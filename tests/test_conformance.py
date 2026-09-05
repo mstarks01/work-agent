@@ -308,7 +308,8 @@ class TestModelsCanBeBound:
 
         message = str(raised.value)
         assert vendor in message
-        assert vendor_for(vendor).required_env_vars[0] in message
+        entry = vendor_for(vendor)
+        assert entry.required_env_vars(entry.sole_credential_mode)[0] in message
         assert not any(value in message for value in FAKE_ENV.values())
 
 

@@ -130,7 +130,7 @@ from analysis_service import (
 from analysis_service.deployment import Deployment
 from analysis_service.frameworks import package_for
 from analysis_service.model_tiers import ModelTierConfig
-from analysis_service.vendors import vendor_for
+from analysis_service.vendors import CREDENTIAL_MODE_NOTES, vendor_for
 from webapp.page import (
     LOOPBACK_HOSTS,
     Grants,
@@ -644,13 +644,19 @@ def diagnostic_page(state: Startup) -> RenderedPage:
 def _vendor_sections(
     tiers: ModelTierConfig | None, env: Mapping[str, str] | None = None
 ) -> str:
-    """Each selected vendor's required variables, marked set or unset.
+    """Each selected vendor's declared mode and required variables, set or unset.
 
     ``required_env_vars`` comes from the same registry entry that performs the
     check, so this cannot drift from what actually failed — and it lists the
     vendor's *whole* set, because ``Vendor._require`` raises on the first
     missing one and a reader would otherwise discover them one restart at a
     time.
+
+    The mode is **reported, never resolved**. Under a mode that passes no
+    credential material, the only way to find out whether an identity exists is
+    to ask for one — which is a network call on page render, and it reaches the
+    instance metadata service. So this page says what the deployment declared
+    and what the platform has to supply, and leaves the answer to a run.
     """
     env = os.environ if env is None else env
     if tiers is None:
@@ -665,11 +671,17 @@ def _vendor_sections(
         )
     sections = []
     for vendor in dict.fromkeys(sel.vendor for sel in tiers.tiers.values()):
+        mode = tiers.credential_mode(vendor)
         items = "\n".join(
             _env_var_item(var, bool(env.get(var, "").strip()))
-            for var in vendor_for(vendor).required_env_vars
+            for var in vendor_for(vendor).required_env_vars(mode)
         )
-        sections.append(f"<h3>{escape(vendor)}</h3>\n<ul>{items}</ul>")
+        sections.append(
+            f"<h3>{escape(vendor)}</h3>\n"
+            f"<p>Credential mode: <code>{escape(mode.value)}</code>. "
+            f"{escape(CREDENTIAL_MODE_NOTES[mode])}</p>\n"
+            f"<ul>{items}</ul>"
+        )
     return "\n".join(sections)
 
 

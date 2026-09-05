@@ -30,7 +30,7 @@ are the reference pairs declared in `analysis_service.conformance.REFERENCE_MODE
 | --- | --- | --- | --- |
 | Anthropic | `claude-sonnet-4-6` | `claude-opus-5` | `ANALYSIS_ANTHROPIC_API_KEY` |
 | OpenAI | `gpt-4o` | `gpt-5.6` | `ANALYSIS_OPENAI_API_KEY` |
-| Vertex AI | `gemini-2.5-flash` | `gemini-2.5-pro` | `ANALYSIS_VERTEX_PROJECT`, `ANALYSIS_VERTEX_LOCATION`, `GOOGLE_APPLICATION_CREDENTIALS` |
+| Vertex AI | `gemini-2.5-flash` | `gemini-2.5-pro` | `ANALYSIS_VERTEX_PROJECT`, `ANALYSIS_VERTEX_LOCATION` |
 
 “Reference pair” means the repository's offline capability check knows these
 model names. It does not mean CI has successfully called them or that they are
@@ -70,11 +70,13 @@ gcloud services enable aiplatform.googleapis.com --project your-gcp-project
 
 export ANALYSIS_VERTEX_PROJECT=your-gcp-project
 export ANALYSIS_VERTEX_LOCATION=us-central1
-export GOOGLE_APPLICATION_CREDENTIALS="$HOME/.config/gcloud/application_default_credentials.json"
 ```
 
-The Vertex identity needs `roles/aiplatform.user`. Work Agent requires the ADC
-file path explicitly; it does not search the usual gcloud location.
+The Vertex identity needs `roles/aiplatform.user`. Work Agent passes no
+credential to Vertex: it passes the project and the location, and Google's own
+Application Default Credentials chain resolves the identity. The `gcloud`
+command above writes the file that chain finds on a workstation. On GKE or Cloud
+Run, bind a service account instead and set no file at all.
 
 The tiers may use different vendors. In that case, set credentials for each
 vendor a tier the node map binds selects — the shipped map binds `base` and

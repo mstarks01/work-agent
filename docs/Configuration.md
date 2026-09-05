@@ -77,21 +77,53 @@ reaches Vertex the same way everything else does. The pair above is deliberately
 mixed, because that is an ordinary configuration rather than an advanced one.
 
 **"Gemini support" means Vertex-hosted Gemini.** `vendor = "vertex"` is the only
-route to a Gemini model here, and it carries Vertex's ADC credential mode; the
+route to a Gemini model here, and it carries Vertex's `iam` credential mode; the
 Gemini Developer API is not a binding this service offers. If it is added later
-it arrives as its own vendor rather than as a second credential mode on
-`vertex` — a vendor owns exactly one credential mode, and `vertex_ai/` already
-means "through Vertex" to the router prefix LiteLLM dispatches on.
+it arrives as its own vendor rather than as a second mode on `vertex`, because
+`vertex_ai/` already means "through Vertex" to the router prefix LiteLLM
+dispatches on.
 
-**Auth is derived from the vendor, never configured alongside it.** Each vendor
-owns its credential mode, so an unrepresentable pairing like `vertex` + an API
-key cannot be written down at all:
+**The mechanism is declared, and the material may be discovered.** A deployment
+states which credential mode it uses for a vendor. Only then may that vendor's
+SDK resolve an identity from its own chain. A stray `ANTHROPIC_API_KEY` in the
+process environment still authenticates nothing.
+
+The rule holds because `Vendor._require` raises before the adapter is built.
+LiteLLM cannot be told to refuse its own credential chain, and no parameter
+turns it off, so the refusal has to happen in the registry or not at all.
+
+The registry holds which modes each vendor allows, so an unrepresentable pairing
+like `vertex` + an API key cannot be written down:
 
 | Vendor | Credential mode | Required environment |
 | --- | --- | --- |
-| `vertex` | ADC | `ANALYSIS_VERTEX_PROJECT`, `ANALYSIS_VERTEX_LOCATION`, `GOOGLE_APPLICATION_CREDENTIALS` |
-| `anthropic` | API key | `ANALYSIS_ANTHROPIC_API_KEY` |
-| `openai` | API key | `ANALYSIS_OPENAI_API_KEY` |
+| `vertex` | `iam` | `ANALYSIS_VERTEX_PROJECT`, `ANALYSIS_VERTEX_LOCATION` |
+| `anthropic` | `api_key` | `ANALYSIS_ANTHROPIC_API_KEY` |
+| `openai` | `api_key` | `ANALYSIS_OPENAI_API_KEY` |
+
+`api_key` means the deployment passes the key, read only from the variable
+above. `iam` means **the platform supplies the identity**: the deployment passes
+no credential material, and the vendor's SDK resolves one from the environment
+this process runs in — a GKE Workload Identity binding, an attached service
+account, or a credentials file that ADC's own chain finds. Neither variable in
+the `vertex` row is a credential; both address the deployment.
+
+You may still set `GOOGLE_APPLICATION_CREDENTIALS`, and ADC will use it. It is
+not required, it is not named anywhere in the service, and the service never
+reads it.
+
+Every vendor above allows exactly one mode, so no deployment declares one. Where
+a vendor allows more than one, `model_tiers.toml` carries a `[credentials]`
+table keyed by vendor and the loader requires an entry:
+
+```toml
+[credentials]
+# vendor = "mode"    # only for a vendor that allows more than one
+```
+
+A key for a single-mode vendor is an error, because it is not a choice. A
+missing key for a multi-mode vendor is an error too. Both rules read the same
+registry table the check reads, so neither can drift from it.
 
 Keys are read **only** from these vendor-scoped variables. LiteLLM's ambient
 `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` pickup is deliberately unused, so a

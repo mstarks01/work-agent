@@ -27,9 +27,10 @@ Every occurrence of `vertex`, `gemini`, `google`, `ping`, `flash`, `pro` and
 
 `src/analysis_service/vendors.py` is the only module that names vendors, and it
 holds three facts per vendor that nothing else can supply: the LiteLLM router
-prefix, the credential mode the vendor *implies*, and the pinned-form rule.
-`GOOGLE_APPLICATION_CREDENTIALS` is Vertex's declared ADC variable. All of this
-is implementation, not bias.
+prefix, the credential modes the vendor allows, and the pinned-form rule.
+`ANALYSIS_VERTEX_PROJECT` and `ANALYSIS_VERTEX_LOCATION` address a Vertex
+deployment; they are not credentials, and the registry names no credential for
+Vertex at all. All of this is implementation, not bias.
 
 ### Historical bias — fixed here
 

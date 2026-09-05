@@ -6,10 +6,10 @@ provider is not how to call it. It is three facts the adapter cannot supply:
 * the router prefix LiteLLM dispatches on — ``vertex_ai/``, ``anthropic/`` or
   ``openai/`` — which is also the vendor half of an **Execution Identity**
   fingerprint;
-* the credential mode, which the vendor implies rather than the config choosing.
-  Vertex admits no raw-API-key path under any adapter
-  (``BerriAI/litellm#21036``), so ``vertex + api_key`` must be unrepresentable
-  rather than validated against;
+* the credential modes a vendor allows, which :data:`CREDENTIAL_MODES` holds and
+  a deployment declares from. Vertex admits no raw-API-key path under any
+  adapter (``BerriAI/litellm#21036``), so ``vertex + api_key`` is
+  unrepresentable rather than validated against;
 * the floating-form rule for model identifiers, which differs by model family
   rather than by vendor. Claude carries a canonical identifier of its own shape,
   and both vendors that serve it spell that shape the same way.
@@ -22,6 +22,12 @@ config classes, so the check is a call to ``litellm`` at build time; see
 Reasoning effort is likewise not per-vendor data. One uniform
 ``reasoning_effort`` surface reaches every vendor, so the kwarg is a module
 constant rather than a registry field whose value is the same everywhere.
+
+**The mechanism is declared, and the material may be discovered.** A deployment
+states its credential mode in config; only then may a vendor's SDK resolve an
+identity from its own chain. That is the rule the whole credential half of this
+module implements, and :class:`CredentialMode` records why it has to be
+enforced here rather than in the adapter.
 """
 
 from __future__ import annotations
@@ -47,16 +53,10 @@ REASONING_KWARG = "reasoning_effort"
 
 _API_KEY_TEMPLATE = "ANALYSIS_{vendor}_API_KEY"
 
-# Vertex needs a project and a location alongside ADC; they are ordinary config,
+# Vertex needs a project and a location to address; they are ordinary config,
 # not credentials, but the build cannot construct a working client without them.
 VERTEX_PROJECT_VAR = "ANALYSIS_VERTEX_PROJECT"
 VERTEX_LOCATION_VAR = "ANALYSIS_VERTEX_LOCATION"
-
-# Application Default Credentials, named explicitly rather than discovered: the
-# check is for *declared* credential material, and a filesystem probe of gcloud's
-# well-known path would make the build's outcome depend on a developer's laptop
-# state (OWASP A02).
-ADC_VAR = "GOOGLE_APPLICATION_CREDENTIALS"
 
 
 class ProviderAuthError(ConfigError):
@@ -73,10 +73,109 @@ class ProviderAuthError(ConfigError):
 
 
 class CredentialMode(StrEnum):
-    """How a vendor is authenticated. The vendor implies it; config never picks."""
+    """How a vendor is authenticated.
+
+    **The mechanism is declared, and the material may be discovered.** A
+    deployment states its credential mode in config. Only then may a vendor's
+    SDK resolve an identity from its own chain. A stray ``ANTHROPIC_API_KEY``
+    in the process environment still authenticates nothing, because
+    :meth:`Vendor._require` raises before the adapter is built — LiteLLM cannot
+    be told to refuse its own chain, and no parameter turns it off, so the
+    refusal has to happen here or not at all.
+
+    ``IAM`` means the platform supplies the identity: the deployment passes no
+    credential material, and the vendor's SDK resolves one from the environment
+    it runs in. A Google product name does not belong in a vendor-neutral
+    registry, so this is spelled by what it does rather than by whose it is.
+    """
 
     API_KEY = "api_key"
-    ADC = "adc"
+    IAM = "iam"
+
+
+#: Which modes each vendor allows, keyed by vendor. A missing key raises, which
+#: is the point: a table nobody can be silent in, rather than a default that
+#: answers for a vendor its author never considered.
+#:
+#: Every vendor here allows exactly one mode, so no deployment has a choice to
+#: declare yet. The loader's rules are what carry that: a ``[credentials]`` key
+#: for a single-mode vendor is an error, and a missing key for a multi-mode
+#: vendor is an error. Both read this table.
+CREDENTIAL_MODES: dict[VendorName, tuple[CredentialMode, ...]] = {
+    "vertex": (CredentialMode.IAM,),
+    "anthropic": (CredentialMode.API_KEY,),
+    "openai": (CredentialMode.API_KEY,),
+}
+
+
+@dataclass(frozen=True)
+class _CredentialVar:
+    """One environment variable a ``(vendor, mode)`` pair reads.
+
+    ``secret`` is the field that separates this table's two readers.
+    :attr:`Vendor.required_env_vars` reports every entry, because an operator
+    has to set every one. :meth:`Vendor.secret_env_vars` reports only the
+    secret ones, because that is what must never survive into a job summary.
+    A region is required and is not a secret, and one list answering both
+    questions gave the wrong answer to the second.
+    """
+
+    kwarg: str
+    var: str
+    secret: bool
+
+
+def _api_key_var(vendor: VendorName) -> str:
+    """The env var holding one vendor's API key."""
+    return _API_KEY_TEMPLATE.format(vendor=vendor.upper())
+
+
+#: The ``(LiteLlm kwarg, env var, secret)`` entries each ``(vendor, mode)`` pair
+#: authenticates and addresses with. A table rather than a branch on the mode:
+#: a branch answers for the vendors its author had in front of them, and a
+#: missing key here raises instead of falling through to somebody else's shape.
+#: ``tests/test_vendors.py`` checks this table's keys against
+#: :data:`CREDENTIAL_MODES`, because a table nobody compares to its registry
+#: fails as quietly as the branch it replaced.
+#:
+#: Vertex under ``IAM`` passes a project and a location and **no credential**.
+#: ``vertex_credentials`` is omitted so that ``google.auth.default()`` runs and
+#: resolves whatever identity the platform supplies — a Workload Identity
+#: binding, a metadata server, or an operator's own
+#: ``GOOGLE_APPLICATION_CREDENTIALS``, through ADC's chain rather than through
+#: anything this registry names.
+_CREDENTIAL_VARS: dict[
+    tuple[VendorName, CredentialMode], tuple[_CredentialVar, ...]
+] = {
+    ("vertex", CredentialMode.IAM): (
+        _CredentialVar("vertex_project", VERTEX_PROJECT_VAR, secret=False),
+        _CredentialVar("vertex_location", VERTEX_LOCATION_VAR, secret=False),
+    ),
+    ("anthropic", CredentialMode.API_KEY): (
+        _CredentialVar("api_key", _api_key_var("anthropic"), secret=True),
+    ),
+    ("openai", CredentialMode.API_KEY): (
+        _CredentialVar("api_key", _api_key_var("openai"), secret=True),
+    ),
+}
+
+#: What an operator must arrange outside this service, per mode. The diagnostic
+#: page reports this beside the declared mode; it never resolves a credential to
+#: find out, because that is a network call on page render and it reaches the
+#: instance metadata service.
+CREDENTIAL_MODE_NOTES: dict[CredentialMode, str] = {
+    CredentialMode.API_KEY: (
+        "This vendor authenticates with an API key, read from the variable"
+        " below and from nowhere else."
+    ),
+    CredentialMode.IAM: (
+        "This vendor passes no credential material. The platform supplies the"
+        " identity, and the vendor's SDK resolves it from the environment this"
+        " process runs in — a workload identity binding, an attached service"
+        " account, or a credentials file the platform's own chain finds. The"
+        " variables below address the deployment; none of them is a credential."
+    ),
+}
 
 
 @dataclass(frozen=True)
@@ -240,7 +339,6 @@ class Vendor:
 
     name: VendorName
     prefix: str
-    credential: CredentialMode
 
     @property
     def litellm_provider(self) -> str:
@@ -254,7 +352,29 @@ class Vendor:
     @property
     def api_key_var(self) -> str:
         """The env var holding this vendor's API key, where it uses one."""
-        return _API_KEY_TEMPLATE.format(vendor=self.name.upper())
+        return _api_key_var(self.name)
+
+    @property
+    def credential_modes(self) -> tuple[CredentialMode, ...]:
+        """Every mode this vendor allows, from :data:`CREDENTIAL_MODES`."""
+        return CREDENTIAL_MODES[self.name]
+
+    @property
+    def sole_credential_mode(self) -> CredentialMode:
+        """This vendor's mode where it allows exactly one, or raise.
+
+        A vendor with a choice has to be asked which one a deployment declared,
+        and the config is what holds that answer. Raising here rather than
+        picking the first entry is what stops a caller that never learned about
+        the choice from silently making it.
+        """
+        modes = self.credential_modes
+        if len(modes) != 1:
+            raise ValueError(
+                f"vendor {self.name!r} allows {len(modes)} credential modes,"
+                " so the deployment declares which one; ask the tier config"
+            )
+        return modes[0]
 
     def route(self, model: str) -> str:
         """The router string LiteLLM dispatches on, e.g. ``vertex_ai/gemini-2.5-pro``.
@@ -306,7 +426,9 @@ class Vendor:
         rules = _FORM_RULES[self.name]
         return next(rule for rule in rules if model.startswith(rule.family))
 
-    def credential_kwargs(self, env: Mapping[str, str]) -> dict[str, str]:
+    def credential_kwargs(
+        self, env: Mapping[str, str], mode: CredentialMode
+    ) -> dict[str, str]:
         """The auth kwargs for this vendor's ``LiteLlm``, or fail closed.
 
         Read **explicitly** from vendor-scoped variables rather than relying on
@@ -315,70 +437,76 @@ class Vendor:
         an undeclared key in the process environment is exactly the ASI03
         inherited-credential path.
 
+        Under a mode that passes no credential material this returns the
+        vendor's addressing kwargs and nothing else, which is what lets the
+        vendor's SDK resolve the platform's identity. See
+        :class:`CredentialMode` for why the mechanism is still declared.
+
         Long-lived API keys are accepted with controls, not avoided: none of
         these vendors issues a short-lived token, so the residual risk is real
         and is mitigated by keeping keys env-only, out of logs, out of the
         report, and out of the fingerprint, plus rotation.
         """
         return {
-            kwarg: self._require(env, var) for kwarg, var in self._credential_vars()
+            entry.kwarg: self._require(env, entry.var, mode)
+            for entry in self._credential_vars(mode)
         }
 
-    def _credential_vars(self) -> tuple[tuple[str, str], ...]:
-        """The ``(LiteLlm kwarg, env var)`` pairs this vendor authenticates with.
+    def _credential_vars(self, mode: CredentialMode) -> tuple[_CredentialVar, ...]:
+        """This ``(vendor, mode)`` pair's entries, or raise on an unallowed mode.
 
-        One table, two readers: :meth:`credential_kwargs` builds the adapter's
-        auth from it and :attr:`required_env_vars` reports it. Deriving both
-        from the same place is the point — a vendor -> env-var table copied
-        into a caller drifts from the check that actually runs, and the caller
-        that needs it is a *diagnostic* page whose whole value is being right
-        about which variables are missing.
+        One table, three readers: :meth:`credential_kwargs` builds the adapter's
+        auth from it, :meth:`required_env_vars` reports it and
+        :meth:`secret_env_vars` says which values must never be echoed.
+        Deriving all three from the same place is the point — a vendor -> env-var
+        table copied into a caller drifts from the check that actually runs, and
+        one of those callers is a *diagnostic* page whose whole value is being
+        right about which variables are missing.
         """
-        if self.credential is CredentialMode.API_KEY:
-            return (("api_key", self.api_key_var),)
-        return (
-            ("vertex_project", VERTEX_PROJECT_VAR),
-            ("vertex_location", VERTEX_LOCATION_VAR),
-            ("vertex_credentials", ADC_VAR),
-        )
+        try:
+            return _CREDENTIAL_VARS[self.name, mode]
+        except KeyError as exc:
+            allowed = ", ".join(sorted(m.value for m in self.credential_modes))
+            raise ValueError(
+                f"vendor {self.name!r} has no {mode.value!r} credential mode"
+                f" (it allows: {allowed})"
+            ) from exc
 
-    @property
-    def required_env_vars(self) -> tuple[str, ...]:
+    def required_env_vars(self, mode: CredentialMode) -> tuple[str, ...]:
         """Every environment variable this vendor needs, in check order.
 
-        :meth:`_require` raises on the *first* missing variable, so a Vertex
-        user with none of the three set would otherwise discover them one per
-        restart. Callers reporting a credential failure list this whole set and
-        mark the unset ones — presence only, never values (OWASP A09).
+        :meth:`_require` raises on the *first* missing variable, so an operator
+        with none of them set would otherwise discover them one per restart.
+        Callers reporting a credential failure list this whole set and mark the
+        unset ones — presence only, never values (OWASP A09).
         """
-        return tuple(var for _, var in self._credential_vars())
+        return tuple(entry.var for entry in self._credential_vars(mode))
 
-    def _require(self, env: Mapping[str, str], var: str) -> str:
+    def secret_env_vars(self, mode: CredentialMode) -> tuple[str, ...]:
+        """Only the variables holding credential material.
+
+        A narrower question than :meth:`required_env_vars` answers, and the
+        difference matters: a caller redacting provider error text must remove
+        a key and must **not** remove a region. One list answering both
+        questions removed the region, which is the one fact that diagnoses a
+        wrong-region request.
+        """
+        return tuple(entry.var for entry in self._credential_vars(mode) if entry.secret)
+
+    def _require(self, env: Mapping[str, str], var: str, mode: CredentialMode) -> str:
         value = env.get(var, "")
         if not value.strip():
             raise ProviderAuthError(
                 f"vendor {self.name!r} needs {var};"
-                f" it is unset or empty (credential mode: {self.credential})"
+                f" it is unset or empty (credential mode: {mode.value})"
             )
         return value.strip()
 
 
 VENDORS: dict[VendorName, Vendor] = {
-    "vertex": Vendor(
-        name="vertex",
-        prefix="vertex_ai/",
-        credential=CredentialMode.ADC,
-    ),
-    "anthropic": Vendor(
-        name="anthropic",
-        prefix="anthropic/",
-        credential=CredentialMode.API_KEY,
-    ),
-    "openai": Vendor(
-        name="openai",
-        prefix="openai/",
-        credential=CredentialMode.API_KEY,
-    ),
+    "vertex": Vendor(name="vertex", prefix="vertex_ai/"),
+    "anthropic": Vendor(name="anthropic", prefix="anthropic/"),
+    "openai": Vendor(name="openai", prefix="openai/"),
 }
 
 
