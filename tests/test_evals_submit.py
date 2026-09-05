@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-from evals.harness import submit
+from evals.harness import baseline, submit
 from evals.harness.fingerprint import Components
 from evals.harness.ledger import cast
 from evals.harness.run import main
@@ -1154,3 +1154,35 @@ class TestTheChecklistSurvivesAShapeNobodyListed:
         live.write_bytes(b'version = 1\n[voters.ada]\nstanding = "\xff\xfe"\n')
 
         assert submit._roster_delta(ROSTER_WITH_ADA, live) == []
+
+
+class TestADeclaredFrameworkNameIsBounded:
+    """Length is part of a name's shape, and one number says how long.
+
+    `baseline` already bounded this field and `submit` did not, on the same
+    rule with the same regex — 300 lowercase letters are a slug, so a slug
+    shape alone is not a bound. Both readers now call one constant.
+    """
+
+    def test_a_name_past_the_bound_declares_nothing(self, tmp_path):
+        case = "01-payments-checkout"
+        path = tmp_path / submit.KINDS["sitting"].prefix / case
+        path.mkdir(parents=True)
+        long_name = "a" * (baseline.FRAMEWORK_NAME_MAX + 1)
+        (path / "case.json").write_text(
+            json.dumps({"frameworks": [{"name": "stride"}, {"name": long_name}]}),
+            encoding="utf-8",
+        )
+
+        assert submit._declared_frameworks(tmp_path, case) == ["stride"]
+
+    def test_a_name_at_the_bound_still_declares(self, tmp_path):
+        case = "01-payments-checkout"
+        path = tmp_path / submit.KINDS["sitting"].prefix / case
+        path.mkdir(parents=True)
+        at_bound = "a" * baseline.FRAMEWORK_NAME_MAX
+        (path / "case.json").write_text(
+            json.dumps({"frameworks": [{"name": at_bound}]}), encoding="utf-8"
+        )
+
+        assert submit._declared_frameworks(tmp_path, case) == [at_bound]

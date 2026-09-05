@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 from analysis_service.api import (
     _BODY_SLACK,
     MAX_RENDERED_ERRORS,
+    BodyLimitMiddleware,
     create_app,
 )
 from analysis_service.auth import AuthenticationError
@@ -26,6 +27,7 @@ from analysis_service.jobs import (
     PipelineRejected,
     StubPipelineRunner,
 )
+from analysis_service.parsing import ascii_int
 from analysis_service.report import FrameworkName, Report
 from analysis_service.sources import Source, SourceLimits
 from analysis_service.validation import ValidationIssue
@@ -35,6 +37,7 @@ from tests.factories import (
     admit,
     sample_selection,
 )
+from tests.test_parsing import ISDIGIT_TRAPS
 
 TOKENS = {"alice-token": "alice", "bob-token": "bob"}
 
@@ -975,3 +978,44 @@ class TestConsumptionBudgets:
         assert first.status_code == 201
         second = client.post("/v1/jobs", json=submission(), headers=auth())
         assert second.status_code == 201
+
+
+class TestAHeaderThatDoesNotSpellANumber:
+    """``str.isdigit`` was the guard on both, and it is wrong on both.
+
+    A client sets these. A shape ``isdigit`` passes and ``int`` refuses reached
+    ``int`` and raised, which is a 500 on a header the caller controls.
+    """
+
+    @pytest.mark.parametrize("declared", ISDIGIT_TRAPS)
+    def test_a_content_length_that_is_not_a_number_is_no_claim_at_all(self, declared):
+        """Read off the raw header bytes, which is where such a value arrives.
+
+        An HTTP client will not send a non-ASCII header, but the middleware
+        decodes with ``latin-1`` and a byte is a byte on the wire. The declared
+        length is only the cheap half anyway — the running byte count is what
+        makes the bound true — so a header that names no number must read as no
+        claim rather than as a crash.
+        """
+        middleware = BodyLimitMiddleware(lambda *_: None, max_bytes=1000)
+        scope = {
+            "type": "http",
+            "headers": [(b"content-length", declared.encode("latin-1", "replace"))],
+        }
+
+        assert middleware._declared_over_cap(scope) is False
+
+    def test_a_content_length_over_the_cap_is_still_refused_before_a_byte(self):
+        # The repair must not close the fast path it guards.
+        middleware = BodyLimitMiddleware(lambda *_: None, max_bytes=1000)
+        scope = {"type": "http", "headers": [(b"content-length", b"1001")]}
+
+        assert middleware._declared_over_cap(scope) is True
+
+    @pytest.mark.parametrize("last_event_id", ISDIGIT_TRAPS)
+    def test_a_last_event_id_that_is_not_a_number_resumes_from_the_start(
+        self, last_event_id
+    ):
+        # Which is what a missing header does too: the value names no event,
+        # so there is nothing to resume after.
+        assert ascii_int(last_event_id, max_digits=18) is None

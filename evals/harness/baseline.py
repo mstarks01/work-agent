@@ -272,7 +272,11 @@ _FRAMEWORK_NAME = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 #: How long one may be. A slug shape alone is not a bound: 300 lowercase
 #: letters are a slug, and the whole point here is that this field had no
 #: length while every model name beside it had one.
-_FRAMEWORK_NAME_MAX = 40
+#:
+#: Public, because ``submit`` reads the same rule before a declared name
+#: reaches a path and had no bound at all. One number, two readers that call
+#: it, rather than two numbers that drift.
+FRAMEWORK_NAME_MAX = 40
 
 
 def _framework_name(value: object) -> str:
@@ -284,7 +288,7 @@ def _framework_name(value: object) -> str:
     that is not one is not a name.
     """
     name = str(value)
-    if len(name) > _FRAMEWORK_NAME_MAX or not _FRAMEWORK_NAME.fullmatch(name):
+    if len(name) > FRAMEWORK_NAME_MAX or not _FRAMEWORK_NAME.fullmatch(name):
         raise BaselineError(
             f"{name!r} is not a framework name; a Baseline's identity carries"
             " the packages the sweep ran, and a package name is a slug"
