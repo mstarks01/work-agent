@@ -825,6 +825,9 @@ class NodeRun:
     duration_ms: int
     usage: TokenUsage | None  # what the provider says the call cost; None if unmetered
     attempts: int  # provider calls this execution took; 1 unless the driver retried
+    served_trust: (
+        Literal["provider_reported", "requested_echo"] | None
+    )  # what `model` is worth as evidence; None for code-only nodes
 
 
 class TokenUsage:
@@ -870,10 +873,10 @@ class TokenUsage:
   configuration and the translator has no say in it.
 
 - **`execution`** is one block per report: `identity_version` (the schema the
-  fingerprints hash), `served_model_trust` (always `"provider_reported"` — the
-  provider named the build on its own event stream and nothing independent
-  confirmed it), and `build` (the version of each distribution between a node
-  and its provider). It also carries `review_independence` — how far this
+  fingerprints hash) and `build` (the version of each distribution between a
+  node and its provider). What a served build is *worth* is not here: it varies
+  by vendor, and a deployment may select a different vendor per tier, so it
+  rides on each node as `nodes[].served_trust`. It also carries `review_independence` — how far this
   deployment required each framework's critic to sit from the analysis it
   checks, so a reader of a `shared` run sees the review was same-domain rather
   than inferring it from two node rows naming one model. That field is a
@@ -888,6 +891,14 @@ class TokenUsage:
   the parts are not cross-checked, because vendors disagree on whether
   `reasoning_tokens` sits inside `completion_tokens` or beside it. Sum them
   yourself only if you know who answered.
+- **`served_trust`** says what this node's `model` is worth as evidence.
+  `provider_reported` means the translator read the build's name out of the
+  response body, so the provider named what answered. `requested_echo` means the
+  translator filled it from the request, so the served half repeats the
+  requested half and adds nothing. It is per node rather than per report,
+  because a deployment may select a different vendor per tier and one report can
+  then hold rows with different answers. It is derived from `requested_model`,
+  so a value you edit in a stored file is recomputed on read.
 - **`attempts`** is how many provider calls the node took, as the retry driver
   counted them. `usage` meters only the call that answered; a failed attempt
   reports nothing. The budget settlement charges each earlier attempt the

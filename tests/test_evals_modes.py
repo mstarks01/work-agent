@@ -47,7 +47,7 @@ from analysis_service.report import (
     SharedElementName,
 )
 from analysis_service.sampling import load_sampling
-from tests.factories import DEFAULT_FRAMEWORKS, ScriptedLlm
+from tests.factories import DEFAULT_FRAMEWORKS, EVAL_MODEL, ScriptedLlm
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CASE_DIR = REPO_ROOT / "evals" / "corpus" / "01-payments-checkout"
@@ -200,7 +200,7 @@ def build(case, entry, models: dict[str, ScriptedLlm]) -> object:
             node for node, tier in TIER_NODE_BY_GRAPH_NODE.items() if tier == tier_node
         )
         models[graph_node] = LaneAwareLlm(
-            model="fake-pro-001",
+            model=EVAL_MODEL,
             reply=_reply_for(case, graph_node),
             seen=[],
             replies=_lane_replies(case, graph_node),

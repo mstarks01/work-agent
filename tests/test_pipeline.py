@@ -47,7 +47,7 @@ from tests.factories import (
     sample_proposal,
     sample_ruling,
     sample_selection,
-    served_build,
+    served_route,
     valid_model,
 )
 from tests.factories import scripted_pipeline as build
@@ -353,7 +353,7 @@ def test_the_report_carries_the_graph_runs_node_stamps():
 
     assert [node_run.node for node_run in outcome.report.nodes] == visited
     by_node = {run_.node: run_ for run_ in outcome.report.nodes}
-    assert by_node[graph.EXTRACT_NODE].model == served_build(BASE_MODEL)
+    assert by_node[graph.EXTRACT_NODE].model == served_route(BASE_MODEL)
     assert by_node[CRITIC].execution_fingerprint is not None
     assert by_node[graph.ASSEMBLE_NODE].execution_fingerprint is None
 
@@ -432,16 +432,18 @@ def test_each_llm_node_fingerprint_recomputes_from_the_artifact():
 
 
 def test_the_report_records_what_ran_it():
-    """The execution envelope: identity version, trust level, build map."""
+    """The execution envelope: identity version and build map.
+
+    What a served build is *worth* is not here. It varies by vendor, and a
+    deployment may select a different vendor per tier, so it rides on each
+    ``NodeRun`` instead.
+    """
     pipeline, _ = build(happy_replies())
     outcome, _ = run(pipeline, job())
 
     envelope = outcome.report.execution
     assert envelope is not None
     assert envelope.identity_version == IDENTITY_VERSION
-    # Stated, not assumed: the served build on every node is the provider's own
-    # claim and nothing here confirms it.
-    assert envelope.served_model_trust == "provider_reported"
     assert envelope.build == dict(build_identity())
     # The policy this deployment required, stated rather than inferred. The
     # shipped node map leaves criticism on `strong`, so a reader has to be able

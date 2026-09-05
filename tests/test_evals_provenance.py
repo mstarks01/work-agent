@@ -37,11 +37,12 @@ from evals.harness.reference import load_case
 from evals.harness.run import main
 from tests.factories import (
     DEFAULT_FRAMEWORKS,
+    EVAL_MODEL,
     SAMPLE_INSTRUCTIONS,
     TEST_TIER_ENV,
     repo_tiers,
     sample_fingerprint,
-    served_build,
+    served_route,
 )
 from tests.test_evals_run_grounds import CASE_DIR
 from tests.test_evals_run_grounds import sweep as drive_sweep
@@ -220,8 +221,8 @@ class TestArtifactSerialization:
         run = drive_sweep(monkeypatch, load_case(CASE_DIR), None)
 
         identity = run.provenance.tier_identities()["strong"]
-        assert identity.requested_models == ("fake-pro-001",)
-        assert identity.served_models == (served_build("fake-pro-001"),)
+        assert identity.requested_models == (EVAL_MODEL,)
+        assert identity.served_models == (served_route(EVAL_MODEL),)
         # The verdict and the artifact are two views of this one record.
         assert set(run.observations) == set(run.provenance.node_runs)
 

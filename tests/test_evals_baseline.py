@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.identity import build_identity
+from analysis_service.identity import IDENTITY_VERSION, build_identity
 from analysis_service.report import TokenUsage
 from analysis_service.sampling import TierSampling
 from evals.harness import baseline, prices
@@ -77,6 +77,7 @@ def payload(
     }
     provenance = RunProvenance.model_validate(
         {
+            "identity_version": IDENTITY_VERSION,
             "build": dict(build_identity()),
             "sampling_config_version": 1,
             "tiers_config_version": 1,
@@ -175,7 +176,11 @@ class TestPricing:
         assert not cost.unpriced
 
     def test_a_model_nobody_prices_is_named_never_zeroed(self, tmp_path, priced):
-        document = payload(strong_model="mystery/model", served_strong="mystery-001")
+        # A known vendor, so the fixture can compute a fingerprint; a model
+        # identifier no price map carries, which is what the test is about.
+        document = payload(
+            strong_model="vertex_ai/mystery-model", served_strong="mystery-001"
+        )
         cost = price_sweep(load_artifact(write_sweep(tmp_path, document)))
         assert cost.unpriced == ("mystery-001",)
 

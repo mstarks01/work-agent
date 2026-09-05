@@ -43,6 +43,20 @@ from analysis_service.errors import ConfigError
 VendorName = Literal["vertex", "anthropic", "openai"]
 VENDOR_NAMES: tuple[VendorName, ...] = ("vertex", "anthropic", "openai")
 
+#: How much a vendor's *served* build identifier is worth as evidence.
+#:
+#: ``provider_reported`` means the translator read the build's name out of the
+#: response body, so the provider named what answered. ``requested_echo`` means
+#: the translator filled it from the request, so the served half of an
+#: **Execution Identity** repeats the requested half and adds nothing.
+#:
+#: Two values and not three. The reader asks one question — does the served
+#: build add evidence the requested build did not — and an echo answers no
+#: whatever the reason for it. A Gemini response body carries ``modelVersion``
+#: and the pinned translator never reads it; a Bedrock Converse response carries
+#: no model identifier at all. Either way the answer is the same.
+ServedTrust = Literal["provider_reported", "requested_echo"]
+
 # The one reasoning knob, uniform across vendors: LiteLLM maps it to adaptive
 # ``thinking`` plus ``output_config.effort`` on Anthropic (identically via
 # Vertex), to ``thinkingConfig`` on Gemini, and passes it through on OpenAI
@@ -339,6 +353,19 @@ class Vendor:
 
     name: VendorName
     prefix: str
+    #: What this vendor's served build identifier is worth, under the pinned
+    #: translator. A field rather than a module table, so ``VENDORS`` is the
+    #: table and a fourth vendor cannot construct without an answer.
+    #:
+    #: This is a property of the vendor **and** of the translator that reads it,
+    #: which is why ``tests/test_identity.py`` drives each vendor's installed
+    #: transformation with a canned response rather than restating the value. A
+    #: litellm bump that started reading ``modelVersion`` would make the
+    #: ``vertex`` entry wrong, and every fingerprint would move on that bump
+    #: anyway — ``litellm`` sits in ``BUILD_DISTRIBUTIONS`` — so the hashes
+    #: would move for an unrelated reason and the stale entry would stay
+    #: invisible.
+    served_trust: ServedTrust
 
     @property
     def litellm_provider(self) -> str:
@@ -504,10 +531,55 @@ class Vendor:
 
 
 VENDORS: dict[VendorName, Vendor] = {
-    "vertex": Vendor(name="vertex", prefix="vertex_ai/"),
-    "anthropic": Vendor(name="anthropic", prefix="anthropic/"),
-    "openai": Vendor(name="openai", prefix="openai/"),
+    "vertex": Vendor(
+        name="vertex",
+        prefix="vertex_ai/",
+        # litellm fills ``model_response.model`` from the request in its Gemini
+        # transformation. The response body carries ``modelVersion`` and litellm
+        # never reads it.
+        served_trust="requested_echo",
+    ),
+    "anthropic": Vendor(
+        name="anthropic",
+        prefix="anthropic/",
+        # litellm reads ``completion_response["model"]`` in its Anthropic chat
+        # transformation.
+        served_trust="provider_reported",
+    ),
+    "openai": Vendor(
+        name="openai",
+        prefix="openai/",
+        # litellm reads ``response_object["model"]`` when it converts an
+        # OpenAI-shaped response dict.
+        served_trust="provider_reported",
+    ),
 }
+
+
+def vendor_for_route(route: str) -> Vendor:
+    """The vendor a router string belongs to, by its prefix.
+
+    The **one reader of the route-to-vendor rule**, built by inverting
+    :data:`VENDORS` on :attr:`Vendor.prefix` rather than from a hand-written
+    prefix map. A second map would answer this question differently the first
+    time a prefix changed, and its own test would agree with it.
+
+    Raises on a bare name and on a prefix no vendor claims. Both are a caller
+    holding a string that is not a route, and inventing a vendor for one is how
+    a fingerprint comes to name a provider that never ran.
+    """
+    prefix, separator, _ = route.partition("/")
+    if not separator:
+        raise ValueError(
+            f"{route!r} is not a router string: it carries no vendor prefix"
+        )
+    for vendor in VENDORS.values():
+        if vendor.prefix == f"{prefix}{separator}":
+            return vendor
+    known = ", ".join(sorted(vendor.prefix for vendor in VENDORS.values()))
+    raise ValueError(
+        f"no vendor serves the prefix {prefix + separator!r} (known: {known})"
+    )
 
 
 def join_served(requested_route: str, served_model: str) -> str:
@@ -520,13 +592,13 @@ def join_served(requested_route: str, served_model: str) -> str:
     a served-only hash would let a manifest blessed on one silently certify the
     other.
 
-    The prefix is the segment before the first ``/``, which is the shape every
-    registry entry's :attr:`Vendor.prefix` takes. A requested route carrying no
-    prefix — an offline stand-in bound to a bare name — yields the served build
-    unchanged rather than inventing a vendor for it.
+    The prefix comes from :func:`vendor_for_route` rather than from the string,
+    so this and every other reader of the rule agree by construction. A route
+    that names no vendor raises here, which is what the producer's own
+    invariant already guarantees: ``node_models`` is built from the tier config
+    through :attr:`Vendor.prefix`.
     """
-    prefix, separator, _ = requested_route.partition("/")
-    return f"{prefix}{separator}{served_model}" if separator else served_model
+    return f"{vendor_for_route(requested_route).prefix}{served_model}"
 
 
 def vendor_for(name: str) -> Vendor:

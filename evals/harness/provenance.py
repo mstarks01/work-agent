@@ -186,7 +186,14 @@ class RunProvenance(BaseModel):
     #: under. Checked on load rather than assumed: a hash from another schema is
     #: a hash of a different payload, and comparing the two is exactly the
     #: silent mismatch versioning exists to prevent.
-    identity_version: int = IDENTITY_VERSION
+    #:
+    #: **Required, with no default.** A default meant an artifact that omitted
+    #: the field claimed the version it was about to be checked against. Under
+    #: one version that was harmless. Under two it is not: every artifact
+    #: written before version 2 would claim version 2 and fail on the recompute
+    #: with "the recorded fingerprint does not follow from ..." — the wrong
+    #: error, naming the wrong cause.
+    identity_version: int
     #: The installed versions of the distributions between a node and its
     #: provider. A genuine per-sweep fact — one process, one install — so it is
     #: recorded once here and read back on verify rather than re-read from the
@@ -416,6 +423,9 @@ def provenance_of(
             )
         )
     return RunProvenance(
+        # Stated, not inherited from a default: this is the producer, and the
+        # version it stamps is the one that computed the fingerprints beside it.
+        identity_version=IDENTITY_VERSION,
         build=dict(build),
         sampling_config_version=sampling.version,
         tiers_config_version=tiers_config_version,

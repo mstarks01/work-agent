@@ -42,6 +42,7 @@ from pydantic import (
     ModelWrapValidatorHandler,
     SerializeAsAny,
     ValidationError,
+    computed_field,
     field_validator,
     model_validator,
 )
@@ -50,6 +51,7 @@ from pydantic.json_schema import SkipJsonSchema
 from analysis_service.actions import ActionVerb
 from analysis_service.sources import Source
 from analysis_service.system_model import BoundaryCrossing, SystemModel
+from analysis_service.vendors import ServedTrust, vendor_for_route
 
 # The payload schema readers key on. Consumers that ignore unknown fields
 # tolerate a minor bump; a major bump is a breaking change to a field's
@@ -1372,6 +1374,14 @@ class NodeRun(BaseModel):
     reports nothing, so the count is the only trace the prompt bytes it sent
     leave. A settlement charges them from it (see
     :func:`analysis_service.budgets.measured_tokens`).
+
+    ``served_trust`` says what this row's ``model`` is worth as evidence, and it
+    is **here rather than once per report**. A deployment may select a
+    different vendor per tier, so one report can hold rows whose served builds
+    are worth different things, and a single value for the whole run has to be
+    wrong on one of them. It is *derived* from ``requested_model`` rather than
+    stored, so the report and the fingerprint read one rule through one reader
+    and cannot disagree.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -1384,6 +1394,33 @@ class NodeRun(BaseModel):
     duration_ms: int = Field(ge=0)
     usage: TokenUsage | None = None
     attempts: int = Field(default=1, ge=1)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _drop_derived_trust(cls, data: Any) -> Any:
+        """Ignore a ``served_trust`` on input; it is output, not state.
+
+        The field is serialized so a reader of a stored report can see it, which
+        means a round trip hands it straight back. Recomputing from
+        ``requested_model`` rather than trusting the key is what keeps one rule
+        to one reader: an edited value cannot survive, and the value inside the
+        fingerprint is derived the same way from the same route.
+        """
+        if isinstance(data, dict):
+            data = {k: v for k, v in data.items() if k != "served_trust"}
+        return data
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def served_trust(self) -> ServedTrust | None:
+        """What ``model`` is worth as evidence, for the vendor that served it.
+
+        ``None`` on a deterministic FunctionNode, which asked no provider and
+        has no served build to weigh.
+        """
+        if self.requested_model is None:
+            return None
+        return vendor_for_route(self.requested_model).served_trust
 
     @model_validator(mode="after")
     def _fingerprint_needs_its_inputs(self) -> Self:
@@ -1422,12 +1459,13 @@ class ExecutionEnvelope(BaseModel):
     it, and certification refuses a manifest written for a different one rather
     than comparing across them.
 
-    ``served_model_trust`` states plainly what the served build on each node is
-    worth. ``provider_reported`` means the provider named it on its own event
-    stream and nothing independent confirmed it. It is recorded rather than
-    assumed because the difference between "the provider said Opus" and "Opus
-    answered" is exactly the difference a compromised translator lives in, and
-    a report that omits the distinction reads as the stronger claim.
+    What a served build is *worth* is **not** here. It was
+    ``served_model_trust``, a constant reading ``provider_reported`` for the
+    whole report, and it was wrong twice over: a translator that fills the
+    served identifier from the request confirms nothing, and a deployment may
+    select a different vendor per tier, so one report can hold rows with
+    different answers. It moved to :attr:`NodeRun.served_trust`, where the
+    vendor is known and one reader answers for every caller.
 
     ``build`` is the installed version of every distribution whose code sits
     between a node and its provider — this service, the agent runtime and the
@@ -1454,7 +1492,6 @@ class ExecutionEnvelope(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     identity_version: int = Field(ge=1)
-    served_model_trust: Literal["provider_reported"] = "provider_reported"
     build: dict[str, str] = Field(default_factory=dict)
     review_independence: Literal["shared", "distinct_model", "distinct_provider"] = (
         "shared"

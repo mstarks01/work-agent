@@ -35,7 +35,7 @@ from evals.harness import modes
 from evals.harness.coverage import aggregate_coverage, coverage_totals
 from evals.harness.reference import load_case
 from evals.harness.run import _run_mode
-from tests.factories import DEFAULT_FRAMEWORKS, TEST_TIER_ENV, ScriptedLlm
+from tests.factories import DEFAULT_FRAMEWORKS, EVAL_MODEL, TEST_TIER_ENV, ScriptedLlm
 from tests.test_evals_modes import lane_of, reaching_refs, scripted_ruling
 
 TIER_NODE_BY_GRAPH_NODE = tier_node_by_graph_node(DEFAULT_FRAMEWORKS)
@@ -168,7 +168,7 @@ def sweep(monkeypatch, case, spoofing_first: dict[str, Any] | None) -> Any:
             node for node, tier in TIER_NODE_BY_GRAPH_NODE.items() if tier == tier_node
         )
         return QueuedLlm(
-            model="fake-pro-001",
+            model=EVAL_MODEL,
             reply=_reply_for(case, graph_node),
             lane_replies=_lane_replies(case, graph_node),
             queued=_queued_for(case, graph_node, first),

@@ -436,6 +436,7 @@ def test_stability_reads_the_applicability_block_too():
     ASVS matches by requirement ID with no model call, so a sweep of
     ASVS-only cases still carries a comparable half where STRIDE's is absent.
     """
+    from analysis_service.identity import IDENTITY_VERSION
     from evals.harness.artifact import DECLARED_KEYS, EvalArtifact, RepoCommit
     from evals.harness.provenance import RunProvenance
     from evals.harness.stability import read_run
@@ -447,6 +448,7 @@ def test_stability_reads_the_applicability_block_too():
         trusted=True,
         structural_failures=(),
         provenance=RunProvenance(
+            identity_version=IDENTITY_VERSION,
             build={},
             sampling_config_version=1,
             tiers_config_version=1,
