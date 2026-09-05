@@ -21,11 +21,12 @@ silent default (A01, deny by default).
 
 from __future__ import annotations
 
-import re
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, cast
+
+from evals.harness import ledger
 
 EVALS_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_ROSTER_PATH = EVALS_ROOT / "review" / "voters.toml"
@@ -42,9 +43,12 @@ Standing = Literal["maintainer", "contributor"]
 #: standing selects which votes a series reads, never how much a vote counts.
 STANDINGS: frozenset[str] = frozenset({"maintainer", "contributor"})
 
-#: The same login shape the ledger enforces on ``voter``, spelled here too so
-#: the roster refuses a key that could never name a vote file.
-_LOGIN = re.compile(r"(?=.{1,39}\Z)[A-Za-z0-9](?:-?[A-Za-z0-9])*\Z")
+#: The login shape the ledger enforces on ``voter``, **called** rather than
+#: spelled again: the roster refuses a key that could never name a vote file,
+#: and it has to refuse exactly what the ledger refuses. Two copies of one
+#: regex answer the same question until somebody edits one of them, and each
+#: one's own test agrees with it either way.
+_LOGIN = ledger.GITHUB_LOGIN
 
 
 class RosterError(ValueError):
