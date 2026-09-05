@@ -32,6 +32,7 @@ from __future__ import annotations
 
 from dataclasses import FrozenInstanceError
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 from google.adk.models.base_llm import BaseLlm
@@ -56,6 +57,7 @@ from analysis_service.sampling import load_sampling
 from analysis_service.system_model import SystemModel
 from analysis_service.vendors import (
     VENDOR_NAMES,
+    CredentialMode,
     ProviderAuthError,
     join_served,
     vendor_for,
@@ -451,7 +453,26 @@ class TestProvenanceIsProviderIndependent:
 class TestTheLiveLanesSweepWhatWasProfiled:
     """The matrix and the live workflows must name the same models."""
 
-    def test_every_reference_model_appears_in_the_workflow_that_sweeps_it(self):
+    #: Which live sweep lane authenticates a vendor, keyed by **credential
+    #: mode**. A lane is a credential arrangement — one exchanges an OIDC token
+    #: for a platform identity, the other reads API keys from repository
+    #: secrets — so the mode is the property that chooses, and the vendor's name
+    #: never was. Keyed here rather than branched, so a vendor row nobody has
+    #: written already has a lane, and a *mode* nobody has written raises
+    #: instead of falling through to somebody else's file.
+    LANE_FOR_MODE: ClassVar[dict[CredentialMode, str]] = {
+        CredentialMode.IAM: "evals-live.yml",
+        CredentialMode.API_KEY: "evals-live-api-key.yml",
+    }
+
+    def test_every_credential_mode_has_a_lane(self):
+        # The table checked against its registry. A mode with no lane is a
+        # deployment class no live sweep can exercise, and it would otherwise
+        # be invisible until somebody looked for the coverage.
+        assert set(self.LANE_FOR_MODE) == set(CredentialMode)
+
+    @pytest.mark.parametrize("vendor", VENDOR_NAMES)
+    def test_every_reference_model_appears_in_the_workflow_that_sweeps_it(self, vendor):
         """A live lane pinned to a model nobody profiled is unexercised coverage.
 
         A text search rather than a YAML parse, and deliberately so: PyYAML is
@@ -460,18 +481,21 @@ class TestTheLiveLanesSweepWhatWasProfiled:
         it cannot tell which matrix leg a model sits on — and it catches the
         drift that matters, which is a workflow pinning a pair the offline
         suite has never seen.
-        """
-        workflows = PROJECT_ROOT / ".github" / "workflows"
-        vertex = (workflows / "evals-live.yml").read_text(encoding="utf-8")
-        api_key = (workflows / "evals-live-api-key.yml").read_text(encoding="utf-8")
 
-        for model in REFERENCE_MODELS["vertex"]:
-            assert model in vertex, f"{model} is profiled but no live lane sweeps it"
-        for vendor in ("anthropic", "openai"):
-            for model in REFERENCE_MODELS[vendor]:
-                assert model in api_key, (
-                    f"{model} is profiled but no live lane sweeps it"
-                )
+        Driven from the registry rather than from a hand-written list of
+        vendors. The list named `vertex` in one branch and the other two in a
+        second, so a fourth vendor row would have been swept by no lane and
+        asserted about by nothing.
+        """
+        mode = vendor_for(vendor).sole_credential_mode
+        lane = PROJECT_ROOT / ".github" / "workflows" / self.LANE_FOR_MODE[mode]
+        text = lane.read_text(encoding="utf-8")
+
+        for model in REFERENCE_MODELS[vendor]:
+            assert model in text, (
+                f"{model} is profiled on {vendor} ({mode.value}) but"
+                f" {lane.name} does not sweep it"
+            )
 
     def test_the_smoke_lane_covers_every_vendor_on_the_profiled_pair(self):
         """The smoke is the lane that has to be comparable across vendors.
