@@ -29,9 +29,7 @@ def tree_for(tmp_path: Path) -> Path:
     (tree / "evals" / "review" / "voters.toml").write_text(ROSTER, encoding="utf-8")
     (tree / "tests").mkdir()
     (tree / "tests" / "test_case_review.py").write_text(
-        "UNREVIEWED: dict[str, str] = {\n"
-        f'    "{CASE}": "unread for this test",\n'
-        "}\n",
+        f'UNREVIEWED: dict[str, str] = {{\n    "{CASE}": "unread for this test",\n}}\n',
         encoding="utf-8",
     )
     return tree
@@ -193,4 +191,7 @@ def test_submit_stage_gives_an_actionable_no_gh_path():
     assert "Open a contribution issue in GitHub" in page
     assert "gh auth login" in page
     assert "keep the review local" in page.lower()
-    assert "Button unavailable because this session has no authenticated gh account" not in page
+    assert (
+        "Button unavailable because this session has no authenticated gh account"
+        not in page
+    )
