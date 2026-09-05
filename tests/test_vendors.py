@@ -101,12 +101,17 @@ class TestCredentialModes:
         )
         assert kwargs == {"api_key": API_KEY}
 
+    # ``.get`` rather than ``[]``: this list is built at collection time, and a
+    # vendor added to ``VENDOR_NAMES`` before its ``CREDENTIAL_MODES`` entry
+    # would raise here and stop the whole suite from collecting — including
+    # ``test_vendor_neutrality``, whose message is what names the missing entry.
+    # A guard that cannot run when the tree is half-built helps nobody.
     @pytest.mark.parametrize(
         "name",
         [
             name
             for name in VENDOR_NAMES
-            if CredentialMode.API_KEY in CREDENTIAL_MODES[name]
+            if CredentialMode.API_KEY in CREDENTIAL_MODES.get(name, ())
         ],
     )
     def test_an_ambient_key_authenticates_nothing(self, name):
