@@ -298,8 +298,28 @@ _CLAUDE_RULE = _FormRule(
     ),
 )
 
-# Every family whose vendor publishes no canonical form: Gemini on Vertex, and
-# OpenAI's own models. Only the shared denylist applies.
+# The families this service requires no canonical shape from: Gemini on Vertex,
+# and OpenAI's own models. Only the shared denylist applies.
+#
+# Gemini 2.5 and later publish no numbered builds, so the bare name is the most
+# specific identifier that exists and there is nothing to require.
+#
+# **OpenAI's gpt-* family is different, and the rule stays open by decision
+# rather than by absence.** That family does publish dated snapshots, and the
+# bare name is an alias to one of them. Measured live against the API:
+#
+#     requested 'gpt-4o'            -> response model 'gpt-4o-2024-08-06'
+#     requested 'gpt-4o-2024-08-06' -> response model 'gpt-4o-2024-08-06'
+#
+# So the alias resolves, and the response names the build that actually served
+# rather than echoing the request. That is what makes refusing the alias
+# unnecessary here: a fingerprint binds the *served* build beside the requested
+# route, ``openai`` is ``provider_reported``, and OpenAI moving the alias to a
+# different snapshot therefore moves every fingerprint and fails certification
+# closed. The reproducibility guarantee rests on the readback, exactly as
+# :class:`_FormRule` says it does, and this is the family that demonstrates it.
+#
+# The o-series is a separate case again: it ships no dated form at all.
 _CATCH_ALL = _FormRule(family="", pinned=None, hint="")
 
 # Which family rules each vendor applies, in order, with the catch-all last.

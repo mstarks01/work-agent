@@ -142,6 +142,16 @@ every other character a delimiter. So `codestral@latest` is refused, and
 Gemini 2.5 and later ship no numbered builds, so there the bare name is the most
 specific identifier available; the same is true of OpenAI's o-series.
 
+OpenAI's `gpt-*` family is the one exception, and it is deliberate. That family
+does publish dated snapshots, and a bare name such as `gpt-4o` is an alias to
+one of them — today, `gpt-4o-2024-08-06`. The service still accepts the alias,
+because OpenAI's response names the build that actually served rather than
+echoing what you asked for. Your fingerprint therefore records the snapshot, and
+if OpenAI ever points the alias at a different one, every fingerprint moves and
+certification fails closed rather than passing quietly. Naming the snapshot
+yourself is still the clearer choice, because then your config says which build
+you meant.
+
 Claude is the family with a published form:
 
 ```text
