@@ -298,15 +298,34 @@ _CLAUDE_RULE = _FormRule(
     ),
 )
 
-# Gemini on Vertex, and every OpenAI model: no canonical form to require, so
-# only the shared denylist applies. OpenAI's o-series ships no dated form at
-# all, and the dated gpt-* snapshots are optional rather than canonical.
+# Every family whose vendor publishes no canonical form: Gemini on Vertex, and
+# OpenAI's own models. Only the shared denylist applies.
 _CATCH_ALL = _FormRule(family="", pinned=None, hint="")
 
+# Which family rules each vendor applies, in order, with the catch-all last.
+#
+# **A vendor's entry lists every family that vendor can serve, and the rule
+# itself is a property of the family.** The entry is keyed by vendor only
+# because one family can be spelled differently on different vendors, which is
+# what a future row serving ``anthropic.claude-…`` will need — not because a
+# vendor decides what a Claude identifier looks like.
+#
+# ``openai`` listed the catch-all alone, and that was the defect: the prefix
+# reaches any OpenAI-compatible endpoint, and a gateway serving Claude passes
+# the vendor's own identifier straight through. So ``claude-3-opus`` — a
+# floating alias — and ``claude-opus-4-20250514`` — a dated form — were refused
+# on two vendors and accepted on the third. An operator moving a tier between
+# vendors met a different set of legal identifiers, which is the disagreement
+# the pinned-form rule exists to remove.
+#
+# This is the mirror of the reason ``check_temperature`` and
+# ``openai_reasoning_model`` refuse to key on the vendor at all: nothing stops a
+# family arriving through a gateway under a vendor that did not train it, and
+# the number of routes to one family only ever grows.
 _FORM_RULES: dict[VendorName, tuple[_FormRule, ...]] = {
     "vertex": (_CLAUDE_RULE, _CATCH_ALL),
     "anthropic": (_CLAUDE_RULE, _CATCH_ALL),
-    "openai": (_CATCH_ALL,),
+    "openai": (_CLAUDE_RULE, _CATCH_ALL),
 }
 
 
