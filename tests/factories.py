@@ -82,6 +82,7 @@ from analysis_service.system_model import (
     SystemModel,
     TrustBoundary,
 )
+from analysis_service.vendors import join_served
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -90,8 +91,17 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 #: test that means "the ``stride`` package specifically" are distinguishable.
 DEFAULT_FRAMEWORKS: tuple[FrameworkName, ...] = ("stride",)
 
-BASE_MODEL = "fake-base-001"
-STRONG_MODEL = "fake-strong-001"
+# Router strings, not bare names: every route a node holds in production comes
+# from the tier config through ``Vendor.prefix``, and a bare stand-in left the
+# join that reattaches a vendor untested. Two vendors, so the offline suite
+# reaches both ``served_trust`` values.
+BASE_MODEL = "vertex_ai/fake-base-001"
+STRONG_MODEL = "anthropic/fake-strong-001"
+
+#: The single route the eval harness's stand-ins answer on. One name, so the
+#: three modules that drive a sweep offline cannot disagree about what a sweep
+#: requested.
+EVAL_MODEL = "vertex_ai/fake-pro-001"
 
 # The shipped config selects no vendor, so a test that needs a resolvable tier
 # config has to choose one. Deliberately **mixed**: the two tiers select
@@ -618,9 +628,19 @@ def claims_json(*claims: BaseModel) -> str:
     return json.dumps({"claims": [claim.model_dump(mode="json") for claim in claims]})
 
 
-def served_build(requested: str) -> str:
-    """The build a scripted model claims answered: the request plus a suffix."""
-    return f"{requested}-served"
+def served_build(requested_route: str) -> str:
+    """The **bare** build a scripted model claims answered.
+
+    Bare, because that is what a provider returns: the vendor prefix belongs to
+    the router, and nothing in a response carries it. Use :func:`served_route`
+    for what the recorded served identity should be.
+    """
+    return f"{requested_route.rpartition('/')[2]}-served"
+
+
+def served_route(requested_route: str) -> str:
+    """The vendor-prefixed served identity, as ``join_served`` builds it."""
+    return join_served(requested_route, served_build(requested_route))
 
 
 def scripted_usage() -> types.GenerateContentResponseUsageMetadata:

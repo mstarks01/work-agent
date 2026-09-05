@@ -9,6 +9,7 @@ to a call) and a per-vendor reasoning kwarg (#15 made the surface uniform).
 from __future__ import annotations
 
 from dataclasses import FrozenInstanceError
+from typing import get_args
 
 import pytest
 
@@ -20,9 +21,12 @@ from analysis_service.vendors import (
     VENDOR_NAMES,
     CredentialMode,
     ProviderAuthError,
+    ServedTrust,
     Vendor,
+    join_served,
     openai_reasoning_model,
     vendor_for,
+    vendor_for_route,
 )
 
 API_KEY = "sk-test-not-a-real-key"
@@ -390,3 +394,35 @@ class TestOpenAIReasoningFamilies:
         """The one identifier whose trailing letter could read as a suffix."""
         assert not openai_reasoning_model("gpt-4o")
         assert openai_reasoning_model("gpt-5o")
+
+
+class TestTheRouteToVendorRule:
+    """One reader, built by inverting the registry on its own prefixes."""
+
+    @pytest.mark.parametrize("name", VENDOR_NAMES)
+    def test_a_route_resolves_to_the_vendor_that_built_it(self, name):
+        vendor = vendor_for(name)
+        assert vendor_for_route(vendor.route("some-model")) is vendor
+
+    def test_a_bare_name_raises_rather_than_inventing_a_vendor(self):
+        # A fingerprint that names a provider which never ran is worse than an
+        # error, and it is the failure a pass-through would have produced.
+        with pytest.raises(ValueError, match="no vendor prefix"):
+            vendor_for_route("gemini-2.5-pro")
+
+    def test_a_prefix_no_vendor_claims_raises(self):
+        with pytest.raises(ValueError, match="no vendor serves"):
+            vendor_for_route("cohere/command-r")
+
+    @pytest.mark.parametrize("name", VENDOR_NAMES)
+    def test_the_join_reattaches_the_requesting_vendors_prefix(self, name):
+        # Providers return a bare build; the vendor comes from what was asked
+        # for. Two vendors serving one build must not join to one route.
+        vendor = vendor_for(name)
+        assert join_served(vendor.route("requested"), "served-002") == (
+            f"{vendor.prefix}served-002"
+        )
+
+    @pytest.mark.parametrize("name", VENDOR_NAMES)
+    def test_every_vendor_states_what_its_served_build_is_worth(self, name):
+        assert vendor_for(name).served_trust in get_args(ServedTrust)
