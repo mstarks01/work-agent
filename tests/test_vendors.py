@@ -9,7 +9,7 @@ to a call) and a per-vendor reasoning kwarg (#15 made the surface uniform).
 from __future__ import annotations
 
 from dataclasses import FrozenInstanceError
-from typing import get_args
+from typing import ClassVar, get_args
 
 import pytest
 
@@ -287,13 +287,56 @@ class TestPinnedFormRule:
         with pytest.raises(ValueError, match="not a model identifier"):
             vendor_for("vertex").validate_model(bad, source="t")
 
-    def test_the_vertex_rule_branches_on_model_family(self):
+    def test_the_rule_branches_on_model_family(self):
         vertex = vendor_for("vertex")
         # Gemini 2.5+ ships no numbered stable builds, so bare is most specific.
         assert vertex.validate_model("gemini-2.5-pro", source="t")
         # Claude's canonical form is the dateless ID, on Vertex as on the direct
         # API — Google Cloud spells 4.6-and-later identically.
         assert vertex.validate_model("claude-opus-5", source="t")
+
+    #: One identifier, one verdict, whatever vendor names it. A **family** rule
+    #: follows the family, so moving a tier between vendors must not change
+    #: which identifiers are legal. The dated and pre-4.6 forms are the cases
+    #: that decide it: they were refused on ``vertex`` and ``anthropic`` and
+    #: accepted on ``openai``, because that row listed the catch-all alone.
+    CLAUDE_VERDICTS: ClassVar[dict[str, bool]] = {
+        "claude-opus-5": True,
+        "claude-sonnet-4-6": True,
+        "claude-haiku-4-5": True,
+        "claude-opus-4-1": True,
+        # A floating alias from the era when the bare name was one.
+        "claude-3-opus": False,
+        "claude-3-sonnet": False,
+        # The dated forms, direct and Vertex-spelled.
+        "claude-opus-4-20250514": False,
+        "claude-sonnet-4-5-20250929": False,
+        "claude-haiku-4-5@20251001": False,
+        # The old name-after-version order.
+        "claude-3-5-sonnet-20241022": False,
+        "claude-3-7-sonnet": False,
+    }
+
+    @pytest.mark.parametrize("name", VENDOR_NAMES)
+    @pytest.mark.parametrize(("model", "accepted"), sorted(CLAUDE_VERDICTS.items()))
+    def test_a_claude_gets_one_verdict_whatever_vendor_names_it(
+        self, name, model, accepted
+    ):
+        """A gateway serves a family its vendor did not train.
+
+        ``openai/`` reaches any OpenAI-compatible endpoint, so a Claude
+        identifier arrives under a vendor that never published it. The shape
+        rule has to answer the same way there, for the reason
+        ``check_temperature`` and ``openai_reasoning_model`` both key on the
+        model and refuse to key on the vendor: the number of routes to one
+        family only ever grows.
+        """
+        vendor = vendor_for(name)
+        if accepted:
+            assert vendor.validate_model(model, source="t") == model
+        else:
+            with pytest.raises(ValueError):
+                vendor.validate_model(model, source="t")
 
     @pytest.mark.parametrize("name", ["anthropic", "vertex"])
     @pytest.mark.parametrize(

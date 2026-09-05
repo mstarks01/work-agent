@@ -148,7 +148,10 @@ Claude is the family with a published form:
 claude-<name>-<major>[-<minor>]     e.g. claude-opus-5, claude-sonnet-4-6
 ```
 
-The code applies that shape to every Claude model name. It does **not** enforce a
+The code applies that shape to every Claude model name, **whichever vendor you
+name it under**. An OpenAI-compatible gateway can serve Claude, so the family
+rule follows the family rather than the vendor: moving a tier between vendors
+never changes which identifiers are legal. It does **not** enforce a
 minimum Claude generation. Dated identifiers such as
 `claude-sonnet-4-5-20250929` do not match the accepted shape, while a dateless
 name that matches it is allowed to proceed to the capability checks. Passing
