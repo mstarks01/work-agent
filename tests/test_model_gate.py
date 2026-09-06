@@ -21,6 +21,7 @@ from typing import ClassVar
 
 import pytest
 
+from analysis_service.conformance import REFERENCE_MODELS
 from analysis_service.model_gate import (
     ModelGateError,
     assert_kwarg_supported,
@@ -277,39 +278,36 @@ class TestErrorsPointAtTheKnob:
 
 @pytest.mark.parametrize(
     ("vendor", "base_model", "strong_model"),
-    [
-        ("vertex", "gemini-2.5-flash", "gemini-2.5-pro"),
-        ("anthropic", "claude-sonnet-4-6", "claude-opus-5"),
-        ("openai", "gpt-4.1-mini", "gpt-4.1"),
-    ],
+    [(vendor, *models) for vendor, models in REFERENCE_MODELS.items()],
 )
 def test_every_documented_vendor_passes_the_gate_on_shipped_sampling(
     vendor, base_model, strong_model
 ):
-    """What the docs offer is what the gate accepts — for all three, not one.
+    """What the docs offer is what the gate accepts — for every vendor, not one.
 
     The predecessor asserted this of the *shipped selection*, which worked only
     while a selection shipped. Now that none does, the equivalent guarantee has
     to be made of every pair `docs/First-Run.md` step 2 tells a reader to write
     down: shipped sampling has to survive whichever of them they pick, and a
     param one vendor rejects must not reach a reader as a working example.
+
+    **Driven from `REFERENCE_MODELS`, because the hand-written list drifted.**
+    It said `openai` was `gpt-4.1-mini` / `gpt-4.1` while the table it names
+    said `gpt-4o` / `gpt-5.6`, and it carried no `bedrock` row at all — so the
+    vendor added most recently was the one this check never made. A list that
+    mirrors a table by hand is a second reader of it, and the two disagreed for
+    as long as nobody read them side by side.
     """
     from pathlib import Path
 
-    from analysis_service.model_tiers import load_model_tiers
     from analysis_service.sampling import load_sampling
+    from tests.factories import tiers_for
 
     root = Path(__file__).resolve().parents[1]
-    tiers = load_model_tiers(
-        root / "config" / "model_tiers.toml",
-        env={
-            "ANALYSIS_MODEL_BASE_VENDOR": vendor,
-            "ANALYSIS_MODEL_BASE_MODEL": base_model,
-            "ANALYSIS_MODEL_STRONG_VENDOR": vendor,
-            "ANALYSIS_MODEL_STRONG_MODEL": strong_model,
-            "ANALYSIS_MODEL_REVIEW_VENDOR": "anthropic",
-            "ANALYSIS_MODEL_REVIEW_MODEL": "claude-opus-5",
-        },
+    tiers = tiers_for(vendor)
+    assert (tiers.tiers["base"].model, tiers.tiers["strong"].model) == (
+        base_model,
+        strong_model,
     )
     sampling = load_sampling(root / "config" / "sampling.toml", env={})
     for tier in ("base", "strong"):
