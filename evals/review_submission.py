@@ -78,10 +78,11 @@ def _case_problems(
             f"{case_id}: {', '.join(stale)} changed since the reviewer opened the case"
         )
 
-    try:
-        sittings.check_marks(prepared, answers.marks)
-    except sittings.SittingError as exc:
-        problems.append(str(exc))
+    for rule in (sittings.check_marks, sittings.check_every_finding_marked):
+        try:
+            rule(prepared, answers.marks)
+        except sittings.SittingError as exc:
+            problems.append(str(exc))
     return problems
 
 

@@ -689,6 +689,39 @@ def check_marks(prepared: Prepared, marks: Mapping[str, Mark]) -> None:
         )
 
 
+def check_every_finding_marked(prepared: Prepared, marks: Mapping[str, Mark]) -> None:
+    """Refuse a sitting that judges none of the findings it read.
+
+    **The bar is a judgement, not an open file.** A submission used to clear a
+    case on the digests alone, so a reader could open every set, write ten
+    characters of own list, and record nothing about any **Claim** — and CI
+    counted that case as read. The one defect a sitting exists to catch is a
+    claim asserting a fact its own **System Model** does not hold, and a reader
+    records that as a ``reject``. A case with no marks holds no such answer.
+
+    One mark per recorded finding, which is what the by-hand path already asks:
+    the reading document carries a ``> mark:`` slot per claim, and a browser
+    sitting that filled fewer recorded less than the shell beside it.
+
+    **Every** finding rather than some of them, because a fraction is a number
+    nobody can defend. The cost is small where the cost actually falls: the
+    hour goes on reading the sets, and the mark is a press the reader makes
+    while they read.
+    """
+    unmarked = sorted(
+        target.fingerprint
+        for target in prepared.mark_targets
+        if target.fingerprint not in marks
+    )
+    if unmarked:
+        raise SittingError(
+            f"{prepared.case_id}: {len(unmarked)} of"
+            f" {len(prepared.mark_targets)} recorded findings carry no mark."
+            " A sitting answers every finding it read, because a set nobody"
+            " judged is a set nobody tested."
+        )
+
+
 def document(
     prepared: Prepared,
     own_list: list[str],
@@ -924,13 +957,16 @@ def finish(
     second press corrects the draft rather than appending to a file, and a
     reader who stops has nothing to clean up.
 
-    A mark key naming no recorded finding refuses the press, through
-    :func:`check_marks` — the same reader a merged submission is checked by.
+    Two rules refuse the press, and a merged submission is refused by the
+    same two readers: :func:`check_marks` on a key naming no finding of this
+    case, and :func:`check_every_finding_marked` on a finding this reader left
+    unanswered.
 
     The draft is saved before this returns, because it is the only thing here
     that outlives a process.
     """
     check_marks(prepared, marks)
+    check_every_finding_marked(prepared, marks)
     draft.marks = dict(marks)
     draft.missing = list(missing)
     draft.notes = notes
