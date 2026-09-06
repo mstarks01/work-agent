@@ -669,7 +669,10 @@
     "reference_verb": "alter",
     "candidate_verb": "inject",
     "label": "no-match",
-    "note": "Injection through unvalidated content is a distinct action the corpus does not carry; a matcher that merges it hides a real gap."
+    "note": "Injection through unvalidated content is a distinct action the corpus does not carry; it also invents a sanitization property the model does not state.",
+    "annotations": [
+      "mixed"
+    ]
   },
   {
     "case": "03-batch-data-pipeline",
@@ -962,8 +965,11 @@
     "candidate_element_ids": null,
     "reference_verb": "plant",
     "candidate_verb": null,
-    "label": "no-match",
-    "note": "Training-time poisoning is outside this model entirely \u2014 no training pipeline exists in it \u2014 so this is unsupported, not a match."
+    "label": "unsupported",
+    "note": "Training-time poisoning is outside this model entirely \u2014 no training pipeline exists in it. It also describes a different action from replacing a published artifact.",
+    "annotations": [
+      "mixed"
+    ]
   },
   {
     "case": "04-ml-inference-service",
@@ -1519,7 +1525,10 @@
     "reference_verb": "impersonate",
     "candidate_verb": "flood",
     "label": "no-match",
-    "note": "Same element, availability action rather than identity; the corpus files it under denial-of-service."
+    "note": "Same element, availability action rather than identity; the corpus files it under denial-of-service.",
+    "annotations": [
+      "misclassified-lane"
+    ]
   },
   {
     "case": "06-cookbook-online-game",
@@ -1747,7 +1756,10 @@
     "reference_verb": "escalate",
     "candidate_verb": "read",
     "label": "no-match",
-    "note": "Reading stats is neither the escalation claimed nor the target claimed; the reference is about write access to player records."
+    "note": "Reading stats is neither the escalation claimed nor the target claimed; the reference is about write access to player records.",
+    "annotations": [
+      "misclassified-lane"
+    ]
   },
   {
     "case": "06-cookbook-online-game",
@@ -1833,8 +1845,8 @@
     ],
     "reference_verb": "read",
     "candidate_verb": "read",
-    "label": "no-match",
-    "note": "The reference is about protection at rest of the stored data; querying with a valid credential is the elevation/spoofing path, not this one."
+    "label": "match",
+    "note": "Same read action against the same stored data. The candidate names one way an attacker with database access performs the reference claim."
   },
   {
     "case": "01-payments-checkout",
@@ -1882,8 +1894,11 @@
     "candidate_element_ids": null,
     "reference_verb": "forge",
     "candidate_verb": null,
-    "label": "no-match",
-    "note": "Device enrolment is not described anywhere in the model; unsupported rather than matched."
+    "label": "unsupported",
+    "note": "Device enrolment is outside the model, so the candidate cannot be grounded in any element. It also describes a different action from impersonating a modelled node.",
+    "annotations": [
+      "mixed"
+    ]
   },
   {
     "case": "02-iot-fleet-telemetry",
@@ -1980,8 +1995,8 @@
     "candidate_element_ids": null,
     "reference_verb": "unattributable",
     "candidate_verb": null,
-    "label": "no-match",
-    "note": "A documentation gap is not an attacker action at all; a matcher that merges this is matching on topic, not on claim."
+    "label": "invalid-claim",
+    "note": "A documentation gap is not an attacker action at all and therefore is not a STRIDE threat claim."
   },
   {
     "case": "03-batch-data-pipeline",
@@ -2083,7 +2098,10 @@
     "reference_verb": "abuse-grant",
     "candidate_verb": "abuse-grant",
     "label": "unsupported",
-    "note": "No quota is described in the model, and exceeding one is not reaching an unentitled capability."
+    "note": "No quota is described in the model, and exceeding one is not reaching an unentitled capability.",
+    "annotations": [
+      "mixed"
+    ]
   },
   {
     "case": "05-cookbook-queue-webapp",
@@ -2165,8 +2183,11 @@
     "candidate_element_ids": null,
     "reference_verb": "impersonate",
     "candidate_verb": null,
-    "label": "no-match",
-    "note": "No account-recovery path exists in the model; unsupported rather than a match."
+    "label": "unsupported",
+    "note": "No account-recovery path exists in the model. It also describes a different route from connecting to the lobby as another player.",
+    "annotations": [
+      "mixed"
+    ]
   },
   {
     "case": "06-cookbook-online-game",
@@ -2324,7 +2345,7 @@
     ],
     "reference_verb": "impersonate",
     "candidate_verb": "use-credential",
-    "label": "no-match",
+    "label": "unsupported",
     "note": "Unsupported: the model records what a store server presents as unknown, and no certificate exists in it."
   },
   {
@@ -2446,7 +2467,10 @@
     "reference_verb": "plant",
     "candidate_verb": "delete",
     "label": "no-match",
-    "note": "Hard negative: destruction rather than replacement, and the corpus files registry unavailability in the denial-of-service lane instead."
+    "note": "Hard negative: destruction rather than replacement, and the corpus files registry unavailability in the denial-of-service lane instead.",
+    "annotations": [
+      "misclassified-lane"
+    ]
   },
   {
     "case": "07-cicd-store-deploy",
@@ -2580,7 +2604,7 @@
     ],
     "reference_verb": "read",
     "candidate_verb": "recover-credential",
-    "label": "no-match",
+    "label": "unsupported",
     "note": "Unsupported: encryption at rest is unknown in the model, so the candidate invents the control it then defeats."
   },
   {
@@ -2597,7 +2621,10 @@
     "reference_verb": "intercept",
     "candidate_verb": "alter-in-transit",
     "label": "no-match",
-    "note": "The mirror of the tampering hard negative; matching it in this direction is the same collapse."
+    "note": "The mirror of the tampering hard negative; matching it in this direction is the same collapse.",
+    "annotations": [
+      "misclassified-lane"
+    ]
   },
   {
     "case": "07-cicd-store-deploy",
@@ -3289,8 +3316,8 @@
     ],
     "reference_verb": "abuse-grant",
     "candidate_verb": "abuse-grant",
-    "label": "no-match",
-    "note": "Hard negative: a plausible neighbouring claim about the same window, but the corpus enumerates the leaver and not the mover."
+    "label": "unclear",
+    "note": "The candidate shares the stale-group mechanism and window but applies it to a role mover rather than the reference's leaver; the sentences do not establish whether that specificity changes finding identity."
   },
   {
     "case": "08-sso-identity-broker",
@@ -3325,7 +3352,10 @@
     "reference_verb": "escalate",
     "candidate_verb": "escalate",
     "label": "unsupported",
-    "note": "Unsupported, and the point of the case: the model gives the franchise party no network path in, only the right to assert an identity."
+    "note": "Unsupported, and the point of the case: the model gives the franchise party no network path in, only the right to assert an identity.",
+    "annotations": [
+      "mixed"
+    ]
   },
   {
     "case": "09-cookbook-sokify-retail",
@@ -3448,7 +3478,10 @@
     "reference_verb": "forge",
     "candidate_verb": "intercept",
     "label": "no-match",
-    "note": "Hard negative: the same leg and the same stated weakness, but reading is not impersonating, and the corpus files the read separately."
+    "note": "Hard negative: the same leg and the same stated weakness, but reading is not impersonating, and the corpus files the read separately.",
+    "annotations": [
+      "misclassified-lane"
+    ]
   },
   {
     "case": "09-cookbook-sokify-retail",
@@ -3707,7 +3740,10 @@
     "reference_verb": "unattributable",
     "candidate_verb": "read",
     "label": "no-match",
-    "note": "The most valuable negative in this case: identical stated fact, different claim. One is the absence of proof of delivery, the other is disclosure to the wrong recipient, and a matcher that merges them collapses two lanes."
+    "note": "The most valuable negative in this case: identical stated fact, different claim. One is the absence of proof of delivery, the other is disclosure to the wrong recipient, and a matcher that merges them collapses two lanes.",
+    "annotations": [
+      "misclassified-lane"
+    ]
   },
   {
     "case": "09-cookbook-sokify-retail",
@@ -4135,8 +4171,11 @@
     "candidate_element_ids": null,
     "reference_verb": "use-credential",
     "candidate_verb": null,
-    "label": "no-match",
-    "note": "Different action against a different target, and registration is nowhere in the model."
+    "label": "unsupported",
+    "note": "Registration is outside the model, so the claim cannot be grounded in any element. It also describes a different action from riding an existing session.",
+    "annotations": [
+      "mixed"
+    ]
   },
   {
     "case": "10-cookbook-generic-cms",
@@ -4301,8 +4340,11 @@
     "candidate_element_ids": null,
     "reference_verb": "unattributable",
     "candidate_verb": null,
-    "label": "no-match",
-    "note": "Unsupported: the model describes no log to delete, and the reference's point is that the path was never recorded in the first place."
+    "label": "unsupported",
+    "note": "The model describes no log to delete, so the claim cannot be grounded in any element. Deleting evidence also differs from the reference's absence of attribution.",
+    "annotations": [
+      "mixed"
+    ]
   },
   {
     "case": "10-cookbook-generic-cms",
@@ -4419,7 +4461,10 @@
     "reference_verb": "intercept",
     "candidate_verb": "intercept",
     "label": "unsupported",
-    "note": "Unsupported: the model says nothing about cookie scope, and the candidate turns a traffic-analysis claim into a session-theft one."
+    "note": "Unsupported: the model says nothing about cookie scope, and the candidate turns a traffic-analysis claim into a session-theft one.",
+    "annotations": [
+      "mixed"
+    ]
   },
   {
     "case": "10-cookbook-generic-cms",
@@ -4813,8 +4858,11 @@
     "candidate_element_ids": null,
     "reference_verb": "unattributable",
     "candidate_verb": null,
-    "label": "no-match",
-    "note": "Unsupported: the model has no audit store to delete from, which is the reference's own point."
+    "label": "unsupported",
+    "note": "The model has no audit store to delete from, so the claim cannot be grounded in any element. Deleting evidence also differs from the reference's absence of attribution.",
+    "annotations": [
+      "mixed"
+    ]
   },
   {
     "case": "11-sparse-shift-scheduling",
@@ -5075,7 +5123,10 @@
     "reference_verb": "plant",
     "candidate_verb": "read",
     "label": "no-match",
-    "note": "Hard negative: same element, same file, but reading is the information-disclosure entry and writing is this one."
+    "note": "Hard negative: same element, same file, but reading is the information-disclosure entry and writing is this one.",
+    "annotations": [
+      "misclassified-lane"
+    ]
   },
   {
     "case": "12-overclaiming-supplier-portal",
@@ -5208,8 +5259,11 @@
     "candidate_element_ids": null,
     "reference_verb": "unattributable",
     "candidate_verb": null,
-    "label": "no-match",
-    "note": "Unsupported: there is no audit log element in the model, which is precisely the reference's claim."
+    "label": "unsupported",
+    "note": "There is no audit log element in the model, so the claim cannot be grounded. A wrong recorded actor also differs from the reference's absence of an audit trail.",
+    "annotations": [
+      "mixed"
+    ]
   },
   {
     "case": "12-overclaiming-supplier-portal",
@@ -5420,7 +5474,10 @@
     "reference_verb": "use-credential",
     "candidate_verb": "guess-credential",
     "label": "no-match",
-    "note": "Unsupported, and a different action: the source states the token was never rotated and states nothing about its length."
+    "note": "Unsupported, and a different action: the source states the token was never rotated and states nothing about its length.",
+    "annotations": [
+      "mixed"
+    ]
   },
   {
     "case": "13-dispatch-control-plane",
@@ -5580,8 +5637,8 @@
     ],
     "reference_verb": "forge",
     "candidate_verb": "alter",
-    "label": "match",
-    "note": "Same action, same target."
+    "label": "unclear",
+    "note": "The candidate alters existing job orders while the reference writes job orders directly. The sentences do not establish whether that action distinction changes finding identity."
   },
   {
     "case": "13-dispatch-control-plane",
@@ -5630,8 +5687,11 @@
     "candidate_element_ids": null,
     "reference_verb": "unattributable",
     "candidate_verb": null,
-    "label": "no-match",
-    "note": "Unsupported: there is no log element in the model, and the reference's claim is precisely that the job order carries no person."
+    "label": "unsupported",
+    "note": "There is no log element in the model, so the claim cannot be grounded. A wrong recorded actor also differs from the reference's job order carrying no person.",
+    "annotations": [
+      "mixed"
+    ]
   },
   {
     "case": "13-dispatch-control-plane",

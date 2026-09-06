@@ -11,13 +11,21 @@ what a person decided about each finding.
 
 ## Read this before you quote a number
 
-**An agent wrote all of it, and a person has read 30 of the 339 match labels.**
-Every golden case, every reference claim and every calibration label was written
-by an agent. One review sitting has happened:
+**An agent wrote all of it; review records now identify the subsets people have
+read.** Every golden case, every reference claim and every calibration label
+began agent-authored. The first calibration review was
 [`calibration_labels/REVIEW-01.md`](calibration_labels/REVIEW-01.md), on
 2026-08-18, over the 30 hardest pairs. It answered 25 `same`, 1 `different` and 4
 `unclear`, and it changed two things — a wrong label, and a reference claim in
 case 04 that asserted a fact its own model does not hold.
+
+The second calibration review,
+[`calibration_labels/REVIEW-02.md`](calibration_labels/REVIEW-02.md), read all
+44 pre-review decision-boundary fixtures and a blind random sample of 60 of the
+remaining 295. The random sample agreed with the original primary label on 58
+of 60; the exact finite-population 95% interval for that non-boundary
+population's discrepancy rate is 0.7%–10.5%. It was a joint review, not two
+independent ratings, and it says nothing about corpus correctness.
 
 **One case has been through `BLESSING.md` step 6, and twelve have not.** That is
 the reading session over a case's source, model and reference sets together, and
@@ -33,10 +41,10 @@ that arrives without a sitting, and fails a read file that changes under its
 recorded digest.
 
 So every agreement figure the suite produces is **self-consistency, not
-accuracy**: it measures how closely a rule reproduces what an earlier agent
-wrote down. That includes the 90% bar. A rule at 93.7% agrees with an agent's
-opinions 93.7% of the time, and sitting 01 is the only evidence anywhere that
-any of those opinions are right.
+accuracy**: it measures how closely a rule reproduces the recorded
+dispositions. That includes the 90% bar. A rule at 94.5% agrees with those
+dispositions 94.5% of the time; the calibration review records are the only
+evidence that those label opinions have been checked.
 
 **Two live sweeps exist, and neither is a quality standard.** The service has
 been swept live twice: `claude-opus-4-6` on 2026-08-14 (12 cases) and
@@ -51,23 +59,28 @@ which questions a cheap model may answer and which it may not.
 
 **There is no model judge.** Claim matching is `SubsetVerbIdentity`, a rule in
 `harness/identity.py`, and it is measured on the two directions it can fail in
-(`python -m evals.harness.run calibrate`), with no provider call: **15 false
-splits over 200 equivalent candidate pairs, 5 false merges over 115 candidate
-negatives, and 3 false merges over 287 distinct reference pairs.** Read them
+(`python -m evals.harness.run calibrate`), with no provider call: **14 false
+splits of 200, 3 false merges of 111 and 3 false merges of 287.** The first two
+denominators are equivalent candidates and candidate negatives; the third is
+distinct reference pairs. Read them
 apart. A false split hands a reviewer one unmatched finding; a false merge
 destroys a finding and inflates recall, and nobody sees it happen. The three
 denominators are different populations and none is a rate over what a live run
 emits.
 
+Equivalently by population: 14 false splits over 200 equivalent candidate pairs,
+3 false merges over 111 candidate negatives, and 3 false merges over 287
+distinct reference pairs.
+
+The 339 calibration fixtures retain their original order and reference claims.
 The candidate merge column arrived with
 [#511](https://github.com/mstarks01/work-agent/issues/511), which assigned the
 negative half the elements and verbs the rule reads. Before it every candidate
-merge count was structurally zero. A further 15 negatives carry the
-`unsupported` label: they name the same place and the same action as their
-reference and differ only in a fact the model does not hold, which no
-comparison of elements and verbs can reach. Scored anyway the rule has 20
-candidate merges of 330 and 89.4% agreement, so both numbers are on the
-record.
+merge count was structurally zero. A further 28 fixtures are set aside before
+identity scoring: 25 `unsupported`, 2 `unclear`, and 1 `invalid-claim`. The
+matcher therefore answers 311 fixtures, refuses none, and agrees with 294
+(94.5%). Diagnostic `mixed` and `misclassified-lane` annotations preserve
+secondary observations without moving that denominator.
 
 Whether an unmatched finding is real is a question about prose, and a
 person answers it: each unmatched finding is keyed by its fingerprint and
@@ -143,7 +156,7 @@ evals/
 | `harness/calibration.py` | Rule-vs-label agreement over the labelled fixtures — the scoreboard any rule change must clear. |
 | `harness/verbs.py` | The closed vocabulary of attacker actions, and what counts as one action. |
 | `harness/exemplar_verbs.py` | Which actions a package's shipped exemplars demonstrate against which its reference sets grade, and the exemplar pairs that name one place and two actions. Reads text and blessed models only, so it costs no provider call. |
-| `harness/identity.py` | Claim identity from the fields a claim carries. `SubsetVerbIdentity` has 15 false splits of 200, 5 false merges of 115 and 3 false merges of 287, with no model call. |
+| `harness/identity.py` | Claim identity from the fields a claim carries. `SubsetVerbIdentity` has 14 false splits of 200, 3 false merges of 111 and 3 false merges of 287, with no model call. |
 | `harness/fingerprint.py` | A **Claim**'s identity as a versioned value code computes. No model call. |
 | `harness/ledger.py` | The append-only record of what a **person** decided about a finding. One file per voter, named by the GitHub login. |
 | `harness/envelope.py` | The offline sitting envelope: one reader's answers read back from the standalone page and applied through the same `finish` the app runs. Treats the file as untrusted input and recomputes every digest against this tree. |
