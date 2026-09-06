@@ -229,8 +229,17 @@ def _declared_fields() -> dict[str, tuple[Path, int]]:
 
 
 def _readers_corpus() -> str:
+    """Every file that may read a field — except this one.
+
+    A declaration here spells ``Class.field``, which the reader pattern would
+    match, so the lint would read its own table as a reader and the rot check
+    would fail on every declared row.
+    """
     files = _source_files(*SEARCHED, suffixes=(".py", ".js", ".html"))
-    return "\n".join(path.read_text(encoding="utf-8") for path in files)
+    own = Path(__file__).resolve()
+    return "\n".join(
+        path.read_text(encoding="utf-8") for path in files if path.resolve() != own
+    )
 
 
 def _unread_fields() -> dict[str, str]:
