@@ -17,6 +17,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from urllib.parse import quote, urlencode
 
 from evals.harness import envelope as envelopes
 from evals.harness import sitting as sittings
@@ -185,6 +186,35 @@ def unreviewed_cases(root: Path) -> list[str]:
         for case in sittings.load_corpus(root / "evals" / "corpus")
         if case.meta.id not in current
     ]
+
+
+def contribution_url(envelope: envelopes.Envelope, slug: str) -> str:
+    """A link that opens GitHub's editor with this submission already typed.
+
+    **The way in for a reader with no clone.** They open the standalone sitting
+    page, read a case, press this, and land on GitHub's new-file form holding
+    the file and its name. **Propose changes** opens the pull request, and
+    contribution CI validates it exactly as it validates one the app opened.
+    Nothing is installed and no credential is held anywhere but GitHub.
+
+    The name is the digest of the canonical bytes, so a reader who edits the
+    prefilled content before proposing it lands a file whose name no longer
+    matches — which :func:`verify_pull_request` refuses by name, in their own
+    pull request, rather than merging words nobody read.
+
+    Both values are escaped as query components, so a case id or a reader's own
+    words cannot add a parameter of their own (OWASP A05). ``slug`` comes from
+    the operator's own git remote through
+    :func:`~evals.harness.submit.repo_slug`, never from a request.
+    """
+    query = urlencode(
+        {
+            "filename": relative_path(envelope),
+            "value": serialize(envelope).decode("utf-8"),
+        },
+        quote_via=quote,
+    )
+    return f"https://github.com/{slug}/new/{submit_spine.BASE_BRANCH}?{query}"
 
 
 def verify_pull_request(root: Path, author: str) -> list[str]:

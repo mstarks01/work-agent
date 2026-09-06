@@ -134,12 +134,21 @@ def _review_envelope(
     return envelope
 
 
-def _preview(envelope: envelopes.Envelope) -> dict[str, str]:
-    content = review_submissions.serialize(envelope).decode("utf-8")
+def _preview(session: Session, envelope: envelopes.Envelope) -> dict[str, str]:
+    """What a reader without a `gh` login is handed: the file, and a way out.
+
+    ``url`` opens GitHub's editor with the file already typed, so the way out
+    is one press rather than a download, a search for the right directory and a
+    drag. The content rides beside it because a reader is entitled to read what
+    they are about to publish before they publish it.
+    """
     return {
         "filename": review_submissions.submission_name(envelope),
         "path": review_submissions.relative_path(envelope),
-        "content": content,
+        "content": review_submissions.serialize(envelope).decode("utf-8"),
+        "url": review_submissions.contribution_url(
+            envelope, submit_spine.repo_slug(session.root)
+        ),
     }
 
 
@@ -347,7 +356,7 @@ ul.terms { list-style:none; padding:0; }.rec { border-left:3px solid #8886; }.fi
 <p><button id="showFiles">Show files</button> <button id="submit">Contribute</button><span id="contributeStatus" class="save-status" role="status"></span></p>
 <div id="filePreview" class="file-preview hidden"><h3>Files to submit</h3><p id="previewPath"></p><pre id="previewContent"></pre></div>
 <pre id="result" class="hidden"></pre><p id="thanks" class="hidden">Thank you for contributing this review.</p>
-<div id="browserSteps" class="note hidden"><p><b>The review JSON has been downloaded.</b></p><p>Open the GitHub upload page, add that single file, and choose <b>Propose changes</b>. GitHub will guide you through opening the pull request. CI validates the review before it can merge.</p><p><a id="uploadLink" href="https://github.com/mstarks01/work-agent/upload/main/evals/review/submissions" target="_blank" rel="noopener">Open the GitHub upload page</a></p></div>
+<div id="browserSteps" class="note hidden"><p><b>Your review is ready to publish.</b></p><p>The link below opens GitHub with the file and its name already filled in. Sign in if you need to, then choose <b>Propose changes</b>. GitHub opens the pull request, and CI validates the review before it can merge.</p><p><a id="contributeLink" href="#" target="_blank" rel="noopener">Open the pull request on GitHub</a></p><p class="sub">A copy has also been downloaded, in case you would rather upload it by hand.</p></div>
 </section></article>
 </main>
 <script nonce="__CSP_NONCE__">
@@ -414,7 +423,9 @@ def create_app(session: Session) -> FastAPI:
         base.refuse_cross_origin(request)
         base.require_token(request, session)
         author = _choice_author(session, body)
-        return JSONResponse(_preview(_review_envelope(session, author, body.reviewer)))
+        return JSONResponse(
+            _preview(session, _review_envelope(session, author, body.reviewer))
+        )
 
     @app.post("/api/contribute")
     def contribute(request: Request, body: ContributionChoice) -> JSONResponse:
@@ -424,7 +435,9 @@ def create_app(session: Session) -> FastAPI:
         author = _author(login or body.author)
         envelope = _review_envelope(session, author, body.reviewer)
         if not login:
-            return JSONResponse({"mode": "browser", "ok": True, **_preview(envelope)})
+            return JSONResponse(
+                {"mode": "browser", "ok": True, **_preview(session, envelope)}
+            )
         try:
             url = review_submissions.open_pull_request(session.root, envelope)
         except review_submissions.ReviewSubmissionError as exc:

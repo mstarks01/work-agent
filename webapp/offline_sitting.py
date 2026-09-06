@@ -8,7 +8,10 @@ actually go wrong.
 
 The browser is the runtime, which is what makes this independent of the
 operating system. Nothing is installed, nothing is signed, no per-platform build
-exists, and the page opens from ``file://``. The payload is the whole corpus, at
+exists, and the page opens from ``file://``. It is also the whole way out: the
+publish button carries the reader to GitHub's editor with their submission
+already filled in, so a reader with no clone opens their own pull request and
+needs nobody to carry it for them. The payload is the whole corpus, at
 about 440 KB of sources, models and reference sets. That is one ordinary email
 attachment, so there is no reason to split it per case and every reason not to:
 the rail, and with it the reader's own choice of what to sit, exists only over
@@ -53,6 +56,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from evals.harness import envelope as envelopes
 from evals.harness import sitting as sittings
 from evals.harness import submit as submit_spine
 from evals.harness.envelope import VERSION
@@ -98,6 +102,12 @@ def payload(corpus_dir: Path, submitted_by: str, submitted_for: str) -> dict:
         "submitted_by": submitted_by,
         "submitted_for": submitted_for,
         "generated": datetime.now(UTC).date().isoformat(),
+        # Where the reader's pull request goes. Baked in when the page is
+        # built, because the page is opened from a `file://` URL by somebody
+        # who has no clone to read a remote from.
+        "repo": submit_spine.repo_slug(REPO_ROOT),
+        "branch": submit_spine.BASE_BRANCH,
+        "submissions_dir": envelopes.SUBMISSIONS_DIR.as_posix(),
         "min_own_list": sittings.MIN_OWN_LIST,
         "marks": list(sittings.MARKS),
         "cases": cases,

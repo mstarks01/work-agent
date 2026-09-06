@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import tomllib
 from collections.abc import Callable, Iterator, Mapping, Sequence
@@ -66,6 +67,35 @@ _RANK = {"contributor": 0, "maintainer": 1}
 #: The roster, which every kind may carry so a first-timer registers in the
 #: same PR as their first submission.
 ROSTER_FILE = "evals/review/voters.toml"
+
+
+#: The repository a contribution goes to when the remote does not say. A
+#: fallback rather than the answer: a fork's clone names its own remote, and a
+#: contributor who reads a case in a fork should still be sent to the upstream
+#: this constant names.
+DEFAULT_REPO = "mstarks01/work-agent"
+
+#: The branch a contribution branches from, read off :data:`BASE_REF` so the
+#: two cannot name different branches.
+BASE_BRANCH = BASE_REF.split("/", 1)[1]
+
+_REMOTE = re.compile(r"(?:[:/])(?P<owner>[^/:]+)/(?P<name>[^/]+?)(?:\.git)?$")
+
+
+def repo_slug(root: Path) -> str:
+    """``owner/name`` for this clone's origin, or :data:`DEFAULT_REPO`.
+
+    Read from git rather than written down, so a fork's own page links to the
+    fork it was built in. It falls back rather than raising, because the only
+    caller is a page offering somebody a link: no link is worse than a link to
+    the upstream, and neither is worth refusing a sitting over.
+    """
+    try:
+        url = _run(["git", "remote", "get-url", "origin"], root).strip()
+    except SubmitError:
+        return DEFAULT_REPO
+    found = _REMOTE.search(url)
+    return f"{found['owner']}/{found['name']}" if found else DEFAULT_REPO
 
 
 class SubmitError(RuntimeError):

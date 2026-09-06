@@ -475,7 +475,7 @@ uv run python webapp/sitting.py --submitted-for anonymous
 Then the filled document opens with `Read by anonymous, submitted by <login>.`,
 so nobody later reads the file name as the author.
 
-### A reader with no clone: one file out, one file back
+### A reader with no clone: one page out, one pull request back
 
 A reader who cannot install a toolchain — or whose own policy stops them
 putting this repository on their machine — still reads the case. The whole
@@ -496,12 +496,24 @@ case before that case's sets open, and marks each record `agree`, `reject` or
 takes it back, so a read that runs over several days needs no browser storage
 and no second copy: the envelope is the save file.
 
-They can change any mark up to the moment they send it — nothing is a record
-until you import it. They cannot rewrite a case's own list once that case's
+**Open the pull request on GitHub** is the way out, and it needs nothing from
+you. It carries the reader straight to GitHub's editor with their submission
+and its name already filled in; **Propose changes** opens the pull request, and
+contribution CI validates it exactly as it validates one the app opened. The
+page names the file by the digest of its own canonical bytes, the same rule
+`evals.harness.envelope` uses, so a name CI accepts is one the page computed
+from the words the reader actually wrote.
+
+The page loads nothing and sends nothing by itself. That press is the only
+address it holds, and `tests/test_offline_sitting.py` holds it to exactly one.
+
+They can change any mark up to the moment they press — nothing is a record
+until it merges. They cannot rewrite a case's own list once that case's
 sets are open, for the reason the app refuses the same thing: a list written
 afterwards would be evidence of an order that did not happen.
 
-When the file comes back:
+A reader who would rather send the file to you than open a pull request
+still can. When it comes back:
 
 ```sh
 python -m evals.harness.run sitting-import sitting-<login>.json --submitted-by <login>

@@ -165,6 +165,10 @@ function bar(into) {
   const load = el("button", null, "Load a saved file");
   load.onclick = () => document.getElementById("file").click();
   b.appendChild(load);
+  const publish = el("button", "go", "Open the pull request on GitHub");
+  publish.disabled = !done;
+  publish.onclick = publishToGitHub;
+  if (window.crypto && window.crypto.subtle) b.appendChild(publish);
   b.appendChild(el("span", "hint", done + " case(s) started. Download to stop " +
     "and load the same file to carry on — nothing is sent from this page."));
   into.appendChild(b);
@@ -207,6 +211,39 @@ function download() {
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+}
+
+// The bytes a submission is named by, and the name they give it. Both must
+// match what `evals.harness.envelope` computes, or the file this page sends
+// lands under a name CI refuses. `tests/test_offline_sitting.py` drives this
+// block under node against the Python it has to agree with.
+function canonical(env) {
+  return JSON.stringify(env, null, 2) + "\n";
+}
+
+async function submissionName(env) {
+  const bytes = new TextEncoder().encode(canonical(env));
+  const hashed = await window.crypto.subtle.digest("SHA-256", bytes);
+  const digest = Array.from(new Uint8Array(hashed))
+    .map(b => b.toString(16).padStart(2, "0")).join("").slice(0, 12);
+  return "review-" + env.generated + "-" + env.submitted_by + "-" + digest + ".json";
+}
+
+async function contributionUrl(env) {
+  const query = new URLSearchParams({
+    filename: DATA.submissions_dir + "/" + await submissionName(env),
+    value: canonical(env),
+  });
+  return "https://github.com/" + DATA.repo + "/new/" + DATA.branch + "?" + query;
+}
+
+// Opened from a click handler rather than from the promise, because a popup
+// blocker refuses a window a page opens after an await.
+async function publishToGitHub() {
+  const opened = window.open("", "_blank", "noopener");
+  const url = await contributionUrl(envelope());
+  if (opened) opened.location = url;
+  else window.location = url;
 }
 
 function restore(text) {
