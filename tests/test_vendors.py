@@ -221,6 +221,7 @@ class TestCredentialModes:
     def test_the_key_var_is_vendor_scoped(self):
         assert vendor_for("anthropic").api_key_var == "ANALYSIS_ANTHROPIC_API_KEY"
         assert vendor_for("openai").api_key_var == "ANALYSIS_OPENAI_API_KEY"
+        assert vendor_for("gemini").api_key_var == "ANALYSIS_GEMINI_API_KEY"
 
     def test_a_vendor_with_a_choice_refuses_to_answer_for_the_deployment(self):
         """A caller that never learned about the choice must not make it.
@@ -269,20 +270,36 @@ class TestCredentialModes:
         )
         assert kwargs == {"api_key": API_KEY}
 
-    # ``.get`` rather than ``[]``: this list is built at collection time, and a
+    #: The variables litellm reads a key out of on its own, per vendor that
+    #: takes one. Written down rather than derived from the vendor's name,
+    #: because litellm's spelling is not this registry's: Bedrock's bearer
+    #: token is ``AWS_BEARER_TOKEN_BEDROCK``, and the Gemini Developer API
+    #: reads two names. A derived ``{NAME}_API_KEY`` matched none of those.
+    AMBIENT_KEY_VARS: ClassVar[dict[str, tuple[str, ...]]] = {
+        "anthropic": ("ANTHROPIC_API_KEY",),
+        "openai": ("OPENAI_API_KEY",),
+        "bedrock": ("AWS_BEARER_TOKEN_BEDROCK",),
+        "gemini": ("GOOGLE_API_KEY", "GEMINI_API_KEY"),
+    }
+
+    # ``.get`` rather than ``[]``: this check runs at collection time, and a
     # vendor added to ``VENDOR_NAMES`` before its ``CREDENTIAL_MODES`` entry
     # would raise here and stop the whole suite from collecting — including
     # ``test_vendor_neutrality``, whose message is what names the missing entry.
     # A guard that cannot run when the tree is half-built helps nobody.
-    @pytest.mark.parametrize(
-        "name",
-        [
+    def test_every_key_bearing_vendor_names_its_ambient_variables(self):
+        takes_a_key = {
             name
             for name in VENDOR_NAMES
             if CredentialMode.API_KEY in CREDENTIAL_MODES.get(name, ())
-        ],
+        }
+        assert set(self.AMBIENT_KEY_VARS) == takes_a_key
+
+    @pytest.mark.parametrize(
+        ("name", "ambient"),
+        [(name, var) for name, vars_ in AMBIENT_KEY_VARS.items() for var in vars_],
     )
-    def test_an_ambient_key_authenticates_nothing(self, name):
+    def test_an_ambient_key_authenticates_nothing(self, name, ambient):
         """Every vendor that takes a key, not just the one somebody tested.
 
         An undeclared credential in the process environment is the ASI03
@@ -292,7 +309,6 @@ class TestCredentialModes:
         half of the rule is enforced here rather than in the adapter.
         """
         vendor = vendor_for(name)
-        ambient = f"{name.upper()}_API_KEY"
         with pytest.raises(ProviderAuthError, match=vendor.api_key_var):
             vendor.credential_kwargs({ambient: API_KEY}, CredentialMode.API_KEY)
 

@@ -112,15 +112,15 @@ review_independence = "shared"
 # through each vendor's credentials; docs/Configuration.md has the rules.
 #
 # [tiers.base]
-# vendor = "<vertex|anthropic|openai|bedrock>"
+# vendor = "<vertex|anthropic|openai|bedrock|gemini>"
 # model = "<model>"
 #
 # [tiers.strong]
-# vendor = "<vertex|anthropic|openai|bedrock>"
+# vendor = "<vertex|anthropic|openai|bedrock|gemini>"
 # model = "<model>"
 #
 # [tiers.review]
-# vendor = "<vertex|anthropic|openai|bedrock>"
+# vendor = "<vertex|anthropic|openai|bedrock|gemini>"
 # model = "<model>"
 #
 # A VENDOR THAT ALLOWS MORE THAN ONE CREDENTIAL MODE declares which one this
@@ -154,8 +154,14 @@ review_independence = "shared"
 #   anthropic   base "claude-sonnet-4-6"     strong "claude-opus-5"
 #   bedrock     base "anthropic.claude-sonnet-4-6"
 #               strong "anthropic.claude-opus-5"
+#   gemini      base "gemini-2.5-flash"      strong "gemini-2.5-pro"
 #   openai      base "gpt-4o-2024-08-06"     strong "gpt-5.6"
 #   vertex      base "gemini-2.5-flash"      strong "gemini-2.5-pro"
+#
+# `gemini` and `vertex` name the same models. They are two vendors because they
+# are two routes: the Gemini Developer API takes an API key, Vertex takes a
+# platform identity, and LiteLLM dispatches `gemini/` and `vertex_ai/` to two
+# providers. A tier may select either, and a deployment may select both.
 #
 # `review` needs a pair only once something sits on it. Under the shipped
 # `review_independence = "shared"` nothing does, so a deployment that wants the

@@ -81,7 +81,8 @@ sparse or inaccurate system model, which limits everything downstream.
 ## Try it
 
 You need Python 3.11 or newer, [uv](https://docs.astral.sh/uv/), and credentials
-for Vertex AI, Anthropic, or OpenAI.
+for one registered vendor: Vertex AI, Anthropic, OpenAI, Bedrock or the Gemini
+Developer API.
 
 ```sh
 git clone https://github.com/mstarks01/work-agent.git

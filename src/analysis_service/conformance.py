@@ -104,6 +104,10 @@ REFERENCE_MODELS: dict[str, tuple[str, ...]] = {
     # so neither could bind a tier of this graph. The plain identifier rather
     # than a region-scoped one, because no region enters an Execution Identity.
     "bedrock": ("anthropic.claude-sonnet-4-6", "anthropic.claude-opus-5"),
+    # The weights the ``vertex`` pair names, behind the Developer API. The
+    # same identifiers on purpose: the matrix is where the two routes to one
+    # family show their one difference, and a different pair would hide it.
+    "gemini": ("gemini-2.5-flash", "gemini-2.5-pro"),
     # The dated snapshot rather than the ``gpt-4o`` alias it resolves to.
     # OpenAI fronts its dated builds with a bare name and moves which build that
     # name means; the matrix is a claim about what was profiled, so it names the

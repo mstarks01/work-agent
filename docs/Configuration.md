@@ -27,8 +27,8 @@ Both [`Engine.from_config(frameworks, env=...)`](Integration-Guide.md) and the
 
 ### Models and vendors
 
-The code has registry entries for Vertex AI, Anthropic, and OpenAI. It reaches
-all three through ADK's LiteLLM adapter. `model_tiers.toml` selects **nothing**:
+The code has registry entries for Vertex AI, Anthropic, OpenAI, Bedrock and the
+Gemini Developer API. It reaches all of them through ADK's LiteLLM adapter. `model_tiers.toml` selects **nothing**:
 all three tier tables are absent, so startup fails until `base`, `strong` and
 `review` each name a vendor and a model. `review` is required even though the
 shipped node map points criticism at `strong`, because a tier a file may omit is
@@ -71,9 +71,9 @@ vendor = "anthropic"
 model = "claude-opus-5"
 ```
 
-Supported vendors are `vertex`, `anthropic`, `openai` and `bedrock`. Every one
-is reached through a single adapter (LiteLLM); there is no per-vendor code path,
-and Gemini reaches Vertex the same way everything else does. The pair above is deliberately
+Supported vendors are `vertex`, `anthropic`, `openai`, `bedrock` and `gemini`.
+Every one is reached through a single adapter (LiteLLM); there is no per-vendor
+code path, and Gemini reaches Vertex the same way everything else does. The pair above is deliberately
 mixed, because that is an ordinary configuration rather than an advanced one.
 
 **A Bedrock model identifier carries the family segment.** Claude on Bedrock is
@@ -90,12 +90,15 @@ An ARN is refused for every vendor. It hides which model answers, so a blessed
 fingerprint would go on certifying a target somebody can repoint, and it carries
 the account that owns the resource into a fingerprint and a report.
 
-**"Gemini support" means Vertex-hosted Gemini.** `vendor = "vertex"` is the only
-route to a Gemini model here, and it carries Vertex's `iam` credential mode; the
-Gemini Developer API is not a binding this service offers. If it is added later
-it arrives as its own vendor rather than as a second mode on `vertex`, because
-`vertex_ai/` already means "through Vertex" to the router prefix LiteLLM
-dispatches on.
+**A Gemini model has two vendors.** `vertex` reaches it through Vertex AI under
+a platform identity. `gemini` reaches it through the Gemini Developer API under
+an API key. They are two vendors and not two credential modes on one, because
+LiteLLM dispatches `vertex_ai/` and `gemini/` to two providers, and the router
+prefix is the vendor half of an Execution Identity. So the same model on the two
+routes yields two fingerprints, and a fingerprint blessed on one never certifies
+the other. A deployment may select both. The two routes differ in one
+capability: LiteLLM passes `seed` to Vertex and refuses it for the Developer
+API. Run the conformance command to see both rows.
 
 **The mechanism is declared, and the material may be discovered.** A deployment
 states which credential mode it uses for a vendor. Only then may that vendor's
@@ -116,6 +119,7 @@ like `vertex` + an API key cannot be written down:
 | `openai` | `api_key` | `ANALYSIS_OPENAI_API_KEY` |
 | `bedrock` | `api_key` | `ANALYSIS_BEDROCK_API_KEY`, `ANALYSIS_BEDROCK_REGION` |
 | `bedrock` | `iam` | `ANALYSIS_BEDROCK_REGION` |
+| `gemini` | `api_key` | `ANALYSIS_GEMINI_API_KEY` |
 
 `api_key` means the deployment passes the key, read only from the variable
 above. `iam` means **the platform supplies the identity**: the deployment passes
@@ -169,8 +173,9 @@ modes need it: LiteLLM's Converse handler resolves credentials through a bare
 never selects `bedrock` never carries it.
 
 Keys are read **only** from these vendor-scoped variables. LiteLLM's ambient
-`ANTHROPIC_API_KEY` / `OPENAI_API_KEY` pickup is deliberately unused, so a
-credential this deployment did not declare cannot authenticate a run. Keys are
+`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY` and `GEMINI_API_KEY`
+pickup is deliberately unused, so a credential this deployment did not declare
+cannot authenticate a run. Keys are
 never logged, never in the report, and never in a fingerprint; errors name the
 variable, never its value.
 
