@@ -14,7 +14,10 @@ refusals, the token, and the shape of each reply.
 
 from __future__ import annotations
 
+from typing import get_args
+
 import pytest
+from pydantic import ValidationError
 
 from evals.harness import sitting as sittings
 from evals.harness.reference import ANONYMOUS
@@ -263,3 +266,44 @@ class TestTheNamingPhrase:
 
     def test_both_names_where_an_account_carries_another_read(self):
         assert sittings.naming("ada", ANONYMOUS) == f"ada for {ANONYMOUS}"
+
+
+class TestUnsureIsAnAnswer:
+    """The fourth mark, and the rule it exists to make honest.
+
+    Answering every recorded finding is the bar. A bar that forces an answer
+    needs an answer for "I cannot decide", or a reader who cannot judge one
+    entry picks one of the other three to get past it — and the safe pick is
+    ``agree``, which inflates the agreement these numbers publish.
+    """
+
+    def test_it_is_in_the_closed_set(self):
+        assert "unsure" in sittings.MARKS
+
+    def test_it_is_the_word_a_vote_already_spells(self):
+        """One word, one meaning, over the key both are filed under.
+
+        A **Ledger** vote and a sitting mark share a fingerprint. The two mean
+        the same thing — the reader read the finding and cannot decide — so a
+        second word for it would be a second meaning waiting to happen.
+        """
+        from evals.harness.ledger import Verdict
+
+        assert "unsure" in get_args(Verdict)
+
+    def test_a_sitting_of_nothing_but_unsure_records(self, store):
+        """A reader who cannot judge one entry still finishes their sitting."""
+        draft = sittings.finish(
+            store,
+            prepared_for(store),
+            open_draft(store),
+            marks=dict.fromkeys(every_mark(store), "unsure"),
+            missing=[],
+            notes="I could not settle any of them",
+        )
+
+        assert draft.state == "finished"
+
+    def test_a_value_outside_the_set_is_still_refused(self, store):
+        with pytest.raises(ValidationError):
+            sittings.Draft(case=CASE, clone=str(store.root), marks={"v3:abc": "maybe"})

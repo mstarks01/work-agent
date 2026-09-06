@@ -362,6 +362,7 @@ ul.terms { list-style:none; padding:0; }.rec { border-left:3px solid #8886; }.fi
 <script nonce="__CSP_NONCE__">
 const TOKEN = <!--token-->;
 const MIN_OWN_LIST = <!--minownlist-->;
+const MARK_VALUES = <!--markvalues-->;
 </script>
 <script nonce="__CSP_NONCE__"><!--script--></script></body></html>
 <!-- legacy rail-footer contract: "Submit — " + count + " cases ready" -->

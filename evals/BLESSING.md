@@ -387,10 +387,16 @@ the server rather than by asking. The press waits until the list says
 something, so the sets cannot open on an empty box. The rule holds per case: **Previous** and
 **Next** in the case header walk the list, and a case you have not written a
 list for arrives blind however you reach it. Each recorded finding carries a
-control that takes `agree`, `reject` or `duplicate`, which is the same mark the
-by-hand path writes into a `> mark:` slot. **Answer every one.** A case records
-only when no finding is left unmarked, because a set nobody judged is a set
-nobody tested — and **Record review** stays off until the count reaches zero.
+control that takes `agree`, `reject`, `duplicate` or `unsure`, which is the
+same mark the by-hand path writes into a `> mark:` slot. **Answer every one.** A
+case records only when no finding is left unmarked, because a set nobody judged
+is a set nobody tested — and **Record review** stays off until the count reaches
+zero.
+
+`unsure` is there so that answering every one costs you nothing you do not
+believe. It is a real answer and it is counted as one, exactly as it is for a
+vote. Say it rather than pick one of the other three to get past an entry: a
+mark you did not mean moves a number, and this one does not.
 
 **One press submits every case you finished, as one pull request.** A footer
 under the list reads `Submit — N cases ready`, counts them, and is the way to
@@ -492,8 +498,8 @@ stands. Send it. **The browser is the runtime**, so nothing is installed,
 nothing is signed and no platform is left out.
 
 The reader opens it, picks cases from the rail, writes their own list for a
-case before that case's sets open, and marks each record `agree`, `reject` or
-`duplicate`. **Download my answers** saves one JSON file. **Load a saved file**
+case before that case's sets open, and marks each record `agree`, `reject`,
+`duplicate` or `unsure`. **Download my answers** saves one JSON file. **Load a saved file**
 takes it back, so a read that runs over several days needs no browser storage
 and no second copy: the envelope is the save file.
 
@@ -572,9 +578,9 @@ sitting measures nothing.
 
 Take the shape from it and the mark names from a generated `REVIEW.md`. That
 document is a merged reader's own words, so a vocabulary sweep stops at it, and
-it still spells the marks `doubt` and `dup`. The set is now `agree`, `reject`
-and `duplicate` — `MARKS` in `evals/harness/sitting.py` — and the app and the
-import both refuse anything else.
+it still spells the marks `doubt` and `dup`. The set is now `agree`, `reject`,
+`duplicate` and `unsure` — `MARKS` in `evals/harness/sitting.py` — and the app
+and the import both refuse anything else.
 
 Merge checklist:
 
