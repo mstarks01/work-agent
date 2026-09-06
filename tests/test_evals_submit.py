@@ -599,3 +599,29 @@ class TestTheChecklistSurvivesAShapeNobodyListed:
         live.write_bytes(b'version = 1\n[voters.ada]\nstanding = "\xff\xfe"\n')
 
         assert submit._roster_delta(ROSTER_WITH_ADA, live) == []
+
+
+class TestRepoSlug:
+    """The link a slug lands in names github.com, so the slug names a
+    repository there or falls back to the upstream."""
+
+    @pytest.mark.parametrize(
+        ("url", "slug"),
+        [
+            ("https://github.com/ada/work-agent.git", "ada/work-agent"),
+            ("git@github.com:ada/work-agent.git", "ada/work-agent"),
+            ("https://github.com/ada/work-agent", "ada/work-agent"),
+            ("https://gitlab.example/ada/work-agent.git", submit.DEFAULT_REPO),
+            ("ssh://git@ghe.corp.example/ada/work-agent.git", submit.DEFAULT_REPO),
+        ],
+    )
+    def test_only_a_github_origin_names_a_fork(self, monkeypatch, url, slug):
+        monkeypatch.setattr(submit, "run_command", lambda args, cwd: url + "\n")
+        assert submit.repo_slug(Path("/nowhere")) == slug
+
+    def test_no_origin_falls_back_to_the_upstream(self, monkeypatch):
+        def refuse(args, cwd):
+            raise submit.SubmitError("no origin")
+
+        monkeypatch.setattr(submit, "run_command", refuse)
+        assert submit.repo_slug(Path("/nowhere")) == submit.DEFAULT_REPO

@@ -20,7 +20,9 @@ rest needs the whole tree.
 
 **A fix is the riskiest code in the tree.** Across the audit rounds, most findings in
 a round came from the previous round's fixes, and every one of those passed the tests
-that shipped with it. So read your own fix diff against the three causes above, prefer
+that shipped with it. So read your own fix diff against the five defect classes in
+`docs/agents/code-review.md` — two readers, a table with a hole, a shape not listed, a
+bound not measured, a fact with no reader — prefer
 one shared reader over a guard copied into a second, and make the harness that proved
 the defect the regression test.
 
@@ -135,7 +137,7 @@ Two audits, three defects, and each one a shape that was legal all along.
 ### Provenance
 
 A fact about how an artifact was made belongs in a **field the code reads**, never a
-sentence in a guide: `bootstrap` on `case.json` stayed true for a year, while the same
+sentence in a guide: `bootstrap` on `case.json`, a required field, stayed true for a year, while the same
 file's prose about a reviewer drifted the moment nobody was one. When a design names a
 role, ship the field and the list of what nobody has done before the artifact. Write guides in the
 imperative, never the past tense. See `docs/agents/provenance.md`.
