@@ -36,9 +36,9 @@ figure the suite reports is **self-consistency, not accuracy** — including the
 Each one re-asserted the reviewer the headline had just retracted. That is the
 second half of the same lesson: a claim retracted in one paragraph stays alive
 in every noun that assumed it, and only a grep for the *vocabulary* finds those.
-The `review` block on `CaseMetadata` and `tests/test_case_review.py` are the
-field-shaped fix — a case is reviewed when it carries the block, and no prose
-can say otherwise.
+The **Case Sitting** submission and `tests/test_case_review.py` are the
+field-shaped fix — a case is read when a merged file under
+`evals/review/submissions/` clears it, and no prose can say otherwise.
 
 ## The failure was partial disclosure, not concealment
 
