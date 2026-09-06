@@ -308,6 +308,18 @@ def fence_for(body: str) -> str:
     return "`" * max(3, longest + 1)
 
 
+def fenced(body: str) -> str:
+    """``body`` inside the shortest fence it cannot close.
+
+    The one spelling of the block layout. :func:`render_sources` wraps each
+    source in it, and :func:`analysis_service.graph.render_fenced` wraps each
+    rendered value a prompt interpolates in it, so the two seams cannot come to
+    lay a block out differently.
+    """
+    fence = fence_for(body)
+    return f"{fence}\n{body}\n{fence}"
+
+
 def render_sources(sources: Sequence[Source]) -> str:
     """Render the job's sources as the untrusted-data section of a prompt.
 
@@ -327,9 +339,8 @@ def render_sources(sources: Sequence[Source]) -> str:
     blocks = []
     for index, source in enumerate(sources, start=1):
         body = f"label: {source.label}\n{_HEADER_RULE}\n{source.text}"
-        fence = fence_for(body)
         blocks.append(
             f"### Source {index} of {total} — {_REGISTERS[source.kind]}\n\n"
-            f"{fence}\n{body}\n{fence}"
+            f"{fenced(body)}"
         )
     return "\n\n".join(blocks)

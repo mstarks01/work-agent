@@ -23,7 +23,6 @@ from evals.harness import sitting as sittings
 from evals.harness.reference import ANONYMOUS
 from evals.harness.sitting import Draft, Store
 from tests.test_sitting_app import CASE, build_tree, drafts_root
-from webapp.sitting_base import HELD
 
 OWN_LIST = ["a spoofed device"]
 
@@ -40,7 +39,6 @@ def store(tree):
         submitted_by="ada",
         submitted_for="ada",
         drafts=drafts_root(tree),
-        held=HELD,
     )
 
 
@@ -52,7 +50,6 @@ def proxy_store(tree):
         submitted_by="ada",
         submitted_for=ANONYMOUS,
         drafts=drafts_root(tree),
-        held=HELD,
     )
 
 
@@ -71,7 +68,6 @@ def open_draft(store: Store, case: str = CASE, **fields) -> Draft:
     prepared = prepared_for(store, case)
     return Draft(
         case=case,
-        clone=str(store.root),
         own_list=list(OWN_LIST),
         opened_digests=sittings.digests(store.case_dir(case), prepared.files),
         **fields,
@@ -306,4 +302,4 @@ class TestUnsureIsAnAnswer:
 
     def test_a_value_outside_the_set_is_still_refused(self, store):
         with pytest.raises(ValidationError):
-            sittings.Draft(case=CASE, clone=str(store.root), marks={"v3:abc": "maybe"})
+            sittings.Draft(case=CASE, marks={"v3:abc": "maybe"})
