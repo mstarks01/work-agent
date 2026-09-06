@@ -10,13 +10,24 @@ bookkeeping around it.
 > is free, offline, and open to outside contributors. New here? Start at
 > [`../CONTRIBUTING.md`](../CONTRIBUTING.md).
 
-> **Step 6 has run once, and no other step ever has.** All 13 cases in
-> `evals/corpus/` were written by an agent. A person has now read case
-> `01-payments-checkout` whole — source, model and both reference sets — and
-> signed it off in `case.json`. Nobody has read the other twelve, and nobody has
-> run step 3 on any case: the `corrections.md` files record what an agent changed
-> against the source text, not what a reviewer caught. Every number the suite
-> reports carries that provenance — see the top of [README.md](README.md).
+> **A person has read the calibration labels, and no case has a merged Case
+> Sitting.** All 13 cases in `evals/corpus/` were written by an agent. Two
+> calibration reviews read the pairs step 5 produces:
+> [`calibration_labels/REVIEW-01.md`](calibration_labels/REVIEW-01.md) on
+> 2026-08-18, and
+> [`calibration_labels/REVIEW-02.md`](calibration_labels/REVIEW-02.md) on
+> 2026-09-02. Step 6 is the step that clears a case, and it has cleared none: a
+> **Case Sitting** merges as one JSON file under `evals/review/submissions/`,
+> that directory holds no submission, and `tests/test_case_review.py` derives the
+> count from it — so this sentence and the gate cannot disagree. Case
+> `01-payments-checkout` carries a reading document one person filled on
+> 2026-08-23,
+> [`corpus/01-payments-checkout/REVIEW-02.md`](corpus/01-payments-checkout/REVIEW-02.md),
+> which is the template for the method rather than a submission that clears the
+> case (ADR 24). Nobody has run step 3 on any case: the `corrections.md` files
+> record what an agent changed against the source text, not what a reviewer
+> caught. Every number the suite reports carries that provenance — see the top of
+> [README.md](README.md).
 
 ## What a case is
 
