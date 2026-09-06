@@ -1881,6 +1881,16 @@ class UnknownClaimIdentity(BaseModel):
 # bounded only by its own field, so the reason that repeats it must cut it.
 DROPPED_REASON_MAX_CHARS = 500
 
+# How much of an agent's own title a dropped claim carries. Named rather
+# than spelled at the field, because :meth:`DroppedClaim.of` cuts to it and
+# a second spelling is how the cut and the bound come to disagree.
+DROPPED_TITLE_MAX_CHARS = 200
+
+#: What a dropped claim is called where the agent named it nothing. A
+#: proposal that failed its own schema may carry no title at all, and
+#: ``title`` is the only trace of the finding, so it cannot be empty.
+UNTITLED = "(untitled)"
+
 
 class DroppedClaim(BaseModel):
     """A claim the service dropped for a fault in one entry of it.
@@ -1916,8 +1926,28 @@ class DroppedClaim(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     claim_id: str = Field(min_length=1, max_length=CLAIM_ID_MAX_CHARS)
-    title: str = Field(min_length=1, max_length=200)
+    title: str = Field(min_length=1, max_length=DROPPED_TITLE_MAX_CHARS)
     reason: str = Field(min_length=1, max_length=DROPPED_REASON_MAX_CHARS)
+
+    @classmethod
+    def of(cls, *, claim_id: str, title: str, reason: str) -> DroppedClaim:
+        """This drop as a mark, with every agent-written value cut to fit.
+
+        **The only way one is built.** All three values are agent text bounded
+        by their own fields upstream, or composed here from one — and a
+        producer that raised while recording a drop would cost the job the very
+        report the mark exists to preserve. So the cut belongs beside the
+        bound, once, rather than at each place a claim is dropped.
+
+        An empty title becomes :data:`UNTITLED`. A proposal that failed its own
+        schema may name nothing, and ``title`` is the only trace of what the
+        agent found.
+        """
+        return cls(
+            claim_id=claim_id[:CLAIM_ID_MAX_CHARS],
+            title=(title or UNTITLED)[:DROPPED_TITLE_MAX_CHARS],
+            reason=reason[:DROPPED_REASON_MAX_CHARS],
+        )
 
 
 class MissingMitigation(BaseModel):

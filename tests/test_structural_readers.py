@@ -34,6 +34,7 @@ from collections.abc import Callable
 import pytest
 from pydantic import ValidationError
 
+from analysis_service.frameworks.stride.record import Threat
 from analysis_service.report import (
     Report,
     ScopeEntry,
@@ -89,7 +90,16 @@ def _repeated_claim_id(report: Report) -> None:
 
 
 def _severity_off_the_matrix(report: Report) -> None:
-    report.analyses[0].claims[0].severity.level = "low"
+    """The band is STRIDE's, because the neutral claim grades no harm.
+
+    The same reason :func:`~evals.harness.structural._block_issues` reads the
+    field off the package rather than off the annotation: a block's claims
+    validate as their own package's record, and only a record that grades harm
+    declares ``severity``.
+    """
+    claim = report.analyses[0].claims[0]
+    assert isinstance(claim, Threat)
+    claim.severity.level = "low"
 
 
 def _summary_miscounts(report: Report) -> None:
