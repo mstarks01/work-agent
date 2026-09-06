@@ -61,7 +61,6 @@ from analysis_service.analysis import (
 )
 from analysis_service.frameworks import FrameworkPackage, schemas_for
 from analysis_service.report import (
-    DROPPED_REASON_MAX_CHARS,
     GROUND_TERM_MAX_CHARS,
     REFERENCE_MAX_CHARS,
     AnalysisMarks,
@@ -472,13 +471,13 @@ def resolve_proposals(
         if not grounds:
             cited = ", ".join(repr(ref) for ref in unresolved)
             groundless.append(
-                DroppedClaim(
+                DroppedClaim.of(
                     claim_id=claim_id,
                     title=proposal.title,
                     reason=(
                         "cites only evidence this job's catalog does not"
                         f" contain ({cited})"
-                    )[:DROPPED_REASON_MAX_CHARS],
+                    ),
                 )
             )
             continue
@@ -540,12 +539,10 @@ def invalid_proposal_marks(
         except (TypeError, ValueError, KeyError):
             claim_id = ""
         dropped.append(
-            DroppedClaim(
+            DroppedClaim.of(
                 claim_id=claim_id or f"{package.name}:{lane}:proposal-{entry.index}",
-                title=str(entry.scalars.get("title") or "(untitled)"),
-                reason=f"fails the proposal schema at {entry.error}"[
-                    :DROPPED_REASON_MAX_CHARS
-                ],
+                title=str(entry.scalars.get("title") or ""),
+                reason=f"fails the proposal schema at {entry.error}",
             )
         )
     return AnalysisMarks(dropped_claims=dropped)

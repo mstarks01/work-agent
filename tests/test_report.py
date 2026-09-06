@@ -11,8 +11,13 @@ from analysis_service.frameworks.stride.record import (
     build_stride_summary,
 )
 from analysis_service.report import (
+    CLAIM_ID_MAX_CHARS,
+    DROPPED_REASON_MAX_CHARS,
+    DROPPED_TITLE_MAX_CHARS,
+    UNTITLED,
     AnalysisMarks,
     ClaimMark,
+    DroppedClaim,
     Ground,
     LaneCoverage,
     MissingMitigation,
@@ -473,10 +478,11 @@ class TestEveryClaimMarkPointsAtAThreat:
 
 
 class TestAnalysisMarks:
-    """The five service-owned marks as one value.
+    """Every service-owned mark as one value.
 
     The fan-in collects them from more than one producer, so merging is the
-    operation this type exists for.
+    operation this type exists for, and landing them on the report is the
+    other.
     """
 
     def test_an_empty_set_is_the_common_case(self):
@@ -507,16 +513,120 @@ class TestAnalysisMarks:
         assert merged.unverified_grounds == []
 
     def test_merging_covers_every_declared_mark(self):
-        """A sixth mark joins by being declared, not by editing ``merged_with``.
+        """A new mark joins by being declared, not by editing ``merged_with``.
 
         The method walks ``model_fields``, so this holds the whole set rather
-        than the four names that happen to exist today.
+        than the names that happen to exist today.
         """
         empty = AnalysisMarks()
 
         merged = empty.merged_with(empty)
 
         assert set(merged.model_dump()) == set(AnalysisMarks.model_fields)
+
+    def test_every_mark_reaches_the_report(self):
+        """A mark the report has no field for is dropped, and says nothing.
+
+        :func:`~analysis_service.graph._framework_block` spreads this value
+        onto a block by walking the block's own fields, and keeps only what the
+        block declares. That filter is right — a package that grades no harm
+        carries no :class:`MissingMitigation` list — and it cannot tell a mark
+        another package owns from a mark nobody declared. Both are dropped in
+        silence.
+
+        This is the table check the framework axis already runs for
+        ``CONTENT_LICENSE`` against ``PACKAGES``, one axis over. It is derived
+        from the registry rather than listed, so a package that arrives with a
+        mark of its own is covered by this test existing.
+        """
+        from analysis_service.frameworks import SCHEMAS
+        from analysis_service.report import FrameworkAnalysis, Report
+
+        blocks = {FrameworkAnalysis, *(schemas.block for schemas in SCHEMAS.values())}
+        lands = set(Report.model_fields)
+        for block in blocks:
+            lands |= set(block.model_fields)
+
+        stranded = sorted(set(AnalysisMarks.model_fields) - lands)
+
+        assert not stranded, (
+            f"the service computes {stranded} and no report field carries it."
+            " Declare the mark on the envelope, if it is about the shared"
+            " model, or on the block of every package that can produce it."
+        )
+
+
+class TestDroppedClaim:
+    """One constructor, so the bound on agent text has one reader.
+
+    A drop is recorded from four places in three modules, and every value on
+    the mark is agent text or composed from it. A producer that raised while
+    recording a drop would cost the job the report the mark exists to preserve,
+    so the cut sits beside the bound rather than at each producer.
+    """
+
+    def test_an_over_long_reason_is_cut(self):
+        mark = DroppedClaim.of(
+            claim_id="S-01", title="Session fixation", reason="x" * 900
+        )
+
+        assert len(mark.reason) == DROPPED_REASON_MAX_CHARS
+
+    def test_an_over_long_title_is_cut(self):
+        """The one value no producer cut for itself."""
+        mark = DroppedClaim.of(
+            claim_id="S-01", title="t" * 900, reason="no ground verifies"
+        )
+
+        assert len(mark.title) == DROPPED_TITLE_MAX_CHARS
+
+    def test_an_over_long_claim_id_is_cut(self):
+        mark = DroppedClaim.of(
+            claim_id="S" * 900, title="Session fixation", reason="dropped"
+        )
+
+        assert len(mark.claim_id) == CLAIM_ID_MAX_CHARS
+
+    def test_a_nameless_claim_gets_the_stated_placeholder(self):
+        """A proposal that failed its own schema may name nothing."""
+        mark = DroppedClaim.of(
+            claim_id="stride:spoofing:proposal-3", title="", reason="bad shape"
+        )
+
+        assert mark.title == UNTITLED
+
+    def test_nothing_builds_one_any_other_way(self):
+        """``DroppedClaim(...)`` past the constructor is the second reader.
+
+        Read with ``ast`` rather than by substring, so the prose in these
+        modules — which names the type while explaining what it is for — is not
+        mistaken for a call.
+        """
+        import ast
+        from pathlib import Path
+
+        from analysis_service import report as report_module
+
+        source_root = Path(report_module.__file__).parent
+        direct: list[str] = []
+        for path in sorted(source_root.rglob("*.py")):
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                is_call = isinstance(node, ast.Call)
+                names_the_type = (
+                    is_call
+                    and isinstance(node.func, ast.Name)
+                    and node.func.id == "DroppedClaim"
+                )
+                if names_the_type:
+                    direct.append(f"{path.name}:{node.lineno}")
+
+        assert not direct, (
+            f"{direct} builds a DroppedClaim directly. Call DroppedClaim.of,"
+            " which cuts every agent-written value to the bound its field"
+            " declares — a producer that raises here costs the job the report"
+            " the mark exists to preserve."
+        )
 
 
 class TestCoverageRatios:

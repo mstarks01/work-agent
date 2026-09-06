@@ -56,7 +56,6 @@ from analysis_service.grounding import (
 from analysis_service.references import canonical, snap
 from analysis_service.report import (
     BEYOND_GROUNDS,
-    DROPPED_REASON_MAX_CHARS,
     ELEMENT_REF_MAX_CHARS,
     MENTION_MAX_CHARS,
     AnalysisMarks,
@@ -307,13 +306,13 @@ def _resolve_element_references(
             continue
         if not kept:
             dropped.append(
-                DroppedClaim(
+                DroppedClaim.of(
                     claim_id=claim.id,
                     title=claim.title,
                     reason=(
                         "names only elements the system model does not contain"
                         f" ({', '.join(repr(ref) for ref in lost)})"
-                    )[:DROPPED_REASON_MAX_CHARS],
+                    ),
                 )
             )
             continue
@@ -382,13 +381,13 @@ def _bound_element_references(
             continue
         if not kept:
             dropped.append(
-                DroppedClaim(
+                DroppedClaim.of(
                     claim_id=claim.id,
                     title=claim.title,
                     reason=(
                         "names only elements its grounds do not reach"
                         f" ({', '.join(repr(ref) for ref in lost)})"
-                    )[:DROPPED_REASON_MAX_CHARS],
+                    ),
                 )
             )
             continue
@@ -418,7 +417,7 @@ def _drop_duplicate_ids(
     for claim in claims:
         if claim.id in seen:
             dropped.append(
-                DroppedClaim(
+                DroppedClaim.of(
                     claim_id=claim.id,
                     title=claim.title,
                     reason="repeats the ID of an earlier draft in this framework",
@@ -819,10 +818,10 @@ def _verify_quotes(claims: Sequence[Claim], sources: Mapping[str, str]) -> _Quot
                 for index in unverified
             )
             groundless.append(
-                DroppedClaim(
+                DroppedClaim.of(
                     claim_id=claim.id,
                     title=claim.title,
-                    reason=f"no ground verifies: {lost}"[:DROPPED_REASON_MAX_CHARS],
+                    reason=f"no ground verifies: {lost}",
                 )
             )
             continue

@@ -172,7 +172,6 @@ from analysis_service.prompts import (
     compose_repair_prompt,
 )
 from analysis_service.report import (
-    DROPPED_REASON_MAX_CHARS,
     AnalysisContext,
     AnalysisMarks,
     Claim,
@@ -1579,10 +1578,10 @@ def merge_drafts(
     # twice, once as a claim and once as not applicable (#443).
     ruled_out = state.get(nodes.key("ruled_out")) or {}
     refused = [
-        DroppedClaim(
+        DroppedClaim.of(
             claim_id=draft.id,
             title=draft.title,
-            reason=ruled_out[unit][:DROPPED_REASON_MAX_CHARS],
+            reason=ruled_out[unit],
         )
         for draft in joined.drafts
         if (unit := package.record.unit_of(draft)) in ruled_out

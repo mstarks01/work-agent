@@ -41,8 +41,10 @@ from __future__ import annotations
 
 import html
 import json
+import re
 import secrets
 from dataclasses import dataclass
+from pathlib import Path
 
 from fastapi import HTTPException
 from fastapi.responses import HTMLResponse
@@ -67,6 +69,13 @@ LOOPBACK_HOSTS = ["127.0.0.1", "localhost"]
 #: falls back to ``default-src``, so a policy that omits them is open on all
 #: three however total the rest of it reads.
 _CLOSED = ("base-uri 'none'", "form-action 'none'", "frame-ancestors 'none'")
+
+#: Where the local apps' client scripts live, one file per page.
+_STATIC = Path(__file__).resolve().parent / "static"
+
+#: What a script file may be called. Callers name a file in code, so this
+#: never sees a request value; it is checked so that it cannot start to.
+_SCRIPT_NAME = re.compile(r"[a-z][a-z_]*\.js")
 
 
 class MissingPlaceholder(RuntimeError):
@@ -148,7 +157,32 @@ def script_json(value: object) -> str:
     return json.dumps(value).replace("<", "\\u003c")
 
 
-def render(template: str, grants: Grants, **fields: str) -> RenderedPage:
+def client_script(name: str) -> str:
+    """One page's client script, read from ``webapp/static``.
+
+    A page's script is authored code rather than a value, so it carries no
+    escape and nothing here escapes it. What a submitter or an operator wrote
+    never reaches this text: a page's injected values stay in its template, in
+    their own ``<script>`` block, where :func:`script_json` still decides how
+    each one is spelled. The two blocks share the page's top-level scope, so
+    the script reads those values as the globals they are.
+
+    Keeping the code in a file is what lets a reader, a linter and a test read
+    it as JavaScript. A script inside a Python string is only ever readable as
+    a string, and the only assertion available over one is how it is spelled.
+
+    ``name`` is a file name a caller writes as a literal, never a request
+    value. It is checked anyway, so that a name arriving from somewhere else
+    cannot leave the directory (OWASP A01).
+    """
+    if not _SCRIPT_NAME.fullmatch(name):
+        raise ValueError(f"{name!r} is not a script file name")
+    return (_STATIC / name).read_text(encoding="utf-8")
+
+
+def render(
+    template: str, grants: Grants, *, script: str = "", **fields: str
+) -> RenderedPage:
     """Fill a page template, and stamp the nonce its policy authorises.
 
     Substitution is by explicit ``<!--name-->`` replacement rather than
@@ -160,15 +194,21 @@ def render(template: str, grants: Grants, **fields: str) -> RenderedPage:
     This cannot choose for the caller, because only the template says where a
     placeholder sits.
 
-    A field whose placeholder the template does not carry **raises**. The two
-    disagree about what the page holds, and a page served with a value silently
-    dropped is the worse of the two outcomes: the first-run app's report page is
-    the whole payload, and an empty one renders as a report of nothing rather
-    than as a failure.
+    ``script`` is the page's client code, from :func:`client_script`. It fills
+    ``<!--script-->`` and takes no escape, for the reason that function gives.
+    It lands before the fields do, so a template is free to put a placeholder
+    inside the code as well as beside it.
+
+    A field whose placeholder the template does not carry **raises**, and so
+    does a script. The two disagree about what the page holds, and a page
+    served with a value silently dropped is the worse of the two outcomes: the
+    first-run app's report page is the whole payload, and an empty one renders
+    as a report of nothing rather than as a failure.
     """
     nonce = secrets.token_urlsafe(16)
     page = template.replace(NONCE_PLACEHOLDER, nonce)
-    for name, value in fields.items():
+    filling = {**({"script": script} if script else {}), **fields}
+    for name, value in filling.items():
         placeholder = f"<!--{name}-->"
         if placeholder not in page:
             raise MissingPlaceholder(f"the template carries no {placeholder}")

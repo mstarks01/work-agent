@@ -16,6 +16,12 @@ to parse. And a gate that would silently weaken if somebody relaxed
 because a run artifact that named one problem per iteration would waste a live
 sweep.
 
+One rule with two readers drifts, and each reader's own test agrees with it, so
+neither notices. ``tests/test_structural_readers.py`` is what stops that: it
+breaks one sound report every way either reader names, runs both, and holds
+their answers against each other. It also carries the written list of the rules
+this module does not re-assert, and why each one holds anyway.
+
 The checks run per block, and every message names the framework. A report
 carries one :class:`~analysis_service.report.FrameworkAnalysis` per framework
 the job selected, so a claim ID is unique only within its own block, and a
@@ -104,8 +110,10 @@ def _block_issues(block: FrameworkAnalysis, known_ids: set[str]) -> list[str]:
         # carries no ``element_id`` and there is nothing here to resolve.
         #
         # This re-derives `Report._reference_issues` one seam later, so it has
-        # to read both spellings exactly as that check does. Nothing offline
-        # exercises the difference: the scripted critic never emits a subject.
+        # to read both spellings exactly as that check does. The scripted critic
+        # never emits a subject, so a sweep does not exercise the difference;
+        # `tests/test_structural_readers.py` holds the two readers against each
+        # other over every fault either one names.
         issues += [
             f"{where}: claim {claim.id!r} hangs its needs-info verdict on element"
             f" {ref.element_id!r}, absent from the embedded system model"

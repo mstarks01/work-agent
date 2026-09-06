@@ -1881,6 +1881,16 @@ class UnknownClaimIdentity(BaseModel):
 # bounded only by its own field, so the reason that repeats it must cut it.
 DROPPED_REASON_MAX_CHARS = 500
 
+# How much of an agent's own title a dropped claim carries. Named rather
+# than spelled at the field, because :meth:`DroppedClaim.of` cuts to it and
+# a second spelling is how the cut and the bound come to disagree.
+DROPPED_TITLE_MAX_CHARS = 200
+
+#: What a dropped claim is called where the agent named it nothing. A
+#: proposal that failed its own schema may carry no title at all, and
+#: ``title`` is the only trace of the finding, so it cannot be empty.
+UNTITLED = "(untitled)"
+
 
 class DroppedClaim(BaseModel):
     """A claim the service dropped for a fault in one entry of it.
@@ -1916,8 +1926,28 @@ class DroppedClaim(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     claim_id: str = Field(min_length=1, max_length=CLAIM_ID_MAX_CHARS)
-    title: str = Field(min_length=1, max_length=200)
+    title: str = Field(min_length=1, max_length=DROPPED_TITLE_MAX_CHARS)
     reason: str = Field(min_length=1, max_length=DROPPED_REASON_MAX_CHARS)
+
+    @classmethod
+    def of(cls, *, claim_id: str, title: str, reason: str) -> DroppedClaim:
+        """This drop as a mark, with every agent-written value cut to fit.
+
+        **The only way one is built.** All three values are agent text bounded
+        by their own fields upstream, or composed here from one — and a
+        producer that raised while recording a drop would cost the job the very
+        report the mark exists to preserve. So the cut belongs beside the
+        bound, once, rather than at each place a claim is dropped.
+
+        An empty title becomes :data:`UNTITLED`. A proposal that failed its own
+        schema may name nothing, and ``title`` is the only trace of what the
+        agent found.
+        """
+        return cls(
+            claim_id=claim_id[:CLAIM_ID_MAX_CHARS],
+            title=(title or UNTITLED)[:DROPPED_TITLE_MAX_CHARS],
+            reason=reason[:DROPPED_REASON_MAX_CHARS],
+        )
 
 
 class MissingMitigation(BaseModel):
@@ -2002,24 +2032,32 @@ class SharedElementName(BaseModel):
 class AnalysisMarks(BaseModel):
     """Every service-owned mark one run produced, as one value.
 
-    The five lists below have one owner, one standing and one policy: the
-    *service* records them, they ride beside the findings rather than on them
-    (an agent must not report on its own accuracy), and none of them fails a
-    job. They used to travel as five loose parallel lists — through the fan-in,
-    through four session-state keys, through four parameters on the assemble
-    node, through four fields on an :class:`~analysis_service.graph.Analysis` and
-    its two state methods — so adding the fifth cost about fifteen edits of one
-    shape. Here they are one field.
+    Every list below has one owner, one standing and one policy: the *service*
+    records them, they ride beside the findings rather than on them (an agent
+    must not report on its own accuracy), and none of them fails a job. One
+    field carries all of them, so a mark travels the fan-in, the session state,
+    the assemble node and an :class:`~analysis_service.graph.Analysis` as part
+    of one value. A new mark is a field here, and nothing downstream is edited
+    to carry it.
 
-    **Not the report's wire shape.** The report keeps its five top-level
-    arrays; :meth:`~analysis_service.graph.Analysis.into_report` is where this
-    value becomes them. Nesting them there would break every consumer of a
-    published schema to save one of those fifteen edits.
+    **Not the report's wire shape.** A mark annotates one framework's claims,
+    so it rides on that framework's block, and the one mark about the shared
+    model rides on the envelope.
+    :meth:`~analysis_service.graph.Analysis.into_report` and
+    :func:`~analysis_service.graph._framework_block` are where this value
+    becomes those arrays. Nesting it there instead would break every consumer
+    of a published schema.
+
+    **Every field here must reach one of those two destinations.** The spread
+    walks the block's own fields, so a package that declares no ``severity``
+    gets no :class:`MissingMitigation` list — and a mark *no* destination
+    declares is dropped by the same walk, in silence.
+    ``tests/test_report.py`` is what refuses that.
 
     Empty is the common case and means what it says: every quote verified,
-    every mention resolved, every reference named a fact, every threat carried
-    a countermeasure or the unknown that excuses carrying none, and no two
-    element types share a name.
+    every mention resolved, every reference named a fact, every claim kept its
+    identity, every threat carried a countermeasure or the unknown that excuses
+    carrying none, and no two element types share a name.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -2053,8 +2091,8 @@ class AnalysisMarks(BaseModel):
         The fan-in collects marks from three producers — one per lane's
         evidence resolution, the join across all six, and the model itself —
         and this is how they become one value. It walks ``model_fields`` rather
-        than naming the five lists, so a sixth mark joins by being declared
-        above rather than by someone remembering this method.
+        than naming each list, so a new mark joins by being declared above
+        rather than by someone remembering this method.
         """
         return AnalysisMarks(
             **{
