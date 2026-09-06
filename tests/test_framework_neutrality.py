@@ -151,14 +151,6 @@ DECLARED: dict[str, str] = {
         "This code is STRIDE's. It reads a category and two rated severity axes,"
         " which only that package's record carries (#167)."
     ),
-    "evals/migrations/2026-08-30-asvs-verb.py": (
-        "This code is ASVS's, and it is a one-time repair of archived data"
-        " rather than a rule the service runs. A framework whose claims name a"
-        " catalog requirement composes no action verb, so a stored verb on one"
-        " of its claims is a field nothing reads; the migration nulls exactly"
-        " those, and reads each claim's own `framework` rather than the file it"
-        " sits in, so a package that does compose a verb keeps every one."
-    ),
     "evals/harness/pairing.py": (
         "This code is ASVS's, and reads the same catalog `applicability.py`"
         " scores against. A framework whose claims name a catalog requirement"
@@ -1097,3 +1089,32 @@ def test_no_shared_instruction_file_counts_a_packages_lanes():
         " Every framework reads this text and they declare different numbers of"
         " lanes. Say what the agents do, not how many there are."
     )
+
+
+def test_every_package_caps_the_drafts_one_lane_may_emit():
+    """A package narrows ``claims`` to its own draft type, and a redeclared
+    field carries none of the base's constraints.
+
+    So the cap that bounds a lane's emission is not inherited: it is a line each
+    package writes, and a package that narrows the field and forgets it gets the
+    unbounded list back with nothing to say so. Checked against the registry
+    rather than a fixed pair, because the gap this closes is a package nobody
+    has written yet.
+    """
+    import annotated_types
+
+    from analysis_service.frameworks import SCHEMAS
+    from analysis_service.report import MAX_CLAIMS_PER_BATCH
+
+    for name, schemas in SCHEMAS.items():
+        field = schemas.proposals.model_fields["claims"]
+        caps = [
+            constraint.max_length
+            for constraint in field.metadata
+            if isinstance(constraint, annotated_types.MaxLen)
+        ]
+        assert caps == [MAX_CLAIMS_PER_BATCH], (
+            f"{name}'s {schemas.proposals.__name__}.claims does not cap its"
+            " length. Narrowing the field drops the base's cap silently, so the"
+            " package has to spell MAX_CLAIMS_PER_BATCH itself."
+        )

@@ -26,12 +26,19 @@ exactly. A deployment that wants a dollar bound converts once, at the knob,
 where it can see the rate it used. The provider's own spend limit is the
 backstop behind both, and ``docs/Configuration.md`` says so.
 
-The estimate is deliberately coarse and deliberately high. :func:`estimate`
-multiplies the submission's own byte count by every LLM call the selection
-implies, which over-counts: not every call carries the whole input, and a repair
-node often does not run. Over-counting is the right direction for a bound that
-must hold before anything is spent. The alternative is a gate that admits a job
-it cannot afford and discovers this at node nine. The service replaces the
+The estimate is deliberately coarse, and it is **lower** than the truth rather
+than higher. :func:`estimate` multiplies the submission's own byte count by
+every LLM call the selection implies. Two errors run in opposite directions and
+they do not cancel: not every call carries the whole input, which pulls the
+number up, and none of them counts the instruction text every call does carry,
+which pulls it down by far more. Measured, a small submission reserves 318 times
+less than it spends.
+
+Over-counting is the direction a bound that must hold before anything is spent
+should err in, and this does not, so it is a floor rather than a bound today.
+What keeps that from being an exposure is that ``max_jobs_per_window`` refuses a
+subject first at every shipped deployment. :func:`estimate` records what fixing
+it takes. The service replaces the
 reservation with the measured usage the moment the job reaches a terminal state,
 so a window's accounting converges on what happened rather than on what was
 feared.
@@ -99,9 +106,24 @@ def estimate(
     shrink. A word count would read a 100 KiB base64 blob as two tokens while a
     tokenizer meters it near one token per byte, so only a byte count
     over-counts every text a caller can send.
-    It ignores the instruction text each node also carries, which pulls the
-    estimate down, and assumes every call sees the whole input, which pulls it
-    up much harder — so it over-counts, on purpose. See the module docstring.
+    **It under-counts, and the direction was measured rather than reasoned.**
+    The claim here used to be that assuming every call sees the whole input
+    pulls the number up harder than ignoring instruction text pulls it down.
+    That is false wherever the submission is small, which is the ordinary case:
+    a 133-byte submission naming both frameworks reserves 3,857 tokens against
+    1,225,788 bytes of real prompt, 318 times short, because 986,348 of those
+    bytes are instruction text the inputs cannot predict. At the largest
+    submission the service accepts it is still 1.24 times short.
+
+    What limits the damage today is that this is not the bound that binds:
+    ``max_jobs_per_window`` refuses a subject before ``max_tokens_per_window``
+    does, at every deployment shipped. So the bound the configuration names as
+    the spend bound is the inert one, which is worth fixing and is not an
+    exposure while that holds.
+
+    The fix is to derive the instruction bytes from ``PACKAGES`` the way
+    :func:`llm_calls_for` derives the call count, rather than to add a constant
+    somebody has to maintain. Until then this number is a floor, not a bound.
     """
     submitted = sum(source.size_bytes() for source in sources)
     return submitted * llm_calls_for(frameworks)
@@ -149,6 +171,23 @@ def spent_tokens(charges: Iterable[tuple[int, int | None]]) -> int:
     )
 
 
+def retried_prompt_tokens(node: NodeRun) -> int:
+    """The prompt tokens a node's *failed* attempts sent, and nobody metered.
+
+    One reader for a rule two callers need. `measured_tokens` charges these to
+    a window; `evals.harness.consent` prices them into the figure a contributor
+    is asked to accept. The two disagreed: the budget charged them and the
+    consent price did not, so a sweep offered $9.75 against a $25.35 bill at the
+    shipped `attempts = 3`. Each was tested against its own expectation.
+
+    Only the attempt that answered is metered, and every attempt before it sent
+    the same prompt. `analysis_service.retry` stamps the count for exactly this
+    (OWASP LLM10). This over-counts an attempt the provider refused before
+    reading the prompt, which is the direction a settlement should err in.
+    """
+    return 0 if node.usage is None else node.usage.prompt_tokens * (node.attempts - 1)
+
+
 def measured_tokens(nodes: Iterable[NodeRun]) -> int:
     """What a finished job's node runs actually cost, or 0 if nothing metered.
 
@@ -171,7 +210,7 @@ def measured_tokens(nodes: Iterable[NodeRun]) -> int:
     decides a budget must not have a quiet default behind it.
     """
     return sum(
-        node.usage.total_tokens + node.usage.prompt_tokens * (node.attempts - 1)
+        node.usage.total_tokens + retried_prompt_tokens(node)
         for node in nodes
         if node.usage is not None
     )

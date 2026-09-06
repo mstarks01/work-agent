@@ -60,7 +60,7 @@ selected in step 2 of [First-Run](First-Run.md), since nothing is selected by
 default:
 
 ```
-base   → openai / gpt-4o
+base   → openai / gpt-4o-2024-08-06
 strong → vertex / gemini-2.5-pro
 ```
 
@@ -105,20 +105,35 @@ page instead of the form**. There is no textarea and no Analyze button, so no
 analysis can run on a model nobody chose.
 
 Where the config itself read cleanly — the credential and sampling cases — the
-page names the vendor your config selects and lists **every** environment
-variable that vendor needs, marking the ones that are unset. It reports presence
-only and never prints a value. Vertex is shown because it needs the most
-variables of the three vendors, which is what makes the next point visible:
+page names the vendor your config selects, states the credential mode that
+vendor runs under, and lists **every** environment variable that vendor needs,
+marking the ones that are unset. It reports presence only and never prints a
+value. Vertex is shown because it needs more variables than most, which is what
+makes the next point visible:
 
 ```
-ANALYSIS_VERTEX_PROJECT           NOT SET
-ANALYSIS_VERTEX_LOCATION          NOT SET
-GOOGLE_APPLICATION_CREDENTIALS  NOT SET
+vertex
+Credential mode: iam. This vendor passes no credential material. The platform
+supplies the identity, and the vendor's SDK resolves it from the environment
+this process runs in.
+
+ANALYSIS_VERTEX_PROJECT   NOT SET
+ANALYSIS_VERTEX_LOCATION  NOT SET
 ```
+
+A vendor whose provider needs a client library gets a row for that too, naming
+the extra that installs it. Without it the page would mark every variable set
+while the run still failed to bind.
 
 All of them at once, rather than one per restart — the underlying check raises on
-the first variable it finds missing, which would otherwise mean three restarts to
-discover three variables.
+the first variable it finds missing, which would otherwise mean two restarts to
+discover two variables.
+
+The mode is **reported, never resolved**. Under `iam` the only way to find out
+whether an identity exists is to ask for one, which is a network call on page
+render and reaches the instance metadata service. So the page says what your
+deployment declared and what the platform has to supply, and leaves the answer
+to a run.
 
 If the tier config is what failed, there is no selected vendor to report and the
 page says so instead: fix the file named in the error first.
@@ -193,6 +208,6 @@ Every response also carries `X-Content-Type-Options: nosniff` and
 `Referrer-Policy: no-referrer` — those are per response rather than per page,
 which is why they are not part of the CSP.
 
-None of this is what makes the app safe to run: **loopback binding is**. On
+Loopback binding is the first of these and not the whole of them: a page you visit can reach a loopback port, and DNS rebinding is how it tries. Three controls stop it, and each refuses something the others do not — the `Host` check refuses a rebound name, the `Sec-Fetch-Site` check refuses a write that did not come from this page, and `frame-ancestors 'none'` refuses a page that would frame this one to borrow its origin. `webapp/page.py` holds all three. On
 `127.0.0.1` the submitter is both attacker and victim. These are the controls
 that keep that from being the only thing standing between the two.

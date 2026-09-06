@@ -15,6 +15,7 @@ import pytest
 
 from evals.harness import ledger
 from evals.harness.roster import (
+    _LOGIN,
     DEFAULT_ROSTER_PATH,
     STANDINGS,
     RosterError,
@@ -163,3 +164,43 @@ class TestTheCheckedInTree:
         votes = ledger.load(ledger.DEFAULT_LEDGER_PATH)
         unrostered = sorted({vote.voter for vote in votes if vote.voter not in roster})
         assert not unrostered, f"voters with no roster line: {unrostered}"
+
+
+class TestTheRosterAndTheLedgerAgreeOnALogin:
+    """One rule, one reader — asserted against each other, not each alone.
+
+    A roster key names a voter, and a ledger ``voter`` names that voter's file.
+    A key the roster admits and the ledger refuses is a line nobody can vote
+    from; a key the ledger admits and the roster refuses is a vote from a voter
+    with no standing. Both spelled the same regex, so each one's own test
+    agreed with it and neither test could see a disagreement.
+    """
+
+    @pytest.mark.parametrize(
+        "login",
+        [
+            "octocat",
+            "a",
+            "a-b-c",
+            "0",
+            "a" * 39,
+            # Every shape a GitHub login is not.
+            "",
+            "-leading",
+            "trailing-",
+            "double--hyphen",
+            "has space",
+            "has/slash",
+            "..",
+            "a" * 40,
+        ],
+    )
+    def test_the_two_readers_answer_identically(self, login):
+        assert bool(_LOGIN.fullmatch(login)) is bool(
+            ledger.GITHUB_LOGIN.fullmatch(login)
+        )
+
+    def test_they_are_one_object_rather_than_two_that_match(self):
+        # Equal answers on a list somebody wrote is weaker than one rule: the
+        # list is what a second copy drifts past.
+        assert _LOGIN is ledger.GITHUB_LOGIN

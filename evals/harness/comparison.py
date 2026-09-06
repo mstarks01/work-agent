@@ -38,8 +38,9 @@ from pathlib import Path
 from typing import Any
 
 from analysis_service.report import FrameworkName
-from evals.harness import standings
+from evals.harness import baseline, standings
 from evals.harness.artifact import REPO_ROOT
+from evals.harness.baseline import BaselineError, artifact_filename
 from evals.harness.instruments import INSTRUMENTS, Column
 from evals.harness.scorer import vote_coverage
 
@@ -144,7 +145,12 @@ def read_baseline(directory: Path, root: Path = REPO_ROOT) -> Row | None:
 
     per_series: dict[str, list[dict[str, Any]]] = {}
     for entry in entries:
-        path = directory / str(entry.get("artifact", ""))
+        try:
+            path = directory / artifact_filename(entry.get("artifact", ""))
+        except BaselineError:
+            # A published table is not the place to explain a malformed
+            # manifest, and `verify-contribution` already refuses one.
+            continue
         if not path.is_file():
             continue
         raw = json.loads(path.read_text(encoding="utf-8"))
@@ -186,7 +192,7 @@ def read_baseline(directory: Path, root: Path = REPO_ROOT) -> Row | None:
         ),
         sweeps=len(entries),
         cost_usd=sum(
-            float(entry.get("cost", {}).get("actual_usd", 0.0)) for entry in entries
+            baseline.recorded_usd(entry.get("cost", {})) or 0.0 for entry in entries
         ),
         merged=_merged_at(directory, root),
         cells=cells,
@@ -257,21 +263,46 @@ def build(root: Path = REPO_ROOT) -> str:
     return "".join(parts)
 
 
+#: Characters that end a cell, a code span or a line in the table this module
+#: writes. A value carrying one stops being a value and becomes structure.
+_MARKDOWN_STRUCTURE = str.maketrans({"`": "'", "|": "/", "\n": " ", "\r": " "})
+
+
+def _inline(value: object) -> str:
+    """One value, safe to put in a cell of a generated table.
+
+    Everything this module renders comes out of a contributor's artifact, and
+    the table it writes is committed, published, and headed "do not edit by
+    hand: a test recomputes this file". So a value that closes its own code
+    span writes the rest of the document with that authority behind it -- a
+    model that never ran, a commit group nobody pushed, a recall of 1.000.
+    A 176-character `requested_model` was enough, inside the field's own
+    200-character bound.
+    ``frameworks`` is the same sink with no bound at all, which is why this
+    escapes at the sink rather than only tightening the sources: the source
+    bound is the half that keeps being forgotten.
+    """
+    return str(value).translate(_MARKDOWN_STRUCTURE)
+
+
 def _render_row(row: Row) -> str:
     models = ", ".join(
-        f"`{tier}`: `{model}`"
+        f"`{_inline(tier)}`: `{_inline(model)}`"
         for tier, model in sorted(row.identity.get("models", {}).items())
     )
-    frameworks = ", ".join(row.identity.get("frameworks", [])) or "none"
+    frameworks = (
+        ", ".join(_inline(name) for name in row.identity.get("frameworks", []))
+        or "none"
+    )
     summary = (
         f"\n{models} · frameworks {frameworks} · {row.sweeps} sweep(s)"
         f" · ${row.cost_usd:.2f} recorded"
-        f" · submitted by {', '.join(row.submitters) or 'nobody'}"
-        f" · merged {row.merged or 'unknown'}\n"
+        f" · submitted by {', '.join(_inline(who) for who in row.submitters) or 'nobody'}"
+        f" · merged {_inline(row.merged) if row.merged else 'unknown'}\n"
         f"\nVote coverage: {row.coverage[0]} of {row.coverage[1]} unmatched"
         f" finding(s) judged by a person.\n"
     )
-    lines = [f"\n### `{row.name}`\n", summary]
+    lines = [f"\n### `{_inline(row.name)}`\n", summary]
     if not row.voted:
         lines.append(
             "\nNobody has voted on this Baseline's findings, so every"

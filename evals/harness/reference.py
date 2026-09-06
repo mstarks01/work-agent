@@ -51,6 +51,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 
 from analysis_service.frameworks.asvs.record import AsvsChapter
 from analysis_service.frameworks.stride.record import StrideCategory
+from analysis_service.markdown_loader import RESOLVE_ERRORS
 from analysis_service.report import (
     FrameworkName,
     Rating,
@@ -80,6 +81,18 @@ CLAIMS_DIR = "claims"
 
 class CorpusError(ValueError):
     """A golden case is missing, malformed, or internally inconsistent."""
+
+
+def corpus_refusal(error: CorpusError) -> str:
+    """The one line a command line prints when the corpus does not load.
+
+    Every entry point that reads the corpus refuses the same way, so the
+    sentence is written here once rather than in each ``main``. The error
+    already names the case, the file and the field it stopped on. A traceback
+    in its place names a pydantic frame, which is nothing the reader whose own
+    case carries the bad entry can act on.
+    """
+    return f"cannot read the corpus: {error}"
 
 
 class ReferenceSeverity(BaseModel):
@@ -346,6 +359,26 @@ class CaseFramework(BaseModel):
     reference_set: Literal["exhaustive", "sampled"] = "sampled"
 
 
+#: A path inside one corpus case directory, and nothing else: slash-joined
+#: segments of ordinary filename characters, each starting with something other
+#: than a dot. So `..` cannot appear, a leading `/` cannot appear, and neither
+#: can a backslash. The corpus holds four shapes today -- `source.md`,
+#: `model.json`, `claims/stride.json` and `claims/asvs.json`.
+#:
+#: Bounded because the value is joined onto a case directory and the result is
+#: read. `Path("/case") / "/etc/hostname"` is `/etc/hostname`, because an
+#: absolute right-hand side replaces the left, and `sitting.moved()` then reads
+#: whatever it names and compares it against the digest the same record carries.
+#: That is a digest oracle over the machine, an unbounded read, and an uncaught
+#: `PermissionError` on a file the process may not open. `contribution.yml` runs
+#: the corpus lint over a stranger's pull request tree, so the reach is any
+#: GitHub account.
+#:
+#: One shape for both models below. They name the same kind of thing, and a
+#: bound on one of them is a bound on half the sinks.
+CORPUS_RELATIVE_PATH = r"^[^./\\][^/\\]*(?:/[^./\\][^/\\]*)*$"
+
+
 class CaseSource(BaseModel):
     """One declared input file, and what it is.
 
@@ -359,7 +392,7 @@ class CaseSource(BaseModel):
 
     kind: SourceKind
     label: str = Field(min_length=1, max_length=MAX_LABEL_CHARS)
-    file: str = Field(min_length=1)
+    file: str = Field(min_length=1, max_length=200, pattern=CORPUS_RELATIVE_PATH)
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
@@ -374,7 +407,7 @@ class ReadRecord(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    file: str = Field(min_length=1)
+    file: str = Field(min_length=1, max_length=200, pattern=CORPUS_RELATIVE_PATH)
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
@@ -414,49 +447,6 @@ def is_submitted_for(value: str) -> bool:
     )
 
 
-class CaseSitting(BaseModel):
-    """One **Case Sitting**: who read this case, who carries it, and which bytes.
-
-    ``evals/BLESSING.md`` step 6 is one reading session over ``source.md``, the
-    model and every reference set together. Until an entry exists on a case,
-    nobody has done it — and the corpus shipped 13 cases in that state, which is
-    how a reference claim asserting a fact its own model does not hold survived
-    to review sitting 01. ``tests/test_case_review.py`` names every case still
-    waiting and fails on a new one that arrives without an entry.
-
-    **Two names, because they answer two questions.** ``submitted_by`` is the
-    GitHub login of the account whose PR carries the sitting — the accountable
-    half, bound to the authenticated login and checked by CI, and the only one
-    the roster, the **Standing** and :func:`~evals.harness.sitting.clears` ever
-    read. ``submitted_for`` is who did the reading. It equals ``submitted_by``
-    where a person reads their own case, and it is :data:`ANONYMOUS` where an
-    account submits for a reader whose own policy stops them taking part under
-    their name.
-
-    That split is what makes the record true in both shapes. One name forced a
-    proxied read into one of two lies: the submitter signs words they did not
-    write, or the read disappears.
-
-    ``document`` names the filled ``REVIEW-<login>.md`` committed beside the
-    case, under ``submitted_by``'s login, because that is the account whose
-    submission may write it.
-    """
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    #: The account that carries the sitting. Accountability lives here alone.
-    submitted_by: str = Field(pattern=rf"^{_LOGIN}$", max_length=MAX_NAME)
-    #: Who read the case: a login, or :data:`ANONYMOUS`. It is provenance and
-    #: never authority — a value here clears no case and carries no standing,
-    #: so no rule has to ask whether the name behind it is real.
-    submitted_for: str = Field(pattern=SUBMITTED_FOR_PATTERN, max_length=MAX_NAME)
-    #: ISO date. A sitting is a dated event; the reference set moves under it.
-    date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
-    read: list[ReadRecord] = Field(min_length=1)
-    document: str = Field(min_length=1)
-    notes: str = ""
-
-
 class CaseMetadata(BaseModel):
     """``case.json``: what the case is, where it came from, and who grades it."""
 
@@ -473,12 +463,6 @@ class CaseMetadata(BaseModel):
     # Non-empty: a case no framework grades is a case that scores nothing, and
     # a corpus quietly carrying one lowers no denominator visibly.
     frameworks: list[CaseFramework] = Field(min_length=1)
-    #: Every Case Sitting this case has had, oldest first, append-only — a
-    #: re-read is a new entry, never an edit (#327). Empty until a person
-    #: reads the case: the 13 cases that shipped unread are real, and a
-    #: required entry would make them unloadable rather than visibly
-    #: unreviewed.
-    reviews: list[CaseSitting] = Field(default_factory=list)
     notes: str = ""
 
 
@@ -654,6 +638,11 @@ def load_case(case_dir: Path | str) -> GoldenCase:
     )
 
 
+#: The most a single corpus source may read. The largest source this repository
+#: ships is under 3 KiB; the ceiling exists to bound a symlink, not a document.
+MAX_CORPUS_SOURCE_BYTES = 262_144
+
+
 def _load_sources(case_dir: Path, meta: CaseMetadata) -> tuple[Source, ...]:
     """The case's declared sources, in declared order.
 
@@ -661,19 +650,40 @@ def _load_sources(case_dir: Path, meta: CaseMetadata) -> tuple[Source, ...]:
     source: a case that silently analyses less text than it claims would score
     against a reference set written for the whole of it.
     """
+    root = case_dir.resolve()
     sources = []
     for declared in meta.sources:
         path = case_dir / declared.file
-        if not path.is_file():
+        # A declared name is untrusted: a corpus case can arrive from a
+        # stranger's pull request, and CI reads it over the whole tree. The
+        # rule is `sitting.moved`'s -- resolve the name, treat anything the
+        # process cannot answer for as absent, and refuse a target outside the
+        # case directory -- so a `source.md` symlinked at `/proc/self/pagemap`
+        # or a large file cannot be read out of the tree or exhaust memory
+        # here. `is_file()` alone follows such a link; this reader must not.
+        try:
+            resolved = path.resolve()
+            inside = resolved.is_relative_to(root)
+            readable = inside and resolved.is_file()
+            size = resolved.stat().st_size if readable else 0
+        except RESOLVE_ERRORS:
+            readable = False
+            size = 0
+        if not readable:
             raise CorpusError(
                 f"{case_dir.name}: case.json declares {declared.file!r}, which"
-                " does not exist"
+                " does not resolve to a readable file inside the case directory"
+            )
+        if size > MAX_CORPUS_SOURCE_BYTES:
+            raise CorpusError(
+                f"{case_dir.name}: {declared.file!r} is {size} bytes, over the"
+                f" {MAX_CORPUS_SOURCE_BYTES}-byte source ceiling"
             )
         sources.append(
             Source(
                 kind=declared.kind,
                 label=declared.label,
-                text=path.read_text(encoding="utf-8"),
+                text=resolved.read_text(encoding="utf-8"),
             )
         )
     return tuple(sources)

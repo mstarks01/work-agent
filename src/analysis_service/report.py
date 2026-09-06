@@ -42,6 +42,7 @@ from pydantic import (
     ModelWrapValidatorHandler,
     SerializeAsAny,
     ValidationError,
+    computed_field,
     field_validator,
     model_validator,
 )
@@ -50,6 +51,7 @@ from pydantic.json_schema import SkipJsonSchema
 from analysis_service.actions import ActionVerb
 from analysis_service.sources import Source
 from analysis_service.system_model import BoundaryCrossing, SystemModel
+from analysis_service.vendors import ServedTrust, vendor_for_route
 
 # The payload schema readers key on. Consumers that ignore unknown fields
 # tolerate a minor bump; a major bump is a breaking change to a field's
@@ -448,6 +450,26 @@ class UnknownRef(BaseModel):
 GROUND_TERM_MAX_CHARS = 100
 
 
+# How long the lists a model fills may get (OWASP LLM10). Every scalar a lane
+# emits already carries a bound; these are the counts, and without them the only
+# limit on an emission is the tier's output ceiling — tens of thousands of
+# tokens, every one of which the service then does deterministic work over. The
+# grounding rung is the expensive one: it searches the submitted source once per
+# quote a claim carries, so the product of these two numbers is the work one
+# lane can buy.
+#
+# The figures are the observed maxima across the 77 corpus and sweep artifacts
+# in the tree, with headroom: 84 claims in a batch, 13 grounds on a claim and 14
+# affected elements. They bound an emission that is not a lane's work at all,
+# and none of them constrains what the service has actually produced.
+MAX_CLAIMS_PER_BATCH = 400
+MAX_GROUNDS_PER_CLAIM = 60
+MAX_QUOTES_PER_PROPOSAL = 20
+MAX_REFS_PER_PROPOSAL = 20
+MAX_ABSENT_PER_PROPOSAL = 20
+MAX_ELEMENTS_PER_PROPOSAL = 60
+
+
 class Ground(BaseModel):
     """What justifies one finding: a quote, an attribute's state, or a derived fact.
 
@@ -741,7 +763,7 @@ class Claim(BaseModel):
     # claim set narrows this to required, because for those claims the action is
     # half of what makes two of them the same finding.
     verb: ActionVerb | None = None
-    grounds: list[Ground] = Field(min_length=1)
+    grounds: list[Ground] = Field(min_length=1, max_length=MAX_GROUNDS_PER_CLAIM)
 
     @classmethod
     def claim_marks(cls, drafts: Sequence[Claim]) -> AnalysisMarks:
@@ -1044,19 +1066,27 @@ class Proposal(BaseModel):
     # Unconstrained here and narrowed by the packages that need it, exactly as
     # :class:`Claim`'s own is: a proposal that validates must be resolvable into
     # a claim that validates, so the two sides of that pair move together.
-    affected_element_ids: list[str] = Field(default_factory=list)
+    affected_element_ids: list[str] = Field(
+        default_factory=list, max_length=MAX_ELEMENTS_PER_PROPOSAL
+    )
     # Unconstrained here and narrowed by the packages that need it, for the
     # reason the line above gives: a proposal that validates must resolve into a
     # claim that validates, so the two sides of that pair move together.
     verb: ActionVerb | None = None
-    evidence_refs: list[str] = Field(default_factory=list)
-    quotes: list[QuoteCandidate] = Field(default_factory=list)
+    evidence_refs: list[str] = Field(
+        default_factory=list, max_length=MAX_REFS_PER_PROPOSAL
+    )
+    quotes: list[QuoteCandidate] = Field(
+        default_factory=list, max_length=MAX_QUOTES_PER_PROPOSAL
+    )
     # The third list, and the one whose referent is the model as a whole. A
     # catalog can enumerate what a model contains; it cannot enumerate what a
     # model lacks, so an absence is named rather than selected. Each entry is
     # one lowercase term, and the service checks it against every element's
     # text before building the ground.
-    absent_elements: list[str] = Field(default_factory=list)
+    absent_elements: list[str] = Field(
+        default_factory=list, max_length=MAX_ABSENT_PER_PROPOSAL
+    )
 
     @model_validator(mode="after")
     def _check_shape(self) -> Self:
@@ -1144,7 +1174,7 @@ class ProposalBatch(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    claims: list[Proposal]
+    claims: list[Proposal] = Field(max_length=MAX_CLAIMS_PER_BATCH)
     invalid: SkipJsonSchema[list[InvalidProposal]] = Field(default_factory=list)
 
     @model_validator(mode="wrap")
@@ -1344,6 +1374,14 @@ class NodeRun(BaseModel):
     reports nothing, so the count is the only trace the prompt bytes it sent
     leave. A settlement charges them from it (see
     :func:`analysis_service.budgets.measured_tokens`).
+
+    ``served_trust`` says what this row's ``model`` is worth as evidence, and it
+    is **here rather than once per report**. A deployment may select a
+    different vendor per tier, so one report can hold rows whose served builds
+    are worth different things, and a single value for the whole run has to be
+    wrong on one of them. It is *derived* from ``requested_model`` rather than
+    stored, so the report and the fingerprint read one rule through one reader
+    and cannot disagree.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -1356,6 +1394,33 @@ class NodeRun(BaseModel):
     duration_ms: int = Field(ge=0)
     usage: TokenUsage | None = None
     attempts: int = Field(default=1, ge=1)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _drop_derived_trust(cls, data: Any) -> Any:
+        """Ignore a ``served_trust`` on input; it is output, not state.
+
+        The field is serialized so a reader of a stored report can see it, which
+        means a round trip hands it straight back. Recomputing from
+        ``requested_model`` rather than trusting the key is what keeps one rule
+        to one reader: an edited value cannot survive, and the value inside the
+        fingerprint is derived the same way from the same route.
+        """
+        if isinstance(data, dict):
+            data = {k: v for k, v in data.items() if k != "served_trust"}
+        return data
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def served_trust(self) -> ServedTrust | None:
+        """What ``model`` is worth as evidence, for the vendor that served it.
+
+        ``None`` on a deterministic FunctionNode, which asked no provider and
+        has no served build to weigh.
+        """
+        if self.requested_model is None:
+            return None
+        return vendor_for_route(self.requested_model).served_trust
 
     @model_validator(mode="after")
     def _fingerprint_needs_its_inputs(self) -> Self:
@@ -1394,12 +1459,13 @@ class ExecutionEnvelope(BaseModel):
     it, and certification refuses a manifest written for a different one rather
     than comparing across them.
 
-    ``served_model_trust`` states plainly what the served build on each node is
-    worth. ``provider_reported`` means the provider named it on its own event
-    stream and nothing independent confirmed it. It is recorded rather than
-    assumed because the difference between "the provider said Opus" and "Opus
-    answered" is exactly the difference a compromised translator lives in, and
-    a report that omits the distinction reads as the stronger claim.
+    What a served build is *worth* is **not** here. It was
+    ``served_model_trust``, a constant reading ``provider_reported`` for the
+    whole report, and it was wrong twice over: a translator that fills the
+    served identifier from the request confirms nothing, and a deployment may
+    select a different vendor per tier, so one report can hold rows with
+    different answers. It moved to :attr:`NodeRun.served_trust`, where the
+    vendor is known and one reader answers for every caller.
 
     ``build`` is the installed version of every distribution whose code sits
     between a node and its provider — this service, the agent runtime and the
@@ -1426,7 +1492,6 @@ class ExecutionEnvelope(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     identity_version: int = Field(ge=1)
-    served_model_trust: Literal["provider_reported"] = "provider_reported"
     build: dict[str, str] = Field(default_factory=dict)
     review_independence: Literal["shared", "distinct_model", "distinct_provider"] = (
         "shared"
@@ -1518,6 +1583,11 @@ class Job(BaseModel):
     status: Literal["completed"] = "completed"
     created_at: datetime
     completed_at: datetime
+    #: How many times a critic was asked again, summed across the job's
+    #: frameworks. The graph re-asks a critic whose rulings do not reconcile
+    #: with the drafts, once and bounded, so zero is the ordinary answer and a
+    #: rate that climbs after a prompt edit says the edit made the ruling harder
+    #: to give. Computed by :func:`~analysis_service.graph.revise_rounds`.
     revise_rounds: int = Field(default=0, ge=0)
     frameworks: list[FrameworkSelection] = Field(default_factory=list)
 
@@ -1616,7 +1686,7 @@ class RepairedQuote(BaseModel):
     """A quote ground whose text the service replaced with the source's own span.
 
     The ladder refused what the agent wrote, and
-    :func:`~analysis_service.grounding.repair_quote` found a window of the named
+    :func:`~analysis_service.grounding.repair_prepared` found a window of the named
     source near enough to hand back. The ground now carries that window — the
     submitter's words — and this mark carries what the agent wrote, so the
     substitution is on the record rather than silent. ``similarity`` is the
@@ -1703,7 +1773,7 @@ class UnresolvedMention(BaseModel):
     mistyped ID in prose trades a whole report for a typo. The mark rides
     beside the threats exactly as an unverified quote does, and the same
     argument applies to why it is service-owned rather than a field on
-    :class:`DraftThreat` — an agent must not be able to report on its own
+    :class:`~analysis_service.frameworks.stride.record.DraftThreat` — an agent must not be able to report on its own
     accuracy.
 
     The most valuable thing it catches is not a typo. The analyze prompt is
@@ -1754,7 +1824,7 @@ class UnresolvedEvidence(BaseModel):
     report for a citation error, which is the trade
     :class:`UnresolvedMention` already refused to make.
 
-    Service-owned rather than a field on :class:`DraftThreat`, for the reason
+    Service-owned rather than a field on :class:`~analysis_service.frameworks.stride.record.DraftThreat`, for the reason
     every mark here is: an agent must not report on its own accuracy.
     """
 
@@ -1811,6 +1881,16 @@ class UnknownClaimIdentity(BaseModel):
 # bounded only by its own field, so the reason that repeats it must cut it.
 DROPPED_REASON_MAX_CHARS = 500
 
+# How much of an agent's own title a dropped claim carries. Named rather
+# than spelled at the field, because :meth:`DroppedClaim.of` cuts to it and
+# a second spelling is how the cut and the bound come to disagree.
+DROPPED_TITLE_MAX_CHARS = 200
+
+#: What a dropped claim is called where the agent named it nothing. A
+#: proposal that failed its own schema may carry no title at all, and
+#: ``title`` is the only trace of the finding, so it cannot be empty.
+UNTITLED = "(untitled)"
+
 
 class DroppedClaim(BaseModel):
     """A claim the service dropped for a fault in one entry of it.
@@ -1823,7 +1903,7 @@ class DroppedClaim(BaseModel):
 
     * the proposal failed its own schema — a verb outside the closed set, a
       severity value the enum does not hold, neither a reference nor a quote
-      (:func:`~analysis_service.evidence.validate_proposals`);
+      (:func:`~analysis_service.evidence.resolve_proposals`);
     * every reference it cited is outside the catalog
       (:func:`~analysis_service.evidence.resolve_proposals`);
     * every element it named is absent from the model, its ID duplicates an
@@ -1846,8 +1926,28 @@ class DroppedClaim(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     claim_id: str = Field(min_length=1, max_length=CLAIM_ID_MAX_CHARS)
-    title: str = Field(min_length=1, max_length=200)
+    title: str = Field(min_length=1, max_length=DROPPED_TITLE_MAX_CHARS)
     reason: str = Field(min_length=1, max_length=DROPPED_REASON_MAX_CHARS)
+
+    @classmethod
+    def of(cls, *, claim_id: str, title: str, reason: str) -> DroppedClaim:
+        """This drop as a mark, with every agent-written value cut to fit.
+
+        **The only way one is built.** All three values are agent text bounded
+        by their own fields upstream, or composed here from one — and a
+        producer that raised while recording a drop would cost the job the very
+        report the mark exists to preserve. So the cut belongs beside the
+        bound, once, rather than at each place a claim is dropped.
+
+        An empty title becomes :data:`UNTITLED`. A proposal that failed its own
+        schema may name nothing, and ``title`` is the only trace of what the
+        agent found.
+        """
+        return cls(
+            claim_id=claim_id[:CLAIM_ID_MAX_CHARS],
+            title=(title or UNTITLED)[:DROPPED_TITLE_MAX_CHARS],
+            reason=reason[:DROPPED_REASON_MAX_CHARS],
+        )
 
 
 class MissingMitigation(BaseModel):
@@ -1932,24 +2032,32 @@ class SharedElementName(BaseModel):
 class AnalysisMarks(BaseModel):
     """Every service-owned mark one run produced, as one value.
 
-    The five lists below have one owner, one standing and one policy: the
-    *service* records them, they ride beside the findings rather than on them
-    (an agent must not report on its own accuracy), and none of them fails a
-    job. They used to travel as five loose parallel lists — through the fan-in,
-    through four session-state keys, through four parameters on the assemble
-    node, through four fields on an :class:`~analysis_service.graph.Analysis` and
-    its two state methods — so adding the fifth cost about fifteen edits of one
-    shape. Here they are one field.
+    Every list below has one owner, one standing and one policy: the *service*
+    records them, they ride beside the findings rather than on them (an agent
+    must not report on its own accuracy), and none of them fails a job. One
+    field carries all of them, so a mark travels the fan-in, the session state,
+    the assemble node and an :class:`~analysis_service.graph.Analysis` as part
+    of one value. A new mark is a field here, and nothing downstream is edited
+    to carry it.
 
-    **Not the report's wire shape.** The report keeps its five top-level
-    arrays; :meth:`~analysis_service.graph.Analysis.into_report` is where this
-    value becomes them. Nesting them there would break every consumer of a
-    published schema to save one of those fifteen edits.
+    **Not the report's wire shape.** A mark annotates one framework's claims,
+    so it rides on that framework's block, and the one mark about the shared
+    model rides on the envelope.
+    :meth:`~analysis_service.graph.Analysis.into_report` and
+    :func:`~analysis_service.graph._framework_block` are where this value
+    becomes those arrays. Nesting it there instead would break every consumer
+    of a published schema.
+
+    **Every field here must reach one of those two destinations.** The spread
+    walks the block's own fields, so a package that declares no ``severity``
+    gets no :class:`MissingMitigation` list — and a mark *no* destination
+    declares is dropped by the same walk, in silence.
+    ``tests/test_report.py`` is what refuses that.
 
     Empty is the common case and means what it says: every quote verified,
-    every mention resolved, every reference named a fact, every threat carried
-    a countermeasure or the unknown that excuses carrying none, and no two
-    element types share a name.
+    every mention resolved, every reference named a fact, every claim kept its
+    identity, every threat carried a countermeasure or the unknown that excuses
+    carrying none, and no two element types share a name.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -1983,8 +2091,8 @@ class AnalysisMarks(BaseModel):
         The fan-in collects marks from three producers — one per lane's
         evidence resolution, the join across all six, and the model itself —
         and this is how they become one value. It walks ``model_fields`` rather
-        than naming the five lists, so a sixth mark joins by being declared
-        above rather than by someone remembering this method.
+        than naming each list, so a new mark joins by being declared above
+        rather than by someone remembering this method.
         """
         return AnalysisMarks(
             **{
@@ -2594,6 +2702,13 @@ class Report(BaseModel):
     block's own ``framework`` field can disagree, and a dropped framework is
     invisible. A list plus one check catches both, and silently dropping a
     framework the caller paid for is the failure this rules out.
+
+    **The blocks are not merged, and nothing here merges them.** The relation an
+    analyst wants between two frameworks' output is *these findings touch one
+    element*, and the **Element ID** is the join key both blocks already cite --
+    so a reader joins on it with no model pass, which is what *deterministic
+    code, models for judgement* asks for. That is why no cross-framework critic
+    node exists to merge them instead.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -2730,22 +2845,3 @@ class Report(BaseModel):
         if answered == asked:
             return []
         return [f"analyses answer {answered!r}, but the job selected {asked!r}"]
-
-    def claims_by_element(self) -> dict[str, dict[FrameworkName, list[str]]]:
-        """Which claims name each element, grouped by framework.
-
-        The cross-framework view, and the whole of it. The relation an analyst
-        wants between two frameworks' output is *these findings touch one
-        element*, and the **Element ID** is the join key both analyses already
-        cite. Code does that with no model pass, which is what
-        *deterministic code, models for judgement* asks for — and it is why no
-        cross-framework critic node exists to merge them instead.
-        """
-        grouped: dict[str, dict[FrameworkName, list[str]]] = {}
-        for block in self.analyses:
-            for claim in block.all_claims():
-                for element_id in claim.affected_element_ids:
-                    grouped.setdefault(element_id, {}).setdefault(
-                        block.framework, []
-                    ).append(claim.id)
-        return grouped

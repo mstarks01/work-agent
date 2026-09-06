@@ -19,7 +19,7 @@ being able to see which capabilities differ.
 The module is credential-free by construction. Every probe here is a call into
 the pinned ``litellm``'s local model-cost map; see
 :func:`~analysis_service.model_gate._import_litellm_hermetically`. A full matrix
-for all three vendors is therefore computable in the offline CI lane, with no
+for every vendor is therefore computable in the offline CI lane, with no
 key, no ADC and no egress. That is what makes this suite runnable on every pull
 request, rather than in a live sweep nobody has provisioned. It is also the
 limit of what it proves: this module reports what a provider would accept, and
@@ -82,7 +82,7 @@ PROBED_PARAMS: dict[str, Any] = {
 # The pairs this project claims to have profiled, one per tier per vendor.
 #
 # In ``src/`` rather than under ``tests/`` because it is not a fixture: it is
-# the *extent* of the conformance claim — "Vertex, Anthropic and OpenAI share a
+# the *extent* of the conformance claim — "every supported vendor shares a
 # common conformance suite" is only meaningful alongside the list of what was
 # actually put through it. Two readers need exactly this list and must not each
 # keep their own: the offline suite in ``tests/test_conformance.py``, and the
@@ -98,7 +98,23 @@ PROBED_PARAMS: dict[str, Any] = {
 # the vendors are alphabetical everywhere a reader might infer one.
 REFERENCE_MODELS: dict[str, tuple[str, ...]] = {
     "anthropic": ("claude-sonnet-4-6", "claude-opus-5"),
-    "openai": ("gpt-4o", "gpt-5.6"),
+    # Claude in its Bedrock spelling, and only Claude: Nova and Llama get
+    # *emulated* structured output there, which
+    # :func:`~analysis_service.binding._check_native_structured_output` refuses,
+    # so neither could bind a tier of this graph. The plain identifier rather
+    # than a region-scoped one, because no region enters an Execution Identity.
+    "bedrock": ("anthropic.claude-sonnet-4-6", "anthropic.claude-opus-5"),
+    # The weights the ``vertex`` pair names, behind the Developer API. The
+    # same identifiers on purpose: the matrix is where the two routes to one
+    # family show their one difference, and a different pair would hide it.
+    "gemini": ("gemini-2.5-flash", "gemini-2.5-pro"),
+    # The dated snapshot rather than the ``gpt-4o`` alias it resolves to.
+    # OpenAI fronts its dated builds with a bare name and moves which build that
+    # name means; the matrix is a claim about what was profiled, so it names the
+    # build. Nothing else moves with it: the pinned cost map's entries for the
+    # alias and this snapshot differ in no key, and the two profile identically.
+    # ``test_no_reference_model_is_an_alias_for_a_dated_build`` is the rule.
+    "openai": ("gpt-4o-2024-08-06", "gpt-5.6"),
     "vertex": ("gemini-2.5-flash", "gemini-2.5-pro"),
 }
 

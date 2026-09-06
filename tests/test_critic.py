@@ -1,5 +1,7 @@
 """Tests for the mechanical checks around the critic: join and assemble."""
 
+import time
+
 import pytest
 
 from analysis_service import critic
@@ -495,6 +497,36 @@ class TestQuoteVerification:
             ("S-01", 0)
         ]
         assert LABEL in joined.marks.unverified_grounds[0].reason
+
+    def test_a_body_of_adversarial_quotes_stops_at_the_body_deadline(
+        self, model, monkeypatch
+    ):
+        """Tested against the rung, not against its own expectation: each of
+        these quotes alone runs to the per-scan deadline, so the body's cost is
+        the count times that unless one deadline covers them all. Three of
+        them under a half-second body bound must finish in about that, where
+        the per-scan bound alone would let them run for three scans.
+        """
+        from analysis_service import grounding
+
+        monkeypatch.setattr(grounding, "MAX_REPAIR_SECONDS_PER_BODY", 0.5)
+        quote = " ".join(["ab"] * 133)
+        source = " ".join(["ba"] * 147)
+        drafts = {
+            "spoofing": [
+                sample_draft(
+                    f"S-0{i}",
+                    grounds=[Ground(kind="quote", text=quote, source_label=LABEL)],
+                )
+                for i in range(1, 4)
+            ]
+        }
+        started = time.thread_time()
+
+        joined = join_drafts(drafts, STRIDE, model, {LABEL: source})
+
+        assert time.thread_time() - started < 1.5
+        assert len(joined.marks.dropped_claims) == 3
 
     def test_a_refused_quote_near_the_source_is_repaired_and_marked(self, model):
         """The ground now carries the submitter's words, and the mark carries
@@ -1551,3 +1583,56 @@ class TestTheCriticView:
         re_ask = critic.critic_view(drafts, model, only={"S-01", "T-01"})
 
         assert first_pass == re_ask
+
+
+class TestASpentBodyDeadlineFoldsNoSource:
+    """The bound the fan-in actually runs under.
+
+    ``repair_quote`` has its own guard, but the fan-in does not call it: it
+    prepares each source itself and calls ``repair_prepared``. So the guard that
+    matters is the one at the call site, and this is what holds it there.
+    """
+
+    def test_a_body_past_its_deadline_prepares_no_further_source(self, monkeypatch):
+        def refuse(source: str):
+            raise AssertionError("a source was folded past the body deadline")
+
+        monkeypatch.setattr(critic, "prepare_source", refuse)
+        monkeypatch.setattr(critic, "repair_deadline", lambda: time.thread_time() - 1)
+        claims = [
+            sample_draft(
+                "S-01",
+                grounds=[
+                    Ground(
+                        kind="quote",
+                        text="a span this source does not contain at all",
+                        source_label="description",
+                    )
+                ],
+            )
+        ]
+
+        checked = critic._verify_quotes(claims, {"description": "Some other words."})
+
+        assert checked.repaired == []
+        assert [dropped.claim_id for dropped in checked.groundless] == ["S-01"]
+
+    def test_a_body_with_time_left_still_repairs(self):
+        """The guard refuses a spent body, never a live one."""
+        source = "The ledger service talks to the accounts database."
+        claims = [
+            sample_draft(
+                "S-01",
+                grounds=[
+                    Ground(
+                        kind="quote",
+                        text="The ledger service talks to the acounts database.",
+                        source_label="description",
+                    )
+                ],
+            )
+        ]
+
+        checked = critic._verify_quotes(claims, {"description": source})
+
+        assert [repair.claim_id for repair in checked.repaired] == ["S-01"]

@@ -211,6 +211,8 @@ For each, mark one of:
 - `agree` — a real finding against this system, worth reporting.
 - `reject` — overstated, unsupported by the text, or not really a finding here.
 - `duplicate` — the same finding as another entry on this list, by number.
+- `unsure` — you read it and cannot decide. It is a real answer: say it rather
+  than pick one of the other three to get past the entry.
 
 Then, at the end of the last part, note anything on **your** list that is not
 on either of them. That is the finding this sitting exists for.
@@ -387,49 +389,49 @@ The point of the sitting. One line each, and say which set you expected it in.
 - **Several `reject` marks** — the sets overstate, inflating the denominator. Cheaper
   direction, still wrong.
 
-**Then record the sitting.** Save this filled document as
-`REVIEW-<the submitting GitHub login>.md` beside the original — the filled copy
-is the evidence, and the generated `REVIEW.md` stays derived and unfilled.
-Append this entry to `reviews` in `evals/corpus/11-sparse-shift-scheduling/case.json`, which is
-what `tests/test_case_review.py` reads:
+**Then record the sitting.** This document is your reading aid and the
+evidence that the method ran; it is not the record. The record is **one JSON
+file** under `evals/review/submissions/`, carrying your own list, your marks,
+your missing list, your notes and a digest of each file you read:
 
 ```json
-  "reviews": [
-    {
-      "submitted_by": "<the GitHub login opening the PR>",
-      "submitted_for": "<who read the case: a login, or the word anonymous>",
-      "date": "<YYYY-MM-DD>",
-      "read": [
-        {"file": "source.md", "sha256": "2507fd3081003c1c94427ef81dcea36f6ca92f5358c965789b49ec4af89b6a60"},
-        {"file": "model.json", "sha256": "8a84e2d38125ddfd3c82971019a4d35d95f92de3689c6743cc3a449195a42420"},
-        {"file": "claims/asvs.json", "sha256": "70682bbd369bfa31b62dc3127d10f33c5636106d80a4f3ff997987fab3c2d58d"},
-        {"file": "claims/stride.json", "sha256": "b56e600389930164b345d4859160bc6fd77bc59df466b5ecf0af5e22bb8d67b0"}
-      ],
-      "document": "REVIEW-<the submitting GitHub login>.md",
-      "notes": "<counts, and anything you changed>"
+{
+  "envelope": 1,
+  "submitted_by": "<the GitHub login opening the PR>",
+  "submitted_for": "<who read the case: a login, or the word anonymous>",
+  "generated": "<YYYY-MM-DD>",
+  "cases": {
+    "11-sparse-shift-scheduling": {
+      "own_list": ["<what you wrote before the sets opened>"],
+      "marks": {"<finding fingerprint>": "agree | reject | duplicate | unsure"},
+      "missing": ["<what the recorded sets do not name>"],
+      "notes": "<counts, and anything you would change>",
+      "opened_digests": {
+      "source.md": "2507fd3081003c1c94427ef81dcea36f6ca92f5358c965789b49ec4af89b6a60",
+      "model.json": "8a84e2d38125ddfd3c82971019a4d35d95f92de3689c6743cc3a449195a42420",
+      "claims/asvs.json": "70682bbd369bfa31b62dc3127d10f33c5636106d80a4f3ff997987fab3c2d58d",
+      "claims/stride.json": "b56e600389930164b345d4859160bc6fd77bc59df466b5ecf0af5e22bb8d67b0"
+      }
     }
-  ],
+  }
+}
 ```
 
+The app (`uv run python webapp/sitting.py`) and the standalone page both write
+that file for you and open the pull request; a reader with no clone lands on
+GitHub's editor with it already filled in. The file is named for its own
+digest, so an edited file no longer matches its name.
+
 **Two names, because they answer two questions.** `submitted_by` is the account
-that opens the pull request and answers for the sitting. `submitted_for` is who
-read the case: the same login where you read it yourself, another login, or
-`anonymous` where the reader takes part on no name of their own. Only
-`submitted_by` needs a roster line, and only `submitted_by` names the document.
+that opens the pull request and answers for the sitting; contribution CI binds
+it to that account, so it needs no roster line. `submitted_for` is who read the
+case: the same login where you read it yourself, another login, or `anonymous`
+where the reader takes part on no name of their own.
 
 The digests above are the files as they were when this document was
-generated. If the sitting changed a file — a claim edit is a normal outcome —
-recompute that file's digest (`sha256sum <file>`) before you commit: the
-entry signs the bytes that merge.
-
-If this case is named in `UNREVIEWED` in `tests/test_case_review.py`, delete
-its line. That list names the cases nobody has read, so it is only accurate
-while a reviewed case comes off it. A case not named there is new, and merges
-with this entry from the start.
-
-`tests/test_case_review.py` checks that `read` covers every framework the
-case declares, that every digest matches, that the `document` file exists,
-and that `submitted_by` has a line in `evals/review/voters.toml` — a first-time
-contributor adds their own, standing `contributor`. `submitted_for` needs no
-roster line, because it grants nothing. Then
-`python -m evals.harness.run submit sitting` opens the PR.
+generated. A submission covers the frameworks whose reference sets it carries
+a matching digest for, and it stops covering one the moment that file changes.
+CI checks that every finding of every set you read carries a mark, that the
+digests match the tree, and that the pull request adds this one file and
+nothing else. `tests/test_case_review.py` names the cases still waiting, and
+derives that list from the merged submissions.

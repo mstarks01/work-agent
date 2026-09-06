@@ -48,8 +48,9 @@ RECRITIC_NODE = _STRIDE.node(graph.RECRITIC_ROLE)
 
 # The shipped config selects nothing, so every resolution here has to choose a
 # vendor first. Vertex on both tiers, because this module's subject is
-# credential resolution and Vertex's ADC mode is the three-variable case — the
-# one where getting the set wrong is worth catching.
+# credential resolution and Vertex's platform-identity mode is the case where
+# no credential material is passed at all — the one where getting the set wrong
+# is worth catching.
 VERTEX_TIERS = {
     "ANALYSIS_MODEL_BASE_VENDOR": "vertex",
     "ANALYSIS_MODEL_BASE_MODEL": "gemini-2.5-flash",
@@ -63,12 +64,12 @@ VERTEX_TIERS = {
     "ANALYSIS_MODEL_REVIEW_MODEL": "gemini-2.5-pro",
 }
 
-# Building adapters for that selection needs these three present. They are names
-# of variables, never credentials: nothing here is a secret.
+# Building adapters for that selection needs these two present. They address the
+# deployment; neither is a credential, and no credentials file is named —
+# Vertex resolves its identity from the platform.
 VERTEX_ENV = VERTEX_TIERS | {
     "ANALYSIS_VERTEX_PROJECT": "test-project",
     "ANALYSIS_VERTEX_LOCATION": "us-central1",
-    "GOOGLE_APPLICATION_CREDENTIALS": "/nonexistent/adc.json",
 }
 
 

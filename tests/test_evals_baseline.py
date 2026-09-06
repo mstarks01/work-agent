@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.identity import build_identity
+from analysis_service.identity import IDENTITY_VERSION, build_identity
 from analysis_service.report import TokenUsage
 from analysis_service.sampling import TierSampling
 from evals.harness import baseline, prices
@@ -24,6 +24,7 @@ from evals.harness.artifact import ARTIFACT_VERSION, load_artifact
 from evals.harness.baseline import (
     BaselineError,
     BaselineIdentity,
+    artifact_filename,
     assemble,
     price_sweep,
     verify,
@@ -76,6 +77,7 @@ def payload(
     }
     provenance = RunProvenance.model_validate(
         {
+            "identity_version": IDENTITY_VERSION,
             "build": dict(build_identity()),
             "sampling_config_version": 1,
             "tiers_config_version": 1,
@@ -174,7 +176,11 @@ class TestPricing:
         assert not cost.unpriced
 
     def test_a_model_nobody_prices_is_named_never_zeroed(self, tmp_path, priced):
-        document = payload(strong_model="mystery/model", served_strong="mystery-001")
+        # A known vendor, so the fixture can compute a fingerprint; a model
+        # identifier no price map carries, which is what the test is about.
+        document = payload(
+            strong_model="vertex_ai/mystery-model", served_strong="mystery-001"
+        )
         cost = price_sweep(load_artifact(write_sweep(tmp_path, document)))
         assert cost.unpriced == ("mystery-001",)
 
@@ -379,3 +385,87 @@ class TestAnUnknownCacheDiscount:
         """A manifest records what was known, so the hole travels with it."""
         unknown = UnitPrices("m", 2e-6, 8e-6, None)
         assert UnitPrices.from_json(unknown.to_json()) == unknown
+
+
+class TestAnArtifactNameCarriesNoDirectory:
+    """A Baseline manifest is a contributor's file, and both readers of it join
+    the name onto a directory.
+
+    Nothing stopped ``../`` there, so a manifest could name a JSON outside the
+    Baseline it belongs to and have its numbers read as that Baseline's --
+    and ``comparison`` folds those numbers into a published README. Neither
+    reader wants a path: a Baseline's artifacts sit beside its manifest.
+    """
+
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "../other-baseline/sweep.json",
+            "/etc/passwd",
+            "sub/sweep.json",
+            "..",
+            "",
+            ".hidden.json",
+        ],
+    )
+    def test_a_name_that_is_not_a_plain_file_name_is_refused(self, name):
+        with pytest.raises(BaselineError, match="carries no directory"):
+            artifact_filename(name)
+
+    def test_an_ordinary_artifact_name_passes(self):
+        assert artifact_filename("sweep-1.json") == "sweep-1.json"
+
+
+class TestAFrameworkNameIsASlug:
+    """`frameworks` was declared as a plain list and validated element by
+    element nowhere, so the value carried into a Baseline's identity -- and from
+    there into the published table -- was whatever a contributor wrote, with no
+    length bound at all while every model name beside it had one."""
+
+    @pytest.mark.parametrize(
+        "name",
+        ["Stride", "a b", "a`b", "x" * 300, "", "a/b", "a.b", "-a", "a-"],
+    )
+    def test_a_name_that_is_not_a_slug_is_refused(self, name):
+        with pytest.raises(BaselineError, match="not a framework name"):
+            baseline._framework_name(name)
+
+    @pytest.mark.parametrize("name", ["stride", "asvs", "some-new-package"])
+    def test_a_registered_shape_passes(self, name):
+        assert baseline._framework_name(name) == name
+
+
+class TestOneReaderForRecordedDollars:
+    """Four sites read `actual_usd` from a committed manifest; one checked it."""
+
+    @pytest.mark.parametrize(
+        "raw",
+        [float("inf"), float("nan"), -1.0, "abc", "2.25", "1_000", True, None, 10**400],
+    )
+    def test_a_value_that_is_not_money_reads_as_absent(self, raw):
+        """The writer emits a JSON number. Everything else is not money: a
+        string `float()` would read, a boolean that is an `int`, and an integer
+        too large for a float, which raises `OverflowError` rather than
+        `ValueError`.
+        """
+        assert baseline.recorded_usd({"actual_usd": raw}) is None
+
+    @pytest.mark.parametrize("cost", ["12.5", 12.5, None, [1]])
+    def test_a_cost_that_is_not_a_table_reads_as_absent(self, cost):
+        assert baseline.recorded_usd(cost) is None
+
+    @pytest.mark.parametrize("raw", [0.0, 1.5, 3])
+    def test_a_real_amount_reads_back(self, raw):
+        assert baseline.recorded_usd({"actual_usd": raw}) == float(raw)
+
+    def test_every_reader_answers_the_same_way(self):
+        """Compared against each other, not each against its own expectation.
+
+        `math.isfinite` guarded the consent path alone, so the published
+        comparison table, the contribution summary and the baseline re-check all
+        read the same field without it. A NaN poisons a mean and a total.
+        """
+        poisoned = {"actual_usd": float("nan")}
+
+        assert baseline.recorded_usd(poisoned) is None
+        assert (baseline.recorded_usd(poisoned) or 0.0) == 0.0

@@ -358,5 +358,18 @@ deployments need a shared backend (see below).
 
 A durable or shared backend (Redis, Postgres, …) is a new entry in the
 `_FACTORIES` registry in [`src/analysis_service/jobs.py`](../src/analysis_service/jobs.py).
-Implement the `JobStore` protocol (`create`, `get`, `save`) and read any
-connection settings from its own prefixed env vars; the API layer is unchanged.
+Implement the `JobStore` protocol and read any connection settings from its own
+prefixed env vars; the API layer is unchanged. The protocol is six methods:
+
+| Method | What a backend owes it |
+| --- | --- |
+| `reserve` | **Counts and inserts in one atomic operation.** Every bound admission enforces — the concurrency ceiling, the per-subject rate, the per-subject token budget and the deployment's global token budget — is enforced here and nowhere else. A backend that checks and then inserts has put the race back: two submissions that each read the count before either inserts both pass a ceiling of one. |
+| `get` | The whole record, for the driver that runs the job. |
+| `owned` | The record a subject owns, without its report. Ownership is checked before anything is copied, so a foreign job costs what a missing one costs. |
+| `report_json` | The owned job's report, already serialised. |
+| `events_after` | A job's status and the events past a cursor, and nothing else. |
+| `save` | The record back, for a job that already exists. |
+
+The three read methods are separate because a read that copies a whole report to
+answer a question about its status is the expensive path, and no bound applies to
+reads at all.

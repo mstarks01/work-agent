@@ -1,4 +1,4 @@
-"""Driving the ADK graph for one job: the real :class:`PipelineRunner`.
+"""Driving the ADK graph for one job: the real :class:`~analysis_service.jobs.PipelineRunner`.
 
 The implementation behind :class:`~analysis_service.jobs.PipelineRunner`: the job
 API hands it a :class:`~analysis_service.jobs.JobRecord` and a node callback, and
@@ -39,6 +39,7 @@ from analysis_service.graph import (
     Pipeline,
     Rejected,
     result_of,
+    revise_rounds,
 )
 from analysis_service.jobs import (
     JobRecord,
@@ -158,6 +159,9 @@ class AdkPipelineRunner:
                 # field, so recording what the job asked for is what makes that
                 # check mean anything.
                 frameworks=list(job.frameworks),
+                revise_rounds=revise_rounds(
+                    graph_run.node_runs, [entry.name for entry in job.frameworks]
+                ),
             ),
             input_ref=input_ref,
             nodes=graph_run.node_runs,

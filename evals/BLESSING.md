@@ -398,23 +398,30 @@ the server rather than by asking. The press waits until the list says
 something, so the sets cannot open on an empty box. The rule holds per case: **Previous** and
 **Next** in the case header walk the list, and a case you have not written a
 list for arrives blind however you reach it. Each recorded finding carries a
-control that takes `agree`, `reject` or `duplicate`, which is the same mark the
-by-hand path writes into a `> mark:` slot. When you finish a case it writes
-that case's record into your working tree.
+control that takes `agree`, `reject`, `duplicate` or `unsure`, which is the
+same mark the by-hand path writes into a `> mark:` slot. **Answer every one.** A
+case records only when no finding is left unmarked, because a set nobody judged
+is a set nobody tested — and **Record review** stays off until the count reaches
+zero.
 
-**One press submits every case you finished, as one pull request.** A footer
-under the list reads `Submit — N cases ready`, counts them, and is the way to
-the submit stage; the last **Next** ends there too. The stage lists every case
-the press carries, one row each, with a **Drop**. A dropped case moves to a
-held-back group with a **Put back**, and goes back to *draft in progress* in
-the list — you keep every word you wrote, and the press stops carrying it. The
-stage also says how many cases stay unfinished, so you never send four cases
-believing you sent five. Below the list it carries the written paths, the
-command and the paste text, each over every case the press carries. The button
-opens the pull request through the `gh` you are already signed in to. It binds
-to loopback and holds no credential of its own; `--no-submit` hides the button
-and keeps the command and the paste text. `--list` prints the cases nobody has
-read.
+`unsure` is there so that answering every one costs you nothing you do not
+believe. It is a real answer and it is counted as one, exactly as it is for a
+vote. Say it rather than pick one of the other three to get past an entry: a
+mark you did not mean moves a number, and this one does not.
+
+**One press contributes every case you finished, as one pull request.** A
+footer under the list reads `Review results — N ready`, counts them, and is the
+way to the results stage; the last **Next** ends there too. The stage lists
+every case the press carries, one row each, with a **Drop**. A dropped case
+moves to a held-back group with a **Put back**, and goes back to *in progress*
+in the list — you keep every word you wrote, and the press stops carrying it.
+The stage also says how many cases stay unfinished, so you never send four
+cases believing you sent five. **Show files** displays the one JSON file the
+press carries before you press. **Contribute** opens the pull request through
+the `gh` you are already signed in to; it binds to loopback and holds no
+credential of its own. With no `gh` login it downloads the same one file and
+hands you a link to GitHub's editor with it already filled in, so the way out
+never depends on a credential. `--list` prints the cases nobody has read.
 
 **Stop whenever you like.** The moment you post your own list, the app opens a
 **Draft Sitting** for that case and keeps your list, your marks, your missing
@@ -428,38 +435,53 @@ case throws one away and puts that case back on the list to do. A draft the
 app cannot read refuses its own case and names the file in the rail; the file
 is yours, so repair it or delete it, and every other case still walks.
 
-The rest of this section is what it writes, and what you write by hand if you
-would rather. Both paths end in the same files, and the checks cannot tell
-them apart.
+The rest of this section is what it writes.
 
-**This step is now enforced.** The act is a **Case Sitting** (see
-`CONTEXT.md`), and it is recorded as an entry appended to `reviews` in
-`case.json`:
+**This step is now enforced.** The act is a **Case Sitting** (see `CONTEXT.md`),
+and it is recorded as **one JSON file** under `evals/review/submissions/`:
 
 ```json
-  "reviews": [
-    {
-      "submitted_by": "<the GitHub login opening the PR>",
-      "submitted_for": "<who read the case: a login, or the word anonymous>",
-      "date": "<YYYY-MM-DD>",
-      "read": [
-        {"file": "source.md", "sha256": "<the file's digest>"},
-        {"file": "model.json", "sha256": "<the file's digest>"},
-        {"file": "claims/stride.json", "sha256": "<the file's digest>"}
-      ],
-      "document": "REVIEW-<the submitting GitHub login>.md",
-      "notes": "<counts, and anything you changed>"
+{
+  "envelope": 1,
+  "submitted_by": "<the GitHub login opening the PR>",
+  "submitted_for": "<who read the case: a login, or the word anonymous>",
+  "generated": "<YYYY-MM-DD>",
+  "cases": {
+    "<case id>": {
+      "own_list": ["<what you wrote before the sets opened>"],
+      "marks": {"<finding fingerprint>": "agree | reject | duplicate | unsure"},
+      "missing": ["<what the recorded sets do not name>"],
+      "notes": "<counts, and anything you would change>",
+      "opened_digests": {"source.md": "<the file's digest>"}
     }
-  ],
+  }
+}
 ```
+
+The file name carries its own digest, so an edited file no longer matches it.
+The app writes it, and **Contribute** opens a pull request carrying that one
+file and nothing else. A review pull request that changes anything else is
+refused, which is why nothing here asks you to edit a case, a list or the
+roster.
+
+`opened_digests` pins the bytes the sitting covered, and it says which sets
+you read. A later pull request that edits a read file makes this review stop
+covering those sets, fail-closed, and they go back on the list.
+
+**A case that gains a framework waits for that one set.** Your sitting judged
+what existed, and it still stands. The rail says `<framework> waiting;
+<framework> read` rather than `to do`, the case opens with the list you wrote
+blind and the marks you already made, and the only work is the new set. You
+cannot write a second blind list once you have read the recorded sets, so the
+first one rides forward and stays locked.
 
 **The entry carries two names, because they answer two questions.**
 
 `submitted_by` is the GitHub login of the account whose PR carries the sitting.
-It answers for the read. It needs a line in `evals/review/voters.toml`, which
-`submit` adds for a first-timer with standing `contributor`, and it is the name
-every rule reads: the clearing rule, the **Standing** on the read, the document
-name and the allowlist a pull request may write inside.
+It answers for the read, and contribution CI binds it to the account that opened
+the pull request — which is a stronger claim than a line in a file, and is why a
+review needs no roster entry. **Standing** still governs a vote, which is a
+different act under `evals/review/votes/`.
 
 `submitted_for` is who did the reading. Write your own login where you read the
 case yourself. Write `anonymous` where you carry a read for somebody whose own
@@ -477,7 +499,7 @@ uv run python webapp/sitting.py --submitted-for anonymous
 Then the filled document opens with `Read by anonymous, submitted by <login>.`,
 so nobody later reads the file name as the author.
 
-### A reader with no clone: one file out, one file back
+### A reader with no clone: one page out, one pull request back
 
 A reader who cannot install a toolchain — or whose own policy stops them
 putting this repository on their machine — still reads the case. The whole
@@ -493,22 +515,39 @@ stands. Send it. **The browser is the runtime**, so nothing is installed,
 nothing is signed and no platform is left out.
 
 The reader opens it, picks cases from the rail, writes their own list for a
-case before that case's sets open, and marks each record `agree`, `reject` or
-`duplicate`. **Download my answers** saves one JSON file. **Load a saved file**
+case before that case's sets open, and marks each record `agree`, `reject`,
+`duplicate` or `unsure`. **Download my answers** saves one JSON file. **Load a saved file**
 takes it back, so a read that runs over several days needs no browser storage
 and no second copy: the envelope is the save file.
 
-They can change any mark up to the moment they send it — nothing is a record
-until you import it. They cannot rewrite a case's own list once that case's
+**Open the pull request on GitHub** is the way out, and it needs nothing from
+you. It carries the reader straight to GitHub's editor with their submission
+and its name already filled in; **Propose changes** opens the pull request, and
+contribution CI validates it exactly as it validates one the app opened. The
+page names the file by the digest of its own canonical bytes, the same rule
+`evals.harness.envelope` uses, so a name CI accepts is one the page computed
+from the words the reader actually wrote.
+
+The page loads nothing and sends nothing by itself. That press is the only
+address it holds, and `tests/test_offline_sitting.py` holds it to exactly one.
+
+They can change any mark up to the moment they press — nothing is a record
+until it merges. They cannot rewrite a case's own list once that case's
 sets are open, for the reason the app refuses the same thing: a list written
 afterwards would be evidence of an order that did not happen.
 
-When the file comes back:
+A reader who would rather send the file to you than open a pull request
+still can. When it comes back:
 
 ```sh
-python -m evals.harness.run sitting-import sitting-<login>.json
-python -m evals.harness.run submit sitting
+python -m evals.harness.run sitting-import sitting-<login>.json --submitted-by <login>
 ```
+
+You name the account; the envelope has to agree with you. Both identity fields
+travel back inside the file the reader holds, so what arrives is a claim rather
+than a stamp, and a sitting record says who read a case. Add `--submitted-for`
+where somebody carried the read for another account. A mismatch is refused
+before anything is written.
 
 The import treats the file as untrusted. It resolves every case id against the
 corpus, re-checks the own list against the same `MIN_OWN_LIST`, refuses a mark
@@ -524,33 +563,23 @@ already ruled that the gate protects the evidence in the document, not the
 reader. And a reader in a browser cannot edit a reference set, so a correction
 arrives as prose in their notes and you make the change.
 
-`read` pins the bytes the sitting
-covered: a later PR that edits a read file puts the case back on the list
-fail-closed.
-`document` names the filled copy, committed beside the case, because only the
-filled copy shows the method ran. The generated `REVIEW.md` carries this
-entry pre-filled with the current digests.
-`python -m evals.harness.run submit sitting` opens the PR.
+The import writes the same one file the app writes, so an offline reader and a
+reader at a keyboard contribute the same bytes and the checks cannot tell them
+apart. Commit it and open the pull request.
 
-**A sitting pull request may change an answer, never the question it answers.**
-Under each case it carries `case.json`, your own `REVIEW-<login>.md` and the
-`claims/` reference sets, so a correction to a recorded set travels with the
-record that justifies it. `model.json` and every file `sources` lists stay
-outside it — they are what you read, and a submission that edits one fails the
-scope check by name.
+**A sitting pull request carries one file.** It adds your submission under
+`evals/review/submissions/` and changes nothing else — not a case, not a
+reference set, not the roster, not a test. A pull request that touches anything
+else fails the scope check by name. So a correction you would make to a recorded
+set travels as prose in your notes, and a maintainer makes the change.
 
-It also carries `tests/test_case_review.py`, and there the rule is stricter
-than a path: the only change it may hold is the deletion of your cases'
-`UNREVIEWED` entries. That file is a module `pytest` imports, so a submission
-that changed anything else in it would run code nobody asked for in every
-checkout. The check compares the file to the base ref with those entries taken
-out of both sides.
-
-`tests/test_case_review.py` fails on a new case that arrives without a
-clearing sitting, and names every case still waiting in its `UNREVIEWED`
-list. Thirteen of the 13 cases that shipped before this was enforced are still
-on that list. It names work nobody has done, not an exemption, and it is
-meant to shrink to nothing.
+`tests/test_case_review.py` fails on a new case that arrives with no submission
+clearing it, and its `UNREVIEWED` table says what each unread case leaves
+unchecked. Thirteen of the 13 cases that shipped before this was enforced are
+still unread. The table is not the count — `evals.review_submission`
+derives that from the corpus and the merged submissions, so no list can disagree
+with it — and an entry for a case somebody has since read is spent and can be
+deleted.
 
 **Why it cannot be replaced by a lint.** Review sitting 01 found a reference claim
 asserting the model emits training data in a case with no training pipeline. A
@@ -566,9 +595,9 @@ sitting measures nothing.
 
 Take the shape from it and the mark names from a generated `REVIEW.md`. That
 document is a merged reader's own words, so a vocabulary sweep stops at it, and
-it still spells the marks `doubt` and `dup`. The set is now `agree`, `reject`
-and `duplicate` — `MARKS` in `evals/harness/sitting.py` — and the app and the
-import both refuse anything else.
+it still spells the marks `doubt` and `dup`. The set is now `agree`, `reject`,
+`duplicate` and `unsure` — `MARKS` in `evals/harness/sitting.py` — and the app
+and the import both refuse anything else.
 
 Merge checklist:
 

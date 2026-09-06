@@ -34,24 +34,20 @@ request, and nothing here reaches the network.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, ValidationError
 
+from analysis_service.sources import LINE_BREAKS
 from evals.harness import sitting as sittings
 from evals.harness.reference import (
     MAX_NAME,
     SUBMITTED_FOR_PATTERN,
-    is_submitted_for,
 )
-from evals.harness.sitting import Draft, Mark, SittingError, Store
-
-#: What this path calls itself in the evidence it writes. A read held on the
-#: offline page and imported here is not a read held on the local app, and the
-#: filled document is where somebody later asks which it was.
-HELD = "the offline sitting page, imported with `run sitting-import`"
+from evals.harness.sitting import Mark, SittingError, Store
 
 #: The envelope format, so a file written by an older page refuses loudly
 #: rather than being read under rules it was not built for. There is one
@@ -75,7 +71,25 @@ MAX_NOTES = 20_000
 #: it reaches a comparison.
 _SHA256 = r"^[0-9a-f]{64}$"
 
-Line = Annotated[str, Field(max_length=MAX_LINE)]
+
+def _one_line(value: str) -> str:
+    """One line, asked of the value rather than of the producer.
+
+    Both pages that write these split their input on newlines, so a break
+    cannot arrive from a browser -- and this type is also the shape of an
+    envelope a reader mails back, which this module's own docstring calls
+    untrusted. A break here forges headings in the committed reading document,
+    because the sink joins these into Markdown with `- ` in front of each.
+
+    The rule is :data:`~analysis_service.sources.LINE_BREAKS`, which already
+    answers this question for a source label. One tuple, two callers.
+    """
+    if any(char in value for char in LINE_BREAKS):
+        raise ValueError("a line holds no line break")
+    return value
+
+
+Line = Annotated[str, Field(max_length=MAX_LINE), AfterValidator(_one_line)]
 
 #: A generous ceiling on one envelope's cases and marks. The corpus is 13
 #: cases with tens of records each; these bound a hostile file rather than a
@@ -120,10 +134,11 @@ class CaseAnswers(BaseModel):
 class Envelope(BaseModel):
     """One reader's session, however many days it took, as one file.
 
-    ``submitted_by`` and ``submitted_for`` are stamped when the page is built
-    rather than typed by the reader, so an envelope cannot claim an account
-    the operator did not offer it — and ``submit sitting`` re-checks
-    ``submitted_by`` against the authenticated login regardless.
+    ``submitted_by`` and ``submitted_for`` are stamped when the page is built,
+    but they ride back inside a file the reader holds, so what arrives is a
+    claim rather than a stamp. :func:`command_import` checks both against the
+    account the operator names before anything is written, and ``submit
+    sitting`` re-checks ``submitted_by`` against the authenticated login.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -170,10 +185,6 @@ def read(path: Path) -> Envelope:
             f" reads version {VERSION}; generate the page again and ask for a"
             " fresh read"
         )
-    if not is_submitted_for(envelope.submitted_for):
-        raise EnvelopeError(
-            f"{envelope.submitted_for!r} is not a name a sitting can record"
-        )
     return envelope
 
 
@@ -194,52 +205,62 @@ def _refusals(
 ) -> list[str]:
     """Everything wrong with one case's answers, all of it at once.
 
-    One case refusing must not hide the next one's problem: the reader is
-    hours away by email, so a round trip has to carry every question at once.
+    Asked rather than re-derived. An offline reader and a reader at a keyboard
+    are held to one rule, so a change to it cannot refuse one and accept the
+    other.
     """
-    problems = []
-    if not sittings.own_list_is_written(answers.own_list):
-        problems.append(
-            f"{case_id}: the own list is shorter than {sittings.MIN_OWN_LIST}"
-            " characters, so this case's sets should never have opened"
-        )
-    stale = sittings.moved(
+    return sittings.sitting_problems(
         case_dir,
-        {name: answers.opened_digests.get(name, "") for name in prepared.files},
+        own_list=answers.own_list,
+        opened_digests=answers.opened_digests,
+        marks=answers.marks,
     )
-    if stale:
-        problems.append(
-            f"{case_id}: {', '.join(stale)} changed since the page was built,"
-            " so this read answers words that are no longer there. Generate"
-            " the page again and ask for this case to be re-read."
-        )
-    unknown = sorted(
-        set(answers.marks) - {target.fingerprint for target in prepared.mark_targets}
-    )
-    if unknown:
-        problems.append(
-            f"{case_id}: {', '.join(unknown)} names no recorded finding of this"
-            " case, so the mark answers nothing"
-        )
-    return problems
+
+
+#: Where a merged submission lives, relative to the repository root.
+SUBMISSIONS_DIR = Path("evals/review/submissions")
+
+
+def serialize(envelope: Envelope) -> bytes:
+    """Canonical bytes for the committed review file."""
+    return (envelope.model_dump_json(indent=2) + "\n").encode("utf-8")
+
+
+def submission_name(envelope: Envelope) -> str:
+    """The one file name these bytes may be committed under.
+
+    Keyed by their own digest, so two readers cannot collide and an edited file
+    no longer matches its name — which is what
+    :func:`evals.review_submission.verify_pull_request` checks.
+    """
+    digest = hashlib.sha256(serialize(envelope)).hexdigest()[:12]
+    return f"review-{envelope.generated}-{envelope.submitted_by}-{digest}.json"
+
+
+def relative_path(envelope: Envelope) -> str:
+    """Where these bytes are committed, relative to the repository root."""
+    return (SUBMISSIONS_DIR / submission_name(envelope)).as_posix()
 
 
 def apply(envelope: Envelope, root: Path, drafts: Path | None = None) -> list[str]:
-    """Write every case in one envelope into the operator's tree.
+    """Write one envelope into the operator's tree as its submission file.
 
-    **Nothing is written until every case passes.** An envelope is one
-    reader's session, and a half-applied one leaves the operator deciding
-    which cases are real from a tree that no longer says. So the checks run
-    over the whole file first, and the writes run only after.
+    **Nothing is written until every case passes.** An envelope is one reader's
+    session, and a half-applied one leaves the operator deciding which cases are
+    real from a tree that no longer says. So the checks run over the whole file
+    first, and the write runs only after.
 
-    Returns the case ids written, in corpus order.
+    One file lands, under :func:`relative_path`, which is the same artifact the
+    app opens a pull request with. An offline reader and a reader at a keyboard
+    therefore contribute the same bytes, checked the same way.
+
+    Returns the case ids the envelope carries, in corpus order.
     """
     store = Store(
         root=root,
         submitted_by=envelope.submitted_by,
         submitted_for=envelope.submitted_for,
         drafts=drafts or sittings.draft_root(),
-        held=HELD,
     )
     offered = _offered(store.corpus_dir)
     unknown = sorted(set(envelope.cases) - offered)
@@ -248,7 +269,8 @@ def apply(envelope: Envelope, root: Path, drafts: Path | None = None) -> list[st
             f"this envelope names cases the corpus does not hold: {unknown}"
         )
 
-    ordered = [case_id for case_id in sorted(envelope.cases) if case_id in offered]
+    # Every case is offered: the check above raised on the difference.
+    ordered = sorted(envelope.cases)
     prepared = {}
     problems: list[str] = []
     for case_id in ordered:
@@ -264,30 +286,41 @@ def apply(envelope: Envelope, root: Path, drafts: Path | None = None) -> list[st
     if problems:
         raise EnvelopeError("\n".join(problems))
 
-    for case_id in ordered:
-        answers = envelope.cases[case_id]
-        draft = Draft(
-            case=case_id,
-            clone=str(root),
-            own_list=[item.strip() for item in answers.own_list if item.strip()],
-            opened_digests=dict(answers.opened_digests),
-        )
-        sittings.finish(
-            store,
-            prepared[case_id],
-            draft,
-            marks=answers.marks,
-            missing=answers.missing,
-            notes=answers.notes,
-        )
+    target = root / relative_path(envelope)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(serialize(envelope))
     return ordered
 
 
 def command_import(args: argparse.Namespace) -> int:
-    """``run sitting-import <file>``: one envelope into this working tree."""
+    """``run sitting-import <file> --submitted-by <login>``: one envelope in.
+
+    The operator names the account, and the envelope has to agree with them.
+    Both identity fields arrive inside a file a reader mailed back, so neither
+    is a fact this command may take on the file's word: the reader is the one
+    party here who is not the operator, and a sitting record says who read a
+    case.
+
+    Checked **before** :func:`apply`, because apply writes the corpus, the
+    reading document, the unreviewed list and the draft store. A refusal that
+    came after them would leave a tree only ``git checkout`` puts back.
+    """
     root = Path(args.root).resolve() if args.root else sittings.REPO_ROOT
+    submitted_for = args.submitted_for or args.submitted_by
     try:
         envelope = read(Path(args.envelope))
+        if envelope.submitted_by != args.submitted_by:
+            raise EnvelopeError(
+                f"this envelope reads as {envelope.submitted_by!r} and you named"
+                f" {args.submitted_by!r}. Import it under the account it was"
+                " built for, or ask the reader for one built for this account."
+            )
+        if envelope.submitted_for != submitted_for:
+            raise EnvelopeError(
+                f"this envelope says it was read for {envelope.submitted_for!r}"
+                f" and you named {submitted_for!r}. Pass --submitted-for to"
+                " record a read somebody carried for another account."
+            )
         written = apply(envelope, root)
     except EnvelopeError as exc:
         print(f"this envelope was not applied:\n{exc}")
@@ -306,6 +339,17 @@ def command_import(args: argparse.Namespace) -> int:
 
 def import_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("envelope", help="the JSON file the reader sent back")
+    parser.add_argument(
+        "--submitted-by",
+        required=True,
+        help="the account this sitting binds to. The envelope must agree, and"
+        " nothing is written if it does not.",
+    )
+    parser.add_argument(
+        "--submitted-for",
+        help="who the case was read for, where somebody carried the read for"
+        " another account. Defaults to --submitted-by.",
+    )
     parser.add_argument(
         "--root",
         help="the clone to write into. Defaults to this one; a test points it"

@@ -26,7 +26,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import re
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime
@@ -39,7 +38,13 @@ from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+)
 from starlette._utils import get_route_path
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -63,8 +68,9 @@ from analysis_service.jobs import (
     build_store,
     execute_job,
 )
+from analysis_service.parsing import ascii_int
 from analysis_service.report import FrameworkName, FrameworkSelection
-from analysis_service.sources import Source, SourceLimits
+from analysis_service.sources import Source, SourceLimits, plain_name
 from analysis_service.validation import ValidationIssue
 
 logger = logging.getLogger(__name__)
@@ -79,12 +85,17 @@ _BODY_SLACK = 2
 
 _SSE_POLL_SECONDS = 0.2
 
-#: What a ``Last-Event-ID`` may spell before ``int`` sees it. ASCII digits
-#: only, because ``str.isdigit`` also passes superscripts ``int`` refuses; and
-#: bounded, because ``int`` refuses a string past 4300 digits by raising. Either
-#: refusal would surface as a 500 on a header the client controls. Anything
-#: else resumes from the start, which is what a missing header does too.
-_LAST_EVENT_ID = re.compile(r"[0-9]{1,18}")
+#: How long a ``Last-Event-ID`` may be. The shape itself is
+#: :func:`~analysis_service.parsing.ascii_int`'s question, and this is the
+#: caller's own bound: an event sequence is a counter, so 18 digits is past any
+#: run this service could produce. Anything else resumes from the start, which
+#: is what a missing header does too.
+_LAST_EVENT_ID_DIGITS = 18
+
+#: How long a ``Content-Length`` may be. Nineteen digits covers any byte count
+#: an HTTP body can state; a longer one is a client trying something rather
+#: than a request this service could serve.
+_CONTENT_LENGTH_DIGITS = 19
 
 # The rungs of the input ladder, mapped to what HTTP calls them. An empty
 # list is a malformed request rather than an oversized one: a job with no input
@@ -170,8 +181,14 @@ class BodyLimitMiddleware:
     def _declared_over_cap(self, scope) -> bool:
         for name, value in scope.get("headers", ()):
             if name == b"content-length":
-                declared = value.decode("latin-1").strip()
-                return declared.isdigit() and int(declared) > self._max_bytes
+                # ``str.isdigit`` was this test and was wrong twice over: it
+                # passes shapes ``int`` refuses, so a header a client controls
+                # reached a 500 instead of a decision.
+                declared = ascii_int(
+                    value.decode("latin-1").strip(),
+                    max_digits=_CONTENT_LENGTH_DIGITS,
+                )
+                return declared is not None and declared > self._max_bytes
         return False
 
     async def _refuse(self, scope, receive, send) -> None:
@@ -220,13 +237,35 @@ class FrameworkRequest(BaseModel):
     options: dict[str, Any] = Field(default_factory=dict)
 
 
+#: How many sources a body may carry before the schema refuses it, whatever a
+#: deployment's ``max_sources`` says. Far above any configured value — the
+#: shipped one is ten — because it is not that limit: it is the point past
+#: which validating the body costs more than reading it.
+MAX_SOURCES_PER_BODY = 100
+
+#: How many complaints a 422 carries. A body that is wrong in ten thousand
+#: places is wrong; a caller needs to see that and the first few, not all of
+#: them. Rendering every one made the refusal amplify the request 43 times.
+MAX_RENDERED_ERRORS = 20
+
+
 class JobSubmission(BaseModel):
     """Body of ``POST /v1/jobs``.
 
-    ``sources`` is typed but not bounded here. Pydantic answers the first rung
-    of the ladder — is each source well-formed? — and the route answers the
-    rest, because the count and byte budgets are this deployment's config
-    rather than a property of the schema.
+    ``sources`` carries a **structural** bound here and the deployment's real
+    one at the route. Pydantic answers the first rung of the ladder — is each
+    source well-formed? — and the route answers the rest, because the count and
+    byte budgets are this deployment's config rather than a property of the
+    schema.
+
+    The structural bound exists because the first rung is not free. Without it
+    Pydantic validated every element a body held and the error handler rendered
+    every complaint it made, so 200 KB of empty objects — under
+    ``BodyLimitMiddleware``'s cap — cost 2.2 seconds of event loop and an 8.5 MB
+    response, and no admission bound saw any of it: the refusal happens while
+    dependencies are being solved, before a ``JobRecord`` exists, so the
+    ceiling, the rate and both token budgets count nothing. A caller could hold
+    the loop with well under one request a second.
 
     ``frameworks`` is **required and non-empty**, with no default anywhere on
     the path. A submission that names none is refused rather than analysed under
@@ -241,14 +280,24 @@ class JobSubmission(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    sources: list[Source]
+    # Upper bound only. An empty list is the input ladder's second rung and the
+    # route answers it with a 400 and a sentence; a `min_length` here would take
+    # that refusal off the ladder and give back a schema dump instead.
+    sources: list[Source] = Field(max_length=MAX_SOURCES_PER_BODY)
     # Bounded by the number of frameworks this build knows: a valid selection
     # names each at most once (a repeat is refused downstream), so no legitimate
     # request exceeds it, and the schema refuses an over-long list before the
     # route's per-name work runs. The bound tracks the registry, so a new
     # package raises it with no edit here.
     frameworks: list[FrameworkRequest] = Field(min_length=1, max_length=len(PACKAGES))
-    system_name: str | None = Field(default=None, min_length=1, max_length=200)
+    #: Bounded like a Source label rather than merely in length: it reaches the
+    #: report a consumer renders, and this is the one entry point to the
+    #: pipeline that refused it nothing but a length. A control, format or
+    #: bidirectional character in a name has no reading a person wants and one
+    #: a renderer might.
+    system_name: Annotated[str, AfterValidator(plain_name)] | None = Field(
+        default=None, min_length=1, max_length=200
+    )
 
 
 class NodeCompletion(BaseModel):
@@ -406,10 +455,15 @@ async def require_subject(
 
 
 async def _owned_job(request: Request, job_id: str, subject: str) -> JobRecord:
-    """Fetch a job the subject owns; missing and foreign jobs are the same 404."""
+    """Fetch a job the subject owns; missing and foreign jobs are the same 404.
+
+    The record comes back without its report. Every route here reads the
+    envelope, and the one that serves the analysis asks the store for it
+    separately, so no read copies a report to decide something about it.
+    """
     store: JobStore = request.app.state.store
-    record = await store.get(job_id)
-    if record is None or record.owner_subject != subject:
+    record = await store.owned(job_id, subject)
+    if record is None:
         raise HTTPException(status_code=404, detail="job not found")
     return record
 
@@ -563,13 +617,22 @@ def create_app(
 
     @app.exception_handler(RequestValidationError)
     async def _validation_error(request: Request, exc: RequestValidationError):
+        found = exc.errors()
         errors = [
             {
                 "loc": ".".join(str(part) for part in error["loc"]),
                 "msg": error["msg"],
             }
-            for error in exc.errors()
+            for error in found[:MAX_RENDERED_ERRORS]
         ]
+        if len(found) > MAX_RENDERED_ERRORS:
+            errors.append(
+                {
+                    "loc": "",
+                    "msg": f"and {len(found) - MAX_RENDERED_ERRORS} more problems"
+                    " not shown",
+                }
+            )
         return _problem_response(422, "request body is invalid", errors=errors)
 
     @app.exception_handler(Exception)
@@ -683,13 +746,15 @@ def create_app(
                 detail=f"job status is {record.status!r};"
                 " the report exists only once the job is completed",
             )
-        if record.report is None:
-            logger.error("completed job %s has no report attached", record.id)
-            raise HTTPException(status_code=500, detail="an internal error occurred")
         withheld = _withheld_report(request, record)
         if withheld is not None:
             return withheld
-        return JSONResponse(record.report.model_dump(mode="json"))
+        store: JobStore = request.app.state.store
+        payload = await store.report_json(job_id, subject)
+        if payload is None:
+            logger.error("completed job %s has no report attached", record.id)
+            raise HTTPException(status_code=500, detail="an internal error occurred")
+        return JSONResponse(payload)
 
     @app.get("/v1/jobs/{job_id}/events")
     async def stream_events(
@@ -697,7 +762,7 @@ def create_app(
     ) -> StreamingResponse:
         await _owned_job(request, job_id, subject)
         last_event_id = request.headers.get("last-event-id", "")
-        seen = int(last_event_id) if _LAST_EVENT_ID.fullmatch(last_event_id) else 0
+        seen = ascii_int(last_event_id, max_digits=_LAST_EVENT_ID_DIGITS) or 0
         store: JobStore = request.app.state.store
 
         async def event_stream():

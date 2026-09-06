@@ -2,21 +2,34 @@
 
 from __future__ import annotations
 
+import ast
 import re
+import sys
+from pathlib import Path
+from typing import ClassVar
 
 import pytest
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
+from analysis_service.conformance import REFERENCE_MODELS
 from analysis_service.identity import (
     BUILD_DISTRIBUTIONS,
     IDENTITY_VERSION,
-    SERVED_TRUST,
     BuildIdentityError,
     build_identity,
     execution_fingerprint,
     execution_identity,
     fingerprint,
+    served_trust_for,
 )
 from analysis_service.sampling import TierSampling
+from analysis_service.vendors import (
+    VENDOR_NAMES,
+    CredentialMode,
+    Vendor,
+    vendor_for,
+)
 
 # Deliberately not the installed versions: a fixture that happened to match the
 # running install would let a recomputation that ignores the recorded map pass.
@@ -46,8 +59,8 @@ class TestShape:
 
     def test_the_identity_carries_its_own_version(self):
         identity = execution_identity(
-            requested_route="a",
-            served_route="b",
+            requested_route="anthropic/claude-opus-5",
+            served_route="anthropic/claude-opus-5",
             sampling={},
             instruction_sha256=INSTRUCTIONS,
             build=BUILD,
@@ -59,13 +72,49 @@ class TestShape:
         # verify a served build must hash differently from one that only
         # repeated the provider's claim.
         identity = execution_identity(
-            requested_route="a",
-            served_route="b",
+            requested_route="anthropic/claude-opus-5",
+            served_route="anthropic/claude-opus-5",
             sampling={},
             instruction_sha256=INSTRUCTIONS,
             build=BUILD,
         )
-        assert identity["served_trust"] == SERVED_TRUST == "provider_reported"
+        assert identity["served_trust"] == "provider_reported"
+
+    def test_a_vendor_that_echoes_the_request_says_so(self):
+        """The #606 defect. Every vertex fingerprint claimed evidence it had.
+
+        ``SERVED_TRUST`` was the constant ``"provider_reported"``, and litellm
+        fills the served identifier from the request on vertex — so the payload
+        stated that a provider named the build, and none had.
+        """
+        identity = execution_identity(
+            requested_route="vertex_ai/gemini-2.5-pro",
+            served_route="vertex_ai/gemini-2.5-pro",
+            sampling={},
+            instruction_sha256=INSTRUCTIONS,
+            build=BUILD,
+        )
+        assert identity["served_trust"] == "requested_echo"
+
+    def test_the_two_vendors_hash_differently_on_the_same_pair(self):
+        # The value is in the payload, so the same routes under two vendors
+        # cannot collide on one fingerprint.
+        assert fp(
+            requested_route="vertex_ai/claude-opus-5",
+            served_route="vertex_ai/claude-opus-5",
+        ) != fp(
+            requested_route="anthropic/claude-opus-5",
+            served_route="anthropic/claude-opus-5",
+        )
+
+    def test_a_route_naming_no_vendor_raises_rather_than_guessing(self):
+        # Inventing a vendor is how a fingerprint comes to name a provider
+        # that never ran. The producer's own invariant makes this unreachable:
+        # node_models is built from the tier config through Vendor.prefix.
+        with pytest.raises(ValueError):
+            served_trust_for("gemini-2.5-pro")
+        with pytest.raises(ValueError):
+            served_trust_for("cohere/command-r")
 
     def test_the_hash_follows_from_the_identity_a_reader_can_see(self):
         # Nothing is hashed that the identity mapping does not show, so a
@@ -160,3 +209,268 @@ class TestBuildIdentity:
         with pytest.raises(BuildIdentityError, match="no-such-distribution"):
             build_identity()
         build_identity.cache_clear()
+
+
+def test_every_distribution_the_package_imports_is_declared():
+    """A dependency you rely on but do not declare is one a bump can remove.
+
+    `pyproject.toml` already records this happening once, to `cryptography`.
+    It had happened twice more by the time an audit looked: `anyio`, `starlette`
+    and `google-genai` were all imported by name and all arrived only
+    transitively.
+
+    The import name is not the distribution name -- `jwt` is PyJWT, `google` is
+    three separate distributions -- so this asks `packages_distributions()`
+    rather than guessing, and accepts a top-level name when ANY distribution
+    providing it is declared.
+    """
+    import tomllib
+    from importlib.metadata import packages_distributions
+
+    project = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    declared = {
+        re.split(r"[<>=\[]", spec)[0].strip().lower()
+        for spec in project["project"]["dependencies"]
+    }
+    provides = packages_distributions()
+
+    imported: set[str] = set()
+    for source in (REPO_ROOT / "src" / "analysis_service").rglob("*.py"):
+        tree = ast.parse(source.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                imported |= {alias.name.split(".")[0] for alias in node.names}
+            elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                imported.add(node.module.split(".")[0])
+
+    assert "litellm" in imported, "the import scan found nothing; it is broken"
+    assert "litellm" in declared, "the dependency read found nothing; it is broken"
+
+    undeclared = sorted(
+        name
+        for name in imported - sys.stdlib_module_names - {"analysis_service"}
+        if name in provides
+        and not any(dist.lower() in declared for dist in provides[name])
+    )
+
+    assert not undeclared, (
+        f"imported but not declared in pyproject.toml: {undeclared}"
+        " — a transitive bump can remove these from under the code that calls them"
+    )
+
+
+class TestTheTableMatchesWhatTheTranslatorDoes:
+    """``served_trust`` is a property of the vendor **and** of the translator.
+
+    A litellm bump that started reading Gemini's ``modelVersion`` would make the
+    ``vertex`` entry wrong, and every fingerprint would move on that bump anyway
+    — ``litellm`` sits in ``BUILD_DISTRIBUTIONS`` — so the hashes would move for
+    an unrelated reason and the stale entry would stay invisible.
+
+    So the table is checked against what the installed translator does, rather
+    than against a second copy of the same claim. Each vendor's own
+    transformation is driven with a canned response naming a build **different**
+    from the request, offline, with no credential and no network.
+    """
+
+    REQUESTED = "requested-build"
+    SERVED = "served-build-002"
+
+    #: One canned provider response per vendor, in that vendor's own wire
+    #: shape, naming :attr:`SERVED` where that API carries a model name. Keyed
+    #: by vendor, so a row cannot be added without answering here.
+    #:
+    #: The Bedrock body names it nowhere, and that absence is the fact: a
+    #: Converse response carries no model identifier at all, so there is no
+    #: field a translator could read and the served half can only echo the
+    #: request. A body that invented one would test a wire shape AWS does not
+    #: send.
+    BODIES: ClassVar[dict[str, dict]] = {
+        "vertex": {
+            "candidates": [
+                {
+                    "content": {"parts": [{"text": "hi"}], "role": "model"},
+                    "finishReason": "STOP",
+                }
+            ],
+            "usageMetadata": {
+                "promptTokenCount": 1,
+                "candidatesTokenCount": 1,
+                "totalTokenCount": 2,
+            },
+            # Gemini carries the served build here. litellm never reads it,
+            # which is exactly what this test pins.
+            "modelVersion": SERVED,
+        },
+        "anthropic": {
+            "id": "msg_1",
+            "type": "message",
+            "role": "assistant",
+            "model": SERVED,
+            "content": [{"type": "text", "text": "hi"}],
+            "stop_reason": "end_turn",
+            "usage": {"input_tokens": 1, "output_tokens": 1},
+        },
+        "openai": {
+            "id": "c1",
+            "object": "chat.completion",
+            "created": 0,
+            "model": SERVED,
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": "hi"},
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+        },
+        "bedrock": {
+            "output": {"message": {"role": "assistant", "content": [{"text": "hi"}]}},
+            "stopReason": "end_turn",
+            "usage": {"inputTokens": 1, "outputTokens": 1, "totalTokens": 2},
+            "metrics": {"latencyMs": 1},
+        },
+        # The Developer API answers in the Vertex wire shape, ``modelVersion``
+        # included, and litellm's config for it inherits the Vertex
+        # transformation. Whether that inheritance still holds is what this
+        # entry drives.
+        "gemini": {
+            "candidates": [
+                {
+                    "content": {"parts": [{"text": "hi"}], "role": "model"},
+                    "finishReason": "STOP",
+                }
+            ],
+            "usageMetadata": {
+                "promptTokenCount": 1,
+                "candidatesTokenCount": 1,
+                "totalTokenCount": 2,
+            },
+            "modelVersion": SERVED,
+        },
+    }
+
+    def test_every_vendor_has_a_canned_response(self):
+        assert set(self.BODIES) == set(VENDOR_NAMES)
+
+    def _served_name(self, vendor: Vendor) -> str:
+        """What the installed translator puts in ``model_response.model``.
+
+        The config class is resolved from the *model*, not from the vendor:
+        ``vertex_ai/`` is not one provider, and litellm hands a Gemini
+        identifier and a Llama identifier to different transformations.
+        """
+        import httpx
+        from litellm.litellm_core_utils.litellm_logging import Logging
+        from litellm.types.utils import LlmProviders, ModelResponse
+        from litellm.utils import ProviderConfigManager
+
+        model = REFERENCE_MODELS[vendor.name][0]
+        config = ProviderConfigManager.get_provider_chat_config(
+            model=model, provider=LlmProviders(vendor.litellm_provider)
+        )
+        assert config is not None, vendor.name
+        raw = httpx.Response(
+            200,
+            json=self.BODIES[vendor.name],
+            request=httpx.Request("POST", "https://provider.invalid/v1"),
+        )
+        logging_obj = Logging(
+            model=model,
+            messages=[],
+            stream=False,
+            call_type="completion",
+            start_time=0,
+            litellm_call_id="offline",
+            function_id="offline",
+        )
+        logging_obj.optional_params = {}
+        served = config.transform_response(
+            model=self.REQUESTED,
+            raw_response=raw,
+            model_response=ModelResponse(),
+            logging_obj=logging_obj,
+            request_data={},
+            messages=[{"role": "user", "content": "hi"}],
+            optional_params={},
+            litellm_params={},
+            encoding=None,
+        ).model
+        assert served is not None, vendor.name
+        return served
+
+    @pytest.mark.parametrize("name", VENDOR_NAMES)
+    def test_the_entry_matches_the_installed_transformation(self, name):
+        vendor = vendor_for(name)
+        served = self._served_name(vendor)
+        if vendor.served_trust == "provider_reported":
+            assert served == self.SERVED, (
+                f"{name} is recorded as provider_reported, but the installed"
+                " translator did not use the name in the response body"
+            )
+        else:
+            assert served == self.REQUESTED, (
+                f"{name} is recorded as requested_echo, but the installed"
+                " translator read a name from the response body"
+            )
+
+
+class TestAPlatformIdentityModePassesNoAmbientCredential:
+    """The claim is about litellm's behaviour, so litellm is what answers it.
+
+    `vendors.py` says an absent `api_key` sends litellm to the process
+    environment for a bearer token, and that an empty one states the
+    platform-identity choice positively. Neither half is decidable from this
+    repository's own tables, and a version bump could move either — so the
+    installed library is driven directly, offline, with a canned credential and
+    no network.
+    """
+
+    AMBIENT = "ambient-token-nobody-declared"
+
+    def _authorization(self, api_key: str | None) -> str:
+        # botocore ships no stubs, and this is the one call that needs its
+        # credential object rather than litellm's wrapper around it.
+        from botocore.credentials import Credentials  # type: ignore[import-untyped]
+        from litellm.llms.bedrock.base_aws_llm import BaseAWSLLM
+
+        prepared = BaseAWSLLM().get_request_headers(
+            credentials=Credentials(access_key="AK", secret_key="SK"),
+            aws_region_name="us-east-1",
+            extra_headers=None,
+            endpoint_url="https://bedrock-runtime.us-east-1.amazonaws.com/x",
+            data=b"{}",
+            headers={"Content-Type": "application/json"},
+            api_key=api_key,
+        )
+        return dict(prepared.headers).get("Authorization", "")
+
+    @pytest.fixture(autouse=True)
+    def _ambient_token(self, monkeypatch):
+        """The undeclared credential this mode has to ignore."""
+        monkeypatch.setenv("AWS_BEARER_TOKEN_BEDROCK", self.AMBIENT)
+
+    def test_an_absent_api_key_lets_the_ambient_token_authenticate(self):
+        """The behaviour the registry works around, pinned as its counter-example.
+
+        If a litellm bump stopped reading the variable, this fails and the
+        empty-string entry in `_MODE_KWARGS` becomes unnecessary rather than
+        wrong — which is a thing to find out here rather than to keep carrying.
+        """
+        assert self.AMBIENT in self._authorization(None)
+
+    def test_the_registry_kwargs_sign_from_the_resolved_identity(self):
+        """What this deployment actually sends under the platform-identity mode.
+
+        Read off `credential_kwargs` rather than restated, so the test and the
+        registry cannot come to disagree about which value is passed.
+        """
+        vendor = vendor_for("bedrock")
+        mode = CredentialMode.IAM
+        env = dict.fromkeys(vendor.required_env_vars(mode), "us-east-1")
+        kwargs = vendor.credential_kwargs(env, mode)
+
+        authorization = self._authorization(kwargs.get("api_key"))
+        assert self.AMBIENT not in authorization
+        assert authorization.startswith("AWS4-HMAC-SHA256")

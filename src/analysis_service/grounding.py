@@ -10,8 +10,16 @@ thing that addresses it.
 
 Model output is untrusted input (OWASP LLM05). A quote is bytes a model chose,
 matched against bytes a caller submitted, and this module interprets neither as
-anything but text. It compiles no regular expression from either side, so a
-hostile quote cannot cost more than its length.
+anything but text. It compiles no regular expression from either side, so the
+ladder proper cannot cost more than the quote's length times the source's.
+
+The repair rung is where cost has to be bounded on purpose, because it is the
+one place both lengths multiply into a search. :data:`MAX_REPAIR_WORK` is that
+bound, and the constant carries the measurements behind it. It is a budget the
+scan spends, not a size it is refused for: what costs the time is how many
+windows survive pruning, and no function of the two lengths can see that.
+Without the budget a caller sizes the rung's work directly — both terms come
+from the submitted text — and one quote runs for minutes.
 
 The ladder is pinned, and each rung is a policy decision rather than a
 convenience. The figures below are measured over the 12 corpus cases' 206
@@ -72,8 +80,11 @@ rather than leaning on the label check to do it.
 
 from __future__ import annotations
 
+import math
 import re
+import time
 import unicodedata
+from dataclasses import dataclass
 from difflib import SequenceMatcher
 
 #: How alike a source window and a refused quote must be, as a
@@ -90,6 +101,138 @@ REPAIR_THRESHOLD = 0.9
 #: carried.
 _REPAIR_WIDTH_SLACK = 2
 
+#: How much character comparison the repair rung may do before it gives up,
+#: counted as it happens rather than predicted from the input's shape.
+#:
+#: Counted, because two attempts to predict it were both wrong and wrong in
+#: different directions. The first counted the quote in words while
+#: :meth:`~difflib.SequenceMatcher.ratio` costs characters. The second counted
+#: characters but still predicted, and a prediction cannot order these two:
+#:
+#: ===================  ==========  ========  =======
+#: source               predicted   real CPU  ratio
+#: ===================  ==========  ========  =======
+#: 100 KiB of English   288,000,000    0.39s   pruned
+#: 100 KiB repetitive   111,974,400    5.95s   unpruned
+#: ===================  ==========  ========  =======
+#:
+#: The cheaper case scores higher, by 39x on the rate. The shape decides
+#: everything and the shape is the caller's:
+#: :meth:`~difflib.SequenceMatcher.quick_ratio` prunes almost every window of
+#: ordinary prose and almost none of a source whose windows share the quote's
+#: character multiset. No constant over the input can admit the first and refuse
+#: the second, because the first is the larger number.
+#:
+#: So the loop spends this budget as it goes, and it charges for **both** kinds
+#: of work at **different rates**. Two corrections, each from an input that beat
+#: the version before it.
+#:
+#: Charging only the comparisons that survive the prune reads zero on the input
+#: where the prune itself is the cost: the join and ``quick_ratio`` are each
+#: linear in the span and run on every window, so an English source and a
+#: 333-word quote spent 0 of 50,000,000 units and ran 8.4 seconds. A budget
+#: nothing charges is not a budget.
+#:
+#: And one rate does not serve both, because ``ratio`` is not linear in the
+#: product it is charged by. Pruning moves at roughly 7 million characters a
+#: second. Comparison measured 19 million units a second on one shape and 4
+#: million on another, where every window shared the quote's multiset and the
+#: matching blocks degenerated. The weights below are that spread, and the
+#: budget buys about a second and a half of the worst of it.
+#:
+#: The longest quote this rung will try to repair, in normalized characters.
+#:
+#: **The bound that works, after five that did not.** Every earlier attempt
+#: priced a `difflib` comparison from its operands, and six separate models of
+#: that cost were all wrong -- the last by 200x, when 156,976 matching pairs ran
+#: in 0.015 s and 332,002 ran in 6.5 s. `SequenceMatcher` recurses on the blocks
+#: it finds, and nothing computable from the inputs sees how many that will be.
+#:
+#: So this does not predict the cost. It caps the input, and the worst case is
+#: measured rather than modelled. Against the shape that beats everything else
+#: -- an inverted phase, where the prune passes every window:
+#:
+#: =============  ==========
+#: quote chars    worst call
+#: =============  ==========
+#: 300            0.166s
+#: 400            0.515s
+#: 1000           6.444s
+#: =============  ==========
+#:
+#: The 400 row is measured at the widest span ``quick_ratio`` still admits, 488
+#: characters, not at a span equal to the quote; the same shape costs 0.400 s at
+#: 400. The deadline check runs before the comparison, so a scan overshoots it
+#: by at most one call of this size.
+#:
+#: Four hundred costs nothing real. Across 784 spans of all 13 corpus sources
+#: the normalized quote length runs to a median of 134, a 99th percentile of 279
+#: and a maximum of 305, so no case in the corpus reaches this and the rung
+#: keeps every repair it makes today. A longer quote answers `None`, which is
+#: what the threshold already answers when no window is close enough.
+MAX_REPAIR_QUOTE_CHARS = 400
+
+
+#: **Five bounds failed before this one, and all five priced the comparison.**
+#: `difflib` recurses on the matching blocks it finds, so its cost is not a
+#: function of the operands: 156,976 matching character pairs ran in 0.015 s
+#: while 332,002 ran in 6.5 s, a 200x spread on the only cheap statistic that
+#: looked promising. Word counts, character products, prune-aware budgets and a
+#: junk heuristic were each tried and each wrong.
+#:
+#: :data:`MAX_REPAIR_QUOTE_CHARS` is what actually bounds a single comparison,
+#: by capping what goes into one. This budget bounds the *number* of them, which
+#: is a count rather than a prediction, and the deadline below catches whatever
+#: both of those still misprice. Three bounds, because the record earned them.
+#:
+#: The weights are the measured ratio between a character of pruning and a unit
+#: of comparison. They are re-derived whenever the comparison changes shape --
+#: `autojunk` moved them once and was then reverted, because it dropped 12.4% of
+#: the repairs a stripped-punctuation quote needs while the transposition the
+#: test happened to use lost 0.0%.
+MAX_REPAIR_WORK = 250_000_000
+
+#: What one pruned window costs, per character of the window. Pruning is the
+#: cheaper work and every window pays it.
+#: A ratio at or above this is the span itself; nothing later can beat it,
+#: so the scan stops rather than ranking the rest of the document.
+_CERTAIN = 0.9999
+
+#: The backstop, on a **per-thread** clock. `time.process_time()` sums CPU
+#: across every thread in the process and `graph.py` runs eight node bodies on
+#: one pool, so that spelling made the effective deadline about 0.22 s under a
+#: full pool: one busy caller truncated another job's repairs and the report
+#: became a function of unrelated traffic.
+#:
+#: Four seconds, because legitimate work measured 1.98 s and a backstop that
+#: legitimate work brushes against is not a backstop -- at 2.0 s a slower
+#: machine silently truncated a repair that should have been made. It has to
+#: stay finite: the shape that beats the budget, a small alphabet where every
+#: window survives the prune, runs 56.72 s with the budget alone, because the
+#: budget prices each of its comparisons at a hundredth of what they cost.
+_REPAIR_DEADLINE_SECONDS = 4.0
+
+#: What every repair in one node body may spend together, in thread CPU
+#: seconds. The three bounds above hold for ONE scan, and a body runs one scan
+#: per quote ground the ladder refused: at 64,000 output tokens a lane emits
+#: about 400 such grounds, so a body of scans that each stop at the deadline
+#: runs 2.9 hours for six lanes and 8.1 for seventeen, on a 440-byte source.
+#: The job deadline settles the job and the thread runs on, and `graph.py`
+#: names this bound as the reason that is harmless.
+#:
+#: A cost that turns on how many inputs survive a filter is bounded where the
+#: work happens, not per input. Thirty seconds is fifteen scans at the slowest
+#: legitimate single scan measured (1.98 s) and three thousand at the corpus's
+#: own 0.01 s; a corpus job repairs under five. Measured against the shape that
+#: reaches every scan's deadline, a body of nine such quotes stops at 30.0 s
+#: where it ran 39 s unbounded, and the overshoot is one comparison.
+MAX_REPAIR_SECONDS_PER_BODY = 30.0
+_PRUNE_COST = 13
+
+#: What one full comparison costs, per character-pair. Five to three, because
+#: that is the measured spread between the two rates; see MAX_REPAIR_WORK.
+_COMPARE_COST = 1
+
 #: Characters a model routinely substitutes for their ASCII originals when it
 #: believes it is quoting verbatim. NFKC folds most of the width and ligature
 #: cases; these are the ones it leaves alone.
@@ -101,12 +244,10 @@ _TYPOGRAPHIC_FOLDS = {
     "”": '"',
     "„": '"',
     "‐": "-",
-    "‑": "-",
     "‒": "-",
     "–": "-",
     "—": "-",
     "―": "-",
-    " ": " ",
 }
 
 # A cut, however the model spelled it. Both forms are in play: the prompt asks
@@ -174,7 +315,102 @@ def verify_normalized(quote: str, haystack: str) -> bool:
     return matched
 
 
-def repair_quote(quote: str, source: str) -> tuple[str, float] | None:
+def repair_deadline() -> float:
+    """The one deadline every repair scan in a node body shares.
+
+    An absolute :func:`time.thread_time` value, so it is right only on the
+    thread that runs the scans: the caller builds it once and passes it to each
+    scan of the same body.
+    """
+    return time.thread_time() + MAX_REPAIR_SECONDS_PER_BODY
+
+
+@dataclass(frozen=True)
+class PreparedSource:
+    """One source split into words and folded, ready for any repair scan.
+
+    The scan needs the source twice: as words, so a candidate window hands back
+    the submitter's own spelling, and as folded words, so a window's normalized
+    form is its folded words joined. Neither depends on the quote, so a body
+    that scans one source for many refused quotes builds this once.
+
+    Built by :func:`prepare_source` and never mutated. It is a value derived
+    from the source text, so two of them over one source are equal by
+    construction and nothing has to invalidate one.
+    """
+
+    words: tuple[str, ...]
+    folded: tuple[str, ...]
+
+
+def prepare_source(source: str) -> PreparedSource:
+    """Split and fold one source, once.
+
+    Each source word is normalized once rather than once per window that covers
+    it, and once per source rather than once per refused quote. Both are the
+    same comparison for a fraction of the folding: the ladder's rungs are
+    per-character and the last one collapses whitespace, so a window's folded
+    form is its folded words joined.
+    """
+    words = source.split()
+    return PreparedSource(tuple(words), tuple(normalize(word) for word in words))
+
+
+def deadline_spent(deadline: float | None) -> bool:
+    """Has the body's shared deadline passed?
+
+    One reader, because three sites ask it and each asks to avoid a different
+    cost: :func:`repair_quote` and :func:`~analysis_service.critic._verify_quotes`
+    ask before they prepare a source, and :func:`repair_prepared` asks before it
+    scans one. ``None`` is a caller that set no body bound, which is every
+    caller outside the fan-in.
+    """
+    return deadline is not None and time.thread_time() > deadline
+
+
+def _needle_of(quote: str) -> str:
+    """The quote's folded form, or ``""`` where the rung will not scan it.
+
+    Three refusals, and every one of them is about the quote alone, so they are
+    decided before any source is touched. A quote marking a cut with ``…`` is a
+    sequence of spans rather than one, and one nearest window for the whole is a
+    span the quote never claimed. A quote that normalizes away has no words to
+    find. A quote past :data:`MAX_REPAIR_QUOTE_CHARS` is what bounds a single
+    comparison.
+    """
+    if _ELLIPSIS.search(quote):
+        return ""
+    needle = normalize(quote)
+    if len(needle) > MAX_REPAIR_QUOTE_CHARS:
+        return ""
+    return needle
+
+
+def repair_quote(
+    quote: str, source: str, deadline: float | None = None
+) -> tuple[str, float] | None:
+    """The raw-text form of :func:`repair_prepared`, for a caller holding text.
+
+    A caller scanning the same source for many refused quotes should call
+    :func:`prepare_source` once and :func:`repair_prepared` per quote — the
+    split and the per-word folding are the same answer for every quote, and
+    this form pays for them again on each call.
+
+    **Nothing here folds a source to reach an answer it already has.** Both
+    refusals that need no source are taken first: a quote the rung will not scan
+    at all, and a body whose ``deadline`` has passed. Folding the quote twice —
+    once here and once in the scan — costs microseconds against a whole
+    submission, because a quote is bounded by :data:`MAX_REPAIR_QUOTE_CHARS` and
+    a source is not.
+    """
+    if not _needle_of(quote) or deadline_spent(deadline):
+        return None
+    return repair_prepared(quote, prepare_source(source), deadline)
+
+
+def repair_prepared(
+    quote: str, source: PreparedSource, deadline: float | None = None
+) -> tuple[str, float] | None:
     """The source's own span nearest a refused quote, or ``None``.
 
     Run only after :func:`verify_quote` said no. The answer is a span cut from
@@ -187,27 +423,68 @@ def repair_quote(quote: str, source: str) -> tuple[str, float] | None:
     both sides so the rungs the ladder already forgives cost nothing here. The
     best candidate wins if it reaches :data:`REPAIR_THRESHOLD`.
 
+    ``source`` is a :class:`PreparedSource` from :func:`prepare_source`, whose
+    docstring carries why the split and the folding sit outside this scan.
+
+    A scan that spends :data:`MAX_REPAIR_WORK`, or runs past
+    :data:`_REPAIR_DEADLINE_SECONDS`, or past the body's own ``deadline`` from
+    :func:`repair_deadline`, stops where it is and answers with the best window
+    it found by then. A scan that starts after the body's deadline answers
+    ``None`` without scanning.
+
+    **A truncated scan can return a good span where a better one sat later**,
+    and the caller cannot tell a truncated answer from a complete one. Both
+    alternatives are worse: refusing the answer throws away a correct match --
+    measured, the median case finds its span at window 1,500 and is cut off at
+    window 26,445 -- and scanning to the end is what the bound exists to stop.
+    Returning nothing is right only when nothing reached the threshold. It does not discard that answer: the
+    budget exists to bound the time, and throwing away a match already above
+    :data:`REPAIR_THRESHOLD` spends the time and buys nothing. A truncated scan
+    can return a match that is merely good rather than the best one, which is
+    the honest cost of the bound.
+
+    Finding nothing still answers ``None``, which is what the threshold already
+    answers when no window is close enough, and the caller already handles it:
+    the quote stays unverified and the report says so.
+
     A quote marking a cut with ``…`` is not repaired: each fragment is a span of
     its own, and one nearest window for the whole is a span the quote never
     claimed.
     """
-    if _ELLIPSIS.search(quote):
-        return None
-    needle = normalize(quote)
+    needle = _needle_of(quote)
     if not needle:
         return None
-    words = source.split()
+    if deadline_spent(deadline):
+        return None
+    words = source.words
+    folded = source.folded
     width = len(quote.split())
     best: tuple[str, float] | None = None
+    budget = MAX_REPAIR_WORK
     matcher = SequenceMatcher(autojunk=False)
+    deadline = min(time.thread_time() + _REPAIR_DEADLINE_SECONDS, deadline or math.inf)
     matcher.set_seq2(needle)
     for count in range(width, width + _REPAIR_WIDTH_SLACK + 1):
         for start in range(len(words) - count + 1):
-            span = " ".join(words[start : start + count])
-            matcher.set_seq1(normalize(span))
+            span = " ".join(w for w in folded[start : start + count] if w)
+            # Charged on EVERY window, before the prune decides anything. The
+            # join above and `quick_ratio` below are both linear in the span,
+            # and they run whether or not the window survives -- so a budget
+            # that charges only survivors reads zero on the input where the
+            # pruning IS the cost. An English source and a 333-word quote spent
+            # 0 of 50,000,000 and ran 8.4 seconds.
+            budget -= _PRUNE_COST * len(span)
+            if budget < 0 or time.thread_time() > deadline:
+                return best
+            matcher.set_seq1(span)
             if matcher.quick_ratio() < REPAIR_THRESHOLD:
                 continue
+            budget -= _COMPARE_COST * len(span) * len(needle)
+            if budget < 0 or time.thread_time() > deadline:
+                return best
             ratio = matcher.ratio()
             if ratio >= REPAIR_THRESHOLD and (best is None or ratio > best[1]):
-                best = (span, ratio)
+                best = (" ".join(words[start : start + count]), ratio)
+                if ratio >= _CERTAIN:
+                    return best
     return best

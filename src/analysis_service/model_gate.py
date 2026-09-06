@@ -46,10 +46,31 @@ class ModelGateError(ConfigError):
     """A tier's ``(vendor, model, sampling)`` combination cannot be requested."""
 
 
+#: Every ``LITELLM_LOCAL_*`` switch litellm defines, set together rather than
+#: chosen between. Each one turns off a remote config fetch, and the repository
+#: set one of them: 1.97.0 also fetches the Anthropic beta headers, at request
+#: time, from a different URL behind a differently-named variable. Whoever
+#: serves that JSON chooses the outgoing ``anthropic-beta`` header, and the only
+#: integrity check is a non-empty dict with a known provider key.
+#:
+#: Setting a switch for a feature this service does not use costs nothing, and
+#: deciding which ones matter is the judgement that failed. ``test_model_gate``
+#: compares this tuple against litellm's own source, so a bump that adds a fifth
+#: fails the offline suite rather than opening a quiet egress.
+LITELLM_LOCAL_SWITCHES = (
+    "LITELLM_LOCAL_ANTHROPIC_BETA_HEADERS",
+    "LITELLM_LOCAL_BLOG_POSTS",
+    "LITELLM_LOCAL_MODEL_COST_MAP",
+    "LITELLM_LOCAL_POLICY_TEMPLATES",
+)
+
+
 def _import_litellm_hermetically() -> Any:
     """Import ``litellm`` with its model-cost map pinned to the installed copy.
 
-    ``litellm`` fetches that map from ``BerriAI/litellm@main`` **at import**, and
+    ``litellm`` fetches remote config in more than one place, and this pins every
+    one of them. The model-cost map is the first: it is fetched from
+    ``BerriAI/litellm@main`` **at import**, and
     the map backs the gate's own conditionals — so pinning the package version
     alone pins nothing, and the gate's verdict would depend on a network fetch
     made at process start. Setting ``LITELLM_LOCAL_MODEL_COST_MAP`` first removes
@@ -64,7 +85,19 @@ def _import_litellm_hermetically() -> Any:
             "litellm was imported before its local model-cost map was pinned;"
             " analysis_service.model_gate must be imported first"
         )
-    os.environ["LITELLM_LOCAL_MODEL_COST_MAP"] = "True"
+    for switch in LITELLM_LOCAL_SWITCHES:
+        os.environ[switch] = "True"
+    # The set is plural, and the names do not rhyme. 1.97.0 fetches a SECOND
+    # config -- the Anthropic beta headers -- from a different URL behind a
+    # different variable, at request time rather than at import, and the repo
+    # set only the first. Whoever serves that JSON chooses the outgoing
+    # `anthropic-beta` header verbatim, and litellm's only integrity check is
+    # that the response is a non-empty dict with a known provider key: no
+    # signature and no digest.
+    #
+    # A version bump must re-check this list against litellm's own source. It
+    # is not derivable from the pin, which is the whole reason the pin is not
+    # enough.
     import litellm
 
     return litellm

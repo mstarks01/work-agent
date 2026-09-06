@@ -21,6 +21,7 @@ from pathlib import Path
 
 import pytest
 
+from analysis_service.identity import IDENTITY_VERSION
 from evals.harness.artifact import ARTIFACT_VERSION, DECLARED_KEYS, load_artifact
 from evals.harness.instruction_delta import (
     artifact as delta_artifact,
@@ -59,6 +60,7 @@ def write_run(tmp_path: Path, name: str, instruction: list[dict], **overrides) -
         "repo_commit": {"commit": "0" * 40, "clean": True},
         "corpus_digest": "0" * 64,
         "provenance": RunProvenance(
+            identity_version=IDENTITY_VERSION,
             build={},
             sampling_config_version=1,
             tiers_config_version=1,

@@ -30,11 +30,36 @@ def estimate_tokens(text: str) -> int:
     return math.ceil(len(text.split()) * 4 / 3)
 
 
+#: Every way :meth:`pathlib.Path.resolve` fails on Python 3.12: ``OSError``
+#: for a path the process cannot walk, ``RuntimeError`` for a symlink loop,
+#: and ``ValueError`` for an embedded NUL. A handler that lists the first alone
+#: let a committed ``source.md -> source.md`` raise a traceback through the
+#: startup gate, the loader, and the lint that runs over a stranger's pull
+#: request. Every reader that resolves and contains catches this set.
+RESOLVE_ERRORS = (OSError, RuntimeError, ValueError)
+
+
+def _inside(root: Path, path: Path) -> bool:
+    """Whether ``path`` resolves to a readable file under ``root``.
+
+    One reader for "is this file mine to read". A name resolving outside the
+    root -- by traversal or by symlink -- is treated the same as absent: deny,
+    and reveal nothing about what lies outside. A name that cannot be resolved
+    at all is absent too.
+    """
+    try:
+        resolved = path.resolve()
+        return resolved.is_relative_to(root.resolve()) and resolved.is_file()
+    except RESOLVE_ERRORS:
+        return False
+
+
 def split_sections(text: str) -> dict[str, str]:
     """Split a Markdown file into its H2 sections, preserving order.
 
-    Headings are taken verbatim (everything after ``## ``) so the lints can
-    enforce exact strings. Duplicate or empty headings raise
+    Headings are everything after ``## ``, with surrounding whitespace removed,
+    which is the same reading the package gate's own heading lint applies. Two
+    readings of one heading is a file that passes the gate and fails the load. Duplicate or empty headings raise
     :class:`MarkdownFormatError`.
     """
     sections: dict[str, str] = {}
@@ -44,7 +69,12 @@ def split_sections(text: str) -> dict[str, str]:
         if line.startswith("## "):
             if heading is not None:
                 sections[heading] = "\n".join(body).strip()
-            heading = line[3:]
+            # Stripped, because the lint that gates these files strips.
+            # `_heading_issues` compared `line[3:].strip()` and this stored
+            # `line[3:]`, so one trailing space after `## Scope` passed the gate
+            # and then raised here -- the critic's lane digest is read out of
+            # that section, so the package started and its first job died.
+            heading = line[3:].strip()
             if not heading.strip():
                 raise MarkdownFormatError("empty H2 heading")
             if heading in sections:
@@ -93,12 +123,26 @@ class MarkdownLoader:
             for path in self._root.rglob("*.md")
         )
 
+    def readable(self, name: str) -> bool:
+        """Whether :meth:`load` would return this name's text.
+
+        Exported so a caller checking a file exists asks the same question the
+        loader will ask. The framework package gate asked ``is_file()``, which
+        follows a symlink out of the root that :meth:`load` refuses -- so a
+        package passed startup validation and failed on its first job.
+        """
+        return _inside(self._root, self._root / f"{name}.md")
+
     def load(self, name: str) -> str:
-        path = (self._root / f"{name}.md").resolve()
+        path = self._root / f"{name}.md"
         # A name resolving outside the root (traversal) is treated the same
-        # as absent — deny, don't reveal what lies outside.
-        if not path.is_relative_to(self._root) or not path.is_file():
+        # as absent — deny, don't reveal what lies outside. `_inside` does the
+        # resolving, so a name that cannot be resolved is refused the same way.
+        if not _inside(self._root, path):
             raise MarkdownNotFoundError(
                 f"no markdown named {name!r} under {self._root}"
             )
-        return path.read_text(encoding="utf-8")
+        try:
+            return path.read_text(encoding="utf-8")
+        except UnicodeDecodeError as exc:
+            raise MarkdownFormatError(f"{name}.md is not UTF-8: {exc}") from exc

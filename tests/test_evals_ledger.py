@@ -10,10 +10,11 @@ Deterministic and free of provider calls, so it gates on every PR.
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 
 import pytest
 
-from evals.harness.fingerprint import Components, fingerprint
+from evals.harness.fingerprint import Components, fingerprint, version_for
 from evals.harness.ledger import (
     REASON_GLOSS,
     REASONS,
@@ -102,7 +103,7 @@ def test_a_correction_is_a_new_event_and_the_old_one_survives(tmp_path):
 
     ledger = load(path)
     assert len(ledger) == 2, "the first vote was overwritten"
-    key = (fingerprint(components()), "sam")
+    key = (fingerprint(components(), version=version_for("stride")), "sam")
     assert ledger.current()[key].verdict == "down"
     assert [vote.verdict for vote in ledger.for_fingerprint(key[0])] == ["up", "down"]
 
@@ -117,9 +118,13 @@ def test_the_pool_is_derived_from_the_live_verdicts(tmp_path):
     )
 
     pool = load(path).pool()
-    assert fingerprint(components("process:a")) in pool
-    assert fingerprint(components("process:b")) in pool, "style down left the pool"
-    assert fingerprint(components("process:c")) not in pool
+    assert fingerprint(components("process:a"), version=version_for("stride")) in pool
+    assert (
+        fingerprint(components("process:b"), version=version_for("stride")) in pool
+    ), "style down left the pool"
+    assert (
+        fingerprint(components("process:c"), version=version_for("stride")) not in pool
+    )
 
 
 def test_a_retracted_upvote_leaves_the_pool(tmp_path):
@@ -140,7 +145,9 @@ def test_double_voted_findings_are_the_agreement_sample(tmp_path):
     append(cast(components("process:b"), "01", "up", "sam"), path)
 
     ledger = load(path)
-    assert ledger.double_voted() == (fingerprint(components("process:a")),)
+    assert ledger.double_voted() == (
+        fingerprint(components("process:a"), version=version_for("stride")),
+    )
     assert ledger.voters() == ("ada", "sam")
 
 
@@ -157,7 +164,7 @@ def test_a_rekey_needs_no_revote(tmp_path):
     original = load(path)
     assert original.votes[0].fingerprint.startswith("v1:")
 
-    moved = rekey(original.votes, version=2)
+    moved = rekey(original.votes)
     assert [vote.fingerprint for vote in moved] != [
         vote.fingerprint for vote in original.votes
     ]
@@ -247,4 +254,98 @@ def test_an_empty_ledger_answers_every_question(tmp_path):
     assert ledger.pool() == frozenset()
     assert ledger.voters() == ()
     assert ledger.double_voted() == ()
-    assert ledger.voted_fingerprints() == frozenset()
+
+
+def test_every_package_keys_its_own_votes(tmp_path):
+    """``cast`` took its version from a default, which is a single rule for a
+    table that holds one row per package.
+
+    So an ASVS claim was keyed under STRIDE's rule, which reads an action verb
+    an ASVS claim does not carry, and every ASVS vote raised instead of
+    recording. Checked against the registry rather than a fixed pair: a package
+    added to ``VERSION_FOR`` is covered here the day it is added.
+    """
+    from evals.harness.fingerprint import VERSION_FOR
+
+    for framework, version in VERSION_FOR.items():
+        recorded = cast(
+            _components_for(framework),
+            "01-payments-checkout",
+            "up",
+            "ada",
+        )
+        assert recorded.fingerprint.startswith(f"v{version}:"), (
+            f"{framework} keyed under the wrong rule"
+        )
+
+
+def _components_for(framework):
+    """One package's claim components, each satisfying its own version."""
+    if framework == "asvs":
+        return Components("asvs", "V6", ("process:a",), identifier="6.2.1")
+    return Components("stride", "spoofing", ("process:a",), verb="read")
+
+
+def test_a_rekey_moves_each_row_under_its_own_frameworks_rule(tmp_path):
+    """One version for the file stopped being a coherent request when the table
+    grew its second row: either value raised on the other package's rows."""
+    path = tmp_path / "votes"
+    append(cast(_components_for("stride"), "01", "up", "sam"), path)
+    append(cast(_components_for("asvs"), "01", "up", "sam"), path)
+
+    moved = rekey(load(path).votes)
+
+    assert sorted(vote.fingerprint.split(":")[0] for vote in moved) == ["v2", "v3"]
+
+
+class TestTheKeyIsComputedNeverStated:
+    """A row arrives from a contributor's pull request, and until this ran
+    nothing recomputed its fingerprint.
+
+    The stored string was taken on the row's word while `components` -- the
+    fields the key is made of -- went unread, so a row could describe one
+    finding and key another. Every reader keys on the string: `pool`,
+    `_standing`, `agreement`. A maintainer cannot catch it by reading: a roster
+    edit says `standing = "maintainer"` in a diff, and this says sixteen hex
+    characters.
+    """
+
+    def test_a_row_whose_key_names_another_finding_is_refused(self):
+        mine = _components_for("stride")
+        theirs = Components("stride", "tampering", ("store:victim",), verb="alter")
+        honest = cast(mine, "01", "down", "ada", reason="not-a-threat")
+
+        with pytest.raises(LedgerError, match="computed, never stated"):
+            replace(
+                honest, fingerprint=fingerprint(theirs, version=version_for("stride"))
+            )
+
+    def test_an_honest_row_is_untouched(self):
+        recorded = cast(_components_for("stride"), "01", "up", "ada")
+
+        assert recorded.fingerprint.startswith("v2:")
+
+    def test_a_framework_no_rule_keys_is_refused_at_the_row(self):
+        """Before, it loaded and pooled, and then refused the maintainer's
+        re-key over everybody's data with a message naming no file and no row."""
+        with pytest.raises(LedgerError):
+            Vote(
+                fingerprint="v2:0000000000000000",
+                components=Components("bogus-pkg", "lane", ("process:a",), verb="read"),
+                case="01",
+                verdict="up",
+                voter="ada",
+                recorded="2026-09-03T00:00:00+00:00",
+            )
+
+    def test_a_target_that_is_not_a_string_is_refused_at_the_row(self):
+        """`"abc"` used to split per character into ('a','b','c')."""
+        with pytest.raises(LedgerError):
+            Vote(
+                fingerprint="v2:0000000000000000",
+                components=Components("stride", "spoofing", (1, 2), verb="read"),
+                case="01",
+                verdict="up",
+                voter="ada",
+                recorded="2026-09-03T00:00:00+00:00",
+            )

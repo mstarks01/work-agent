@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import jwt
 import pytest
 from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.asymmetric import ec, rsa
 from pydantic import ValidationError
 
 from analysis_service.auth import (
@@ -33,11 +33,26 @@ _PRIVATE_PEM = _PRIVATE_KEY.private_bytes(
 _PUBLIC_KEY = _PRIVATE_KEY.public_key()
 
 
+def _jwk(public_key, algorithm: str) -> jwt.PyJWK:
+    """The public key as a PyJWK, which is what a real JWKS client returns.
+
+    A stand-in that answered a bare key would let the verifier be tested against
+    a contract the live client does not honour, and the difference is the one
+    that matters here: PyJWT binds an algorithm to a PyJWK and not to a bare
+    key.
+    """
+    if algorithm == "RS256":
+        jwk = jwt.algorithms.RSAAlgorithm.to_jwk(public_key, as_dict=True)
+    else:
+        jwk = jwt.algorithms.ECAlgorithm.to_jwk(public_key, as_dict=True)
+    return jwt.PyJWK({**jwk, "alg": algorithm, "use": "sig"})
+
+
 class StaticJwksClient:
     """Serves the test public key regardless of the token's kid."""
 
-    def get_signing_key_from_jwt(self, token: str):
-        return SimpleNamespace(key=_PUBLIC_KEY)
+    def get_signing_key_from_jwt(self, token: str) -> jwt.PyJWK:
+        return _jwk(_PUBLIC_KEY, "RS256")
 
 
 def settings() -> OidcSettings:
@@ -326,9 +341,12 @@ class TestJwksTransport:
 
 
 class _FakeKey:
-    def __init__(self, kid: str):
+    """A PyJWK stand-in, carrying the two fields the matcher reads."""
+
+    def __init__(self, kid: str, use: str | None = None):
         self.key_id = kid
         self.key = _PUBLIC_KEY
+        self.public_key_use = use
 
 
 class _FakeJwkSet:
@@ -376,3 +394,81 @@ class TestRefreshCooldown:
         key = client.get_signing_key_from_jwt(self._token("known"))
         assert key.key_id == "known"
         assert counting.refreshes == 0
+
+
+class TestAKeyOfTheWrongFamily:
+    """A JWKS carrying two key families while two algorithms are configured is
+    an ordinary state during a rotation, and the docs describe it.
+
+    The verifier looks a key up by ``kid`` alone, so a token can name the EC
+    key's ``kid`` and the RS256 algorithm. That has to be one more rejected
+    token. Handed a bare key, PyJWT raised ``TypeError`` out of ``prepare_key``
+    instead, which is not a ``PyJWTError``: it escaped the verifier, reached the
+    500 handler, and made one ``kid`` answer differently from another -- the
+    oracle the single generic message exists to prevent.
+    """
+
+    def _ec_verifier(self) -> OidcJwtVerifier:
+        ec_key = ec.generate_private_key(ec.SECP256R1())
+
+        class MixedJwksClient:
+            """Answers with an EC key whatever algorithm the token names."""
+
+            def get_signing_key_from_jwt(self, token: str) -> jwt.PyJWK:
+                return _jwk(ec_key.public_key(), "ES256")
+
+        configured = OidcSettings(
+            issuer=ISSUER,
+            audience=AUDIENCE,
+            jwks_url="https://idp.example.com/jwks",
+            algorithms=("RS256", "ES256"),
+        )
+        return OidcJwtVerifier(configured, jwks_client=MixedJwksClient())
+
+    def test_it_is_a_rejected_token_and_not_an_internal_error(self):
+        with pytest.raises(AuthenticationError):
+            self._ec_verifier().verify(make_token())
+
+    def test_the_message_is_the_same_one_every_other_refusal_gives(self):
+        """The whole point: this ``kid`` must be indistinguishable from any
+        other rejected token."""
+        try:
+            self._ec_verifier().verify(make_token())
+        except AuthenticationError as exc:
+            assert str(exc) == "invalid or expired credentials"
+        else:
+            pytest.fail("expected AuthenticationError")
+
+
+class TestAKeyIsUsedForWhatTheIssuerSaysItIsFor:
+    """A JWKS entry's ``use`` is the issuer declaring what a key is for.
+
+    The matcher read only ``kid``, so an encryption key published in the same
+    set verified signatures — using a key against its stated purpose. PyJWT's
+    own client filters this way; this one did not.
+    """
+
+    def _client(self, *keys):
+        class Client:
+            def get_jwk_set(self, refresh: bool = False):
+                return SimpleNamespace(keys=list(keys))
+
+        return _CooldownSigningKeyClient(Client(), cooldown_seconds=0)
+
+    def test_an_encryption_key_is_not_a_signing_key(self):
+        client = self._client(_FakeKey("enc-1", use="enc"))
+
+        with pytest.raises(jwt.PyJWKClientError):
+            client.get_signing_key_from_jwt(make_token())
+
+    def test_a_key_that_states_sig_is_used(self):
+        client = self._client(_FakeKey("sig-1", use="sig"))
+
+        assert client.get_signing_key_from_jwt(make_token()).key_id == "sig-1"
+
+    def test_a_key_that_states_nothing_is_still_used(self):
+        """``use`` is optional in a JWK, and an issuer that omits it has not
+        said the key is for something else."""
+        client = self._client(_FakeKey("quiet-1"))
+
+        assert client.get_signing_key_from_jwt(make_token()).key_id == "quiet-1"

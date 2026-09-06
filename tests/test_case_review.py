@@ -8,11 +8,18 @@ words the system description never uses. So the reading session is not
 belt-and-braces on top of the lints — it is the only instrument for a whole class
 of defect, and the corpus shipped 13 cases without it.
 
-This makes the gap countable and stops it growing. A case whose ``reviews``
-list holds a clearing **Case Sitting** — a rostered submitting account, every
-required file read, every recorded digest still matching — has been read. Every case
-that has not is named in :data:`UNREVIEWED` with what it is still exposed to,
-and a **new** case that arrives without one fails.
+This makes the gap countable and stops it growing. A case a merged
+submission under ``evals/review/submissions`` currently clears has been read.
+:func:`~evals.review_submission.current_reviews` is the one reader of that
+question, and it is fail-closed: a submission stops clearing its case the
+moment any file it read changes. Every case no submission clears is named in
+:data:`UNREVIEWED` with what it is still exposed to, and a **new** case that
+arrives without a review fails.
+
+:data:`UNREVIEWED` says what each unread case leaves unchecked. It is not the
+count of unread cases — :func:`~evals.review_submission.unreviewed_cases`
+derives that from the corpus and the submissions, so no list can disagree with
+it. An entry for a case somebody has since read is spent and can be deleted.
 
 **A sitting must cover every framework the case carries.** Step 6 asks the reader
 to sign off on the reference sets *together*, because the property being
@@ -23,19 +30,21 @@ beside them. So the ``read`` list is checked against the case's declared
 frameworks rather than merely being present, and a case reviewed for one
 framework stays unread for the other.
 
-Deterministic over ``case.json`` and free of provider calls, which is why it
-gates on every PR.
+Deterministic over the corpus and the merged submissions, and free of
+provider calls, which is why it gates on every PR.
 """
 
 from __future__ import annotations
 
+import hashlib
+
 import pytest
+from pydantic import ValidationError
 
 from evals import verify_corpus
-from evals.harness.reference import load_corpus
-from evals.harness.roster import DEFAULT_ROSTER_PATH
-from evals.harness.roster import load as load_roster
-from evals.harness.sitting import clears, drifted
+from evals.harness.reference import ReadRecord, load_corpus
+from evals.harness.sitting import moved
+from evals.review_submission import REPO_ROOT, unreviewed_cases
 
 #: Cases nobody has read, each with what that leaves unchecked. Every entry is
 #: a case nobody read rather than an exemption: unlike the lists in
@@ -112,28 +121,19 @@ def corpus():
 
 
 @pytest.fixture(scope="module")
-def roster():
-    return load_roster(DEFAULT_ROSTER_PATH)
+def reviewed_by_case(corpus):
+    """Whether merged submissions currently clear each case.
 
-
-@pytest.fixture(scope="module")
-def reviewed_by_case(corpus, roster):
-    """Whether any of each case's sittings takes it off the list.
-
-    A sitting clears when a **rostered** person read every required file and
-    the recorded digests still match the tree (#327). A drifted digest stops
-    clearing, so a PR that edits a read file puts the case back on the list
-    fail-closed: it carries a fresh sitting, or it puts the case's line back
-    in ``UNREVIEWED`` — a person always names the unread case, in the PR that
+    One reader, and the one the app and ``--list`` read too:
+    :func:`~evals.review_submission.unreviewed_cases`. A case is read when
+    every framework it declares is covered, and a submission stops covering
+    a framework the moment a file it read changes — so a PR that edits a read
+    file puts the case back on the list fail-closed. It carries a fresh
+    review, or a person names the case in ``UNREVIEWED``, in the PR that
     caused it.
     """
-    return {
-        case.meta.id: any(
-            clears(case, sitting, roster, verify_corpus.CORPUS_DIR)
-            for sitting in case.meta.reviews
-        )
-        for case in corpus
-    }
+    unread = set(unreviewed_cases(REPO_ROOT))
+    return {case.meta.id: case.meta.id not in unread for case in corpus}
 
 
 def test_a_new_case_carries_a_sitting(reviewed_by_case):
@@ -144,25 +144,12 @@ def test_a_new_case_carries_a_sitting(reviewed_by_case):
     )
     assert not undeclared, (
         f"these cases have no Case Sitting that clears them: {undeclared}."
-        " Either no `reviews` entry covers every required file, its"
-        " `submitted_by` has no roster line, or a read file changed under its"
-        " digests. Hold"
-        " a sitting (evals/BLESSING.md step 6) and append the entry, or name"
-        " the case as unread by adding its line to UNREVIEWED. A case merged"
-        " unread cannot be caught later by any lint — that is what this"
-        " module's docstring is about."
-    )
-
-
-def test_the_unreviewed_list_does_not_rot(reviewed_by_case):
-    """A case that gets read has to leave the list, or the count is a lie."""
-    stale = sorted(
-        case_id for case_id in UNREVIEWED if reviewed_by_case.get(case_id, False)
-    )
-    assert not stale, (
-        f"these cases now carry a review and are still listed as unread:"
-        f" {stale}."
-        " Remove them from UNREVIEWED."
+        " Either no merged submission under evals/review/submissions covers"
+        " every framework the case declares, or a read file changed under a"
+        " submission's digests. Hold a sitting (evals/BLESSING.md step 6) and"
+        " contribute it, or name the case as unread by adding its line to"
+        " UNREVIEWED. A case merged unread cannot be caught later by any lint"
+        " — that is what this module's docstring is about."
     )
 
 
@@ -172,56 +159,81 @@ def test_every_listed_case_exists(reviewed_by_case):
     assert not missing, f"UNREVIEWED names cases that do not exist: {missing}"
 
 
-def test_no_recorded_digest_has_drifted(corpus):
-    """A sitting signs specific bytes; a silent edit under it must be loud.
+class TestAReadRecordNamesAFileInsideItsCase:
+    """The value is joined onto a case directory and the result is read."""
 
-    The failure this exists for: a PR that improves a reviewed case's
-    ``claims/stride.json`` would leave the sitting's sign-off pointing at
-    words the reviewer never read. The digest names the drifted file here, in
-    the PR that caused it, and the author answers with a fresh sitting or a
-    re-opened UNREVIEWED line.
+    @pytest.mark.parametrize(
+        "path", ["source.md", "model.json", "claims/stride.json", "claims/asvs.json"]
+    )
+    def test_the_shapes_the_corpus_actually_holds_are_accepted(self, path):
+        ReadRecord(file=path, sha256="0" * 64)
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "../../../etc/passwd",
+            "/etc/hostname",
+            "a/../b",
+            "..",
+            ".hidden",
+            "a\\b",
+            "claims/../../x",
+        ],
+    )
+    def test_a_path_that_leaves_the_case_directory_is_refused(self, path):
+        """`Path("/case") / "/etc/hostname"` is `/etc/hostname`: an absolute
+        right-hand side replaces the left. `moved()` then reads whatever the
+        record names and compares the digest the same record supplied, which is
+        a digest oracle, an unbounded read, and an uncaught `PermissionError`
+        on a file the process may not open."""
+        with pytest.raises(ValidationError):
+            ReadRecord(file=path, sha256="0" * 64)
+
+
+class TestAReadRecordCannotLeaveItsCaseBySymlink:
+    """`CORPUS_RELATIVE_PATH` bounds the name; a symlink needs no bad name.
+
+    Run-6 closed the string half of this and the docstring, the test and the
+    fix all said it was closed. `source.md` matches the pattern perfectly and
+    can point anywhere, so the digest oracle, the unbounded read and the
+    uncaught `PermissionError` all came back.
     """
-    stale_files = {
-        f"{case.meta.id}[{index}]": stale
-        for case in corpus
-        for index, sitting in enumerate(case.meta.reviews)
-        if (stale := drifted(case, sitting, verify_corpus.CORPUS_DIR))
-    }
-    assert not stale_files, (
-        f"these sittings' read files changed under their digests: {stale_files}."
-        " Hold a fresh sitting over the changed files and append its entry,"
-        " or put the case's line back in UNREVIEWED — and either way, a"
-        " person names the unread case in this PR."
-    )
 
+    def _case(self, tmp_path):
+        case = tmp_path / "99-a-case"
+        case.mkdir()
+        (case / "real.md").write_text("genuine\n", encoding="utf-8")
+        return case
 
-def test_every_sitting_names_an_existing_document(corpus):
-    """Only the filled ``REVIEW-<login>.md`` shows the method ran (#327)."""
-    missing = [
-        f"{case.meta.id}: {sitting.document}"
-        for case in corpus
-        for sitting in case.meta.reviews
-        if not (verify_corpus.CORPUS_DIR / case.meta.id / sitting.document).is_file()
-    ]
-    assert not missing, (
-        f"these sittings name evidence documents that do not exist: {missing}."
-        " Commit the filled copy beside the case; the entry's `document`"
-        " field is what makes the sitting auditable."
-    )
+    def test_a_symlink_out_of_the_case_is_stale_not_matched(self, tmp_path):
+        case = self._case(tmp_path)
+        outside = tmp_path / "outside.txt"
+        outside.write_text("the secret\n", encoding="utf-8")
+        (case / "source.md").symlink_to(outside)
+        correct = hashlib.sha256(outside.read_bytes()).hexdigest()
 
+        # A correct guess must NOT report "not stale"; that is the oracle.
+        assert moved(case, {"source.md": correct}) == ["source.md"]
 
-def test_every_submitting_account_has_a_roster_line(corpus, roster):
-    """Standing labels the read, and the one roster is where standing lives."""
-    unrostered = sorted(
-        {
-            sitting.submitted_by
-            for case in corpus
-            for sitting in case.meta.reviews
-            if sitting.submitted_by not in roster
-        }
-    )
-    assert not unrostered, (
-        f"these submitting accounts have no line in evals/review/voters.toml:"
-        f" {unrostered}. A sitting no rostered account carries clears nothing,"
-        " because no published number could state the standing behind it."
-    )
+    def test_an_unreadable_target_does_not_raise(self, tmp_path):
+        """The lint runs over a stranger's PR tree in CI; it must not crash."""
+        case = self._case(tmp_path)
+        (case / "source.md").symlink_to("/proc/1/mem")
+
+        assert moved(case, {"source.md": "0" * 64}) == ["source.md"]
+
+    def test_a_symlink_loop_does_not_raise(self, tmp_path):
+        """`resolve` raises `RuntimeError` on a loop under 3.12, which an
+        `except OSError` let through as the traceback the lint promises not to
+        leave on a stranger's pull request.
+        """
+        case = self._case(tmp_path)
+        (case / "source.md").symlink_to(case / "source.md")
+
+        assert moved(case, {"source.md": "0" * 64}) == ["source.md"]
+
+    def test_an_ordinary_file_still_verifies(self, tmp_path):
+        case = self._case(tmp_path)
+        digest = hashlib.sha256(b"genuine\n").hexdigest()
+
+        assert moved(case, {"real.md": digest}) == []

@@ -130,12 +130,19 @@ from analysis_service import (
 from analysis_service.deployment import Deployment
 from analysis_service.frameworks import package_for
 from analysis_service.model_tiers import ModelTierConfig
-from analysis_service.vendors import vendor_for
+from analysis_service.vendors import (
+    CREDENTIAL_MODE_NOTES,
+    VendorName,
+    missing_sdk,
+    sdk_for,
+    vendor_for,
+)
 from webapp.page import (
     LOOPBACK_HOSTS,
     Grants,
     RenderedPage,
     SecurityHeaders,
+    client_script,
     escape,
     is_same_origin,
     render,
@@ -306,6 +313,7 @@ def render_report(report: Report) -> RenderedPage:
     return render(
         VIEWER.read_text(encoding="utf-8"),
         _REPORT_GRANTS,
+        script=client_script("report_view.js"),
         report=script_json(report.model_dump(mode="json")),
     )
 
@@ -321,7 +329,7 @@ def create_app(
     """
     state = build_startup() if startup is None else startup
     analyses = Analyses() if analyses is None else analyses
-    app = FastAPI(title="First run", docs_url=None, redoc_url=None)
+    app = FastAPI(title="First run", docs_url=None, redoc_url=None, openapi_url=None)
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=LOOPBACK_HOSTS)
     app.add_middleware(SecurityHeaders)
 
@@ -333,6 +341,7 @@ def create_app(
             render(
                 _FORM_PAGE,
                 _FORM_GRANTS,
+                script=client_script("first_run.js"),
                 tiers=_tier_lines(state.tiers),
                 frameworks=_framework_fields(state.frameworks),
             )
@@ -644,13 +653,24 @@ def diagnostic_page(state: Startup) -> RenderedPage:
 def _vendor_sections(
     tiers: ModelTierConfig | None, env: Mapping[str, str] | None = None
 ) -> str:
-    """Each selected vendor's required variables, marked set or unset.
+    """Each selected vendor's declared mode and required variables, set or unset.
 
     ``required_env_vars`` comes from the same registry entry that performs the
     check, so this cannot drift from what actually failed — and it lists the
     vendor's *whole* set, because ``Vendor._require`` raises on the first
     missing one and a reader would otherwise discover them one restart at a
     time.
+
+    The mode is **reported, never resolved**. Under a mode that passes no
+    credential material, the only way to find out whether an identity exists is
+    to ask for one — which is a network call on page render, and it reaches the
+    instance metadata service. So this page says what the deployment declared
+    and what the platform has to supply, and leaves the answer to a run.
+
+    The client library a vendor's provider needs is reported beside its
+    variables, from the same table the build-time gate reads. Without that row
+    the page would mark every variable "set" while the run still failed at bind
+    time, which is exactly the drift this section exists not to have.
     """
     env = os.environ if env is None else env
     if tiers is None:
@@ -665,12 +685,37 @@ def _vendor_sections(
         )
     sections = []
     for vendor in dict.fromkeys(sel.vendor for sel in tiers.tiers.values()):
+        mode = tiers.credential_mode(vendor)
         items = "\n".join(
             _env_var_item(var, bool(env.get(var, "").strip()))
-            for var in vendor_for(vendor).required_env_vars
+            for var in vendor_for(vendor).required_env_vars(mode)
         )
-        sections.append(f"<h3>{escape(vendor)}</h3>\n<ul>{items}</ul>")
+        sections.append(
+            f"<h3>{escape(vendor)}</h3>\n"
+            f"<p>Credential mode: <code>{escape(mode.value)}</code>. "
+            f"{escape(CREDENTIAL_MODE_NOTES[mode])}</p>\n"
+            f"<ul>{items}{_sdk_item(vendor)}</ul>"
+        )
     return "\n".join(sections)
+
+
+def _sdk_item(vendor: VendorName) -> str:
+    """One row for the client library this vendor needs, or nothing.
+
+    A vendor whose provider needs no library gets no row: an empty statement
+    reads as a missing one, and the section is a list of what an operator has
+    to arrange.
+    """
+    sdk = sdk_for(vendor)
+    if sdk is None:
+        return ""
+    installed = missing_sdk(vendor) is None
+    css_class, label = ("set", "installed") if installed else ("not", "NOT INSTALLED")
+    return (
+        f"<li><code>{escape(sdk.module)}</code> "
+        f'<span class="{css_class}">{label}</span> — '
+        f"<code>pip install analysis-service[{escape(sdk.extra)}]</code></li>"
+    )
 
 
 def _env_var_item(var: str, is_set: bool) -> str:
@@ -728,113 +773,7 @@ _FORM_PAGE = (
 </form>
 <div id="problem" class="problem" hidden></div>
 <ul id="ticks" hidden></ul>
-<script nonce="__CSP_NONCE__">
-  const form = document.getElementById("analyze");
-  const box = document.getElementById("description");
-  const ticks = document.getElementById("ticks");
-  const problem = document.getElementById("problem");
-  const go = document.getElementById("go");
-
-  // The picker. A checkbox reaches its own option controls through the row
-  // that contains them, never through a selector built from its value: the
-  // DOM already says which controls belong to which framework, and reading
-  // that beats keeping a second copy of the mapping on this page.
-  const boxes = [...document.querySelectorAll("input[name=framework]")];
-  const optionsOf = (checkbox) => [
-    ...checkbox.closest(".pick").querySelectorAll("select"),
-  ];
-
-  // An unticked framework's options are hidden rather than removed, so
-  // re-ticking it restores what was chosen instead of resetting it.
-  const sync = (checkbox) => {
-    checkbox.closest(".pick").querySelector(".opts").hidden = !checkbox.checked;
-  };
-  for (const checkbox of boxes) {
-    checkbox.addEventListener("change", () => sync(checkbox));
-    sync(checkbox);
-  }
-
-  // What the server allow-lists. Each choice's value is the JSON of the choice
-  // itself, so a level posts as the number its options model declares rather
-  // than as the string a form control would otherwise send.
-  const selection = () =>
-    boxes
-      .filter((checkbox) => checkbox.checked)
-      .map((checkbox) => ({
-        name: checkbox.value,
-        options: Object.fromEntries(
-          optionsOf(checkbox).map((s) => [s.dataset.option, JSON.parse(s.value)]),
-        ),
-      }));
-
-  document.getElementById("load").addEventListener("click", async () => {
-    box.value = await (await fetch("/example")).text();
-  });
-
-  // Nodes and strings, never markup. replaceChildren() inserts a string as a
-  // text node, so a source label or a validator message that spells markup
-  // shows the characters the submitter typed. Same rule as the report viewer,
-  // and for the same reason: with no escape helper on the page there is none
-  // to forget, and forgetting shows junk on screen instead of running.
-  const fail = (...content) => {
-    problem.replaceChildren(...content);
-    problem.hidden = false;
-    ticks.hidden = true;
-    go.disabled = false;
-  };
-
-  form.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    problem.hidden = true;
-    ticks.replaceChildren();
-    go.disabled = true;
-
-    const started = await fetch("/analyze", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        sources: [
-          { kind: "description", label: "Pasted description", text: box.value },
-        ],
-        frameworks: selection(),
-      }),
-    });
-    if (!started.ok) {
-      fail((await started.json()).message);
-      return;
-    }
-
-    ticks.hidden = false;
-    const stream = new EventSource("/events/" + (await started.json()).run);
-    stream.addEventListener("node", (event) => {
-      const item = document.createElement("li");
-      item.textContent = JSON.parse(event.data).node;
-      ticks.append(item);
-    });
-    stream.addEventListener("done", (event) => {
-      stream.close();
-      location.href = JSON.parse(event.data).url;
-    });
-    stream.addEventListener("rejected", (event) => {
-      stream.close();
-      const lead = document.createElement("b");
-      lead.textContent = "That description could not be modelled.";
-      const list = document.createElement("ul");
-      for (const issue of JSON.parse(event.data).issues) {
-        const item = document.createElement("li");
-        const code = document.createElement("code");
-        code.textContent = issue.code;
-        item.append(code, " " + issue.message);
-        list.append(item);
-      }
-      fail(lead, list);
-    });
-    stream.addEventListener("failed", (event) => {
-      stream.close();
-      fail(JSON.parse(event.data).message);
-    });
-  });
-</script>
+<script nonce="__CSP_NONCE__"><!--script--></script>
 </body></html>
 """
 )

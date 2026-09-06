@@ -47,7 +47,7 @@ from analysis_service.report import (
     SharedElementName,
 )
 from analysis_service.sampling import load_sampling
-from tests.factories import DEFAULT_FRAMEWORKS, ScriptedLlm
+from tests.factories import DEFAULT_FRAMEWORKS, EVAL_MODEL, ScriptedLlm
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CASE_DIR = REPO_ROOT / "evals" / "corpus" / "01-payments-checkout"
@@ -84,14 +84,15 @@ def reaching_refs(case, element_ids) -> list[str]:
     Where nothing reaches every element the best partial reach is cited, and
     the drop of the rest is the point.
     """
-    from analysis_service.critic import _reach_of
+    from analysis_service.system_model import ModelIndex
 
     catalog = evidence_catalog(case.model)
+    index = ModelIndex.of(case.model)
     wanted = set(element_ids)
 
     def merit(ref: str) -> tuple[int, bool]:
         ground = catalog[ref]
-        reach = _reach_of({ground.element_id or ground.flow_id}, case.model)
+        reach = index.reach({ground.element_id or ground.flow_id})
         return len(wanted & reach), ref.startswith("unknown:")
 
     return [max(catalog, key=merit)]
@@ -200,7 +201,7 @@ def build(case, entry, models: dict[str, ScriptedLlm]) -> object:
             node for node, tier in TIER_NODE_BY_GRAPH_NODE.items() if tier == tier_node
         )
         models[graph_node] = LaneAwareLlm(
-            model="fake-pro-001",
+            model=EVAL_MODEL,
             reply=_reply_for(case, graph_node),
             seen=[],
             replies=_lane_replies(case, graph_node),
@@ -276,9 +277,9 @@ def test_an_eval_report_carries_every_field_production_stamps(case):
     is exactly how ``coverage`` came to be computed at the fan-in for a sweep
     that then read an empty list for it.
 
-    The five marks are pinned through
-    :class:`~analysis_service.report.AnalysisMarks`, which is where an
-    ``Analysis`` holds them now.
+    The marks are pinned through
+    :class:`~analysis_service.report.AnalysisMarks`, which is the one field
+    an ``Analysis`` holds them on.
     """
     pipeline = build(case, ENTRY_PREPARE, {})
 

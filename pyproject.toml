@@ -39,10 +39,43 @@ dependencies = [
     "cryptography>=45",
     "pydantic>=2.7",
     "pyjwt[crypto]>=2.9",
+    # The same rule as `cryptography` above, applied to the rest of what the
+    # package imports. All three arrive transitively today and all three are
+    # imported by name, so a transitive bump can remove one from under code
+    # that calls it. `google-genai` also carries a build identity: ADK permits
+    # any 2.x, so it moves while a fingerprint that does not name it stays
+    # still. `tests/test_identity.py` compares this list against what the
+    # source actually imports.
+    "anyio>=4",
+    "starlette>=0.40",
+    "google-genai>=2.9",
 ]
+
+[project.optional-dependencies]
+# One vendor's client library, per ADR 0023: a vendor SDK is an optional extra,
+# so a deployment that never selects the vendor does not carry it. Bedrock is
+# the first vendor row whose provider needs one — litellm's Converse handler
+# resolves credentials through a bare `import boto3` under both of that
+# vendor's credential modes, so `botocore` alone is not enough.
+#
+# A range and not an exact pin. The reason `google-adk` and `litellm` carry one
+# — this service reads their APIs directly — does not apply: litellm is the
+# caller here and this project reads none of boto3's API. The range is copied
+# from litellm 1.97.0's own `proxy` extra, so a litellm bump has to re-read it.
+#
+# `boto3` is deliberately absent from `BUILD_DISTRIBUTIONS`. It signs a request
+# and never changes what a node answers, and `build_identity()` fails closed on
+# a distribution it cannot find — so naming it there would leave every install
+# without this extra unable to produce an execution identity at all.
+bedrock = ["boto3>=1.43.1,<2.0"]
 
 [dependency-groups]
 dev = [
+    # The project's own bedrock extra, named rather than re-specified: the
+    # offline conformance suite binds an adapter for **every** vendor, and a
+    # vendor whose client library were absent would be the one vendor that
+    # suite could not cover. One place states the version range.
+    "analysis-service[bedrock]",
     "httpx>=0.27",
     "mypy>=1.18",
     "pip-audit>=2.9",
@@ -105,7 +138,7 @@ target-version = "py311"
 #
 # `extend-exclude` rather than `exclude`, and that is load-bearing: a
 # command-line `--exclude` REPLACES `exclude`, and both CI and `.githooks/`
-# run `ruff format --check . --exclude '*.md'`. Under `exclude` these three
+# run `ruff format --check . --exclude '*.md'`. Under `exclude` these
 # files would be checked in exactly the two places that matter.
 extend-exclude = ["docs/research"]
 

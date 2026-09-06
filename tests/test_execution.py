@@ -41,7 +41,7 @@ from tests.factories import (
     sample_proposal,
     sample_ruling,
     scripted_pipeline,
-    served_build,
+    served_route,
     valid_model,
 )
 
@@ -116,9 +116,9 @@ def test_node_runs_record_the_served_and_the_requested_model(graph_run):
     certification, not out of a comparison here.
     """
     nodes = by_node(graph_run)
-    assert nodes[graph.EXTRACT_NODE].model == served_build(BASE_MODEL)
+    assert nodes[graph.EXTRACT_NODE].model == served_route(BASE_MODEL)
     assert nodes[graph.EXTRACT_NODE].requested_model == BASE_MODEL
-    assert nodes[CRITIC].model == served_build(STRONG_MODEL)
+    assert nodes[CRITIC].model == served_route(STRONG_MODEL)
     assert nodes[CRITIC].requested_model == STRONG_MODEL
 
 
@@ -189,7 +189,7 @@ def test_a_provider_that_meters_nothing_yields_no_usage_at_all():
     pipeline, _ = scripted_pipeline(happy_replies(), llm_class=UnmeteredLlm)
     extract = by_node(drive(pipeline))[graph.EXTRACT_NODE]
 
-    assert extract.model == served_build(BASE_MODEL)
+    assert extract.model == served_route(BASE_MODEL)
     assert extract.usage is None
 
 
@@ -281,7 +281,7 @@ def test_base_and_strong_nodes_get_different_identities(graph_run):
     sampling = load_sampling(PROJECT_ROOT / "config" / "sampling.toml", env={})
     critic_run = nodes[CRITIC]
     assert critic_fp == sample_fingerprint(
-        served_build(STRONG_MODEL),
+        served_route(STRONG_MODEL),
         sampling.for_tier("strong"),
         requested=critic_run.requested_model,
         instructions=critic_run.instruction_sha256,

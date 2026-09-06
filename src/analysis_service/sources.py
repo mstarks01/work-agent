@@ -63,7 +63,11 @@ MAX_LABEL_CHARS = 200
 # text below it unreadable as text. Includes the Unicode line separators, which
 # a caller can paste without seeing.
 
-_LINE_BREAKS = ("\n", "\r", "\u2028", "\u2029")
+LINE_BREAKS = ("\n", "\r", "\u2028", "\u2029")
+
+#: The private spelling, kept so this module reads as it did. Callers outside
+#: it take :data:`LINE_BREAKS`; there is one tuple and one rule.
+_LINE_BREAKS = LINE_BREAKS
 
 # Also rejected in a label, by Unicode general category. ``Cc`` is the C0 and C1
 # control characters; ``Cf`` the invisible formatting ones — the bidi overrides
@@ -267,6 +271,22 @@ class SourceLimits:
         )
 
 
+def plain_name(value: str) -> str:
+    """A caller-supplied name with nothing a renderer reads as structure.
+
+    The rule :meth:`Source._single_line_label` applies, exported because the
+    same question is asked of a name that arrives at another entry point. A
+    value carried into a report somebody reads must not hold a line break or a
+    bidirectional override: either changes what they see without changing what
+    they are told they are seeing.
+    """
+    if any(char in value for char in _LINE_BREAKS):
+        raise ValueError("carries a line break")
+    if any(unicodedata.category(char) in _FORMATTING_CATEGORIES for char in value):
+        raise ValueError("carries a control or formatting character")
+    return value
+
+
 def fence_for(body: str) -> str:
     """The shortest fence ``body`` cannot close.
 
@@ -276,12 +296,28 @@ def fence_for(body: str) -> str:
     carrying its own fence stay inside the block.
 
     Shared with the seam that renders the System Model into a category agent's prompt:
-    ``json.dumps`` escapes quotes and newlines but **not** backticks, so a
-    ``notes`` or ``source_excerpt`` value that carries a fence would otherwise
-    close a static one node downstream of here.
+    ``json.dumps`` escapes quotes, ``\\n`` and ``\\r`` but **not** backticks, and
+    **not** U+2028, U+2029 or U+0085 — three characters it passes through as
+    themselves and that ``str.splitlines`` and most renderers break a line on.
+    So a ``notes`` or ``source_excerpt`` value carrying a fence and one of those
+    has both halves of a closing fence, and would close a fence written into a
+    prompt file. Sizing the fence to the body is what makes that unspellable,
+    here and downstream.
     """
     longest = max((len(run.group()) for run in _BACKTICK_RUN.finditer(body)), default=0)
     return "`" * max(3, longest + 1)
+
+
+def fenced(body: str) -> str:
+    """``body`` inside the shortest fence it cannot close.
+
+    The one spelling of the block layout. :func:`render_sources` wraps each
+    source in it, and :func:`analysis_service.graph.render_fenced` wraps each
+    rendered value a prompt interpolates in it, so the two seams cannot come to
+    lay a block out differently.
+    """
+    fence = fence_for(body)
+    return f"{fence}\n{body}\n{fence}"
 
 
 def render_sources(sources: Sequence[Source]) -> str:
@@ -303,9 +339,8 @@ def render_sources(sources: Sequence[Source]) -> str:
     blocks = []
     for index, source in enumerate(sources, start=1):
         body = f"label: {source.label}\n{_HEADER_RULE}\n{source.text}"
-        fence = fence_for(body)
         blocks.append(
             f"### Source {index} of {total} — {_REGISTERS[source.kind]}\n\n"
-            f"{fence}\n{body}\n{fence}"
+            f"{fenced(body)}"
         )
     return "\n\n".join(blocks)

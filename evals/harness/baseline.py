@@ -38,6 +38,7 @@ import json
 import math
 import re
 import subprocess
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -120,7 +121,7 @@ class BaselineIdentity:
             ),
             sampling=sampling,
             frameworks=tuple(
-                sorted(str(name) for name in artifact.block("frameworks"))
+                sorted(_framework_name(name) for name in artifact.block("frameworks"))
             ),
         )
 
@@ -144,6 +145,35 @@ class BaselineIdentity:
         """``<short-commit>-<strong-model-slug>-<hash8>``, e.g. ``7c3a007-gpt-5.6-3f9a1c2e``."""
         strong = dict(self.models).get(_NAMING_TIER, "unknown")
         return f"{self.repo_commit[:7]}-{_slug(strong)}-{self.hash[:8]}"
+
+
+def recorded_usd(cost: Any) -> float | None:
+    """A committed manifest's recorded dollars, or ``None`` if it is not money.
+
+    One reader for a value four sites read and one site checked. A manifest is a
+    contributor's file, and `float()` accepts "inf" and "nan": a non-finite or
+    negative `actual_usd` poisons a mean, a total and a comparison, and renders
+    as an acceptable offer in the consent gate. `math.isfinite` guarded the
+    consent path alone, which left the published table, the contribution summary
+    and the baseline re-check reading the same field without it.
+
+    The shape is the one :meth:`SweepCost.to_json` writes: a JSON number. A
+    string is refused even when `float()` would read it -- "1_000" and
+    non-ASCII digits both would -- and so is a boolean, which is an `int` to
+    `float()`. A JSON integer too large for a float raises `OverflowError`,
+    which is not a `ValueError`. ``cost`` itself is whatever the manifest holds
+    under that key, and a scalar there is not a cost.
+    """
+    if not isinstance(cost, Mapping):
+        return None
+    raw = cost.get("actual_usd")
+    if isinstance(raw, bool) or not isinstance(raw, int | float):
+        return None
+    try:
+        value = float(raw)
+    except OverflowError:
+        return None
+    return value if math.isfinite(value) and value >= 0 else None
 
 
 @dataclass(frozen=True)
@@ -213,7 +243,7 @@ def price_sweep(artifact: EvalArtifact) -> SweepCost:
     )
 
 
-def _recomputed_cost(artifact: EvalArtifact, recorded: dict[str, Any]) -> float:
+def _recomputed_cost(artifact: EvalArtifact, recorded: Mapping[str, Any]) -> float:
     """#323 check 5: recorded units × recorded unit prices, and nothing live."""
     rates = {
         entry["model"]: UnitPrices.from_json(entry)
@@ -231,6 +261,60 @@ def _recomputed_cost(artifact: EvalArtifact, recorded: dict[str, Any]) -> float:
             " unpriced; a silent zero is never admissible"
         )
     return price_calls(calls, rates=rates).total_usd
+
+
+#: A registered package name, which is the only thing this field ever holds.
+#: The artifact declares ``frameworks`` as a plain list and validates no element,
+#: so before this the value reaching the published table was whatever a
+#: contributor wrote -- unbounded in length, unlike every model name beside it.
+_FRAMEWORK_NAME = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+
+#: How long one may be. A slug shape alone is not a bound: 300 lowercase
+#: letters are a slug, and the whole point here is that this field had no
+#: length while every model name beside it had one.
+#:
+#: Public, because ``submit`` reads the same rule before a declared name
+#: reaches a path and had no bound at all. One number, two readers that call
+#: it, rather than two numbers that drift.
+FRAMEWORK_NAME_MAX = 40
+
+
+def _framework_name(value: object) -> str:
+    """One framework name out of an artifact, or a refusal.
+
+    Shaped rather than merely stringified. It is carried into a Baseline's
+    identity, which is recomputed and compared on every verification and
+    rendered into a committed, published table; a name is a slug, and anything
+    that is not one is not a name.
+    """
+    name = str(value)
+    if len(name) > FRAMEWORK_NAME_MAX or not _FRAMEWORK_NAME.fullmatch(name):
+        raise BaselineError(
+            f"{name!r} is not a framework name; a Baseline's identity carries"
+            " the packages the sweep ran, and a package name is a slug"
+        )
+    return name
+
+
+def artifact_filename(value: object) -> str:
+    """One sweep's artifact name, refused unless it is a plain file name.
+
+    A Baseline manifest is a contributor's file, and both readers of it join the
+    name onto a directory. Nothing stops ``../`` there, so a manifest could name
+    a JSON outside the Baseline it belongs to and have its numbers read as that
+    Baseline's -- and ``comparison`` folds them into a published README.
+
+    Neither reader wants a path: a Baseline's artifacts sit beside its manifest
+    by construction. So the field says so, rather than each reader guarding it
+    and one of them forgetting.
+    """
+    name = str(value)
+    if not name or name != Path(name).name or name.startswith("."):
+        raise BaselineError(
+            f"{name!r} is not an artifact file name; a Baseline's artifacts sit"
+            " beside its manifest, so the name carries no directory"
+        )
+    return name
 
 
 def _file_digests(directory: Path, sweep_stem: str) -> dict[str, str]:
@@ -406,7 +490,7 @@ def verify(
     identities = set()
     artifacts: dict[str, EvalArtifact] = {}
     for entry in sweeps:
-        filename = str(entry.get("artifact", ""))
+        filename = artifact_filename(entry.get("artifact", ""))
         path = directory / filename
         try:
             artifact = load_artifact(path)
@@ -462,11 +546,15 @@ def verify(
                 f"{filename}: no node_usage for {missing_usage}; the actual"
                 " cost is not computable"
             )
+        recorded = entry.get("cost")
+        if not isinstance(recorded, Mapping):
+            problems.append(f"{filename}: cost is {recorded!r}, not a table")
+            continue
         try:
-            recorded = entry.get("cost", {})
             recomputed_cost = _recomputed_cost(artifact, recorded)
-            if not math.isclose(
-                recomputed_cost, float(recorded.get("actual_usd", -1.0)), rel_tol=1e-9
+            actual = recorded_usd(recorded)
+            if actual is None or not math.isclose(
+                recomputed_cost, actual, rel_tol=1e-9
             ):
                 problems.append(
                     f"{filename}: recorded units x recorded unit prices is"

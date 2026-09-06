@@ -20,9 +20,11 @@ from analysis_service.frameworks import (
     PRECONDITION_RESULTS,
     FrameworkPackageError,
     PreconditionError,
+    _readable,
     run_precondition,
     validate_package,
 )
+from analysis_service.markdown_loader import MarkdownLoader, MarkdownNotFoundError
 from tests.factories import (
     PROJECT_ROOT,
     package_answering,
@@ -106,3 +108,41 @@ def test_a_precondition_error_is_a_package_error():
     precondition reads a model, so the deployment gate cannot reach it.
     """
     assert issubclass(PreconditionError, FrameworkPackageError)
+
+
+def test_the_gate_and_the_loader_answer_the_same_question(tmp_path):
+    """The two readers of "is this file mine to read", asked together.
+
+    They have now disagreed in both directions. The gate first asked
+    `is_file()`, which follows a symlink out of the package root that
+    `MarkdownLoader.load` refuses — so a package passed startup and failed on
+    its first job. Sharing the loader's rule fixed that and introduced the
+    mirror image: the gate was handed `path.parent` as its root, so a lane
+    skill symlinked to another file inside the same package was accepted by the
+    loader and refused by the gate.
+
+    Asked of both readers over the same paths, which is the only way this pair
+    stays honest.
+    """
+    root = tmp_path / "pkg"
+    (root / "lanes" / "spoofing").mkdir(parents=True)
+    (root / "lanes" / "tampering").mkdir(parents=True)
+    shared = root / "lanes" / "tampering" / "skill.md"
+    shared.write_text("# shared\n", encoding="utf-8")
+    (root / "lanes" / "spoofing" / "skill.md").symlink_to(shared)
+    outside = tmp_path / "elsewhere.md"
+    outside.write_text("# elsewhere\n", encoding="utf-8")
+    (root / "lanes" / "spoofing" / "exemplars.md").symlink_to(outside)
+    # The third shape: a loop. Python 3.12's `resolve` raises `RuntimeError`
+    # on one, not `OSError`, and both readers must answer "absent" rather
+    # than raise through the startup gate or the first job.
+    (root / "critic.md").symlink_to(root / "critic.md")
+
+    loader = MarkdownLoader(root)
+    for name in ("lanes/spoofing/skill", "lanes/spoofing/exemplars", "critic"):
+        path = root / f"{name}.md"
+
+        assert _readable(root, path) == loader.readable(name), name
+    assert not loader.readable("critic")
+    with pytest.raises(MarkdownNotFoundError):
+        loader.load("critic")

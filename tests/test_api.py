@@ -4,11 +4,17 @@ import asyncio
 import json
 import logging
 from collections.abc import Sequence
+from typing import ClassVar
 
 import pytest
 from fastapi.testclient import TestClient
 
-from analysis_service.api import _BODY_SLACK, create_app
+from analysis_service.api import (
+    _BODY_SLACK,
+    MAX_RENDERED_ERRORS,
+    BodyLimitMiddleware,
+    create_app,
+)
 from analysis_service.auth import AuthenticationError
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.errors import ConfigError
@@ -21,6 +27,7 @@ from analysis_service.jobs import (
     PipelineRejected,
     StubPipelineRunner,
 )
+from analysis_service.parsing import ascii_int
 from analysis_service.report import FrameworkName, Report
 from analysis_service.sources import Source, SourceLimits
 from analysis_service.validation import ValidationIssue
@@ -30,6 +37,7 @@ from tests.factories import (
     admit,
     sample_selection,
 )
+from tests.test_parsing import ISDIGIT_TRAPS
 
 TOKENS = {"alice-token": "alice", "bob-token": "bob"}
 
@@ -206,6 +214,98 @@ class TestHealthAndAuth:
         client, _ = make_client()
         response = client.get("/v1/jobs/job-x", headers=auth("forged-token"))
         assert response.status_code == 401
+
+
+class TestARefusedSubmissionIsCheap:
+    """A refusal happens while dependencies are being solved, before a
+    `JobRecord` exists -- so the ceiling, the rate and both token budgets count
+    nothing about it.
+
+    That made the cheapest request the most expensive one to answer. 200 KB of
+    empty objects, under `BodyLimitMiddleware`'s cap, had Pydantic validate
+    every element and the handler render every complaint: 2.2 seconds of event
+    loop and an 8.5 MB response, at 43 times the request. One caller held the
+    loop with well under a request a second, and nothing in the admission
+    machinery could see it, because admission is downstream of here.
+    """
+
+    ROOMY: ClassVar[SourceLimits] = SourceLimits(
+        max_total_bytes=102_400, max_sources=10
+    )
+
+    def _client(self):
+        return make_client(limits=self.ROOMY)
+
+    def _flood(self, count: int) -> dict:
+        body = submission()
+        body["sources"] = [{}] * count
+        return body
+
+    def test_more_sources_than_the_schema_allows_is_refused_at_once(self):
+        client, store = self._client()
+
+        response = client.post("/v1/jobs", json=self._flood(5_000), headers=auth())
+
+        assert response.status_code == 422
+        assert len(response.content) < 4_000, "the refusal must not amplify the request"
+        assert not store._records, "nothing reached admission, which is the point"
+
+    def test_a_422_names_the_first_problems_and_says_how_many_more(self):
+        client, _ = make_client()
+
+        errors = client.post("/v1/jobs", json=self._flood(80), headers=auth()).json()[
+            "errors"
+        ]
+
+        assert len(errors) <= MAX_RENDERED_ERRORS + 1
+        assert "more problems not shown" in errors[-1]["msg"]
+
+    def test_a_body_within_the_bound_still_reaches_the_route_ladder(self):
+        """The deployment's own `max_sources` is the real limit, and it must
+        still be the one a caller is told about."""
+        client, _ = self._client()
+
+        response = client.post("/v1/jobs", json=self._flood(50), headers=auth())
+
+        assert response.status_code == 422
+        assert "sources" in response.text
+
+
+class TestSystemNameIsBoundedLikeALabel:
+    """It reaches the report a consumer renders, and this was the one entry
+    point to the pipeline that refused it nothing but a length.
+
+    A Source label refuses these categories and the token subject refuses them
+    too; the same value arriving here was checked only for being 1 to 200
+    characters.
+    """
+
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "Orders\nCRITICAL forged",
+            "Orders\u2028second line",
+            "Orders\u202egnirdrO",
+            "Orders\u200bhidden",
+        ],
+    )
+    def test_a_name_a_renderer_reads_as_structure_is_refused(self, name):
+        client, _ = make_client()
+
+        response = client.post(
+            "/v1/jobs", json=submission(system_name=name), headers=auth()
+        )
+
+        assert response.status_code == 422
+
+    def test_an_ordinary_name_still_passes(self):
+        client, _ = make_client()
+
+        response = client.post(
+            "/v1/jobs", json=submission(system_name="Orders API"), headers=auth()
+        )
+
+        assert response.status_code == 201
 
 
 class TestSubmit:
@@ -878,3 +978,44 @@ class TestConsumptionBudgets:
         assert first.status_code == 201
         second = client.post("/v1/jobs", json=submission(), headers=auth())
         assert second.status_code == 201
+
+
+class TestAHeaderThatDoesNotSpellANumber:
+    """``str.isdigit`` was the guard on both, and it is wrong on both.
+
+    A client sets these. A shape ``isdigit`` passes and ``int`` refuses reached
+    ``int`` and raised, which is a 500 on a header the caller controls.
+    """
+
+    @pytest.mark.parametrize("declared", ISDIGIT_TRAPS)
+    def test_a_content_length_that_is_not_a_number_is_no_claim_at_all(self, declared):
+        """Read off the raw header bytes, which is where such a value arrives.
+
+        An HTTP client will not send a non-ASCII header, but the middleware
+        decodes with ``latin-1`` and a byte is a byte on the wire. The declared
+        length is only the cheap half anyway — the running byte count is what
+        makes the bound true — so a header that names no number must read as no
+        claim rather than as a crash.
+        """
+        middleware = BodyLimitMiddleware(lambda *_: None, max_bytes=1000)
+        scope = {
+            "type": "http",
+            "headers": [(b"content-length", declared.encode("latin-1", "replace"))],
+        }
+
+        assert middleware._declared_over_cap(scope) is False
+
+    def test_a_content_length_over_the_cap_is_still_refused_before_a_byte(self):
+        # The repair must not close the fast path it guards.
+        middleware = BodyLimitMiddleware(lambda *_: None, max_bytes=1000)
+        scope = {"type": "http", "headers": [(b"content-length", b"1001")]}
+
+        assert middleware._declared_over_cap(scope) is True
+
+    @pytest.mark.parametrize("last_event_id", ISDIGIT_TRAPS)
+    def test_a_last_event_id_that_is_not_a_number_resumes_from_the_start(
+        self, last_event_id
+    ):
+        # Which is what a missing header does too: the value names no event,
+        # so there is nothing to resume after.
+        assert ascii_int(last_event_id, max_digits=18) is None

@@ -198,7 +198,6 @@ class ScoredCase:
     """One case scored on both sides of the critic."""
 
     score: CaseScore
-    pre_critic: CaseScore
     critic_yield: CriticYield
 
 
@@ -217,9 +216,7 @@ def score_case_with_yield(
     """
     pre = score_case(case, drafts, matcher, votes)
     post = score_case(case, produced, matcher, votes)
-    return ScoredCase(
-        score=post, pre_critic=pre, critic_yield=_yield(pre, post, drafts)
-    )
+    return ScoredCase(score=post, critic_yield=_yield(pre, post, drafts))
 
 
 def _yield(

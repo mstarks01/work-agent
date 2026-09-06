@@ -12,7 +12,21 @@ maps under `.wayfinder/` are archived history, not live. See `docs/agents/issue-
 
 ### Code review checkpoints
 
-A finished code review ends in an annotated `reviewed/<date>` tag on the commit
+Review runs at two scales. A **pre-merge review** reads one pull request's diff
+and asks whether the change is correct; a **checkpoint round** reads a range of
+merged commits and asks what the tree holds that no single diff showed. Run both:
+a defect in a recent fix is the dominant class and sits inside one diff, and the
+rest needs the whole tree.
+
+**A fix is the riskiest code in the tree.** Across the audit rounds, most findings in
+a round came from the previous round's fixes, and every one of those passed the tests
+that shipped with it. So read your own fix diff against the five defect classes in
+`docs/agents/code-review.md` — two readers, a table with a hole, a shape not listed, a
+bound not measured, a fact with no reader — prefer
+one shared reader over a guard copied into a second, and make the harness that proved
+the defect the regression test.
+
+A finished checkpoint round ends in an annotated `reviewed/<date>` tag on the commit
 it covered. Start the next one from `git tag -l 'reviewed/*' --sort=-creatordate
 | head -1` rather than asking for a fixed point. The tag message carries what the
 diff cannot: which axes ran, where each finding was fixed, and **what was left
@@ -43,10 +57,87 @@ because a table nobody compares to `PACKAGES` fails as quietly as the branch it 
 `tests/test_framework_neutrality.py` holds the decidable half of both. See
 `docs/agents/framework-parity.md` for the post-mortem this is derived from.
 
+### Vendor parity
+
+A **Vendor** row is the second axis with the same failure mode as a **Framework
+Package**, and it went unguarded for longer. Six defects were found in the
+`vertex` row by sessions that were looking at something else, and the audit that
+answered them found five more. Every one was a constant, a branch, or a table
+entry that was absent or short — and not one of them raised.
+
+**A one-vendor assumption is vacuously correct when it is written and silently
+wrong afterwards.** `SERVED_TRUST = "provider_reported"` was true with one
+vendor and still true-looking with two.
+
+`tests/test_vendor_neutrality.py` is the mechanism, in three layers, and each
+catches what the others cannot:
+
+- **Completeness.** Every module-level table keyed by a vendor vocabulary is
+  found by reading the modules, not by listing the tables, and must answer for
+  every vendor — *including a table added tomorrow*. A `Vendor` field may carry
+  no default, because a default is how a new row stays silent about a fact.
+- **Declaration.** A vendor named outside the registry must say why, as a
+  property of the vendor rather than as its name.
+- **Property.** Completeness cannot see a wrong value: `_FORM_RULES["openai"]`
+  had its key and the wrong entry. Those tests sit beside the rules they check.
+
+**Keep the guards runnable on a half-built registry.** A collection-time
+`CREDENTIAL_MODES[name]` once made a partly-added row an import error, so the
+suite could not reach the module whose message names the missing entry. Use
+`.get`. A guard that cannot run when the tree is half-built helps nobody.
+
+**A vendor row makes claims about a third party, which a framework never does.**
+`served_trust` is a claim about what litellm reads; whether `gpt-4o` is an alias
+is a claim about OpenAI's catalogue. Drive the real dependency where CI can
+(`test_identity.py` drives the installed translator), and where it cannot,
+record the measurement beside the code rather than asserting it in prose.
+
+### One rule, one reader
+
+When two pieces of code answer the same question, they will eventually answer it
+differently, and the disagreement is invisible because each one's test agrees
+with it. **Give a rule one reader and let every other site call it.**
+
+Where a second reader is unavoidable — an app and an offline gate, a harness
+check and a corpus lint — test the two **against each other**, never each
+against its own expectation.
+
+Six instances in two audits, and every one survived because the readers were
+tested separately: what an UNREVIEWED key is (substring vs `ast`); whether a
+finding is answered (`queue.build` vs `Session.remaining`); which UNREVIEWED
+table is the table (first assignment vs last); which version keys a ledger row
+(`__post_init__` vs `rekey` vs `VERSION_FOR`); what a filled reading document is
+(two copies of one line); when an element ID is checked (the rule and the
+deriver disagreed about the empty-slug case).
+
+Two corollaries, both from the same audits:
+
+- **A self-sized fence is safe only while its neighbours are fenced too.** Ask
+  what sits beside the value, not only what wraps it.
+- **A bound that predicts a cost from its inputs is wrong whenever the cost
+  turns on which inputs survive a filter.** Spend a budget where the work
+  happens.
+
+### Name the shapes before you read the value
+
+New code that reads a value fails on the shape its author never listed.
+`unfence` split on `"\n"` and missed U+2028, U+2029 and U+0085, so a payload
+carrying one round-tripped corrupted. The roster note called `.get` on an entry
+TOML does not require to be a table, and `ada = "contributor"` — the line a
+first-timer writes — raised `AttributeError` through a whole preflight.
+
+**Write down every shape the value can take, then handle each one.** The
+question is what the *producer* can emit, not what it usually emits: `str` has
+more line terminators than `"\n"`, `tomllib` returns a scalar where you expect a
+table, and a model emits a name that slugs to empty. Ask the parser's
+documentation rather than the sample input.
+
+Two audits, three defects, and each one a shape that was legal all along.
+
 ### Provenance
 
 A fact about how an artifact was made belongs in a **field the code reads**, never a
-sentence in a guide: `bootstrap` on `case.json` stayed true for a year, while the same
+sentence in a guide: `bootstrap` on `case.json`, a required field, stayed true for a year, while the same
 file's prose about a reviewer drifted the moment nobody was one. When a design names a
 role, ship the field and the list of what nobody has done before the artifact. Write guides in the
 imperative, never the past tense. See `docs/agents/provenance.md`.

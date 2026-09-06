@@ -17,7 +17,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from analysis_service.identity import build_identity
+from analysis_service.budgets import measured_tokens
+from analysis_service.identity import IDENTITY_VERSION, build_identity
 from analysis_service.report import NodeRun, TokenUsage
 from analysis_service.sampling import TierSampling
 from evals.harness import consent, modes, prices, run
@@ -81,6 +82,7 @@ def artifact_document(usage, seed=1):
     }
     provenance = RunProvenance.model_validate(
         {
+            "identity_version": IDENTITY_VERSION,
             "build": dict(build_identity()),
             "sampling_config_version": 1,
             "tiers_config_version": 1,
@@ -749,3 +751,76 @@ class TestTheSweepLoopPassesTheCasesThatRan:
         offered = self.offer_at_the_hold(monkeypatch, [True, True, True])
 
         assert offered == pytest.approx(one_case * 3, rel=1e-3)
+
+
+class TestTheAcceptedAmountIsTheAmountBilled:
+    """The two readers of what a retry costs, tested against each other.
+
+    Not each against its own expectation, which is how they came to disagree:
+    `test_budgets.py` asserted the charge and this file never mentioned
+    `attempts`, so a sweep offered $9.75 against a $25.35 bill.
+    """
+
+    def _nodes(self, attempts):
+        return [
+            NodeRun(
+                node=f"n{i}",
+                model="claude-opus-4-5",
+                requested_model="claude-opus-4-5",
+                duration_ms=100,
+                attempts=attempts,
+                usage=TokenUsage(
+                    prompt_tokens=10_000, completion_tokens=500, total_tokens=10_500
+                ),
+            )
+            for i in range(26)
+        ]
+
+    @pytest.mark.parametrize("attempts", [1, 2, 3, 5])
+    def test_consent_prices_the_tokens_the_budget_charges(self, attempts):
+        nodes = self._nodes(attempts)
+
+        billed = measured_tokens(nodes)
+        priced = sum(usage.total_tokens for _, _, usage in consent._calls_of(nodes))
+
+        assert priced == billed
+
+    def test_a_retried_sweep_costs_more_than_an_unretried_one(self):
+        """The property the equality above cannot show: that both moved."""
+        assert consent.spent(self._nodes(3)) > consent.spent(self._nodes(1))
+
+
+class TestAnAcceptedAmountIsAnAmountOfMoney:
+    @pytest.mark.parametrize("flag", ["inf", "-inf", "nan", "Infinity", "-1"])
+    def test_a_value_that_is_not_dollars_is_refused(self, flag):
+        """`float()` takes all of these. `x > inf` and `x > nan` are False, so
+        either satisfies any estimate and disables `hold` for the whole sweep."""
+        offer = consent.Estimate(label="recorded", amount_usd=50.00, lines=())
+
+        with pytest.raises(consent.Refused):
+            consent._accept_from_flag(offer, flag)
+
+    def test_a_real_amount_still_accepts(self):
+        offer = consent.Estimate(label="recorded", amount_usd=50.00, lines=())
+
+        assert consent._accept_from_flag(offer, "50.00") == 50.00
+
+
+class TestABorrowedArtifactStaysInsideItsBaseline:
+    """`artifact` comes off a committed manifest, and a join is not a bound."""
+
+    def test_an_absolute_artifact_name_is_refused(self, tmp_path):
+        """`Path("/baselines/x") / "/etc/passwd"` is `/etc/passwd`: an absolute
+        right-hand side replaces the left rather than extending it. The same
+        shape was found in `sitting.moved` and `markdown_loader` this round."""
+        directory = tmp_path / "baseline"
+        directory.mkdir()
+
+        assert consent._reprice(directory, "/etc/hostname", {}) is None
+
+    def test_a_traversing_artifact_name_is_refused(self, tmp_path):
+        directory = tmp_path / "baseline"
+        directory.mkdir()
+        (tmp_path / "elsewhere.json").write_text("{}", encoding="utf-8")
+
+        assert consent._reprice(directory, "../elsewhere.json", {}) is None

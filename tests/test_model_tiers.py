@@ -1,5 +1,6 @@
 """Tests for model-tier config loading, env overrides, and pin validation."""
 
+import tempfile
 from pathlib import Path
 from typing import ClassVar
 
@@ -19,7 +20,7 @@ from analysis_service.model_tiers import (
     validate_model_string,
 )
 from analysis_service.report import FRAMEWORK_NAMES
-from analysis_service.vendors import VENDOR_NAMES
+from analysis_service.vendors import VENDOR_NAMES, CredentialMode, vendor_for
 
 PROJECT_ROOT = Path(__file__).parents[1]
 REPO_CONFIG = PROJECT_ROOT / "config" / "model_tiers.toml"
@@ -144,6 +145,47 @@ class TestRepoConfig:
         assert "ANALYSIS_MODEL_BASE_VENDOR" in message
         assert "docs/First-Run.md" in message
 
+    def test_a_tier_the_node_map_does_not_use_needs_no_selection(self):
+        """The shipped map runs criticism on ``strong``, so nothing sits on
+        ``review`` -- and ``build_adapters`` binds no adapter for a tier nothing
+        is bound to.
+
+        Requiring a pair for it anyway made a first run choose a vendor and a
+        model for a tier no request reaches, and the answer the config file
+        suggested was to repeat the ``strong`` pair, which chooses nothing.
+        """
+        selected = {
+            key: value for key, value in self.SELECTED.items() if "REVIEW" not in key
+        }
+
+        config = load_model_tiers(REPO_CONFIG, env=selected)
+
+        assert set(config.tiers) == {"base", "strong"}
+        assert "review" not in set(config.nodes.values())
+
+    def test_a_tier_the_node_map_does_use_is_still_required(self):
+        """The reason the requirement existed, kept: the day somebody moves
+        criticism onto ``review`` is the wrong day to find no model was chosen
+        for it. That day is a node-map edit, and this is read on that edit."""
+        moved = REPO_CONFIG.read_text(encoding="utf-8").replace(
+            '"critic/stride" = "strong"', '"critic/stride" = "review"'
+        )
+        path = self.written(moved)
+        selected = {
+            key: value for key, value in self.SELECTED.items() if "REVIEW" not in key
+        }
+
+        with pytest.raises(ModelConfigError, match="no vendor selected") as excinfo:
+            load_model_tiers(path, env=selected)
+
+        assert "review" in str(excinfo.value)
+
+    def written(self, text: str) -> Path:
+        directory = Path(tempfile.mkdtemp())
+        path = directory / "model_tiers.toml"
+        path.write_text(text, encoding="utf-8")
+        return path
+
     def test_shipped_config_names_no_vendor_anywhere_uncommented(self):
         """A commented example is guidance; an uncommented one is a default."""
         live = [
@@ -244,7 +286,7 @@ class TestEnvOverrides:
 
     def test_env_alias_rejected(self, config_path):
         _, model_var = env_vars_for("base")
-        with pytest.raises(ModelConfigError, match="-latest"):
+        with pytest.raises(ModelConfigError, match="latest"):
             load_model_tiers(
                 config_path(config_toml()), env={model_var: "gemini-2.5-flash-latest"}
             )
@@ -283,19 +325,22 @@ class TestPinValidation:
     released tomorrow already satisfies it.
     """
 
-    @pytest.mark.parametrize(
-        "value",
-        [
-            "gemini-2.5-pro-latest",
-            "gemini-2.5-pro-preview-06-05",
-            "gemini-2.0-flash-exp",
-            " gemini-2.5-pro",
-            "",
-        ],
-    )
-    def test_aliases_and_pre_ga_builds_rejected(self, value):
+    @pytest.mark.parametrize("value", [" gemini-2.5-pro", ""])
+    def test_a_non_identifier_is_rejected(self, value):
         with pytest.raises(ModelConfigError):
             validate_model_string(value, "vertex", source="tiers.strong.model")
+
+    def test_the_registrys_refusal_arrives_as_a_config_error(self):
+        """What this seam adds over ``Vendor.validate_model`` is the type.
+
+        Which identifiers float is asserted once, in
+        ``test_vendors.py::TestPinnedFormRule``. Restating that table here
+        would give one rule a second reader that agrees with it by copying.
+        """
+        with pytest.raises(ModelConfigError, match="latest"):
+            validate_model_string(
+                "gemini-2.5-pro-latest", "vertex", source="tiers.strong.model"
+            )
 
     @pytest.mark.parametrize("value", ["gemini-2.5-pro", "gemini-2.5-flash"])
     def test_bare_stable_gemini_accepted(self, value):
@@ -345,8 +390,157 @@ class TestPinValidation:
 
     def test_alias_in_file_rejected(self, config_path):
         path = config_path(config_toml(strong="gemini-2.5-pro-latest"))
-        with pytest.raises(ModelConfigError, match="-latest"):
+        with pytest.raises(ModelConfigError, match="latest"):
             load_model_tiers(path, env={})
+
+
+class TestDeclaredCredentialMode:
+    """A deployment declares a mode only where the vendor gives it a choice.
+
+    Both rules read ``CREDENTIAL_MODES``, so they follow the registry rather
+    than a second copy of it. The shipped table is empty because no shipped
+    file selects a vendor at all; a deployment that selects a vendor with a
+    choice fills it, from the file or from the environment.
+    """
+
+    def test_a_single_mode_vendor_needs_no_declaration(self, config_path):
+        tiers = load_model_tiers(config_path(config_toml()), env={})
+        assert tiers.credentials == {}
+        assert tiers.credential_mode("vertex") is CredentialMode.IAM
+
+    def test_the_mode_comes_from_the_registry_not_from_a_default(self):
+        # Not "whatever the first vendor uses": each one answers for itself.
+        assert vendor_for("anthropic").sole_credential_mode is CredentialMode.API_KEY
+        assert vendor_for("vertex").sole_credential_mode is CredentialMode.IAM
+
+    def test_declaring_a_mode_for_a_single_mode_vendor_is_an_error(self, config_path):
+        """It is not a choice, so stating it can only go stale.
+
+        A file that names a mode the registry has since replaced would otherwise
+        keep asserting it, and the loader would keep accepting it.
+        """
+        path = config_path(config_toml() + '\n[credentials]\nvertex = "iam"\n')
+        with pytest.raises(ModelConfigError, match="nothing to choose"):
+            load_model_tiers(path, env={})
+
+    def test_a_mode_the_vendor_does_not_allow_is_an_error(self, config_path):
+        path = config_path(config_toml() + '\n[credentials]\nvertex = "api_key"\n')
+        with pytest.raises(ModelConfigError):
+            load_model_tiers(path, env={})
+
+    def test_an_unknown_mode_is_an_error(self, config_path):
+        path = config_path(config_toml() + '\n[credentials]\nvertex = "sudo"\n')
+        with pytest.raises(ModelConfigError):
+            load_model_tiers(path, env={})
+
+    def test_an_unknown_vendor_is_an_error(self, config_path):
+        path = config_path(config_toml() + '\n[credentials]\ncohere = "api_key"\n')
+        with pytest.raises(ModelConfigError):
+            load_model_tiers(path, env={})
+
+    def test_a_selected_multi_mode_vendor_must_declare_one(self, config_path):
+        """The half a single-mode registry could never exercise.
+
+        A vendor with a choice and no declaration is the state that would let a
+        build authenticate under a mode nobody chose, so it is a load error
+        naming the key to add.
+        """
+        path = config_path(
+            config_toml(
+                base_vendor="bedrock",
+                base="anthropic.claude-sonnet-4-6",
+                strong_vendor="bedrock",
+                strong="anthropic.claude-opus-5",
+            )
+        )
+        with pytest.raises(ModelConfigError, match="credentials.bedrock"):
+            load_model_tiers(path, env={})
+
+    def test_a_multi_mode_vendor_nobody_selects_needs_no_declaration(self, config_path):
+        """A vendor no tier calls needs no identity.
+
+        The rule is scoped to what a deployment actually runs, so adding a
+        vendor row cannot make every existing config file fail to load.
+        """
+        tiers = load_model_tiers(config_path(config_toml()), env={})
+        assert "bedrock" not in tiers.credentials
+
+    @pytest.mark.parametrize("mode", [CredentialMode.API_KEY, CredentialMode.IAM])
+    def test_the_file_declares_the_mode(self, config_path, mode):
+        path = config_path(
+            config_toml(
+                base_vendor="bedrock",
+                base="anthropic.claude-sonnet-4-6",
+                strong_vendor="bedrock",
+                strong="anthropic.claude-opus-5",
+            )
+            + f'\n[credentials]\nbedrock = "{mode.value}"\n'
+        )
+        assert load_model_tiers(path, env={}).credential_mode("bedrock") is mode
+
+    def test_the_environment_declares_the_mode(self, config_path):
+        """A deployment configured entirely by environment can select this vendor.
+
+        Every other half of a selection already moves that way. A mode that
+        moved only in the file would mean rebuilding an image to run a vendor
+        it already carries.
+        """
+        tiers = load_model_tiers(
+            config_path(config_toml()),
+            env={
+                "ANALYSIS_MODEL_BASE_VENDOR": "bedrock",
+                "ANALYSIS_MODEL_BASE_MODEL": "anthropic.claude-sonnet-4-6",
+                "ANALYSIS_MODEL_CREDENTIALS_BEDROCK": "iam",
+            },
+        )
+        assert tiers.credential_mode("bedrock") is CredentialMode.IAM
+
+    def test_the_environment_wins_over_the_file(self, config_path):
+        """One rule, and the environment is the later reader of it.
+
+        Same precedence as a tier's own vendor and model override, so an
+        operator does not have to remember which keys behave differently.
+        """
+        path = config_path(
+            config_toml(
+                base_vendor="bedrock",
+                base="anthropic.claude-sonnet-4-6",
+                strong_vendor="bedrock",
+                strong="anthropic.claude-opus-5",
+            )
+            + '\n[credentials]\nbedrock = "api_key"\n'
+        )
+        tiers = load_model_tiers(
+            path, env={"ANALYSIS_MODEL_CREDENTIALS_BEDROCK": "iam"}
+        )
+        assert tiers.credential_mode("bedrock") is CredentialMode.IAM
+
+    def test_an_environment_declaration_meets_the_same_rules(self, config_path):
+        """The loader judges the result, wherever the value arrived from."""
+        with pytest.raises(ModelConfigError, match="nothing to choose"):
+            load_model_tiers(
+                config_path(config_toml()),
+                env={"ANALYSIS_MODEL_CREDENTIALS_VERTEX": "iam"},
+            )
+
+    def test_an_empty_environment_declaration_is_an_error(self, config_path):
+        with pytest.raises(ModelConfigError, match="set but empty"):
+            load_model_tiers(
+                config_path(config_toml()),
+                env={"ANALYSIS_MODEL_CREDENTIALS_BEDROCK": "  "},
+            )
+
+    def test_an_unrecognised_credentials_variable_still_raises(self, config_path):
+        """The namespace check covers the new keys too.
+
+        A typo'd vendor name would otherwise be ignored while the tier ran
+        under a mode nobody declared.
+        """
+        with pytest.raises(ModelConfigError, match="unrecognised"):
+            load_model_tiers(
+                config_path(config_toml()),
+                env={"ANALYSIS_MODEL_CREDENTIALS_BEDR0CK": "iam"},
+            )
 
 
 class TestFileValidation:

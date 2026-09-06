@@ -1,8 +1,77 @@
 # Code review checkpoints
 
-**A completed code review ends in an annotated tag named `reviewed/<date>`.**
-That tag is the fixed point the next review starts from, so "review the code
+**A completed checkpoint round ends in an annotated tag named `reviewed/<date>`.**
+That tag is the fixed point the next round starts from, so "review the code
 since the last review" resolves to a command rather than to a question.
+
+## Two instruments, two questions
+
+Review runs twice, at two scales, and each scale sees what the other cannot.
+
+- **A pre-merge review** reads one pull request's diff before the merge. It
+  asks whether this change is correct.
+- **A checkpoint round** reads a range of merged commits. It asks what the tree
+  now holds that no single diff showed.
+
+Run both. Nine audit rounds produced the evidence, and it points both ways at
+once.
+
+| Round | Findings | From the previous round's own fixes |
+|---|---|---|
+| 5 | 6 | 4 |
+| 6 | 6 | 3 |
+| 7 | 11 | 9 shared one rule that a fix gave a second reader |
+| 8 | 3 | 3 |
+| 9 | 2 | 1 |
+
+A defect in a recent fix is the dominant class, and it sits inside one diff, so
+a reader of that diff before the merge is the instrument that fits it. Run-9's
+HIGH is the plainest case: the bound sat on a scan where the caller runs a body,
+and `CLAUDE.md` named that mistake two days before the fix shipped.
+
+The rest of the table is the argument for the round. Run-9's LOW was a
+`RuntimeError` that `Path.resolve` raises on a symlink loop. It was legal in
+every diff that touched it, and it became reachable only when a later pull
+request made the gate resolve a path. No diff carries that fact; the tree does.
+
+### What a pre-merge review reads
+
+The diff, against the five defect classes below, and against the fix habits at
+the end of this guide.
+
+## The five defect classes
+
+Every finding in this repository's record — ten audit rounds, the range review
+of `reviewed/2026-09-09...35ae7a0` and the whole-tree hunt that followed it —
+falls into one of five classes. They are distinct because each has its own test
+and its own repair.
+
+| # | Class | What it looks like here | Repair | Decidable? |
+|---|---|---|---|---|
+| 1 | **One rule, two readers** | the CI gate and `--list` read "is this case read" differently; a client gate that disagrees with the server's; two readers each tested against its own expectation | Delete a reader. Where two must stay, test them against each other | Partly. A scan finds a literal spelled twice; a rule needs the pair named |
+| 2 | **A table with a hole** | `SERVED_TRUST` as a constant; `_FORM_RULES["openai"]` present and short; a default that answers for a row nobody asked | A table keyed by the registry, checked against the registry | Yes: `test_framework_neutrality.py`, `test_vendor_neutrality.py` |
+| 3 | **A shape not listed** | `str.isdigit`; a date in a minor-version group; `window.open(…, "noopener")` returning `null`; a state nothing creates | List every shape the producer can emit, from its documentation | No. It needs the producer's documentation |
+| 4 | **A bound predicted, not measured** | a cost computed from input sizes; a per-scan bound beside an unbounded count of scans | Two measurements, one admitted and one refused, and the neighbours named | No. It needs a run |
+| 5 | **A fact with no reader** | an answer the page never reads; a field nothing reads; prose naming a removed thing; content placed only to satisfy a check; a refusal the page swallows | Give the fact one reader the code follows, or delete it | Mostly: `test_dead_code_lints.py`, `test_reader_lints.py` |
+
+Class 5 is the largest by count and the cheapest to find, because most of it is
+a grep. Class 1 is the largest by damage: it is where the fix that passed its
+tests sat in runs 5 to 9, and where #640 sat. Measured on 2026-09-06, a
+whole-tree sweep of the decidable classes over code older than the last round
+found nothing that breaks a flow; the findings that mattered sat in code
+younger than the round. Spend attention on `git diff reviewed/<last>...HEAD`
+and on fix diffs, and let the lints hold the rest.
+
+Put the result in the pull request, so the record sits with the change. A
+pre-merge review cuts no tag.
+
+### What the round reads after that
+
+The same range as before. Its question narrows, because each pull request in the
+range already had a reader: the round hunts across pull requests, over the whole
+tree, and on surfaces no diff touched. The tag message names which pull requests
+in the range got a pre-merge review, so the next round knows which half of the
+range is new ground.
 
 ## Find the last checkpoint
 
@@ -41,6 +110,8 @@ git push origin reviewed/<date>
 The message carries what a later reader cannot recover from the diff:
 
 - the range reviewed, as `<base>...<head>`, with the size at the time
+- which pull requests in the range had a pre-merge review, so the next round
+  knows which half of its own range nobody read before the merge
 - which axes ran, and what each read as its source of truth
 - how many findings each axis produced, and where each was fixed
 - **what was left open by decision**, with the reason — this is the part that
@@ -56,3 +127,73 @@ every clone, needs no service, and is what `git diff` already takes.
 `reviewed/*` sits beside the repository's other tag namespaces, `archive/*`
 and `backup/*`, and reads the same way: the branch is gone, the tag is the
 record.
+
+## Habits that fixes need
+
+All five come from the audit runs that found defects in the previous run's
+fixes. Run 4 found 4 of its 6 findings in run 3's fixes, run 5 found 4 of 6 in
+run 4's, and all 3 of run 8's came from two fix pull requests. Every one of
+those defects passed the tests that shipped with it, so these are rules about
+the fix itself, not about testing harder.
+
+A fix is the riskiest code in the tree. It is new, it lands fast, and the
+attention that found the defect is spent by the time the repair is written.
+
+### Review your own fix the way you reviewed the defect
+
+Read the fix diff against the five defect classes above, the same way a
+pre-merge review reads anybody else's diff. This includes the fix that closes a
+finding you reported an hour ago. Run 9 shipped a bound with no per-body limit,
+and `CLAUDE.md` carried that corollary two days before the fix merged.
+
+Let a fix to a hot path sit long enough to read it once more. Minutes between
+the last keystroke and the merge is how the previous rounds shipped their
+defects.
+
+### Prefer deleting a reader over adding a guard
+
+When the defect is a rule with two readers, make one reader call the other. A
+guard copied into the second reader contains this defect and leaves the class
+open; one shared helper removes the class.
+
+Run 10 fixed a corpus loader that followed a symlink out of a case directory. It
+inlined the resolve-and-bound rule a third time rather than exporting the one
+`sitting.moved` already held. The two readers are tested against each other, so
+they cannot drift in silence — but that is the fallback, not the fix to reach
+for first.
+
+### Make the harness that proved the bug the regression test
+
+The input that reproduced the defect is the honest one. A simpler test written
+after the repair tends to check the repair rather than the defect, and it passes
+for a reason the author chose.
+
+### Ship no bound without two measurements
+
+A constant that bounds work needs a measured case it **must admit** and a
+measured case it **must refuse**, and the commit message carries both numbers.
+
+The repair rung took three attempts because the first two bounds computed a
+cost from the input sizes. Measurement showed the metric ordered two real cases
+backwards: English prose at 288M ran 0.39 s, and a repetitive source at 112M
+ran 5.95 s. No reading of the code produces that; only running it does.
+
+If you cannot produce both numbers, the bound is a guess. Say so, or measure.
+
+Then name what sits beside the new bound. A ceiling makes the next unbounded
+value the weak one, so the pull request body lists the neighbours and says which
+of them are bounded. Run 9's finding was a bound on one scan beside an unbounded
+count of scans.
+
+### When a fix breaks an existing test, suspect the fix
+
+The default assumption is that the test is right and the fix is wrong. Read the
+test and find out what it protects before you touch its premise.
+
+`test_rekey_refuses_a_move_the_components_cannot_satisfy` caught a fix that
+would have made `rekey` impossible to run: it asked a ledger row to prove itself
+against the *current* rule, and a ledger written before a rule change is exactly
+what `rekey` reads. The test failed for that reason and no other.
+
+A test that fails on a correct change is a real thing, and pinned lists move
+that way. It is the second explanation to reach for, not the first.

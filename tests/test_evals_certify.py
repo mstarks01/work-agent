@@ -84,7 +84,7 @@ def keys(**served: str) -> dict[str, tuple[TierIdentityKey, ...]]:
 # --- sweep parametrization: each variant is fingerprinted, drift flagged ---
 
 
-def _build_fingerprints(sampling, served="fake-model-001"):
+def _build_fingerprints(sampling, served="vertex_ai/fake-model-001"):
     """The per-node fingerprints one sampling variant would produce.
 
     The served build is supplied rather than read off the built graph: a
@@ -144,11 +144,14 @@ def test_certify_flags_an_override_drifted_run():
 
 def test_certify_flags_a_served_build_drifted_run():
     default = load_sampling(SAMPLING_PATH)
-    manifest = _blessed_from(_build_fingerprints(default, "build-001"))
+    manifest = _blessed_from(_build_fingerprints(default, "vertex_ai/build-001"))
 
     # Same sampling, a different served build — every tier's hash moves.
     drifted = certify(
-        _build_fingerprints(default, "build-002"), manifest, tier_of, ALL_NODES
+        _build_fingerprints(default, "vertex_ai/build-002"),
+        manifest,
+        tier_of,
+        ALL_NODES,
     )
     assert not drifted.certified
     assert len(drifted.uncertified) == len(_build_fingerprints(default))
@@ -176,7 +179,7 @@ def test_promote_reprints_values_in_place_and_writes_the_manifest(tmp_path):
 
     manifest = promote(
         winner,
-        keys(base="build-001", strong="build-001"),
+        keys(base="vertex_ai/build-001", strong="vertex_ai/build-001"),
         build=build_identity(),
         sampling_path=sampling_copy,
         manifest_path=manifest_copy,
@@ -212,7 +215,7 @@ def test_promoting_a_param_the_file_leaves_unset_raises(tmp_path):
     with pytest.raises(CertificationError, match="tiers.strong.temperature"):
         promote(
             winner,
-            keys(base="build-001", strong="build-001"),
+            keys(base="vertex_ai/build-001", strong="vertex_ai/build-001"),
             build=build_identity(),
             sampling_path=sampling_copy,
             manifest_path=manifest_copy,
@@ -229,7 +232,7 @@ def test_promoting_one_tier_leaves_the_other_unblessed(tmp_path):
 
     manifest = promote(
         winner,
-        keys(base="build-001"),
+        keys(base="vertex_ai/build-001"),
         build=build_identity(),
         sampling_path=sampling_copy,
         manifest_path=manifest_copy,
@@ -244,7 +247,7 @@ def test_promote_rejects_an_unknown_tier(tmp_path):
     with pytest.raises(CertificationError, match="unknown tier"):
         promote(
             load_sampling(SAMPLING_PATH),
-            keys(extract="build-001"),  # a node name, not a tier
+            keys(extract="vertex_ai/build-001"),  # a node name, not a tier
             build=build_identity(),
             sampling_path=sampling_copy,
             manifest_path=manifest_copy,
@@ -257,14 +260,14 @@ def test_promote_accumulates_blessed_builds(tmp_path):
 
     promote(
         winner,
-        keys(base="build-001"),
+        keys(base="vertex_ai/build-001"),
         build=build_identity(),
         sampling_path=sampling_copy,
         manifest_path=manifest_copy,
     )
     manifest = promote(
         winner,
-        keys(base="build-002"),
+        keys(base="vertex_ai/build-002"),
         build=build_identity(),
         sampling_path=sampling_copy,
         manifest_path=manifest_copy,
@@ -283,7 +286,7 @@ def test_promote_refuses_to_pin_a_previously_unset_param(tmp_path):
     with pytest.raises(CertificationError, match="tiers.strong.top_p"):
         promote(
             winner,
-            keys(strong="build-001"),
+            keys(strong="vertex_ai/build-001"),
             build=build_identity(),
             sampling_path=sampling_copy,
             manifest_path=manifest_copy,

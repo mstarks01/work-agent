@@ -8,18 +8,21 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from pydantic import ValidationError
 
 from analysis_service import verify_report
 from analysis_service.attestation import (
     CANONICAL_VERSION,
     PAYLOAD_TYPE,
     Attestation,
+    DuplicateKeyError,
     Keyring,
     KeyringError,
     VerificationKey,
     canonicalize,
     digest,
     load_keyring,
+    load_report,
     sign,
     verify,
 )
@@ -384,3 +387,84 @@ def test_the_signed_payload_binds_everything_it_must():
         "report_sha256",
         "signed_at",
     }
+
+
+class TestTwoParsersCannotDisagreeAboutTheFile:
+    """A signature covers the canonical form of the *parsed* document.
+
+    That is what lets a verifier check a report without this project's models,
+    and it is the right trade. Its cost is that parsing is where two readers can
+    disagree: ``json`` keeps the last of a repeated key and other parsers keep
+    the first, so one file can say two things and verify as the harmless one.
+    """
+
+    def test_a_repeated_key_is_refused_rather_than_resolved(self):
+        forged = (
+            '{"id": "r1", "summary": "CRITICAL RCE, unauthenticated",'
+            ' "summary": "no issues found"}'
+        )
+
+        with pytest.raises(DuplicateKeyError, match="'summary' appears twice"):
+            load_report(forged)
+
+    def test_a_repeated_key_deeper_in_the_document_is_refused_too(self):
+        forged = '{"analyses": [{"framework": "stride", "framework": "asvs"}]}'
+
+        with pytest.raises(DuplicateKeyError, match="'framework' appears twice"):
+            load_report(forged)
+
+    def test_an_ordinary_report_still_loads(self):
+        report = sample_report().model_dump(mode="json")
+
+        assert load_report(json.dumps(report)) == report
+
+    def test_an_escape_is_the_same_document_and_still_verifies(self):
+        """The other half of this class is not a forgery: `\\u0041` and `A` are
+        one string, so they canonicalize alike and mean the same thing."""
+        assert load_report('{"id": "\\u0041"}') == {"id": "A"}
+        assert canonicalize({"id": "A"}) == canonicalize(
+            load_report('{"id": "\\u0041"}')
+        )
+
+
+class TestATimeIsComparableToAnother:
+    """Both sides of the retirement check are datetimes, and Python refuses to
+    order a naive one against an aware one.
+
+    ``signed_at`` arrives in the file a caller supplies and ``retired_at`` in a
+    TOML keyring, where a local date-time is naive and perfectly valid TOML. A
+    naive value on either side raised ``TypeError`` out of `verify`, past a
+    handler that catches neither, and exited on a code the table does not name.
+    """
+
+    def test_a_naive_signed_at_is_refused_where_it_arrives(self):
+        with pytest.raises(ValidationError):
+            Attestation(
+                canonical_version=CANONICAL_VERSION,
+                payload_type=PAYLOAD_TYPE,
+                report_sha256="a" * 64,
+                key_id="k1",
+                signature="AA==",
+                # Naive on purpose: the refusal is the subject.
+                signed_at=datetime(2026, 9, 2, 12, 0, 0),  # noqa: DTZ001
+            )
+
+    def test_a_naive_retirement_is_refused_where_it_arrives(self):
+        with pytest.raises(ValidationError):
+            VerificationKey(
+                key_id="k1",
+                public_key="AA==",
+                status="retired",
+                # Naive on purpose, as a TOML local date-time is.
+                retired_at=datetime(2026, 9, 2, 12, 0, 0),  # noqa: DTZ001
+            )
+
+    def test_an_aware_one_is_accepted(self):
+        key = VerificationKey(
+            key_id="k1",
+            public_key="AA==",
+            status="retired",
+            retired_at=datetime(2026, 9, 2, 12, 0, 0, tzinfo=UTC),
+        )
+
+        assert key.retired_at is not None

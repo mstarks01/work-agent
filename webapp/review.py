@@ -33,10 +33,12 @@ The security posture is deliberate throughout, and inherited from
 * Loopback only, hard-bound with no flag (A01). The ledger is the supply chain
   of every published quality number, so a writable endpoint reachable off the
   host is an unauthenticated way to forge that record.
-* ``POST /api/vote`` refuses a request that is not same-origin, and no page here
-  can be framed (A01). Both are needed, because either alone is a way to the
-  same forged row: a fingerprint is not a secret, so a foreign page can name a
-  real finding, and a framed page votes with the operator's own origin.
+* ``POST /api/vote`` refuses a request that is not same-origin, refuses one
+  that does not carry the page token, and no page here can be framed (A01).
+  All three are needed, because each alone is a way to the same forged row: a
+  fingerprint is not a secret, so a foreign page can name a real finding; a
+  framed page votes with the operator's own origin; and a request that never
+  read the page has no token to send.
 * The voter comes from the command line, never from the request (A01). A browser
   field naming the voter would let one reviewer file votes as another, and the
   double-vote agreement measure rests on the name being true.
@@ -57,7 +59,7 @@ import json
 import secrets
 import sys
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import get_args
 
@@ -74,7 +76,7 @@ from analysis_service.frameworks import PACKAGES
 from evals import verify_corpus
 from evals.harness import queue as review_queue
 from evals.harness import run
-from evals.harness.fingerprint import identifier_of, lane_field
+from evals.harness.fingerprint import FingerprintError, identifier_of, lane_field
 from evals.harness.ledger import (
     DEFAULT_LEDGER_PATH,
     REASON_GLOSS,
@@ -91,10 +93,12 @@ from webapp.page import (
     LOOPBACK_HOSTS,
     Grants,
     SecurityHeaders,
+    client_script,
     escape,
     refuse_cross_origin,
     render,
     response,
+    script_json,
 )
 
 HOST = "127.0.0.1"
@@ -172,6 +176,10 @@ class Session:
     sources: dict[str, str]
     configs: dict[str, str]
     sitting: str
+    #: Minted per process and delivered only in the page. A request that never
+    #: read the page cannot hold it, so it rides beside the origin check on the
+    #: one endpoint that writes -- the same pair the sitting app's writes carry.
+    token: str = field(default_factory=lambda: secrets.token_urlsafe(24))
 
     def remaining(self) -> list[review_queue.QueueItem]:
         """The queue minus anything this voter has answered since it was built.
@@ -179,11 +187,17 @@ class Session:
         Recomputed per request rather than popped from a list: two tabs open on
         one sitting is a thing people do, and a list would let the second tab
         serve a finding the first already answered.
+
+        Asked of :func:`~evals.harness.queue.answered`, which is the same
+        function the queue was built with. It used to be a second copy of that
+        rule here, and the copy went stale the day the rule changed: it counted
+        a `needs-evidence` answer as answered and dropped, on every serve, the
+        finding the queue had just re-offered.
         """
-        answered = frozenset(
-            key[0] for key in load(self.ledger_path).current() if key[1] == self.voter
+        skip = review_queue.answered(
+            load(self.ledger_path), voter=self.voter, sitting=self.sitting
         )
-        return [item for item in self.items if item.fingerprint not in answered]
+        return [item for item in self.items if item.fingerprint not in skip]
 
     def find(self, value: str) -> review_queue.QueueItem:
         """The item a vote names, or a refusal.
@@ -223,12 +237,15 @@ def build_session(
         for case in corpus
     }
     ledger = load(ledger_path)
+    # Minted before the queue rather than with the Session, because the queue
+    # reads it: a `needs-evidence` answer holds for its own sitting only.
+    sitting = f"web-{secrets.token_hex(4)}"
     items = review_queue.build(
         review_queue.merge_runs(runs, flows),
         flows,
         ledger,
-        reference_pool=ledger.pool(),
         voter=voter,
+        sitting=sitting,
     )
     return Session(
         voter=voter,
@@ -236,13 +253,13 @@ def build_session(
         items=items,
         sources=sources,
         configs=dict(configs or {}),
-        sitting=f"web-{secrets.token_hex(4)}",
+        sitting=sitting,
     )
 
 
 def create_app(session: Session) -> FastAPI:
     """The review app over one prepared sitting."""
-    app = FastAPI(title="Review", docs_url=None, redoc_url=None)
+    app = FastAPI(title="Review", docs_url=None, redoc_url=None, openapi_url=None)
     # Before anything else, so a rebound request is refused rather than
     # reaching the one endpoint in this repository that writes a human
     # judgement. See LOOPBACK_HOSTS for what binding alone does not stop.
@@ -251,17 +268,31 @@ def create_app(session: Session) -> FastAPI:
 
     @app.get("/", response_class=HTMLResponse)
     def index() -> HTMLResponse:
-        return response(render(_QUEUE_PAGE, _PAGE_GRANTS, voter=escape(session.voter)))
+        return response(
+            render(
+                _QUEUE_PAGE,
+                _PAGE_GRANTS,
+                script=client_script("review_queue.js"),
+                voter=escape(session.voter),
+            )
+        )
 
     @app.get("/review", response_class=HTMLResponse)
     def review() -> HTMLResponse:
-        return response(render(_REVIEW_PAGE, _PAGE_GRANTS, voter=escape(session.voter)))
+        return response(
+            render(
+                _REVIEW_PAGE,
+                _PAGE_GRANTS,
+                script=client_script("review_finding.js"),
+                voter=escape(session.voter),
+                token=script_json(session.token),
+            )
+        )
 
     @app.get("/api/summary")
     def summary() -> JSONResponse:
         remaining = session.remaining()
         payload = review_queue.summarise(remaining, load(session.ledger_path))
-        payload["voter"] = session.voter
         return JSONResponse(payload)
 
     @app.get("/api/next")
@@ -287,6 +318,7 @@ def create_app(session: Session) -> FastAPI:
         # foreign page can name a real finding, and the only thing standing
         # between it and a forged row under this voter's name is this line.
         refuse_cross_origin(request)
+        _require_token(request, session)
         item = session.find(body.fingerprint)
         # Narrowed here rather than trusted from the body: ``Vote`` refuses an
         # unknown verdict at construction anyway, and checking against the same
@@ -315,9 +347,28 @@ def create_app(session: Session) -> FastAPI:
         except LedgerError as exc:
             # The message names the closed set the value missed, never a path.
             raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except FingerprintError as exc:
+            # A claim the keying rule cannot key. It reached here as a 500,
+            # which told the reviewer nothing and re-served the same item on
+            # every reload, so one unkeyable finding stalled a whole sitting.
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
         return JSONResponse({"recorded": recorded.fingerprint})
 
     return app
+
+
+def _require_token(request: Request, session: Session) -> None:
+    """The page token, on the one endpoint that writes.
+
+    Beside the origin check rather than instead of it, because they refuse
+    different things: the origin check refuses a page on another origin, and
+    this refuses a request that never read this one. The ledger is the supply
+    chain of every published quality number, and the sitting app's writes have
+    carried both since they were written.
+    """
+    sent = request.headers.get("x-review-token", "")
+    if not secrets.compare_digest(sent.encode(), session.token.encode()):
+        raise HTTPException(status_code=403, detail="wrong or missing page token")
 
 
 def _reason_payload() -> list[dict[str, str]]:
@@ -398,20 +449,7 @@ that name and kept forever.</p>
   <h2>The ledger so far</h2>
   <p id="ledger" class="meta">Loading…</p>
 </div>
-<script nonce="__CSP_NONCE__">
-  fetch("/api/summary").then(r => r.json()).then(s => {
-    document.getElementById("counts").textContent =
-      s.waiting + " findings waiting, " + s.volatile +
-      " of them found in some runs and not others.";
-    const cases = Object.entries(s.by_case)
-      .map(([id, n]) => id + ": " + n).join("   ");
-    document.getElementById("cases").textContent = cases;
-    document.getElementById("ledger").textContent =
-      s.votes_recorded + " votes by " + (s.voters.join(", ") || "nobody") +
-      "   |   " + s.pool + " findings in the reference pool" +
-      "   |   " + s.double_voted + " answered by two people";
-  });
-</script>
+<script nonce="__CSP_NONCE__"><!--script--></script>
 </body></html>"""
 )
 
@@ -467,93 +505,9 @@ _REVIEW_PAGE = (
 </div>
 
 <script nonce="__CSP_NONCE__">
-  // Every value below is submitter prose or model output, so it reaches the
-  // page as a text node and never as markup. There is no escape helper here
-  // deliberately: with no innerHTML path there is nothing to forget to call.
-  let current = null;
-
-  const el = id => document.getElementById(id);
-
-  function fill(item) {
-    current = item;
-    if (item.done) {
-      el("card").style.display = "none";
-      el("done").classList.add("open");
-      el("left").textContent = "";
-      return;
-    }
-    el("left").textContent = item.remaining + " left";
-    // The question is the package's, not this page's: a threat and a
-    // requirement are not ruled on in the same words.
-    el("heading").textContent = item.question.heading;
-    el("ask").textContent = item.question.ask;
-    el("up").textContent = item.question.yes;
-    el("down").textContent = item.question.no;
-    el("case").textContent = item.case + " / " + item.lane;
-    el("why").textContent = "You are being asked because " + item.why + ".";
-    el("source").textContent = item.source;
-    el("title").textContent = item.title;
-    el("description").textContent = item.description;
-    el("elements").textContent = "Cited: " + item.element_ids.join(", ");
-
-    const quotes = el("quotes");
-    quotes.replaceChildren();
-    item.quotes.forEach(text => {
-      const div = document.createElement("div");
-      div.className = "quote";
-      div.textContent = '"' + text + '"';
-      quotes.appendChild(div);
-    });
-
-    const list = el("rlist");
-    list.replaceChildren();
-    ["substance", "style"].forEach(kind => {
-      const rows = item.reasons.filter(r => r.kind === kind);
-      if (!rows.length) return;
-      const group = document.createElement("div");
-      group.className = "rgroup " + kind;
-      const head = document.createElement("h3");
-      head.textContent = kind === "substance" ? "It is wrong" : "It is badly written";
-      group.appendChild(head);
-      rows.forEach(reason => {
-        const button = document.createElement("button");
-        button.textContent = reason.gloss;
-        button.addEventListener("click", () => send("down", reason.code));
-        group.appendChild(button);
-      });
-      list.appendChild(group);
-    });
-    el("reasons").classList.remove("open");
-  }
-
-  function load() {
-    fetch("/api/next").then(r => r.json()).then(fill);
-  }
-
-  function send(verdict, reason) {
-    if (!current || current.done) return;
-    fetch("/api/vote", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({
-        fingerprint: current.fingerprint,
-        verdict: verdict,
-        reason: reason || null,
-        note: ""
-      })
-    }).then(response => {
-      if (!response.ok) { alert("That vote was refused."); return; }
-      load();
-    });
-  }
-
-  el("up").addEventListener("click", () => send("up", null));
-  el("unsure").addEventListener("click", () => send("unsure", null));
-  el("evidence").addEventListener("click", () => send("needs-evidence", null));
-  el("down").addEventListener("click", () => el("reasons").classList.add("open"));
-  el("cancel").addEventListener("click", () => el("reasons").classList.remove("open"));
-  load();
+  const TOKEN = <!--token-->;
 </script>
+<script nonce="__CSP_NONCE__"><!--script--></script>
 </body></html>"""
 )
 

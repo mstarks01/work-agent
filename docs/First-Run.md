@@ -29,8 +29,10 @@ are the reference pairs declared in `analysis_service.conformance.REFERENCE_MODE
 | Vendor | `base` | `strong` | Credentials read by the code |
 | --- | --- | --- | --- |
 | Anthropic | `claude-sonnet-4-6` | `claude-opus-5` | `ANALYSIS_ANTHROPIC_API_KEY` |
-| OpenAI | `gpt-4o` | `gpt-5.6` | `ANALYSIS_OPENAI_API_KEY` |
-| Vertex AI | `gemini-2.5-flash` | `gemini-2.5-pro` | `ANALYSIS_VERTEX_PROJECT`, `ANALYSIS_VERTEX_LOCATION`, `GOOGLE_APPLICATION_CREDENTIALS` |
+| Bedrock | `anthropic.claude-sonnet-4-6` | `anthropic.claude-opus-5` | `ANALYSIS_BEDROCK_API_KEY`, `ANALYSIS_BEDROCK_REGION` |
+| Gemini | `gemini-2.5-flash` | `gemini-2.5-pro` | `ANALYSIS_GEMINI_API_KEY` |
+| OpenAI | `gpt-4o-2024-08-06` | `gpt-5.6` | `ANALYSIS_OPENAI_API_KEY` |
+| Vertex AI | `gemini-2.5-flash` | `gemini-2.5-pro` | `ANALYSIS_VERTEX_PROJECT`, `ANALYSIS_VERTEX_LOCATION` |
 
 “Reference pair” means the repository's offline capability check knows these
 model names. It does not mean CI has successfully called them or that they are
@@ -41,7 +43,7 @@ Add one pair to `config/model_tiers.toml`. For example:
 ```toml
 [tiers.base]
 vendor = "openai"
-model = "gpt-4o"
+model = "gpt-4o-2024-08-06"
 
 [tiers.strong]
 vendor = "openai"
@@ -55,6 +57,52 @@ Then export the credentials for the vendor or vendors you selected.
 ```sh
 export ANALYSIS_ANTHROPIC_API_KEY=sk-ant-...
 ```
+
+### Bedrock
+
+Bedrock needs its client library, which is an optional extra:
+
+```sh
+uv sync --extra bedrock
+```
+
+Then choose a credential mode. Bedrock is the one vendor that offers two, so
+`config/model_tiers.toml` has to say which one you use:
+
+```toml
+[credentials]
+bedrock = "api_key"    # or "iam"
+```
+
+Under `api_key`, export the key and the region:
+
+```sh
+export ANALYSIS_BEDROCK_API_KEY=...
+export ANALYSIS_BEDROCK_REGION=us-east-1
+```
+
+An AWS short-term Bedrock key lasts twelve hours and nothing here refreshes it,
+so rotate the variable before it expires.
+
+Under `iam`, export the region alone:
+
+```sh
+export ANALYSIS_BEDROCK_REGION=us-east-1
+```
+
+Work Agent then passes no credential, and boto3's own chain resolves the
+identity — an attached role, `AWS_PROFILE`, or SSO. The identity needs
+`bedrock:InvokeModel` on the models you selected.
+
+### Gemini
+
+```sh
+export ANALYSIS_GEMINI_API_KEY=AIza...
+```
+
+This is the Gemini Developer API, with a key from Google AI Studio. It serves
+the same models as Vertex AI. Select `gemini` when you hold a key and no Google
+Cloud project. Select `vertex` when the platform supplies the identity.
 
 ### OpenAI
 
@@ -70,18 +118,21 @@ gcloud services enable aiplatform.googleapis.com --project your-gcp-project
 
 export ANALYSIS_VERTEX_PROJECT=your-gcp-project
 export ANALYSIS_VERTEX_LOCATION=us-central1
-export GOOGLE_APPLICATION_CREDENTIALS="$HOME/.config/gcloud/application_default_credentials.json"
 ```
 
-The Vertex identity needs `roles/aiplatform.user`. Work Agent requires the ADC
-file path explicitly; it does not search the usual gcloud location.
+The Vertex identity needs `roles/aiplatform.user`. Work Agent passes no
+credential to Vertex: it passes the project and the location, and Google's own
+Application Default Credentials chain resolves the identity. The `gcloud`
+command above writes the file that chain finds on a workstation. On GKE or Cloud
+Run, bind a service account instead and set no file at all.
 
 The tiers may use different vendors. In that case, set credentials for each
 vendor a tier the node map binds selects — the shipped map binds `base` and
-`strong`, so a selection for `review` needs no credential until you move
-criticism onto it. You may also select models through the matching
+`strong`, so `review` needs neither a selection nor a credential until you move
+criticism onto it, and the loader asks for both at that edit. You may also select models through the matching
 `ANALYSIS_MODEL_BASE_{VENDOR,MODEL}`, `ANALYSIS_MODEL_STRONG_{VENDOR,MODEL}` and
-`ANALYSIS_MODEL_REVIEW_{VENDOR,MODEL}` environment variables. See
+`ANALYSIS_MODEL_REVIEW_{VENDOR,MODEL}` environment variables, and a credential
+mode through `ANALYSIS_MODEL_CREDENTIALS_{VENDOR}`. See
 [Configuration](Configuration.md#model-overrides-deploy-time-no-image-rebuild)
 for the exact override rules.
 

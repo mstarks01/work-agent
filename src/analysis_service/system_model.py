@@ -16,7 +16,9 @@ boundary iff its endpoints' zones differ.
 from __future__ import annotations
 
 import re
-from collections.abc import Collection
+from collections.abc import Collection, Mapping
+from dataclasses import dataclass
+from types import MappingProxyType
 from typing import ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -41,6 +43,23 @@ CORE_ASSET_TAGS = frozenset(
 )
 
 _NON_SLUG_CHARS_RE = re.compile(r"[^a-z0-9]+")
+
+
+#: The shape every element ID this service builds already has:
+#: ``<prefix>:<slug>``, or a flow's ``flow:<slug>-to-<slug>:<slug>``, where a
+#: slug is what :func:`normalize_name` produces.
+#:
+#: Stated on the field because :func:`derive_element_id` cannot always be asked.
+#: It raises when an element's *name* slugs to empty -- a name of ``"!!!"`` --
+#: and the ``id-mismatch`` rule that would otherwise pin the ID to the derived
+#: one is skipped exactly then, so the emitted ID survived verbatim with only a
+#: length bound. ``references.py`` records that hole as a reference-resolution
+#: one; it is also a fencing one, because an element ID is rendered into a lane
+#: agent's prompt in a table that carries no fence of its own, and a value with
+#: a newline and a backtick run there opens a block that swallows every fenced
+#: block after it. A self-sized fence is only safe while its neighbours are
+#: fenced too.
+ELEMENT_ID = r"^[a-z_]+:[a-z0-9]+(?:-[a-z0-9]+)*(?::[a-z0-9]+(?:-[a-z0-9]+)*)?$"
 
 
 def normalize_name(name: str) -> str:
@@ -72,7 +91,7 @@ class _Element(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    id: str = Field(max_length=300)
+    id: str = Field(max_length=300, pattern=ELEMENT_ID)
     name: str = Field(min_length=1, max_length=200)
     description: str = Field(default="", max_length=2000)
     assets: list[str] = Field(default_factory=list, max_length=len(CORE_ASSET_TAGS) * 4)
@@ -305,8 +324,21 @@ class SystemModel(BaseModel):
         return [*self.external_entities, *self.processes, *self.data_stores]
 
     def get(self, element_id: str) -> Element | None:
-        """Look up an element by ID, or None if absent."""
-        return {element.id: element for element in self.elements()}.get(element_id)
+        """Look up an element by ID, or None if absent.
+
+        The convenience form, for a caller holding a model and one ID. It
+        builds a whole :class:`ModelIndex` to answer, exactly as
+        :func:`~analysis_service.grounding.verify_quote` folds a whole source
+        to answer one quote, so that how an element is found by ID is written
+        down once. A caller asking more than once — the critic asks per claim,
+        and per grounds entry within a claim — builds the index itself.
+
+        What the convenience costs is the index's fixed part: 2.4 us on a
+        five-element model, against 0.6 us for the element walk alone. The walk
+        is what grows with the model, so the share falls as the model gets
+        bigger, and no production path takes this form.
+        """
+        return ModelIndex.of(self).get(element_id)
 
     def boundary_crossings(self) -> list[BoundaryCrossing]:
         """Derive boundary crossings mechanically. Requires a valid model.
@@ -372,6 +404,81 @@ class SystemModel(BaseModel):
         return {
             slug: sorted(ids) for slug, ids in sorted(by_slug.items()) if len(ids) > 1
         }
+
+
+@dataclass(frozen=True)
+class ModelIndex:
+    """The lookups a validated model answers repeatedly, computed once.
+
+    Three questions the critic asks per claim, and each one walks the whole
+    model to answer: which element carries this ID, which two elements does
+    this flow run between, and which flows touch this element. A model of 200
+    processes and 400 flows answered them 2,000 times in 0.104 s of a node
+    body's own CPU; over this index the same run costs 0.003 s.
+    ``evals/bench/deterministic.py index`` re-derives both.
+
+    **Built by an explicit call rather than cached on the model.**
+    :func:`normalize_element_ids` rewrites element IDs in place, so an index a
+    model kept would answer for the IDs the model held before the rewrite, and
+    no call site would say so. A caller builds one from the model it is about to
+    read many times, which makes it a snapshot of that model by construction:
+    the model it indexes has already been through the validity gate, and no
+    later pass mutates it.
+    """
+
+    #: Every element of the model, by ID.
+    elements: Mapping[str, Element]
+
+    #: Each flow's ID against the two elements it runs between.
+    flow_endpoints: Mapping[str, tuple[str, str]]
+
+    #: Each element's ID against every element and flow one hop from it. A
+    #: flow's own ID is absent here: :attr:`flow_endpoints` answers for a flow,
+    #: and one hop from a flow is exactly its two endpoints.
+    adjacent: Mapping[str, frozenset[str]]
+
+    @classmethod
+    def of(cls, model: SystemModel) -> ModelIndex:
+        """Index one validated model. The model is read, never held."""
+        endpoints = {
+            flow.id: (flow.source, flow.destination) for flow in model.data_flows
+        }
+        adjacent: dict[str, set[str]] = {}
+        for flow_id, (source, destination) in endpoints.items():
+            for endpoint in (source, destination):
+                adjacent.setdefault(endpoint, set()).update(
+                    (flow_id, source, destination)
+                )
+        return cls(
+            elements=MappingProxyType(
+                {element.id: element for element in model.elements()}
+            ),
+            flow_endpoints=MappingProxyType(endpoints),
+            adjacent=MappingProxyType(
+                {place: frozenset(reach) for place, reach in adjacent.items()}
+            ),
+        )
+
+    def get(self, element_id: str) -> Element | None:
+        """Look up an element by ID, or ``None`` if absent."""
+        return self.elements.get(element_id)
+
+    def reach(self, places: Collection[str]) -> frozenset[str]:
+        """``places`` plus every element one hop away in the graph.
+
+        A flow reaches its two endpoints. An element reaches the flows that
+        touch it and the elements at their far ends. Nothing further: the second
+        hop is the reach a description narrates, never the place an action
+        lands. A place the model does not contain reaches only itself.
+        """
+        reach = set(places)
+        for place in places:
+            endpoints = self.flow_endpoints.get(place)
+            if endpoints is None:
+                reach.update(self.adjacent.get(place, ()))
+            else:
+                reach.update(endpoints)
+        return frozenset(reach)
 
 
 def _rewrite_id(element: Element, rewrites: dict[str, str]) -> None:

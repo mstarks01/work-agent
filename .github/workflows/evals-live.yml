@@ -149,8 +149,8 @@ jobs:
     # else (#9): an ambient credential this deployment did not declare must not
     # be able to authenticate a run, which is the ASI03 inherited-credential
     # path. So the project and location have to be handed over explicitly --
-    # ADC alone is not enough, because `vertex_project` and `vertex_location`
-    # are ordinary config that LiteLlm needs alongside the credentials.
+    # a resolved identity alone is not enough, because `vertex_project` and
+    # `vertex_location` address the request and LiteLlm needs both.
     #
     # These replace GOOGLE_CLOUD_PROJECT / GOOGLE_CLOUD_LOCATION /
     # GOOGLE_GENAI_USE_VERTEXAI, which this workflow set from 2026-07-21 until
@@ -160,8 +160,10 @@ jobs:
     # Setting three variables no code reads while omitting the two it requires
     # is why the sweep has never completed a run.
     #
-    # The third required variable, GOOGLE_APPLICATION_CREDENTIALS, is exported
-    # by the auth action below rather than set here.
+    # Those two are the whole required set. Vertex runs under the `iam`
+    # credential mode and passes no credential material: the auth action below
+    # writes a credentials file, and Google's own ADC chain finds it. The
+    # service names no credentials variable and reads none.
     #
     # The ANALYSIS_MODEL_* four are the sweep's vendor choice. Nothing is selected
     # by default, so without them the run stops at config load with the
@@ -279,13 +281,13 @@ jobs:
       # Writes an external-account credentials file and exports
       # GOOGLE_APPLICATION_CREDENTIALS pointing at it.
       #
-      # That variable is read *explicitly* by the vendor registry
-      # (`vendors.ADC_VAR`), not picked up implicitly: the check is for
-      # credential material this deployment declared, and probing gcloud's
-      # well-known path would make the build depend on laptop state (A02). It
-      # is the one GOOGLE_-prefixed variable the service reads, and the auth
-      # action is what sets it -- which is why it is absent from the job `env`
-      # above while its two companions are listed there.
+      # The service never reads that variable. Vertex runs under the `iam`
+      # credential mode, so the deployment declares the mechanism and passes no
+      # material: `google.auth.default()` runs inside LiteLLM and resolves the
+      # identity from its own chain, which is what finds this file. The same
+      # code path serves a GKE Workload Identity binding, where there is no
+      # file at all. That is why the variable is absent from the job `env`
+      # above while the two the registry does read are listed there.
       - name: Authenticate to Google Cloud
         if: steps.preflight.outputs.configured == 'true'
         uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3

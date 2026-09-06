@@ -7,3 +7,15 @@ __pycache__/
 .claude/worktrees/
 .claude/settings.local.json.tmp.*
 evals/runs/
+.coverage
+.coverage.*
+htmlcov/
+
+# Credentials and keys: nothing here is tracked, and this is what keeps it
+# that way. A key written into the tree by mistake is a commit away otherwise.
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.jks

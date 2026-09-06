@@ -109,6 +109,7 @@ critic seams here.
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import json
 import logging
@@ -118,6 +119,7 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Literal
 
+import anyio.to_thread
 from google.adk.agents import LlmAgent
 from google.adk.events.event import Event
 from google.adk.models.base_llm import BaseLlm
@@ -170,7 +172,6 @@ from analysis_service.prompts import (
     compose_repair_prompt,
 )
 from analysis_service.report import (
-    DROPPED_REASON_MAX_CHARS,
     AnalysisContext,
     AnalysisMarks,
     Claim,
@@ -197,7 +198,7 @@ from analysis_service.skills import (
     compose_domain_skills,
     compose_lane_skills,
 )
-from analysis_service.sources import CARRIED_EVIDENCE_KINDS, fence_for
+from analysis_service.sources import CARRIED_EVIDENCE_KINDS, fenced
 from analysis_service.system_model import BoundaryCrossing, SystemModel
 from analysis_service.validation import ValidationIssue, parse_and_validate
 
@@ -953,19 +954,50 @@ def render(value: Any) -> str:
 def render_fenced(value: Any) -> str:
     """A rendered value plus a fence it cannot close.
 
-    ``render`` is ``json.dumps``, which escapes quotes, backslashes and
-    newlines but **not** backticks. A System Model carries caller words by rule
-    — ``source_excerpt`` verbatim, and ``notes`` quoting what a speaker said —
-    so a value holding a fence would close a static one in the prompt and land
-    the bytes after it in instruction position. That is the hole
-    :func:`~analysis_service.sources.render_sources` closes one node upstream,
-    with the same technique and the same sizing rule: sized once over the whole
-    rendered document, because this seam renders one JSON blob rather than N
-    caller-controlled blocks.
+    ``render`` is ``json.dumps`` with ``ensure_ascii=False``. It escapes quotes,
+    backslashes, ``\\n`` and ``\\r`` — and **not** backticks, and **not**
+    U+2028, U+2029 or U+0085, which it passes through as themselves. Those three
+    are line terminators to ``str.splitlines`` and to most renderers, so a value
+    holding one plus a backtick run has both halves of a closing fence.
+
+    A System Model carries caller words by rule — ``source_excerpt`` verbatim,
+    and ``notes`` quoting what a speaker said — and a merged draft carries a
+    lane agent's own prose. Against a fence written into the prompt file, such a
+    value closes the block and lands the bytes after it in instruction position.
+    Against this one it cannot, because the fence is sized over the body: a body
+    holding ``` gets a four-backtick fence.
+
+    That is the hole :func:`~analysis_service.sources.render_sources` closes one
+    node upstream, with the same technique and the same sizing rule — sized once
+    over the whole rendered document, because this seam renders one JSON blob
+    rather than N caller-controlled blocks.
+
+    **Every rendered key a prompt interpolates goes through here**, and no
+    prompt file writes a fence of its own. A static fence is only ever as long
+    as itself, so the two cannot be mixed: one written in the file would be the
+    one a body could close.
     """
-    body = render(value)
-    fence = fence_for(body)
-    return f"{fence}\n{body}\n{fence}"
+    return fenced(render(value))
+
+
+def unfence(rendered: str) -> str:
+    """The body back out of :func:`render_fenced`.
+
+    One rendered key is also read back by Python: the parked rejection, which
+    the driver turns into the issues a caller is shown. It still ships fenced,
+    because the same string is interpolated into ``repair.md`` and a key that
+    shipped bare would be the one a body could close.
+    """
+    # Split on the delimiter `render_fenced` joined with, not on every line
+    # boundary Python knows. `str.splitlines` also breaks on U+2028, U+2029 and
+    # U+0085, which `render` passes through as themselves -- so splitting that
+    # way and re-joining with "\n" rewrites a terminator the value carried into
+    # a raw newline, and a raw newline inside a JSON string is what `json.loads`
+    # refuses. The inverse of a join is a split on the same string.
+    lines = rendered.split("\n")
+    if len(lines) >= 2 and lines[0].startswith("```") and lines[-1] == lines[0]:
+        return "\n".join(lines[1:-1])
+    return rendered
 
 
 # --- Deterministic node functions -------------------------------------------
@@ -973,6 +1005,60 @@ def render_fenced(value: Any) -> str:
 # Plain functions, wrapped in FunctionNodes below. Parameters bind by name
 # from session state; ``ctx`` is ADK's node context, whose ``state`` writes
 # become the session's state delta.
+
+
+#: How many node bodies may hold a worker thread at once, across every job in
+#: the process. Separate from anyio's default limiter on purpose: that one is
+#: also what `require_subject` verifies a bearer token through, and a graph that
+#: could fill it would make every arriving caller wait for a node body.
+#:
+#: Small because a node body is CPU-bound, so more threads than cores buys
+#: queueing rather than throughput, and because the point of the bound is to
+#: leave the default limiter's slots for the request path.
+_NODE_THREADS = anyio.CapacityLimiter(8)
+
+
+def _node(func: Callable[..., Any], name: str) -> FunctionNode:
+    """Wrap a node body in a FunctionNode that runs it off the event loop.
+
+    ADK calls a synchronous node body inline in the coroutine that drives the
+    workflow, so its CPU time is the event loop's: while it runs, the process
+    serves no other job, no health check and no event stream, and the job
+    deadline's timer cannot fire either, because a cooperative timeout cannot
+    interrupt a synchronous call. These bodies are not cheap — one of them
+    fuzzy-matches every quote a model emitted against the whole submitted
+    source — so the loop is the wrong thread for them.
+
+    ADK awaits a body that is a coroutine function, so wrapping it in one moves
+    the work to a worker thread and gives the loop back. It does **not** make
+    the deadline able to stop a running body -- nothing can, short of a process
+    boundary -- so the wrapper holds the task until the body ends and the
+    deadline lands between nodes. The
+    wrapper keeps the wrapped signature, which is what ADK binds parameters
+    from, and touches nothing else: a node reaches the session only through
+    :class:`SessionState`, whose writes are plain dict writes, and only one
+    node of a run is in flight at a time.
+    """
+
+    @functools.wraps(func)
+    async def offloaded(**kwargs: Any) -> Any:
+        # On a limiter of its own, because the default one is shared and
+        # `require_subject` verifies every bearer token through it: node bodies
+        # filling all forty slots put an arriving caller behind a whole body
+        # before their token was even read.
+        #
+        # A cancelled await here does NOT stop the body. `run_sync` takes its
+        # token outside the scope `abandon_on_cancel=False` shields, so the
+        # deadline returns the token, settles the job and frees its subject's
+        # slot while the thread runs on. Nothing in-process can stop a running
+        # Python call, so what keeps that harmless is that a body is short:
+        # `grounding.MAX_REPAIR_SECONDS_PER_BODY` is the bound that makes it
+        # so, and it is the reason this is a wrapper and not a supervisor.
+        return await anyio.to_thread.run_sync(
+            functools.partial(func, **kwargs), limiter=_NODE_THREADS
+        )
+
+    return FunctionNode(func=offloaded, name=name)
 
 
 def validate_extraction(
@@ -1020,7 +1106,7 @@ def validate_extraction(
         state.prompt(STATE_PREVIOUS_MODEL, render_fenced(parked))
         state.prompt(
             STATE_VALIDATION_ISSUES,
-            render([issue.model_dump(mode="json") for issue in issues]),
+            render_fenced([issue.model_dump(mode="json") for issue in issues]),
         )
         return _routed(ROUTE_INVALID, {"issue_count": len(issues)})
 
@@ -1175,7 +1261,7 @@ def prepare_analysis(
     state.prompt(STATE_SYSTEM_MODEL, render_fenced(_without_source_fields(valid_model)))
     state.prompt(
         STATE_BOUNDARY_CROSSINGS,
-        render([crossing.model_dump(mode="json") for crossing in crossings]),
+        render_fenced([crossing.model_dump(mode="json") for crossing in crossings]),
     )
     state.prompt(STATE_EVIDENCE_CATALOG, render_catalog(catalog))
     # Beside the model rather than instead of it: a lane agent reasons over the
@@ -1297,7 +1383,7 @@ def prepare_node(
             valid_model, ctx, keys, frameworks, domain_loader, package_loaders
         )
 
-    return FunctionNode(func=prepare_analysis_node, name=PREPARE_NODE)
+    return _node(prepare_analysis_node, PREPARE_NODE)
 
 
 def _claims_of(payload: object) -> list[Any]:
@@ -1382,6 +1468,14 @@ def merge_drafts(
     derived it from, rather than parked in state and read back — it is a pure
     function of that model, so deriving it twice is what guarantees the set an
     agent chose from and the set its choice is resolved against are the same set.
+
+    **The second derivation stays, and the measurement is why.** Sharing one
+    catalog would have to carry it through the session, where a value a node can
+    reach is a value a node can change, and what it would buy is 0.048 ms on a
+    corpus-sized model and 3.7 ms on one of 600 elements — three derivations in
+    a two-framework job, so 0.14 ms and 11 ms. Deriving it again is cheaper than
+    any structure that would let the two sets differ.
+    ``evals/bench/deterministic.py catalog`` re-derives the two figures.
 
     Then the mechanical half of the fan-in: :func:`join_drafts` fails closed if
     a draft cites an element the model does not contain, if two agents reused a
@@ -1482,10 +1576,10 @@ def merge_drafts(
     # twice, once as a claim and once as not applicable (#443).
     ruled_out = state.get(nodes.key("ruled_out")) or {}
     refused = [
-        DroppedClaim(
+        DroppedClaim.of(
             claim_id=draft.id,
             title=draft.title,
-            reason=ruled_out[unit][:DROPPED_REASON_MAX_CHARS],
+            reason=ruled_out[unit],
         )
         for draft in joined.drafts
         if (unit := package.record.unit_of(draft)) in ruled_out
@@ -1523,7 +1617,7 @@ def merge_drafts(
     # pairs it would otherwise hunt for computed onto them. The re-ask builds
     # its own view through the same function, so the two passes cannot disagree
     # about what a critic reads.
-    state.prompt(nodes.key("draft_view"), render(critic_view(merged, model)))
+    state.prompt(nodes.key("draft_view"), render_fenced(critic_view(merged, model)))
     return {
         "framework": nodes.name,
         "draft_count": len(merged),
@@ -1589,10 +1683,12 @@ def route_review(
         # ``previous_review`` is the parked payload itself rather than anything
         # recomputed, because what the re-ask must reconcile with is the bytes
         # the critic actually returned.
-        state.prompt(nodes.key("previous_review"), render(ruled))
-        state.prompt(nodes.key("critic_issues"), render(outcome.messages))
-        state.prompt(nodes.key("draft_roster"), render(outcome.roster))
-        state.prompt(nodes.key("unreconciled_drafts"), render(outcome.unreconciled))
+        state.prompt(nodes.key("previous_review"), render_fenced(ruled))
+        state.prompt(nodes.key("critic_issues"), render_fenced(outcome.messages))
+        state.prompt(nodes.key("draft_roster"), render_fenced(outcome.roster))
+        state.prompt(
+            nodes.key("unreconciled_drafts"), render_fenced(outcome.unreconciled)
+        )
         # Recorded onto this framework's marks before the re-ask runs, so the
         # report says how the first pass failed even when the re-ask repairs it
         # completely. Merged rather than assigned: ``marks`` already holds what
@@ -1686,25 +1782,50 @@ def assemble_report(
     here because one model serves N blocks: deriving it per framework would put
     the same finding in the report N times.
 
-    **This node runs once per incoming trigger, so a two-framework job runs it
-    twice.** ADK schedules a ``FunctionNode`` on each trigger rather than on all
-    of its predecessors, and the earlier run builds the block of whichever
-    framework has not finished as empty: a framework reads as finished only once
-    its own router wrote its ``accepted`` marker. The final state is right
-    by construction — the last run is the one that follows the last subgraph, so
-    it sees every framework's artifacts — and it overwrites what the earlier run
-    left.
+    **This node is triggered once per framework, and it assembles on the last
+    of those triggers only.** ADK schedules a ``FunctionNode`` on each incoming
+    trigger rather than on all of its predecessors, so a two-framework job
+    reaches here twice. :func:`_framework_finished` is the gate: a trigger that
+    finds any selected framework still running returns without building
+    anything, and the trigger that finds them all finished builds the one
+    report. A two-framework job therefore builds one report rather than an
+    incomplete one it then overwrites.
+
+    Refusing the later triggers as well as the earlier ones is what makes it
+    exactly one. Once every framework is finished, every remaining trigger would
+    compose the same blocks from the same parked artifacts, so a second pass
+    can only spend the time again — and :data:`STATE_ANALYSIS`, already written,
+    is what says the pass happened.
+
+    **Two triggers that run at once are not serialized, and need not be.**
+    Node bodies run on the worker pool, and the gate is a read of the session
+    state followed by a write, so two triggers that both find every framework
+    finished before either writes both assemble. What keeps that safe is the
+    assembly, not the gate: it is a pure function of the parked artifacts, so
+    both passes write the same value and the second costs time and nothing
+    else. A lock here would buy one assembly instead of two identical ones,
+    at the price of a lock on the one node every framework's route ends at.
 
     **A join node is the wrong fix here**, and the run-time gate is why. ADK's
     ``JoinNode`` waits for *all* predecessors to complete, and a refused
     framework's subgraph never runs, so its terminal node never completes and the
-    join would never fire. The wasted run is the price of a topology where a
-    framework may legitimately not run at all.
+    join would never fire. This gate reads each framework's own finished state
+    instead, where a refusal is one of the two ways to be finished.
     """
     model = SystemModel.model_validate(valid_model)
     state = keys.state(ctx)
     options = state.get(STATE_FRAMEWORK_OPTIONS) or {}
+    # Checked on every trigger, before the gate, because it is a driver contract
+    # rather than assembly work: a job whose options are missing says so on the
+    # first framework to finish rather than on the last.
     _check_options(frameworks, options)
+    pending = [
+        name
+        for name in frameworks
+        if not _framework_finished(state, FrameworkNodes(name))
+    ]
+    if pending or state.get(STATE_ANALYSIS) is not None:
+        return {"assembled": False, "pending_frameworks": pending}
     blocks = [
         _framework_block(
             FrameworkNodes(name),
@@ -1728,6 +1849,29 @@ def assemble_report(
         "rejected_count": sum(len(block.rejected_claims) for block in blocks),
         "framework_count": len(blocks),
     }
+
+
+def _framework_finished(state: SessionState, nodes: FrameworkNodes) -> bool:
+    """Has this framework reached a state its block can be built from?
+
+    Two ways, and a framework takes exactly one of them. Its own router wrote
+    the ``accepted`` marker, which is what says its critic reconciled; or its
+    precondition refused it at ``prepare``, which is what sent it down the
+    ``skip`` route with no subgraph to run at all. A framework part-way through
+    its lanes, or one whose critic is in the bounded re-ask, has taken neither.
+
+    The refusal half reads :data:`_REFUSAL_REASONS`, the same table that says
+    *why* a refused framework did not run, so what counts as a refusal is
+    written down once.
+
+    A graph entered past ``prepare`` wrote no precondition key, and
+    :func:`_refusal_reason` reads that absence as ``satisfied``. This reads it
+    the same way: such a framework is finished once it is accepted, and never
+    by refusal.
+    """
+    if state.get(nodes.key("accepted")):
+        return True
+    return str(state.get(nodes.key("precondition"))) in _REFUSAL_REASONS
 
 
 class MissingFrameworkOptions(ValueError):
@@ -2191,10 +2335,10 @@ def _framework_subgraph(
             resilience=resilience,
         ),
         join=JoinNode(name=nodes.node(JOIN_ROLE)),
-        merge=FunctionNode(func=merge, name=nodes.node(MERGE_ROLE)),
-        router=FunctionNode(func=route, name=nodes.node(ROUTER_ROLE)),
-        rereview=FunctionNode(func=route, name=nodes.node(REREVIEW_ROLE)),
-        critic_failed=FunctionNode(func=failed, name=nodes.node(CRITIC_FAILED_ROLE)),
+        merge=_node(merge, nodes.node(MERGE_ROLE)),
+        router=_node(route, nodes.node(ROUTER_ROLE)),
+        rereview=_node(route, nodes.node(REREVIEW_ROLE)),
+        critic_failed=_node(failed, nodes.node(CRITIC_FAILED_ROLE)),
     )
 
 
@@ -2270,9 +2414,7 @@ def build_pipeline(
         for framework in frameworks
     }
     prepare = prepare_node(keys, frameworks, domain_loader, package_loaders)
-    assemble = FunctionNode(
-        func=_assemble_node_func(keys, frameworks, disclaimers), name=ASSEMBLE_NODE
-    )
+    assemble = _node(_assemble_node_func(keys, frameworks, disclaimers), ASSEMBLE_NODE)
 
     subgraphs = [
         _framework_subgraph(
@@ -2303,9 +2445,9 @@ def build_pipeline(
             resolve_sampling=resolve_sampling,
             resilience=resilience,
         )
-        validate = FunctionNode(func=_validate_node_func(keys), name=VALIDATE_NODE)
-        revalidate = FunctionNode(func=_validate_node_func(keys), name=REVALIDATE_NODE)
-        reject = FunctionNode(func=_reject_node_func(keys), name=REJECT_NODE)
+        validate = _node(_validate_node_func(keys), VALIDATE_NODE)
+        revalidate = _node(_validate_node_func(keys), REVALIDATE_NODE)
+        reject = _node(_reject_node_func(keys), REJECT_NODE)
         extraction_nodes = [extract, repair]
         # ``list[tuple[Any, ...]]`` because ADK does not export the alias for
         # a chain element, and a routing-map literal only infers its declared
@@ -2419,9 +2561,6 @@ class InstructionSize:
     tokens: int
     sha256: str
 
-    def to_json(self) -> dict[str, Any]:
-        return {"tokens": self.tokens, "sha256": self.sha256}
-
 
 def instruction_sizes(llm_nodes: Sequence[LlmAgent]) -> dict[str, InstructionSize]:
     """Every LLM node's instruction, measured and digested, keyed by node name.
@@ -2494,9 +2633,33 @@ def _node_sampling(
     return {node.name: resolve_sampling(tier_nodes[node.name]) for node in llm_nodes}
 
 
+def revise_rounds(
+    node_runs: Sequence[NodeRun], frameworks: Sequence[FrameworkName]
+) -> int:
+    """How many times a critic was asked a second time, across the whole job.
+
+    The graph's ``revise`` edge: a critic whose rulings do not reconcile with
+    the drafts is re-asked once, bounded, and the re-ask is its own node. So the
+    count is how many of those nodes ran, and a job that reconciled first time
+    reports zero.
+
+    Worth recording because it is the cheapest signal that a critic is
+    struggling with a package's question -- a rate that climbs after a prompt
+    edit says the edit made the ruling harder to give, which no other number in
+    the report says.
+
+    Node names are derived per framework rather than matched by prefix, so a
+    package registered tomorrow is counted by the same line.
+    """
+    re_asks = {FrameworkNodes(name).node(RECRITIC_ROLE) for name in frameworks}
+    return sum(1 for run in node_runs if run.node in re_asks)
+
+
 def rejection_issues(rendered: str) -> list[ValidationIssue]:
     """Parse the rejection the graph parked in state back into issues."""
-    return [ValidationIssue.model_validate(issue) for issue in json.loads(rendered)]
+    return [
+        ValidationIssue.model_validate(issue) for issue in json.loads(unfence(rendered))
+    ]
 
 
 @dataclass(frozen=True)

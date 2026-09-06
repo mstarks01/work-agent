@@ -1,8 +1,8 @@
 # The live provider smoke: one small job per vendor, on every merge to main.
 #
 # WHAT THIS IS FOR, and it is the half of #116 the offline suite cannot reach.
-# `ci.yml` runs the credential-free conformance suite for Vertex, Anthropic and
-# OpenAI equally, and that suite is explicit about its own limit: it establishes
+# `ci.yml` runs the credential-free conformance suite for every vendor equally,
+# and that suite is explicit about its own limit: it establishes
 # what each provider *would be asked for*, never that a provider has served a
 # request. This workflow asks the second question, for every vendor, on the same
 # trigger -- which is what "comparable smoke coverage for supported providers"
@@ -191,8 +191,9 @@ jobs:
                "configured. Unset: ${missing[*]}."
 
       # Writes an external-account credentials file and exports
-      # GOOGLE_APPLICATION_CREDENTIALS, which the vendor registry reads
-      # explicitly (`vendors.ADC_VAR`) rather than discovering.
+      # GOOGLE_APPLICATION_CREDENTIALS. The service never reads it: Vertex runs
+      # under the `iam` credential mode and passes no credential material, so
+      # `google.auth.default()` inside LiteLLM is what finds this file.
       - name: Authenticate to Google Cloud
         if: steps.preflight.outputs.configured == 'true'
         uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
@@ -253,14 +254,40 @@ jobs:
           # `temperature`: OpenAI's reasoning families serve that parameter
           # only at their own default, so the OpenAI leg had to strip the line
           # before it could bind, and the smoke measured a file nobody ships.
+          #
+          # `addressing` names the non-secret variables a leg's vendor also
+          # needs, space separated. Anthropic, OpenAI and Gemini address
+          # nothing beyond their key, so theirs is empty.
           - vendor: anthropic
             secret_name: ANALYSIS_ANTHROPIC_API_KEY
             base_model: claude-sonnet-4-6
             strong_model: claude-opus-5
+            addressing: ""
           - vendor: openai
             secret_name: ANALYSIS_OPENAI_API_KEY
-            base_model: gpt-4o
+            base_model: gpt-4o-2024-08-06
             strong_model: gpt-5.6
+            addressing: ""
+          # Bedrock declares `api_key` because an `iam` leg needs
+          # `id-token: write`, and this job must hold no identity beside the
+          # bearer keys -- see the header. So BEDROCK'S `iam` MODE IS
+          # UNEXERCISED by any live lane. That is a state to record here rather
+          # than a gap to hide: the offline suite proves the mode fails closed
+          # naming its own variable, and nothing proves AWS serves it.
+          - vendor: bedrock
+            secret_name: ANALYSIS_BEDROCK_API_KEY
+            base_model: anthropic.claude-sonnet-4-6
+            strong_model: anthropic.claude-opus-5
+            addressing: ANALYSIS_BEDROCK_REGION
+          # The same models the vertex job above pins, behind an API key. Two
+          # legs for one set of weights is the point: the vertex job holds an
+          # identity and this leg holds a key, and the smoke asks whether
+          # each route serves the graph, not whether the weights do.
+          - vendor: gemini
+            secret_name: ANALYSIS_GEMINI_API_KEY
+            base_model: gemini-2.5-flash
+            strong_model: gemini-2.5-pro
+            addressing: ""
 
     env:
       ANALYSIS_MODEL_BASE_VENDOR: ${{ matrix.vendor }}
@@ -274,6 +301,15 @@ jobs:
       # pair legal here.
       ANALYSIS_MODEL_REVIEW_VENDOR: ${{ matrix.vendor }}
       ANALYSIS_MODEL_REVIEW_MODEL: ${{ matrix.strong_model }}
+      # Bedrock allows two credential modes, so a deployment that selects it
+      # declares one. Set for every leg because a declaration for a vendor no
+      # tier selects is legal and reads as nothing; a per-leg value would be a
+      # second place for this to drift from the matrix above.
+      ANALYSIS_MODEL_CREDENTIALS_BEDROCK: api_key
+      # The region Bedrock addresses. Required under both of its modes and a
+      # credential under neither, so it is a repository variable rather than a
+      # secret. The other legs never read it.
+      ANALYSIS_BEDROCK_REGION: ${{ vars.AWS_REGION }}
 
     steps:
       - name: Check out
@@ -287,8 +323,13 @@ jobs:
           python-version: "3.12"
           enable-cache: true
 
+      # `--extra bedrock` for every leg, from one step. Naming the extra rather
+      # than `--all-extras` keeps a later extra out of this lane unless somebody
+      # writes it here; installing it on a leg that never selects Bedrock costs
+      # a download and changes nothing, because the build-time gate reads the
+      # vendor table rather than the environment.
       - name: Install dependencies
-        run: uv sync --locked
+        run: uv sync --locked --extra bedrock
 
       # States that the lane is unexercised and stops, rather than failing --
       # the same call the Vertex preflight above makes, for the same reason.
@@ -297,7 +338,13 @@ jobs:
       # ask for a live run. This one fires on every qualifying merge, which
       # did not.
       #
-      # Only the secret's NAME is ever printed.
+      # Only NAMES are ever printed -- the secret's, and each variable's.
+      #
+      # A leg needs its key AND every addressing variable its vendor reads, so
+      # `addressing` is checked here too. Without that the Bedrock leg would go
+      # red on an unset region while the other two reported themselves
+      # unexercised, and a red check for absent configuration on every merge is
+      # what this preflight exists to avoid.
       - name: Check the vendor key is configured
         id: preflight
         shell: bash
@@ -305,10 +352,26 @@ jobs:
           VENDOR_API_KEY: ${{ secrets[matrix.secret_name] }}
           SECRET_NAME: ${{ matrix.secret_name }}
           VENDOR: ${{ matrix.vendor }}
+          ADDRESSING: ${{ matrix.addressing }}
         run: |
           set -euo pipefail
 
-          if [[ -n "${VENDOR_API_KEY:-}" ]]; then
+          missing=()
+          secret_unset=false
+          if [[ -z "${VENDOR_API_KEY:-}" ]]; then
+            missing+=("${SECRET_NAME}")
+            secret_unset=true
+          fi
+          # Unquoted on purpose: this is a space-separated list of names, and
+          # an empty value contributes none.
+          # shellcheck disable=SC2086
+          for name in ${ADDRESSING}; do
+            # :- because set -u treats indirect expansion of an unset name as
+            # fatal, and a guard that depends on a name being set is not a guard.
+            [[ -n "${!name:-}" ]] || missing+=("$name")
+          done
+
+          if [[ ${#missing[@]} -eq 0 ]]; then
             echo "configured=true" >>"$GITHUB_OUTPUT"
             exit 0
           fi
@@ -320,18 +383,29 @@ jobs:
             echo "No ${VENDOR} request was made. Nothing in this run is evidence"
             echo "that ${VENDOR} serves this graph."
             echo
-            echo "Unset repository secret: \`${SECRET_NAME}\`"
+            echo "Unset:"
+            # The backticks are markdown, not command substitution.
+            # shellcheck disable=SC2016
+            printf -- '- `%s`\n' "${missing[@]}"
             echo
-            echo '```sh'
-            echo "gh secret set ${SECRET_NAME}"
-            echo '```'
-            echo
-            echo "The name is vendor-scoped on purpose: the registry reads only"
-            echo "its own ANALYSIS_-prefixed variables, so a plain"
-            echo "\`${VENDOR^^}_API_KEY\` will not authenticate a run."
+            # Only where the secret itself is what is missing. An addressing
+            # variable is a repository variable, so telling an operator to set
+            # a secret they have already set is advice that does not apply.
+            if [[ "${secret_unset}" == true ]]; then
+              echo '```sh'
+              echo "gh secret set ${SECRET_NAME}"
+              echo '```'
+              echo
+              echo "The name is vendor-scoped on purpose: the registry reads only"
+              echo "its own ANALYSIS_-prefixed variables, so a plain"
+              echo "\`${VENDOR^^}_API_KEY\` will not authenticate a run."
+            else
+              echo "Set the missing repository variable(s) in this repository's"
+              echo "settings; they address the deployment and are not secrets."
+            fi
           } >>"$GITHUB_STEP_SUMMARY"
 
-          echo "::warning::${VENDOR} smoke unexercised -- ${SECRET_NAME} is not set."
+          echo "::warning::${VENDOR} smoke unexercised -- unset: ${missing[*]}."
 
       # The key is exported under the vendor-scoped name the registry reads,
       # inside this step, from this leg's own secret. `secrets[matrix.secret_name]`

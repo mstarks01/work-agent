@@ -27,8 +27,8 @@ Both [`Engine.from_config(frameworks, env=...)`](Integration-Guide.md) and the
 
 ### Models and vendors
 
-The code has registry entries for Vertex AI, Anthropic, and OpenAI. It reaches
-all three through ADK's LiteLLM adapter. `model_tiers.toml` selects **nothing**:
+The code has registry entries for Vertex AI, Anthropic, OpenAI, Bedrock and the
+Gemini Developer API. It reaches all of them through ADK's LiteLLM adapter. `model_tiers.toml` selects **nothing**:
 all three tier tables are absent, so startup fails until `base`, `strong` and
 `review` each name a vendor and a model. `review` is required even though the
 shipped node map points criticism at `strong`, because a tier a file may omit is
@@ -59,7 +59,7 @@ until something runs on it. See
 [Review independence](#review-independence).
 
 ```toml
-version = 6
+version = 7
 review_independence = "shared"
 
 [tiers.base]
@@ -71,40 +71,135 @@ vendor = "anthropic"
 model = "claude-opus-5"
 ```
 
-Supported vendors are `vertex`, `anthropic` and `openai`. Every one is reached
-through a single adapter (LiteLLM); there is no per-vendor code path, and Gemini
-reaches Vertex the same way everything else does. The pair above is deliberately
+Supported vendors are `vertex`, `anthropic`, `openai`, `bedrock` and `gemini`.
+Every one is reached through a single adapter (LiteLLM); there is no per-vendor
+code path, and Gemini reaches Vertex the same way everything else does. The pair above is deliberately
 mixed, because that is an ordinary configuration rather than an advanced one.
 
-**"Gemini support" means Vertex-hosted Gemini.** `vendor = "vertex"` is the only
-route to a Gemini model here, and it carries Vertex's ADC credential mode; the
-Gemini Developer API is not a binding this service offers. If it is added later
-it arrives as its own vendor rather than as a second credential mode on
-`vertex` — a vendor owns exactly one credential mode, and `vertex_ai/` already
-means "through Vertex" to the router prefix LiteLLM dispatches on.
+**A Bedrock model identifier carries the family segment.** Claude on Bedrock is
+`[<scope>.]anthropic.claude-<name>-<major>[-<minor>]`, with an optional date and
+an optional `-v<n>[:<m>]` build tail — `anthropic.claude-opus-5`, or
+`us.anthropic.claude-sonnet-4-5-20250929-v1:0`. The bare `claude-opus-5` is
+refused there, because it is not an identifier AWS serves; the error names the
+right spelling. Dated forms pass on Bedrock and are refused on `vertex` and
+`anthropic`, and that difference is a property of the catalogues rather than a
+special case: a date is refused where the vendor also serves the bare name as a
+floating alias, and Bedrock serves none.
 
-**Auth is derived from the vendor, never configured alongside it.** Each vendor
-owns its credential mode, so an unrepresentable pairing like `vertex` + an API
-key cannot be written down at all:
+An ARN is refused for every vendor. It hides which model answers, so a blessed
+fingerprint would go on certifying a target somebody can repoint, and it carries
+the account that owns the resource into a fingerprint and a report.
+
+**A Gemini model has two vendors.** `vertex` reaches it through Vertex AI under
+a platform identity. `gemini` reaches it through the Gemini Developer API under
+an API key. They are two vendors and not two credential modes on one, because
+LiteLLM dispatches `vertex_ai/` and `gemini/` to two providers, and the router
+prefix is the vendor half of an Execution Identity. So the same model on the two
+routes yields two fingerprints, and a fingerprint blessed on one never certifies
+the other. A deployment may select both. The two routes differ in one
+capability: LiteLLM passes `seed` to Vertex and refuses it for the Developer
+API. Run the conformance command to see both rows.
+
+**The mechanism is declared, and the material may be discovered.** A deployment
+states which credential mode it uses for a vendor. Only then may that vendor's
+SDK resolve an identity from its own chain. A stray `ANTHROPIC_API_KEY` in the
+process environment still authenticates nothing.
+
+The rule holds because `Vendor._require` raises before the adapter is built.
+LiteLLM cannot be told to refuse its own credential chain, and no parameter
+turns it off, so the refusal has to happen in the registry or not at all.
+
+The registry holds which modes each vendor allows, so an unrepresentable pairing
+like `vertex` + an API key cannot be written down:
 
 | Vendor | Credential mode | Required environment |
 | --- | --- | --- |
-| `vertex` | ADC | `ANALYSIS_VERTEX_PROJECT`, `ANALYSIS_VERTEX_LOCATION`, `GOOGLE_APPLICATION_CREDENTIALS` |
-| `anthropic` | API key | `ANALYSIS_ANTHROPIC_API_KEY` |
-| `openai` | API key | `ANALYSIS_OPENAI_API_KEY` |
+| `vertex` | `iam` | `ANALYSIS_VERTEX_PROJECT`, `ANALYSIS_VERTEX_LOCATION` |
+| `anthropic` | `api_key` | `ANALYSIS_ANTHROPIC_API_KEY` |
+| `openai` | `api_key` | `ANALYSIS_OPENAI_API_KEY` |
+| `bedrock` | `api_key` | `ANALYSIS_BEDROCK_API_KEY`, `ANALYSIS_BEDROCK_REGION` |
+| `bedrock` | `iam` | `ANALYSIS_BEDROCK_REGION` |
+| `gemini` | `api_key` | `ANALYSIS_GEMINI_API_KEY` |
+
+`api_key` means the deployment passes the key, read only from the variable
+above. `iam` means **the platform supplies the identity**: the deployment passes
+no credential material, and the vendor's SDK resolves one from the environment
+this process runs in — a GKE Workload Identity binding, an attached service
+account, or a credentials file that ADC's own chain finds. Neither variable in
+the `vertex` row is a credential; both address the deployment.
+
+You may still set `GOOGLE_APPLICATION_CREDENTIALS`, and ADC will use it. It is
+not required, it is not named anywhere in the service, and the service never
+reads it.
+
+`bedrock` is the vendor that allows more than one mode, so a deployment that
+selects it says which one. `model_tiers.toml` carries a `[credentials]` table
+keyed by vendor, and the loader requires an entry:
+
+```toml
+[credentials]
+bedrock = "api_key"    # or "iam"
+```
+
+`ANALYSIS_MODEL_CREDENTIALS_BEDROCK` sets the same value from the environment,
+and wins over the file — the same precedence a tier's own vendor and model
+override carries.
+
+A key for a single-mode vendor is an error, because it is not a choice. A
+missing key for a multi-mode vendor is an error too, but only where a tier
+selects that vendor: a vendor nobody calls needs no identity. Both rules read
+the same registry table the check reads, so neither can drift from it.
+
+Under `iam`, Work Agent passes an **empty** `api_key` rather than none at all.
+That is not a detail: LiteLLM reads `AWS_BEARER_TOKEN_BEDROCK` out of the
+process environment whenever no key is passed, authenticates with it and skips
+request signing. AWS tooling sets that variable for its own reasons, so an
+absent kwarg would let a credential this deployment never declared authenticate
+a run. Stating the choice is what closes it.
+
+**A Bedrock API key expires, and nothing here refreshes it.** AWS's short-term
+Bedrock key lasts twelve hours, and LiteLLM never refreshes a bearer token, so
+under `api_key` the operator rotates `ANALYSIS_BEDROCK_API_KEY` before it
+expires. Under `iam` the problem does not arise, because boto3 refreshes the
+identity it resolved. The service detects neither state, by decision: it holds
+no schedule and a key that still works is indistinguishable here from one that
+was renewed a minute ago.
+
+**Bedrock needs its client library in the image.** Install it with
+`pip install analysis-service[bedrock]`, which adds `boto3`. Both credential
+modes need it: LiteLLM's Converse handler resolves credentials through a bare
+`import boto3` before anything reads a bearer token. A tier that selects
+`bedrock` refuses to bind without it and names the extra; a deployment that
+never selects `bedrock` never carries it.
 
 Keys are read **only** from these vendor-scoped variables. LiteLLM's ambient
-`ANTHROPIC_API_KEY` / `OPENAI_API_KEY` pickup is deliberately unused, so a
-credential this deployment did not declare cannot authenticate a run. Keys are
+`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY` and `GEMINI_API_KEY`
+pickup is deliberately unused, so a credential this deployment did not declare
+cannot authenticate a run. Keys are
 never logged, never in the report, and never in a fingerprint; errors name the
 variable, never its value.
 
 **Pinning** means naming a model specifically enough that it won't quietly
 change under you. The check is per model *family* and deliberately loose: it
-rejects names that openly float (`-latest`, `-preview`, `-exp`) and, where the
-vendor publishes a canonical form, requires that shape. Gemini 2.5 and later
-ship no numbered builds, so there the bare name is the most specific identifier
-available; the same is true of OpenAI's o-series.
+rejects names that openly float and, where the vendor publishes a canonical
+form, requires that shape. A name floats when it carries `latest`, `preview`,
+`exp` or `experimental` as a **whole word** — a run of letters and digits, with
+every other character a delimiter. So `codestral@latest` is refused, and
+`amazon.titan-text-express-v1` is not: `express` merely begins with `exp`.
+
+Gemini 2.5 and later ship no numbered builds, so there the bare name is the most
+specific identifier available; the same is true of OpenAI's o-series.
+
+OpenAI's `gpt-*` family is the one exception, and it is deliberate. That family
+does publish dated snapshots, and a bare name such as `gpt-4o` is an alias to
+one of them — today, `gpt-4o-2024-08-06`. The service still accepts the alias,
+because OpenAI's response names the build that actually served rather than
+echoing what you asked for. Your fingerprint therefore records the snapshot, and
+if OpenAI ever points the alias at a different one, every fingerprint moves and
+certification fails closed rather than passing quietly. Naming the snapshot
+yourself is still the clearer choice, because then your config says which build
+you meant. The reference pairs in [First-Run](First-Run.md) name the build for
+that reason, and a check refuses any reference pair that names an alias.
 
 Claude is the family with a published form:
 
@@ -112,7 +207,10 @@ Claude is the family with a published form:
 claude-<name>-<major>[-<minor>]     e.g. claude-opus-5, claude-sonnet-4-6
 ```
 
-The code applies that shape to every Claude model name. It does **not** enforce a
+The code applies that shape to every Claude model name, **whichever vendor you
+name it under**. An OpenAI-compatible gateway can serve Claude, so the family
+rule follows the family rather than the vendor: moving a tier between vendors
+never changes which identifiers are legal. It does **not** enforce a
 minimum Claude generation. Dated identifiers such as
 `claude-sonnet-4-5-20250929` do not match the accepted shape, while a dateless
 name that matches it is allowed to proceed to the capability checks. Passing

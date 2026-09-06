@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import pytest
 
-from evals.harness.fingerprint import components_for, fingerprint
+from evals.harness.fingerprint import components_for
 from evals.harness.ledger import Ledger, cast
 from evals.harness.queue import (
     PRIORITIES,
@@ -117,19 +117,34 @@ def test_a_volatile_finding_outranks_an_unmatched_one():
     assert not items[1].volatile
 
 
-def test_a_finding_already_in_the_pool_ranks_below_an_unmatched_one():
-    pooled = finding(title="Known good", target="process:p")
-    unmatched = finding(title="Never seen", target="process:n")
-    pool = frozenset({fingerprint(value_of(pooled))})
+def test_a_second_voter_is_not_told_how_the_first_one_voted():
+    """The queue used to rank by the reference pool, which is built from votes.
 
-    items = build([pooled, unmatched], FLOWS, Ledger(), reference_pool=pool)
-    assert [item.finding.title for item in items] == ["Never seen", "Known good"]
+    A finding this voter has not answered can only be in that pool because
+    somebody else put it there, so the weight, the position and the printed
+    reason all carried the earlier voter's verdict into the second opinion --
+    the one pass that has to be independent.
+    """
+    pooled = finding(title="Ada said yes", target="process:p")
+    untouched = finding(title="Nobody voted", target="process:n")
+    ledger = Ledger()
+    ledger.votes.append(cast(value_of(pooled), "01-payments-checkout", "up", "ada"))
+
+    items = build([pooled, untouched], FLOWS, ledger, voter="bob")
+
+    assert {item.finding.title for item in items} == {"Ada said yes", "Nobody voted"}
+    assert len({item.priority for item in items}) == 1, (
+        "one of them was ranked by how ada voted"
+    )
+    assert len({item.why for item in items}) == 1, (
+        "and the reason printed beside it said so"
+    )
 
 
 def test_the_first_reason_wins_rather_than_the_sum():
     """Summing would rank new-and-unmatched above volatile, which is wrong."""
     volatile = finding(seen_in=1, runs=3)
-    weight, why = priority_of(volatile, in_reference_set=True)
+    weight, why = priority_of(volatile)
     assert weight == 30
     assert "some runs and not others" in why
 
@@ -274,3 +289,63 @@ class TestTheRunCountsComeFromTheRuns:
 
         assert items["Sometimes"].volatile is True
         assert "some runs and not others" in items["Sometimes"].why
+
+
+class TestNeedsEvidenceIsNotAnAnswer:
+    """The button says "Needs more evidence". It has to mean that.
+
+    Every other verdict answers the question. This one says the reviewer could
+    not answer it from what they were shown -- so counting it as answered took
+    the finding out of their queue for good, and the one input asking to see
+    more was the one that guaranteed they never would.
+    """
+
+    def _ledger(self, item, *, sitting):
+        led = Ledger()
+        led.votes.append(
+            cast(
+                value_of(item),
+                "01-payments-checkout",
+                "needs-evidence",
+                "ada",
+                sitting=sitting,
+            )
+        )
+        return led
+
+    def test_it_does_not_come_back_in_the_sitting_it_was_cast_in(self):
+        """Otherwise the reviewer is handed it again on the next click."""
+        unanswerable = finding(title="Cannot judge this", target="process:a")
+        led = self._ledger(unanswerable, sitting="web-1")
+
+        queue = build([unanswerable], FLOWS, led, voter="ada", sitting="web-1")
+
+        assert queue == []
+
+    def test_it_comes_back_in_a_later_sitting(self):
+        """Which is what the reviewer asked for: ask again, over whatever
+        evidence exists by then."""
+        unanswerable = finding(title="Cannot judge this", target="process:a")
+        led = self._ledger(unanswerable, sitting="web-1")
+
+        queue = build([unanswerable], FLOWS, led, voter="ada", sitting="web-2")
+
+        assert [item.finding.title for item in queue] == ["Cannot judge this"]
+
+    def test_a_real_answer_still_never_comes_back(self):
+        """The economics the fingerprint buys: a vote is spent once and kept."""
+        answered = finding(title="Judged", target="process:b")
+        led = Ledger()
+        led.votes.append(cast(value_of(answered), "01", "up", "ada", sitting="web-1"))
+
+        assert build([answered], FLOWS, led, voter="ada", sitting="web-2") == []
+
+    def test_another_voter_is_unaffected_by_it(self):
+        """It records what one reviewer could not judge, not a fact about the
+        finding."""
+        unanswerable = finding(title="Cannot judge this", target="process:a")
+        led = self._ledger(unanswerable, sitting="web-1")
+
+        queue = build([unanswerable], FLOWS, led, voter="bob", sitting="web-1")
+
+        assert [item.finding.title for item in queue] == ["Cannot judge this"]

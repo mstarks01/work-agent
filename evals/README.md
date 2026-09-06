@@ -27,18 +27,20 @@ of 60; the exact finite-population 95% interval for that non-boundary
 population's discrepancy rate is 0.7%–10.5%. It was a joint review, not two
 independent ratings, and it says nothing about corpus correctness.
 
-**One case has been through `BLESSING.md` step 6, and twelve have not.** That is
-the reading session over a case's source, model and reference sets together, and
-it is what would catch the case-04 defect anywhere else. That act is a **Case
-Sitting**, recorded as an entry in the `reviews` list in the case's
-`case.json` — who read it, the digest of each file they read, and the filled
-document as evidence. Case `01-payments-checkout`, the control, carries one
-dated 2026-08-23: the reader agreed with all 21 STRIDE claims and all 17 ASVS
-records, and changed none of them
-([`REVIEW-02.md`](corpus/01-payments-checkout/REVIEW-02.md)).
-`tests/test_case_review.py` names the other twelve as unread, fails a new case
-that arrives without a sitting, and fails a read file that changes under its
-recorded digest.
+**No case has a merged Case Sitting, and thirteen wait for one.** That is the
+reading session over a case's source, model and reference sets together
+(`BLESSING.md` step 6), and it is what would catch the case-04 defect anywhere
+else. The act is a **Case Sitting**, recorded as one JSON file under
+`evals/review/submissions/` — who read it, what they wrote before the sets
+opened, and the digest of each file they read. `tests/test_case_review.py`
+derives the count from that directory, so this sentence and the gate cannot
+disagree. Case `01-payments-checkout` carries a filled reading document dated
+2026-08-23 ([`REVIEW-02.md`](corpus/01-payments-checkout/REVIEW-02.md)): the
+reader agreed with all 21 STRIDE claims and all 17 ASVS records. It is a
+reader's own words and the template for the method, and no submission clears
+the case (ADR 24).
+`tests/test_case_review.py` fails a new case that arrives without a sitting, and
+fails a read file that changes under its recorded digest.
 
 So every agreement figure the suite produces is **self-consistency, not
 accuracy**: it measures how closely a rule reproduces the recorded
@@ -131,12 +133,50 @@ evals/
     build_pairs.py              the match fixtures and their labels (edit this)
     pairs.json                  generated from build_pairs.py (never hand-edit)
   harness/                      the scorer and the eval runner
+  bench/deterministic.py        offline timings for the deterministic layer (no model call)
   review/voters.toml            the roster: voter → standing, the only place standing lives
   review/votes/                 the vote ledger, one file per voter — the only human record here
   baselines/README.md           the published comparison over every merged Baseline (generated)
   baselines/<derived-name>/     merged Baselines: up to ten sweeps with their reports, per configuration
   runs/                         local sweeps (gitignored) — the private scratch area
 ```
+
+## The benchmarks
+
+`bench/deterministic.py` measures the deterministic layer — quote repair, the
+model index, report assembly, the evidence catalog, and a whole scripted job —
+with no model call and no credential. It exists because three merged changes
+carry timings in their commit messages, and a number nobody can re-derive is a
+number nobody can check.
+
+**What it found, which is worth reading before optimising this layer again.**
+The deterministic bodies of a whole scripted job cost about 3 ms of CPU on a
+STRIDE-only selection and about 48 ms on one carrying ASVS. Serializing the
+analysis costs 0.2 ms. A real job waits seconds per node on a provider, so this
+layer is a rounding error on job latency — with one exception. Fuzzy quote
+repair is the only part whose cost is set by *submitted text* rather than by the
+model, which is why it carries three separate bounds and why it is the part
+worth tuning.
+
+A node's recorded `duration_ms` runs about 1.3x to 2.5x its own body's wall
+time, because it starts when that node's last predecessor finished. Do not read
+it as a CPU timing.
+
+```sh
+uv run python -m evals.bench.deterministic              # every case
+uv run python -m evals.bench.deterministic repair       # one case
+uv run python -m evals.bench.deterministic --spans out.json
+```
+
+It measures **one tree**. A before/after is two runs with a checkout between
+them. `--spans` writes every repaired span the corpus sources produce, so two
+trees that mean to agree about repairs can be diffed rather than assumed to
+agree — a timing-bounded scan given back time can inspect more candidates and
+land on a different span.
+
+It is not run by CI and is not a test. The figures are machine-dependent, so
+compare two runs on one machine and never a run here against a number from
+somewhere else.
 
 ## The harness
 
@@ -489,8 +529,8 @@ beside the finding.
 When the identity rule changes, the ledger moves with it and costs no re-vote:
 
 ```sh
-python -m evals.harness.run rekey --to-version 2        # preview, writes nothing
-python -m evals.harness.run rekey --to-version 2 --yes  # rewrite
+python -m evals.harness.run rekey        # preview, writes nothing
+python -m evals.harness.run rekey --yes  # rewrite
 ```
 
 A vote stores the fields its fingerprint was computed from, so re-keying is

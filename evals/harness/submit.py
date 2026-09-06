@@ -18,6 +18,11 @@ authenticated login, and it refuses a roster edit that raises the author's own
 standing. CI re-checks both. Running them here fails them early, at the machine
 where the fix is.
 
+A **Case Sitting** is not a kind here. It merges as one JSON file under
+``evals/review/submissions``, which :mod:`evals.review_submission` opens and
+validates on its own terms — one file, no allowlist to widen, and nothing in
+the working tree to package.
+
 On security: everything this module runs is an argument list with
 ``shell=False`` (A05), and every path it stages comes from the kind's allowlist
 rather than from the command line (A01). The packaging happens in a throwaway
@@ -28,12 +33,11 @@ carries beyond the allowlist can ride into the pull request.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import re
 import subprocess
 import tomllib
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -42,18 +46,12 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
 
-from pydantic import ValidationError
-
-from evals.build_review_docs import GENERATED_DOCUMENT
 from evals.harness import baseline, comparison, ledger, roster
 from evals.harness.artifact import ProvenanceError
-from evals.harness.reference import CaseSitting
-from evals.harness.sitting import (
-    SittingError,
-    claim_files,
-    document_name,
-    required_files,
-    without_unreviewed,
+from evals.harness.fingerprint import (
+    FingerprintError,
+    version_for,
+    version_of,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -71,6 +69,41 @@ _RANK = {"contributor": 0, "maintainer": 1}
 ROSTER_FILE = "evals/review/voters.toml"
 
 
+#: The repository a contribution goes to when the remote does not say. A
+#: fallback rather than the answer: a fork's clone names its own remote, and a
+#: contributor who reads a case in a fork should still be sent to the upstream
+#: this constant names.
+DEFAULT_REPO = "mstarks01/work-agent"
+
+#: The branch a contribution branches from, read off :data:`BASE_REF` so the
+#: two cannot name different branches.
+BASE_BRANCH = BASE_REF.split("/", 1)[1]
+
+#: An origin on github.com, in either spelling git prints. The host is part
+#: of the match on purpose: the slug is composed into a ``https://github.com``
+#: link, so a remote on any other host names a repository that link cannot
+#: reach, and the upstream is the honest answer for it.
+_REMOTE = re.compile(r"github\.com[:/](?P<owner>[^/:]+)/(?P<name>[^/]+?)(?:\.git)?/?$")
+
+
+def repo_slug(root: Path) -> str:
+    """``owner/name`` for this clone's origin on github.com, or :data:`DEFAULT_REPO`.
+
+    Read from git rather than written down, so a fork's own page links to the
+    fork it was built in. It falls back rather than raising, because the only
+    caller is a page offering somebody a link: no link is worse than a link to
+    the upstream, and neither is worth refusing a sitting over. A remote on
+    another host falls back too, because the link the slug lands in names
+    github.com.
+    """
+    try:
+        url = run_command(["git", "remote", "get-url", "origin"], root).strip()
+    except SubmitError:
+        return DEFAULT_REPO
+    found = _REMOTE.search(url)
+    return f"{found['owner']}/{found['name']}" if found else DEFAULT_REPO
+
+
 class SubmitError(RuntimeError):
     """The submission cannot proceed; the message says what stops it."""
 
@@ -81,6 +114,9 @@ class Check:
 
     name: str
     problems: tuple[str, ...] = ()
+    #: Lines printed beside the result that do not fail it. For a fact the
+    #: reviewer -- not the checklist -- is the one who can judge.
+    notes: tuple[str, ...] = ()
 
     @property
     def passed(self) -> bool:
@@ -130,7 +166,7 @@ class Kind:
     prepare: Callable[[Path, str, argparse.Namespace], None] | None = None
 
 
-def _run(args: Sequence[str], cwd: Path) -> str:
+def run_command(args: Sequence[str], cwd: Path) -> str:
     """One subprocess, list-form and captured; the error names the command."""
     try:
         done = subprocess.run(
@@ -146,7 +182,7 @@ def _run(args: Sequence[str], cwd: Path) -> str:
 
 def gh_login(root: Path) -> str:
     """The authenticated ``gh`` account — the one name a submission may use."""
-    return _run(["gh", "api", "user", "--jq", ".login"], root).strip()
+    return run_command(["gh", "api", "user", "--jq", ".login"], root).strip()
 
 
 #: The delta, held for the length of one checklist pass. A key present means
@@ -176,7 +212,7 @@ def _delta_cache(root: Path) -> Iterator[None]:
         _DELTA.pop(root, None)
 
 
-def _changed_paths(root: Path) -> list[str]:
+def changed_paths(root: Path) -> list[str]:
     """Everything different from BASE_REF, tracked or not, repo-relative.
 
     The caller fetched once already; fetching here would make every check
@@ -185,8 +221,8 @@ def _changed_paths(root: Path) -> list[str]:
     cached = _DELTA.get(root)
     if cached is not None:
         return cached
-    tracked = _run(["git", "diff", "--name-only", BASE_REF], root).splitlines()
-    porcelain = _run(
+    tracked = run_command(["git", "diff", "--name-only", BASE_REF], root).splitlines()
+    porcelain = run_command(
         ["git", "status", "--porcelain", "--untracked-files=all"], root
     ).splitlines()
     untracked = [line[3:] for line in porcelain if line.startswith("?? ")]
@@ -214,10 +250,10 @@ def _is_derived(rel: str) -> bool:
     )
 
 
-def _base_text(root: Path, rel: str) -> str | None:
+def base_text(root: Path, rel: str) -> str | None:
     """The file's content at BASE_REF, or None where the base has no file."""
     try:
-        return _run(["git", "show", f"{BASE_REF}:{rel}"], root)
+        return run_command(["git", "show", f"{BASE_REF}:{rel}"], root)
     except SubmitError:
         return None
 
@@ -233,7 +269,7 @@ def _vote_rows(root: Path, author: str) -> list[ledger.Vote]:
     """The rows this submission adds: the lines past the base-ref prefix."""
     rel = f"evals/review/votes/{author}.jsonl"
     new = (root / rel).read_text(encoding="utf-8") if (root / rel).exists() else ""
-    base = _base_text(root, rel) or ""
+    base = base_text(root, rel) or ""
     if not new.startswith(base):
         return []
     added = new[len(base) :]
@@ -244,8 +280,8 @@ def _vote_rows(root: Path, author: str) -> list[ledger.Vote]:
     ]
 
 
-def _check(name: str, problems: list[str]) -> Check:
-    return Check(name=name, problems=tuple(problems))
+def _check(name: str, problems: list[str], notes: list[str] | None = None) -> Check:
+    return Check(name=name, problems=tuple(problems), notes=tuple(notes or ()))
 
 
 # --- the checks every kind shares --------------------------------------------
@@ -263,7 +299,7 @@ def _subdirs(root: Path, prefix: str) -> list[str]:
     return sorted(
         {
             rest.split("/")[0]
-            for rel in _changed_paths(root)
+            for rel in changed_paths(root)
             if rel.startswith(prefix) and "/" in (rest := rel[len(prefix) :])
         }
     )
@@ -327,7 +363,7 @@ def _check_scope(root: Path, author: str, kind_name: str) -> Check:
     """
     kind = KINDS[kind_name]
     allowed = set(kind.allowlist(root, author))
-    strays = [rel for rel in _changed_paths(root) if rel not in allowed]
+    strays = [rel for rel in changed_paths(root) if rel not in allowed]
     return _check(
         "nothing outside this kind's allowlist changed",
         [f"{rel} is changed but not part of a {kind.noun}" for rel in strays],
@@ -368,7 +404,11 @@ def _check_roster_covers(root: Path, author: str) -> Check:
                 f"{author!r} has no roster line; add yourself to"
                 f' {ROSTER_FILE} with standing "contributor"'
             )
-    except roster.RosterError as exc:
+    # LedgerError too: this reads the ledger as well as the roster, and a
+    # malformed row made the checklist exit on a traceback instead of a line a
+    # contributor can act on. Fail-closed either way; only one of them is
+    # readable.
+    except (roster.RosterError, ledger.LedgerError) as exc:
         problems.append(str(exc))
     return _check("every voter has a roster line, including you", problems)
 
@@ -378,18 +418,52 @@ def _check_the_delta_is_yours(root: Path, author: str) -> Check:
     problems = []
     votes_dir = "evals/review/votes/"
     own = f"{votes_dir}{author}.jsonl"
-    for rel in _changed_paths(root):
+    for rel in changed_paths(root):
         if rel.startswith(votes_dir) and rel != own:
             problems.append(f"{rel} is not your file; you are {author!r}")
     return _check("the ledger delta is yours alone", problems)
 
 
+def _stale_keys(rel: str, rows: list[ledger.Vote]) -> list[str]:
+    """Rows this PR adds that are keyed under a version their framework left.
+
+    The loader asks only that a row be self-consistent at the version it names,
+    because a ledger written before a rule change still has to load -- `rekey`
+    is the command that moves it, and it reads the file first. That leaves one
+    gap, and it is here: a row written *today* under a version the table has
+    moved past. It is self-consistent, so it loads and scores under the old
+    rule, and `rekey` then refuses to move it and takes the whole ledger with
+    it. An added row is the only row this repository can insist is current.
+    """
+    problems = []
+    for vote in rows:
+        want = version_for(vote.components.framework)
+        got = version_of(vote.fingerprint)
+        if got != want:
+            problems.append(
+                f"{rel}: a vote on {vote.case} is keyed at version {got}, and"
+                f" {vote.components.framework} keys at {want}; re-key before you"
+                " submit"
+            )
+    return problems
+
+
 def _check_your_file_appends(root: Path, author: str) -> Check:
     """#322's append shape: the base content is a byte prefix of the new."""
     rel = f"evals/review/votes/{author}.jsonl"
-    new = (root / rel).read_text(encoding="utf-8") if (root / rel).exists() else ""
-    base = _base_text(root, rel)
     problems = []
+    try:
+        new = (root / rel).read_text(encoding="utf-8") if (root / rel).exists() else ""
+    except UnicodeDecodeError as exc:
+        # The same pull request commits this file, so its bytes are a
+        # contributor's and need not be UTF-8. This read sits ahead of every
+        # handler below, so the checklist ended in a traceback rather than in
+        # the sentence that names the file.
+        return _check(
+            "your file only appends, and adds something",
+            [f"{rel}: is not UTF-8 text: {exc}"],
+        )
+    base = base_text(root, rel)
     if base is not None and not new.startswith(base):
         problems.append(
             f"{rel} rewrites history; a vote submission only appends, and a"
@@ -397,17 +471,87 @@ def _check_your_file_appends(root: Path, author: str) -> Check:
         )
     else:
         try:
-            if not _vote_rows(root, author):
+            rows = _vote_rows(root, author)
+            if not rows:
                 problems.append(f"{rel} adds no votes; there is nothing to submit")
+            problems.extend(_stale_keys(rel, rows))
         except (ledger.LedgerError, json.JSONDecodeError) as exc:
             problems.append(f"{rel}: an added row will not parse: {exc}")
+        except UnicodeDecodeError as exc:
+            # The base revision's bytes, which `_vote_rows` reads separately
+            # from the read above.
+            problems.append(f"{rel}: is not UTF-8 text: {exc}")
+        except FingerprintError as exc:
+            # `version_for` raises this, and it is neither of the two above. A
+            # row naming a framework outside VERSION_FOR loads fine, because
+            # `fingerprint()` consults no table, and then aborted the whole
+            # preflight with a traceback instead of naming the row.
+            problems.append(f"{rel}: an added row names no known rule: {exc}")
     return _check("your file only appends, and adds something", problems)
 
 
+def _roster_delta(base_raw: str | None, live: Path) -> list[str]:
+    """Every roster line this PR changes, for the reviewer to read.
+
+    Informational, and deliberately not a refusal. What a roster edit is
+    entitled to do is a judgement about people, and the merge is where this
+    repository makes it -- ``voters.toml`` says a maintainer line is legitimate
+    only because a maintainer merged it. A check cannot make that call.
+
+    What it can do is put the edit where the person making the call will see it.
+    :func:`_check_no_self_raise` looks at one line, the author's, which is the
+    contract ``contribution.yml`` states; an audit twice observed that the other
+    lines go past unremarked, and twice concluded the merge is the control.
+    This is the note that observation asked for both times: the control works
+    better when it is shown the diff.
+    """
+    if base_raw is None:
+        return []
+    try:
+        was = tomllib.loads(base_raw).get("voters", {})
+        now = tomllib.loads(live.read_text(encoding="utf-8")).get("voters", {})
+    except (OSError, tomllib.TOMLDecodeError, UnicodeDecodeError):
+        return []  # the check below reports an unreadable roster
+    # The table itself, not only its entries. `voters = "abc"` is legal TOML and
+    # is the same defect one level up from the entry guard below: `set(was)`
+    # would iterate its characters and `was.get` does not exist. The loader
+    # reports it; this note only has to survive it.
+    if not isinstance(was, dict) or not isinstance(now, dict):
+        return ["voters: the roster's own table is not a table"]
+    notes = []
+    for login in sorted(set(was) | set(now)):
+        before, after = was.get(login), now.get(login)
+        if before == after:
+            continue
+        # A scalar here is `ada = "contributor"` where `[voters.ada]` was meant,
+        # which is the line a first-timer writes. It is the roster loader's to
+        # report; this one only has to not raise, because it runs after that
+        # check's own handler and is the sole check a roster-only PR runs.
+        if not isinstance(before, dict | None) or not isinstance(after, dict | None):
+            notes.append(f"{login}: changed, and its entry is not a table")
+            continue
+        if before is None and after is not None:
+            notes.append(f"{login}: added as {after.get('standing', '?')!r}")
+        elif after is None and before is not None:
+            notes.append(f"{login}: removed (was {before.get('standing', '?')!r})")
+        elif before is not None and after is not None:
+            for key in sorted(set(before) | set(after)):
+                if before.get(key) != after.get(key):
+                    notes.append(
+                        f"{login}.{key}: {before.get(key)!r} -> {after.get(key)!r}"
+                    )
+    return notes
+
+
 def _check_no_self_raise(root: Path, author: str) -> Check:
-    """#320's one dangerous edit: nobody raises their own standing."""
+    """#320's one dangerous edit: nobody raises their own standing.
+
+    One line, the author's, which is what ``contribution.yml`` states this job
+    proves. Every other roster line is reported beside the result rather than
+    refused -- see :func:`_roster_delta`.
+    """
     problems = []
-    base_raw = _base_text(root, ROSTER_FILE)
+    base_raw = base_text(root, ROSTER_FILE)
     live = root / ROSTER_FILE
     try:
         now = roster.load(live).standing_of(author) if live.exists() else None
@@ -429,7 +573,11 @@ def _check_no_self_raise(root: Path, author: str) -> Check:
             )
     except (roster.RosterError, tomllib.TOMLDecodeError) as exc:
         problems.append(str(exc))
-    return _check("your roster line does not raise itself", problems)
+    return _check(
+        "your roster line does not raise itself",
+        problems,
+        notes=_roster_delta(base_raw, live) if live.exists() else [],
+    )
 
 
 def _vote_preflight(root: Path, author: str) -> list[Check]:
@@ -462,269 +610,9 @@ def _vote_closing(root: Path, author: str) -> str:
 
 # --- the sitting kind ---------------------------------------------------------
 
+
 #: Where the unreviewed list lives; a sitting PR deletes its case's line
 #: from it.
-CASE_REVIEW_TEST = "tests/test_case_review.py"
-
-
-def _sitting_cases(root: Path) -> list[str]:
-    """Every case this submission touches, sorted. One session, one PR."""
-    return _subdirs(root, KINDS["sitting"].prefix)
-
-
-#: The shape a declared framework name holds before it reaches a path. The
-#: allowlist derives a claim file from the case's own metadata, so a name
-#: carrying a separator would name a file outside the case's ``claims``
-#: directory (A01). A package nobody wrote yet still passes it: every package
-#: this repository ships is a lowercase slug.
-_FRAMEWORK_NAME = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
-
-
-def _declared_frameworks(root: Path, case: str) -> list[str]:
-    """Every framework one case declares, in the order it declares them.
-
-    Fail-closed and quiet: a case whose metadata cannot be read, or whose
-    declaration is the wrong shape, declares nothing here. The checks that
-    read the metadata report that, and an allowlist which raised would answer
-    a scope question with a parse error.
-    """
-    path = root / KINDS["sitting"].prefix / case / "case.json"
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return []
-    declared = raw.get("frameworks") if isinstance(raw, dict) else None
-    if not isinstance(declared, list):
-        return []
-    names = [entry.get("name") for entry in declared if isinstance(entry, dict)]
-    return [
-        name
-        for name in names
-        if isinstance(name, str) and _FRAMEWORK_NAME.fullmatch(name)
-    ]
-
-
-def _sitting_allowlist(root: Path, author: str) -> list[str]:
-    """A sitting may change an answer. It may never change the question.
-
-    Under each touched case: the case metadata, this reader's own filled
-    reading document, and one claim file per framework the case declares
-    (#388). The reference sets are the answer under review, so a reader who
-    corrects one does what #327 asks for. The sources and the blessed
-    **System Model** are the question, so an edit to either falls outside
-    and fails scope — a reader who rewrites the question makes their own
-    read unfalsifiable.
-
-    The claim files come from the case's own declaration rather than a list
-    here, so a **Framework Package** nobody wrote yet is covered the moment a
-    case declares it. The document name comes from the authenticated login
-    rather than from the appended entry, so no name the diff supplies can
-    widen the list.
-    """
-    allowed = [
-        f"{KINDS['sitting'].prefix}{case}/{name}"
-        for case in _sitting_cases(root)
-        for name in [
-            "case.json",
-            document_name(author),
-            *claim_files(_declared_frameworks(root, case)),
-        ]
-    ]
-    return [*allowed, CASE_REVIEW_TEST, ROSTER_FILE]
-
-
-def _new_sittings(root: Path, case: str) -> tuple[list[dict], list[str]]:
-    """The entries this PR appends, and what is wrong with the append.
-
-    ``reviews`` is append-only (#327): the base ref's entries must survive as
-    an exact prefix, and only what follows them is this submission's.
-    """
-    rel = f"evals/corpus/{case}/case.json"
-    try:
-        raw = json.loads((root / rel).read_text(encoding="utf-8"))
-        base_raw = _base_text(root, rel)
-        base = json.loads(base_raw) if base_raw else {}
-    except (OSError, json.JSONDecodeError) as exc:
-        return [], [f"{case}/case.json: cannot be read: {exc}"]
-    reviews = raw.get("reviews", []) if isinstance(raw, dict) else None
-    base_reviews = base.get("reviews", []) if isinstance(base, dict) else None
-    # Shape first: one malformed case refuses its own case, and every other
-    # one still reports. A slice of the wrong type raises out of the pass.
-    if not isinstance(reviews, list) or not isinstance(base_reviews, list):
-        return [], [f"{case}/case.json: no `reviews` list to append to"]
-    if reviews[: len(base_reviews)] != base_reviews:
-        return [], [
-            (
-                f"{case}/case.json rewrites recorded sittings; `reviews` is"
-                " append-only, and a correction is a new entry"
-            )
-        ]
-    new = reviews[len(base_reviews) :]
-    if not new:
-        return [], [f"{case}/case.json appends no sitting entry"]
-    return new, []
-
-
-def _appended(root: Path, case: str) -> list[dict]:
-    """The entries this PR appends to one case, without what refuses them.
-
-    :func:`_check_sitting_is_yours` prints every problem :func:`_new_sittings`
-    finds, so the checks that only read the entries stay quiet about them:
-    one problem, one message, whatever N is.
-    """
-    new, _ = _new_sittings(root, case)
-    return new
-
-
-def _check_sitting_is_yours(root: Path, author: str) -> Check:
-    """#327 check 1, failed early: every appended entry is submitted by the author.
-
-    This also carries the gate ADR 0020 took off the cardinality check: a case
-    directory in the diff whose metadata appends nothing refuses the whole
-    submission, so a submission cannot carry a case it did not sit.
-
-    **It reads ``submitted_by`` and never ``submitted_for``.** The submitting
-    account is what `gh` proves, and it stays bound to the author exactly as
-    #320 rules. ``submitted_for`` names who read the case, is free to be
-    :data:`~evals.harness.reference.ANONYMOUS` or another person, and is
-    checked by nothing here — because it grants nothing anywhere.
-    """
-    problems: list[str] = []
-    for case in _sitting_cases(root):
-        new, refusals = _new_sittings(root, case)
-        problems += refusals
-        for entry in new:
-            try:
-                sitting = CaseSitting.model_validate(entry)
-            except ValidationError as exc:
-                problems.append(
-                    f"{case}/case.json: an appended entry is malformed: {exc}"
-                )
-                continue
-            if sitting.submitted_by != author:
-                problems.append(
-                    f"{case}: an appended entry is submitted by"
-                    f" {sitting.submitted_by!r}; you are {author!r}, and a"
-                    " sitting only enters through its own submitter's PR"
-                    " (#320)"
-                )
-    return _check("every appended sitting is submitted by you", problems)
-
-
-def _check_sitting_evidence(root: Path, author: str) -> Check:
-    """The digests match the tree, and the filled document is committed."""
-    problems: list[str] = []
-    for case in _sitting_cases(root):
-        case_dir = root / "evals" / "corpus" / case
-        for entry in _appended(root, case):
-            try:
-                sitting = CaseSitting.model_validate(entry)
-            except ValidationError:
-                continue  # named by the naming check; one problem, one message
-            for record in sitting.read:
-                target = case_dir / record.file
-                if not target.is_file():
-                    problems.append(
-                        f"{case}/{record.file}: read but not in the case directory"
-                    )
-                elif hashlib.sha256(target.read_bytes()).hexdigest() != record.sha256:
-                    problems.append(
-                        f"{case}/{record.file}: the digest does not match the"
-                        " file; the entry signs the bytes that merge, so"
-                        " recompute it"
-                    )
-            if not (case_dir / sitting.document).is_file():
-                problems.append(
-                    f"{case}/{sitting.document}: the filled document is the"
-                    " evidence, and it is not committed beside the case"
-                )
-    return _check("the digests and the document hold", problems)
-
-
-def _check_sitting_covers(root: Path, author: str) -> Check:
-    """#327's derived rule: the read covers every framework the case declares."""
-    problems: list[str] = []
-    for case in _sitting_cases(root):
-        new = _appended(root, case)
-        if not new:
-            continue  # the naming check refuses a case that appends nothing
-        raw = json.loads(
-            (root / "evals" / "corpus" / case / "case.json").read_text(encoding="utf-8")
-        )
-        required = set(
-            required_files(declared["name"] for declared in raw.get("frameworks", []))
-        )
-        read = {
-            record.get("file")
-            for entry in new
-            if isinstance(entry, dict)
-            for record in entry.get("read", [])
-            if isinstance(record, dict)
-        }
-        if gap := sorted(required - read):
-            problems.append(
-                f"{case}: the appended sitting leaves {gap} unread; one sitting"
-                " signs the model and every declared framework's reference set"
-                " together"
-            )
-    return _check("the sitting covers every declared framework", problems)
-
-
-def _check_sitting_clears_unreviewed(root: Path, author: str) -> Check:
-    cases = _sitting_cases(root)
-    listing = (root / CASE_REVIEW_TEST).read_text(encoding="utf-8") if cases else ""
-    return _check(
-        "every case's UNREVIEWED line is gone",
-        [
-            f"{case}: delete its line from UNREVIEWED in {CASE_REVIEW_TEST}"
-            for case in cases
-            if f'"{case}":' in listing
-        ],
-    )
-
-
-def _check_sitting_edits_only_the_list(root: Path, author: str) -> Check:
-    """The unreviewed list changed by the carried cases' lines and nothing else.
-
-    ``CASE_REVIEW_TEST`` is the one file outside a case directory that a
-    sitting may change, and it is a module ``pytest`` imports — so an
-    allowlist that admits it by path admits arbitrary Python running in
-    everybody's checkout. The scope check compares paths and cannot see that;
-    this compares content.
-
-    Both sides have the carried cases' entries taken out before they are
-    compared, so a reader who has not cleared a line yet fails
-    :func:`_check_sitting_clears_unreviewed` and not this. What is left is
-    the module's prose, its code, and every case this submission does not
-    carry.
-    """
-    cases = _sitting_cases(root)
-    if not cases:
-        return _check(_ONLY_THE_LIST, [])
-    base = _base_text(root, CASE_REVIEW_TEST)
-    if base is None:
-        return _check(
-            _ONLY_THE_LIST,
-            [f"{CASE_REVIEW_TEST}: the base ref has no such file to compare against"],
-        )
-    live = (root / CASE_REVIEW_TEST).read_text(encoding="utf-8")
-    try:
-        moved = without_unreviewed(live, cases) != without_unreviewed(base, cases)
-    except SittingError as exc:
-        # The message names the file already, so it goes out as it stands.
-        return _check(_ONLY_THE_LIST, [str(exc)])
-    refusal = (
-        f"{CASE_REVIEW_TEST} changed outside the lines this sitting clears;"
-        " a sitting deletes its cases' UNREVIEWED entries and nothing else"
-    )
-    return _check(_ONLY_THE_LIST, [refusal] if moved else [])
-
-
-#: Spelled once because the check names it twice and a checklist line is the
-#: contract a contributor reads.
-_ONLY_THE_LIST = "the unreviewed list changed only by those lines"
-
-
 def _check_author_rostered(root: Path, author: str) -> Check:
     problems = []
     try:
@@ -736,47 +624,6 @@ def _check_author_rostered(root: Path, author: str) -> Check:
     except roster.RosterError as exc:
         problems.append(str(exc))
     return _check("you have a roster line", problems)
-
-
-def _sitting_preflight(root: Path, author: str) -> list[Check]:
-    return [
-        check(root, author)
-        for check in (
-            partial(_check_subject_count, kind_name="sitting"),
-            partial(_check_scope, kind_name="sitting"),
-            _check_sitting_is_yours,
-            _check_sitting_evidence,
-            _check_sitting_covers,
-            _check_sitting_clears_unreviewed,
-            _check_sitting_edits_only_the_list,
-            _check_author_rostered,
-            _check_no_self_raise,
-        )
-    ]
-
-
-def _sitting_title(root: Path, author: str) -> str:
-    """``Sitting: <author>, <n> cases``, the vote kind's shape.
-
-    Its plural agreement too: the count reads for itself, and a branch on a
-    count is the thing this repository does not write.
-    """
-    return f"Sitting: {author}, {len(_sitting_cases(root))} cases"
-
-
-def _sitting_closing(root: Path, author: str) -> str:
-    standing = _standing_of(root, author)
-    cases = "\n".join(f"- {case}" for case in _sitting_cases(root))
-    return (
-        f"{cases}\n\n"
-        f"{REVIEW_SENTENCE} Each sitting above clears its case from"
-        f" UNREVIEWED, and standing {standing!r} labels the read — the"
-        " UNREVIEWED line means nobody read it, and a labelled read answers"
-        " that."
-    )
-
-
-# --- the baseline kind ---------------------------------------------------------
 
 
 def _baseline_prepare(root: Path, author: str, args: argparse.Namespace) -> None:
@@ -803,7 +650,7 @@ def _baseline_allowlist(root: Path, author: str) -> list[str]:
     prefix = f"{KINDS['baseline'].prefix}{name}/"
     changed = [
         rel
-        for rel in _changed_paths(root)
+        for rel in changed_paths(root)
         if name is not None and rel.startswith(prefix)
     ]
     # The generated comparison moves whenever a Baseline lands, and
@@ -832,7 +679,7 @@ def _check_baseline_sweeps_are_yours(root: Path, author: str) -> Check:
     problems: list[str] = []
     try:
         manifest = json.loads((root / manifest_rel).read_text(encoding="utf-8"))
-        base_raw = _base_text(root, manifest_rel)
+        base_raw = base_text(root, manifest_rel)
         known = {
             str(entry.get("artifact"))
             for entry in (json.loads(base_raw).get("sweeps", []) if base_raw else [])
@@ -883,11 +730,19 @@ def _baseline_closing(root: Path, author: str) -> str:
     manifest = _baseline_manifest(root)
     identity = manifest.get("identity", {})
     sweeps = manifest.get("sweeps", [])
+    # Escaped for the reason `comparison._inline` gives: these come out of the
+    # contributor's own artifact, and this text is the review aid a maintainer
+    # reads before merging it.
     models = ", ".join(
-        f"{tier}: {model}" for tier, model in sorted(identity.get("models", {}).items())
+        f"{comparison._inline(tier)}: {comparison._inline(model)}"
+        for tier, model in sorted(identity.get("models", {}).items())
     )
-    costs = [entry.get("cost", {}) for entry in sweeps]
-    total = sum(float(cost.get("actual_usd", 0.0)) for cost in costs)
+    # A cost that is not a table is not money and names nothing unpriced; the
+    # baseline re-check lists it as a problem, and this summary reads past it.
+    costs = [
+        c for c in (entry.get("cost") for entry in sweeps) if isinstance(c, Mapping)
+    ]
+    total = sum(baseline.recorded_usd(cost) or 0.0 for cost in costs)
     unpriced = sorted({model for cost in costs for model in cost.get("unpriced", ())})
     standing = _standing_of(root, author)
     lines = [
@@ -917,20 +772,6 @@ KINDS: dict[str, Kind] = {
         title=_vote_title,
         closing=_vote_closing,
     ),
-    "sitting": Kind(
-        prefix="evals/corpus/",
-        # `REVIEW.md` is written by `evals/build_review_docs.py` from the case
-        # it sits beside. The filled `REVIEW-<login>.md` is evidence and is
-        # not derived, so the two names part company here.
-        derived=frozenset({GENERATED_DOCUMENT}),
-        noun="sitting",
-        subject="case",
-        subjects="many",
-        preflight=_sitting_preflight,
-        allowlist=_sitting_allowlist,
-        title=_sitting_title,
-        closing=_sitting_closing,
-    ),
     "baseline": Kind(
         prefix="evals/baselines/",
         noun="baseline submission",
@@ -947,34 +788,36 @@ KINDS: dict[str, Kind] = {
 # --- the spine ----------------------------------------------------------------
 
 
-def _branch_name(root: Path, kind: str, author: str, remote: str) -> str:
+def branch_name(root: Path, kind: str, author: str, remote: str) -> str:
     """``submit/<kind>/<login>-<date>``, suffixed numerically on collision."""
     stem = f"submit/{kind}/{author}-{datetime.now(UTC).date().isoformat()}"
     name = stem
     suffix = 2
-    while _run(["git", "ls-remote", remote, f"refs/heads/{name}"], root).strip():
+    while run_command(["git", "ls-remote", remote, f"refs/heads/{name}"], root).strip():
         name = f"{stem}-{suffix}"
         suffix += 1
     return name
 
 
-def _push_remote(root: Path, author: str) -> str:
+def push_remote(root: Path, author: str) -> str:
     """Where the branch goes: origin for the repo's owner, the fork otherwise.
 
     ``gh repo fork`` is idempotent — it creates the fork when missing and
     answers with the existing one when not.
     """
-    owner = _run(
+    owner = run_command(
         ["gh", "repo", "view", "--json", "owner", "--jq", ".owner.login"], root
     ).strip()
     if owner == author:
         return "origin"
-    name = _run(["gh", "repo", "view", "--json", "name", "--jq", ".name"], root).strip()
-    _run(["gh", "repo", "fork", "--clone=false"], root)
+    name = run_command(
+        ["gh", "repo", "view", "--json", "name", "--jq", ".name"], root
+    ).strip()
+    run_command(["gh", "repo", "fork", "--clone=false"], root)
     return f"https://github.com/{author}/{name}.git"
 
 
-def _pr_head(remote: str, author: str, branch: str) -> str:
+def pr_head(remote: str, author: str, branch: str) -> str:
     return branch if remote == "origin" else f"{author}:{branch}"
 
 
@@ -987,9 +830,9 @@ def open_pr(root: Path, kind_name: str, author: str) -> str:
     and the worktree makes that refusal structural.
     """
     kind = KINDS[kind_name]
-    _run(["git", "fetch", "origin"], root)
-    remote = _push_remote(root, author)
-    branch = _branch_name(root, kind_name, author, remote)
+    run_command(["git", "fetch", "origin"], root)
+    remote = push_remote(root, author)
+    branch = branch_name(root, kind_name, author, remote)
     title = kind.title(root, author)
     body = (
         f"{kind.closing(root, author)}\n\n"
@@ -998,7 +841,9 @@ def open_pr(root: Path, kind_name: str, author: str) -> str:
     )
     with TemporaryDirectory(prefix="submit-") as scratch:
         worktree = Path(scratch) / "worktree"
-        _run(["git", "worktree", "add", "--detach", str(worktree), BASE_REF], root)
+        run_command(
+            ["git", "worktree", "add", "--detach", str(worktree), BASE_REF], root
+        )
         try:
             staged = []
             for rel in kind.allowlist(root, author):
@@ -1009,19 +854,19 @@ def open_pr(root: Path, kind_name: str, author: str) -> str:
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
                 staged.append(rel)
-            _run(["git", "checkout", "-b", branch], worktree)
-            _run(["git", "add", "--", *staged], worktree)
-            _run(["git", "commit", "-m", title], worktree)
-            _run(["git", "push", remote, f"HEAD:refs/heads/{branch}"], worktree)
+            run_command(["git", "checkout", "-b", branch], worktree)
+            run_command(["git", "add", "--", *staged], worktree)
+            run_command(["git", "commit", "-m", title], worktree)
+            run_command(["git", "push", remote, f"HEAD:refs/heads/{branch}"], worktree)
         finally:
-            _run(["git", "worktree", "remove", "--force", str(worktree)], root)
-    return _run(
+            run_command(["git", "worktree", "remove", "--force", str(worktree)], root)
+    return run_command(
         [
             "gh",
             "pr",
             "create",
             "--head",
-            _pr_head(remote, author, branch),
+            pr_head(remote, author, branch),
             "--title",
             title,
             "--body",
@@ -1041,7 +886,7 @@ def detect_kind(root: Path) -> str | None:
     roster line on its own. Raises when it touches two, because one kind per
     PR is the rule the forced merge order rests on (#325).
     """
-    changed = _changed_paths(root)
+    changed = changed_paths(root)
     found = sorted(
         name
         for name, kind in KINDS.items()
@@ -1082,7 +927,7 @@ def command_verify(args: argparse.Namespace) -> int:
     if kind is None:
         # A roster line with no submission behind it still may not raise its
         # own author's standing — the one edit that is dangerous alone.
-        if ROSTER_FILE in _changed_paths(root):
+        if ROSTER_FILE in changed_paths(root):
             checks = [_check_no_self_raise(root, author)]
         else:
             print("no contribution in this diff; nothing to check")
@@ -1093,6 +938,8 @@ def command_verify(args: argparse.Namespace) -> int:
         print(f"  {'ok  ' if check.passed else 'FAIL'}  {check.name}")
         for problem in check.problems:
             print(f"        {problem}")
+        for note in check.notes:
+            print(f"        note  {note}")
     if all(check.passed for check in checks):
         return 0
     print(
@@ -1186,7 +1033,7 @@ def submission(
         return Outcome(author="", error=f"cannot read the gh login: {exc}")
 
     try:
-        _run(["git", "fetch", "origin"], root)
+        run_command(["git", "fetch", "origin"], root)
         _register(root, author)
     except (OSError, SubmitError, roster.RosterError) as exc:
         return Outcome(author=author, error=str(exc))

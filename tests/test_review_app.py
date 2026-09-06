@@ -19,7 +19,7 @@ from fastapi.testclient import TestClient
 from analysis_service.frameworks import PACKAGES
 from evals.harness import queue as review_queue
 from evals.harness import run as harness_run
-from evals.harness.ledger import load
+from evals.harness.ledger import append, cast, load
 from webapp.review import (
     QUESTIONS,
     build_session,
@@ -94,7 +94,7 @@ def client(runs, tmp_path):
         TestClient(
             create_app(session),
             base_url="http://127.0.0.1:8010",
-            headers=SAME_ORIGIN,
+            headers={**SAME_ORIGIN, "X-Review-Token": session.token},
         ),
         session,
     )
@@ -266,7 +266,6 @@ def test_the_summary_tracks_the_sitting(client):
     app, _ = client
     before = app.get("/api/summary").json()
     assert before["waiting"] == 2
-    assert before["voter"] == "ada"
 
     item = app.get("/api/next").json()
     app.post("/api/vote", json={"fingerprint": item["fingerprint"], "verdict": "up"})
@@ -464,3 +463,78 @@ def test_the_question_is_the_finding_s_own_framework(tmp_path):
     assert questions["asvs"] == QUESTIONS["asvs"]
     assert "attack" in questions["stride"]["ask"]
     assert "requirement" in questions["asvs"]["ask"]
+
+
+def test_a_vote_without_the_page_token_is_refused(runs, tmp_path):
+    """The origin check and the token refuse different things.
+
+    The origin check refuses a page on another origin; this refuses a request
+    that never read this one. The ledger is the supply chain of every published
+    quality number, and the sitting app's writes have carried both from the
+    start — this one carried only the first.
+    """
+    session = build_session(runs, voter="ada", ledger_path=tmp_path / "votes")
+    app = TestClient(
+        create_app(session), base_url="http://127.0.0.1:8010", headers=SAME_ORIGIN
+    )
+    item = app.get("/api/next").json()
+
+    response = app.post(
+        "/api/vote", json={"fingerprint": item["fingerprint"], "verdict": "up"}
+    )
+
+    assert response.status_code == 403
+    assert load(session.ledger_path).votes == [], "a refused vote wrote nothing"
+
+
+def test_the_page_carries_the_token_the_vote_needs(runs, tmp_path):
+    session = build_session(runs, voter="ada", ledger_path=tmp_path / "votes")
+    app = TestClient(create_app(session), base_url="http://127.0.0.1:8010")
+
+    page = app.get("/review").text
+
+    assert session.token in page, "the page cannot vote without it"
+
+
+def test_a_needs_evidence_finding_comes_back_in_a_later_sitting(runs, tmp_path):
+    """The end of the path #554 only fixed the start of.
+
+    `queue.build` re-offers it, and `Session.remaining()` used to drop it again
+    with a second copy of the rule that had not been changed. Every serving path
+    goes through `remaining()`, so the app never showed what the queue re-offered
+    and `Vote.sitting` reached no reader that decided anything.
+    """
+    ledger_path = tmp_path / "votes"
+    first = build_session(runs, voter="ada", ledger_path=ledger_path)
+    item = first.remaining()[0]
+    append(
+        cast(
+            item.components,
+            item.finding.case,
+            "needs-evidence",
+            "ada",
+            sitting=first.sitting,
+        ),
+        ledger_path,
+    )
+
+    assert item.fingerprint not in {
+        served.fingerprint for served in first.remaining()
+    }, "within its own sitting it stays down"
+
+    later = build_session(runs, voter="ada", ledger_path=ledger_path)
+
+    assert item.fingerprint in {served.fingerprint for served in later.remaining()}, (
+        "a later sitting asks again, which is what the button says"
+    )
+
+
+def test_an_ordinary_answer_is_still_spent(runs, tmp_path):
+    ledger_path = tmp_path / "votes"
+    first = build_session(runs, voter="ada", ledger_path=ledger_path)
+    item = first.remaining()[0]
+    append(cast(item.components, item.finding.case, "up", "ada"), ledger_path)
+
+    later = build_session(runs, voter="ada", ledger_path=ledger_path)
+
+    assert item.fingerprint not in {served.fingerprint for served in later.remaining()}

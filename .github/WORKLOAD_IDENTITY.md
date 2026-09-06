@@ -47,12 +47,32 @@ Two layers close it, and either one closes it alone:
    `if: github.ref == 'refs/heads/main'` on the job, because a
    `workflow_dispatch` names its own ref and would otherwise reach an
    unreviewed branch. `pull_request_target` is prohibited outright.
-2. **The federation.** The attribute condition pins `job_workflow_ref` to the
-   trusted ref, so only a workflow file already on `main` can exchange a token
-   at all — see section 3.
+2. **The federation.** The attribute condition pins the `ref` claim to the
+   trusted ref, and pins `job_workflow_ref` beside it — see section 3.
 
 Two layers rather than one because layer 1 lives in files a collaborator can
 edit in a pull request, and layer 2 does not.
+
+**The `live-providers` environment carries a deployment branch policy naming
+`main`, and it is the third layer.** It is a repository setting rather than a
+line in a file, so a pushed branch cannot edit it — which is exactly what layer
+1 cannot claim and what layer 2 wrongly claimed. `evals-live-api-key.yml` says
+what its absence means: "an environment nobody has configured protection rules
+on protects nothing." It was absent until 2026-09-03, so for the provider-key
+jobs the editable ref guard was the only control. If you ever need to run one of
+those workflows from a branch, this policy is the second thing to change, and
+that is the point of it.
+
+**Layer 2 pins `ref` because a suffix is not a pin.** It read
+`job_workflow_ref.endsWith('@refs/heads/main')`, and the `@` there separates a
+prefix from a ref the attacker names. `git check-ref-format` accepts a branch
+called `pwn@refs/heads/main`; its claim ends `@refs/heads/pwn@refs/heads/main`
+and satisfies the suffix. So both layers fell to one push: the branch name
+carried layer 2, and editing the workflow file on that branch carried layer 1.
+A security audit found this on 2026-09-03 and it is fixed. The lesson is worth
+more than the fix — **the guard whose failure the design accepts and the guard
+it relies on must fail for different reasons**, and these two failed for the
+same one.
 
 `tests/test_workflow_lints.py` enforces both halves of layer 1 against every
 workflow in the directory, so a lane added later is covered without anyone

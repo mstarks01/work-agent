@@ -30,7 +30,7 @@ import os
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Literal, Protocol, Self
+from typing import Any, Literal, Protocol, Self
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -335,6 +335,10 @@ class JobStore(Protocol):
 
     async def get(self, job_id: str) -> JobRecord | None: ...
 
+    async def owned(self, job_id: str, subject: str) -> JobRecord | None: ...
+
+    async def report_json(self, job_id: str, subject: str) -> dict[str, Any] | None: ...
+
     async def events_after(
         self, job_id: str, seen: int
     ) -> tuple[JobStatus, list[JobEvent]] | None: ...
@@ -432,6 +436,43 @@ class InMemoryJobStore:
     async def get(self, job_id: str) -> JobRecord | None:
         record = self._records.get(job_id)
         return None if record is None else record.model_copy(deep=True)
+
+    async def owned(self, job_id: str, subject: str) -> JobRecord | None:
+        """The record ``subject`` owns, without its report, or ``None``.
+
+        What the status and event routes need: they read the envelope and never
+        the analysis, and the report is nearly all of a completed record's
+        weight. Copying it for them is work no caller asked for, and a read
+        carries none of the bounds admission does — no ceiling, no rate, no
+        budget — so a caller who polls a completed job pays the whole report per
+        request and the process pays it on the event loop.
+
+        Ownership is checked before anything is copied, so a foreign job costs
+        what a missing one costs. Answering the same ``None`` for both is what
+        keeps a job id from being probed for existence, and answering it at the
+        same *speed* is the other half of that.
+        """
+        record = self._records.get(job_id)
+        if record is None or record.owner_subject != subject:
+            return None
+        return record.model_copy(update={"report": None}).model_copy(deep=True)
+
+    async def report_json(self, job_id: str, subject: str) -> dict[str, Any] | None:
+        """The owned job's report, already JSON, or ``None`` if it has none.
+
+        Serialized straight off the stored record. ``model_dump`` builds a fresh
+        structure that aliases nothing the record holds, so the deep copy a
+        caller would otherwise take first is a second copy of the same bytes.
+
+        Ownership is re-checked rather than assumed of the caller: this reads
+        the one thing on the record worth reading.
+        """
+        record = self._records.get(job_id)
+        if record is None or record.owner_subject != subject:
+            return None
+        if record.report is None:
+            return None
+        return record.report.model_dump(mode="json")
 
     async def events_after(
         self, job_id: str, seen: int

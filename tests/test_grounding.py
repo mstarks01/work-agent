@@ -7,11 +7,19 @@ same failure mode, an unmarked elision stitched into a sentence the source never
 contains.
 """
 
+import time
+
 import pytest
 
+from analysis_service import grounding
 from analysis_service.grounding import (
+    MAX_REPAIR_QUOTE_CHARS,
+    MAX_REPAIR_WORK,
     REPAIR_THRESHOLD,
     normalize,
+    prepare_source,
+    repair_deadline,
+    repair_prepared,
     repair_quote,
     verify_quote,
 )
@@ -148,3 +156,269 @@ class TestTheRepairRung:
 
     def test_an_empty_quote_is_refused(self):
         assert repair_quote("   ", SOURCE) is None
+
+    def test_a_scan_over_the_bound_stops_rather_than_running(self):
+        """Both terms come from the submitted text, so the rung's cost is the
+        submitter's to set unless something bounds it.
+
+        The quote shares its character multiset with every window and matches
+        none of them, so `quick_ratio` prunes nothing and each window pays the
+        full comparison. Nothing reaches the threshold, so the answer is the
+        one the threshold already gives and the caller leaves the quote
+        unverified.
+
+        The quote must not be a span of the source. An earlier version of this
+        test reversed the source's own words, which for a repeated word is the
+        source's own text -- so the scan found an exact match, and the test
+        passed only because the budget was throwing that match away.
+        """
+        width = 40
+        words = ["word"] * (MAX_REPAIR_WORK // (width * width) + 1)
+        quote = " ".join(["dorw"] * width)
+
+        started = time.process_time()
+        assert repair_quote(quote, " ".join(words)) is None
+        assert time.process_time() - started < 5.0
+
+    def test_the_bound_leaves_a_median_quote_on_the_largest_source(self):
+        """100 KiB of ordinary prose is around 15,000 words, and the corpus
+        median quote is 80 characters. The bound has to clear that pair and
+        still repair it, or it has turned the rung off rather than bounded it.
+
+        Asked of the rung rather than of the arithmetic. Two predictive metrics
+        in a row read the cost of a scan off its inputs and got the order wrong
+        -- English prose at 288M metric ran in 0.39 s while a repetitive source
+        at 112M ran in 5.95 s -- because what costs the time is how many windows
+        survive `quick_ratio`, which no function of the lengths can see.
+        """
+        source = " ".join(f"the {n} quick brown foxes jumped" for n in range(2500))
+        quote = source[9000:9080].strip()
+
+        assert repair_quote(quote.replace("quick", "quikc"), source) is not None
+
+    def test_an_inverted_phase_does_not_run_for_half_a_minute(self):
+        """`difflib` recursion, not window count, and on a 1 KiB source.
+
+        With `autojunk` off, `SequenceMatcher` recurses on every match it finds,
+        and a quote whose phase is inverted against the source makes that cubic.
+        One comparison of 998 characters against 998 took 6.5 seconds, and the
+        rung took 38 seconds on a source a hundredth of the size ceiling -- so
+        no bound that counts comparisons could have helped, because the first
+        comparison already exceeded it.
+
+        `MAX_GROUNDS_PER_CLAIM` is 60, and `graph.py` names this rung's bound as
+        the reason a node body stays short enough for a cancelled offload to be
+        harmless.
+        """
+        quote = " ".join(["ab"] * 333)
+        source = " ".join(["ba"] * 341)
+
+        started = time.process_time()
+        assert repair_quote(quote, source) is None
+        assert time.process_time() - started < 3.0
+
+    @pytest.mark.parametrize(
+        "kind", ["transposition", "dropped word", "removed punctuation"]
+    )
+    def test_every_error_the_rung_exists_for_is_still_repaired(self, kind):
+        """Three mutations, because measuring one of them hid a regression.
+
+        `autojunk=True` was tried as the bound and reverted. It drops elements
+        appearing in more than 1% of a sequence of 200 or more, so on a quote
+        past that length a match can only anchor on a rare character. A
+        transposition keeps an anchor and lost 0.0% of repairs; a stripped
+        comma does not and lost 12.4%. The test written with that fix used a
+        transposition, so it measured the one mutation the change could not
+        break.
+
+        `REPAIR_THRESHOLD`'s own docstring names the errors this rung is for:
+        a dropped article, a changed preposition, a tidied plural.
+        """
+        source = " ".join(
+            f"the {n} quick, brown foxes jumped over a lazy dog." for n in range(60)
+        )
+        words = source.split()
+        true = " ".join(words[100:140])
+        if kind == "transposition":
+            quote = true.replace("quick", "quikc", 1)
+        elif kind == "dropped word":
+            quote = " ".join(words[100:120] + words[121:140])
+        else:
+            quote = true.replace(",", "").replace(".", "")
+
+        repair = repair_quote(quote, source)
+
+        assert repair is not None
+        assert repair[1] >= REPAIR_THRESHOLD
+
+    def test_a_quote_too_long_to_bound_is_refused_rather_than_run(self):
+        """The bound that works, after five that did not.
+
+        A single `difflib` comparison of two 1,000-character strings measured
+        6.44 seconds on an inverted phase, and no statistic computable from the
+        inputs predicts that -- the closest candidate was wrong by 200x. So the
+        input is capped instead, and the worst single call is measured: 0.166 s
+        at 300 characters, 0.400 s at 400.
+
+        It costs nothing real. Across 784 spans of all 13 corpus sources the
+        normalized quote length runs to a maximum of 305.
+        """
+        quote = " ".join(["ab"] * 333)
+        source = " ".join(["ba"] * 341)
+
+        assert len(quote) > MAX_REPAIR_QUOTE_CHARS
+        started = time.process_time()
+        assert repair_quote(quote, source) is None
+        assert time.process_time() - started < 0.5
+
+    def test_a_pruned_window_is_charged_for_the_work_it_took_to_prune(self):
+        """The input that reads zero on a budget charging only survivors.
+
+        `quick_ratio` prunes every window of ordinary English, so a budget that
+        charges only the comparisons it does not prune never charges at all.
+        The join and the prune are each linear in the span and run on every
+        window, so a 333-word quote against a source at the shipped size
+        ceiling ran 8.4 seconds having spent 0 of 50,000,000 units.
+
+        The ceiling here is generous on purpose: the measured time is about
+        0.7 s, and the defect this pins ran twelve times that.
+        """
+        source = " ".join(
+            f"the {n} quick brown foxes jumped over a lazy dog near"
+            for n in range(6000)
+        )[:102_400]
+        quote = " ".join(["ab"] * 333)
+
+        started = time.process_time()
+        assert repair_quote(quote, source) is None
+        assert time.process_time() - started < 3.0
+
+    def test_a_truncated_scan_returns_the_match_it_already_found(self):
+        """The budget bounds the time; it does not throw away the answer.
+
+        A median quote on a source at the size ceiling finds its match after
+        about 6,000 units and then needs 113,000,000 more to finish ranking
+        every remaining window. Answering `None` there spends the whole budget
+        and buys nothing, and it turns the rung off for exactly the largest
+        source it is meant to serve.
+        """
+        source = " ".join(
+            f"the {n} quick brown foxes jumped over a lazy dog near"
+            for n in range(6000)
+        )[:102_400]
+        words = source.split()
+        quote = " ".join(words[1500:1516]).replace("quick", "quikc")
+
+        repair = repair_quote(quote, source)
+
+        assert repair is not None
+        assert repair[1] >= REPAIR_THRESHOLD
+
+    def test_a_match_late_in_a_large_source_still_wins(self):
+        """The budget must not truncate before the scan reaches the end.
+
+        A pruned window costs `_PRUNE_COST` characters, so the constant decides
+        how much of a large source the scan sees. A match in the last words of
+        a source at the size ceiling is the case that pins it.
+        """
+        source = " ".join(
+            f"the {n} quick brown foxes jumped over a lazy dog near"
+            for n in range(6000)
+        )[:102_400]
+        words = source.split()
+        quote = " ".join(words[-40:-24]).replace("lazy", "lzay")
+
+        repair = repair_quote(quote, source)
+
+        assert repair is not None
+        assert repair[1] >= REPAIR_THRESHOLD
+
+    def test_the_bound_counts_the_quote_in_characters(self):
+        """A source of few very long words kept the word figure near zero while
+        every window stayed thousands of characters wide, so the scan ran for
+        minutes inside a bound reporting thousandths of a percent of its cap.
+
+        Two words of five hundred characters are two words and a thousand
+        characters; only the second figure predicts the time.
+        """
+        long_words = " ".join(["x" * 500] * 200)
+        quote = " ".join(["y" * 500] * 2)
+
+        assert repair_quote(quote, long_words) is None
+
+    def test_a_scan_that_starts_after_the_body_deadline_does_not_scan(self):
+        """Every scan of one body shares one deadline, and a scan that begins
+        past it answers ``None`` at once rather than running its own four
+        seconds: bounded per scan alone, a body of adversarial quotes ran for
+        hours after its job settled.
+        """
+        quote = " ".join(["ab"] * 133)
+        source = " ".join(["ba"] * 147)
+        started = time.thread_time()
+
+        assert repair_quote(quote, source, deadline=started) is None
+        assert time.thread_time() - started < 0.1
+
+    def test_the_body_deadline_cuts_a_scan_already_running(self, monkeypatch):
+        """The body's deadline binds inside a scan too, not only between scans:
+        one quote whose scan would run to its own four-second deadline stops
+        at the body's instead, overshooting by at most one comparison.
+        """
+        monkeypatch.setattr(grounding, "MAX_REPAIR_SECONDS_PER_BODY", 0.5)
+        quote = " ".join(["ab"] * 133)
+        source = " ".join(["ba"] * 147)
+        started = time.thread_time()
+
+        assert repair_quote(quote, source, repair_deadline()) is None
+        assert time.thread_time() - started < 1.5
+
+    def test_folding_a_window_word_by_word_is_folding_it_whole(self):
+        """The scan folds each source word once instead of once per window
+        covering it. That is only the same comparison because the ladder's
+        rungs are per-character and the last one collapses whitespace."""
+        words = ["The", "`LEDGER`", "*service*", "runs"]
+
+        assert " ".join(w for w in map(normalize, words) if w) == normalize(
+            " ".join(words)
+        )
+
+
+class TestPreparingASourceOnce:
+    """The split and the per-word folding do not depend on the quote, so a body
+    scanning one source for many refused quotes pays for them once.
+    """
+
+    def test_a_prepared_source_answers_what_the_raw_form_answers(self):
+        """The two entry points are one scan. ``repair_quote`` prepares the
+        source and calls the prepared form, so a caller that prepares its own
+        cannot get a different span."""
+        quote = "with a single shared passwrd"
+
+        assert repair_prepared(quote, prepare_source(SOURCE)) == repair_quote(
+            quote, SOURCE
+        )
+
+    def test_one_prepared_source_serves_every_quote(self):
+        """Reuse across quotes is what the value exists for: the second scan
+        over one prepared source answers what its own fresh preparation would.
+        """
+        prepared = prepare_source(SOURCE)
+        quotes = ["with a single shared passwrd", "has full read/write on evry table"]
+
+        assert [repair_prepared(quote, prepared) for quote in quotes] == [
+            repair_quote(quote, SOURCE) for quote in quotes
+        ]
+
+    def test_an_expired_body_deadline_prepares_nothing(self, monkeypatch):
+        """A scan with no time left folds no source to find that out. Bounded
+        the other way round, a body that spent its thirty seconds still paid one
+        whole fold per remaining quote: 400 refused quotes against a
+        20,000-word source is 6.4 s of folding for 400 answers of ``None``.
+        """
+
+        def refuse(source: str):
+            raise AssertionError("the source was prepared past the deadline")
+
+        monkeypatch.setattr(grounding, "prepare_source", refuse)
+
+        assert repair_quote("anything at all", SOURCE, time.thread_time() - 1) is None

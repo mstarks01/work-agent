@@ -56,10 +56,10 @@ from pathlib import Path
 from typing import Any, Literal
 
 from evals.harness.fingerprint import (
-    DEFAULT_VERSION,
     Components,
     FingerprintError,
     fingerprint,
+    version_for,
     version_of,
 )
 
@@ -79,8 +79,10 @@ GITHUB_LOGIN = re.compile(r"(?=.{1,39}\Z)[A-Za-z0-9](?:-?[A-Za-z0-9])*\Z")
 #: button would have thrown it away.
 #:
 #: ``needs-evidence`` is not a verdict about the finding at all — it says the
-#: reviewer cannot answer from what they were shown. It routes to a re-ask
-#: rather than to a score.
+#: reviewer cannot answer from what they were shown. It moves no number, and it
+#: holds only for the sitting it was cast in: a later sitting asks again, over
+#: whatever evidence exists by then. That is what makes it different from
+#: ``unsure``, which is a spent answer like any other.
 Verdict = Literal["up", "down", "unsure", "needs-evidence"]
 
 #: Reasons that speak to whether the finding is *right*. A ``down`` carrying one
@@ -183,6 +185,46 @@ class Vote:
                 f"{self.reason!r} is not a reason code; the set is"
                 f" {', '.join(sorted(REASONS))}"
             )
+        # The key is computed, never stated. A row arrives from a contributor's
+        # pull request, and until this ran nothing recomputed it: the stored
+        # string was taken on the row's word, while `components` -- the fields
+        # the key is *made of* -- went unread. So a row could describe one
+        # finding and key another, and every reader keys on the string: `pool`,
+        # `_standing`, `agreement`.
+        #
+        # A maintainer cannot catch that by reading. A roster edit says
+        # `standing = "maintainer"` in a diff; this says sixteen hex characters,
+        # and no eye tells a right hash from a wrong one.
+        #
+        # It also restores the promise the module opens with. `rekey` recomputes
+        # from `components`, so a mismatched row *moves* on a re-key -- the
+        # ledger scored one thing before and another after, which is exactly
+        # what "a metric computed last month recomputes to the same number
+        # today" says cannot happen.
+        try:
+            # The version the row names, not the framework's current one.
+            # A ledger written before a rule change has to keep loading: it is
+            # what `rekey` reads, and it is what `current`, `pool` and scoring
+            # read too. Demanding `version_for` here would make one stale row
+            # refuse the whole file for every command, including the one command
+            # that exists to fix it.
+            #
+            # A row keyed under a version its framework has moved past is
+            # refused where it arrives instead -- `_check_your_file_appends`,
+            # on the pull request that adds it -- and `rekey` names any row it
+            # cannot move.
+            expected = fingerprint(
+                self.components, version=version_of(self.fingerprint)
+            )
+        except FingerprintError as exc:
+            raise LedgerError(f"vote fingerprint: {exc}") from exc
+        except (TypeError, ValueError) as exc:
+            raise LedgerError(f"malformed vote: {exc}") from exc
+        if self.fingerprint != expected:
+            raise LedgerError(
+                f"{self.fingerprint!r} is not the fingerprint of this vote's"
+                f" components ({expected!r}); the key is computed, never stated"
+            )
 
     @property
     def counts_against_analysis(self) -> bool:
@@ -255,9 +297,19 @@ def cast(
     config: str = "",
     note: str = "",
     sitting: str = "",
-    version: int = DEFAULT_VERSION,
+    version: int | None = None,
 ) -> Vote:
-    """Build one validated vote, stamping its fingerprint and the time."""
+    """Build one validated vote, stamping its fingerprint and the time.
+
+    The version comes from :data:`~evals.harness.fingerprint.VERSION_FOR` keyed by the claim's own
+    framework, never from a default. A default is a single rule for a table with
+    one row per package: it keyed an ASVS claim under STRIDE's rule, which reads
+    an action verb an ASVS claim does not carry, so every ASVS vote raised
+    instead of recording. ``version`` stays overridable for a caller re-keying a
+    row deliberately.
+    """
+    if version is None:
+        version = version_for(components.framework)
     return Vote(
         fingerprint=fingerprint(components, version=version),
         components=components,
@@ -316,10 +368,6 @@ class Ledger:
         for (value, _), vote in self.current().items():
             by_finding.setdefault(value, []).append(vote)
         return by_finding
-
-    def voted_fingerprints(self) -> frozenset[str]:
-        """Every fingerprint anybody has answered, for the queue to skip."""
-        return frozenset(vote.fingerprint for vote in self.votes)
 
     def pool(self) -> frozenset[str]:
         """The reference pool: every fingerprint a live verdict puts in it.
@@ -466,18 +514,37 @@ def _replace_voter_file(path: Path, lines: list[str]) -> None:
         raise LedgerError(f"{path}: cannot be written: {exc}") from exc
 
 
-def rekey(votes: Iterable[Vote], version: int) -> list[Vote]:
-    """Recompute every fingerprint under ``version``, from stored components.
+def rekey(votes: Iterable[Vote]) -> list[Vote]:
+    """Recompute every fingerprint from stored components, under the table.
 
     The operation that makes a better recogniser affordable: no re-vote, no
     provider, no credentials, and the answer is a pure function of the ledger.
-    A vote whose components cannot satisfy the new version — no verb, under
-    version 2 — raises, so a partial re-key is impossible.
+    A vote whose components cannot satisfy its framework's version raises, so a
+    partial re-key is impossible.
+
+    Each row is keyed under :data:`~evals.harness.fingerprint.VERSION_FOR` for **its own** framework rather
+    than under one version for the file. One version for the file cannot be
+    right once the table holds two: a ledger carrying a STRIDE row and an ASVS
+    row had no value that re-keyed it, because either choice raised on the other
+    package's rows. So a rule improves by editing its package's entry in the
+    table, and this recomputes what that moved.
     """
-    return [
-        replace(vote, fingerprint=fingerprint(vote.components, version=version))
-        for vote in votes
-    ]
+    moved = []
+    for vote in votes:
+        try:
+            key = fingerprint(
+                vote.components, version=version_for(vote.components.framework)
+            )
+        except FingerprintError as exc:
+            # Name the row. Refusing the whole ledger is right -- a partial
+            # re-key is worse -- but an audit found the refusal unactionable,
+            # because the message said only that some row somewhere could not
+            # move, over a file that holds thousands.
+            raise FingerprintError(
+                f"{vote.voter}'s vote on {vote.case} ({vote.fingerprint}): {exc}"
+            ) from exc
+        moved.append(replace(vote, fingerprint=key))
+    return moved
 
 
 def command_rekey(args: argparse.Namespace) -> int:
@@ -488,6 +555,11 @@ def command_rekey(args: argparse.Namespace) -> int:
     hash, so moving the ledger is arithmetic over a file. No provider, no
     credentials, no re-vote: the ledger stores each vote's components, so a
     version bump is a pure recomputation over the file.
+
+    Every row is keyed under its own framework's entry in ``VERSION_FOR``, so
+    the way to move a rule is to edit that entry and run this. There is no
+    target version to pass: one version for the whole file stopped being a
+    coherent request when the table grew its second row.
 
     Refuses to write anything unless ``--yes`` is given, like ``promote``: this
     rewrites the only human record in the repository, and a preview that also
@@ -502,7 +574,7 @@ def command_rekey(args: argparse.Namespace) -> int:
         return 0
 
     try:
-        moved = rekey(current.votes, version=args.to_version)
+        moved = rekey(current.votes)
     except FingerprintError as exc:
         print(f"cannot re-key: {exc}")
         return 1
@@ -513,9 +585,23 @@ def command_rekey(args: argparse.Namespace) -> int:
         if before.fingerprint != after.fingerprint
     )
     was = sorted({version_of(v.fingerprint) for v in current.votes})
-    print(f"{len(moved)} votes at version {was} -> {args.to_version}")
+    now = sorted({version_of(v.fingerprint) for v in moved})
+    print(f"{len(moved)} votes at version {was} -> {now}")
     print(f"{changed} fingerprints move, {len(moved) - changed} unchanged")
-    print(f"{len(current.pool())} findings in the pool, before and after")
+    # Both pools, computed. This printed one number and asserted it held for
+    # the other, which is a post-condition stated rather than evaluated -- and a
+    # re-key that moved a row to a different finding is exactly what it would
+    # have had to catch.
+    before, after = current.pool(), Ledger(votes=moved).pool()
+    if before == after:
+        print(f"{len(before)} findings in the pool, before and after")
+    else:
+        print(
+            f"POOL MOVED: {len(before)} findings before, {len(after)} after."
+            " A re-key recomputes a key and must not change which findings the"
+            " pool holds; this ledger has a row whose components and key"
+            " disagree."
+        )
 
     if not args.yes:
         print("\npreview only; nothing written. Re-run with --yes to apply.")

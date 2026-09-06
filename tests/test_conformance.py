@@ -6,7 +6,7 @@ answer, and running them together is what produced the imbalance
 [#116](https://github.com/mstarks01/work-agent/issues/116) is about:
 
 * **Application conformance** — does the *application* behave the same way on
-  this provider? Deterministic, and answered here, for all three vendors, on
+  this provider? Deterministic, and answered here, for every vendor, on
   every pull request.
 * **Model quality** — how good are the threat models this model writes? Empirical,
   answered by ``evals/``, and expected to differ between models. A vendor never
@@ -17,7 +17,7 @@ Everything below is **credential-free**. The capability probes read the pinned
 :func:`~analysis_service.binding.build_tier_adapters` a synthetic environment —
 the registry checks that a credential was *declared*, never that it
 authenticates, so a placeholder builds a real adapter without a key and without
-egress. That is what lets one suite cover Vertex, Anthropic and OpenAI equally
+egress. That is what lets one suite cover every vendor equally
 in the offline lane, rather than covering whichever vendor CI happens to hold
 credentials for.
 
@@ -30,8 +30,11 @@ requires the live lanes, and they remain unprovisioned — see
 
 from __future__ import annotations
 
+import re
+from collections.abc import Collection
 from dataclasses import FrozenInstanceError
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 from google.adk.models.base_llm import BaseLlm
@@ -50,13 +53,14 @@ from analysis_service.frameworks.stride.record import ThreatProposals, ThreatRul
 from analysis_service.graph import Pipeline, build_pipeline
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.model_gate import ModelGateError
-from analysis_service.model_tiers import ModelTierConfig, load_model_tiers
 from analysis_service.resilience import load_resilience
 from analysis_service.sampling import load_sampling
 from analysis_service.system_model import SystemModel
 from analysis_service.vendors import (
     VENDOR_NAMES,
+    CredentialMode,
     ProviderAuthError,
+    VendorName,
     join_served,
     vendor_for,
 )
@@ -66,23 +70,72 @@ from tests.factories import (
     ScriptedLlm,
     repo_package_loaders,
     sample_fingerprint,
+    tiers_for,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 CONFIG = PROJECT_ROOT / "config"
+WORKFLOWS = PROJECT_ROOT / ".github" / "workflows"
+
+#: One line of a workflow file, split into the key of a YAML mapping entry and
+#: the scalar it pins. The value is anchored at both ends, so a line pins a
+#: value only when it holds that value and nothing else: a longer identifier
+#: which *contains* it does not match. The optional dash carries a matrix
+#: entry, and the optional quotes and trailing comment carry the other shapes
+#: YAML lets an author write the same pin in.
+_PINNED_SCALAR = re.compile(
+    r"""
+    ^\s*(?:-\s+)?      # an optional sequence dash
+    [\w.-]+:\s*        # the mapping key and its colon
+    (?P<quote>['"]?)   # an optional quote
+    (?P<value>.*?)
+    (?P=quote)         # the closing quote
+    (?:\s+\#.*)?       # an optional trailing comment, which YAML spaces off
+    \s*$               # and any trailing space
+    """,
+    re.VERBOSE,
+)
+
+
+def pins_scalar(text: str, value: str) -> bool:
+    """Does *text* pin *value* as a whole YAML scalar, on any of its lines?
+
+    The one reader of what it means for a workflow to pin a model or a vendor.
+    Both drift checks below call it, because two readers of that rule will
+    eventually disagree and each one's own test will agree with it.
+
+    A text search rather than a YAML parse, and deliberately so: PyYAML is not
+    a declared dependency of this project, and adding one to assert that a
+    string appears in a file would be a poor trade.
+
+    ``splitlines`` rather than a split on ``"\n"``, because a line ends at more
+    characters than that one and a pin on the last of them would read as part
+    of its neighbour.
+    """
+    return any(
+        match["value"] == value
+        for line in text.splitlines()
+        if (match := _PINNED_SCALAR.match(line))
+    )
+
 
 # Placeholder credential material. Every vendor's variables at once, so one
-# mapping serves all three legs: the registry reads only the ones the selected
+# mapping serves every leg: the registry reads only the ones the selected
 # vendor names, and an unused entry authenticates nothing because nothing reads
 # it. Values are visibly fake — a suite that needed a real key would be a suite
 # that only ran where one existed, which is the imbalance this file exists to
 # remove.
+#
+# Derived from the registry rather than written down. A hand-kept copy was a
+# second reader of `_CREDENTIAL_VARS`, and it answered for four vendors on the
+# day a fifth arrived: the binding check raised on the one variable this
+# mapping had never heard of. The loader checks that a variable is declared,
+# never that its value has a shape, so one placeholder serves every variable.
 FAKE_ENV = {
-    "ANALYSIS_ANTHROPIC_API_KEY": "sk-ant-not-a-real-key",
-    "ANALYSIS_OPENAI_API_KEY": "sk-not-a-real-key",
-    "ANALYSIS_VERTEX_PROJECT": "test-project",
-    "ANALYSIS_VERTEX_LOCATION": "us-central1",
-    "GOOGLE_APPLICATION_CREDENTIALS": "/nonexistent/adc.json",
+    var: f"not-a-real-{var.lower()}"
+    for name in VENDOR_NAMES
+    for mode in vendor_for(name).credential_modes
+    for var in vendor_for(name).required_env_vars(mode)
 }
 
 
@@ -95,28 +148,21 @@ def reference_pairs() -> list[tuple[str, str]]:
     ]
 
 
-def tiers_for(vendor: str) -> ModelTierConfig:
-    """The shipped node -> tier map, with both tiers on one vendor's pair.
+def credential_cases() -> list[tuple[VendorName, CredentialMode]]:
+    """Every ``(vendor, mode)`` a deployment can declare, from the registry.
 
-    Built from the real ``config/model_tiers.toml`` rather than a hand-made
-    object, so the node table under test is the one that ships. Only the two
-    selections are substituted, which is exactly what a deployment does.
+    Every mode and not one per vendor: a vendor with a choice fails closed
+    differently under each, and the mode a live lane cannot exercise is exactly
+    the one nothing else would check.
     """
-    base, strong = REFERENCE_MODELS[vendor]
-    return load_model_tiers(
-        CONFIG / "model_tiers.toml",
-        env={
-            "ANALYSIS_MODEL_BASE_VENDOR": vendor,
-            "ANALYSIS_MODEL_BASE_MODEL": base,
-            "ANALYSIS_MODEL_STRONG_VENDOR": vendor,
-            "ANALYSIS_MODEL_STRONG_MODEL": strong,
-            "ANALYSIS_MODEL_REVIEW_VENDOR": "anthropic",
-            "ANALYSIS_MODEL_REVIEW_MODEL": "claude-opus-5",
-        },
-    )
+    return [
+        (vendor, mode)
+        for vendor in VENDOR_NAMES
+        for mode in vendor_for(vendor).credential_modes
+    ]
 
 
-def _pipeline_for(vendor: str) -> Pipeline:
+def _pipeline_for(vendor: VendorName) -> Pipeline:
     """The real graph, built on one vendor's reference pair.
 
     Models are resolved to the shared scripted stand-in rather than to real
@@ -189,6 +235,18 @@ class TestTheMatrixItself:
 
         gemini = profile(vendor_for("vertex"), "gemini-2.5-pro")
         assert gemini.params["seed"] is Capability.SUPPORTED
+
+        # One set of weights, two routes, one cell apart: litellm maps
+        # ``seed`` for ``vertex_ai/`` and refuses it for ``gemini/``. A
+        # capability is a property of the ``(vendor, model)`` pair, and this
+        # is the pair that proves the vendor half is not decorative.
+        developer_api = profile(vendor_for("gemini"), "gemini-2.5-pro")
+        assert developer_api.params["seed"] is Capability.UNSUPPORTED
+        assert {
+            name: cell for name, cell in developer_api.params.items() if name != "seed"
+        } == {name: cell for name, cell in gemini.params.items() if name != "seed"}
+        assert developer_api.structured_output is gemini.structured_output
+        assert developer_api.output_ceiling == gemini.output_ceiling
 
     def test_the_matrix_covers_every_supported_vendor(self):
         """A vendor absent from the matrix is a vendor nobody profiled."""
@@ -289,18 +347,25 @@ class TestModelsCanBeBound:
         for vendor, per_tier in ancestries.items():
             assert per_tier == reference, f"{vendor} binds a different adapter class"
 
-    @pytest.mark.parametrize("vendor", sorted(REFERENCE_MODELS))
-    def test_a_missing_credential_fails_closed_naming_its_own_variable(self, vendor):
+    @pytest.mark.parametrize(("vendor", "mode"), credential_cases())
+    def test_a_missing_credential_fails_closed_naming_its_own_variable(
+        self, vendor, mode
+    ):
         """Equivalent failure behaviour, not an equivalent credential mode.
 
-        The three vendors authenticate differently — that difference is real
-        and stays. What has to be identical is what the *application* does
-        about it: refuse to build, under one error type, naming the variable
-        this vendor needs and never its value.
+        The vendors authenticate differently — that difference is real and
+        stays. What has to be identical is what the *application* does about
+        it: refuse to build, under one error type, naming the variable this
+        vendor needs and never its value.
+
+        Per ``(vendor, mode)`` rather than per vendor, because a mode is what
+        decides which variables are required. Bedrock's ``iam`` mode is the one
+        no live lane sweeps, so this is the only place it is asserted about at
+        all.
         """
         with pytest.raises(ProviderAuthError) as raised:
             build_tier_adapters(
-                tiers_for(vendor),
+                tiers_for(vendor, mode),
                 load_sampling(CONFIG / "sampling.toml", env={}),
                 load_resilience(CONFIG / "resilience.toml", env={}),
                 env={},
@@ -308,7 +373,7 @@ class TestModelsCanBeBound:
 
         message = str(raised.value)
         assert vendor in message
-        assert vendor_for(vendor).required_env_vars[0] in message
+        assert vendor_for(vendor).required_env_vars(mode)[0] in message
         assert not any(value in message for value in FAKE_ENV.values())
 
 
@@ -450,47 +515,207 @@ class TestProvenanceIsProviderIndependent:
 class TestTheLiveLanesSweepWhatWasProfiled:
     """The matrix and the live workflows must name the same models."""
 
-    def test_every_reference_model_appears_in_the_workflow_that_sweeps_it(self):
+    #: Which live sweep lane runs a vendor, keyed by **vendor**. A lane is a
+    #: property of what a workflow sweeps, not of how a deployment
+    #: authenticates: a vendor that allows two credential modes still runs on
+    #: one lane, and asking such a vendor for a sole mode raises.
+    #:
+    #: ``None`` states that no lane sweeps this vendor. The checks below name
+    #: it and skip, rather than assert against somebody else's file — so an
+    #: unswept vendor is a state this table records, and never coverage that
+    #: nobody looked for.
+    #:
+    #: The single reader of which lane sweeps what. A second table answering
+    #: the same question would eventually answer it differently, and each
+    #: one's own test would agree with it.
+    LIVE_SWEEP_LANE: ClassVar[dict[VendorName, str | None]] = {
+        "vertex": "evals-live.yml",
+        "anthropic": "evals-live-api-key.yml",
+        "openai": "evals-live-api-key.yml",
+        # No lane. A sweep needs a baseline name and an eval price entry, and
+        # the Bedrock map rules both out of scope. The smoke lane covers this
+        # vendor; the corpus sweep does not.
+        "bedrock": None,
+        # No lane. The pinned map prices ``gemini/`` routes, so a sweep is
+        # not blocked; nobody has chosen to spend on a second route to the
+        # weights ``evals-live.yml`` already sweeps. The smoke lane covers
+        # this vendor.
+        "gemini": None,
+    }
+
+    #: The lane every vendor is compared on, whatever authenticates it. One
+    #: file for every vendor, so a vendor missing from it has no live
+    #: coverage at all.
+    SMOKE_LANE: ClassVar[Path] = WORKFLOWS / "provider-smoke.yml"
+
+    def sweep_lane(self, vendor: VendorName) -> Path | None:
+        """The live sweep workflow that runs *vendor*, or ``None`` if none does.
+
+        One reader, called by every check below and by the deletion test, so
+        the checks and the test that proves them sensitive cannot come to
+        disagree about which file holds a vendor's pins.
+        """
+        lane = self.LIVE_SWEEP_LANE[vendor]
+        return None if lane is None else WORKFLOWS / lane
+
+    def test_every_vendor_has_a_lane_or_states_it_has_none(self):
+        # The table checked against its registry. A vendor row added tomorrow
+        # raises here, rather than being swept by no lane and asserted about
+        # by nothing.
+        assert set(self.LIVE_SWEEP_LANE) == set(VENDOR_NAMES)
+
+    def test_every_lane_the_table_names_is_a_real_workflow(self):
+        """A table may not name a file the repository does not hold.
+
+        A lane whose filename is wrong reads every check below as green: the
+        model pins it asserts about are read out of a file that is not there,
+        and a missing file is the one shape a text search cannot report.
+        """
+        for vendor, lane in self.LIVE_SWEEP_LANE.items():
+            if lane is None:
+                continue
+            assert (WORKFLOWS / lane).is_file(), (
+                f"{vendor} names {lane}, which is not under .github/workflows/"
+            )
+
+    def test_every_credential_mode_is_exercised_by_some_swept_vendor(self):
+        """The mode-coverage property, restated against the vendor table.
+
+        A mode no swept vendor declares is a deployment class no live lane
+        exercises. That was worth knowing while the lane was keyed by mode,
+        and it is still worth knowing now the key is the vendor — but it is a
+        statement about coverage, so it is asserted rather than used to
+        choose a file.
+        """
+        exercised = {
+            mode
+            for vendor, lane in self.LIVE_SWEEP_LANE.items()
+            if lane is not None
+            for mode in vendor_for(vendor).credential_modes
+        }
+        assert exercised == set(CredentialMode)
+
+    @pytest.mark.parametrize("vendor", VENDOR_NAMES)
+    def test_every_reference_model_appears_in_the_workflow_that_sweeps_it(self, vendor):
         """A live lane pinned to a model nobody profiled is unexercised coverage.
 
-        A text search rather than a YAML parse, and deliberately so: PyYAML is
-        not a declared dependency of this project, and adding one to assert a
-        string appears in a file would be a poor trade. The check is coarse —
-        it cannot tell which matrix leg a model sits on — and it catches the
-        drift that matters, which is a workflow pinning a pair the offline
-        suite has never seen.
-        """
-        workflows = PROJECT_ROOT / ".github" / "workflows"
-        vertex = (workflows / "evals-live.yml").read_text(encoding="utf-8")
-        api_key = (workflows / "evals-live-api-key.yml").read_text(encoding="utf-8")
+        :func:`pins_scalar` decides what pins a model, here and in the smoke
+        check below. The check stays coarse — it cannot tell which matrix leg
+        a model sits on — and it catches the drift that matters, which is a
+        workflow pinning a pair the offline suite has never seen.
 
-        for model in REFERENCE_MODELS["vertex"]:
-            assert model in vertex, f"{model} is profiled but no live lane sweeps it"
-        for vendor in ("anthropic", "openai"):
-            for model in REFERENCE_MODELS[vendor]:
-                assert model in api_key, (
-                    f"{model} is profiled but no live lane sweeps it"
-                )
+        Driven from the registry rather than from a hand-written list of
+        vendors. The list named `vertex` in one branch and the other two in a
+        second, so a fourth vendor row would have been swept by no lane and
+        asserted about by nothing.
+        """
+        lane = self.sweep_lane(vendor)
+        if lane is None:
+            pytest.skip(f"LIVE_SWEEP_LANE says no live lane sweeps {vendor}")
+        text = lane.read_text(encoding="utf-8")
+
+        for model in REFERENCE_MODELS[vendor]:
+            assert pins_scalar(text, model), (
+                f"{model} is profiled on {vendor} but {lane.name} does not sweep it"
+            )
 
     def test_the_smoke_lane_covers_every_vendor_on_the_profiled_pair(self):
         """The smoke is the lane that has to be comparable across vendors.
 
-        The sweeps above are two files by credential class and one of them
-        carries a single vendor; this one file carries all three, so a vendor
-        missing from it is a vendor with no live coverage at all — which is the
+        The sweeps above are one file per lane and a vendor may have no lane
+        at all; this one file carries every vendor, so a vendor missing from
+        it is a vendor with no live coverage at all — which is the
         imbalance
         [#116](https://github.com/mstarks01/work-agent/issues/116) asked to
         remove, reappearing in the lane built to remove it.
         """
-        smoke = (
-            PROJECT_ROOT / ".github" / "workflows" / "provider-smoke.yml"
-        ).read_text(encoding="utf-8")
+        smoke = self.SMOKE_LANE.read_text(encoding="utf-8")
 
         for vendor, models in REFERENCE_MODELS.items():
-            assert vendor in smoke, f"{vendor} has no lane in the provider smoke"
+            assert pins_scalar(smoke, vendor), (
+                f"{vendor} has no lane in the provider smoke"
+            )
             for model in models:
-                assert model in smoke, (
+                assert pins_scalar(smoke, model), (
                     f"{model} is profiled but the smoke lane does not pin it"
+                )
+
+    def test_a_prefixed_identifier_does_not_pin_the_bare_name(self):
+        """The defect this matcher replaces, written as its counter-example.
+
+        A Bedrock identifier is a vendor prefix plus the Anthropic name, so
+        the text `anthropic.claude-sonnet-4-6` contains `claude-sonnet-4-6`.
+        Under the substring search this replaces, a Bedrock pin answered for
+        Anthropic's pair: a person who deleted Anthropic's own pin left the
+        check passing on somebody else's line, and the suite reported coverage
+        that was not there.
+        """
+        line = "            base_model: anthropic.claude-sonnet-4-6"
+        assert pins_scalar(line, "anthropic.claude-sonnet-4-6")
+        assert not pins_scalar(line, "claude-sonnet-4-6")
+
+    @pytest.mark.parametrize(
+        ("line", "value"),
+        [
+            ("      ANALYSIS_MODEL_BASE_MODEL: gemini-2.5-flash", "gemini-2.5-flash"),
+            ("          - vendor: anthropic", "anthropic"),
+            ('            base_model: "gpt-4o"', "gpt-4o"),
+            ("            base_model: 'gpt-4o'", "gpt-4o"),
+            ("            base_model: gpt-4o   # the profiled pair", "gpt-4o"),
+            ("            base_model: gpt-4o\r\n", "gpt-4o"),
+            ("            base_model: gpt-4o\u2028", "gpt-4o"),
+        ],
+    )
+    def test_a_pin_is_read_in_every_shape_a_workflow_can_write_it(self, line, value):
+        """What the producer may emit, rather than what it emits today.
+
+        A matcher that reads only the shape in front of it fails silently on
+        the first author who quotes a value, comments a line or saves a file
+        with a line terminator this one never listed.
+        """
+        assert pins_scalar(line, value)
+
+    @pytest.mark.parametrize(
+        "line",
+        [
+            "            base_model: gpt-4o-mini",
+            "            base_model: ${{ matrix.base_model }}",
+            "            # base_model: gpt-4o",
+            "            description: the gpt-4o leg of the smoke",
+            # YAML spaces a comment off the value, so this pins one long
+            # scalar and the matcher must read it the way the runner will.
+            "            base_model: gpt-4o# not a comment",
+        ],
+    )
+    def test_a_value_inside_a_longer_scalar_is_not_a_pin(self, line):
+        assert not pins_scalar(line, "gpt-4o")
+
+    @pytest.mark.parametrize("vendor", VENDOR_NAMES)
+    def test_deleting_a_pin_from_a_live_workflow_breaks_the_check(self, vendor):
+        """The checks read the real files, and not only their own examples.
+
+        A matcher can be exactly right about a synthetic line and still read
+        nothing in the workflow it guards. That failure is silent, because an
+        assertion which never sees a pin never fails. So drop each real pin out
+        of the real text, one at a time, and require the answer to change.
+
+        A vendor with no sweep lane keeps the smoke half of this check, which
+        is the half every vendor has.
+        """
+        sweep = self.sweep_lane(vendor)
+        lanes = {self.SMOKE_LANE: (vendor, *REFERENCE_MODELS[vendor])}
+        if sweep is not None:
+            lanes[sweep] = REFERENCE_MODELS[vendor]
+
+        for lane, pins in lanes.items():
+            text = lane.read_text(encoding="utf-8")
+            for pin in pins:
+                assert pins_scalar(text, pin)
+                without = "\n".join(
+                    line for line in text.splitlines() if not pins_scalar(line, pin)
+                )
+                assert not pins_scalar(without, pin), (
+                    f"{lane.name} pins {pin} on no line the matcher reads"
                 )
 
 
@@ -541,3 +766,153 @@ def test_a_stated_temperature_cannot_bind_openais_strong_reference_model(tmp_pat
             load_resilience(CONFIG / "resilience.toml", env={}),
             env=FAKE_ENV,
         )
+
+
+class TestTheDocumentedPairsAreTheProfiledPairs:
+    """Three files tell a reader what the reference pairs are, and one table
+    decides. Each of the three names ``conformance.REFERENCE_MODELS`` in its own
+    prose, and until these checks existed nothing held any of them to it.
+
+    They drifted, which is why the checks are here rather than in a habit. The
+    parametrize list in ``tests/test_model_gate.py`` said ``openai`` was
+    ``gpt-4.1-mini`` / ``gpt-4.1`` while ``docs/First-Run.md`` — the table its
+    own docstring named — said something else, and it carried no ``bedrock``
+    row at all. That list now reads the registry; these three read the files.
+    """
+
+    FIRST_RUN: ClassVar[Path] = PROJECT_ROOT / "docs" / "First-Run.md"
+    TIERS_TEMPLATE: ClassVar[Path] = PROJECT_ROOT / "config" / "model_tiers.toml"
+    WEB_APP: ClassVar[Path] = PROJECT_ROOT / "docs" / "Web-App.md"
+
+    # One row of the First-Run table: the vendor's display name, the two
+    # backticked models, and the credentials cell. The vendor is read from the
+    # credentials cell rather than the display name, because "Vertex AI" is
+    # prose and ``ANALYSIS_VERTEX_...`` is the registry's own spelling.
+    _ROW = re.compile(
+        r"^\|[^|]+\|\s*`(?P<base>[^`]+)`\s*\|\s*`(?P<strong>[^`]+)`\s*\|"
+        r"\s*`ANALYSIS_(?P<vendor>[A-Z]+)_[^`]+`"
+    )
+
+    def test_the_first_run_table_is_the_registry(self):
+        """The table says outright that it holds "the reference pairs declared
+        in ``analysis_service.conformance.REFERENCE_MODELS``". This is what
+        makes that sentence true rather than aspirational."""
+        documented = {
+            match["vendor"].lower(): (match["base"], match["strong"])
+            for line in self.FIRST_RUN.read_text(encoding="utf-8").splitlines()
+            if (match := self._ROW.match(line))
+        }
+
+        assert documented == {
+            vendor: tuple(models) for vendor, models in REFERENCE_MODELS.items()
+        }
+
+    def test_the_tier_template_names_every_profiled_model(self):
+        """``config/model_tiers.toml``'s header lists the pairs as a comment and
+        claims each "is a real pair the offline conformance suite profiles".
+
+        Membership rather than a line parser: the comment wraps a long pair
+        across two lines, and a check that a wrap breaks is a check that gets
+        deleted. One direction only, and deliberately — the file quotes node
+        names and tier names as well, so "names nothing else" is not a property
+        this file can have.
+        """
+        text = self.TIERS_TEMPLATE.read_text(encoding="utf-8")
+        quoted = set(re.findall(r'"([^"]+)"', text))
+        profiled = {model for models in REFERENCE_MODELS.values() for model in models}
+
+        assert profiled <= quoted, (
+            f"these profiled models are named nowhere in"
+            f" {self.TIERS_TEMPLATE.name}: {sorted(profiled - quoted)}"
+        )
+
+    def test_the_web_app_example_selects_a_profiled_pair(self):
+        """``docs/Web-App.md`` shows what the page prints for "whichever pair
+        you selected in step 2 of First-Run", so its example has to be a pair
+        First-Run offers. A stale example here reads as a working selection."""
+        shown = re.findall(
+            r"^(base|strong)\s+→\s+(\S+)\s*/\s*(\S+)$",
+            self.WEB_APP.read_text(encoding="utf-8"),
+            re.MULTILINE,
+        )
+
+        assert shown, "docs/Web-App.md shows no tier lines to check"
+        for tier, vendor, model in shown:
+            index = 0 if tier == "base" else 1
+            assert REFERENCE_MODELS[vendor][index] == model, (
+                f"Web-App.md shows {tier} as {vendor}/{model}, which is not"
+                f" that vendor's profiled {tier} model"
+            )
+
+
+# A dated build's identifier ends in the date it was published, in either of the
+# two spellings the pinned map uses. Anchored on the whole tail, so
+# ``gpt-4o-mini-2024-07-18`` is not read as a build of ``gpt-4o``: it is a
+# different model whose own name happens to start with this one's.
+_DATED_BUILD = re.compile(r"^(20\d{6}|20\d\d-\d\d-\d\d)$")
+
+
+def dated_builds_of(model: str, catalogue: Collection[str]) -> list[str]:
+    """Every identifier in ``catalogue`` that is ``model`` plus a date."""
+    return sorted(
+        key
+        for key in catalogue
+        if key.startswith(f"{model}-") and _DATED_BUILD.match(key[len(model) + 1 :])
+    )
+
+
+def test_no_reference_model_is_an_alias_for_a_dated_build():
+    """A reference model names a build, never a name pointing at one.
+
+    **The matrix is a claim about what was profiled**, so the identifier it
+    carries has to mean one build. OpenAI publishes dated builds and fronts them
+    with a bare name, and it chooses which build that name means: ``gpt-4o``
+    resolved to ``gpt-4o-2024-08-06``, which is neither the newest of its three
+    nor a choice this repository makes. Naming the alias would make the matrix a
+    claim about whichever build OpenAI points it at next, and nothing offline
+    would say the claim had moved.
+
+    A live run fails closed on its own — ``openai`` is ``provider_reported``, so
+    a moved alias moves every Execution Identity — which is why the *form rule*
+    still accepts an alias from an operator (see ``vendors._CATCH_ALL``). This
+    is the narrower rule for the pairs this repository itself pins, and it is
+    decidable offline against the pinned cost map, with no credential.
+
+    Stated as a property rather than as a list of names, so it answers for a
+    vendor row nobody has written: any future pair that names an alias fails
+    here, whichever vendor serves it.
+    """
+    import litellm
+
+    aliases = {
+        f"{vendor}/{model}": builds
+        for vendor, models in REFERENCE_MODELS.items()
+        for model in models
+        if (builds := dated_builds_of(model, litellm.model_cost))
+    }
+
+    assert not aliases, (
+        f"these reference models front dated builds rather than naming one:"
+        f" {aliases}. Pin the build the alias resolves to — the matrix says"
+        f" which build was profiled, and an alias is one the provider moves."
+    )
+
+
+def test_the_alias_rule_finds_the_alias_it_was_written_for():
+    """Guards the guard. A rule that matches nothing passes vacuously, and this
+    one would have, had the tail anchor been a prefix test: ``gpt-5.6`` and
+    every Claude pair front no dated build, so the check above is all-clear on
+    an empty catalogue too.
+
+    ``gpt-4o`` is the identifier that motivated the rule, and it still fronts
+    three dated builds in the pinned map.
+    """
+    import litellm
+
+    assert dated_builds_of("gpt-4o", litellm.model_cost) == [
+        "gpt-4o-2024-05-13",
+        "gpt-4o-2024-08-06",
+        "gpt-4o-2024-11-20",
+    ]
+    # The sub-family is a different model, not a build of this one.
+    assert "gpt-4o-mini-2024-07-18" not in dated_builds_of("gpt-4o", litellm.model_cost)

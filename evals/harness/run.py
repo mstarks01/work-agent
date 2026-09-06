@@ -113,7 +113,12 @@ from evals.harness.provenance import (
     RunProvenance,
     provenance_of,
 )
-from evals.harness.reference import GoldenCase, load_corpus
+from evals.harness.reference import (
+    CorpusError,
+    GoldenCase,
+    corpus_refusal,
+    load_corpus,
+)
 from evals.harness.scorer import CaseScore
 from evals.harness.stability import (
     CaseStability,
@@ -161,7 +166,7 @@ def stride_block(report: Report) -> FrameworkAnalysis:
 def stride_threats(report: Report) -> list[Threat]:
     """This report's STRIDE claims, at the record type they validate as.
 
-    ``claims`` is annotated at the neutral :class:`RuledClaim` because a block
+    ``claims`` is annotated at the neutral :class:`~analysis_service.report.RuledClaim` because a block
     holds whatever its own package produced; the scorers grade ``category`` and
     ``severity``, which only STRIDE's record carries. The envelope already
     validated this block as its package's own shape, so this re-states that
@@ -1450,13 +1455,6 @@ def _pairing_arguments(parser: argparse.ArgumentParser) -> None:
 
 def _rekey_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
-        "--to-version",
-        type=int,
-        required=True,
-        help="the fingerprint version to move to; see VERSION_FOR for which"
-        " rule each framework is keyed under",
-    )
-    parser.add_argument(
         "--ledger", default=str(ledger.DEFAULT_LEDGER_PATH), help="the vote ledger"
     )
     parser.add_argument(
@@ -1635,7 +1633,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             command.arguments(sub)
         sub.set_defaults(func=command.run)
     args = parser.parse_args(argv)
-    return args.func(args)
+    # Every command that reads the corpus refuses here, through the one
+    # sentence `webapp/sitting.py` and the offline page print: the error names
+    # the case and the field, and a traceback over it names neither.
+    try:
+        return args.func(args)
+    except CorpusError as exc:
+        print(corpus_refusal(exc), file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":

@@ -33,6 +33,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from analysis_service.certification import CertifyResult
+from analysis_service.identity import IDENTITY_VERSION
 from analysis_service.report import NodeLatency, TokenUsage
 from evals.harness.instruments import INSTRUMENTS, Sweep, artifact_blocks
 from evals.harness.provenance import ProvenanceError, RunProvenance
@@ -94,7 +95,14 @@ class RepoCommit(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    commit: str = Field(min_length=1)
+    #: A full or abbreviated hex sha, or :data:`UNRECORDED`. Bounded because a
+    #: recorded commit reaches ``git`` argv in
+    #: option position -- ``git ls-tree -r -z <commit> --`` -- so a value opening
+    #: with ``-`` is read as an option rather than a commit. Every path fails
+    #: closed today, and the result is a silently skipped check rather than an
+    #: injected argument; a shape the field can state is better than a failure
+    #: mode the reader has to work out.
+    commit: str = Field(pattern=rf"^([0-9a-f]{{7,40}}|{UNRECORDED})$")
     #: ``None`` exactly when the commit was never recorded. A recorded sweep
     #: always knows, so a missing answer and "the tree was clean" stay distinct.
     clean: bool | None = None
@@ -247,6 +255,19 @@ def load_artifact(path: Path | str) -> EvalArtifact:
         raise ProvenanceError(
             f"{path}: no provenance block, so nothing records what actually"
             " served this run"
+        )
+
+    if "identity_version" not in block:
+        # Written before the identity carried a version. The field has no
+        # default on purpose: an artifact that omitted it used to claim the
+        # version it was about to be checked against, so it failed later with
+        # "the recorded fingerprint does not follow from ..." — the wrong error,
+        # naming the wrong cause.
+        raise ProvenanceError(
+            f"{path}: the provenance block records no identity_version, so it"
+            " predates execution-identity versioning. Its fingerprints hash a"
+            f" payload this build cannot recompute (version {IDENTITY_VERSION});"
+            " the run's recall, precision and spread still read"
         )
 
     stored = block.get("generation_identities")

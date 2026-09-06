@@ -1,7 +1,7 @@
 """The live half of the provider contract: did this vendor actually serve the graph.
 
 :mod:`analysis_service.conformance` answers what a provider would be asked for,
-from the pinned model map, for all three vendors at once, with no credential and
+from the pinned model map, for every vendor at once, with no credential and
 no egress. That is what lets it run on every pull request, and it is also the
 exact limit of what it can claim: nothing in it is evidence that any vendor has
 served a request.
@@ -657,9 +657,15 @@ def _redacted(text: str, deployment: Deployment) -> str:
     registry already knows which variables hold credential material for the
     selected vendors, so the substitution is exact rather than a guess at what a
     key looks like (OWASP A09). Names survive; values never do.
+
+    ``secret_env_vars``, not ``required_env_vars``. The wider list holds
+    addressing config too, and substituting a region out of a provider message
+    hides the one fact that diagnoses a wrong-region request — a corrupted
+    diagnostic, in the file whose whole job is to report one.
     """
     for selection in deployment.tiers.tiers.values():
-        for var in selection.vendor_entry.required_env_vars:
+        mode = deployment.tiers.credential_mode(selection.vendor)
+        for var in selection.vendor_entry.secret_env_vars(mode):
             value = deployment.env.get(var, "").strip()
             if value:
                 text = text.replace(value, f"${{{var}}}")

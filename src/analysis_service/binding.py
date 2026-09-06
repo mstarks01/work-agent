@@ -25,7 +25,7 @@ Constructor kwargs reach ``acompletion`` through ``_additional_args`` before
 ``drop_params``, here or through ``LITELLM_DROP_PARAMS``, because LiteLLM's
 default is fail-closed and the sampling fingerprint's honesty depends on it.
 
-Six build-time gates fire per tier, so a misconfiguration costs nothing rather
+Seven build-time gates fire per tier, so a misconfiguration costs nothing rather
 than dying on node one of a paid-for job:
 
 * the supported-param check (:mod:`analysis_service.model_gate`);
@@ -44,7 +44,11 @@ than dying on node one of a paid-for job:
   at output validation mid-job, which is the one failure shape the other gates
   cannot see, because both the request and the response are well-formed;
 * the credential check (:meth:`Vendor.credential_kwargs`), which fires once per
-  tier and fails closed under :class:`ProviderAuthError`.
+  tier and fails closed under :class:`~analysis_service.vendors.ProviderAuthError`;
+* the vendor-SDK check (:func:`~analysis_service.vendors.require_sdk`), which
+  asks whether the client library this vendor's provider needs is in the image.
+  Once per bound tier, so a tier nothing runs on costs no SDK — the same rule
+  that makes it cost no credential.
 
 No vendor is privileged, and every model reaches its provider through
 ``LiteLlm``. ADK emits a warning when a Gemini model runs through LiteLLM. That
@@ -89,6 +93,7 @@ from analysis_service.vendors import (
     Vendor,
     claude_generation,
     openai_reasoning_model,
+    require_sdk,
 )
 
 if TYPE_CHECKING:
@@ -312,16 +317,19 @@ def build_tier_adapters(
     refuse to start without them. The tier map is what says which tiers are in
     use, and it is read here rather than assumed.
 
-    A tier nothing runs on is still *selected*: the config requires a
-    ``(vendor, model)`` pair for it, so moving a node onto it later is a one-line
-    edit rather than a discovery. What it does not require is a credential for a
-    provider this deployment does not call.
+    A tier nothing runs on needs no selection either. The config requires a
+    ``(vendor, model)`` pair only for the tiers the node map names -- the same
+    rule this loop applies -- so moving a node onto an empty tier is refused at
+    the edit that moves it, by the loader, rather than at a first run that never
+    reaches the tier. What it does not require is a credential for a provider
+    this deployment does not call.
 
     Raises :class:`~analysis_service.model_gate.ModelGateError` if a bound tier's
     sampling is unsupported by its ``(vendor, model)`` — whether LiteLLM says so
-    or :func:`_check_temperature_unset` does — and
+    or :func:`_check_temperature_unset` does —
     :class:`~analysis_service.vendors.ProviderAuthError` if its credentials are
-    missing.
+    missing, and :class:`~analysis_service.vendors.VendorSdkError` if the vendor's
+    client library is not installed.
     """
     if env is None:
         env = os.environ
@@ -364,6 +372,7 @@ def build_tier_adapters(
         )
         _check_output_ceiling(vendor, selection.model, tier_sampling, source)
         _check_native_structured_output(vendor, selection.model, tier_sampling, source)
+        require_sdk(selection.vendor)
         adapters[tier] = retrying(
             model=selection.route,
             # Zero, and not because retry is off: it is one layer up, in
@@ -373,7 +382,7 @@ def build_tier_adapters(
             # means requests instead of half of a product with them.
             **{_NUM_RETRIES_KWARG: 0},
             **tier_sampling.constructor_kwargs(),
-            **vendor.credential_kwargs(env),
+            **vendor.credential_kwargs(env, tiers.credential_mode(selection.vendor)),
         )
     return adapters
 

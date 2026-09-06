@@ -58,7 +58,14 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
     Ed25519PrivateKey,
     Ed25519PublicKey,
 )
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from pydantic import (
+    AwareDatetime,
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    model_validator,
+)
 
 from analysis_service.errors import ConfigError
 
@@ -75,12 +82,42 @@ PAYLOAD_TYPE = "application/vnd.work-agent.report+json"
 _SIGNATURE_LENGTH = 64
 
 
-class AttestationError(ValueError):
-    """A report cannot be signed, or an attestation cannot be verified."""
-
-
 class KeyringError(ConfigError):
     """The verification keyring is missing or unusable."""
+
+
+class DuplicateKeyError(ValueError):
+    """A JSON object naming one key twice, which two parsers may read apart."""
+
+
+def _no_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    """``object_pairs_hook`` that refuses an object naming a key twice.
+
+    A signature covers the canonical form of the *parsed* document, which is
+    what lets a verifier check a report without this project's models. The cost
+    is that parsing is where two readers can disagree: ``json`` keeps the last
+    of a repeated key, other parsers keep the first, and a file carrying both
+    ``"summary": "critical"`` and ``"summary": "none"`` verifies here while
+    reading the other way somewhere else.
+
+    Nothing this service produces has a repeated key, so refusing one costs a
+    real report nothing and takes the disagreement away.
+    """
+    seen: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in seen:
+            raise DuplicateKeyError(f"{key!r} appears twice in one object")
+        seen[key] = value
+    return seen
+
+
+def load_report(text: str) -> Mapping[str, Any]:
+    """One report from JSON text, refusing what two parsers could read apart.
+
+    The reader a verifier should use. ``json.loads`` on its own is not enough:
+    see :func:`_no_duplicate_keys`.
+    """
+    return json.loads(text, object_pairs_hook=_no_duplicate_keys)
 
 
 def canonicalize(report: Mapping[str, Any]) -> bytes:
@@ -95,6 +132,12 @@ def canonicalize(report: Mapping[str, Any]) -> bytes:
     so a verifier can work from the JSON file alone — it must not need this
     project's models to check a signature, which is most of what "operates
     independently of the producing service" means.
+
+    **What is covered is the canonical form of the parsed document, not the
+    file's bytes.** Two files that parse alike verify alike, which is the point:
+    a re-serialized report is the same report. It also means parsing is where a
+    forgery would live, so :func:`load_report` is the reader that closes the one
+    way two parsers can disagree about what a file says.
     """
     return json.dumps(
         report, sort_keys=True, separators=(",", ":"), ensure_ascii=False
@@ -130,7 +173,13 @@ class Attestation(BaseModel):
     key_id: str = Field(min_length=1, max_length=200)
     #: base64, over the canonical bytes.
     signature: str = Field(min_length=1)
-    signed_at: datetime
+    #: Aware, always. It is compared against a key's retirement, and Python
+    #: refuses to order a naive datetime against an aware one -- so a naive
+    #: value here raised ``TypeError`` out of :func:`verify`, past a handler
+    #: that catches neither, and exited on a code the table does not name. This
+    #: field arrives in the file a caller supplies, so the shape is theirs to
+    #: get wrong and this is where it is refused.
+    signed_at: AwareDatetime
 
     def signed_payload(self) -> bytes:
         """The bytes the signature is actually over. See :func:`signed_payload`."""
@@ -227,7 +276,9 @@ class VerificationKey(BaseModel):
     status: KeyStatus
     #: When this key stopped signing. Required for a retired key and meaningless
     #: for an active one, so it is checked rather than merely typed.
-    retired_at: datetime | None = None
+    #: Aware, for the reason :attr:`Attestation.signed_at` is: the two are
+    #: compared, and TOML's local date-time is naive and perfectly valid TOML.
+    retired_at: AwareDatetime | None = None
 
     @model_validator(mode="after")
     def _retirement_carries_its_date(self) -> Self:

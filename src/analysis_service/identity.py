@@ -23,15 +23,12 @@ matched. Binding the requested route as well makes the manifest bless a pair,
 and the requested half comes from the deployment's own configuration, where the
 translator has no say. The provider's claim can no longer select an approved
 entry by itself. It still cannot be verified by itself either, which is why
-:data:`SERVED_TRUST` is in the payload rather than in a comment.
+``served_trust`` is in the payload rather than in a comment.
 
-No endpoint or region is here yet, and that is deliberate rather than
-overlooked. Whether a region scope belongs in an execution identity is
-[#496](https://github.com/mstarks01/work-agent/issues/496)'s question. Bedrock
-gives one set of weights two spellings, and Vertex's location has never been in
-the payload. Answering it here would decide that ticket by accident. It becomes
-a version 2 field when #496 rules, and :data:`IDENTITY_VERSION` is what makes
-adding it a re-key rather than a silent widening.
+**No endpoint or region is in the payload, on any vendor.** That is a ruling
+rather than an omission: a region names where a request went, not what decided
+the answer, and two regions serving one set of weights would give one run two
+fingerprints for no difference a reader could act on.
 
 Widening the identity re-baselines every blessed fingerprint. A prompt edit, a
 ``litellm`` bump or a service release now moves every hash, so a deployment's
@@ -52,23 +49,34 @@ from functools import cache
 from importlib.metadata import PackageNotFoundError, version
 from typing import Any, Final
 
+from analysis_service.vendors import ServedTrust, vendor_for_route
+
 #: The identity schema. Bumped whenever the payload gains, loses or re-spells a
 #: field, because every fingerprint moves when it does. Certification refuses a
 #: manifest written for a different one rather than comparing across them.
-IDENTITY_VERSION: Final = 1
-
-#: How much the served build is worth. It is read off the provider's own event
-#: stream, so it attests to nothing on its own — and it rides *inside* the
-#: payload so that a future identity which really can verify a served build
-#: produces a different hash rather than a same-looking one with a better story.
-SERVED_TRUST: Final = "provider_reported"
+#:
+#: Version 2 makes ``served_trust`` vary by vendor. It was the constant
+#: ``"provider_reported"``, which was false for ``vertex``: litellm fills the
+#: served identifier from the request there, so every vertex fingerprint stated
+#: that a provider named the build and no provider did.
+IDENTITY_VERSION: Final = 2
 
 #: Every distribution whose code sits between a node's request and the
 #: provider's response, so a version change here can change an answer. A table
 #: rather than three named fields: adding the next one is an entry, and the
 #: payload spells the distribution names it read rather than a shape that has to
 #: be kept in step with them.
-BUILD_DISTRIBUTIONS: Final = ("analysis-service", "google-adk", "litellm")
+#:
+#: ``google-genai`` sits there too, and was missing: it is what ADK hands a
+#: request to, four shipped modules import it, and ``google-adk==2.5.0`` permits
+#: any ``2.x`` -- so it moved while an identity that did not name it hashed the
+#: same before and after, which is the exact drift this table exists to catch.
+BUILD_DISTRIBUTIONS: Final = (
+    "analysis-service",
+    "google-adk",
+    "google-genai",
+    "litellm",
+)
 
 
 class BuildIdentityError(RuntimeError):
@@ -98,6 +106,23 @@ def build_identity() -> Mapping[str, str]:
                 " identity to certify against"
             ) from exc
     return versions
+
+
+def served_trust_for(requested_route: str) -> ServedTrust:
+    """How much the served build is worth, for the vendor a route names.
+
+    Read off the *requested* route because that is the only key the three call
+    sites hold. The producer has a route and no ``Vendor``; the two verifiers
+    recompute from an artifact's recorded ``requested_model``, which is a
+    string. :func:`~analysis_service.vendors.vendor_for_route` is the one
+    reader of the rule that turns it into a vendor.
+
+    Raising on a route that names no vendor is safe, and is the point.
+    ``node_models`` is built from the tier config through ``Vendor.prefix``, so
+    the producer always holds a registry prefix, and a node that never reached a
+    model carries no served build and is never fingerprinted at all.
+    """
+    return vendor_for_route(requested_route).served_trust
 
 
 def execution_identity(
@@ -131,7 +156,7 @@ def execution_identity(
         "version": IDENTITY_VERSION,
         "requested": requested_route,
         "served": served_route,
-        "served_trust": SERVED_TRUST,
+        "served_trust": served_trust_for(requested_route),
         "sampling": dict(sampling),
         "instructions": instruction_sha256,
         "build": dict(build),

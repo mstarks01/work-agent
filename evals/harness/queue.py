@@ -38,7 +38,6 @@ from evals.harness import ledger
 from evals.harness.fingerprint import Components, key_claim
 from evals.harness.identity import FlowMap
 from evals.harness.ledger import Ledger
-from evals.harness.verbs import GLOSS, family_of
 
 
 @dataclass(frozen=True)
@@ -87,23 +86,23 @@ class QueueItem:
         return 0 < self.finding.seen_in < self.finding.runs
 
     def to_json(self) -> dict[str, Any]:
+        """What the review page reads, and nothing else.
+
+        Every key here is one the page renders. The fields it does not render
+        stay on the dataclass, where the server reads them: the vote route takes
+        `components` from the session rather than from the browser, and the
+        question is picked from `finding.framework` here rather than sent. A key
+        the page ignores is a field a reviewer's browser holds for no reason,
+        and this payload is the one the queue's blindness rests on.
+        """
         return {
             "fingerprint": self.fingerprint,
-            "components": self.components.to_json(),
             "case": self.finding.case,
-            "framework": self.finding.framework,
             "lane": self.finding.lane,
             "title": self.finding.title,
             "description": self.finding.description,
             "element_ids": list(self.finding.element_ids),
             "quotes": list(self.finding.quotes),
-            "verb": self.finding.verb,
-            "identifier": self.finding.identifier,
-            "verb_gloss": GLOSS.get(self.finding.verb or "", ""),
-            "verb_family": (family_of(self.finding.verb) if self.finding.verb else ""),
-            "seen_in": self.finding.seen_in,
-            "runs": self.finding.runs,
-            "priority": self.priority,
             "why": self.why,
         }
 
@@ -126,14 +125,6 @@ PRIORITIES: tuple[tuple[str, int, str], ...] = (
         ),
     ),
     (
-        "unmatched",
-        20,
-        (
-            "no reference set carries this, so nothing scores it either way until"
-            " somebody says whether it is real"
-        ),
-    ),
-    (
         "new",
         10,
         (
@@ -143,16 +134,32 @@ PRIORITIES: tuple[tuple[str, int, str], ...] = (
     ),
 )
 
+# There was a third row between these two, ``unmatched``, weighing whether the
+# reference pool already carried the finding. It is gone because it could not
+# answer that question without answering a different one.
+#
+# The pool is derived from votes, and this queue skips what is already
+# answered. In an unnamed queue "answered" is every fingerprint anybody voted
+# on, and the pool is a subset of that, so nothing pooled ever survived to be
+# ranked and the row fired on everything. In a queue built for a named voter
+# "answered" is only that voter's, so a pooled finding that survives was pooled
+# by *somebody else* -- and the row's weight, its position in the order and the
+# reason printed beside it then told this reviewer how another reviewer had
+# voted. The second-opinion pass is the one place that must not be told.
+#
+# So the row was dead where it was safe and an oracle where it was live. Ranking
+# by the corpus reference sets would be a different row, honestly answering the
+# question this one's prose claimed; it is not this one.
 
-def priority_of(finding: Finding, in_reference_set: bool) -> tuple[int, str]:
+
+def priority_of(finding: Finding) -> tuple[int, str]:
     """The first reason that applies, with its weight — never the sum.
 
-    Summing would rank a finding that is merely new-and-unmatched above a
-    volatile one, and volatility is the reason worth a person's click.
+    Summing would rank a finding that is merely new above a volatile one, and
+    volatility is the reason worth a person's click.
     """
     reasons = {
         "volatile": 0 < finding.seen_in < finding.runs,
-        "unmatched": not in_reference_set,
         "new": True,
     }
     for name, weight, why in PRIORITIES:
@@ -161,34 +168,61 @@ def priority_of(finding: Finding, in_reference_set: bool) -> tuple[int, str]:
     raise AssertionError("'new' is unconditional, so this cannot be reached")
 
 
+def answered(ledger: Ledger, *, voter: str, sitting: str) -> frozenset[str]:
+    """The fingerprints this queue skips, and the one answer that does not count.
+
+    ``needs-evidence`` is not an answer about the finding. The reviewer said
+    they could not judge it from what they were shown, and the button says
+    "Needs more evidence" -- so treating it as answered took the finding out of
+    their queue for good, which is the opposite of what they asked for. It was
+    the one input that guaranteed they would never see the finding again.
+
+    So it holds for the sitting it was cast in and no longer: enough to stop the
+    finding coming straight back in the same session, and not enough to lose it.
+    A later sitting asks again, over whatever evidence exists by then, which is
+    what the reviewer was asking for.
+
+    **Public because the app re-asks the same question per request.** It builds
+    the queue once and filters it again on every serve, and when that filter was
+    a second copy of this rule it was a copy that did not have this paragraph in
+    it: it counted a `needs-evidence` answer as answered, and dropped what this
+    had just re-offered. One rule needs one reader.
+    """
+    return frozenset(
+        value
+        for (value, who), vote in ledger.current().items()
+        if (not voter or who == voter)
+        and (vote.verdict != "needs-evidence" or vote.sitting == sitting)
+    )
+
+
 def build(
     findings: Iterable[Finding],
     flows_by_case: Mapping[str, FlowMap],
     ledger: Ledger,
-    reference_pool: frozenset[str] = frozenset(),
     voter: str = "",
+    sitting: str = "",
 ) -> list[QueueItem]:
     """The queue: unanswered findings, most informative first.
 
     ``voter`` narrows "already answered" to *this* reviewer, which is what makes
     a second opinion possible: leaving it empty skips everything anybody
     answered, and naming a reviewer skips only what they answered themselves.
+    ``sitting`` is this session's id, which decides how long a ``needs-evidence``
+    answer holds -- see :func:`answered`.
 
     Deduplicated by fingerprint, keeping the first occurrence. Two runs
     producing one finding is the normal case and is one question, not two.
     :func:`_keyed` is where a finding gets its fingerprint, under its own
     framework's rule.
     """
-    if voter:
-        answered = frozenset(key[0] for key in ledger.current() if key[1] == voter)
-    else:
-        answered = ledger.voted_fingerprints()
+    skip = answered(ledger, voter=voter, sitting=sitting)
 
     items: dict[str, QueueItem] = {}
     for value, components, finding in _keyed(findings, flows_by_case):
-        if value in answered or value in items:
+        if value in skip or value in items:
             continue
-        weight, why = priority_of(finding, value in reference_pool)
+        weight, why = priority_of(finding)
         items[value] = QueueItem(
             fingerprint=value,
             components=components,

@@ -14,10 +14,14 @@ from __future__ import annotations
 
 import contextlib
 import os
+import re
 import sys
+from pathlib import Path
+from typing import ClassVar
 
 import pytest
 
+from analysis_service.conformance import REFERENCE_MODELS
 from analysis_service.model_gate import (
     ModelGateError,
     assert_kwarg_supported,
@@ -274,39 +278,36 @@ class TestErrorsPointAtTheKnob:
 
 @pytest.mark.parametrize(
     ("vendor", "base_model", "strong_model"),
-    [
-        ("vertex", "gemini-2.5-flash", "gemini-2.5-pro"),
-        ("anthropic", "claude-sonnet-4-6", "claude-opus-5"),
-        ("openai", "gpt-4.1-mini", "gpt-4.1"),
-    ],
+    [(vendor, *models) for vendor, models in REFERENCE_MODELS.items()],
 )
 def test_every_documented_vendor_passes_the_gate_on_shipped_sampling(
     vendor, base_model, strong_model
 ):
-    """What the docs offer is what the gate accepts — for all three, not one.
+    """What the docs offer is what the gate accepts — for every vendor, not one.
 
     The predecessor asserted this of the *shipped selection*, which worked only
     while a selection shipped. Now that none does, the equivalent guarantee has
     to be made of every pair `docs/First-Run.md` step 2 tells a reader to write
     down: shipped sampling has to survive whichever of them they pick, and a
     param one vendor rejects must not reach a reader as a working example.
+
+    **Driven from `REFERENCE_MODELS`, because the hand-written list drifted.**
+    It said `openai` was `gpt-4.1-mini` / `gpt-4.1` while the table it names
+    said `gpt-4o` / `gpt-5.6`, and it carried no `bedrock` row at all — so the
+    vendor added most recently was the one this check never made. A list that
+    mirrors a table by hand is a second reader of it, and the two disagreed for
+    as long as nobody read them side by side.
     """
     from pathlib import Path
 
-    from analysis_service.model_tiers import load_model_tiers
     from analysis_service.sampling import load_sampling
+    from tests.factories import tiers_for
 
     root = Path(__file__).resolve().parents[1]
-    tiers = load_model_tiers(
-        root / "config" / "model_tiers.toml",
-        env={
-            "ANALYSIS_MODEL_BASE_VENDOR": vendor,
-            "ANALYSIS_MODEL_BASE_MODEL": base_model,
-            "ANALYSIS_MODEL_STRONG_VENDOR": vendor,
-            "ANALYSIS_MODEL_STRONG_MODEL": strong_model,
-            "ANALYSIS_MODEL_REVIEW_VENDOR": "anthropic",
-            "ANALYSIS_MODEL_REVIEW_MODEL": "claude-opus-5",
-        },
+    tiers = tiers_for(vendor)
+    assert (tiers.tiers["base"].model, tiers.tiers["strong"].model) == (
+        base_model,
+        strong_model,
     )
     sampling = load_sampling(root / "config" / "sampling.toml", env={})
     for tier in ("base", "strong"):
@@ -317,3 +318,163 @@ def test_every_documented_vendor_passes_the_gate_on_shipped_sampling(
             sampling.for_tier(tier).gate_params(),
             source=f"tiers.{tier}",
         )
+
+
+def test_every_local_only_switch_litellm_defines_is_set():
+    """The pin does not pin this, so the suite has to.
+
+    Each `LITELLM_LOCAL_*` variable turns off a remote config fetch. The
+    repository set one of the four, and 1.97.0 fetches the Anthropic beta
+    headers behind another of them -- at request time, from a URL whose content
+    chooses an outgoing header, checked only for being a non-empty dict.
+
+    Read out of litellm's own source rather than restated here, so a version
+    bump that adds a fifth switch fails this test instead of opening an egress
+    nobody looked for.
+    """
+    import litellm
+
+    from analysis_service.model_gate import LITELLM_LOCAL_SWITCHES
+
+    root = Path(litellm.__file__).parent
+    defined = set()
+    for source in root.rglob("*.py"):
+        text = source.read_text(encoding="utf-8", errors="ignore")
+        defined |= set(re.findall(r"LITELLM_LOCAL_[A-Z_]+", text))
+
+    assert defined, "found no switches at all; the scan itself is broken"
+    assert defined <= set(LITELLM_LOCAL_SWITCHES), (
+        f"litellm defines switches this service does not set:"
+        f" {sorted(defined - set(LITELLM_LOCAL_SWITCHES))}"
+    )
+    for switch in LITELLM_LOCAL_SWITCHES:
+        assert os.environ.get(switch) == "True"
+
+
+class TestTheBedrockFormRuleAgainstThePinnedMap:
+    """The one form rule whose family is broad, measured against a real catalogue.
+
+    A shape rule is only as good as the identifiers it meets, and Bedrock is the
+    first vendor whose catalogue is large enough to say something. So this
+    partitions every Bedrock key in the pinned cost map and asserts where each
+    one lands. The **partition** is asserted rather than the counts: a litellm
+    bump adds and retires models, and a test that pinned the numbers would fail
+    on a routine dependency update rather than on a defect.
+    """
+
+    #: Every Bedrock key the pinned map carries, in this service's own
+    #: spelling. `bedrock/`-prefixed keys are dropped because they are router
+    #: strings rather than model identifiers, and that is what `Vendor.route`
+    #: composes.
+    @staticmethod
+    def keys() -> list[str]:
+        import litellm
+
+        return [
+            key
+            for key, entry in litellm.model_cost.items()
+            if entry.get("litellm_provider") in ("bedrock", "bedrock_converse")
+            and not key.startswith("bedrock/")
+        ]
+
+    #: The identifiers the shape refuses although they reach the Claude family,
+    #: each for a stated property rather than for its name. Listed so the
+    #: partition below has somewhere to put them: a refusal nobody wrote down
+    #: is indistinguishable from a defect.
+    REFUSED: ClassVar[frozenset[str]] = frozenset(
+        {
+            # Vertex's `@date` spelling, on one key against the rest.
+            "anthropic.claude-haiku-4-5@20251001",
+            # The 2023 names, which carry no family name and generation.
+            "anthropic.claude-instant-v1",
+            "anthropic.claude-v1",
+            "anthropic.claude-v2:1",
+            # A Claude that omits the family segment: it meets the broad family
+            # and fails the strict shape, rather than passing unpinned.
+            "claude-sonnet-4-5-20250929-v1:0",
+        }
+    )
+
+    def test_the_scan_reads_a_real_catalogue(self):
+        """A partition over an empty set passes every assertion below."""
+        assert len(self.keys()) > 100
+
+    def test_every_bedrock_key_lands_where_the_rule_says_it_does(self):
+        """Each key pins, dies on the shared denylist, or is a written refusal.
+
+        A fourth outcome is a defect: a model AWS publishes that this service
+        would refuse to name, with no decision behind the refusal.
+        """
+        bedrock = vendor_for("bedrock")
+        unexplained = []
+        for key in self.keys():
+            try:
+                bedrock.validate_model(key, source="probe")
+            except ValueError as exc:
+                # The shared denylist runs for every family and refuses a
+                # floating form; only a shape refusal is this rule's own.
+                if "not pinned" in str(exc) and key not in self.REFUSED:
+                    unexplained.append(key)
+
+        assert not unexplained, (
+            f"these Bedrock identifiers are refused and nothing here says why:"
+            f" {sorted(unexplained)}. Either the shape is wrong, or the"
+            " refusal is a decision that belongs in REFUSED with its reason."
+        )
+
+    def test_every_refused_identifier_is_still_in_the_catalogue(self):
+        """A refusal nobody can reach excuses the next one that spells it.
+
+        The bare-spelling entry is the exception: it is the shape a config
+        copying an anthropic-direct row produces, so it is a refusal about
+        something an operator writes rather than something AWS publishes.
+        """
+        published = set(self.keys()) | {"claude-sonnet-4-5-20250929-v1:0"}
+        assert self.REFUSED <= published, (
+            f"these refusals name identifiers the pinned map no longer carries:"
+            f" {sorted(self.REFUSED - published)}"
+        )
+
+    def test_the_family_rule_catches_every_claude_and_nothing_else(self):
+        from analysis_service.vendors import _BEDROCK_CLAUDE_RULE
+
+        bedrock = vendor_for("bedrock")
+        for key in self.keys():
+            reaches_claude = bedrock._rule_for(key) is _BEDROCK_CLAUDE_RULE
+            assert reaches_claude == ("claude-" in key), key
+
+    def test_the_generation_parse_reads_every_pinned_claude(self):
+        """The form rule and the parse must agree about what a Claude is.
+
+        They are two readers of one question, so they are checked against each
+        other rather than each against its own list. A pinned identifier the
+        parse could not read would silence the temperature floor on exactly the
+        models that floor exists for.
+        """
+        from analysis_service.vendors import _BEDROCK_CLAUDE_RULE, claude_generation
+
+        bedrock = vendor_for("bedrock")
+        unread = []
+        for key in self.keys():
+            if bedrock._rule_for(key) is not _BEDROCK_CLAUDE_RULE:
+                continue
+            try:
+                bedrock.validate_model(key, source="probe")
+            except ValueError:
+                continue
+            if claude_generation(key) is None:
+                unread.append(key)
+        assert not unread, (
+            f"these identifiers pin as a Claude and parse to no generation:"
+            f" {sorted(unread)}"
+        )
+
+    def test_no_non_claude_key_parses_as_a_claude(self):
+        from analysis_service.vendors import claude_generation
+
+        false_positives = [
+            key
+            for key in self.keys()
+            if "claude-" not in key and claude_generation(key)
+        ]
+        assert not false_positives, false_positives

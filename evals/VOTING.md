@@ -164,6 +164,13 @@ the artifact counts them per case:
 | `open` | somebody answered `unsure` or `needs-evidence` | Nothing. It waits for a better sitting. |
 | `unvoted` | nobody answered it | Nothing. It is visible in the counts and never counts against the tool. |
 
+Both answers behind `open` move no number, and they part company in your queue.
+`unsure` is a spent answer: you judged the finding and it stays judged. Needing
+more evidence is not a judgement, so it holds for that sitting only, and a later
+sitting asks again over whatever evidence exists by then. Pressing it is how you
+say *not yet*, and it used to be the one answer that removed a finding from your
+queue for good.
+
 Two reviewers can disagree, and then `rejected` wins over `pooled`. A tool must
 not score itself on the answer that flatters it most.
 
@@ -208,14 +215,19 @@ that applies wins, and the reasons never add up.
 | Reason | Weight | Why it is worth your click |
 | --- | --- | --- |
 | `volatile` | 30 | The sweep found it in some runs and not others, so your answer settles which way a recall number should have gone. |
-| `unmatched` | 20 | No reference set carries it, so nothing scores it until somebody says whether it is real. |
 | `new` | 10 | Nobody has answered it, so it counts in no number. |
+
+There was a third reason, `unmatched`, weighing whether the reference pool
+already carried the finding. It is gone. The pool is built from votes and the
+queue skips what is already answered, so the row either fired on everything or
+told you how somebody else had voted — and the second opinion below is the one
+pass that must not be told.
 
 `volatile` needs more than one sweep to exist, which is why both commands take
 an artifact per sweep. A finding every run produced is settled, and a finding
 two runs of five produced is the question one click settles. Over a single
-artifact every count is 1 of 1, nothing is volatile, and the queue orders by the
-other two reasons.
+artifact every count is 1 of 1, nothing is volatile, and every finding sorts
+under `new`.
 
 The queue skips what **you** answered, never what anybody answered. Point a
 second reviewer at the same artifact under their own name to get a second
@@ -323,11 +335,12 @@ from. A rule change is then arithmetic over the ledger's files.
    (`evals/harness/fingerprint.py`). It is a table keyed by framework, checked
    against `PACKAGES`, so each package moves on its own.
 
-3. **Move the ledger.** Preview first:
+3. **Move the ledger.** It reads the table you just edited, so there is no
+   version to pass. Preview first:
 
    ```sh
-   python -m evals.harness.run rekey --to-version 3
-   python -m evals.harness.run rekey --to-version 3 --yes
+   python -m evals.harness.run rekey
+   python -m evals.harness.run rekey --yes
    ```
 
    It reports how many votes move, how many stay, and how many findings sit in

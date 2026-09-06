@@ -45,13 +45,13 @@
 # are ordinary, not a special case.
 #
 # PINNING is per model family and deliberately weak — an open-world denylist of
-# floating forms (`-latest`, `-preview`, `-exp`), plus a canonical shape where
-# the vendor publishes one. Claude is the family that does: from generation 4.6
+# floating words (`latest`, `preview`, `exp`, `experimental`), plus a canonical
+# shape where the vendor publishes one. Claude is the family that does: from 4.6
 # on, the identifier is dateless and carries the whole version
 # (`claude-opus-5`, `claude-sonnet-4-6`), it is a pinned snapshot rather than an
-# alias, and Vertex spells it the same way. This service runs Claude 4.6 and
-# later only; the pre-4.6 dated forms are rejected outright rather than
-# supported alongside.
+# alias, and Vertex spells it the same way. Bedrock spells the same family
+# `[<scope>.]anthropic.claude-...`, with an optional date and build tail, and
+# accepts the dated forms because it serves no bare alias to confuse them with.
 #
 # Pinning is a proxy, not the guarantee: the reproducibility guarantee is the
 # *served* build read back from every response and recorded per node execution.
@@ -60,7 +60,8 @@
 # enumerating builds is what keeps the Claude half from repeating that.
 #
 # ENV OVERRIDES are two vars per tier: ANALYSIS_MODEL_{BASE,STRONG}_VENDOR and
-# _MODEL. `_MODEL` alone is the ops case (retune on a deployed revision without
+# _MODEL, plus ANALYSIS_MODEL_CREDENTIALS_{VENDOR} for the [credentials] table
+# below. `_MODEL` alone is the ops case (retune on a deployed revision without
 # an image rebuild). `_VENDOR` alone is a build-time error — a cross-vendor pair
 # like anthropic + gemini-2.5-pro passes every downstream check and would die on
 # node one of a paid-for job. Any unrecognised ANALYSIS_MODEL_* var also raises,
@@ -72,10 +73,10 @@
 # default" true of the *mechanism* while the values said otherwise — the vendor
 # you got by doing nothing was Google's. Both tier tables are now absent, so a
 # run that has not chosen stops and says so rather than reaching a vendor nobody
-# picked. The three vendors are reached through one adapter and differ only in
+# picked. Every vendor is reached through one adapter and they differ only in
 # the credential mode each implies; none is cheaper to select than the others.
 
-version = 6
+version = 7
 
 # HOW FAR THE CRITIC MUST SIT FROM THE ANALYSIS IT CHECKS. Required, and there
 # is deliberately no default: inheriting `shared` is how an install that meant
@@ -105,26 +106,43 @@ review_independence = "shared"
 # CHOOSE A VENDOR AND MODEL FOR EACH TIER. Fill in the template below, or set
 # ANALYSIS_MODEL_{BASE,STRONG,REVIEW}_VENDOR together with the matching _MODEL —
 # the two halves must move together, since a vendor without its model is not a
-# usable selection. Model identifiers must be pinned: no `-latest`, `-preview` or
-# `-exp`, and Claude takes its dateless 4.6+ ID. docs/First-Run.md step 2 walks
+# usable selection. Model identifiers must be pinned: the identifier may not
+# carry `latest`, `preview`, `exp` or `experimental` as a whole word, and Claude
+# takes its dateless 4.6+ ID. docs/First-Run.md step 2 walks
 # through each vendor's credentials; docs/Configuration.md has the rules.
 #
 # [tiers.base]
-# vendor = "<vertex|anthropic|openai>"
+# vendor = "<vertex|anthropic|openai|bedrock|gemini>"
 # model = "<model>"
 #
 # [tiers.strong]
-# vendor = "<vertex|anthropic|openai>"
+# vendor = "<vertex|anthropic|openai|bedrock|gemini>"
 # model = "<model>"
 #
 # [tiers.review]
-# vendor = "<vertex|anthropic|openai>"
+# vendor = "<vertex|anthropic|openai|bedrock|gemini>"
 # model = "<model>"
 #
-# `review` is required even while `review_independence = "shared"` leaves the
-# node map pointing criticism at `strong`. A tier a file may omit is a tier no
-# deployment has chosen a model for, and the day somebody moves critic/* onto it
-# is the wrong day to discover that.
+# A VENDOR THAT ALLOWS MORE THAN ONE CREDENTIAL MODE declares which one this
+# deployment uses, here or in ANALYSIS_MODEL_CREDENTIALS_{VENDOR}. Bedrock is
+# the one that does, and a missing declaration is a load error naming it:
+#
+# [credentials]
+# bedrock = "<api_key|iam>"
+#
+# A key for a vendor that allows a single mode is also an error, because there
+# is nothing to choose.
+#
+# `review` is NOT required while `review_independence = "shared"` leaves the
+# node map pointing criticism at `strong`, because nothing runs on it and the
+# loader binds no adapter for a tier nothing is bound to. Selecting a pair for
+# an empty place is a choice with no consequence, and the answer this block used
+# to suggest -- repeat the `strong` pair -- is a choice that says nothing.
+#
+# The day somebody moves critic/* onto `review` is still the wrong day to find
+# out no model was chosen for it, and that day is an edit to the [nodes] map
+# below. The loader reads this file on that edit, so it refuses then, with the
+# same message it would have given at a first run.
 #
 # A TEMPLATE RATHER THAN A WORKED PAIR, and that is the same decision as the
 # empty tier tables above. This block used to show a Vertex/Gemini pair, which
@@ -134,13 +152,22 @@ review_independence = "shared"
 # profiles (src/analysis_service/conformance.py):
 #
 #   anthropic   base "claude-sonnet-4-6"     strong "claude-opus-5"
-#   openai      base "gpt-4o"                strong "gpt-5.6"
+#   bedrock     base "anthropic.claude-sonnet-4-6"
+#               strong "anthropic.claude-opus-5"
+#   gemini      base "gemini-2.5-flash"      strong "gemini-2.5-pro"
+#   openai      base "gpt-4o-2024-08-06"     strong "gpt-5.6"
 #   vertex      base "gemini-2.5-flash"      strong "gemini-2.5-pro"
 #
-# `review` needs a pair of its own as well, and the loader refuses a file that
-# names only these two. Under the shipped `review_independence = "shared"`
-# nothing runs on it, so repeating the `strong` pair there is the ordinary
-# answer; a deployment that wants an independent critic names a different one.
+# `gemini` and `vertex` name the same models. They are two vendors because they
+# are two routes: the Gemini Developer API takes an API key, Vertex takes a
+# platform identity, and LiteLLM dispatches `gemini/` and `vertex_ai/` to two
+# providers. A tier may select either, and a deployment may select both.
+#
+# `review` needs a pair only once something sits on it. Under the shipped
+# `review_independence = "shared"` nothing does, so a deployment that wants the
+# shipped arrangement names these two and stops; a deployment that wants an
+# independent critic moves critic/* onto `review` in [nodes] and names a third
+# pair, and the loader asks for it at that edit.
 #
 # The Anthropic pin is 4.6 on both of the tiers above because that is the pair
 # this project
@@ -154,6 +181,10 @@ review_independence = "shared"
 # The three tiers select independently, so a mixed set — a cheap workhorse from
 # one vendor, judgement from another, review from a third — is ordinary rather
 # than a special case.
+#
+# BEDROCK NEEDS ITS CLIENT LIBRARY IN THE IMAGE: `pip install
+# analysis-service[bedrock]`. The build refuses to bind a Bedrock tier without
+# it, and names the extra.
 
 [nodes]
 extract = "base"
