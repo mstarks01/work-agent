@@ -50,7 +50,7 @@ written on the job rather than left to the trigger list — so adding a trigger
 cannot quietly widen what runs with that job's identity.
 
 What a pull request gets instead is `ci.yml`'s offline conformance suite, which
-exercises Vertex, Anthropic and OpenAI equally and holds no credential at all.
+exercises every vendor equally and holds no credential at all.
 It establishes what each provider *would be asked for*; the live lanes answer
 the second question one merge later. That split already existed and is what
 makes the move affordable: no pull request loses provider-adapter coverage,

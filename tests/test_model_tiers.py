@@ -398,9 +398,9 @@ class TestDeclaredCredentialMode:
     """A deployment declares a mode only where the vendor gives it a choice.
 
     Both rules read ``CREDENTIAL_MODES``, so they follow the registry rather
-    than a second copy of it. Every vendor allows exactly one mode today, so the
-    shipped table is empty — what version 7 carries is the rule, which is what
-    makes a vendor row that gains a second mode unable to ship silently.
+    than a second copy of it. The shipped table is empty because no shipped
+    file selects a vendor at all; a deployment that selects a vendor with a
+    choice fills it, from the file or from the environment.
     """
 
     def test_a_single_mode_vendor_needs_no_declaration(self, config_path):
@@ -437,6 +437,110 @@ class TestDeclaredCredentialMode:
         path = config_path(config_toml() + '\n[credentials]\ncohere = "api_key"\n')
         with pytest.raises(ModelConfigError):
             load_model_tiers(path, env={})
+
+    def test_a_selected_multi_mode_vendor_must_declare_one(self, config_path):
+        """The half a single-mode registry could never exercise.
+
+        A vendor with a choice and no declaration is the state that would let a
+        build authenticate under a mode nobody chose, so it is a load error
+        naming the key to add.
+        """
+        path = config_path(
+            config_toml(
+                base_vendor="bedrock",
+                base="anthropic.claude-sonnet-4-6",
+                strong_vendor="bedrock",
+                strong="anthropic.claude-opus-5",
+            )
+        )
+        with pytest.raises(ModelConfigError, match="credentials.bedrock"):
+            load_model_tiers(path, env={})
+
+    def test_a_multi_mode_vendor_nobody_selects_needs_no_declaration(self, config_path):
+        """A vendor no tier calls needs no identity.
+
+        The rule is scoped to what a deployment actually runs, so adding a
+        vendor row cannot make every existing config file fail to load.
+        """
+        tiers = load_model_tiers(config_path(config_toml()), env={})
+        assert "bedrock" not in tiers.credentials
+
+    @pytest.mark.parametrize("mode", [CredentialMode.API_KEY, CredentialMode.IAM])
+    def test_the_file_declares_the_mode(self, config_path, mode):
+        path = config_path(
+            config_toml(
+                base_vendor="bedrock",
+                base="anthropic.claude-sonnet-4-6",
+                strong_vendor="bedrock",
+                strong="anthropic.claude-opus-5",
+            )
+            + f'\n[credentials]\nbedrock = "{mode.value}"\n'
+        )
+        assert load_model_tiers(path, env={}).credential_mode("bedrock") is mode
+
+    def test_the_environment_declares_the_mode(self, config_path):
+        """A deployment configured entirely by environment can select this vendor.
+
+        Every other half of a selection already moves that way. A mode that
+        moved only in the file would mean rebuilding an image to run a vendor
+        it already carries.
+        """
+        tiers = load_model_tiers(
+            config_path(config_toml()),
+            env={
+                "ANALYSIS_MODEL_BASE_VENDOR": "bedrock",
+                "ANALYSIS_MODEL_BASE_MODEL": "anthropic.claude-sonnet-4-6",
+                "ANALYSIS_MODEL_CREDENTIALS_BEDROCK": "iam",
+            },
+        )
+        assert tiers.credential_mode("bedrock") is CredentialMode.IAM
+
+    def test_the_environment_wins_over_the_file(self, config_path):
+        """One rule, and the environment is the later reader of it.
+
+        Same precedence as a tier's own vendor and model override, so an
+        operator does not have to remember which keys behave differently.
+        """
+        path = config_path(
+            config_toml(
+                base_vendor="bedrock",
+                base="anthropic.claude-sonnet-4-6",
+                strong_vendor="bedrock",
+                strong="anthropic.claude-opus-5",
+            )
+            + '\n[credentials]\nbedrock = "api_key"\n'
+        )
+        tiers = load_model_tiers(
+            path, env={"ANALYSIS_MODEL_CREDENTIALS_BEDROCK": "iam"}
+        )
+        assert tiers.credential_mode("bedrock") is CredentialMode.IAM
+
+    def test_an_environment_declaration_meets_the_same_rules(self, config_path):
+        """The loader judges the result, wherever the value arrived from."""
+        with pytest.raises(ModelConfigError, match="nothing to choose"):
+            load_model_tiers(
+                config_path(config_toml()),
+                env={"ANALYSIS_MODEL_CREDENTIALS_VERTEX": "iam"},
+            )
+
+    def test_an_empty_environment_declaration_is_an_error(self, config_path):
+        with pytest.raises(ModelConfigError, match="set but empty"):
+            load_model_tiers(
+                config_path(config_toml()),
+                env={"ANALYSIS_MODEL_CREDENTIALS_BEDROCK": "  "},
+            )
+
+    def test_an_unrecognised_credentials_variable_still_raises(self, config_path):
+        """The namespace check covers the new keys too.
+
+        A typo'd vendor name would otherwise be ignored while the tier ran
+        under a mode nobody declared.
+        """
+        with pytest.raises(ModelConfigError, match="unrecognised"):
+            load_model_tiers(
+                config_path(config_toml()),
+                env={"ANALYSIS_MODEL_CREDENTIALS_BEDR0CK": "iam"},
+            )
 
 
 class TestFileValidation:

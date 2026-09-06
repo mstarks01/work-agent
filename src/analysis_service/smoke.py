@@ -1,7 +1,7 @@
 """The live half of the provider contract: did this vendor actually serve the graph.
 
 :mod:`analysis_service.conformance` answers what a provider would be asked for,
-from the pinned model map, for all three vendors at once, with no credential and
+from the pinned model map, for every vendor at once, with no credential and
 no egress. That is what lets it run on every pull request, and it is also the
 exact limit of what it can claim: nothing in it is evidence that any vendor has
 served a request.

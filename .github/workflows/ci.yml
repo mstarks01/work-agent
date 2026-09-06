@@ -153,7 +153,7 @@ jobs:
       # remove.
       #
       # The table names the lanes rather than the vendors' state, and that is
-      # the honest shape: `provider-smoke.yml` gives all three vendors the same
+      # the honest shape: `provider-smoke.yml` gives every vendor the same
       # lane on the same trigger, so what differs between them is which
       # credentials a repository holds, not how much assurance the project has
       # built for each.
@@ -170,10 +170,11 @@ jobs:
             echo
             echo "| Lane | Vendors | What it answers | State |"
             echo "| --- | --- | --- | --- |"
-            echo "| Offline conformance (this job) | vertex, anthropic, openai | what a provider would be asked for | exercised |"
-            echo "| Provider smoke | vertex, anthropic, openai | does the provider serve this graph | **unexercised** — no credentials configured |"
+            echo "| Offline conformance (this job) | vertex, anthropic, openai, bedrock | what a provider would be asked for | exercised |"
+            echo "| Provider smoke | vertex, anthropic, openai, bedrock | does the provider serve this graph | **unexercised** — no credentials configured |"
             echo "| Evals (live Vertex) | vertex | threat-model quality | **unexercised** — federation unprovisioned |"
             echo "| Evals (live API-key vendors) | anthropic, openai | threat-model quality | **unexercised** — dispatch-only, secrets unset |"
+            echo "| Evals (any lane) | bedrock | threat-model quality | **unexercised** — no sweep lane; ruled out of scope |"
             echo
             echo "See [.github/WORKLOAD_IDENTITY.md](.github/WORKLOAD_IDENTITY.md)"
             echo "and [docs/adr/0003-no-privileged-vendor.md](docs/adr/0003-no-privileged-vendor.md)."

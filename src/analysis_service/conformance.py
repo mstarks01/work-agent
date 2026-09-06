@@ -19,7 +19,7 @@ being able to see which capabilities differ.
 The module is credential-free by construction. Every probe here is a call into
 the pinned ``litellm``'s local model-cost map; see
 :func:`~analysis_service.model_gate._import_litellm_hermetically`. A full matrix
-for all three vendors is therefore computable in the offline CI lane, with no
+for every vendor is therefore computable in the offline CI lane, with no
 key, no ADC and no egress. That is what makes this suite runnable on every pull
 request, rather than in a live sweep nobody has provisioned. It is also the
 limit of what it proves: this module reports what a provider would accept, and
@@ -82,7 +82,7 @@ PROBED_PARAMS: dict[str, Any] = {
 # The pairs this project claims to have profiled, one per tier per vendor.
 #
 # In ``src/`` rather than under ``tests/`` because it is not a fixture: it is
-# the *extent* of the conformance claim — "Vertex, Anthropic and OpenAI share a
+# the *extent* of the conformance claim — "every supported vendor shares a
 # common conformance suite" is only meaningful alongside the list of what was
 # actually put through it. Two readers need exactly this list and must not each
 # keep their own: the offline suite in ``tests/test_conformance.py``, and the
@@ -98,6 +98,12 @@ PROBED_PARAMS: dict[str, Any] = {
 # the vendors are alphabetical everywhere a reader might infer one.
 REFERENCE_MODELS: dict[str, tuple[str, ...]] = {
     "anthropic": ("claude-sonnet-4-6", "claude-opus-5"),
+    # Claude in its Bedrock spelling, and only Claude: Nova and Llama get
+    # *emulated* structured output there, which
+    # :func:`~analysis_service.binding._check_native_structured_output` refuses,
+    # so neither could bind a tier of this graph. The plain identifier rather
+    # than a region-scoped one, because no region enters an Execution Identity.
+    "bedrock": ("anthropic.claude-sonnet-4-6", "anthropic.claude-opus-5"),
     "openai": ("gpt-4o", "gpt-5.6"),
     "vertex": ("gemini-2.5-flash", "gemini-2.5-pro"),
 }

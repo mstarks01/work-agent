@@ -6,7 +6,7 @@ answer, and running them together is what produced the imbalance
 [#116](https://github.com/mstarks01/work-agent/issues/116) is about:
 
 * **Application conformance** — does the *application* behave the same way on
-  this provider? Deterministic, and answered here, for all three vendors, on
+  this provider? Deterministic, and answered here, for every vendor, on
   every pull request.
 * **Model quality** — how good are the threat models this model writes? Empirical,
   answered by ``evals/``, and expected to differ between models. A vendor never
@@ -17,7 +17,7 @@ Everything below is **credential-free**. The capability probes read the pinned
 :func:`~analysis_service.binding.build_tier_adapters` a synthetic environment —
 the registry checks that a credential was *declared*, never that it
 authenticates, so a placeholder builds a real adapter without a key and without
-egress. That is what lets one suite cover Vertex, Anthropic and OpenAI equally
+egress. That is what lets one suite cover every vendor equally
 in the offline lane, rather than covering whichever vendor CI happens to hold
 credentials for.
 
@@ -52,7 +52,11 @@ from analysis_service.frameworks.stride.record import ThreatProposals, ThreatRul
 from analysis_service.graph import Pipeline, build_pipeline
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.model_gate import ModelGateError
-from analysis_service.model_tiers import ModelTierConfig, load_model_tiers
+from analysis_service.model_tiers import (
+    ModelTierConfig,
+    credentials_env_var_for,
+    load_model_tiers,
+)
 from analysis_service.resilience import load_resilience
 from analysis_service.sampling import load_sampling
 from analysis_service.system_model import SystemModel
@@ -119,7 +123,7 @@ def pins_scalar(text: str, value: str) -> bool:
 
 
 # Placeholder credential material. Every vendor's variables at once, so one
-# mapping serves all three legs: the registry reads only the ones the selected
+# mapping serves every leg: the registry reads only the ones the selected
 # vendor names, and an unused entry authenticates nothing because nothing reads
 # it. Values are visibly fake — a suite that needed a real key would be a suite
 # that only ran where one existed, which is the imbalance this file exists to
@@ -127,6 +131,8 @@ def pins_scalar(text: str, value: str) -> bool:
 FAKE_ENV = {
     "ANALYSIS_ANTHROPIC_API_KEY": "sk-ant-not-a-real-key",
     "ANALYSIS_OPENAI_API_KEY": "sk-not-a-real-key",
+    "ANALYSIS_BEDROCK_API_KEY": "not-a-real-bedrock-key",
+    "ANALYSIS_BEDROCK_REGION": "us-east-1",
     "ANALYSIS_VERTEX_PROJECT": "test-project",
     "ANALYSIS_VERTEX_LOCATION": "us-central1",
     "GOOGLE_APPLICATION_CREDENTIALS": "/nonexistent/adc.json",
@@ -142,28 +148,52 @@ def reference_pairs() -> list[tuple[str, str]]:
     ]
 
 
-def tiers_for(vendor: str) -> ModelTierConfig:
+def tiers_for(
+    vendor: VendorName, mode: CredentialMode | None = None
+) -> ModelTierConfig:
     """The shipped node -> tier map, with both tiers on one vendor's pair.
 
     Built from the real ``config/model_tiers.toml`` rather than a hand-made
     object, so the node table under test is the one that ships. Only the two
-    selections are substituted, which is exactly what a deployment does.
+    selections and the credential declaration are substituted, which is exactly
+    what a deployment does.
+
+    ``mode`` picks the credential mode for a vendor that allows more than one.
+    Absent, the vendor's first allowed mode is declared — a value rather than a
+    guess, because the loader refuses to build without one and the choice is
+    what a deployment makes.
     """
     base, strong = REFERENCE_MODELS[vendor]
-    return load_model_tiers(
-        CONFIG / "model_tiers.toml",
-        env={
-            "ANALYSIS_MODEL_BASE_VENDOR": vendor,
-            "ANALYSIS_MODEL_BASE_MODEL": base,
-            "ANALYSIS_MODEL_STRONG_VENDOR": vendor,
-            "ANALYSIS_MODEL_STRONG_MODEL": strong,
-            "ANALYSIS_MODEL_REVIEW_VENDOR": "anthropic",
-            "ANALYSIS_MODEL_REVIEW_MODEL": "claude-opus-5",
-        },
-    )
+    entry = vendor_for(vendor)
+    env = {
+        "ANALYSIS_MODEL_BASE_VENDOR": vendor,
+        "ANALYSIS_MODEL_BASE_MODEL": base,
+        "ANALYSIS_MODEL_STRONG_VENDOR": vendor,
+        "ANALYSIS_MODEL_STRONG_MODEL": strong,
+        "ANALYSIS_MODEL_REVIEW_VENDOR": "anthropic",
+        "ANALYSIS_MODEL_REVIEW_MODEL": "claude-opus-5",
+    }
+    if len(entry.credential_modes) > 1:
+        chosen = entry.credential_modes[0] if mode is None else mode
+        env[credentials_env_var_for(vendor)] = chosen.value
+    return load_model_tiers(CONFIG / "model_tiers.toml", env=env)
 
 
-def _pipeline_for(vendor: str) -> Pipeline:
+def credential_cases() -> list[tuple[VendorName, CredentialMode]]:
+    """Every ``(vendor, mode)`` a deployment can declare, from the registry.
+
+    Every mode and not one per vendor: a vendor with a choice fails closed
+    differently under each, and the mode a live lane cannot exercise is exactly
+    the one nothing else would check.
+    """
+    return [
+        (vendor, mode)
+        for vendor in VENDOR_NAMES
+        for mode in vendor_for(vendor).credential_modes
+    ]
+
+
+def _pipeline_for(vendor: VendorName) -> Pipeline:
     """The real graph, built on one vendor's reference pair.
 
     Models are resolved to the shared scripted stand-in rather than to real
@@ -336,18 +366,25 @@ class TestModelsCanBeBound:
         for vendor, per_tier in ancestries.items():
             assert per_tier == reference, f"{vendor} binds a different adapter class"
 
-    @pytest.mark.parametrize("vendor", sorted(REFERENCE_MODELS))
-    def test_a_missing_credential_fails_closed_naming_its_own_variable(self, vendor):
+    @pytest.mark.parametrize(("vendor", "mode"), credential_cases())
+    def test_a_missing_credential_fails_closed_naming_its_own_variable(
+        self, vendor, mode
+    ):
         """Equivalent failure behaviour, not an equivalent credential mode.
 
-        The three vendors authenticate differently — that difference is real
-        and stays. What has to be identical is what the *application* does
-        about it: refuse to build, under one error type, naming the variable
-        this vendor needs and never its value.
+        The vendors authenticate differently — that difference is real and
+        stays. What has to be identical is what the *application* does about
+        it: refuse to build, under one error type, naming the variable this
+        vendor needs and never its value.
+
+        Per ``(vendor, mode)`` rather than per vendor, because a mode is what
+        decides which variables are required. Bedrock's ``iam`` mode is the one
+        no live lane sweeps, so this is the only place it is asserted about at
+        all.
         """
         with pytest.raises(ProviderAuthError) as raised:
             build_tier_adapters(
-                tiers_for(vendor),
+                tiers_for(vendor, mode),
                 load_sampling(CONFIG / "sampling.toml", env={}),
                 load_resilience(CONFIG / "resilience.toml", env={}),
                 env={},
@@ -355,8 +392,7 @@ class TestModelsCanBeBound:
 
         message = str(raised.value)
         assert vendor in message
-        entry = vendor_for(vendor)
-        assert entry.required_env_vars(entry.sole_credential_mode)[0] in message
+        assert vendor_for(vendor).required_env_vars(mode)[0] in message
         assert not any(value in message for value in FAKE_ENV.values())
 
 
@@ -515,6 +551,10 @@ class TestTheLiveLanesSweepWhatWasProfiled:
         "vertex": "evals-live.yml",
         "anthropic": "evals-live-api-key.yml",
         "openai": "evals-live-api-key.yml",
+        # No lane. A sweep needs a baseline name and an eval price entry, and
+        # the Bedrock map rules both out of scope. The smoke lane covers this
+        # vendor; the corpus sweep does not.
+        "bedrock": None,
     }
 
     #: The lane every vendor is compared on, whatever authenticates it. One
