@@ -233,6 +233,8 @@ For each, mark one of:
 - `agree` — a real finding against this system, worth reporting.
 - `reject` — overstated, unsupported by the text, or not really a finding here.
 - `duplicate` — the same finding as another entry on this list, by number.
+- `unsure` — you read it and cannot decide. It is a real answer: say it rather
+  than pick one of the other three to get past the entry.
 
 Then, at the end of the last part, note anything on **your** list that is not
 on either of them. That is the finding this sitting exists for.

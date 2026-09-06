@@ -178,6 +178,9 @@ def create_app(session: Session, page: str, script: str) -> FastAPI:
                 submitter=escape(session.submitted_by),
                 token=script_json(session.token),
                 minownlist=script_json(MIN_OWN_LIST),
+                # Read off the one table, so a mark the method adds
+                # arrives on the page without a second list to edit.
+                markvalues=script_json(list(sittings.MARKS)),
             )
         )
 
