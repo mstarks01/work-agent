@@ -31,7 +31,7 @@ function selectedFrameworks(){return new Set([...document.querySelectorAll("inpu
 function visibleSelects(){const selected=selectedFrameworks();return [...document.querySelectorAll("select[data-finding]")].filter(s=>selected.has(s.dataset.framework));}
 function marksNow(){const marks={};for(const s of visibleSelects())if(s.value)marks[s.dataset.finding]=s.value;return marks;}
 function setMarks(marks){for(const s of document.querySelectorAll("select[data-finding]"))s.value=marks[s.dataset.finding]||"";updateMarkCounts();}
-function markSummary(){const c={agree:0,reject:0,duplicate:0},selects=visibleSelects();for(const s of selects)if(s.value in c)c[s.value]++;const marked=c.agree+c.reject+c.duplicate;return "Review summary: "+c.agree+" agree · "+c.reject+" reject · "+c.duplicate+" duplicate · "+(selects.length-marked)+" unmarked";}
+function markSummary(){const selects=visibleSelects(),c={};for(const value of MARK_VALUES)c[value]=0;let marked=0;for(const s of selects)if(s.value in c){c[s.value]++;marked++;}return "Review summary: "+MARK_VALUES.map(v=>c[v]+" "+v).join(" · ")+" · "+(selects.length-marked)+" unmarked";}
 function unmarked(){return visibleSelects().filter(s=>!s.value).length;}
 function updateMarkCounts(){$("markCounts").textContent=markSummary();const left=unmarked();$("finish").disabled=left>0;$("finishHint").textContent=left>0?"Answer every finding to record this review — "+left+" left.":"";}
 function lock(){$("own").readOnly=true;$("lock").disabled=true;$("ownHint").textContent="";} function gate(){if(!$("own").readOnly)$("lock").disabled=lines("own").join("").length<MIN_OWN_LIST;} function finishedNow(done){$("finish").textContent=done?"Save changes":"Record review";}

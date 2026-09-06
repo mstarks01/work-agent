@@ -102,9 +102,18 @@ def own_list_is_written(items: Iterable[str]) -> bool:
 #: set, which ``evals.build_review_docs.MARK_GUIDANCE`` writes out for the
 #: reader who fills the document by hand — free prose here would record less
 #: than that path does, and no count could be taken over it.
-Mark = Literal["agree", "reject", "duplicate"]
+#:
+#: ``unsure`` is a real answer and is counted as one, exactly as it is for a
+#: **Ledger** vote: review sitting 01 answered ``unclear`` on 4 of 30 pairs, and
+#: that finding is what fixed the specificity rule in ``BLESSING.md``. The two
+#: are keyed by one fingerprint and the word means one thing on both — the
+#: reader read it and cannot decide.
+#:
+#: It is last because it is the answer a reader reaches for when the other
+#: three do not fit, and a control lists it where they look for it.
+Mark = Literal["agree", "reject", "duplicate", "unsure"]
 
-#: The same three, for a surface that offers them and a check that reads them.
+#: The same set, for a surface that offers them and a check that reads them.
 MARKS: tuple[Mark, ...] = get_args(Mark)
 
 #: What the rail says about a case no submission clears. The other status a row
