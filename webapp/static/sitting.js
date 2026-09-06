@@ -71,8 +71,8 @@ function railRow(row) {
 
 // A refusal is said where the count would go, rather than left as a page
 // that reads "reading the cases…" forever.
-async function getJson(path) {
-  const res = await fetch(path);
+async function getJson(path, withToken = false) {
+  const res = await fetch(path, withToken ? {headers: headers} : {});
   const d = await res.json();
   if (!res.ok) throw new Error(d.detail || path + " refused");
   return d;
@@ -565,7 +565,9 @@ const putBack = id => stageAct("/api/put-back", id);
 async function loadStage() {
   let d, status;
   try {
-    [d, status] = await Promise.all([getJson("/api/stage"), getJson("/api/contribution-status")]);
+    [d, status] = await Promise.all([
+      getJson("/api/stage"), getJson("/api/contribution-status", true),
+    ]);
   } catch (err) {
     $("ready").textContent = err.message;
     return;

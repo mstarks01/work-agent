@@ -429,7 +429,12 @@ def create_app(session: Session) -> FastAPI:
         return JSONResponse({"case": prepared.case_id, "state": "open"})
 
     @app.get("/api/contribution-status")
-    def contribution_status() -> JSONResponse:
+    def contribution_status(request: Request) -> JSONResponse:
+        # Whether a `gh` login exists, and which, is a fact about the
+        # operator's machine. It goes only to a request that proved it read
+        # the page, which is what the token proves; a read that never did is
+        # a stranger asking.
+        base.require_token(request, session)
         login = _gh_login(session.root)
         return JSONResponse({"mode": "direct" if login else "browser", "author": login})
 

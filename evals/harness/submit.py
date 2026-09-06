@@ -79,16 +79,22 @@ DEFAULT_REPO = "mstarks01/work-agent"
 #: two cannot name different branches.
 BASE_BRANCH = BASE_REF.split("/", 1)[1]
 
-_REMOTE = re.compile(r"(?:[:/])(?P<owner>[^/:]+)/(?P<name>[^/]+?)(?:\.git)?$")
+#: An origin on github.com, in either spelling git prints. The host is part
+#: of the match on purpose: the slug is composed into a ``https://github.com``
+#: link, so a remote on any other host names a repository that link cannot
+#: reach, and the upstream is the honest answer for it.
+_REMOTE = re.compile(r"github\.com[:/](?P<owner>[^/:]+)/(?P<name>[^/]+?)(?:\.git)?/?$")
 
 
 def repo_slug(root: Path) -> str:
-    """``owner/name`` for this clone's origin, or :data:`DEFAULT_REPO`.
+    """``owner/name`` for this clone's origin on github.com, or :data:`DEFAULT_REPO`.
 
     Read from git rather than written down, so a fork's own page links to the
     fork it was built in. It falls back rather than raising, because the only
     caller is a page offering somebody a link: no link is worse than a link to
-    the upstream, and neither is worth refusing a sitting over.
+    the upstream, and neither is worth refusing a sitting over. A remote on
+    another host falls back too, because the link the slug lands in names
+    github.com.
     """
     try:
         url = run_command(["git", "remote", "get-url", "origin"], root).strip()

@@ -352,3 +352,21 @@ def test_review_states_hand_the_page_a_state_and_a_label(tmp_path: Path):
     assert states[CASE] == {"state": "todo", "label": REVIEW_LABELS["todo"]}
     for entry in states.values():
         assert entry["label"] == REVIEW_LABELS[entry["state"]]
+
+
+def test_contribution_status_needs_the_page_token(tmp_path: Path, monkeypatch):
+    """Whether a `gh` login exists is a fact about the operator's machine.
+
+    It reaches a request that read the page and no other, which is what the
+    token proves. The page sends it on that one read.
+    """
+    tree = tree_for(tmp_path)
+    client, _ = client_for(tree)
+    monkeypatch.setattr(sitting.submit_spine, "gh_login", lambda root: "ada")
+
+    bare = TestClient(client.app, base_url=str(client.base_url))
+    assert bare.get("/api/contribution-status").status_code == 403
+    told = client.get("/api/contribution-status")
+    assert told.status_code == 200
+    assert told.json() == {"mode": "direct", "author": "ada"}
+    assert 'getJson("/api/contribution-status", true)' in client_script("sitting.js")
