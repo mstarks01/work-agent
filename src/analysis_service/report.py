@@ -2002,24 +2002,32 @@ class SharedElementName(BaseModel):
 class AnalysisMarks(BaseModel):
     """Every service-owned mark one run produced, as one value.
 
-    The five lists below have one owner, one standing and one policy: the
-    *service* records them, they ride beside the findings rather than on them
-    (an agent must not report on its own accuracy), and none of them fails a
-    job. They used to travel as five loose parallel lists — through the fan-in,
-    through four session-state keys, through four parameters on the assemble
-    node, through four fields on an :class:`~analysis_service.graph.Analysis` and
-    its two state methods — so adding the fifth cost about fifteen edits of one
-    shape. Here they are one field.
+    Every list below has one owner, one standing and one policy: the *service*
+    records them, they ride beside the findings rather than on them (an agent
+    must not report on its own accuracy), and none of them fails a job. One
+    field carries all of them, so a mark travels the fan-in, the session state,
+    the assemble node and an :class:`~analysis_service.graph.Analysis` as part
+    of one value. A new mark is a field here, and nothing downstream is edited
+    to carry it.
 
-    **Not the report's wire shape.** The report keeps its five top-level
-    arrays; :meth:`~analysis_service.graph.Analysis.into_report` is where this
-    value becomes them. Nesting them there would break every consumer of a
-    published schema to save one of those fifteen edits.
+    **Not the report's wire shape.** A mark annotates one framework's claims,
+    so it rides on that framework's block, and the one mark about the shared
+    model rides on the envelope.
+    :meth:`~analysis_service.graph.Analysis.into_report` and
+    :func:`~analysis_service.graph._framework_block` are where this value
+    becomes those arrays. Nesting it there instead would break every consumer
+    of a published schema.
+
+    **Every field here must reach one of those two destinations.** The spread
+    walks the block's own fields, so a package that declares no ``severity``
+    gets no :class:`MissingMitigation` list — and a mark *no* destination
+    declares is dropped by the same walk, in silence.
+    ``tests/test_report.py`` is what refuses that.
 
     Empty is the common case and means what it says: every quote verified,
-    every mention resolved, every reference named a fact, every threat carried
-    a countermeasure or the unknown that excuses carrying none, and no two
-    element types share a name.
+    every mention resolved, every reference named a fact, every claim kept its
+    identity, every threat carried a countermeasure or the unknown that excuses
+    carrying none, and no two element types share a name.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -2053,8 +2061,8 @@ class AnalysisMarks(BaseModel):
         The fan-in collects marks from three producers — one per lane's
         evidence resolution, the join across all six, and the model itself —
         and this is how they become one value. It walks ``model_fields`` rather
-        than naming the five lists, so a sixth mark joins by being declared
-        above rather than by someone remembering this method.
+        than naming each list, so a new mark joins by being declared above
+        rather than by someone remembering this method.
         """
         return AnalysisMarks(
             **{

@@ -277,9 +277,9 @@ def test_an_eval_report_carries_every_field_production_stamps(case):
     is exactly how ``coverage`` came to be computed at the fan-in for a sweep
     that then read an empty list for it.
 
-    The five marks are pinned through
-    :class:`~analysis_service.report.AnalysisMarks`, which is where an
-    ``Analysis`` holds them now.
+    The marks are pinned through
+    :class:`~analysis_service.report.AnalysisMarks`, which is the one field
+    an ``Analysis`` holds them on.
     """
     pipeline = build(case, ENTRY_PREPARE, {})
 

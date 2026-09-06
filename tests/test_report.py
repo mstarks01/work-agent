@@ -473,10 +473,11 @@ class TestEveryClaimMarkPointsAtAThreat:
 
 
 class TestAnalysisMarks:
-    """The five service-owned marks as one value.
+    """Every service-owned mark as one value.
 
     The fan-in collects them from more than one producer, so merging is the
-    operation this type exists for.
+    operation this type exists for, and landing them on the report is the
+    other.
     """
 
     def test_an_empty_set_is_the_common_case(self):
@@ -507,16 +508,47 @@ class TestAnalysisMarks:
         assert merged.unverified_grounds == []
 
     def test_merging_covers_every_declared_mark(self):
-        """A sixth mark joins by being declared, not by editing ``merged_with``.
+        """A new mark joins by being declared, not by editing ``merged_with``.
 
         The method walks ``model_fields``, so this holds the whole set rather
-        than the four names that happen to exist today.
+        than the names that happen to exist today.
         """
         empty = AnalysisMarks()
 
         merged = empty.merged_with(empty)
 
         assert set(merged.model_dump()) == set(AnalysisMarks.model_fields)
+
+    def test_every_mark_reaches_the_report(self):
+        """A mark the report has no field for is dropped, and says nothing.
+
+        :func:`~analysis_service.graph._framework_block` spreads this value
+        onto a block by walking the block's own fields, and keeps only what the
+        block declares. That filter is right — a package that grades no harm
+        carries no :class:`MissingMitigation` list — and it cannot tell a mark
+        another package owns from a mark nobody declared. Both are dropped in
+        silence.
+
+        This is the table check the framework axis already runs for
+        ``CONTENT_LICENSE`` against ``PACKAGES``, one axis over. It is derived
+        from the registry rather than listed, so a package that arrives with a
+        mark of its own is covered by this test existing.
+        """
+        from analysis_service.frameworks import SCHEMAS
+        from analysis_service.report import FrameworkAnalysis, Report
+
+        blocks = {FrameworkAnalysis, *(schemas.block for schemas in SCHEMAS.values())}
+        lands = set(Report.model_fields)
+        for block in blocks:
+            lands |= set(block.model_fields)
+
+        stranded = sorted(set(AnalysisMarks.model_fields) - lands)
+
+        assert not stranded, (
+            f"the service computes {stranded} and no report field carries it."
+            " Declare the mark on the envelope, if it is about the shared"
+            " model, or on the block of every package that can produce it."
+        )
 
 
 class TestCoverageRatios:
