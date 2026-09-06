@@ -624,21 +624,27 @@ MARKUP_PAYLOAD = "<img src=x onerror=alert(1)>"
 HTML_STRING_SINKS = ("innerHTML", "outerHTML", "insertAdjacentHTML", "document.write")
 
 
-def viewer_javascript() -> str:
-    """The viewer's behaviour block, with its comments stripped.
+def page_javascript(name: str) -> str:
+    """One page's client script, with its comments stripped.
 
-    Comments are removed so the lint reads what runs. The prose in this file
+    Read through :func:`~webapp.page.client_script`, so a lint reads the bytes
+    the app serves rather than a slice of a template that happens to hold them.
+
+    Comments are removed so the lint reads what runs. The prose in these files
     names ``innerHTML`` precisely because it is explaining why there isn't one,
-    and a substring check over the raw template would fail on its own docs.
+    and a substring check over the raw source would fail on its own docs.
     """
-    from webapp.main import VIEWER
+    from webapp.page import client_script
 
-    source = VIEWER.read_text(encoding="utf-8")
-    body = source.split('<script nonce="__CSP_NONCE__">')[-1].split("</script>")[0]
-    body = re.sub(r"/\*.*?\*/", "", body, flags=re.DOTALL)
+    body = re.sub(r"/\*.*?\*/", "", client_script(name), flags=re.DOTALL)
     return "\n".join(
         line for line in body.splitlines() if not line.lstrip().startswith("//")
     )
+
+
+def viewer_javascript() -> str:
+    """The report viewer's script."""
+    return page_javascript("report_view.js")
 
 
 @pytest.mark.parametrize("sink", HTML_STRING_SINKS)
@@ -1022,18 +1028,8 @@ def test_the_viewer_has_no_inline_style_attribute():
 
 
 def form_javascript() -> str:
-    """The form page's behaviour block, with its comments stripped.
-
-    The same treatment :func:`viewer_javascript` gives the viewer, and for the
-    same reason: the prose explains why there is no ``innerHTML``, so a
-    substring check over the raw template would fail on its own documentation.
-    """
-    from webapp.main import _FORM_PAGE
-
-    body = _FORM_PAGE.split('<script nonce="__CSP_NONCE__">')[-1].split("</script>")[0]
-    return "\n".join(
-        line for line in body.splitlines() if not line.lstrip().startswith("//")
-    )
+    """The first-run form page's script."""
+    return page_javascript("first_run.js")
 
 
 @pytest.mark.parametrize("sink", HTML_STRING_SINKS)
@@ -1222,3 +1218,80 @@ def test_the_event_stream_still_streams_under_the_header_middleware(client):
         assert response.headers["X-Content-Type-Options"] == "nosniff"
         assert response.headers["content-type"].startswith("text/event-stream")
         assert "event: done" in "".join(response.iter_text())
+
+
+# --- the client scripts live in files ----------------------------------------
+
+
+#: Every page a local app serves, and the file holding its client script. The
+#: page's own module is where a reader looks first, so the pairing is written
+#: here rather than derived: a page added without an entry fails the sweep
+#: below, which is the point.
+PAGE_SCRIPTS = {
+    "webapp/sitting.py": "sitting.js",
+    "webapp/review.py": ("review_queue.js", "review_finding.js"),
+    "webapp/main.py": "first_run.js",
+    "webapp/offline_sitting.py": "offline_sitting.js",
+    "webapp/report_view.html": "report_view.js",
+}
+
+#: A ``<script>`` block a page template is allowed to fill itself. Each one
+#: holds values rather than code: a page's injected values keep their escape
+#: at the template, where :func:`~webapp.page.script_json` decides how each is
+#: spelled, and only the code moves to a file.
+_VALUE_BLOCK = re.compile(r"^\s*(?:const \w+ = <!--\w+-->;\s*)+$")
+
+
+@pytest.mark.parametrize("source", sorted(PAGE_SCRIPTS))
+def test_a_page_template_carries_no_script_body(source):
+    """A page's code lives in ``webapp/static``, never in a Python string.
+
+    A script inside a template is readable only as a string, so the only
+    assertion available over one is how it is spelled — which is what every
+    lint in this file used to do. In a file it is JavaScript that a linter can
+    parse and ``node`` can run.
+
+    Two block shapes stay legal. ``<!--script-->`` is the slot
+    :func:`~webapp.page.render` fills from the file, and a block of nothing but
+    ``const NAME = <!--field-->;`` lines is the page's injected values, which
+    keep their escape at the template.
+    """
+    blocks = re.findall(
+        # Anchored to the start of a line, which is where a template opens one.
+        # Prose in these modules names ``<script>`` while explaining what goes
+        # in one, and an unanchored pattern reads that as a block.
+        r"^<script[^>]*>(.*?)</script>",
+        Path(source).read_text(encoding="utf-8"),
+        re.DOTALL | re.MULTILINE,
+    )
+    written = [
+        block
+        for block in blocks
+        if block.strip() not in {"<!--script-->", "<!--report-->"}
+        and not _VALUE_BLOCK.fullmatch(block)
+    ]
+    assert written == [], (
+        f"{source} writes a script block of its own. Move the code to"
+        " webapp/static and fill the page's <!--script--> slot through"
+        " page.client_script, so a linter and a test can read it."
+    )
+
+
+def test_every_client_script_belongs_to_a_page():
+    """A script file nothing serves is dead code nothing would notice.
+
+    The reverse of the sweep above, over the same table: that one holds a page
+    to its file, and this one holds a file to its page.
+    """
+    named = {
+        name
+        for value in PAGE_SCRIPTS.values()
+        for name in ((value,) if isinstance(value, str) else value)
+    }
+    from webapp.page import _STATIC
+
+    on_disk = {path.name for path in _STATIC.glob("*.js")}
+    assert on_disk == named, (
+        f"webapp/static holds {sorted(on_disk - named)} that no page names, and"
+        f" the table names {sorted(named - on_disk)} that is not there."
+    )
