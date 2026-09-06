@@ -177,7 +177,6 @@ def create_app(session: Session, page: str, script: str) -> FastAPI:
         rows = session.refresh()
         return JSONResponse(
             {
-                "todo": sum(1 for row in rows if row.state == "todo"),
                 "ready": sum(1 for row in rows if row.state == "finished"),
                 "preselect": session.preselect,
                 "cases": [
@@ -255,7 +254,7 @@ def create_app(session: Session, page: str, script: str) -> FastAPI:
                 opened_digests=opened,
             ),
         )
-        return JSONResponse({"case": body.case, "accepted": len(written)})
+        return JSONResponse({"case": body.case})
 
     @app.post("/api/draft")
     def save_progress(request: Request, body: Progress) -> JSONResponse:
@@ -273,19 +272,6 @@ def create_app(session: Session, page: str, script: str) -> FastAPI:
         held.notes = body.notes
         save_draft(session, held)
         return JSONResponse({"case": body.case, "state": held.state})
-
-    @app.post("/api/discard")
-    def discard(request: Request, body: Which) -> JSONResponse:
-        refuse_cross_origin(request)
-        require_token(request, session)
-        open_case(session, body.case)
-        try:
-            gone = sittings.discard_draft(
-                session.drafts, session.submitted_by, body.case
-            )
-        except sittings.DraftError as exc:
-            raise HTTPException(status_code=409, detail=str(exc)) from exc
-        return JSONResponse({"case": body.case, "discarded": gone})
 
     @app.get("/api/part-two")
     def part_two(case: CaseId) -> JSONResponse:
