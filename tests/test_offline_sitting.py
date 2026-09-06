@@ -16,15 +16,22 @@ comes back.
 from __future__ import annotations
 
 import json
+import re
+import shutil
+import subprocess
+import tempfile
+from pathlib import Path
 
 import pytest
 
+from evals.harness import envelope as envelopes
 from evals.harness import sitting as sittings
 from evals.harness.envelope import VERSION
 from evals.harness.reference import ANONYMOUS, CorpusError
 from tests.test_sitting_app import CASE, build_tree
 from webapp.offline_sitting import build, payload
 from webapp.offline_sitting import main as offline_main
+from webapp.page import client_script
 
 
 @pytest.fixture
@@ -117,12 +124,34 @@ class TestThePayloadCannotEndItsOwnBlock:
 
 
 class TestThePageIsSelfContained:
-    def test_it_fetches_nothing(self, corpus):
-        """A reader offline gets the whole sitting or none of it."""
+    def test_it_loads_nothing_and_sends_nothing_by_itself(self, corpus):
+        """A reader offline gets the whole sitting, and it stays theirs.
+
+        Two rules in one check. The page renders from its own bytes, so a
+        reader with no network reads every case. And it sends nothing on its
+        own: the only way their words leave is a press they make.
+        """
         page = build(corpus, "ada", ANONYMOUS)
 
-        for reach in ("http://", "https://", "fetch(", "XMLHttpRequest", "<link"):
+        for reach in ("fetch(", "XMLHttpRequest", "navigator.sendBeacon", "<link"):
             assert reach not in page, f"the page reaches for {reach}"
+        assert "src=" not in page, "the page loads something of its own"
+
+    def test_the_only_destination_is_the_pull_request_the_reader_presses(self, corpus):
+        """One outward address, reached from a click handler and nowhere else.
+
+        The publish button navigates to GitHub carrying the reader's own
+        submission. That is the point of it, and it is why this holds the page
+        to exactly one destination: a second one would be a place the reader
+        did not agree to send their words.
+        """
+        page = build(corpus, "ada", ANONYMOUS)
+
+        addresses = set(re.findall(r"https?://[^\"'\s+]+", page))
+        assert addresses == {"https://github.com/"}, (
+            f"the page names {sorted(addresses)}. A sitting page may offer the"
+            " reader one way out and no other address at all."
+        )
 
     def test_it_carries_no_answers_of_its_own(self, body):
         """The reader's words start empty; the page ships the question only."""
@@ -177,3 +206,102 @@ def test_the_webapp_and_the_envelope_share_one_line_type():
     from webapp.sitting import Line as WebappLine
 
     assert WebappLine is EnvelopeLine
+
+
+#: Where the page's submission-naming block starts. Sliced rather than run
+#: whole, because the rest of the page draws into a document node has none of.
+NAMING_BLOCK = "// The bytes a submission is named by"
+
+
+class TestThePageNamesASubmissionTheWayPythonDoes:
+    """Two readers of one rule, held against each other under ``node``.
+
+    A submission is named by the digest of its canonical bytes, and
+    :func:`evals.review_submission.verify_pull_request` refuses a file whose
+    name does not match. The page computes that name in JavaScript and the
+    service computes it in Python, so the two spell one rule twice — and a
+    disagreement would not show up here at all. It would show up as a
+    contributor's pull request refused after they had already done the reading.
+
+    So the page's own block runs, over an envelope Python built, and the two
+    names are compared.
+    """
+
+    def envelope(self, corpus):
+        """One filled envelope, in the shape the page's own builder emits."""
+        case_dir = corpus / CASE
+        prepared = sittings.prepare(case_dir)
+        return envelopes.Envelope.model_validate(
+            {
+                "envelope": envelopes.VERSION,
+                "submitted_by": "ada",
+                "submitted_for": ANONYMOUS,
+                "generated": "2026-09-06",
+                "cases": {
+                    CASE: {
+                        # Non-ASCII on purpose: the two serializers have to
+                        # agree about escaping, not only about whitespace.
+                        "own_list": ["a spoofed device — reports for another"],
+                        "marks": {
+                            target.fingerprint: "agree"
+                            for target in prepared.mark_targets[:3]
+                        },
+                        "missing": ["nobody rotates the fleet key"],
+                        "notes": "21 agree",
+                        "opened_digests": sittings.digests(case_dir, prepared.files),
+                    }
+                },
+            }
+        )
+
+    def under_node(self, script: str) -> str:
+        node = shutil.which("node")
+        if node is None:
+            pytest.skip("no node on PATH to run the page's own block")
+        source = client_script("offline_sitting.js")
+        # The naming block alone: the rest of the page draws into a document
+        # node has none of. Sliced by the comment the block opens with, so a
+        # rename fails here rather than silently testing nothing.
+        assert NAMING_BLOCK in source, (
+            f"{NAMING_BLOCK!r} is gone, so this test no longer knows where the"
+            " page's naming block starts."
+        )
+        block = source.split(NAMING_BLOCK)[1].split("async function publish")[0]
+        harness = (
+            "const DATA = {repo: 'o/r', branch: 'main', submissions_dir: 'd'};\n"
+            "const window = {crypto: require('node:crypto').webcrypto};\n"
+            f"function canonical{block.split('function canonical', 1)[1]}\n"
+            f"{script}\n"
+        )
+        with tempfile.TemporaryDirectory() as scratch:
+            path = Path(scratch) / "harness.cjs"
+            path.write_text(harness, encoding="utf-8")
+            done = subprocess.run(
+                [node, str(path)],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=False,
+            )
+        assert done.returncode == 0, done.stderr
+        return done.stdout.strip()
+
+    def test_the_canonical_bytes_are_the_same_bytes(self, corpus):
+        envelope = self.envelope(corpus)
+        expected = envelopes.serialize(envelope).decode("utf-8")
+
+        printed = self.under_node(
+            f"process.stdout.write(canonical({envelope.model_dump_json()}));"
+        )
+
+        assert printed + "\n" == expected
+
+    def test_the_submission_name_is_the_same_name(self, corpus):
+        envelope = self.envelope(corpus)
+
+        printed = self.under_node(
+            f"submissionName({envelope.model_dump_json()})"
+            ".then(name => process.stdout.write(name));"
+        )
+
+        assert printed == envelopes.submission_name(envelope)
