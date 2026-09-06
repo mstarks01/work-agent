@@ -331,6 +331,24 @@ class TestTheTableMatchesWhatTheTranslatorDoes:
             "usage": {"inputTokens": 1, "outputTokens": 1, "totalTokens": 2},
             "metrics": {"latencyMs": 1},
         },
+        # The Developer API answers in the Vertex wire shape, ``modelVersion``
+        # included, and litellm's config for it inherits the Vertex
+        # transformation. Whether that inheritance still holds is what this
+        # entry drives.
+        "gemini": {
+            "candidates": [
+                {
+                    "content": {"parts": [{"text": "hi"}], "role": "model"},
+                    "finishReason": "STOP",
+                }
+            ],
+            "usageMetadata": {
+                "promptTokenCount": 1,
+                "candidatesTokenCount": 1,
+                "totalTokenCount": 2,
+            },
+            "modelVersion": SERVED,
+        },
     }
 
     def test_every_vendor_has_a_canned_response(self):

@@ -52,8 +52,8 @@ engine = Engine.from_config(
 ```
 
 The pair above is one of the reference pairs declared by the code, not a
-recommendation. `vertex`, `anthropic`, `openai` and `bedrock` are the
-registered vendors. `bedrock` allows two credential modes, so a deployment
+recommendation. `vertex`, `anthropic`, `openai`, `bedrock` and `gemini` are
+the registered vendors. `bedrock` allows two credential modes, so a deployment
 that selects it also passes `ANALYSIS_MODEL_CREDENTIALS_BEDROCK`, and installs
 `analysis-service[bedrock]` for the client library its provider needs.
 

@@ -199,7 +199,7 @@ class TierSelection(BaseModel):
 
     @property
     def route(self) -> str:
-        """The LiteLLM router string, e.g. ``vertex_ai/gemini-2.5-pro``."""
+        """The LiteLLM router string: the vendor's prefix joined to the model."""
         return self.vendor_entry.route(self.model)
 
 

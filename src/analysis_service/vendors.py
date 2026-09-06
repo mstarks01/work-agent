@@ -4,8 +4,8 @@ Every model reaches the graph through ADK's ``LiteLlm``, so what varies per
 provider is not how to call it. It is three facts the adapter cannot supply:
 
 * the router prefix LiteLLM dispatches on — ``vertex_ai/``, ``anthropic/``,
-  ``openai/`` or ``bedrock/`` — which is also the vendor half of an **Execution
-  Identity** fingerprint;
+  ``openai/``, ``bedrock/`` or ``gemini/`` — which is also the vendor half of
+  an **Execution Identity** fingerprint;
 * the credential modes a vendor allows, which :data:`CREDENTIAL_MODES` holds and
   a deployment declares from. Vertex admits no raw-API-key path under any
   adapter (``BerriAI/litellm#21036``), so ``vertex + api_key`` is
@@ -46,8 +46,14 @@ from typing import Literal
 
 from analysis_service.errors import ConfigError
 
-VendorName = Literal["vertex", "anthropic", "openai", "bedrock"]
-VENDOR_NAMES: tuple[VendorName, ...] = ("vertex", "anthropic", "openai", "bedrock")
+VendorName = Literal["vertex", "anthropic", "openai", "bedrock", "gemini"]
+VENDOR_NAMES: tuple[VendorName, ...] = (
+    "vertex",
+    "anthropic",
+    "openai",
+    "bedrock",
+    "gemini",
+)
 
 #: How much a vendor's *served* build identifier is worth as evidence.
 #:
@@ -138,6 +144,11 @@ CREDENTIAL_MODES: dict[VendorName, tuple[CredentialMode, ...]] = {
     "anthropic": (CredentialMode.API_KEY,),
     "openai": (CredentialMode.API_KEY,),
     "bedrock": (CredentialMode.API_KEY, CredentialMode.IAM),
+    # The Gemini Developer API takes a key and nothing else. It is a different
+    # provider from ``vertex`` rather than a second mode on it:
+    # ``get_llm_provider`` resolves ``gemini/`` and ``vertex_ai/`` to two
+    # providers, and Vertex admits no key under any adapter.
+    "gemini": (CredentialMode.API_KEY,),
 }
 
 
@@ -209,6 +220,13 @@ _CREDENTIAL_VARS: dict[
     ("bedrock", CredentialMode.IAM): (
         _CredentialVar("aws_region_name", BEDROCK_REGION_VAR, secret=False),
     ),
+    # litellm reads ``GOOGLE_API_KEY`` and then ``GEMINI_API_KEY`` out of the
+    # process environment whenever ``api_key`` is absent. Two ambient names
+    # for one provider, and the registry declares neither: the key is read
+    # from this service's own variable, as it is for every key-bearing vendor.
+    ("gemini", CredentialMode.API_KEY): (
+        _CredentialVar("api_key", _api_key_var("gemini"), secret=True),
+    ),
 }
 
 #: The kwargs a ``(vendor, mode)`` pair passes with a **fixed** value, rather
@@ -237,6 +255,7 @@ _MODE_KWARGS: dict[tuple[VendorName, CredentialMode], dict[str, str]] = {
     ("openai", CredentialMode.API_KEY): {},
     ("bedrock", CredentialMode.API_KEY): {},
     ("bedrock", CredentialMode.IAM): {"api_key": ""},
+    ("gemini", CredentialMode.API_KEY): {},
 }
 
 #: What an operator must arrange outside this service, per mode. The diagnostic
@@ -472,11 +491,13 @@ _BEDROCK_CLAUDE_RULE = _FormRule(
     ),
 )
 
-# The families this service requires no canonical shape from: Gemini on Vertex,
-# and OpenAI's own models. Only the shared denylist applies.
+# The families this service requires no canonical shape from: Gemini, on either
+# Google vendor, and OpenAI's own models. Only the shared denylist applies.
 #
 # Gemini 2.5 and later publish no numbered builds, so the bare name is the most
-# specific identifier that exists and there is nothing to require.
+# specific identifier that exists and there is nothing to require. That holds
+# whichever route serves the family, so the ``gemini`` row needs no rule the
+# ``vertex`` row does not already carry.
 #
 # **OpenAI's gpt-* family is different, and the rule stays open by decision
 # rather than by absence.** That family does publish dated snapshots, and the
@@ -524,6 +545,13 @@ _FORM_RULES: dict[VendorName, tuple[_FormRule, ...]] = {
     # serves — Nova, Llama, Mistral and 28 more families — reaches the catch-all,
     # where only the shared denylist applies, scope segment and all.
     "bedrock": (_BEDROCK_CLAUDE_RULE, _CATCH_ALL),
+    # The Developer API serves Gemini alone today, and it still lists the
+    # Claude rule: ``get_llm_provider`` resolves ``gemini/claude-opus-5`` to
+    # this provider without complaint, and a family rule follows the family.
+    # A Claude identifier arriving here gets the verdict every bare-spelling
+    # vendor gives it, and a tier row moved between ``gemini`` and ``vertex``
+    # meets one set of legal identifiers.
+    "gemini": (_CLAUDE_RULE, _CATCH_ALL),
 }
 
 
@@ -824,6 +852,20 @@ VENDORS: dict[VendorName, Vendor] = {
         # fills ``model_response.model`` from the request.
         served_trust="requested_echo",
     ),
+    # The Gemini Developer API: the same weights ``vertex`` serves, behind a
+    # key instead of a platform identity. Two rows and not one, because the
+    # router prefix is the vendor half of an Execution Identity and litellm
+    # dispatches the two prefixes to two providers. A deployment may select
+    # both; the prefixes differ, so :func:`vendor_for_route` tells the routes
+    # apart and a fingerprint blessed on one never certifies the other.
+    "gemini": Vendor(
+        name="gemini",
+        prefix="gemini/",
+        # litellm's Developer API config inherits the Vertex Gemini
+        # transformation, which fills ``model_response.model`` from the
+        # request and never reads the body's ``modelVersion``.
+        served_trust="requested_echo",
+    ),
 }
 
 
@@ -845,7 +887,7 @@ class VendorSdk:
 #: ``tests/test_vendor_neutrality.py`` can see a row that never answered.
 #:
 #: Only a provider that signs or resolves its own requests needs a library here.
-#: The other three reach an HTTPS endpoint with a bearer token or with a
+#: The other four reach an HTTPS endpoint with a bearer token or with a
 #: credential ``google-auth`` already resolves, and litellm carries both.
 #:
 #: An optional extra rather than a wheel dependency, per ADR 0023: a deployment
@@ -858,6 +900,7 @@ VENDOR_SDKS: dict[VendorName, VendorSdk | None] = {
     "anthropic": None,
     "openai": None,
     "bedrock": VendorSdk(module="boto3", extra="bedrock"),
+    "gemini": None,
 }
 
 

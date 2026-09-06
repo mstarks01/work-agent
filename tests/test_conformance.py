@@ -125,14 +125,17 @@ def pins_scalar(text: str, value: str) -> bool:
 # it. Values are visibly fake — a suite that needed a real key would be a suite
 # that only ran where one existed, which is the imbalance this file exists to
 # remove.
+#
+# Derived from the registry rather than written down. A hand-kept copy was a
+# second reader of `_CREDENTIAL_VARS`, and it answered for four vendors on the
+# day a fifth arrived: the binding check raised on the one variable this
+# mapping had never heard of. The loader checks that a variable is declared,
+# never that its value has a shape, so one placeholder serves every variable.
 FAKE_ENV = {
-    "ANALYSIS_ANTHROPIC_API_KEY": "sk-ant-not-a-real-key",
-    "ANALYSIS_OPENAI_API_KEY": "sk-not-a-real-key",
-    "ANALYSIS_BEDROCK_API_KEY": "not-a-real-bedrock-key",
-    "ANALYSIS_BEDROCK_REGION": "us-east-1",
-    "ANALYSIS_VERTEX_PROJECT": "test-project",
-    "ANALYSIS_VERTEX_LOCATION": "us-central1",
-    "GOOGLE_APPLICATION_CREDENTIALS": "/nonexistent/adc.json",
+    var: f"not-a-real-{var.lower()}"
+    for name in VENDOR_NAMES
+    for mode in vendor_for(name).credential_modes
+    for var in vendor_for(name).required_env_vars(mode)
 }
 
 
@@ -232,6 +235,18 @@ class TestTheMatrixItself:
 
         gemini = profile(vendor_for("vertex"), "gemini-2.5-pro")
         assert gemini.params["seed"] is Capability.SUPPORTED
+
+        # One set of weights, two routes, one cell apart: litellm maps
+        # ``seed`` for ``vertex_ai/`` and refuses it for ``gemini/``. A
+        # capability is a property of the ``(vendor, model)`` pair, and this
+        # is the pair that proves the vendor half is not decorative.
+        developer_api = profile(vendor_for("gemini"), "gemini-2.5-pro")
+        assert developer_api.params["seed"] is Capability.UNSUPPORTED
+        assert {
+            name: cell for name, cell in developer_api.params.items() if name != "seed"
+        } == {name: cell for name, cell in gemini.params.items() if name != "seed"}
+        assert developer_api.structured_output is gemini.structured_output
+        assert developer_api.output_ceiling == gemini.output_ceiling
 
     def test_the_matrix_covers_every_supported_vendor(self):
         """A vendor absent from the matrix is a vendor nobody profiled."""
@@ -521,6 +536,11 @@ class TestTheLiveLanesSweepWhatWasProfiled:
         # the Bedrock map rules both out of scope. The smoke lane covers this
         # vendor; the corpus sweep does not.
         "bedrock": None,
+        # No lane. The pinned map prices ``gemini/`` routes, so a sweep is
+        # not blocked; nobody has chosen to spend on a second route to the
+        # weights ``evals-live.yml`` already sweeps. The smoke lane covers
+        # this vendor.
+        "gemini": None,
     }
 
     #: The lane every vendor is compared on, whatever authenticates it. One
