@@ -210,34 +210,16 @@ def _refusals(
 ) -> list[str]:
     """Everything wrong with one case's answers, all of it at once.
 
-    One case refusing must not hide the next one's problem: the reader is
-    hours away by email, so a round trip has to carry every question at once.
+    Asked rather than re-derived. An offline reader and a reader at a keyboard
+    are held to one rule, so a change to it cannot refuse one and accept the
+    other.
     """
-    problems = []
-    if not sittings.own_list_is_written(answers.own_list):
-        problems.append(
-            f"{case_id}: the own list is shorter than {sittings.MIN_OWN_LIST}"
-            " characters, so this case's sets should never have opened"
-        )
-    stale = sittings.moved(
+    return sittings.sitting_problems(
         case_dir,
-        {name: answers.opened_digests.get(name, "") for name in prepared.files},
+        own_list=answers.own_list,
+        opened_digests=answers.opened_digests,
+        marks=answers.marks,
     )
-    if stale:
-        problems.append(
-            f"{case_id}: {', '.join(stale)} changed since the page was built,"
-            " so this read answers words that are no longer there. Generate"
-            " the page again and ask for this case to be re-read."
-        )
-    # Asked rather than re-derived. This module used to spell the mark rule a
-    # second time, so a change to it here and not there would have refused an
-    # offline reader's case and accepted the same case from the app.
-    for rule in (sittings.check_marks, sittings.check_every_finding_marked):
-        try:
-            rule(prepared, answers.marks)
-        except sittings.SittingError as exc:
-            problems.append(str(exc))
-    return problems
 
 
 #: Where a merged submission lives, relative to the repository root.

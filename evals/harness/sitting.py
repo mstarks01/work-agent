@@ -50,8 +50,9 @@ from __future__ import annotations
 import ast
 import hashlib
 import os
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 from typing import Any, Literal, get_args
 
@@ -361,6 +362,17 @@ def document_name(submitted_by: str) -> str:
     return f"REVIEW-{submitted_by}.md"
 
 
+#: What every sitting reads whatever the case declares: the words the
+#: submitter wrote, and the **System Model** built from them. A submission that
+#: carries no digest for these read no case at all.
+SHARED_FILES = ("source.md", "model.json")
+
+
+def claim_file(framework: str) -> str:
+    """The one reference set a **Framework** records under."""
+    return f"{CLAIMS_DIR}/{framework}.json"
+
+
 def required_files(frameworks: Iterable[str]) -> list[str]:
     """What a complete sitting reads, derived from the case's own declaration.
 
@@ -444,6 +456,7 @@ def rail(
     corpus_dir: Path,
     signatures: Mapping[str, str] | None = None,
     drafts: Mapping[str, DraftStatus] | None = None,
+    partial: Mapping[str, str] | None = None,
 ) -> tuple[Row, ...]:
     """Every case in the corpus, in corpus order, with the status a reader reads.
 
@@ -457,14 +470,26 @@ def rail(
     whoever signed it. The status names the signer, which reads correctly
     either way.
 
+    ``partial`` says what a case still waits for where some sitting covers it
+    in part, from :func:`evals.review_submission.partial_signatures`. Such a
+    case presses like any unread one — work remains — and its status names the
+    **Framework** that waits rather than reading ``to do``, which would tell a
+    reader their own finished work was never done.
+
     ``drafts`` is what the reader's own store says, from
     :func:`draft_states`. A caller that passes none gets the rail of a reader
     who holds no drafts, which is what the corpus alone can say.
     """
     signed = signatures or {}
+    part = partial or {}
     held = drafts or {}
     return tuple(
-        _row(case, signed.get(case.meta.id), held.get(case.meta.id))
+        _row(
+            case,
+            signed.get(case.meta.id),
+            held.get(case.meta.id),
+            part.get(case.meta.id),
+        )
         for case in load_corpus(corpus_dir)
     )
 
@@ -482,8 +507,13 @@ def naming(submitted_by: str, submitted_for: str) -> str:
     return f"{submitted_by} for {submitted_for}"
 
 
-def _row(case: GoldenCase, signature: str | None, draft: DraftStatus | None) -> Row:
-    status, state, pressable = _standing(signature, draft)
+def _row(
+    case: GoldenCase,
+    signature: str | None,
+    draft: DraftStatus | None,
+    partial: str | None = None,
+) -> Row:
+    status, state, pressable = _standing(signature, draft, partial)
     return Row(
         case_id=case.meta.id,
         number=case.meta.id.split("-")[0],
@@ -495,7 +525,7 @@ def _row(case: GoldenCase, signature: str | None, draft: DraftStatus | None) -> 
 
 
 def _standing(
-    signature: str | None, draft: DraftStatus | None
+    signature: str | None, draft: DraftStatus | None, partial: str | None = None
 ) -> tuple[str, RowState, bool]:
     """What one case is waiting for, out of the two things that can be true of it.
 
@@ -512,6 +542,8 @@ def _standing(
     if draft is None:
         if signature is not None:
             return f"signed by {signature}", "signed", False
+        if partial is not None:
+            return partial, "todo", True
         return TO_DO, "todo", True
     if draft.state == UNREADABLE:
         return f"draft unreadable: {draft.path}", "error", False
@@ -698,7 +730,16 @@ def check_marks(prepared: Prepared, marks: Mapping[str, Mark]) -> None:
         )
 
 
-def check_every_finding_marked(prepared: Prepared, marks: Mapping[str, Mark]) -> None:
+def targets_of(prepared: Prepared, framework: str) -> tuple[MarkTarget, ...]:
+    """The recorded findings one **Framework** contributed to this case."""
+    return tuple(
+        target for target in prepared.mark_targets if target.framework == framework
+    )
+
+
+def check_every_finding_marked(
+    prepared: Prepared, marks: Mapping[str, Mark], frameworks: Iterable[str]
+) -> None:
     """Refuse a sitting that judges none of the findings it read.
 
     **The bar is a judgement, not an open file.** A submission used to clear a
@@ -716,19 +757,22 @@ def check_every_finding_marked(prepared: Prepared, marks: Mapping[str, Mark]) ->
     nobody can defend. The cost is small where the cost actually falls: the
     hour goes on reading the sets, and the mark is a press the reader makes
     while they read.
+
+    ``frameworks`` names the sets this sitting read, and the rule holds inside
+    each one. A **Framework** that arrives after a reader finished is not their
+    unfinished work, so a message that counted across both would name a debt
+    the reader does not owe.
     """
-    unmarked = sorted(
-        target.fingerprint
-        for target in prepared.mark_targets
-        if target.fingerprint not in marks
-    )
-    if unmarked:
-        raise SittingError(
-            f"{prepared.case_id}: {len(unmarked)} of"
-            f" {len(prepared.mark_targets)} recorded findings carry no mark."
-            " A sitting answers every finding it read, because a set nobody"
-            " judged is a set nobody tested."
-        )
+    for framework in frameworks:
+        targets = targets_of(prepared, framework)
+        unmarked = [target for target in targets if target.fingerprint not in marks]
+        if unmarked:
+            raise SittingError(
+                f"{prepared.case_id}: {len(unmarked)} of {len(targets)}"
+                f" recorded {framework} findings carry no mark. A sitting"
+                " answers every finding it read, because a set nobody judged"
+                " is a set nobody tested."
+            )
 
 
 def document(
@@ -905,6 +949,108 @@ def unreviewed_cases(root: Path) -> list[str]:
     return [case for case, _, _ in entries]
 
 
+def covered_frameworks(case_dir: Path, opened_digests: Mapping[str, str]) -> list[str]:
+    """Which **Framework**s a sitting read, in the case's declared order.
+
+    A sitting covers a framework when it carries a digest for that framework's
+    reference set and the digest still matches the tree.
+
+    **A framework the case gained later is not covered, and is not a fault.**
+    Nobody judges a set that did not exist when they read, so a sitting that
+    covers some of a case's frameworks is sound and leaves the rest waiting.
+    """
+    prepared = prepare(case_dir)
+    return [
+        framework
+        for framework in prepared.part_two_blocks
+        if claim_file(framework) in opened_digests
+        and not moved(
+            case_dir, {claim_file(framework): opened_digests[claim_file(framework)]}
+        )
+    ]
+
+
+def sitting_problems(
+    case_dir: Path,
+    *,
+    own_list: Sequence[str],
+    opened_digests: Mapping[str, str],
+    marks: Mapping[str, Mark],
+) -> list[str]:
+    """Everything wrong with what one sitting claims to have read.
+
+    **One reader, three callers.** The app's press, the CI check over a merged
+    submission and the offline import all ask this, so a rule that refused an
+    offline reader's case cannot accept the same case from the app.
+
+    **It judges the sets the reader opened, never the ones they did not.** A
+    case that gains a **Framework Package** after a sitting merged leaves that
+    framework waiting; it does not make the merged sitting wrong, and it does
+    not put the reader's own work back on their desk.
+
+    Every problem at once, because a reader may be hours away by email and a
+    round trip has to carry every question.
+    """
+    prepared = prepare(case_dir)
+    case_id = prepared.case_id
+    problems: list[str] = []
+
+    if not own_list_is_written(own_list):
+        problems.append(
+            f"{case_id}: the independent list is shorter than"
+            f" {MIN_OWN_LIST} characters, so this case's sets should never"
+            " have opened"
+        )
+
+    recorded = set(opened_digests)
+    if absent := sorted(set(SHARED_FILES) - recorded):
+        problems.append(f"{case_id}: the review carries no digest for {absent}")
+    if extra := sorted(recorded - set(prepared.files)):
+        problems.append(f"{case_id}: the review carries unexpected digests for {extra}")
+
+    # Over the files the reader says they read, and no others. A file the case
+    # gained since is not one that moved under them, and a message that said so
+    # would send them looking for an edit nobody made.
+    if stale := moved(case_dir, dict(opened_digests)):
+        problems.append(
+            f"{case_id}: {', '.join(stale)} changed since the reviewer opened the case"
+        )
+
+    # Computed from the digests whatever else is wrong. Gated on `problems`
+    # it would read as zero, and every mark the reader made would then be
+    # reported as answering a set they never opened — a wall of text hiding the
+    # one line that says what is actually wrong.
+    read = covered_frameworks(case_dir, opened_digests)
+    if not problems and not read:
+        problems.append(
+            f"{case_id}: the review opened no reference set, so it judges nothing"
+        )
+    for rule in (check_marks, partial(check_every_finding_marked, frameworks=read)):
+        try:
+            rule(prepared, marks)
+        except SittingError as exc:
+            problems.append(str(exc))
+
+    # Named by framework rather than by fingerprint: a reader who marked a set
+    # they did not record reading needs the set's name, and a list of every key
+    # would bury it.
+    unread = sorted(
+        framework
+        for framework in prepared.part_two_blocks
+        if framework not in read
+        and any(
+            target.fingerprint in marks for target in targets_of(prepared, framework)
+        )
+    )
+    if unread:
+        problems.append(
+            f"{case_id}: this review marks {', '.join(unread)} findings and"
+            f" carries no digest for {[claim_file(name) for name in unread]},"
+            " so it judges a set it does not say it read"
+        )
+    return problems
+
+
 @dataclass(frozen=True)
 class Store:
     """Where one reader's sitting reads and writes.
@@ -975,7 +1121,7 @@ def finish(
     that outlives a process.
     """
     check_marks(prepared, marks)
-    check_every_finding_marked(prepared, marks)
+    check_every_finding_marked(prepared, marks, prepared.part_two_blocks)
     draft.marks = dict(marks)
     draft.missing = list(missing)
     draft.notes = notes
