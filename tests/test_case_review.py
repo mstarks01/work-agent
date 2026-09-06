@@ -44,7 +44,7 @@ from pydantic import ValidationError
 from evals import verify_corpus
 from evals.harness.reference import ReadRecord, load_corpus
 from evals.harness.sitting import moved
-from evals.review_submission import REPO_ROOT, current_reviews
+from evals.review_submission import REPO_ROOT, unreviewed_cases
 
 #: Cases nobody has read, each with what that leaves unchecked. Every entry is
 #: a case nobody read rather than an exemption: unlike the lists in
@@ -122,16 +122,18 @@ def corpus():
 
 @pytest.fixture(scope="module")
 def reviewed_by_case(corpus):
-    """Whether a merged submission currently clears each case.
+    """Whether merged submissions currently clear each case.
 
-    One reader, and the one the app reads too:
-    :func:`~evals.review_submission.current_reviews` drops a submission whose
-    read files have changed, so a PR that edits a read file puts the case back
-    on the list fail-closed — it carries a fresh review, or a person names the
-    case in ``UNREVIEWED``, in the PR that caused it.
+    One reader, and the one the app and ``--list`` read too:
+    :func:`~evals.review_submission.unreviewed_cases`. A case is read when
+    every framework it declares is covered, and a submission stops covering
+    a framework the moment a file it read changes — so a PR that edits a read
+    file puts the case back on the list fail-closed. It carries a fresh
+    review, or a person names the case in ``UNREVIEWED``, in the PR that
+    caused it.
     """
-    current = current_reviews(REPO_ROOT)
-    return {case.meta.id: case.meta.id in current for case in corpus}
+    unread = set(unreviewed_cases(REPO_ROOT))
+    return {case.meta.id: case.meta.id not in unread for case in corpus}
 
 
 def test_a_new_case_carries_a_sitting(reviewed_by_case):
@@ -142,13 +144,12 @@ def test_a_new_case_carries_a_sitting(reviewed_by_case):
     )
     assert not undeclared, (
         f"these cases have no Case Sitting that clears them: {undeclared}."
-        " Either no `reviews` entry covers every required file, its"
-        " `submitted_by` has no roster line, or a read file changed under its"
-        " digests. Hold"
-        " a sitting (evals/BLESSING.md step 6) and append the entry, or name"
-        " the case as unread by adding its line to UNREVIEWED. A case merged"
-        " unread cannot be caught later by any lint — that is what this"
-        " module's docstring is about."
+        " Either no merged submission under evals/review/submissions covers"
+        " every framework the case declares, or a read file changed under a"
+        " submission's digests. Hold a sitting (evals/BLESSING.md step 6) and"
+        " contribute it, or name the case as unread by adding its line to"
+        " UNREVIEWED. A case merged unread cannot be caught later by any lint"
+        " — that is what this module's docstring is about."
     )
 
 

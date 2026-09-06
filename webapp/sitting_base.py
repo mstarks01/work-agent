@@ -21,15 +21,14 @@ of it is left, whoever signed it. The draft is what re-opens a case, so a reader
 who records one still presses their own row and records it again.
 :func:`open_case` resolves every case id that arrives in a request against that
 list, so the refusal a signed case needs is the same rule that refuses a case id
-nobody wrote. The status reads :func:`evals.review_submission.current_reviews`, and never
-the presence of an entry in ``reviews``: a drifted digest leaves an entry that
-clears nothing, and a rail keyed on the entry would grey a case CI asks somebody
+nobody wrote. The status reads :func:`evals.review_submission.current_reviews`,
+and never the presence of a submission file: a submission whose digests drifted
+clears nothing, and a rail keyed on the file would grey a case CI asks somebody
 to read.
 
-It is eval-side tooling rather than the product, and it is the browser half of a
-path that also works entirely from the shell. Everything it writes is what
-``evals/BLESSING.md`` step 6 asks a person to write by hand, and ``submit
-sitting`` checks the result the same way either way.
+It is eval-side tooling rather than the product. Everything a reader writes here
+lands in a **Draft Sitting** outside the repository, and a sitting becomes a
+record only when its one submission file merges.
 
 Nothing is hosted here and no credential is held. The app binds to loopback.
 Every writing endpoint carries the origin check and the page token, and
@@ -53,10 +52,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from evals import review_submission as review_submissions
 from evals.harness import envelope as envelopes
-from evals.harness import roster as rosters
 from evals.harness import sitting as sittings
-from evals.harness import submit as submit_spine
-from evals.harness.roster import Roster
 from evals.harness.sitting import MIN_OWN_LIST, own_list_is_written
 from webapp.page import (
     LOOPBACK_HOSTS,
@@ -102,7 +98,6 @@ class Session:
     root: Path
     submitted_by: str
     submitted_for: str
-    roster: Roster
     drafts: Path
     preselect: str | None = None
     rows: tuple[sittings.Row, ...] = ()
@@ -121,10 +116,6 @@ class Session:
         )
 
     @property
-    def document_name(self) -> str:
-        return self.store.document_name
-
-    @property
     def corpus_dir(self) -> Path:
         return self.store.corpus_dir
 
@@ -133,11 +124,12 @@ class Session:
         return frozenset(row.case_id for row in self.rows if row.pressable)
 
     def refresh(self) -> tuple[sittings.Row, ...]:
+        signed, partial = review_submissions.rail_signatures(self.root)
         self.rows = sittings.rail(
             self.corpus_dir,
-            review_submissions.clearing_signatures(self.root),
+            signed,
             sittings.draft_states(self.drafts, self.submitted_by),
-            review_submissions.partial_signatures(self.root),
+            partial,
         )
         return self.rows
 
@@ -213,7 +205,7 @@ def create_app(session: Session, page: str, script: str) -> FastAPI:
     def part_one(case: CaseId) -> JSONResponse:
         prepared = open_case(session, case)
         held = held_draft(session, case)
-        work = held or _carried(session, prepared)
+        work = held or sittings.Draft(case=prepared.case_id, clone=str(session.root))
         return JSONResponse(
             {
                 "case": prepared.case_id,
@@ -222,10 +214,7 @@ def create_app(session: Session, page: str, script: str) -> FastAPI:
                 "submitted_for": session.submitted_for,
                 "blocks": prepared.part_one_blocks,
                 "files": prepared.files,
-                # The carried list counts as written: a reader returning for a
-                # framework the case gained cannot write a blind one twice, and
-                # a fresh box would ask them to.
-                "own_list": work.own_list if (held or work.own_list) else None,
+                "own_list": held.own_list if held else None,
                 "state": held.state if held else None,
                 "waiting": review_submissions.waiting(session.root, prepared.case_id),
                 "marks": work.marks,
@@ -341,7 +330,6 @@ def create_app(session: Session, page: str, script: str) -> FastAPI:
         return JSONResponse(
             {
                 "case": prepared.case_id,
-                "written": _written(session, [prepared.case_id]),
                 "moved": moved,
                 "ready": len(session.carried()),
             }
@@ -356,7 +344,6 @@ def create_app(session: Session, page: str, script: str) -> FastAPI:
             for row in rows
             if row.case_id in session.dropped and row.state == "draft"
         ]
-        cases = [row.case_id for row in carried]
         return JSONResponse(
             {
                 "submitted_by": session.submitted_by,
@@ -366,9 +353,6 @@ def create_app(session: Session, page: str, script: str) -> FastAPI:
                 "unfinished": sum(
                     1 for row in rows if row.state not in ("finished", "signed")
                 ),
-                "written": _written(session, cases),
-                "command": "python -m evals.harness.run submit sitting",
-                "paste": _paste(session, cases),
             }
         )
 
@@ -406,29 +390,6 @@ def create_app(session: Session, page: str, script: str) -> FastAPI:
     return app
 
 
-def _carried(session: Session, prepared: sittings.Prepared) -> sittings.Draft:
-    """A fresh draft, carrying what a merged sitting of this case already holds.
-
-    **The own list is written once.** A reader comes back to a case when it
-    gains a **Framework**, and by then they have read the recorded sets — so a
-    list they wrote now would be evidence of an order that did not happen. The
-    list they wrote blind is in their merged submission, and it rides forward
-    locked.
-
-    Their marks ride with it, so the findings they already judged stay judged
-    and only the new set is theirs to answer. A mark is keyed by the finding's
-    own fingerprint, so a mark carried here still names the finding it answered.
-    """
-    draft = sittings.Draft(case=prepared.case_id, clone=str(session.root))
-    merged = review_submissions.current_for_case(session.root, prepared.case_id)
-    if merged is None:
-        return draft
-    draft.own_list = list(merged.answers.own_list)
-    draft.marks = dict(merged.answers.marks)
-    draft.missing = list(merged.answers.missing)
-    return draft
-
-
 def require_token(request: Request, session: Session) -> None:
     sent = request.headers.get("x-sitting-token", "")
     if not secrets.compare_digest(sent.encode(), session.token.encode()):
@@ -445,10 +406,43 @@ def open_case(session: Session, case_id: str) -> sittings.Prepared:
 
 
 def held_draft(session: Session, case_id: str) -> sittings.Draft | None:
+    """This reader's draft of one case, or the refusal an unreadable one gets.
+
+    **A case a merged sitting covers in part re-opens on that sitting.** The
+    reader comes back when the case gains a **Framework**, and by then they
+    have read the recorded sets, so a list written now would be evidence of an
+    order that did not happen. The list written blind rides forward locked,
+    with the marks already made, and only the new set is theirs to answer.
+
+    The resumed draft is written to the store the first time it is asked for,
+    because every later request — the sets, a save, the record — asks the
+    store and not the corpus. A draft that exists is what opens the sets and
+    refuses a second own list, so the resumed one holds the same gate.
+    """
     try:
-        return session.draft(case_id)
+        held = session.draft(case_id)
     except sittings.DraftError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if held is not None:
+        return held
+    merged = review_submissions.current_for_case(session.root, case_id)
+    if merged is None:
+        return None
+    try:
+        prepared = session.prepare(case_id)
+        opened = sittings.digests(session.corpus_dir / prepared.case_id, prepared.files)
+    except sittings.SittingError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    resumed = sittings.Draft(
+        case=prepared.case_id,
+        clone=str(session.root),
+        own_list=list(merged.answers.own_list),
+        opened_digests=opened,
+    )
+    resumed.marks = dict(merged.answers.marks)
+    resumed.missing = list(merged.answers.missing)
+    save_draft(session, resumed)
+    return resumed
 
 
 def _moved(
@@ -456,9 +450,18 @@ def _moved(
 ) -> list[str]:
     if draft is None:
         return []
+    # Over the files the draft pinned, and no others. A required file the
+    # draft never pinned is one the case gained since — a new set, which is
+    # not a file that moved under the reader. Filtered to the case's own list,
+    # so no name the draft holds is read as a path. `sitting_problems` reads
+    # a merged submission by the same rule.
     return sittings.moved(
         session.corpus_dir / prepared.case_id,
-        {name: draft.opened_digests.get(name, "") for name in prepared.files},
+        {
+            name: digest
+            for name, digest in draft.opened_digests.items()
+            if name in prepared.files
+        },
     )
 
 
@@ -492,34 +495,6 @@ def _stage_row(row: sittings.Row) -> dict[str, str]:
     return {"case": row.case_id, "number": row.number, "title": row.title}
 
 
-def _written(session: Session, cases: list[str]) -> list[str]:
-    return [
-        *(
-            f"evals/corpus/{case}/{name}"
-            for case in cases
-            for name in (session.document_name, "case.json")
-        ),
-        *([sittings.UNREVIEWED_FILE] if cases else []),
-    ]
-
-
-def _paste(session: Session, cases: list[str]) -> str:
-    listed = "\n".join(f"- {case}" for case in cases)
-    names = sittings.naming(session.submitted_by, session.submitted_for)
-    return (
-        f"Sitting: {names}, {len(cases)} cases\n\n"
-        f"{listed}\n\n"
-        "Each case above was read from the same source material used by the"
-        " analysis. The reader wrote an independent list before the recorded"
-        " framework findings were opened, then judged the findings they chose"
-        " to assess. The filled document is committed as"
-        f" `{session.document_name}`.\n\n"
-        "The `reviews` entry in each `case.json` records the digest of every"
-        " file as it stands in this PR, so a later edit to any of them puts"
-        " that case back on the list."
-    )
-
-
 def build_session(
     root: Path,
     submitted_by: str,
@@ -532,7 +507,6 @@ def build_session(
         root=root,
         submitted_by=submitted_by,
         submitted_for=submitted_for or submitted_by,
-        roster=rosters.load(root / submit_spine.ROSTER_FILE),
         drafts=drafts or sittings.draft_root(),
         preselect=case,
     )

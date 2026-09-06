@@ -23,7 +23,7 @@ from evals.harness import sitting as sittings
 from evals.harness.reference import ANONYMOUS
 from evals.harness.sitting import Draft, Store
 from tests.test_sitting_app import CASE, build_tree, drafts_root
-from webapp.sitting import HELD
+from webapp.sitting_base import HELD
 
 OWN_LIST = ["a spoofed device"]
 

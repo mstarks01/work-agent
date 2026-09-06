@@ -147,7 +147,11 @@ def test_the_lint_reads_a_real_population():
     """Guards the guard: a regex that matched nothing would pass vacuously."""
     documented = _documented()
 
-    assert len(documented) > 40, (
+    # 37 measured on 2026-09-06. The bound was 40 while the twelve generated
+    # reading documents each carried a `submit sitting` line; that command
+    # went with the case-local sitting format (ADR 24), and the documents no
+    # longer name one.
+    assert len(documented) > 30, (
         f"only {len(documented)} documented invocations found -- the"
         " invocation pattern has stopped matching"
     )

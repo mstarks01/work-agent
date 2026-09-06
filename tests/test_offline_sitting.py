@@ -203,7 +203,7 @@ def test_a_line_holds_no_line_break():
 def test_the_webapp_and_the_envelope_share_one_line_type():
     """Two copies of one shape drift. This is the pair that held the defect."""
     from evals.harness.envelope import Line as EnvelopeLine
-    from webapp.sitting import Line as WebappLine
+    from webapp.sitting_base import Line as WebappLine
 
     assert WebappLine is EnvelopeLine
 

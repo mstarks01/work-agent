@@ -75,8 +75,9 @@ from evals.harness.reference import (
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CORPUS_DIR = REPO_ROOT / "evals" / "corpus"
 
-#: Where the unreviewed list lives. A sitting that does not clear its line
-#: leaves the count a lie, so ``submit sitting`` refuses one that has not.
+#: Where the ``UNREVIEWED`` table lives. It says what each unread case leaves
+#: unchecked; the count itself is derived from the merged submissions by
+#: :func:`evals.review_submission.unreviewed_cases`.
 UNREVIEWED_FILE = "tests/test_case_review.py"
 
 #: The shortest own list a sitting accepts, counted over the reader's own
@@ -348,11 +349,11 @@ def claim_files(frameworks: Iterable[str]) -> list[str]:
 
 
 def document_name(submitted_by: str) -> str:
-    """The filled reading document one submission writes beside a case.
+    """The name a filled reading document carries for one submitting login.
 
-    Spelled once: the app writes this name, and ``submit sitting`` admits
-    this name and no other under the case prefix. A document under another
-    name is another submission's, and a submission may not change one (#388).
+    Nothing is written beside a case: the document is a rendering of a
+    submission's answers, which the read-only view serves. The name still
+    carries the submitting login, so a rendering says whose answers it shows.
 
     **It carries the submitting login, never the reader's.** The allowlist
     derives this name from the authenticated account, so a name the diff
@@ -461,7 +462,7 @@ def rail(
     """Every case in the corpus, in corpus order, with the status a reader reads.
 
     ``signatures`` says who cleared each case, from
-    :func:`evals.review_submission.clearing_signatures` — the one reader of
+    :func:`evals.review_submission.rail_signatures` — the one reader of
     that question. It is passed in rather than read here because a submission
     is a merged file rather than a fact about a case directory, and this
     module is what a submission is validated against.
@@ -471,7 +472,7 @@ def rail(
     either way.
 
     ``partial`` says what a case still waits for where some sitting covers it
-    in part, from :func:`evals.review_submission.partial_signatures`. Such a
+    in part, from the same :func:`evals.review_submission.rail_signatures`. Such a
     case presses like any unread one — work remains — and its status names the
     **Framework** that waits rather than reading ``to do``, which would tell a
     reader their own finished work was never done.
@@ -949,7 +950,11 @@ def unreviewed_cases(root: Path) -> list[str]:
     return [case for case, _, _ in entries]
 
 
-def covered_frameworks(case_dir: Path, opened_digests: Mapping[str, str]) -> list[str]:
+def covered_frameworks(
+    case_dir: Path,
+    opened_digests: Mapping[str, str],
+    prepared: Prepared | None = None,
+) -> list[str]:
     """Which **Framework**s a sitting read, in the case's declared order.
 
     A sitting covers a framework when it carries a digest for that framework's
@@ -958,8 +963,12 @@ def covered_frameworks(case_dir: Path, opened_digests: Mapping[str, str]) -> lis
     **A framework the case gained later is not covered, and is not a fault.**
     Nobody judges a set that did not exist when they read, so a sitting that
     covers some of a case's frameworks is sound and leaves the rest waiting.
+
+    ``prepared`` is the case already prepared, for a caller that holds it;
+    preparing reads and fingerprints every reference set.
     """
-    prepared = prepare(case_dir)
+    if prepared is None:
+        prepared = prepare(case_dir)
     return [
         framework
         for framework in prepared.part_two_blocks
@@ -1020,7 +1029,7 @@ def sitting_problems(
     # it would read as zero, and every mark the reader made would then be
     # reported as answering a set they never opened — a wall of text hiding the
     # one line that says what is actually wrong.
-    read = covered_frameworks(case_dir, opened_digests)
+    read = covered_frameworks(case_dir, opened_digests, prepared)
     if not problems and not read:
         problems.append(
             f"{case_id}: the review opened no reference set, so it judges nothing"

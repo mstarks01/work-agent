@@ -6,8 +6,8 @@ import json
 import shutil
 from pathlib import Path
 
+from evals import review_submission as reviews
 from evals.harness import envelope as envelopes
-from evals.harness import review_submission as reviews
 from evals.harness import sitting as sittings
 
 CASE = "03-batch-data-pipeline"
