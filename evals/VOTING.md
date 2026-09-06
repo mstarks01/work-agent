@@ -316,12 +316,12 @@ from. A rule change is then arithmetic over the ledger's files.
      wrong: a merged finding leaves no unmatched claim for anybody to review.
      Watch the candidate column first — it is the population a live run
      resembles, and an element-only rule that merges 23 of 287 reference pairs
-     merges 85 of 115 candidates. A new collision needs a reason in that
+     merges 81 of 111 candidates. A new collision needs a reason in that
      package's `recorded_collisions`, or the rule is wrong.
    - **The split count must not rise without an argument.** A split costs a
      reviewer one unmatched finding, which is visible and recoverable, so a rule
-     may trade splits for merges — `SubsetVerbIdentity` takes one more split to
-     remove twenty merges. State the trade.
+     may trade splits for merges. The current `SubsetVerbIdentity` adds no
+     candidate split and removes 78 candidate merges. State any future trade.
    - **The bar must hold at 90%.** It admits a candidate rule that has no pinned
      counts of its own yet. Below it, fix the rule or the verb vocabulary
      (`evals/harness/verbs.py`). Never lower the bar.

@@ -295,8 +295,9 @@ identity from: keying two distinct claims alike destroys a finding and nobody
 sees it go. `python -m evals.harness.run calibrate` prints one line per
 package.
 
-In the same sitting, label candidate threat pairs as match / no-match /
-`unclear` / `unsupported` in `build_pairs.py`. **Write `unclear` when the two sentences alone
+In the same sitting, give each candidate threat pair one primary disposition:
+`match`, `no-match`, `unclear`, `unsupported`, or `invalid-claim` in
+`build_pairs.py`. **Write `unclear` when the two sentences alone
 cannot decide it** — that is a real answer, it leaves the denominator rather
 than counting against either side, and it is better than a binary the evidence
 does not support. Check the bullet below on specificity first: review sitting
@@ -307,9 +308,12 @@ by reading the reference's, which would make every pair agree by construction
 and the measurement worthless. These are what the **false-split count** is measured over, and what lets the
 scorer be tested with no live calls at all. The **≥90% rule–label agreement
 bar** they also feed is the admission gate for a candidate rule, not a quality
-statement about the shipped one. They are not ground truth: a person has read 30 of the 339, in
-review sitting 01, so the bar says the identity rule reproduces what an agent
-wrote and says almost nothing about whether it is right.
+statement about the shipped one. They are not ground truth: review records say
+which subsets people have read, and the bar says only how closely the identity
+rule reproduces the recorded dispositions.
+
+The current set has 339 fixtures; changing that count moves every quoted
+denominator and must update the pinned figures with it.
 
 - **Label within a category only** — the prefilter means cross-category pairs
   are never compared.
@@ -335,17 +339,23 @@ wrote and says almost nothing about whether it is right.
   and the route is the finding. Review sitting 01 relabelled a pair for exactly
   this, so the two bullets above have a floor under them.
 - **Include candidates that assert facts the model doesn't support.** Label
-  them **`unsupported`**, not `no-match`: downstream they're the "unsupported"
-  bucket that counts against the tool, and that is a groundedness question the
-  identity rule cannot reach. Use the label only when the invented fact is the
-  *sole* separator — if the candidate also names a different place or a
-  different action, the rule can decide it, so it is a `no-match` the score
-  should keep.
+  them **`unsupported`**, not `no-match`, when the invented fact is essential
+  to the candidate's scenario or mechanism: downstream they're the
+  "unsupported" bucket, and that is a groundedness question the identity rule
+  cannot reach. If a valid, grounded core claim is already distinct and the
+  unsupported text is only an extra qualifier, keep `no-match` as the primary
+  disposition and add `mixed`.
+- **Write `invalid-claim` when there is no framework claim to compare.** An
+  operational concern with no attacker action is not a STRIDE negative and
+  must not be forced through the identity rule.
+- **Preserve a second axis as an annotation.** Add `mixed` when the candidate
+  also crosses another identity/grounding axis, and `misclassified-lane` when
+  it describes a valid threat in another STRIDE lane. An annotation never
+  changes whether the primary disposition is scored.
 - **Keep the set balanced;** `verify_corpus.py` fails if either label drops below
   30%.
-- **Do not try to bless every label.** A person has read 30 of the 339, and the
-  other 309 are not the backlog — blessing an easy paraphrase buys nothing.
-  Spend a sitting on the decision boundaries: same target with a different
+- **Do not turn the whole set into a perpetual reading backlog.** Spend a
+  sitting on the decision boundaries: same target with a different
   action, same action against a different target, flow against endpoint naming,
   a narrower wording against a broader one, and any pair near a merge recorded
   in `verbs.UNSEPARATED`. Add a fixture when a real matcher failure turns one
@@ -362,7 +372,8 @@ wrote and says almost nothing about whether it is right.
   boundary. **Every candidate is assigned, whatever its label** — the negative
   half is what prices the rule on false merges. The only exceptions are the
   handful in `verify_corpus.UNASSIGNABLE`, where the sentence names no element
-  the model holds or no action the vocabulary holds; record the reason there.
+  the model holds or no action the vocabulary holds. Give those a non-scored
+  primary disposition and record the reason there.
 
 ### 6. Bless and merge
 

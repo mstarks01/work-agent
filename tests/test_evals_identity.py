@@ -44,32 +44,32 @@ from evals.harness.identity import (
 from evals.harness.reference import ReferenceThreat, load_corpus
 from evals.harness.verbs import UNSEPARATED, same_action
 
-#: What element agreement alone is worth on the recorded labels, over the 315
+#: What element agreement alone is worth on the recorded labels, over the 311
 #: scored pairs that carry candidate element IDs and a verb.
 #:
 #: **Both halves are assigned now.** Until #511 only the 200 ``match``
 #: candidates carried the fields, so this rule was priced on the split
-#: direction alone and its ``false_matches`` was structurally zero. The 115
-#: scored negatives now say what element equality really costs: it merges 26 of
+#: direction alone and its ``false_matches`` was structurally zero. The 111
+#: scored negatives now say what element equality really costs: it merges 22 of
 #: them. Every number here is quoted in #201, so moving one means updating the
 #: issue.
 MEASURED = {
-    "assigned_pairs": 315,
+    "assigned_pairs": 311,
     "match_pairs": 200,
-    "no_match_pairs": 115,
+    "no_match_pairs": 111,
     # The rule the record can express today: the two element sets are equal,
     # with zones dropped.
-    "equality_agreements": 200,
+    "equality_agreements": 201,
     # It splits nearly half the pairs a label calls the same, and merges a
     # fifth of the ones it calls different.
-    "false_matches": 26,
-    "false_non_matches": 89,
+    "false_matches": 22,
+    "false_non_matches": 88,
 }
 
 #: The frontier, all three ways of being wrong at once.
 #:
 #: - ``splits`` counts the 200 ``match`` pairs a rule calls different.
-#: - ``candidate_merges`` counts the 115 scored ``no-match`` pairs it calls the
+#: - ``candidate_merges`` counts the 111 scored ``no-match`` pairs it calls the
 #:   same. These are candidate paraphrases, which is the population a live run
 #:   emits, and they were unmeasurable before #511 assigned them elements and
 #:   verbs.
@@ -78,25 +78,25 @@ MEASURED = {
 #:
 #: **The candidate column is why the verb is not optional.** Read on reference
 #: pairs alone, ``endpoint subset`` merges 23 of 287 and looks survivable. Read
-#: on the candidates a run actually produces, it merges **85 of 115** — it is
-#: barely a rule at all. The verb takes that to 5 for one extra split.
+#: on the candidates a run actually produces, it merges **81 of 111** — it is
+#: barely a rule at all. The verb takes that to 3 while also avoiding one split.
 FRONTIER = {
-    "equality": {"splits": 89, "candidate_merges": 26, "reference_merges": 1},
+    "equality": {"splits": 88, "candidate_merges": 22, "reference_merges": 1},
     #: The rule #201 argues for, and the only row here that is usable.
     #: It is not an element rule, so it is measured by :func:`_rules`'s
     #: verb-aware entry rather than by a shape function.
     "endpoint subset + verb": {
-        "splits": 15,
-        "candidate_merges": 5,
+        "splits": 14,
+        "candidate_merges": 3,
         "reference_merges": 3,
     },
-    "endpoint equality": {"splits": 60, "candidate_merges": 40, "reference_merges": 6},
-    "subset": {"splits": 41, "candidate_merges": 68, "reference_merges": 7},
-    "endpoint subset": {"splits": 14, "candidate_merges": 85, "reference_merges": 23},
-    "overlap": {"splits": 4, "candidate_merges": 87, "reference_merges": 34},
+    "endpoint equality": {"splits": 59, "candidate_merges": 36, "reference_merges": 6},
+    "subset": {"splits": 41, "candidate_merges": 64, "reference_merges": 7},
+    "endpoint subset": {"splits": 14, "candidate_merges": 81, "reference_merges": 23},
+    "overlap": {"splits": 4, "candidate_merges": 83, "reference_merges": 34},
     "endpoint overlap": {
         "splits": 1,
-        "candidate_merges": 103,
+        "candidate_merges": 99,
         "reference_merges": 126,
     },
 }
@@ -283,13 +283,13 @@ VERB_MEASURED = {
 
 #: What :class:`~evals.harness.identity.SubsetVerbIdentity` scores against the
 #: recorded labels, on the shared bar. The first mechanical rule in this
-#: repository to clear it — ``MechanicalIdentity`` sits at 200/315 — and the
+#: repository to clear it — ``MechanicalIdentity`` sits at 201/311 — and the
 #: number the judge's retirement rests on. It is the admission gate, not the
 #: measurement: :data:`FRONTIER` carries that.
 #:
 #: Read it as ``evals/README.md`` reads every other agreement figure: the labels
 #: are agent-authored, so this measures reproduction and not correctness.
-SUBSET_VERB_AGREEMENT = {"agreements": 295, "total": 315}
+SUBSET_VERB_AGREEMENT = {"agreements": 294, "total": 311}
 
 
 def test_the_verb_separates_what_elements_alone_merge(corpus, flows_by_case):
