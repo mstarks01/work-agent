@@ -430,7 +430,8 @@ def test_the_reading_document_is_what_its_generator_writes(case_dir):
     It matters because the document is what a reader takes away. A person
     holding a sitting offline works from this file alone, so a stale copy is
     wrong in their hands rather than merely untidy in the tree — they mark
-    with words the app refuses, and paste an entry ``submit sitting`` rejects.
+    with words the app refuses, and follow steps the contribution path no
+    longer takes.
 
     **A case that records a sitting is covered too.** A sitting does not retire
     a case, and the generator no longer skips one — so this covers every case

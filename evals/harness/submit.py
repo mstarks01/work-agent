@@ -91,7 +91,7 @@ def repo_slug(root: Path) -> str:
     the upstream, and neither is worth refusing a sitting over.
     """
     try:
-        url = _run(["git", "remote", "get-url", "origin"], root).strip()
+        url = run_command(["git", "remote", "get-url", "origin"], root).strip()
     except SubmitError:
         return DEFAULT_REPO
     found = _REMOTE.search(url)
@@ -160,7 +160,7 @@ class Kind:
     prepare: Callable[[Path, str, argparse.Namespace], None] | None = None
 
 
-def _run(args: Sequence[str], cwd: Path) -> str:
+def run_command(args: Sequence[str], cwd: Path) -> str:
     """One subprocess, list-form and captured; the error names the command."""
     try:
         done = subprocess.run(
@@ -176,7 +176,7 @@ def _run(args: Sequence[str], cwd: Path) -> str:
 
 def gh_login(root: Path) -> str:
     """The authenticated ``gh`` account — the one name a submission may use."""
-    return _run(["gh", "api", "user", "--jq", ".login"], root).strip()
+    return run_command(["gh", "api", "user", "--jq", ".login"], root).strip()
 
 
 #: The delta, held for the length of one checklist pass. A key present means
@@ -206,7 +206,7 @@ def _delta_cache(root: Path) -> Iterator[None]:
         _DELTA.pop(root, None)
 
 
-def _changed_paths(root: Path) -> list[str]:
+def changed_paths(root: Path) -> list[str]:
     """Everything different from BASE_REF, tracked or not, repo-relative.
 
     The caller fetched once already; fetching here would make every check
@@ -215,8 +215,8 @@ def _changed_paths(root: Path) -> list[str]:
     cached = _DELTA.get(root)
     if cached is not None:
         return cached
-    tracked = _run(["git", "diff", "--name-only", BASE_REF], root).splitlines()
-    porcelain = _run(
+    tracked = run_command(["git", "diff", "--name-only", BASE_REF], root).splitlines()
+    porcelain = run_command(
         ["git", "status", "--porcelain", "--untracked-files=all"], root
     ).splitlines()
     untracked = [line[3:] for line in porcelain if line.startswith("?? ")]
@@ -244,10 +244,10 @@ def _is_derived(rel: str) -> bool:
     )
 
 
-def _base_text(root: Path, rel: str) -> str | None:
+def base_text(root: Path, rel: str) -> str | None:
     """The file's content at BASE_REF, or None where the base has no file."""
     try:
-        return _run(["git", "show", f"{BASE_REF}:{rel}"], root)
+        return run_command(["git", "show", f"{BASE_REF}:{rel}"], root)
     except SubmitError:
         return None
 
@@ -263,7 +263,7 @@ def _vote_rows(root: Path, author: str) -> list[ledger.Vote]:
     """The rows this submission adds: the lines past the base-ref prefix."""
     rel = f"evals/review/votes/{author}.jsonl"
     new = (root / rel).read_text(encoding="utf-8") if (root / rel).exists() else ""
-    base = _base_text(root, rel) or ""
+    base = base_text(root, rel) or ""
     if not new.startswith(base):
         return []
     added = new[len(base) :]
@@ -293,7 +293,7 @@ def _subdirs(root: Path, prefix: str) -> list[str]:
     return sorted(
         {
             rest.split("/")[0]
-            for rel in _changed_paths(root)
+            for rel in changed_paths(root)
             if rel.startswith(prefix) and "/" in (rest := rel[len(prefix) :])
         }
     )
@@ -357,7 +357,7 @@ def _check_scope(root: Path, author: str, kind_name: str) -> Check:
     """
     kind = KINDS[kind_name]
     allowed = set(kind.allowlist(root, author))
-    strays = [rel for rel in _changed_paths(root) if rel not in allowed]
+    strays = [rel for rel in changed_paths(root) if rel not in allowed]
     return _check(
         "nothing outside this kind's allowlist changed",
         [f"{rel} is changed but not part of a {kind.noun}" for rel in strays],
@@ -412,7 +412,7 @@ def _check_the_delta_is_yours(root: Path, author: str) -> Check:
     problems = []
     votes_dir = "evals/review/votes/"
     own = f"{votes_dir}{author}.jsonl"
-    for rel in _changed_paths(root):
+    for rel in changed_paths(root):
         if rel.startswith(votes_dir) and rel != own:
             problems.append(f"{rel} is not your file; you are {author!r}")
     return _check("the ledger delta is yours alone", problems)
@@ -457,7 +457,7 @@ def _check_your_file_appends(root: Path, author: str) -> Check:
             "your file only appends, and adds something",
             [f"{rel}: is not UTF-8 text: {exc}"],
         )
-    base = _base_text(root, rel)
+    base = base_text(root, rel)
     if base is not None and not new.startswith(base):
         problems.append(
             f"{rel} rewrites history; a vote submission only appends, and a"
@@ -545,7 +545,7 @@ def _check_no_self_raise(root: Path, author: str) -> Check:
     refused -- see :func:`_roster_delta`.
     """
     problems = []
-    base_raw = _base_text(root, ROSTER_FILE)
+    base_raw = base_text(root, ROSTER_FILE)
     live = root / ROSTER_FILE
     try:
         now = roster.load(live).standing_of(author) if live.exists() else None
@@ -644,7 +644,7 @@ def _baseline_allowlist(root: Path, author: str) -> list[str]:
     prefix = f"{KINDS['baseline'].prefix}{name}/"
     changed = [
         rel
-        for rel in _changed_paths(root)
+        for rel in changed_paths(root)
         if name is not None and rel.startswith(prefix)
     ]
     # The generated comparison moves whenever a Baseline lands, and
@@ -673,7 +673,7 @@ def _check_baseline_sweeps_are_yours(root: Path, author: str) -> Check:
     problems: list[str] = []
     try:
         manifest = json.loads((root / manifest_rel).read_text(encoding="utf-8"))
-        base_raw = _base_text(root, manifest_rel)
+        base_raw = base_text(root, manifest_rel)
         known = {
             str(entry.get("artifact"))
             for entry in (json.loads(base_raw).get("sweeps", []) if base_raw else [])
@@ -782,34 +782,36 @@ KINDS: dict[str, Kind] = {
 # --- the spine ----------------------------------------------------------------
 
 
-def _branch_name(root: Path, kind: str, author: str, remote: str) -> str:
+def branch_name(root: Path, kind: str, author: str, remote: str) -> str:
     """``submit/<kind>/<login>-<date>``, suffixed numerically on collision."""
     stem = f"submit/{kind}/{author}-{datetime.now(UTC).date().isoformat()}"
     name = stem
     suffix = 2
-    while _run(["git", "ls-remote", remote, f"refs/heads/{name}"], root).strip():
+    while run_command(["git", "ls-remote", remote, f"refs/heads/{name}"], root).strip():
         name = f"{stem}-{suffix}"
         suffix += 1
     return name
 
 
-def _push_remote(root: Path, author: str) -> str:
+def push_remote(root: Path, author: str) -> str:
     """Where the branch goes: origin for the repo's owner, the fork otherwise.
 
     ``gh repo fork`` is idempotent — it creates the fork when missing and
     answers with the existing one when not.
     """
-    owner = _run(
+    owner = run_command(
         ["gh", "repo", "view", "--json", "owner", "--jq", ".owner.login"], root
     ).strip()
     if owner == author:
         return "origin"
-    name = _run(["gh", "repo", "view", "--json", "name", "--jq", ".name"], root).strip()
-    _run(["gh", "repo", "fork", "--clone=false"], root)
+    name = run_command(
+        ["gh", "repo", "view", "--json", "name", "--jq", ".name"], root
+    ).strip()
+    run_command(["gh", "repo", "fork", "--clone=false"], root)
     return f"https://github.com/{author}/{name}.git"
 
 
-def _pr_head(remote: str, author: str, branch: str) -> str:
+def pr_head(remote: str, author: str, branch: str) -> str:
     return branch if remote == "origin" else f"{author}:{branch}"
 
 
@@ -822,9 +824,9 @@ def open_pr(root: Path, kind_name: str, author: str) -> str:
     and the worktree makes that refusal structural.
     """
     kind = KINDS[kind_name]
-    _run(["git", "fetch", "origin"], root)
-    remote = _push_remote(root, author)
-    branch = _branch_name(root, kind_name, author, remote)
+    run_command(["git", "fetch", "origin"], root)
+    remote = push_remote(root, author)
+    branch = branch_name(root, kind_name, author, remote)
     title = kind.title(root, author)
     body = (
         f"{kind.closing(root, author)}\n\n"
@@ -833,7 +835,9 @@ def open_pr(root: Path, kind_name: str, author: str) -> str:
     )
     with TemporaryDirectory(prefix="submit-") as scratch:
         worktree = Path(scratch) / "worktree"
-        _run(["git", "worktree", "add", "--detach", str(worktree), BASE_REF], root)
+        run_command(
+            ["git", "worktree", "add", "--detach", str(worktree), BASE_REF], root
+        )
         try:
             staged = []
             for rel in kind.allowlist(root, author):
@@ -844,19 +848,19 @@ def open_pr(root: Path, kind_name: str, author: str) -> str:
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
                 staged.append(rel)
-            _run(["git", "checkout", "-b", branch], worktree)
-            _run(["git", "add", "--", *staged], worktree)
-            _run(["git", "commit", "-m", title], worktree)
-            _run(["git", "push", remote, f"HEAD:refs/heads/{branch}"], worktree)
+            run_command(["git", "checkout", "-b", branch], worktree)
+            run_command(["git", "add", "--", *staged], worktree)
+            run_command(["git", "commit", "-m", title], worktree)
+            run_command(["git", "push", remote, f"HEAD:refs/heads/{branch}"], worktree)
         finally:
-            _run(["git", "worktree", "remove", "--force", str(worktree)], root)
-    return _run(
+            run_command(["git", "worktree", "remove", "--force", str(worktree)], root)
+    return run_command(
         [
             "gh",
             "pr",
             "create",
             "--head",
-            _pr_head(remote, author, branch),
+            pr_head(remote, author, branch),
             "--title",
             title,
             "--body",
@@ -876,7 +880,7 @@ def detect_kind(root: Path) -> str | None:
     roster line on its own. Raises when it touches two, because one kind per
     PR is the rule the forced merge order rests on (#325).
     """
-    changed = _changed_paths(root)
+    changed = changed_paths(root)
     found = sorted(
         name
         for name, kind in KINDS.items()
@@ -917,7 +921,7 @@ def command_verify(args: argparse.Namespace) -> int:
     if kind is None:
         # A roster line with no submission behind it still may not raise its
         # own author's standing — the one edit that is dangerous alone.
-        if ROSTER_FILE in _changed_paths(root):
+        if ROSTER_FILE in changed_paths(root):
             checks = [_check_no_self_raise(root, author)]
         else:
             print("no contribution in this diff; nothing to check")
@@ -1023,7 +1027,7 @@ def submission(
         return Outcome(author="", error=f"cannot read the gh login: {exc}")
 
     try:
-        _run(["git", "fetch", "origin"], root)
+        run_command(["git", "fetch", "origin"], root)
         _register(root, author)
     except (OSError, SubmitError, roster.RosterError) as exc:
         return Outcome(author=author, error=str(exc))

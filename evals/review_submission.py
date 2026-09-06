@@ -14,6 +14,7 @@ case until somebody reviews the new bytes.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -171,10 +172,21 @@ def declared(root: Path, case_id: str) -> list[str]:
     return list(prepared.part_two_blocks)
 
 
-def waiting(root: Path, case_id: str) -> list[str]:
-    """The frameworks of one case that no current sitting covers."""
-    covered = current_reviews(root).get(case_id, {})
-    return [name for name in declared(root, case_id) if name not in covered]
+def waiting(
+    root: Path,
+    case_id: str,
+    covered: Mapping[str, Mapping[str, MergedReview]] | None = None,
+) -> list[str]:
+    """The frameworks of one case that no current sitting covers.
+
+    ``covered`` is :func:`current_reviews` already read, for a caller that
+    walks every case; a caller asking about one case leaves it out and the
+    read happens here.
+    """
+    if covered is None:
+        covered = current_reviews(root)
+    have = covered.get(case_id, {})
+    return [name for name in declared(root, case_id) if name not in have]
 
 
 def current_for_case(root: Path, case_id: str) -> MergedReview | None:
@@ -188,33 +200,32 @@ def current_for_case(root: Path, case_id: str) -> MergedReview | None:
     return max(covered.values(), key=lambda review: review.path.name, default=None)
 
 
-def clearing_signatures(root: Path) -> dict[str, str]:
-    """Who cleared each **fully** covered case, for a rail that greys it.
+def rail_signatures(root: Path) -> tuple[dict[str, str], dict[str, str]]:
+    """What a rail says about every case a merged sitting touches.
 
-    A case with a framework still waiting carries no signature: work remains,
-    and a greyed row would put it out of a reader's reach.
+    Two maps from one read of the submissions. The first names who cleared
+    each **fully** covered case, for a rail that greys it; a case with a
+    framework still waiting carries no signature, because work remains and a
+    greyed row would put it out of a reader's reach. The second says what each
+    partly covered case still waits for, spelled here rather than at the
+    surface, so the rail, the printed count and a future reader agree about
+    what "partly read" is.
+
+    One :func:`current_reviews` serves both. A rail refresh used to read every
+    merged submission once per case per map.
     """
-    return {
-        case_id: max(covered.values(), key=lambda r: r.path.name).signature
-        for case_id, covered in current_reviews(root).items()
-        if not waiting(root, case_id)
-    }
-
-
-def partial_signatures(root: Path) -> dict[str, str]:
-    """What a rail says about a case some sitting covers in part.
-
-    Named rather than derived at the surface, because the rail, the printed
-    count and a future reader all have to agree about what "partly read" is.
-    """
-    lines = {}
-    for case_id, covered in current_reviews(root).items():
-        left = waiting(root, case_id)
-        if not left:
-            continue
-        read = ", ".join(sorted(covered))
-        lines[case_id] = f"{', '.join(left)} waiting; {read} read"
-    return lines
+    covered = current_reviews(root)
+    signed: dict[str, str] = {}
+    partial: dict[str, str] = {}
+    for case_id, reviews in covered.items():
+        left = waiting(root, case_id, covered)
+        if left:
+            read = ", ".join(sorted(reviews))
+            partial[case_id] = f"{', '.join(left)} waiting; {read} read"
+        else:
+            newest = max(reviews.values(), key=lambda review: review.path.name)
+            signed[case_id] = newest.signature
+    return signed, partial
 
 
 def unreviewed_cases(root: Path) -> list[str]:
@@ -272,7 +283,7 @@ def contribution_url(envelope: envelopes.Envelope, slug: str) -> str:
 
 def verify_pull_request(root: Path, author: str) -> list[str]:
     """Validate a review-only pull request against its GitHub author."""
-    changed = submit_spine._changed_paths(root)
+    changed = submit_spine.changed_paths(root)
     review_files = [
         rel
         for rel in changed
@@ -295,7 +306,7 @@ def verify_pull_request(root: Path, author: str) -> list[str]:
         return problems
 
     rel = review_files[0]
-    if submit_spine._base_text(root, rel) is not None:
+    if submit_spine.base_text(root, rel) is not None:
         return [
             *problems,
             f"{rel}: a contributed review is append-only; add a new file",
@@ -338,12 +349,12 @@ def open_pull_request(root: Path, envelope: envelopes.Envelope) -> str:
     author = envelope.submitted_by
     rel = relative_path(envelope)
     try:
-        submit_spine._run(["git", "fetch", "origin"], root)
-        remote = submit_spine._push_remote(root, author)
-        branch = submit_spine._branch_name(root, "review", author, remote)
+        submit_spine.run_command(["git", "fetch", "origin"], root)
+        remote = submit_spine.push_remote(root, author)
+        branch = submit_spine.branch_name(root, "review", author, remote)
         with TemporaryDirectory(prefix="review-submit-") as scratch:
             worktree = Path(scratch) / "worktree"
-            submit_spine._run(
+            submit_spine.run_command(
                 [
                     "git",
                     "worktree",
@@ -358,23 +369,25 @@ def open_pull_request(root: Path, envelope: envelopes.Envelope) -> str:
                 target = worktree / rel
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(serialize(envelope))
-                submit_spine._run(["git", "checkout", "-b", branch], worktree)
-                submit_spine._run(["git", "add", "--", rel], worktree)
-                submit_spine._run(["git", "commit", "-m", _title(envelope)], worktree)
-                submit_spine._run(
+                submit_spine.run_command(["git", "checkout", "-b", branch], worktree)
+                submit_spine.run_command(["git", "add", "--", rel], worktree)
+                submit_spine.run_command(
+                    ["git", "commit", "-m", _title(envelope)], worktree
+                )
+                submit_spine.run_command(
                     ["git", "push", remote, f"HEAD:refs/heads/{branch}"], worktree
                 )
             finally:
-                submit_spine._run(
+                submit_spine.run_command(
                     ["git", "worktree", "remove", "--force", str(worktree)], root
                 )
-        return submit_spine._run(
+        return submit_spine.run_command(
             [
                 "gh",
                 "pr",
                 "create",
                 "--head",
-                submit_spine._pr_head(remote, author, branch),
+                submit_spine.pr_head(remote, author, branch),
                 "--title",
                 _title(envelope),
                 "--body",

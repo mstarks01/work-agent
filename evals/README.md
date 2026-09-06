@@ -19,15 +19,18 @@ by an agent. One review sitting has happened:
 `unclear`, and it changed two things — a wrong label, and a reference claim in
 case 04 that asserted a fact its own model does not hold.
 
-**One case has been through `BLESSING.md` step 6, and twelve have not.** That is
-the reading session over a case's source, model and reference sets together, and
-it is what would catch the case-04 defect anywhere else. That act is a **Case
-Sitting**, recorded as one JSON file under `evals/review/submissions/` — who
-read it, what they wrote before the sets opened, and the digest of each file
-they read. Case `01-payments-checkout`, the control, carries one
-dated 2026-08-23: the reader agreed with all 21 STRIDE claims and all 17 ASVS
-records, and changed none of them
-([`REVIEW-02.md`](corpus/01-payments-checkout/REVIEW-02.md)).
+**No case has a merged Case Sitting, and thirteen wait for one.** That is the
+reading session over a case's source, model and reference sets together
+(`BLESSING.md` step 6), and it is what would catch the case-04 defect anywhere
+else. The act is a **Case Sitting**, recorded as one JSON file under
+`evals/review/submissions/` — who read it, what they wrote before the sets
+opened, and the digest of each file they read. `tests/test_case_review.py`
+derives the count from that directory, so this sentence and the gate cannot
+disagree. Case `01-payments-checkout` carries a filled reading document dated
+2026-08-23 ([`REVIEW-02.md`](corpus/01-payments-checkout/REVIEW-02.md)): the
+reader agreed with all 21 STRIDE claims and all 17 ASVS records. It is a
+reader's own words and the template for the method, and no submission clears
+the case (ADR 24).
 `tests/test_case_review.py` names the other twelve as unread, fails a new case
 that arrives without a sitting, and fails a read file that changes under its
 recorded digest.

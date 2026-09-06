@@ -398,20 +398,19 @@ believe. It is a real answer and it is counted as one, exactly as it is for a
 vote. Say it rather than pick one of the other three to get past an entry: a
 mark you did not mean moves a number, and this one does not.
 
-**One press submits every case you finished, as one pull request.** A footer
-under the list reads `Submit — N cases ready`, counts them, and is the way to
-the submit stage; the last **Next** ends there too. The stage lists every case
-the press carries, one row each, with a **Drop**. A dropped case moves to a
-held-back group with a **Put back**, and goes back to *draft in progress* in
-the list — you keep every word you wrote, and the press stops carrying it. The
-stage also says how many cases stay unfinished, so you never send four cases
-believing you sent five. Below the list it carries the written paths, the
-command and the paste text, each over every case the press carries. The button
-opens the pull request through the `gh` you are already signed in to. It binds
-to loopback and holds no credential of its own. With no `gh` login it hands you
-the same contribution as text to paste into a pull request you open yourself,
-so the way out never depends on a credential. `--list` prints the cases nobody
-has read.
+**One press contributes every case you finished, as one pull request.** A
+footer under the list reads `Review results — N ready`, counts them, and is the
+way to the results stage; the last **Next** ends there too. The stage lists
+every case the press carries, one row each, with a **Drop**. A dropped case
+moves to a held-back group with a **Put back**, and goes back to *in progress*
+in the list — you keep every word you wrote, and the press stops carrying it.
+The stage also says how many cases stay unfinished, so you never send four
+cases believing you sent five. **Show files** displays the one JSON file the
+press carries before you press. **Contribute** opens the pull request through
+the `gh` you are already signed in to; it binds to loopback and holds no
+credential of its own. With no `gh` login it downloads the same one file and
+hands you a link to GitHub's editor with it already filled in, so the way out
+never depends on a credential. `--list` prints the cases nobody has read.
 
 **Stop whenever you like.** The moment you post your own list, the app opens a
 **Draft Sitting** for that case and keeps your list, your marks, your missing
@@ -439,7 +438,7 @@ and it is recorded as **one JSON file** under `evals/review/submissions/`:
   "cases": {
     "<case id>": {
       "own_list": ["<what you wrote before the sets opened>"],
-      "marks": {"<finding fingerprint>": "agree | reject | duplicate"},
+      "marks": {"<finding fingerprint>": "agree | reject | duplicate | unsure"},
       "missing": ["<what the recorded sets do not name>"],
       "notes": "<counts, and anything you would change>",
       "opened_digests": {"source.md": "<the file's digest>"}

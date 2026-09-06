@@ -13,7 +13,7 @@ import re
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Literal
+from typing import Literal, get_args
 
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -22,8 +22,9 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
+from evals import review_submission as review_submissions
 from evals.harness import envelope as envelopes
-from evals.harness import review_submission as review_submissions
+from evals.harness import submit as submit_spine
 from evals.harness.reference import (
     ANONYMOUS,
     CorpusError,
@@ -34,15 +35,23 @@ from webapp import sitting_base as base
 from webapp.page import client_script
 
 sittings = base.sittings
-submit_spine = base.submit_spine
-Line = base.Line
-MIN_OWN_LIST = base.MIN_OWN_LIST
 REPO_ROOT = base.REPO_ROOT
 HOST = base.HOST
 PORT = base.PORT
-HELD = base.HELD
 
 LOCAL_SUBMITTER = "local-review"
+
+#: What the page calls each rail state. One table, keyed by
+#: :data:`~evals.harness.sitting.RowState` and read by the page off
+#: ``/api/review-states``, so the label is spelled here and nowhere else.
+REVIEW_LABELS: dict[sittings.RowState, str] = {
+    "todo": "Not reviewed",
+    "draft": "In progress",
+    "finished": "Reviewed",
+    "signed": "Submitted",
+    "error": "Error",
+}
+assert set(REVIEW_LABELS) == set(get_args(sittings.RowState))
 
 
 class ContributionChoice(BaseModel):
@@ -56,22 +65,19 @@ Session = base.Session
 
 
 def _status_for(session: Session, row: sittings.Row) -> str:
-    if row.state == "todo":
-        return "Not reviewed"
-    if row.state == "signed":
-        return "Submitted"
-    if row.state == "finished":
-        return "Reviewed"
-    if row.state == "error":
-        return "Error"
+    """The label a rail row shows.
+
+    A draft holding an own list and nothing else reads as not started: the
+    reader wrote the list, and the review is the marks that follow it.
+    """
     if row.state == "draft":
         held = session.draft(row.case_id)
-        if held is None:
-            return "Not reviewed"
-        if held.marks or held.missing or held.notes.strip():
-            return "In progress"
-        return "Not reviewed"
-    return row.state
+        started = held is not None and (
+            held.marks or held.missing or held.notes.strip()
+        )
+        if not started:
+            return REVIEW_LABELS["todo"]
+    return REVIEW_LABELS[row.state]
 
 
 def _author(value: str | None) -> str:
@@ -277,7 +283,7 @@ ul.terms { list-style:none; padding:0; }.rec { border-left:3px solid #8886; }.fi
   <h2>How the review works</h2>
   <p>This review compares your independent security assessment of each system description with findings previously produced by an analysis agent. Your judgments show which findings matched your assessment, which did not, which were duplicates, and which issues you found that the agent missed.</p>
   <p><b>Part 1</b> is blind. Read the system description and write your own concerns before any model findings are shown. When you save this list and reveal the model findings, the list is locked for that case. Resetting clears your Part 2 answers but does not unlock the independent list.</p>
-  <p><b>Part 2</b> shows the recorded findings for that same case, grouped by framework. Not every framework applies to every case. Review one framework or several; findings you leave unmarked stay unreviewed. Only reference sets carried by the case are shown, and a missing reference set alone does not prove that a framework is inapplicable.</p>
+  <p><b>Part 2</b> shows the recorded findings for that same case, grouped by framework. Not every framework applies to every case, and only reference sets carried by the case are shown; a missing reference set alone does not prove that a framework is inapplicable. Answer every finding in every set shown: the record waits until none is left unmarked, and <b>Unsure</b> is a real answer for one you cannot judge.</p>
   <p><b>For longer review efforts, consider working in 20–30 minute sessions, then taking a break before continuing.</b> You may complete one or several cases in a session. This helps reduce fatigue and cognitive overload without forcing you to rush.</p>
   <ul>
     <li><b>Agree</b> when the underlying finding is real, supported by the case, and worth reporting.</li>
@@ -325,7 +331,7 @@ ul.terms { list-style:none; padding:0; }.rec { border-left:3px solid #8886; }.fi
 <p><button id="lock">Save and show model findings</button><span id="ownHint" class="save-status"></span></p></section>
 <section id="placeholder"><h2>Part 2 — compare with the recorded findings</h2><p class="note">Model findings stay hidden until your independent list is saved.</p></section>
 <section id="two" class="hidden"><h2>Part 2 — compare with the recorded findings</h2>
-<p class="note">These findings were previously produced by an analysis agent for this same case. Not every framework applies to every case. Review one framework or several. Unmarked findings remain unreviewed. Only reference sets carried by this case are shown; absence alone does not establish that a framework is inapplicable.</p>
+<p class="note">These findings were previously produced by an analysis agent for this same case. Not every framework applies to every case, and only reference sets carried by this case are shown; absence alone does not establish that a framework is inapplicable. Answer every finding in every set: the record waits until none is left unmarked, and <b>Unsure</b> is a real answer for one you cannot judge. Collapse a framework to work through one set at a time.</p>
 <div id="frameworkPicker"></div><div id="partTwo" class="doc"></div>
 <h2>What did your independent review find that these findings missed?</h2><p class="note">If something on your original list is not represented by the framework findings you reviewed, enter it here, one per line. Leave this blank if nothing is missing.</p>
 <textarea id="missing" placeholder="one potentially missed issue per line"></textarea>
@@ -365,8 +371,6 @@ const MIN_OWN_LIST = <!--minownlist-->;
 const MARK_VALUES = <!--markvalues-->;
 </script>
 <script nonce="__CSP_NONCE__"><!--script--></script></body></html>
-<!-- legacy rail-footer contract: "Submit — " + count + " cases ready" -->
-<!-- compatibility: Start with the first case to do · Re-record this sitting -->
 """
 
 

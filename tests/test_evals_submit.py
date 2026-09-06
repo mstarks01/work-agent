@@ -575,14 +575,14 @@ class TestTheDeltaCache:
 
     def test_a_pass_reads_the_tree_once(self, repo, monkeypatch):
         reads = []
-        real = submit._run
+        real = submit.run_command
 
         def counted(args, cwd):
             if args[:3] == ["git", "diff", "--name-only"]:
                 reads.append(args)
             return real(args, cwd)
 
-        monkeypatch.setattr(submit, "_run", counted)
+        monkeypatch.setattr(submit, "run_command", counted)
         prepare_vote(repo)
         git(repo, "fetch", "origin")
         with submit._delta_cache(repo):
@@ -593,10 +593,10 @@ class TestTheDeltaCache:
         """A write between passes is seen, which is why the scope is narrow."""
         git(repo, "fetch", "origin")
         with submit._delta_cache(repo):
-            before = submit._changed_paths(repo)
+            before = submit.changed_paths(repo)
         (repo / "stray.txt").write_text("written between passes\n", encoding="utf-8")
         with submit._delta_cache(repo):
-            after = submit._changed_paths(repo)
+            after = submit.changed_paths(repo)
 
         assert "stray.txt" not in before
         assert "stray.txt" in after
