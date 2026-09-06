@@ -265,7 +265,7 @@ jobs:
             addressing: ""
           - vendor: openai
             secret_name: ANALYSIS_OPENAI_API_KEY
-            base_model: gpt-4o
+            base_model: gpt-4o-2024-08-06
             strong_model: gpt-5.6
             addressing: ""
           # Bedrock declares `api_key` because an `iam` leg needs

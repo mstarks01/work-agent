@@ -104,7 +104,13 @@ REFERENCE_MODELS: dict[str, tuple[str, ...]] = {
     # so neither could bind a tier of this graph. The plain identifier rather
     # than a region-scoped one, because no region enters an Execution Identity.
     "bedrock": ("anthropic.claude-sonnet-4-6", "anthropic.claude-opus-5"),
-    "openai": ("gpt-4o", "gpt-5.6"),
+    # The dated snapshot rather than the ``gpt-4o`` alias it resolves to.
+    # OpenAI fronts its dated builds with a bare name and moves which build that
+    # name means; the matrix is a claim about what was profiled, so it names the
+    # build. Nothing else moves with it: the pinned cost map's entries for the
+    # alias and this snapshot differ in no key, and the two profile identically.
+    # ``test_no_reference_model_is_an_alias_for_a_dated_build`` is the rule.
+    "openai": ("gpt-4o-2024-08-06", "gpt-5.6"),
     "vertex": ("gemini-2.5-flash", "gemini-2.5-pro"),
 }
 

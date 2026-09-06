@@ -154,7 +154,7 @@ review_independence = "shared"
 #   anthropic   base "claude-sonnet-4-6"     strong "claude-opus-5"
 #   bedrock     base "anthropic.claude-sonnet-4-6"
 #               strong "anthropic.claude-opus-5"
-#   openai      base "gpt-4o"                strong "gpt-5.6"
+#   openai      base "gpt-4o-2024-08-06"     strong "gpt-5.6"
 #   vertex      base "gemini-2.5-flash"      strong "gemini-2.5-pro"
 #
 # `review` needs a pair only once something sits on it. Under the shipped

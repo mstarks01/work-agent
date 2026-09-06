@@ -31,6 +31,7 @@ requires the live lanes, and they remain unprovisioned — see
 from __future__ import annotations
 
 import re
+from collections.abc import Collection
 from dataclasses import FrozenInstanceError
 from pathlib import Path
 from typing import ClassVar
@@ -52,11 +53,6 @@ from analysis_service.frameworks.stride.record import ThreatProposals, ThreatRul
 from analysis_service.graph import Pipeline, build_pipeline
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.model_gate import ModelGateError
-from analysis_service.model_tiers import (
-    ModelTierConfig,
-    credentials_env_var_for,
-    load_model_tiers,
-)
 from analysis_service.resilience import load_resilience
 from analysis_service.sampling import load_sampling
 from analysis_service.system_model import SystemModel
@@ -74,6 +70,7 @@ from tests.factories import (
     ScriptedLlm,
     repo_package_loaders,
     sample_fingerprint,
+    tiers_for,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -146,37 +143,6 @@ def reference_pairs() -> list[tuple[str, str]]:
         for vendor, models in REFERENCE_MODELS.items()
         for model in models
     ]
-
-
-def tiers_for(
-    vendor: VendorName, mode: CredentialMode | None = None
-) -> ModelTierConfig:
-    """The shipped node -> tier map, with both tiers on one vendor's pair.
-
-    Built from the real ``config/model_tiers.toml`` rather than a hand-made
-    object, so the node table under test is the one that ships. Only the two
-    selections and the credential declaration are substituted, which is exactly
-    what a deployment does.
-
-    ``mode`` picks the credential mode for a vendor that allows more than one.
-    Absent, the vendor's first allowed mode is declared — a value rather than a
-    guess, because the loader refuses to build without one and the choice is
-    what a deployment makes.
-    """
-    base, strong = REFERENCE_MODELS[vendor]
-    entry = vendor_for(vendor)
-    env = {
-        "ANALYSIS_MODEL_BASE_VENDOR": vendor,
-        "ANALYSIS_MODEL_BASE_MODEL": base,
-        "ANALYSIS_MODEL_STRONG_VENDOR": vendor,
-        "ANALYSIS_MODEL_STRONG_MODEL": strong,
-        "ANALYSIS_MODEL_REVIEW_VENDOR": "anthropic",
-        "ANALYSIS_MODEL_REVIEW_MODEL": "claude-opus-5",
-    }
-    if len(entry.credential_modes) > 1:
-        chosen = entry.credential_modes[0] if mode is None else mode
-        env[credentials_env_var_for(vendor)] = chosen.value
-    return load_model_tiers(CONFIG / "model_tiers.toml", env=env)
 
 
 def credential_cases() -> list[tuple[VendorName, CredentialMode]]:
@@ -780,3 +746,153 @@ def test_a_stated_temperature_cannot_bind_openais_strong_reference_model(tmp_pat
             load_resilience(CONFIG / "resilience.toml", env={}),
             env=FAKE_ENV,
         )
+
+
+class TestTheDocumentedPairsAreTheProfiledPairs:
+    """Three files tell a reader what the reference pairs are, and one table
+    decides. Each of the three names ``conformance.REFERENCE_MODELS`` in its own
+    prose, and until these checks existed nothing held any of them to it.
+
+    They drifted, which is why the checks are here rather than in a habit. The
+    parametrize list in ``tests/test_model_gate.py`` said ``openai`` was
+    ``gpt-4.1-mini`` / ``gpt-4.1`` while ``docs/First-Run.md`` — the table its
+    own docstring named — said something else, and it carried no ``bedrock``
+    row at all. That list now reads the registry; these three read the files.
+    """
+
+    FIRST_RUN: ClassVar[Path] = PROJECT_ROOT / "docs" / "First-Run.md"
+    TIERS_TEMPLATE: ClassVar[Path] = PROJECT_ROOT / "config" / "model_tiers.toml"
+    WEB_APP: ClassVar[Path] = PROJECT_ROOT / "docs" / "Web-App.md"
+
+    # One row of the First-Run table: the vendor's display name, the two
+    # backticked models, and the credentials cell. The vendor is read from the
+    # credentials cell rather than the display name, because "Vertex AI" is
+    # prose and ``ANALYSIS_VERTEX_...`` is the registry's own spelling.
+    _ROW = re.compile(
+        r"^\|[^|]+\|\s*`(?P<base>[^`]+)`\s*\|\s*`(?P<strong>[^`]+)`\s*\|"
+        r"\s*`ANALYSIS_(?P<vendor>[A-Z]+)_[^`]+`"
+    )
+
+    def test_the_first_run_table_is_the_registry(self):
+        """The table says outright that it holds "the reference pairs declared
+        in ``analysis_service.conformance.REFERENCE_MODELS``". This is what
+        makes that sentence true rather than aspirational."""
+        documented = {
+            match["vendor"].lower(): (match["base"], match["strong"])
+            for line in self.FIRST_RUN.read_text(encoding="utf-8").splitlines()
+            if (match := self._ROW.match(line))
+        }
+
+        assert documented == {
+            vendor: tuple(models) for vendor, models in REFERENCE_MODELS.items()
+        }
+
+    def test_the_tier_template_names_every_profiled_model(self):
+        """``config/model_tiers.toml``'s header lists the pairs as a comment and
+        claims each "is a real pair the offline conformance suite profiles".
+
+        Membership rather than a line parser: the comment wraps a long pair
+        across two lines, and a check that a wrap breaks is a check that gets
+        deleted. One direction only, and deliberately — the file quotes node
+        names and tier names as well, so "names nothing else" is not a property
+        this file can have.
+        """
+        text = self.TIERS_TEMPLATE.read_text(encoding="utf-8")
+        quoted = set(re.findall(r'"([^"]+)"', text))
+        profiled = {model for models in REFERENCE_MODELS.values() for model in models}
+
+        assert profiled <= quoted, (
+            f"these profiled models are named nowhere in"
+            f" {self.TIERS_TEMPLATE.name}: {sorted(profiled - quoted)}"
+        )
+
+    def test_the_web_app_example_selects_a_profiled_pair(self):
+        """``docs/Web-App.md`` shows what the page prints for "whichever pair
+        you selected in step 2 of First-Run", so its example has to be a pair
+        First-Run offers. A stale example here reads as a working selection."""
+        shown = re.findall(
+            r"^(base|strong)\s+→\s+(\S+)\s*/\s*(\S+)$",
+            self.WEB_APP.read_text(encoding="utf-8"),
+            re.MULTILINE,
+        )
+
+        assert shown, "docs/Web-App.md shows no tier lines to check"
+        for tier, vendor, model in shown:
+            index = 0 if tier == "base" else 1
+            assert REFERENCE_MODELS[vendor][index] == model, (
+                f"Web-App.md shows {tier} as {vendor}/{model}, which is not"
+                f" that vendor's profiled {tier} model"
+            )
+
+
+# A dated build's identifier ends in the date it was published, in either of the
+# two spellings the pinned map uses. Anchored on the whole tail, so
+# ``gpt-4o-mini-2024-07-18`` is not read as a build of ``gpt-4o``: it is a
+# different model whose own name happens to start with this one's.
+_DATED_BUILD = re.compile(r"^(20\d{6}|20\d\d-\d\d-\d\d)$")
+
+
+def dated_builds_of(model: str, catalogue: Collection[str]) -> list[str]:
+    """Every identifier in ``catalogue`` that is ``model`` plus a date."""
+    return sorted(
+        key
+        for key in catalogue
+        if key.startswith(f"{model}-") and _DATED_BUILD.match(key[len(model) + 1 :])
+    )
+
+
+def test_no_reference_model_is_an_alias_for_a_dated_build():
+    """A reference model names a build, never a name pointing at one.
+
+    **The matrix is a claim about what was profiled**, so the identifier it
+    carries has to mean one build. OpenAI publishes dated builds and fronts them
+    with a bare name, and it chooses which build that name means: ``gpt-4o``
+    resolved to ``gpt-4o-2024-08-06``, which is neither the newest of its three
+    nor a choice this repository makes. Naming the alias would make the matrix a
+    claim about whichever build OpenAI points it at next, and nothing offline
+    would say the claim had moved.
+
+    A live run fails closed on its own — ``openai`` is ``provider_reported``, so
+    a moved alias moves every Execution Identity — which is why the *form rule*
+    still accepts an alias from an operator (see ``vendors._CATCH_ALL``). This
+    is the narrower rule for the pairs this repository itself pins, and it is
+    decidable offline against the pinned cost map, with no credential.
+
+    Stated as a property rather than as a list of names, so it answers for a
+    vendor row nobody has written: any future pair that names an alias fails
+    here, whichever vendor serves it.
+    """
+    import litellm
+
+    aliases = {
+        f"{vendor}/{model}": builds
+        for vendor, models in REFERENCE_MODELS.items()
+        for model in models
+        if (builds := dated_builds_of(model, litellm.model_cost))
+    }
+
+    assert not aliases, (
+        f"these reference models front dated builds rather than naming one:"
+        f" {aliases}. Pin the build the alias resolves to — the matrix says"
+        f" which build was profiled, and an alias is one the provider moves."
+    )
+
+
+def test_the_alias_rule_finds_the_alias_it_was_written_for():
+    """Guards the guard. A rule that matches nothing passes vacuously, and this
+    one would have, had the tail anchor been a prefix test: ``gpt-5.6`` and
+    every Claude pair front no dated build, so the check above is all-clear on
+    an empty catalogue too.
+
+    ``gpt-4o`` is the identifier that motivated the rule, and it still fronts
+    three dated builds in the pinned map.
+    """
+    import litellm
+
+    assert dated_builds_of("gpt-4o", litellm.model_cost) == [
+        "gpt-4o-2024-05-13",
+        "gpt-4o-2024-08-06",
+        "gpt-4o-2024-11-20",
+    ]
+    # The sub-family is a different model, not a build of this one.
+    assert "gpt-4o-mini-2024-07-18" not in dated_builds_of("gpt-4o", litellm.model_cost)
