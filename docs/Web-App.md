@@ -60,7 +60,7 @@ selected in step 2 of [First-Run](First-Run.md), since nothing is selected by
 default:
 
 ```
-base   → openai / gpt-4o
+base   → openai / gpt-4o-2024-08-06
 strong → vertex / gemini-2.5-pro
 ```
 

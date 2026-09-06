@@ -193,7 +193,8 @@ echoing what you asked for. Your fingerprint therefore records the snapshot, and
 if OpenAI ever points the alias at a different one, every fingerprint moves and
 certification fails closed rather than passing quietly. Naming the snapshot
 yourself is still the clearer choice, because then your config says which build
-you meant.
+you meant. The reference pairs in [First-Run](First-Run.md) name the build for
+that reason, and a check refuses any reference pair that names an alias.
 
 Claude is the family with a published form:
 

@@ -37,6 +37,7 @@ from pydantic import BaseModel, Field
 from analysis_service import frameworks as framework_registry
 from analysis_service.binding import NodeBinding
 from analysis_service.budgets import BudgetPolicy
+from analysis_service.conformance import REFERENCE_MODELS
 from analysis_service.frameworks import PACKAGES, FrameworkName, FrameworkPackage
 from analysis_service.frameworks.asvs.record import (
     RequirementProposal,
@@ -58,7 +59,11 @@ from analysis_service.graph import (
 )
 from analysis_service.identity import build_identity, execution_fingerprint
 from analysis_service.markdown_loader import MarkdownLoader
-from analysis_service.model_tiers import ModelTierConfig, load_model_tiers
+from analysis_service.model_tiers import (
+    ModelTierConfig,
+    credentials_env_var_for,
+    load_model_tiers,
+)
 from analysis_service.report import (
     FrameworkSelection,
     Ground,
@@ -82,7 +87,12 @@ from analysis_service.system_model import (
     SystemModel,
     TrustBoundary,
 )
-from analysis_service.vendors import join_served
+from analysis_service.vendors import (
+    CredentialMode,
+    VendorName,
+    join_served,
+    vendor_for,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -150,6 +160,42 @@ def repo_tiers() -> ModelTierConfig:
     return load_model_tiers(
         PROJECT_ROOT / "config" / "model_tiers.toml", env=TEST_TIER_ENV
     )
+
+
+def tiers_for(
+    vendor: VendorName, mode: CredentialMode | None = None
+) -> ModelTierConfig:
+    """The shipped node -> tier map, with both tiers on one vendor's pair.
+
+    Built from the real ``config/model_tiers.toml`` rather than a hand-made
+    object, so the node table under test is the one that ships. Only the two
+    selections and the credential declaration are substituted, which is exactly
+    what a deployment does.
+
+    Lives here rather than in one test module because three modules need the
+    same thing: the conformance matrix, the model gate and the docs check all
+    ask "does the shipped config work on this vendor's reference pair", and a
+    second copy of the answer is a second thing to keep in step.
+
+    ``mode`` picks the credential mode for a vendor that allows more than one.
+    Absent, the vendor's first allowed mode is declared — a value rather than a
+    guess, because the loader refuses to build without one and the choice is
+    what a deployment makes.
+    """
+    base, strong = REFERENCE_MODELS[vendor]
+    entry = vendor_for(vendor)
+    env = {
+        "ANALYSIS_MODEL_BASE_VENDOR": vendor,
+        "ANALYSIS_MODEL_BASE_MODEL": base,
+        "ANALYSIS_MODEL_STRONG_VENDOR": vendor,
+        "ANALYSIS_MODEL_STRONG_MODEL": strong,
+        "ANALYSIS_MODEL_REVIEW_VENDOR": "anthropic",
+        "ANALYSIS_MODEL_REVIEW_MODEL": "claude-opus-5",
+    }
+    if len(entry.credential_modes) > 1:
+        chosen = entry.credential_modes[0] if mode is None else mode
+        env[credentials_env_var_for(vendor)] = chosen.value
+    return load_model_tiers(PROJECT_ROOT / "config" / "model_tiers.toml", env=env)
 
 
 # Far above any bound a test configures, so seeding never refuses.
