@@ -132,9 +132,9 @@ from analysis_service.frameworks import package_for
 from analysis_service.model_tiers import ModelTierConfig
 from analysis_service.vendors import (
     CREDENTIAL_MODE_NOTES,
-    VENDOR_SDKS,
     VendorName,
     missing_sdk,
+    sdk_for,
     vendor_for,
 )
 from webapp.page import (
@@ -703,7 +703,7 @@ def _sdk_item(vendor: VendorName) -> str:
     reads as a missing one, and the section is a list of what an operator has
     to arrange.
     """
-    sdk = VENDOR_SDKS[vendor]
+    sdk = sdk_for(vendor)
     if sdk is None:
         return ""
     installed = missing_sdk(vendor) is None

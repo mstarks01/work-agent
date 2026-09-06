@@ -21,6 +21,7 @@ from analysis_service.vendors import (
     _CATCH_ALL,
     _CLAUDE_RULE,
     _CREDENTIAL_VARS,
+    _MODE_KWARGS,
     CREDENTIAL_MODE_NOTES,
     CREDENTIAL_MODES,
     REASONING_KWARG,
@@ -36,6 +37,7 @@ from analysis_service.vendors import (
     missing_sdk,
     openai_reasoning_model,
     require_sdk,
+    sdk_for,
     vendor_for,
     vendor_for_route,
 )
@@ -92,6 +94,18 @@ class TestVendorSdks:
             f"these extras are named by the registry and defined nowhere:"
             f" {sorted(named - defined)}"
         )
+
+    def test_the_table_has_one_reader(self):
+        """Both questions about the table go through `sdk_for`.
+
+        `missing_sdk` answers `None` for "needs nothing" and for "already
+        installed" alike, so the page needs the raw entry — and reading the
+        table for it would be a second accessor that keeps printing a row the
+        day the first answer becomes conditional.
+        """
+        assert sdk_for("bedrock") is VENDOR_SDKS["bedrock"]
+        for name in VENDOR_NAMES:
+            assert sdk_for(name) is VENDOR_SDKS[name]
 
     def test_a_vendor_that_needs_nothing_reports_nothing_missing(self):
         for name in VENDOR_NAMES:
@@ -164,6 +178,46 @@ class TestCredentialModes:
     def test_the_api_key_vendors_are_api_key(self, name):
         assert vendor_for(name).credential_modes == (CredentialMode.API_KEY,)
 
+    def test_every_pair_states_the_kwargs_it_passes_with_a_fixed_value(self):
+        """The two credential tables are keyed alike, and checked against each other.
+
+        A pair that answered in one and was silent in the other would pass a
+        kwarg set nobody wrote down, or fail to pass one somebody did.
+        """
+        assert set(_MODE_KWARGS) == set(_CREDENTIAL_VARS)
+
+    @pytest.mark.parametrize(
+        ("name", "mode"),
+        [
+            (name, mode)
+            for name in VENDOR_NAMES
+            for mode in CREDENTIAL_MODES.get(name, ())
+            if mode is CredentialMode.IAM
+        ],
+    )
+    def test_a_platform_identity_mode_passes_no_ambient_credential(self, name, mode):
+        """ "Pass no credential material" is not the same as "pass nothing".
+
+        litellm reads ``AWS_BEARER_TOKEN_BEDROCK`` out of the process
+        environment whenever ``api_key`` is ``None``, sets an ``Authorization``
+        header from it and skips request signing entirely. So an *absent*
+        ``api_key`` means "look in the environment", which is the ASI03
+        inherited-credential path this registry exists to close.
+
+        The rule is asserted for every platform-identity pair rather than for
+        the one vendor that has the problem: a provider whose SDK reads an
+        ambient credential is what makes the difference, and there is no reason
+        the next one will not.
+        """
+        vendor = vendor_for(name)
+        env = dict.fromkeys(vendor.required_env_vars(mode), "value")
+        kwargs = vendor.credential_kwargs(env, mode)
+        assert kwargs.get("api_key", "") == "", (
+            f"{name} under {mode.value} passes a credential value; this mode"
+            " passes none"
+        )
+        assert not vendor.secret_env_vars(mode)
+
     def test_the_key_var_is_vendor_scoped(self):
         assert vendor_for("anthropic").api_key_var == "ANALYSIS_ANTHROPIC_API_KEY"
         assert vendor_for("openai").api_key_var == "ANALYSIS_OPENAI_API_KEY"
@@ -194,7 +248,10 @@ class TestCredentialModes:
             "api_key": API_KEY,
             "aws_region_name": "us-east-1",
         }
+        # ``api_key`` is stated and empty rather than absent: absent is what
+        # sends litellm to the process environment for a bearer token.
         assert bedrock.credential_kwargs(env, CredentialMode.IAM) == {
+            "api_key": "",
             "aws_region_name": "us-east-1",
         }
         assert bedrock.secret_env_vars(CredentialMode.API_KEY) == (
@@ -443,6 +500,28 @@ class TestPinnedFormRule:
     }
 
     @pytest.mark.parametrize("name", BARE_SPELLING)
+    @pytest.mark.parametrize(
+        "model",
+        [
+            "anthropic.claude-opus-5",
+            "us.anthropic.claude-opus-5",
+            "anthropic.claude-3-5-sonnet-20240620-v1:0",
+        ],
+    )
+    def test_a_bedrock_spelling_is_refused_by_the_vendors_that_do_not_use_it(
+        self, name, model
+    ):
+        """The other half of the copy-paste, and it was open until #603's review.
+
+        One family pattern reads every spelling any vendor gives the family, so
+        a row copied *out* of the bedrock table meets a rule and fails its shape
+        with a hint. Reaching the catch-all instead would load the config, build
+        the route `anthropic/anthropic.claude-opus-5`, and die on node one.
+        """
+        with pytest.raises(ValueError, match="not pinned"):
+            vendor_for(name).validate_model(model, source="t")
+
+    @pytest.mark.parametrize("name", BARE_SPELLING)
     @pytest.mark.parametrize(("model", "accepted"), sorted(CLAUDE_VERDICTS.items()))
     def test_a_claude_gets_one_verdict_whatever_vendor_names_it(
         self, name, model, accepted
@@ -532,6 +611,14 @@ class TestPinnedFormRule:
             # family that has no shape rule at all.
             "arn:aws:bedrock:us-east-1:123456789012:provisioned-model/abc",
             "arn:aws:bedrock:us-east-1:123456789012:inference-profile/nova",
+            # The three router forms litellm resolves an ARN behind. An ARN
+            # does not have to start the identifier, and a rule that read
+            # position zero refused only the shape nobody writes.
+            "invoke/arn:aws:bedrock:us-east-1:123456789012:provisioned-model/a",
+            "converse/arn:aws:bedrock:us-east-1:123456789012:inference-profile/x",
+            "anthropic/arn:aws:bedrock:us-east-1:123456789012:imported-model/y",
+            # Case is not part of the property either.
+            "invoke/ARN:aws:bedrock:us-east-1:123456789012:imported-model/y",
         ],
     )
     def test_an_identifier_naming_a_resource_is_refused_on_every_vendor(

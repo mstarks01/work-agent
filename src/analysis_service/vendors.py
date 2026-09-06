@@ -211,6 +211,34 @@ _CREDENTIAL_VARS: dict[
     ),
 }
 
+#: The kwargs a ``(vendor, mode)`` pair passes with a **fixed** value, rather
+#: than reading one from the environment. Keyed exactly like
+#: :data:`_CREDENTIAL_VARS`, and ``tests/test_vendors.py`` checks the two key
+#: sets against each other, so a pair cannot answer in one table and be silent
+#: in the other.
+#:
+#: One entry carries a value, and it exists because **"pass no credential
+#: material" is not the same as "pass nothing"**. litellm reads
+#: ``AWS_BEARER_TOKEN_BEDROCK`` out of the process environment whenever
+#: ``api_key`` is ``None`` and authenticates with it, skipping SigV4 — so an
+#: *absent* kwarg means "look in the environment", which is the ASI03
+#: inherited-credential path this registry exists to close. An empty string
+#: states the platform-identity choice positively: litellm tests
+#: ``api_key is not None`` first and the value's truthiness second, so ``""``
+#: passes the first test, fails the second, and the request is signed from the
+#: identity the vendor's own SDK resolved.
+#:
+#: Stated as a property rather than as one vendor's name: a mode that passes no
+#: credential material has to say so to any provider whose SDK would otherwise
+#: read one from the environment on its own.
+_MODE_KWARGS: dict[tuple[VendorName, CredentialMode], dict[str, str]] = {
+    ("vertex", CredentialMode.IAM): {},
+    ("anthropic", CredentialMode.API_KEY): {},
+    ("openai", CredentialMode.API_KEY): {},
+    ("bedrock", CredentialMode.API_KEY): {},
+    ("bedrock", CredentialMode.IAM): {"api_key": ""},
+}
+
 #: What an operator must arrange outside this service, per mode. The diagnostic
 #: page reports this beside the declared mode; it never resolves a credential to
 #: find out, because that is a network call on page render and it reaches the
@@ -315,7 +343,14 @@ _FLOATING_WORDS: dict[str, str] = {
 #:
 #: ``litellm.get_llm_provider`` accepts an ARN and resolves a provider from it,
 #: so this refusal is this service's own and nothing upstream makes it.
-_RESOURCE_ID = re.compile(r"arn:")
+#:
+#: **Searched, never anchored, and case-blind.** An ARN does not have to start
+#: the identifier: litellm routes one behind its own segment, and
+#: ``get_llm_provider`` resolves ``bedrock/invoke/arn:…``,
+#: ``bedrock/converse/arn:…`` and ``bedrock/anthropic/arn:…`` alike. A rule that
+#: read position zero refused the shape an operator would never write and
+#: admitted the three a router document shows them.
+_RESOURCE_ID = re.compile(r"arn:", re.IGNORECASE)
 
 # Claude is the family that *does* publish a canonical form, so it gets a closed
 # shape rather than a denylist. From the 4.6 generation on, the identifier is
@@ -363,34 +398,38 @@ _CLAUDE_LEGACY = r"(?P<lmajor>\d+)(?:-(?P<lminor>\d{1,2})(?!\d))?-(?P<lname>[a-z
 # name on those vendors *was* a floating alias.
 _CLAUDE_ID = re.compile(rf"claude-{_CLAUDE_MODERN}")
 
+# A scope segment, as Bedrock spells one: ``us.``, ``eu.``, ``global.``. Matched
+# as a **shape** and never enumerated — the pinned cost map already carries
+# seven, three arrived after Claude 3.x, one carries a hyphen, and ``global``
+# names no region at all. An allowlist here would repeat what the retired-build
+# allowlist cost. A shape admits ``xx.anthropic.claude-opus-5``, which then
+# fails at the AWS API: the same class as a misspelled model name, and a shape
+# check never proved a model exists.
+_SCOPE_SEGMENT = r"(?:[a-z][a-z0-9-]*\.)?"
+
+# **One family pattern, whatever spells it.** A family rule follows the family,
+# so which rule reads an identifier must not depend on which vendor's spelling
+# the identifier happens to carry. This matches a Claude bare, behind a scope,
+# and behind the ``anthropic.`` family segment — every spelling any vendor gives
+# the family — and each vendor's own ``pinned`` decides whether that spelling is
+# the one it serves.
+#
+# **The split is load-bearing in both directions.** A Bedrock row spelled
+# ``claude-opus-5`` and an ``anthropic`` row spelled ``anthropic.claude-opus-5``
+# are the two halves of one mistake: a tier row copied between vendors. Both
+# reach a rule and fail its shape with a hint naming the right spelling. With a
+# family per spelling, each vendor caught one half and let the other pass
+# unpinned to the catch-all, where the config loads and the job dies on node one.
+_CLAUDE_FAMILY = re.compile(_SCOPE_SEGMENT + r"(?:anthropic\.)?claude-")
+
 _CLAUDE_RULE = _FormRule(
-    family=re.compile(r"claude-"),
+    family=_CLAUDE_FAMILY,
     pinned=_CLAUDE_ID,
     hint=(
         "a Claude model ID is 'claude-<name>-<major>[-<minor>]',"
         " e.g. 'claude-opus-5' or 'claude-sonnet-4-6'"
     ),
 )
-
-# Bedrock spells a model ``[<scope>.]<family>.<name>``, and Claude there is
-# ``[<scope>.]anthropic.claude-…`` with an optional date and an optional build
-# tail. The scope is matched as a **shape** and never enumerated: the pinned cost
-# map already carries seven of them (``us.``, ``eu.``, ``apac.``, ``au.``,
-# ``jp.``, ``global.`` and ``us-gov.``), three arrived after Claude 3.x, one
-# carries a hyphen, and ``global`` names no region at all. An allowlist here
-# would repeat what the retired-build allowlist cost. A shape admits
-# ``xx.anthropic.claude-opus-5``, which then fails at the AWS API — the same
-# class as a misspelled model name, and a shape check never proved a model
-# exists.
-_BEDROCK_SCOPE = r"(?:[a-z][a-z0-9-]*\.)?"
-
-# **Broad family, strict shape, and the split is load-bearing.** The family
-# matches a Claude that omits ``anthropic.``, so such an identifier meets the
-# shape below and fails it with a hint that names the right spelling. Reaching
-# the catch-all instead would let it pass unpinned — and that identifier is
-# exactly what a config copying an anthropic-direct tier row into the bedrock
-# row produces.
-_BEDROCK_CLAUDE_FAMILY = re.compile(_BEDROCK_SCOPE + r"(?:anthropic\.)?claude-")
 
 # **The dated forms pass here, and that is a property rather than an exception.**
 # A dated form is refused where the vendor also serves the bare name as a
@@ -402,7 +441,7 @@ _BEDROCK_CLAUDE_FAMILY = re.compile(_BEDROCK_SCOPE + r"(?:anthropic\.)?claude-")
 # The build tail is part of the canonical AWS identifier and marks no alias. The
 # tails the pinned map carries are ``-v1``, ``-v1:0``, ``-v2:0`` and ``-v2:1``.
 _BEDROCK_CLAUDE_ID = re.compile(
-    _BEDROCK_SCOPE + rf"anthropic\.claude-(?:{_CLAUDE_MODERN}|{_CLAUDE_LEGACY})"
+    _SCOPE_SEGMENT + rf"anthropic\.claude-(?:{_CLAUDE_MODERN}|{_CLAUDE_LEGACY})"
     r"(?:-\d{8})?(?:-v\d+(?::\d+)?)?"
 )
 
@@ -418,9 +457,11 @@ _BEDROCK_CLAUDE_ID = re.compile(
 #   The shape requires a family name and a generation, because those two
 #   segments are what a later reader keys on, and these three predate that
 #   naming.
-# * **A Claude that omits ``anthropic.``**, per the family comment above.
+# * **A Claude that omits ``anthropic.``**, per the shared family above. It is
+#   the shape a config copying an anthropic-direct tier row into the bedrock row
+#   produces, and it fails here with a hint rather than passing unpinned.
 _BEDROCK_CLAUDE_RULE = _FormRule(
-    family=_BEDROCK_CLAUDE_FAMILY,
+    family=_CLAUDE_FAMILY,
     pinned=_BEDROCK_CLAUDE_ID,
     hint=(
         "a Bedrock Claude model ID is"
@@ -642,7 +683,7 @@ class Vendor:
         """
         if not model or model != model.strip():
             raise ValueError(f"{source}: {model!r} is not a model identifier")
-        if _RESOURCE_ID.match(model):
+        if _RESOURCE_ID.search(model):
             raise ValueError(
                 f"{source}: {model!r} names a cloud resource rather than a model"
                 " build; a resource can be repointed at other weights and its"
@@ -678,19 +719,26 @@ class Vendor:
         inherited-credential path.
 
         Under a mode that passes no credential material this returns the
-        vendor's addressing kwargs and nothing else, which is what lets the
-        vendor's SDK resolve the platform's identity. See
-        :class:`CredentialMode` for why the mechanism is still declared.
+        vendor's addressing kwargs, plus whatever :data:`_MODE_KWARGS` says that
+        pair must state positively — because for one provider "no credential"
+        has to be said out loud or the library reads one from the environment.
+        That is what lets the vendor's SDK resolve the platform's identity and
+        nothing else. See :class:`CredentialMode` for why the mechanism is
+        still declared.
 
         Long-lived API keys are accepted with controls, not avoided: none of
         these vendors issues a short-lived token, so the residual risk is real
         and is mitigated by keeping keys env-only, out of logs, out of the
         report, and out of the fingerprint, plus rotation.
         """
-        return {
-            entry.kwarg: self._require(env, entry.var, mode)
-            for entry in self._credential_vars(mode)
-        }
+        kwargs = dict(_MODE_KWARGS.get((self.name, mode), {}))
+        kwargs.update(
+            {
+                entry.kwarg: self._require(env, entry.var, mode)
+                for entry in self._credential_vars(mode)
+            }
+        )
+        return kwargs
 
     def _credential_vars(self, mode: CredentialMode) -> tuple[_CredentialVar, ...]:
         """This ``(vendor, mode)`` pair's entries, or raise on an unallowed mode.
@@ -823,20 +871,32 @@ class VendorSdkError(ConfigError):
     """
 
 
+def sdk_for(name: VendorName) -> VendorSdk | None:
+    """The client library this vendor's provider needs, or ``None``.
+
+    The one reader of :data:`VENDOR_SDKS`. Two callers ask two different
+    questions — the diagnostic page asks *which* library, and :func:`missing_sdk`
+    asks whether it is there — and both go through here, because ``None`` from
+    :func:`missing_sdk` answers "needs nothing" and "already installed" alike.
+    A page reading the table itself would keep printing a row from it the day
+    that answer became conditional.
+    """
+    return VENDOR_SDKS[name]
+
+
 def missing_sdk(name: VendorName) -> VendorSdk | None:
     """The client library this vendor needs and this image does not carry.
 
-    The one reader of :data:`VENDOR_SDKS`, called by the build-time gate in
-    :mod:`analysis_service.binding` and by the diagnostic page. A page that
-    marked every variable "set" while the run still failed at bind time would
-    break the no-drift promise it is built on.
+    Called by the build-time gate in :mod:`analysis_service.binding` and by the
+    diagnostic page. A page that marked every variable "set" while the run still
+    failed at bind time would break the no-drift promise it is built on.
 
     :func:`importlib.util.find_spec` and **never** an import.
     ``tests/test_identity.py`` asserts that every import ``src/`` makes is
     declared in ``project.dependencies``, so ``import boto3`` would turn an
     optional extra into a hard dependency of the wheel.
     """
-    sdk = VENDOR_SDKS[name]
+    sdk = sdk_for(name)
     if sdk is None or importlib.util.find_spec(sdk.module) is not None:
         return None
     return sdk

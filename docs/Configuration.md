@@ -146,6 +146,13 @@ missing key for a multi-mode vendor is an error too, but only where a tier
 selects that vendor: a vendor nobody calls needs no identity. Both rules read
 the same registry table the check reads, so neither can drift from it.
 
+Under `iam`, Work Agent passes an **empty** `api_key` rather than none at all.
+That is not a detail: LiteLLM reads `AWS_BEARER_TOKEN_BEDROCK` out of the
+process environment whenever no key is passed, authenticates with it and skips
+request signing. AWS tooling sets that variable for its own reasons, so an
+absent kwarg would let a credential this deployment never declared authenticate
+a run. Stating the choice is what closes it.
+
 **A Bedrock API key expires, and nothing here refreshes it.** AWS's short-term
 Bedrock key lasts twelve hours, and LiteLLM never refreshes a bearer token, so
 under `api_key` the operator rotates `ANALYSIS_BEDROCK_API_KEY` before it

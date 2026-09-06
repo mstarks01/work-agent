@@ -348,7 +348,11 @@ jobs:
           set -euo pipefail
 
           missing=()
-          [[ -n "${VENDOR_API_KEY:-}" ]] || missing+=("${SECRET_NAME}")
+          secret_unset=false
+          if [[ -z "${VENDOR_API_KEY:-}" ]]; then
+            missing+=("${SECRET_NAME}")
+            secret_unset=true
+          fi
           # Unquoted on purpose: this is a space-separated list of names, and
           # an empty value contributes none.
           # shellcheck disable=SC2086
@@ -375,13 +379,21 @@ jobs:
             # shellcheck disable=SC2016
             printf -- '- `%s`\n' "${missing[@]}"
             echo
-            echo '```sh'
-            echo "gh secret set ${SECRET_NAME}"
-            echo '```'
-            echo
-            echo "The name is vendor-scoped on purpose: the registry reads only"
-            echo "its own ANALYSIS_-prefixed variables, so a plain"
-            echo "\`${VENDOR^^}_API_KEY\` will not authenticate a run."
+            # Only where the secret itself is what is missing. An addressing
+            # variable is a repository variable, so telling an operator to set
+            # a secret they have already set is advice that does not apply.
+            if [[ "${secret_unset}" == true ]]; then
+              echo '```sh'
+              echo "gh secret set ${SECRET_NAME}"
+              echo '```'
+              echo
+              echo "The name is vendor-scoped on purpose: the registry reads only"
+              echo "its own ANALYSIS_-prefixed variables, so a plain"
+              echo "\`${VENDOR^^}_API_KEY\` will not authenticate a run."
+            else
+              echo "Set the missing repository variable(s) in this repository's"
+              echo "settings; they address the deployment and are not secrets."
+            fi
           } >>"$GITHUB_STEP_SUMMARY"
 
           echo "::warning::${VENDOR} smoke unexercised -- unset: ${missing[*]}."

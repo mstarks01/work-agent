@@ -144,8 +144,8 @@ DECLARED: dict[str, str] = {
     "src/analysis_service/vendors.py": (
         "The registry. `VendorName` is the closed type every other module"
         " reads, so this is the one place the names are spelled at all."
-        " Its five tables — VENDORS, CREDENTIAL_MODES, _CREDENTIAL_VARS,"
-        " _FORM_RULES and VENDOR_SDKS — are keyed by vendor and"
+        " Its six tables — VENDORS, CREDENTIAL_MODES, _CREDENTIAL_VARS,"
+        " _MODE_KWARGS, _FORM_RULES and VENDOR_SDKS — are keyed by vendor and"
         " self-completing. VERTEX_PROJECT_VAR, VERTEX_LOCATION_VAR and"
         " BEDROCK_REGION_VAR name one vendor's own addressing config, which no"
         " other vendor reads."
@@ -327,6 +327,7 @@ def test_the_scan_finds_the_tables_we_already_know_about(tables):
         "analysis_service.vendors.VENDORS",
         "analysis_service.vendors.CREDENTIAL_MODES",
         "analysis_service.vendors._CREDENTIAL_VARS",
+        "analysis_service.vendors._MODE_KWARGS",
         "analysis_service.vendors._FORM_RULES",
         "analysis_service.vendors.VENDOR_SDKS",
         "analysis_service.conformance.REFERENCE_MODELS",
