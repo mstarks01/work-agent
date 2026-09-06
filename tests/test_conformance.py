@@ -60,6 +60,7 @@ from analysis_service.vendors import (
     VENDOR_NAMES,
     CredentialMode,
     ProviderAuthError,
+    VendorName,
     join_served,
     vendor_for,
 )
@@ -497,37 +498,76 @@ class TestProvenanceIsProviderIndependent:
 class TestTheLiveLanesSweepWhatWasProfiled:
     """The matrix and the live workflows must name the same models."""
 
-    #: Which live sweep lane authenticates a vendor, keyed by **credential
-    #: mode**. A lane is a credential arrangement — one exchanges an OIDC token
-    #: for a platform identity, the other reads API keys from repository
-    #: secrets — so the mode is the property that chooses, and the vendor's name
-    #: never was. Keyed here rather than branched, so a vendor row nobody has
-    #: written already has a lane, and a *mode* nobody has written raises
-    #: instead of falling through to somebody else's file.
-    LANE_FOR_MODE: ClassVar[dict[CredentialMode, str]] = {
-        CredentialMode.IAM: "evals-live.yml",
-        CredentialMode.API_KEY: "evals-live-api-key.yml",
+    #: Which live sweep lane runs a vendor, keyed by **vendor**. A lane is a
+    #: property of what a workflow sweeps, not of how a deployment
+    #: authenticates: a vendor that allows two credential modes still runs on
+    #: one lane, and asking such a vendor for a sole mode raises.
+    #:
+    #: ``None`` states that no lane sweeps this vendor. The checks below name
+    #: it and skip, rather than assert against somebody else's file — so an
+    #: unswept vendor is a state this table records, and never coverage that
+    #: nobody looked for.
+    #:
+    #: The single reader of which lane sweeps what. A second table answering
+    #: the same question would eventually answer it differently, and each
+    #: one's own test would agree with it.
+    LIVE_SWEEP_LANE: ClassVar[dict[VendorName, str | None]] = {
+        "vertex": "evals-live.yml",
+        "anthropic": "evals-live-api-key.yml",
+        "openai": "evals-live-api-key.yml",
     }
 
     #: The lane every vendor is compared on, whatever authenticates it. One
-    #: file for all three vendors, so a vendor missing from it has no live
+    #: file for every vendor, so a vendor missing from it has no live
     #: coverage at all.
     SMOKE_LANE: ClassVar[Path] = WORKFLOWS / "provider-smoke.yml"
 
-    def sweep_lane(self, vendor: str) -> Path:
-        """The live sweep workflow that runs *vendor*.
+    def sweep_lane(self, vendor: VendorName) -> Path | None:
+        """The live sweep workflow that runs *vendor*, or ``None`` if none does.
 
         One reader, called by every check below and by the deletion test, so
         the checks and the test that proves them sensitive cannot come to
         disagree about which file holds a vendor's pins.
         """
-        return WORKFLOWS / self.LANE_FOR_MODE[vendor_for(vendor).sole_credential_mode]
+        lane = self.LIVE_SWEEP_LANE[vendor]
+        return None if lane is None else WORKFLOWS / lane
 
-    def test_every_credential_mode_has_a_lane(self):
-        # The table checked against its registry. A mode with no lane is a
-        # deployment class no live sweep can exercise, and it would otherwise
-        # be invisible until somebody looked for the coverage.
-        assert set(self.LANE_FOR_MODE) == set(CredentialMode)
+    def test_every_vendor_has_a_lane_or_states_it_has_none(self):
+        # The table checked against its registry. A vendor row added tomorrow
+        # raises here, rather than being swept by no lane and asserted about
+        # by nothing.
+        assert set(self.LIVE_SWEEP_LANE) == set(VENDOR_NAMES)
+
+    def test_every_lane_the_table_names_is_a_real_workflow(self):
+        """A table may not name a file the repository does not hold.
+
+        A lane whose filename is wrong reads every check below as green: the
+        model pins it asserts about are read out of a file that is not there,
+        and a missing file is the one shape a text search cannot report.
+        """
+        for vendor, lane in self.LIVE_SWEEP_LANE.items():
+            if lane is None:
+                continue
+            assert (WORKFLOWS / lane).is_file(), (
+                f"{vendor} names {lane}, which is not under .github/workflows/"
+            )
+
+    def test_every_credential_mode_is_exercised_by_some_swept_vendor(self):
+        """The mode-coverage property, restated against the vendor table.
+
+        A mode no swept vendor declares is a deployment class no live lane
+        exercises. That was worth knowing while the lane was keyed by mode,
+        and it is still worth knowing now the key is the vendor — but it is a
+        statement about coverage, so it is asserted rather than used to
+        choose a file.
+        """
+        exercised = {
+            mode
+            for vendor, lane in self.LIVE_SWEEP_LANE.items()
+            if lane is not None
+            for mode in vendor_for(vendor).credential_modes
+        }
+        assert exercised == set(CredentialMode)
 
     @pytest.mark.parametrize("vendor", VENDOR_NAMES)
     def test_every_reference_model_appears_in_the_workflow_that_sweeps_it(self, vendor):
@@ -544,6 +584,8 @@ class TestTheLiveLanesSweepWhatWasProfiled:
         asserted about by nothing.
         """
         lane = self.sweep_lane(vendor)
+        if lane is None:
+            pytest.skip(f"LIVE_SWEEP_LANE says no live lane sweeps {vendor}")
         text = lane.read_text(encoding="utf-8")
 
         for model in REFERENCE_MODELS[vendor]:
@@ -554,9 +596,9 @@ class TestTheLiveLanesSweepWhatWasProfiled:
     def test_the_smoke_lane_covers_every_vendor_on_the_profiled_pair(self):
         """The smoke is the lane that has to be comparable across vendors.
 
-        The sweeps above are two files by credential class and one of them
-        carries a single vendor; this one file carries all three, so a vendor
-        missing from it is a vendor with no live coverage at all — which is the
+        The sweeps above are one file per lane and a vendor may have no lane
+        at all; this one file carries every vendor, so a vendor missing from
+        it is a vendor with no live coverage at all — which is the
         imbalance
         [#116](https://github.com/mstarks01/work-agent/issues/116) asked to
         remove, reappearing in the lane built to remove it.
@@ -630,11 +672,14 @@ class TestTheLiveLanesSweepWhatWasProfiled:
         nothing in the workflow it guards. That failure is silent, because an
         assertion which never sees a pin never fails. So drop each real pin out
         of the real text, one at a time, and require the answer to change.
+
+        A vendor with no sweep lane keeps the smoke half of this check, which
+        is the half every vendor has.
         """
-        lanes = {
-            self.sweep_lane(vendor): REFERENCE_MODELS[vendor],
-            self.SMOKE_LANE: (vendor, *REFERENCE_MODELS[vendor]),
-        }
+        sweep = self.sweep_lane(vendor)
+        lanes = {self.SMOKE_LANE: (vendor, *REFERENCE_MODELS[vendor])}
+        if sweep is not None:
+            lanes[sweep] = REFERENCE_MODELS[vendor]
 
         for lane, pins in lanes.items():
             text = lane.read_text(encoding="utf-8")
