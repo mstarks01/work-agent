@@ -36,9 +36,31 @@ request made the gate resolve a path. No diff carries that fact; the tree does.
 
 ### What a pre-merge review reads
 
-The diff, against the three named defect causes in `CLAUDE.md` — a rule with two
-readers, a bound that predicts a cost from its inputs, and a value shape the
-author never listed — and against the fix habits at the end of this guide.
+The diff, against the five defect classes below, and against the fix habits at
+the end of this guide.
+
+## The five defect classes
+
+Every finding in this repository's record — ten audit rounds, the range review
+of `reviewed/2026-09-09...35ae7a0` and the whole-tree hunt that followed it —
+falls into one of five classes. They are distinct because each has its own test
+and its own repair.
+
+| # | Class | What it looks like here | Repair | Decidable? |
+|---|---|---|---|---|
+| 1 | **One rule, two readers** | the CI gate and `--list` read "is this case read" differently; a client gate that disagrees with the server's; two readers each tested against its own expectation | Delete a reader. Where two must stay, test them against each other | Partly. A scan finds a literal spelled twice; a rule needs the pair named |
+| 2 | **A table with a hole** | `SERVED_TRUST` as a constant; `_FORM_RULES["openai"]` present and short; a default that answers for a row nobody asked | A table keyed by the registry, checked against the registry | Yes: `test_framework_neutrality.py`, `test_vendor_neutrality.py` |
+| 3 | **A shape not listed** | `str.isdigit`; a date in a minor-version group; `window.open(…, "noopener")` returning `null`; a state nothing creates | List every shape the producer can emit, from its documentation | No. It needs the producer's documentation |
+| 4 | **A bound predicted, not measured** | a cost computed from input sizes; a per-scan bound beside an unbounded count of scans | Two measurements, one admitted and one refused, and the neighbours named | No. It needs a run |
+| 5 | **A fact with no reader** | an answer the page never reads; a field nothing reads; prose naming a removed thing; content placed only to satisfy a check; a refusal the page swallows | Give the fact one reader the code follows, or delete it | Mostly: `test_dead_code_lints.py`, `test_reader_lints.py` |
+
+Class 5 is the largest by count and the cheapest to find, because most of it is
+a grep. Class 1 is the largest by damage: it is where the fix that passed its
+tests sat in runs 5 to 9, and where #640 sat. Measured on 2026-09-06, a
+whole-tree sweep of the decidable classes over code older than the last round
+found nothing that breaks a flow; the findings that mattered sat in code
+younger than the round. Spend attention on `git diff reviewed/<last>...HEAD`
+and on fix diffs, and let the lints hold the rest.
 
 Put the result in the pull request, so the record sits with the change. A
 pre-merge review cuts no tag.
@@ -119,7 +141,7 @@ attention that found the defect is spent by the time the repair is written.
 
 ### Review your own fix the way you reviewed the defect
 
-Read the fix diff against the three named causes in `CLAUDE.md`, the same way a
+Read the fix diff against the five defect classes above, the same way a
 pre-merge review reads anybody else's diff. This includes the fix that closes a
 finding you reported an hour ago. Run 9 shipped a bound with no per-body limit,
 and `CLAUDE.md` carried that corollary two days before the fix merged.
