@@ -8,12 +8,15 @@ to a call) and a per-vendor reasoning kwarg (#15 made the surface uniform).
 
 from __future__ import annotations
 
+import re
 from dataclasses import FrozenInstanceError
 from typing import ClassVar, get_args
 
 import pytest
 
 from analysis_service.vendors import (
+    _CATCH_ALL,
+    _CLAUDE_RULE,
     _CREDENTIAL_VARS,
     CREDENTIAL_MODE_NOTES,
     CREDENTIAL_MODES,
@@ -424,6 +427,36 @@ class TestPinnedFormRule:
             vendor_for("vertex").validate_model(
                 "gemini-2.5-pro-latest", source="tiers.strong.model"
             )
+
+    def test_a_family_is_a_pattern_matched_at_the_start(self):
+        """The family is a `re.Pattern`, and it anchors where a prefix did.
+
+        A prefix cannot say "broad here, strict there": a Bedrock Claude that
+        omits ``anthropic.`` has to reach the Claude rule and fail its shape
+        with a hint, rather than pass unpinned through the catch-all. A pattern
+        can. It is matched rather than searched, so a family name buried inside
+        an identifier still reaches the catch-all — ``search`` would refuse
+        ``inhouse-claude-router``, which no vendor rule has an opinion on.
+        """
+        vendor = vendor_for("anthropic")
+        assert isinstance(_CLAUDE_RULE.family, re.Pattern)
+        assert vendor._rule_for("claude-opus-5") is _CLAUDE_RULE
+        assert vendor._rule_for("inhouse-claude-router") is _CATCH_ALL
+
+    @pytest.mark.parametrize("name", VENDOR_NAMES)
+    @pytest.mark.parametrize(
+        "model",
+        ["claude-opus-5", "gemini-2.5-pro", "o3", "amazon.titan-text-express-v1", "-"],
+    )
+    def test_every_identifier_reaches_a_rule(self, name, model):
+        """The catch-all matches everything, so `_rule_for` cannot raise.
+
+        `_rule_for` reads the first matching rule out of a generator, and a
+        generator with no match raises `StopIteration` rather than returning a
+        default. The catch-all's empty pattern is what stops that, and the
+        empty pattern is easy to lose when a family becomes a real one.
+        """
+        assert vendor_for(name)._rule_for(model) is not None
 
 
 class TestWhatTheRegistryDeliberatelyOmits:
