@@ -30,6 +30,7 @@ requires the live lanes, and they remain unprovisioned — see
 
 from __future__ import annotations
 
+import re
 from dataclasses import FrozenInstanceError
 from pathlib import Path
 from typing import ClassVar
@@ -72,6 +73,49 @@ from tests.factories import (
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 CONFIG = PROJECT_ROOT / "config"
+WORKFLOWS = PROJECT_ROOT / ".github" / "workflows"
+
+#: One line of a workflow file, split into the key of a YAML mapping entry and
+#: the scalar it pins. The value is anchored at both ends, so a line pins a
+#: value only when it holds that value and nothing else: a longer identifier
+#: which *contains* it does not match. The optional dash carries a matrix
+#: entry, and the optional quotes and trailing comment carry the other shapes
+#: YAML lets an author write the same pin in.
+_PINNED_SCALAR = re.compile(
+    r"""
+    ^\s*(?:-\s+)?      # an optional sequence dash
+    [\w.-]+:\s*        # the mapping key and its colon
+    (?P<quote>['"]?)   # an optional quote
+    (?P<value>.*?)
+    (?P=quote)         # the closing quote
+    (?:\s+\#.*)?       # an optional trailing comment, which YAML spaces off
+    \s*$               # and any trailing space
+    """,
+    re.VERBOSE,
+)
+
+
+def pins_scalar(text: str, value: str) -> bool:
+    """Does *text* pin *value* as a whole YAML scalar, on any of its lines?
+
+    The one reader of what it means for a workflow to pin a model or a vendor.
+    Both drift checks below call it, because two readers of that rule will
+    eventually disagree and each one's own test will agree with it.
+
+    A text search rather than a YAML parse, and deliberately so: PyYAML is not
+    a declared dependency of this project, and adding one to assert that a
+    string appears in a file would be a poor trade.
+
+    ``splitlines`` rather than a split on ``"\n"``, because a line ends at more
+    characters than that one and a pin on the last of them would read as part
+    of its neighbour.
+    """
+    return any(
+        match["value"] == value
+        for line in text.splitlines()
+        if (match := _PINNED_SCALAR.match(line))
+    )
+
 
 # Placeholder credential material. Every vendor's variables at once, so one
 # mapping serves all three legs: the registry reads only the ones the selected
@@ -465,6 +509,20 @@ class TestTheLiveLanesSweepWhatWasProfiled:
         CredentialMode.API_KEY: "evals-live-api-key.yml",
     }
 
+    #: The lane every vendor is compared on, whatever authenticates it. One
+    #: file for all three vendors, so a vendor missing from it has no live
+    #: coverage at all.
+    SMOKE_LANE: ClassVar[Path] = WORKFLOWS / "provider-smoke.yml"
+
+    def sweep_lane(self, vendor: str) -> Path:
+        """The live sweep workflow that runs *vendor*.
+
+        One reader, called by every check below and by the deletion test, so
+        the checks and the test that proves them sensitive cannot come to
+        disagree about which file holds a vendor's pins.
+        """
+        return WORKFLOWS / self.LANE_FOR_MODE[vendor_for(vendor).sole_credential_mode]
+
     def test_every_credential_mode_has_a_lane(self):
         # The table checked against its registry. A mode with no lane is a
         # deployment class no live sweep can exercise, and it would otherwise
@@ -475,26 +533,22 @@ class TestTheLiveLanesSweepWhatWasProfiled:
     def test_every_reference_model_appears_in_the_workflow_that_sweeps_it(self, vendor):
         """A live lane pinned to a model nobody profiled is unexercised coverage.
 
-        A text search rather than a YAML parse, and deliberately so: PyYAML is
-        not a declared dependency of this project, and adding one to assert a
-        string appears in a file would be a poor trade. The check is coarse —
-        it cannot tell which matrix leg a model sits on — and it catches the
-        drift that matters, which is a workflow pinning a pair the offline
-        suite has never seen.
+        :func:`pins_scalar` decides what pins a model, here and in the smoke
+        check below. The check stays coarse — it cannot tell which matrix leg
+        a model sits on — and it catches the drift that matters, which is a
+        workflow pinning a pair the offline suite has never seen.
 
         Driven from the registry rather than from a hand-written list of
         vendors. The list named `vertex` in one branch and the other two in a
         second, so a fourth vendor row would have been swept by no lane and
         asserted about by nothing.
         """
-        mode = vendor_for(vendor).sole_credential_mode
-        lane = PROJECT_ROOT / ".github" / "workflows" / self.LANE_FOR_MODE[mode]
+        lane = self.sweep_lane(vendor)
         text = lane.read_text(encoding="utf-8")
 
         for model in REFERENCE_MODELS[vendor]:
-            assert model in text, (
-                f"{model} is profiled on {vendor} ({mode.value}) but"
-                f" {lane.name} does not sweep it"
+            assert pins_scalar(text, model), (
+                f"{model} is profiled on {vendor} but {lane.name} does not sweep it"
             )
 
     def test_the_smoke_lane_covers_every_vendor_on_the_profiled_pair(self):
@@ -507,15 +561,90 @@ class TestTheLiveLanesSweepWhatWasProfiled:
         [#116](https://github.com/mstarks01/work-agent/issues/116) asked to
         remove, reappearing in the lane built to remove it.
         """
-        smoke = (
-            PROJECT_ROOT / ".github" / "workflows" / "provider-smoke.yml"
-        ).read_text(encoding="utf-8")
+        smoke = self.SMOKE_LANE.read_text(encoding="utf-8")
 
         for vendor, models in REFERENCE_MODELS.items():
-            assert vendor in smoke, f"{vendor} has no lane in the provider smoke"
+            assert pins_scalar(smoke, vendor), (
+                f"{vendor} has no lane in the provider smoke"
+            )
             for model in models:
-                assert model in smoke, (
+                assert pins_scalar(smoke, model), (
                     f"{model} is profiled but the smoke lane does not pin it"
+                )
+
+    def test_a_prefixed_identifier_does_not_pin_the_bare_name(self):
+        """The defect this matcher replaces, written as its counter-example.
+
+        A Bedrock identifier is a vendor prefix plus the Anthropic name, so
+        the text `anthropic.claude-sonnet-4-6` contains `claude-sonnet-4-6`.
+        Under the substring search this replaces, a Bedrock pin answered for
+        Anthropic's pair: a person who deleted Anthropic's own pin left the
+        check passing on somebody else's line, and the suite reported coverage
+        that was not there.
+        """
+        line = "            base_model: anthropic.claude-sonnet-4-6"
+        assert pins_scalar(line, "anthropic.claude-sonnet-4-6")
+        assert not pins_scalar(line, "claude-sonnet-4-6")
+
+    @pytest.mark.parametrize(
+        ("line", "value"),
+        [
+            ("      ANALYSIS_MODEL_BASE_MODEL: gemini-2.5-flash", "gemini-2.5-flash"),
+            ("          - vendor: anthropic", "anthropic"),
+            ('            base_model: "gpt-4o"', "gpt-4o"),
+            ("            base_model: 'gpt-4o'", "gpt-4o"),
+            ("            base_model: gpt-4o   # the profiled pair", "gpt-4o"),
+            ("            base_model: gpt-4o\r\n", "gpt-4o"),
+            ("            base_model: gpt-4o\u2028", "gpt-4o"),
+        ],
+    )
+    def test_a_pin_is_read_in_every_shape_a_workflow_can_write_it(self, line, value):
+        """What the producer may emit, rather than what it emits today.
+
+        A matcher that reads only the shape in front of it fails silently on
+        the first author who quotes a value, comments a line or saves a file
+        with a line terminator this one never listed.
+        """
+        assert pins_scalar(line, value)
+
+    @pytest.mark.parametrize(
+        "line",
+        [
+            "            base_model: gpt-4o-mini",
+            "            base_model: ${{ matrix.base_model }}",
+            "            # base_model: gpt-4o",
+            "            description: the gpt-4o leg of the smoke",
+            # YAML spaces a comment off the value, so this pins one long
+            # scalar and the matcher must read it the way the runner will.
+            "            base_model: gpt-4o# not a comment",
+        ],
+    )
+    def test_a_value_inside_a_longer_scalar_is_not_a_pin(self, line):
+        assert not pins_scalar(line, "gpt-4o")
+
+    @pytest.mark.parametrize("vendor", VENDOR_NAMES)
+    def test_deleting_a_pin_from_a_live_workflow_breaks_the_check(self, vendor):
+        """The checks read the real files, and not only their own examples.
+
+        A matcher can be exactly right about a synthetic line and still read
+        nothing in the workflow it guards. That failure is silent, because an
+        assertion which never sees a pin never fails. So drop each real pin out
+        of the real text, one at a time, and require the answer to change.
+        """
+        lanes = {
+            self.sweep_lane(vendor): REFERENCE_MODELS[vendor],
+            self.SMOKE_LANE: (vendor, *REFERENCE_MODELS[vendor]),
+        }
+
+        for lane, pins in lanes.items():
+            text = lane.read_text(encoding="utf-8")
+            for pin in pins:
+                assert pins_scalar(text, pin)
+                without = "\n".join(
+                    line for line in text.splitlines() if not pins_scalar(line, pin)
+                )
+                assert not pins_scalar(without, pin), (
+                    f"{lane.name} pins {pin} on no line the matcher reads"
                 )
 
 
