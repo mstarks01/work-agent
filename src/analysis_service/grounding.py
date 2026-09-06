@@ -356,6 +356,36 @@ def prepare_source(source: str) -> PreparedSource:
     return PreparedSource(tuple(words), tuple(normalize(word) for word in words))
 
 
+def deadline_spent(deadline: float | None) -> bool:
+    """Has the body's shared deadline passed?
+
+    One reader, because three sites ask it and each asks to avoid a different
+    cost: :func:`repair_quote` and :func:`~analysis_service.critic._verify_quotes`
+    ask before they prepare a source, and :func:`repair_prepared` asks before it
+    scans one. ``None`` is a caller that set no body bound, which is every
+    caller outside the fan-in.
+    """
+    return deadline is not None and time.thread_time() > deadline
+
+
+def _needle_of(quote: str) -> str:
+    """The quote's folded form, or ``""`` where the rung will not scan it.
+
+    Three refusals, and every one of them is about the quote alone, so they are
+    decided before any source is touched. A quote marking a cut with ``…`` is a
+    sequence of spans rather than one, and one nearest window for the whole is a
+    span the quote never claimed. A quote that normalizes away has no words to
+    find. A quote past :data:`MAX_REPAIR_QUOTE_CHARS` is what bounds a single
+    comparison.
+    """
+    if _ELLIPSIS.search(quote):
+        return ""
+    needle = normalize(quote)
+    if len(needle) > MAX_REPAIR_QUOTE_CHARS:
+        return ""
+    return needle
+
+
 def repair_quote(
     quote: str, source: str, deadline: float | None = None
 ) -> tuple[str, float] | None:
@@ -366,10 +396,14 @@ def repair_quote(
     split and the per-word folding are the same answer for every quote, and
     this form pays for them again on each call.
 
-    The body's ``deadline`` is checked **before** the source is prepared, so a
-    scan that has no time left does not fold a whole submission to discover it.
+    **Nothing here folds a source to reach an answer it already has.** Both
+    refusals that need no source are taken first: a quote the rung will not scan
+    at all, and a body whose ``deadline`` has passed. Folding the quote twice —
+    once here and once in the scan — costs microseconds against a whole
+    submission, because a quote is bounded by :data:`MAX_REPAIR_QUOTE_CHARS` and
+    a source is not.
     """
-    if deadline is not None and time.thread_time() > deadline:
+    if not _needle_of(quote) or deadline_spent(deadline):
         return None
     return repair_prepared(quote, prepare_source(source), deadline)
 
@@ -417,12 +451,10 @@ def repair_prepared(
     its own, and one nearest window for the whole is a span the quote never
     claimed.
     """
-    if _ELLIPSIS.search(quote):
-        return None
-    needle = normalize(quote)
+    needle = _needle_of(quote)
     if not needle:
         return None
-    if len(needle) > MAX_REPAIR_QUOTE_CHARS:
+    if deadline_spent(deadline):
         return None
     words = source.words
     folded = source.folded
@@ -430,10 +462,7 @@ def repair_prepared(
     best: tuple[str, float] | None = None
     budget = MAX_REPAIR_WORK
     matcher = SequenceMatcher(autojunk=False)
-    now = time.thread_time()
-    if deadline is not None and now > deadline:
-        return None
-    deadline = min(now + _REPAIR_DEADLINE_SECONDS, deadline or math.inf)
+    deadline = min(time.thread_time() + _REPAIR_DEADLINE_SECONDS, deadline or math.inf)
     matcher.set_seq2(needle)
     for count in range(width, width + _REPAIR_WIDTH_SLACK + 1):
         for start in range(len(words) - count + 1):

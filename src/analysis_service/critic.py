@@ -46,6 +46,7 @@ from typing import NamedTuple, get_args
 from analysis_service.frameworks import FrameworkPackage, FrameworkSchemas
 from analysis_service.grounding import (
     PreparedSource,
+    deadline_spent,
     normalize,
     prepare_source,
     repair_deadline,
@@ -753,6 +754,12 @@ def _verify_quotes(claims: Sequence[Claim], sources: Mapping[str, str]) -> _Quot
     # against rather than up front: a body whose quotes all verify repairs
     # nothing, and preparing every submission for it would be the whole cost of
     # the rung with none of its work.
+    #
+    # What it holds for the length of the body is two tuples of words per source
+    # a refused quote named. That is bounded by the job's own sources, which the
+    # deployment caps as one total across all of them
+    # (``resilience.max_source_bytes``), and it is the retention reuse costs:
+    # a fold nobody keeps is a fold the next quote pays for again.
     prepared: dict[str, PreparedSource] = {}
     # One deadline for every repair this body runs. Each scan is bounded on its
     # own, and a body runs one scan per refused quote: bounded per scan, a body
@@ -776,6 +783,15 @@ def _verify_quotes(claims: Sequence[Claim], sources: Mapping[str, str]) -> _Quot
                 continue
             label = ground.source_label
             if label not in prepared:
+                # The body's deadline, asked before the fold rather than inside
+                # the scan after it. A body that has spent its thirty seconds
+                # answers ``None`` for every quote that is left, and folding a
+                # whole submission to reach that answer is what this ordering
+                # removes: 400 refused quotes against a 20,000-word source is
+                # 6.4 s of folding for 400 answers of nothing.
+                if deadline_spent(deadline):
+                    unverified.append(index)
+                    continue
                 prepared[label] = prepare_source(sources[label])
             repair = repair_prepared(ground.text, prepared[label], deadline)
             if repair is None:

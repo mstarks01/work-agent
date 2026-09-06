@@ -23,7 +23,11 @@ from google.adk.workflow import FunctionNode, JoinNode
 from analysis_service import graph
 from analysis_service.binding import NodeBinding
 from analysis_service.critic import CriticOutputError
-from analysis_service.frameworks import PreconditionError, package_for
+from analysis_service.frameworks import (
+    PRECONDITION_RESULTS,
+    PreconditionError,
+    package_for,
+)
 from analysis_service.frameworks.stride import STRIDE
 from analysis_service.frameworks.stride.record import (
     STRIDE_CATEGORIES,
@@ -1758,6 +1762,22 @@ def test_a_refused_framework_still_produces_a_block_that_states_the_reason(
     assert [entry.unit for entry in block.scope] == list(STRIDE.lanes)
     assert all(entry.state == "not-applicable" for entry in block.scope)
     assert "does not apply" in block.scope[0].reason
+
+
+def test_every_precondition_result_is_answered_by_the_refusal_table():
+    """The table is checked against its registry, because the gate reads it.
+
+    ``_framework_finished`` reads a framework as finished when its parked
+    precondition string is in ``_REFUSAL_REASONS``. That makes the table
+    load-bearing for whether a job produces a report at all: a fourth
+    ``PreconditionResult`` that routes to ``skip`` and is missing here would
+    never be finished, every ``assemble`` trigger would report it pending, and
+    the job would end in ``GraphProducedNothing`` rather than in an analysis.
+
+    ``satisfied`` is the one result the table does not carry, because a
+    satisfied framework runs and finishes by its router's marker instead.
+    """
+    assert set(graph._REFUSAL_REASONS) | {"satisfied"} == set(PRECONDITION_RESULTS)
 
 
 def test_the_two_refusing_states_state_different_reasons(monkeypatch):
