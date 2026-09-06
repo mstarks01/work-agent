@@ -117,8 +117,8 @@ python -m evals.harness.run calibrate --out agreement.json
 ```
 
 **Read the error directions first; they are the measurement.** The shipped
-rule has 15 false splits of 200 equivalent candidate pairs, 5 false merges of
-115 candidate negatives and 3 false merges of 287 distinct reference pairs. A
+rule has 14 false splits of 200 equivalent candidate pairs, 3 false merges of
+111 candidate negatives and 3 false merges of 287 distinct reference pairs. A
 split hands a reviewer one unmatched finding. A merge destroys a finding and
 inflates recall, and nobody sees it happen — which is the expensive way to be
 wrong, and why a lenient rule is never the fix. Watch the candidate column
@@ -130,12 +130,14 @@ rule's split and merge counts are pinned exactly in
 `tests/test_evals_identity.py` and bind harder. If the bar fails, the fix is
 the rule or the verb vocabulary (`evals/harness/verbs.py`), not a lower bar.
 Don't tune anything until this passes. The pairs the rule refuses, and the
-pairs a label sets aside as `unclear` or `unsupported`, are counted beside the
-bar rather than inside it.
+pairs a label sets aside as `unclear`, `unsupported`, or `invalid-claim`, are
+counted beside the bar rather than inside it.
 
-What passing means is narrower than it looks. The labels are agent-authored and
-a person has read 30 of the 339, so this measures whether the rule reproduces
-them and not whether they are right. See the top of [README.md](README.md).
+What passing means is narrower than it looks. The 339 calibration fixtures began
+agent-authored;
+review 02 read the 44 decision-boundary fixtures and a random 60 of the 295
+others. This still measures whether the rule reproduces recorded dispositions,
+not whether either is externally right. See the top of [README.md](README.md).
 
 A rule change is a re-keying event, not a dependency bump: bump the fingerprint
 version, run `rekey`, and the whole vote ledger recomputes under the new rule

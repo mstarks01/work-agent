@@ -333,12 +333,12 @@ FIGURES: tuple[Figure, ...] = (
         ),
     ),
     Figure(
-        name="the labelled match fixtures",
+        name="the calibration-label fixtures",
         compute=lambda: {"value": len(load_pairs())},
         claims=(
-            ("evals/README.md", "of the {value} match labels", 1),
-            ("evals/TUNING.md", "of the {value}", 1),
-            ("evals/BLESSING.md", "of the {value}", 2),
+            ("evals/README.md", "The {value} calibration fixtures", 1),
+            ("evals/TUNING.md", "The {value} calibration fixtures", 1),
+            ("evals/BLESSING.md", "The current set has {value} fixtures", 1),
         ),
     ),
     Figure(

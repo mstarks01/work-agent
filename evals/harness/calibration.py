@@ -9,8 +9,9 @@ never averages them into one number. :func:`measure_agreement` answers the split
 direction over the recorded labels. :func:`measure_merges` answers the merge
 direction over the corpus's own distinct claims.
 
-``evals/calibration_labels/pairs.json`` holds candidate pairs marked match or
-no-match, and a matcher's agreement with those labels must be at least 90%. The
+``evals/calibration_labels/pairs.json`` holds candidate pairs whose primary
+dispositions say whether identity is decidable and, when it is, whether the
+claims match. A matcher's agreement with the scored labels must be at least 90%. The
 comparator is Semgrep's 92% to 96% on an analogous triage task. The matcher
 under this bar is the identity rule from :mod:`evals.harness.identity`. The
 model judge this scoreboard was built for is retired, and the scoreboard
@@ -25,14 +26,14 @@ than the ratio: they are asserted exactly, so a rule cannot rot downwards inside
 the bar's slack. Read a passing bar as "this rule is worth measuring properly".
 Never read it as matcher accuracy, and never as external validation.
 
-The labels are agent-authored, and a person has read 30 of the 339. Review
-sitting 01, in ``evals/calibration_labels/REVIEW-01.md`` on 2026-08-18, took the
-30 hardest pairs and relabelled one. Agreement therefore measures whether a rule
-reproduces what an earlier agent wrote down, rather than whether either is
-right. The comparator above is a figure from a task with full reviewer
-agreement, and this number is not comparable to it. ``evals/README.md`` states
-the provenance once for the whole directory. Everything below says "the labels"
-rather than "the human" for that reason.
+The labels began agent-authored. Review records in
+``evals/calibration_labels/reviews`` state exactly which subsets were read and
+how. Agreement therefore measures whether a rule reproduces the recorded
+dispositions, rather than whether either is externally correct. The comparator
+above is a figure from a task with full reviewer agreement, and this number is
+not comparable to it. ``evals/README.md`` states the provenance once for the
+whole directory. Everything below says "the labels" rather than "the human"
+for that reason.
 
 A rule may refuse a pair, and a refusal is not a miss. The identity rule refuses
 a pair it cannot read — one with no candidate element IDs, or no verb — rather
@@ -40,32 +41,29 @@ than grading half of itself. This module counts refused pairs and reports them
 beside the agreement, never inside it. Folding them in either direction would
 let a rule buy accuracy by refusing the hard pairs.
 
-A label may decline too. Two dispositions carry no answer an identity rule can
+A label may decline too. Three dispositions carry no answer an identity rule can
 be graded against, and each sits outside the agreement for the reason a refusal
 does: nobody asked the rule a question it could be wrong about. They are counted
 under their own keys in ``set_aside``, and never folded together.
 
-``unclear`` is the reader declining. It marks two write-ups they could not tell
-apart from the sentences alone. No shipped pair carries it. Review sitting 01
-returned four, and step 5 of ``evals/BLESSING.md`` now states the test that
-decides them, so each resolved to a binary label. The disposition exists so the
-next undecidable pair is recorded rather than forced.
+``unclear`` is the reader declining. It marks two write-ups whose relationship
+cannot be decided cleanly from the sentences alone. It is recorded rather than
+forced into a binary answer.
 
 ``unsupported`` is a different axis rather than a softer no-match. The candidate
-names the same place and the same action as the reference, and is still not a
-match, because it asserts a fact the **System Model** does not hold: a card that
-never crosses a link, or an MFA control nobody wrote down. Whether a claim is
-grounded is not decidable from elements and verbs, so scoring an identity rule
-against these measures nothing about identity. ``BLESSING.md`` step 5 asks for
-them deliberately and routes them to the downstream unsupported bucket. They sat
-inside this score only while the rule refused the whole ``no-match`` half and
-nobody could see them.
+asserts a fact the **System Model** does not hold: a card that never crosses a
+link, or an MFA control nobody wrote down. Whether a claim is grounded is not
+decidable from elements and verbs, so scoring an identity rule against these
+measures nothing about identity. ``BLESSING.md`` step 5 asks for them
+deliberately and routes them to the downstream unsupported bucket.
 
-The exclusion is stated rather than inferred. Each ``unsupported`` fixture
-records the reason in its note, ``build_pairs.py`` carries the label, and the
-count prints beside every score. The number before the partition is on the
-record too: over all 330 readable pairs the rule has 20 false merges and 89.4%
-agreement, and 15 of those 20 are these fixtures.
+``invalid-claim`` says the candidate is not a threat claim the framework can
+classify at all. It names no attacker action, so asking the identity rule whether
+it is the same finding would manufacture a binary answer to a malformed input.
+
+The exclusion is stated rather than inferred. Each non-scored fixture records
+the reason in its note, ``build_pairs.py`` carries the disposition, and the
+counts print beside every score.
 
 State one consequence plainly, every time these numbers are quoted. Recall and
 precision from this suite are rule-relative. They are valid for tracking
@@ -105,23 +103,31 @@ DEFAULT_PAIRS_PATH = EVALS_ROOT / "calibration_labels" / "pairs.json"
 
 AGREEMENT_BAR = 0.90
 
-#: What a recorded label may say. Two of the four carry no answer an identity
+#: What a recorded label may say. Three of the five carry no answer an identity
 #: rule can be graded against, and each says why it does not:
 #:
 #: - ``unclear`` — a reader could not decide the pair from the two sentences
 #:   alone, which is what review sitting 01 asked its reader to write.
-#: - ``unsupported`` — the candidate names the **same place and the same
-#:   action** as the reference and is still not a match, because it asserts a
-#:   fact the **System Model** does not hold. That is a groundedness question,
-#:   and no comparison of elements and verbs can reach it. ``BLESSING.md`` step
-#:   5 asks for these deliberately and sends them to the downstream
-#:   "unsupported" bucket; they were scored here only because the rule used to
-#:   refuse the whole ``no-match`` half.
-Label = Literal["match", "no-match", "unclear", "unsupported"]
+#: - ``unsupported`` — the candidate asserts a fact the **System Model** does
+#:   not hold. That is a groundedness question, and no comparison of elements
+#:   and verbs can reach it.
+#: - ``invalid-claim`` — the candidate names no valid attacker action and is
+#:   therefore not a claim whose identity can be compared.
+Label = Literal["match", "no-match", "unclear", "unsupported", "invalid-claim"]
+
+#: Diagnostic annotations supplement rather than replace the primary label.
+#: They do not change scoring.
+#:
+#: - ``mixed`` — the candidate also crosses a second decision axis. For example,
+#:   a no-match may additionally assert an unsupported fact, or an unsupported
+#:   candidate may also describe a different action.
+#: - ``misclassified-lane`` — the candidate describes a valid threat in a
+#:   different STRIDE lane from the fixture that contains it.
+LabelAnnotation = Literal["mixed", "misclassified-lane"]
 
 #: The labels that carry an answer an identity rule can be graded against. The
-#: two dispositions above are absent by construction, which is what keeps them
-#: out of the denominator.
+#: three dispositions above are absent by construction, which is what keeps
+#: them out of the denominator.
 SCORED_LABELS: tuple[Label, ...] = ("match", "no-match")
 
 
@@ -140,12 +146,13 @@ class LabelledPair:
     reference_element_ids: tuple[str, ...]
     candidate_element_ids: tuple[str, ...] | None
     #: The action each side names. The reference's comes free from the corpus;
-    #: the candidate's is a hand assignment, and is ``None`` on the no-match
-    #: half for the same reason its element IDs are.
+    #: the candidate's is a hand assignment, and is ``None`` only when the
+    #: candidate is structurally unassignable and its disposition is unscored.
     reference_verb: str | None
     candidate_verb: str | None
     label: Label
     note: str
+    annotations: tuple[LabelAnnotation, ...] = ()
 
     @property
     def is_scored(self) -> bool:
@@ -156,9 +163,9 @@ class LabelledPair:
     def label_match(self) -> bool:
         """What the recorded label says, as a boolean the scorer can compare.
 
-        It raises on an ``unclear`` pair rather than returning ``False``.
-        Reading "not a match" out of "nobody could tell" would grade a rule
-        against an answer the label declined to give.
+        It raises on any non-scored disposition rather than returning ``False``.
+        Reading "not a match" out of a declined identity question would grade a
+        rule against an answer the label did not give.
         """
         if not self.is_scored:
             raise CalibrationError(
@@ -201,6 +208,7 @@ class Disagreement:
             "reference_claim": self.pair.reference_claim,
             "candidate_claim": self.pair.candidate_claim,
             "label": self.pair.label,
+            "annotations": list(self.pair.annotations),
             "matcher": "match" if self.matcher_match else "no-match",
             "label_note": self.pair.note,
             "matcher_rationale": self.matcher_rationale,
@@ -289,11 +297,19 @@ def load_pairs(path: Path | str = DEFAULT_PAIRS_PATH) -> tuple[LabelledPair, ...
                 candidate_verb=entry.get("candidate_verb"),
                 label=entry["label"],
                 note=entry.get("note", ""),
+                annotations=tuple(entry.get("annotations", ())),
             )
         except (KeyError, TypeError) as exc:
             raise CalibrationError(f"{path}: pair {index} is malformed: {exc}") from exc
         if pair.label not in get_args(Label):
             raise CalibrationError(f"{path}: pair {index} has label {pair.label!r}")
+        unknown_annotations = set(pair.annotations) - set(get_args(LabelAnnotation))
+        if unknown_annotations:
+            raise CalibrationError(
+                f"{path}: pair {index} has annotations {sorted(unknown_annotations)!r}"
+            )
+        if len(set(pair.annotations)) != len(pair.annotations):
+            raise CalibrationError(f"{path}: pair {index} repeats an annotation")
         if pair.category not in STRIDE_CATEGORIES:
             raise CalibrationError(
                 f"{path}: pair {index} has category {pair.category!r}"
@@ -308,10 +324,10 @@ def measure_agreement(
     """Run the matcher over every labelled pair and compare with the label.
 
     A refusal (:class:`~evals.harness.identity.IdentityError`) is counted and
-    set aside, never scored: the fixtures deliberately keep pairs the rule
-    cannot read, so the refusing path stays exercised. A label that carries no
-    answer — ``unclear`` or ``unsupported`` — is set aside the same way and
-    counted under its own key, because a rule cannot disagree with an answer
+    set aside, never scored, so a rule cannot buy agreement by refusing a hard
+    pair. A label that carries no
+    answer — ``unclear``, ``unsupported`` or ``invalid-claim`` — is set aside
+    the same way and counted under its own key, because a rule cannot disagree with an answer
     nobody gave it.
     """
     if not pairs:
@@ -370,14 +386,12 @@ class MergeResult:
     already calls two findings. So every merge here is an error, and the count
     needs no label to interpret: ``merges`` over ``within_lane_pairs``.
 
-    This is the direction the recorded labels cannot answer today. Their
-    ``no-match`` half carries no candidate element IDs and no verb, so
-    :class:`~evals.harness.identity.SubsetVerbIdentity` refuses all of it and
-    :func:`measure_agreement` scores the split direction alone. Reference
-    claims carry both fields, which is why the merge measurement runs over the
-    corpus instead. Reference-vs-reference is a different distribution from the
-    candidate-vs-reference pairs a live run emits, and that gap is
-    `#511 <https://github.com/mstarks01/work-agent/issues/511>`_.
+    Candidate false merges are measured by :func:`measure_agreement` over the
+    scored ``no-match`` fixtures. This second measurement runs over reference
+    claims because every distinct within-lane pair is independently useful as a
+    collision check. Reference-vs-reference remains a different distribution
+    from the candidate-vs-reference pairs a live run emits, so both counts are
+    reported.
     """
 
     within_lane_pairs: int

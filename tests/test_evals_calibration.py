@@ -7,9 +7,8 @@ decision states, that a refusal and an ``unclear`` label are each counted
 rather than scored, and that a matcher below the bar fails rather than passes
 with a note.
 
-They also cover the merge direction, which the labels cannot answer: the
-``no-match`` half carries no candidate elements, so ``measure_merges`` reads
-the corpus's own distinct claims instead.
+They also cover the merge direction over both scored candidate negatives and
+the corpus's own distinct claims.
 """
 
 from __future__ import annotations
@@ -163,6 +162,14 @@ def test_unknown_label_fails_closed(tmp_path, pairs):
         load_pairs(path)
 
 
+def test_unknown_annotation_fails_closed(tmp_path, pairs):
+    path = tmp_path / "pairs.json"
+    path.write_text(json.dumps([_entry(pairs[0], annotations=["interesting"])]))
+
+    with pytest.raises(CalibrationError, match="annotations"):
+        load_pairs(path)
+
+
 def test_empty_fixture_set_is_refused():
     with pytest.raises(CalibrationError):
         measure_agreement(LabelReplayMatcher({}), [])
@@ -171,8 +178,7 @@ def test_empty_fixture_set_is_refused():
 def test_the_shipped_rule_clears_the_bar_on_the_recorded_labels(pairs):
     """The admission gate, pinned where it can fail.
 
-    93.7% over the 315 scored pairs the rule can read, with the 9 it refuses
-    and the 15 set aside counted beside the bar rather than inside it. A rule
+    94.5% over 311 scored pairs, with 28 set aside and no matcher refusals. A rule
     change that drops below the bar fails here, offline, before any sweep runs
     with it. The bar is not the measurement — the split and merge counts in
     ``tests/test_evals_identity.py`` are, and they bind harder.
@@ -188,14 +194,36 @@ def test_the_shipped_rule_clears_the_bar_on_the_recorded_labels(pairs):
     assert result.total == len(pairs) - result.refused - sum(result.set_aside.values())
 
 
-def test_a_refusal_is_reported_and_never_scored(pairs, labels):
-    """A matcher that cannot read a pair must not buy accuracy with it."""
+def test_the_shipped_fixtures_cause_no_matcher_refusals(pairs):
+    """Non-comparable candidates are disposed before the matcher is called."""
     matcher = SubsetVerbIdentity(_flows_by_case(load_corpus("evals/corpus")))
 
     result = measure_agreement(matcher, pairs)
 
-    assert result.refused > 0
-    assert result.to_json()["refused"] == result.refused
+    assert result.refused == 0
+
+
+def test_a_refusal_is_reported_and_never_scored(tmp_path, pairs):
+    """A matcher that cannot read a scored pair must not buy accuracy with it."""
+    path = tmp_path / "pairs.json"
+    path.write_text(
+        json.dumps(
+            [
+                _entry(
+                    pairs[0],
+                    candidate_element_ids=None,
+                    candidate_verb=None,
+                    label="match",
+                )
+            ]
+        )
+    )
+    matcher = SubsetVerbIdentity(_flows_by_case(load_corpus("evals/corpus")))
+
+    result = measure_agreement(matcher, load_pairs(path))
+
+    assert result.refused == 1
+    assert result.total == 0
 
 
 def _entry(pair, **overrides):
@@ -215,6 +243,7 @@ def _entry(pair, **overrides):
         "candidate_verb": pair.candidate_verb,
         "label": pair.label,
         "note": pair.note,
+        "annotations": list(pair.annotations),
     }
     return entry | overrides
 
@@ -265,45 +294,52 @@ def test_an_unclear_pair_is_counted_and_never_scored(tmp_path, pairs, labels):
     assert result.to_json()["set_aside"] == {"unclear": 1}
 
 
+def test_an_invalid_claim_is_counted_and_never_scored(tmp_path, pairs, labels):
+    decided = [pair for pair in pairs if pair.is_scored][:10]
+    entries = [_entry(pair) for pair in decided]
+    entries.append(
+        _entry(decided[0], label="invalid-claim", candidate_claim="not a threat")
+    )
+    path = tmp_path / "pairs.json"
+    path.write_text(json.dumps(entries))
+
+    result = measure_agreement(LabelReplayMatcher(labels), load_pairs(path))
+
+    assert result.set_aside == {"invalid-claim": 1}
+    assert result.total == len(decided)
+    assert result.agreement == 1.0
+
+
 def test_every_set_aside_pair_says_which_axis_decided_it(pairs):
     """Nothing leaves the score without a disposition that names the reason.
 
-    ``unclear`` ships unused: review sitting 01 returned four and step 5 of
-    ``evals/BLESSING.md`` now states the test that decides them, so every
-    reader-undecided pair resolved to a binary label.
-
-    ``unsupported`` is the axis split #511 exposed. Those candidates name the
-    same place and the same action as their reference and are still not a
-    match, because they assert a fact the model does not hold — which no
-    comparison of elements and verbs can reach. The count is pinned so it
-    cannot drift into a place a rule could quietly hide behind.
+    The counts are pinned so a disposition cannot drift into or out of the
+    identity score unnoticed.
     """
     by_label = collections.Counter(pair.label for pair in pairs)
 
-    assert by_label["unclear"] == 0
-    assert by_label["unsupported"] == 15
-    assert set(by_label) - set(SCORED_LABELS) == {"unsupported"}
+    assert by_label["unclear"] == 2
+    assert by_label["unsupported"] == 25
+    assert by_label["invalid-claim"] == 1
+    assert set(by_label) - set(SCORED_LABELS) == {
+        "unclear",
+        "unsupported",
+        "invalid-claim",
+    }
 
 
-def test_the_unsupported_fixtures_are_all_invisible_to_the_rule(pairs):
-    """Each one names one place and one action with its reference.
-
-    That is what makes it a groundedness fixture rather than an identity one,
-    and it is the property the disposition was assigned on. A pair the rule
-    *can* separate does not belong here — it would be a hard negative the score
-    should keep — so this fails if one is ever mislabelled that way.
-    """
-    matcher = SubsetVerbIdentity(_flows_by_case(load_corpus("evals/corpus")))
-
+def test_annotations_are_diagnostic_only(pairs):
+    """Secondary observations never decide whether a pair enters the score."""
     for pair in pairs:
-        if pair.label != "unsupported":
-            continue
-        ruling = matcher.equivalent(pair.to_claim_pair())
-        assert ruling.match, (
-            f"{pair.case}: {pair.candidate_claim!r} is labelled unsupported but"
-            f" the rule separates it ({ruling.rationale}). Label it no-match:"
-            " the identity rule can decide it, so the score should keep it."
-        )
+        assert pair.is_scored == (pair.label in SCORED_LABELS)
+
+
+def test_recorded_annotation_counts_are_pinned(pairs):
+    annotations = collections.Counter(
+        annotation for pair in pairs for annotation in pair.annotations
+    )
+
+    assert annotations == {"mixed": 13, "misclassified-lane": 7}
 
 
 def test_the_merge_direction_is_measured_over_distinct_reference_claims(pairs):

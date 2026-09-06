@@ -50,7 +50,7 @@ from analysis_service.report import (
 from analysis_service.sources import SourceKind
 from analysis_service.system_model import SystemModel
 from analysis_service.validation import parse_and_validate
-from evals.harness.calibration import SCORED_LABELS, Label
+from evals.harness.calibration import SCORED_LABELS, Label, LabelAnnotation
 from evals.harness.reference import AsvsDisposition
 from evals.harness.verbs import unknown_verbs
 
@@ -72,10 +72,10 @@ MIN_LABEL_SHARE = 0.3
 #: The calibration candidates that carry no element IDs and no verb, with the
 #: reason each cannot be assigned one.
 #:
-#: **This is the refusal set, and it is a fixture rather than a leftover.** The
-#: identity rule refuses a pair it cannot read, and that path has to stay
-#: exercised by pairs chosen for it — not by a backlog nobody finished. Every
-#: other candidate carries both fields whatever its label.
+#: These pairs deliberately carry no mechanical identity assignment. Their
+#: primary dispositions keep them outside the identity score before the matcher
+#: is called; this is a provenance check rather than a matcher-refusal set.
+#: Every other candidate carries both fields whatever its label.
 #:
 #: One rule decides membership: the sentence names no **Element** this case's
 #: model holds, or no action the closed vocabulary holds. A candidate that
@@ -801,8 +801,8 @@ def _check_pair_elements(
     candidate = pair["candidate_element_ids"]
     if candidate is None:
         # A pair is unassigned only when the candidate names no element this
-        # case's model holds, or no action the vocabulary holds. That is the
-        # refusal set, and it is deliberately small; everything else carries
+        # case's model holds, or no action the vocabulary holds. Its primary
+        # disposition keeps it out of identity scoring; everything else carries
         # both fields whatever its label.
         if (pair["case"], pair["candidate_claim"]) not in UNASSIGNABLE:
             problems.append(
@@ -810,6 +810,8 @@ def _check_pair_elements(
                 " the candidate's own words, or record it in UNASSIGNABLE with"
                 " the reason it cannot be assigned"
             )
+        if pair["label"] in SCORED_LABELS:
+            problems.append(f"{where} is scored but carries no candidate_element_ids")
         return problems
     dangling = sorted(set(candidate) - element_ids)
     if dangling:
@@ -871,6 +873,17 @@ def check_calibration(
                 f"{where} label {pair['label']!r} is not one of"
                 f" {sorted(get_args(Label))}"
             )
+        annotations = pair.get("annotations", [])
+        if not isinstance(annotations, list):
+            problems.append(f"{where} annotations must be a list")
+        else:
+            unknown = sorted(set(annotations) - set(get_args(LabelAnnotation)))
+            if unknown:
+                problems.append(f"{where} has unknown annotations: {unknown}")
+            if len(set(annotations)) != len(annotations):
+                problems.append(f"{where} repeats an annotation")
+            if annotations != sorted(annotations):
+                problems.append(f"{where} annotations are not sorted")
 
     # Balance is measured over the pairs that carry an answer. An ``unclear``
     # pair is excluded rather than counted against either side: it is not a

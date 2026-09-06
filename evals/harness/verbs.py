@@ -9,16 +9,16 @@ records what the rule cannot do.
 The figures are measured rather than asserted, over the whole corpus. All 243
 reference claims carry a verb. ``tests/test_evals_identity.py``'s ``FRONTIER``
 prices the rule on every error at once. Against ``endpoint subset`` alone,
-the verb costs one more false split of 200 labelled pairs, and removes
-eighty of the 85 false merges of
-115 candidate negatives, and twenty of the 23 false merges of 287 reference
+the verb adds no false split over 200 labelled pairs, and removes
+78 of the 81 false merges of
+111 candidate negatives, and twenty of the 23 false merges of 287 reference
 pairs. :class:`~evals.harness.identity.SubsetVerbIdentity` scores
-295/315 against the recorded labels, where element agreement alone scores
-200/315.
+294/311 against the recorded labels, where element agreement alone scores
+201/311.
 
 The candidate column is the one that argues for the vocabulary. Priced on
 reference pairs alone, the element rule merges 23 of 287 and reads as
-survivable. Priced on the paraphrases a live run emits, it merges 85 of 115.
+survivable. Priced on the paraphrases a live run emits, it merges 81 of 111.
 """
 
 from __future__ import annotations

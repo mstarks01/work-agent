@@ -1,5 +1,9 @@
 # Review sitting 01 — are these the same threat?
 
+> **Historical review.** A later boundary census and random-sample review is
+> recorded in [`REVIEW-02.md`](REVIEW-02.md). Statements below about this being
+> the first or only review describe the state when this sitting was held.
+
 > ## Result, recorded 2026-08-18
 >
 > **25 `same`, 1 `different`, 4 `unclear`.** Five of thirty, under the six-of-thirty
@@ -31,10 +35,10 @@
 > this class of defect is not mechanically detectable, and a reading session is
 > the only thing that finds it. That is the argument for step 6.
 
-**Nobody has ever reviewed anything under `evals/`.** The 339 pairs the eval
-suite scores against were written by an agent, and the judge model has been
-graded against them since July. This is the first check on whether any of it is
-sound.
+**Before this sitting, nobody had reviewed anything under `evals/`.** The 339
+pairs the eval suite scored against were written by an agent, and the judge
+model had been graded against them since July. This was the first check on
+whether any of it was sound.
 
 You are reading 30 pairs. They are not a random sample. They are the 30 where
 the two write-ups point at the *most different* parts of the system while an
@@ -405,8 +409,8 @@ Count them.
 
 - **You wrote `same` for most of them.** The labels hold at their weakest point.
   The eval numbers have a floor under them, and the duplicate-threat work can
-  proceed on the evidence it already has. Stop here — the other 309 pairs buy
-  nothing.
+  proceed on the evidence it already has. The later random review in
+  `REVIEW-02.md` tested this assumption rather than treating it as established.
 - **You wrote `different` or `unclear` often** (say, more than 6 of 30). Stop the
   duplicate-threat work. The test set is unsound, and every quality number in the
   repo rests on it, including the judge's 90% bar. That is the bigger finding.

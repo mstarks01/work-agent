@@ -1,11 +1,11 @@
 """Assemble the calibration fixtures from the recorded label tuples.
 
 ``LABELS`` is the labelling itself: one tuple per candidate pair, each carrying
-the rationale that argued for it. It is agent-authored, and a person has read 30
-of them. Review sitting 01, in ``REVIEW-01.md`` on 2026-08-18, took the 30
-hardest pairs and relabelled one. The other 309 are what the suite scores
-against rather than ground truth, and ``evals/README.md`` states that once for
-the whole directory. Reference claims are pulled verbatim from each case's
+the rationale that argued for it. It began agent-authored; the review records
+under ``reviews/`` state which subsets have since been read and how. The suite
+scores against recorded dispositions rather than ground truth, and
+``evals/README.md`` states that once for the whole directory. Reference claims
+are pulled verbatim from each case's
 ``claims/stride.json`` by index, so a reworded reference cannot silently detach
 a fixture from the claim it was labelled against. ``verify_corpus.py`` fails
 when it does.
@@ -16,9 +16,11 @@ generated, and should never be hand-edited.
 The sixth field, the candidate's affected element IDs
 -----------------------------------------------------
 
-Every ``match`` tuple carries the elements its candidate claim is about.
-``no-match`` tuples carry ``None`` and are not yet assigned. The field exists
-for `#201 <https://github.com/mstarks01/work-agent/issues/201>`_, which proposes
+Every scored tuple carries the elements its candidate claim is about. The nine
+unassignable candidates carry ``None`` because they name no model element or no
+attacker action, and their primary dispositions keep them outside the identity
+score. The field exists for
+`#201 <https://github.com/mstarks01/work-agent/issues/201>`_, which proposes
 comparing two claims on the fields that decide their identity rather than on a
 model call. Without it, the pair set can say nothing about mechanical identity
 at all, because a bare claim string has no elements to compare.
@@ -31,23 +33,25 @@ elements of this case's blessed model does this sentence name? The corpus's own
 conventions apply — a flow, process, store or entity, one or two of them, and
 never a boundary, which the reference sets cite once in 431.
 
-It is unreviewed, unlike the labels beside it. Sitting 01 asked whether two
-write-ups are one threat, and never read an element assignment.
-``BLESSING.md`` step 5 is where a session labels these pairs, and step 6 is
-where it blesses a case. No case carries a ``review`` block yet, so the number
-this field feeds carries the provenance the labels carried before sitting 01.
+The element and verb assignments remain agent-authored. The review sittings
+asked what disposition each claim pair should carry, not whether every
+structural assignment was correct. ``BLESSING.md`` step 5 is where a session
+labels these pairs, and step 6 is where it blesses a case.
 """
 
 import json
 from collections import Counter
 from pathlib import Path
+from typing import Any, cast
 
 HERE = Path(__file__).resolve().parent
 CORPUS = HERE.parent / "corpus"
 OUT = HERE / "pairs.json"
 
 # (case, reference index, candidate claim, label, note, candidate element ids,
-#  candidate action verb)
+#  candidate action verb[, diagnostic annotations])
+#
+# Annotations supplement the primary disposition and never change scoring.
 LABELS = [
     # ---------------------------------------------------------------- case 01
     ("01-payments-checkout", 0, "An attacker steals a shopper's session cookie and uses it to submit orders on that shopper's account.", "match", "Pure paraphrase: same action (replaying a stolen session), same target.", ("entity:shopper", "flow:shopper-to-storefront-api:place-order"), "replay"),
@@ -90,7 +94,7 @@ LABELS = [
     ("03-batch-data-pipeline", 1, "An attacker drops a file into a partner folder and the nightly run ingests it as that partner's data, since the depositor is never checked.", "match", "Same action, same mechanism.", ("flow:ingest-scheduler-to-landing-bucket:list-and-read-files", "store:landing-bucket"), "plant"),
     ("03-batch-data-pipeline", 1, "An attacker with a valid partner key uploads a file to a folder belonging to a different partner.", "match", "Same action against the same target; the candidate only specifies how the attacker got write access.", ("flow:insurance-partner-to-landing-bucket:push-daily-extract", "store:landing-bucket"), "plant"),
     ("03-batch-data-pipeline", 3, "An attacker edits claim records sitting in the landing bucket before the 02:00 run picks them up.", "match", "Same action, same target and the same timing.", ("store:landing-bucket",), "alter"),
-    ("03-batch-data-pipeline", 3, "An attacker injects SQL through a claim record field that the transform does not sanitize.", "no-match", "Injection through unvalidated content is a distinct action the corpus does not carry; a matcher that merges it hides a real gap.", ("process:transform-job",), "inject"),
+    ("03-batch-data-pipeline", 3, "An attacker injects SQL through a claim record field that the transform does not sanitize.", "no-match", "Injection through unvalidated content is a distinct action the corpus does not carry; it also invents a sanitization property the model does not state.", ("process:transform-job",), "inject", ("mixed",)),
     ("03-batch-data-pipeline", 4, "An attacker changes an Airflow connection string so the pipeline reads from or writes to a system they control.", "match", "Same action, same target.", ("store:airflow-metadata-db",), "alter"),
     ("03-batch-data-pipeline", 6, "Nothing ties an uploaded file to the key that uploaded it, so a partner can disown an extract.", "match", "Same claim stated cause-first.", ("entity:insurance-partner", "flow:insurance-partner-to-landing-bucket:push-daily-extract"), "unattributable"),
     ("03-batch-data-pipeline", 8, "An analyst with dataset-wide access views member names and dates of birth they have no need for.", "match", "Same action, same target.", ("entity:data-analyst", "flow:data-analyst-to-claims-warehouse:run-queries"), "abuse-grant"),
@@ -108,7 +112,7 @@ LABELS = [
     ("04-ml-inference-service", 0, "An attacker brute-forces a valid API key against the gateway.", "no-match", "Guessing a key and using a leaked one are different actions.", ("process:inference-gateway",), "guess-credential"),
     ("04-ml-inference-service", 1, "Anything already inside the model network can send requests straight to the model server, which authenticates nothing.", "match", "Same action, same target.", ("process:model-server",), "impersonate"),
     ("04-ml-inference-service", 3, "An attacker replaces the model artifact in the registry and the model server loads the substituted model without checking it.", "match", "Same action, same target.", ("flow:model-server-to-model-registry:load-artifact", "store:model-registry"), "plant"),
-    ("04-ml-inference-service", 3, "An attacker poisons the training data so the published model behaves incorrectly.", "no-match", "Training-time poisoning is outside this model entirely — no training pipeline exists in it — so this is unsupported, not a match.", None, None),
+    ("04-ml-inference-service", 3, "An attacker poisons the training data so the published model behaves incorrectly.", "unsupported", "Training-time poisoning is outside this model entirely — no training pipeline exists in it. It also describes a different action from replacing a published artifact.", None, None, ("mixed",)),
     ("04-ml-inference-service", 4, "An attacker with access to the model network writes new values into Redis and changes the features the model scores on.", "match", "Same action, same target.", ("store:feature-store",), "alter"),
     ("04-ml-inference-service", 4, "An attacker reads customer features out of the unauthenticated Redis store.", "no-match", "Reading is the disclosure entry; writing is this one. Same element, different action.", ("store:feature-store",), "read"),
     ("04-ml-inference-service", 6, "Because artifacts are published from a shared account, there is no record of which individual published a given model.", "match", "Same claim.", ("flow:ml-engineer-to-model-registry:publish-artifact", "store:model-registry"), "unattributable"),
@@ -142,7 +146,7 @@ LABELS = [
     # ---------------------------------------------------------------- case 06
     ("06-cookbook-online-game", 0, "An attacker connects to the lobby's exposed port and is accepted as another player, since client authentication is unverified.", "match", "Same action, same target.", ("flow:game-client-to-lobby:matchmaking", "process:lobby"), "impersonate"),
     ("06-cookbook-online-game", 1, "An attacker connects straight to a game server without going through matchmaking and joins a match they were not assigned to.", "match", "Same action, same target.", ("flow:game-client-to-game-servers:gameplay-traffic", "process:game-servers"), "impersonate"),
-    ("06-cookbook-online-game", 1, "An attacker floods a game server's port so the match cannot proceed.", "no-match", "Same element, availability action rather than identity; the corpus files it under denial-of-service.", ("process:game-servers",), "flood"),
+    ("06-cookbook-online-game", 1, "An attacker floods a game server's port so the match cannot proceed.", "no-match", "Same element, availability action rather than identity; the corpus files it under denial-of-service.", ("process:game-servers",), "flood", ("misclassified-lane",)),
     ("06-cookbook-online-game", 3, "A player patches their local game client and sends gameplay messages the server accepts as valid.", "match", "Same action, same target.", ("flow:game-client-to-game-servers:gameplay-traffic", "process:game-client"), "forge"),
     ("06-cookbook-online-game", 3, "A player uses their modified client to see other players' positions through walls.", "no-match", "Disclosure through the client is a separate corpus entry; modifying outbound actions and observing extra state are different actions.", ("process:game-client",), "read"),
     ("06-cookbook-online-game", 4, "An attacker rewrites entries in the stats database to inflate their ranking.", "match", "Same action, same target.", ("store:stats-database",), "alter"),
@@ -155,7 +159,7 @@ LABELS = [
     ("06-cookbook-online-game", 12, "An attacker overwhelms the lobby with connections and players can no longer get into matches.", "match", "Same action, same target.", ("process:lobby",), "flood"),
     ("06-cookbook-online-game", 13, "An attacker floods a game server mid-match and disrupts play for everyone in that match.", "match", "Same action, same target.", ("process:game-servers",), "flood"),
     ("06-cookbook-online-game", 15, "An attacker who takes over a game server writes to player records across production.", "match", "Same escalation.", ("flow:game-servers-to-player-database:update-players", "process:game-servers"), "escalate"),
-    ("06-cookbook-online-game", 15, "An attacker who takes over a game server reads match statistics.", "no-match", "Reading stats is neither the escalation claimed nor the target claimed; the reference is about write access to player records.", ("process:game-servers", "store:stats-database"), "read"),
+    ("06-cookbook-online-game", 15, "An attacker who takes over a game server reads match statistics.", "no-match", "Reading stats is neither the escalation claimed nor the target claimed; the reference is about write access to player records.", ("process:game-servers", "store:stats-database"), "read", ("misclassified-lane",)),
     ("06-cookbook-online-game", 16, "An attacker who gets into the moderation website gains control over every player account it can act on.", "match", "Same escalation, same target.", ("process:moderation-website", "store:player-database"), "abuse-grant"),
     ("06-cookbook-online-game", 17, "A player manipulates their client to obtain a match placement or account state they should not have.", "match", "Same escalation, same target.", ("process:game-client",), "escalate"),
     # ------------------------------------------------ additional hard negatives
@@ -164,27 +168,27 @@ LABELS = [
     # roughly one hard negative for every two positives.
     ("01-payments-checkout", 0, "An attacker fixes a shopper's session identifier before they log in and then reuses it.", "no-match", "Session fixation is a distinct action from replaying a stolen cookie.", ("entity:shopper", "flow:shopper-to-storefront-api:place-order"), "ride-session"),
     ("01-payments-checkout", 2, "An attacker sends malformed gRPC messages that crash the order service.", "no-match", "Same flow, availability action rather than identity.", ("flow:storefront-api-to-order-service:submit-order", "process:order-service"), "disable"),
-    ("01-payments-checkout", 11, "An attacker with database access reads shopper addresses and card last-four by querying orders-db.", "no-match", "The reference is about protection at rest of the stored data; querying with a valid credential is the elevation/spoofing path, not this one.", ("store:orders-db",), "read"),
+    ("01-payments-checkout", 11, "An attacker with database access reads shopper addresses and card last-four by querying orders-db.", "match", "Same read action against the same stored data. The candidate names one way an attacker with database access performs the reference claim.", ("store:orders-db",), "read"),
     ("01-payments-checkout", 16, "An attacker causes the order service to leak memory until it restarts.", "no-match", "Resource exhaustion inside the process is not the database-connection exhaustion the reference claims, and nothing in the model supports it.", ("process:order-service",), "disable"),
     ("01-payments-checkout", 20, "An attacker compromises the card processor and uses its access to reach the core zone.", "no-match", "Third-party compromise as an escalation route is not the DMZ-to-core pivot the reference states.", ("entity:card-processor",), "escalate"),
-    ("02-iot-fleet-telemetry", 2, "An attacker registers a device that was never manufactured by the operator.", "no-match", "Device enrolment is not described anywhere in the model; unsupported rather than matched.", None, None),
+    ("02-iot-fleet-telemetry", 2, "An attacker registers a device that was never manufactured by the operator.", "unsupported", "Device enrolment is outside the model, so the candidate cannot be grounded in any element. It also describes a different action from impersonating a modelled node.", None, None, ("mixed",)),
     ("02-iot-fleet-telemetry", 5, "An attacker deletes a device's entry from the registry so it can no longer connect.", "no-match", "Deletion for availability is a different action from reassigning a node's customer.", ("store:device-registry",), "delete"),
     ("02-iot-fleet-telemetry", 11, "An attacker reads customer occupancy patterns from the device registry.", "unsupported", "Occupancy data lives in the lake, not the registry; the candidate asserts a fact the model does not support.", ("store:device-registry",), "read"),
     ("02-iot-fleet-telemetry", 14, "An attacker disables the Pub/Sub topic so readings never reach the normalizer.", "no-match", "Destroying the transport is a different action from flooding it, and the model does not describe who can administer it.", ("flow:device-gateway-to-telemetry-normalizer:forward-readings",), "disable"),
     ("03-batch-data-pipeline", 2, "An attacker cancels a scheduled Airflow run so the extract is never processed.", "no-match", "Availability against the scheduler, not impersonation of it.", ("process:ingest-scheduler",), "disable"),
     ("03-batch-data-pipeline", 5, "An attacker modifies the Spark job's code so every future run transforms records incorrectly.", "no-match", "Job code deployment is not modelled; grounded findings must attach to elements that exist.", ("process:transform-job",), "alter"),
-    ("03-batch-data-pipeline", 7, "An analyst cannot reproduce a warehouse figure because the transform logic is undocumented.", "no-match", "A documentation gap is not an attacker action at all; a matcher that merges this is matching on topic, not on claim.", None, None),
+    ("03-batch-data-pipeline", 7, "An analyst cannot reproduce a warehouse figure because the transform logic is undocumented.", "invalid-claim", "A documentation gap is not an attacker action at all and therefore is not a STRIDE threat claim.", None, None),
     ("03-batch-data-pipeline", 10, "An attacker intercepts partner uploads and reads claim records in transit over SFTP.", "no-match", "The reference is about data at rest in the bucket; the flow is also stated to carry SSH transport encryption.", ("flow:insurance-partner-to-landing-bucket:push-daily-extract",), "intercept"),
     ("04-ml-inference-service", 2, "An attacker steals an ML engineer's laptop and publishes an artifact from it.", "unsupported", "Device theft is not described in the model; the reference is about the shared account behind publication.", ("entity:ml-engineer", "flow:ml-engineer-to-model-registry:publish-artifact"), "use-credential"),
     ("04-ml-inference-service", 5, "An attacker replays a previously captured inference request against the model server.", "no-match", "Replay is a distinct action from altering a payload in flight.", ("flow:inference-gateway-to-model-server:forward-request",), "replay"),
     ("04-ml-inference-service", 9, "An attacker reads customer features from the inference log.", "no-match", "Features are held in Redis; the log holds prompts and responses. Wrong target, and unsupported by the model.", ("store:inference-log",), "read"),
     ("04-ml-inference-service", 14, "An attacker corrupts the feature store so the model server cannot start.", "no-match", "The startup dependency in the reference is the registry artifact, not the feature store.", ("process:model-server", "store:feature-store"), "disable"),
-    ("04-ml-inference-service", 17, "A calling team exceeds the request quota assigned to its key.", "unsupported", "No quota is described in the model, and exceeding one is not reaching an unentitled capability.", ("entity:calling-service", "process:inference-gateway"), "abuse-grant"),
+    ("04-ml-inference-service", 17, "A calling team exceeds the request quota assigned to its key.", "unsupported", "No quota is described in the model, and exceeding one is not reaching an unentitled capability.", ("entity:calling-service", "process:inference-gateway"), "abuse-grant", ("mixed",)),
     ("05-cookbook-queue-webapp", 2, "An attacker who reaches the database queries it directly without any credential.", "no-match", "Asserts an absent control the model never states; the reference is about using the worker's credentials.", ("store:database",), "read"),
     ("05-cookbook-queue-webapp", 5, "An attacker alters the message queue's contents after the worker has read them.", "no-match", "Incoherent against the model's flows and not the database-record tampering the reference claims.", ("store:message-queue",), "alter"),
     ("05-cookbook-queue-webapp", 13, "An attacker exploits a vulnerability in the web application framework to crash it.", "no-match", "The model names no framework; the reference's action is flooding, not exploiting.", ("process:web-application",), "disable"),
     ("05-cookbook-queue-webapp", 15, "An attacker who compromises the web application reads the database directly.", "no-match", "The web application has no path to the database in this model; the escalation route the reference states is the queue.", ("process:web-application", "store:database"), "read"),
-    ("06-cookbook-online-game", 0, "An attacker takes over a player's account by resetting its password.", "no-match", "No account-recovery path exists in the model; unsupported rather than a match.", None, None),
+    ("06-cookbook-online-game", 0, "An attacker takes over a player's account by resetting its password.", "unsupported", "No account-recovery path exists in the model. It also describes a different route from connecting to the lobby as another player.", None, None, ("mixed",)),
     ("06-cookbook-online-game", 5, "An attacker modifies the game client to report fabricated match results.", "no-match", "Relabelled by review sitting 01. The reference is a game server writing fabricated progression to the player database; this is a client reporting fabricated results. Different component, different point of entry, and different remedies — harden the server's write path against validate what the client sends. The original note treated the route as incidental to 'fabricated data ends up recorded', and in threat modelling the route is the finding.", ("flow:game-client-to-game-servers:gameplay-traffic", "process:game-client"), "forge"),
     ("06-cookbook-online-game", 7, "A player disputes a moderation decision and no record shows which agent made it.", "no-match", "That is the support-attribution reference; this one is about which writer changed a player record.", ("process:moderation-website", "store:player-database"), "unattributable"),
     ("06-cookbook-online-game", 14, "An attacker corrupts the player database so matchmaking returns wrong results.", "no-match", "Integrity action, not the resource exhaustion the reference claims.", ("store:player-database",), "alter"),
@@ -194,14 +198,14 @@ LABELS = [
     ("07-cicd-store-deploy", 0, "An attacker guesses the build token because it is short.", "no-match", "Hard negative: holding a shared token and guessing one are different actions, and the corpus files credential recovery separately under information-disclosure.", ("process:build-runner",), "guess-credential"),
     ("07-cicd-store-deploy", 1, "An attacker on the WAN downloads the estate's container images from the registry by presenting whatever a store server presents.", "match", "Same action, same target.", ("flow:store-server-to-image-registry:pull-image", "store:image-registry"), "impersonate"),
     ("07-cicd-store-deploy", 1, "An attacker pushes a new image into the registry while claiming to be the build runner.", "no-match", "Hard negative: same store and lane, but pushing as the runner is a different action on a different flow from pulling as a store server.", ("flow:build-runner-to-image-registry:push-image", "store:image-registry"), "impersonate"),
-    ("07-cicd-store-deploy", 2, "An attacker uses the store server's expired client certificate to poll the controller.", "no-match", "Unsupported: the model records what a store server presents as unknown, and no certificate exists in it.", ("flow:store-server-to-deploy-controller:poll-current-release", "process:deploy-controller"), "use-credential"),
+    ("07-cicd-store-deploy", 2, "An attacker uses the store server's expired client certificate to poll the controller.", "unsupported", "Unsupported: the model records what a store server presents as unknown, and no certificate exists in it.", ("flow:store-server-to-deploy-controller:poll-current-release", "process:deploy-controller"), "use-credential"),
     ("07-cicd-store-deploy", 3, "An attacker bypasses the multi-factor authentication on the git server to push as a developer.", "unsupported", "Unsupported: authentication on that flow is unknown, so a candidate asserting MFA is present is claiming a control the model does not support.", ("entity:developer", "flow:developer-to-git-server:push-branches"), "impersonate"),
     ("07-cicd-store-deploy", 5, "An attacker rewrites the current-release record so the whole estate restarts onto an image the attacker chose.", "match", "Same action, same target.", ("process:deploy-controller",), "alter"),
     ("07-cicd-store-deploy", 5, "An attacker deletes the current-release record so no store knows what to run.", "no-match", "Hard negative: destroying the record and substituting it are different actions, and the corpus does not carry the deletion.", ("process:deploy-controller",), "delete"),
     ("07-cicd-store-deploy", 6, "An attacker gets a backdoored dependency into the build because downloads are not signature-checked.", "match", "Same action and same stated mechanism.", ("entity:public-package-registry", "flow:build-runner-to-public-package-registry:resolve-dependencies"), "plant"),
     ("07-cicd-store-deploy", 6, "An attacker modifies a package in transit between the public registry and the runner.", "no-match", "Hard negative: in-transit modification is a distinct action from publishing the package the lockfile resolves to.", ("flow:build-runner-to-public-package-registry:resolve-dependencies",), "alter-in-transit"),
     ("07-cicd-store-deploy", 7, "An attacker overwrites the image behind a commit sha in the registry so stores pull attacker content.", "match", "Same action, same target.", ("store:image-registry",), "plant"),
-    ("07-cicd-store-deploy", 7, "An attacker deletes images from the registry so store servers cannot pull.", "no-match", "Hard negative: destruction rather than replacement, and the corpus files registry unavailability in the denial-of-service lane instead.", ("store:image-registry",), "delete"),
+    ("07-cicd-store-deploy", 7, "An attacker deletes images from the registry so store servers cannot pull.", "no-match", "Hard negative: destruction rather than replacement, and the corpus files registry unavailability in the denial-of-service lane instead.", ("store:image-registry",), "delete", ("misclassified-lane",)),
     ("07-cicd-store-deploy", 9, "An attacker sitting on the retail WAN modifies the image while a store is pulling it.", "match", "Same action, same flow.", ("flow:store-server-to-image-registry:pull-image",), "alter-in-transit"),
     ("07-cicd-store-deploy", 9, "An attacker reads the container image as it crosses the WAN.", "no-match", "Hard negative and the pair this case exists to teach: reading and altering the same flow are two claims, and the read is its own reference.", ("flow:store-server-to-image-registry:pull-image",), "intercept"),
     ("07-cicd-store-deploy", 11, "There is no way to tell which developer started a build, because manual rebuilds bypass the merge and are not reviewed.", "match", "Same claim, stated as the condition rather than as the dispute.", ("flow:developer-to-build-runner:manual-rebuild", "process:build-runner"), "unattributable"),
@@ -209,8 +213,8 @@ LABELS = [
     ("07-cicd-store-deploy", 13, "An attacker who reads the runner's config files walks away with the build token.", "match", "Same action, same target.", ("process:build-runner",), "recover-credential"),
     ("07-cicd-store-deploy", 13, "An attacker uses the build token to set the estate's release.", "no-match", "Hard negative: using a held credential is the spoofing reference, not the recovery this one claims.", ("flow:build-runner-to-deploy-controller:set-current-release", "process:deploy-controller"), "use-credential"),
     ("07-cicd-store-deploy", 14, "An attacker reads source code out of images stored in the registry.", "no-match", "Hard negative: a different store, and the registry read is its own reference.", ("store:image-registry",), "read"),
-    ("07-cicd-store-deploy", 15, "An attacker recovers the registry's AES-256 encryption key and reads the images.", "no-match", "Unsupported: encryption at rest is unknown in the model, so the candidate invents the control it then defeats.", ("store:image-registry",), "recover-credential"),
-    ("07-cicd-store-deploy", 16, "An attacker alters the container image as it crosses the WAN.", "no-match", "The mirror of the tampering hard negative; matching it in this direction is the same collapse.", ("flow:store-server-to-image-registry:pull-image",), "alter-in-transit"),
+    ("07-cicd-store-deploy", 15, "An attacker recovers the registry's AES-256 encryption key and reads the images.", "unsupported", "Unsupported: encryption at rest is unknown in the model, so the candidate invents the control it then defeats.", ("store:image-registry",), "recover-credential"),
+    ("07-cicd-store-deploy", 16, "An attacker alters the container image as it crosses the WAN.", "no-match", "The mirror of the tampering hard negative; matching it in this direction is the same collapse.", ("flow:store-server-to-image-registry:pull-image",), "alter-in-transit", ("misclassified-lane",)),
     ("07-cicd-store-deploy", 17, "An attacker pushes a release that fails to start and tills across the estate go down.", "match", "Same action, same estate-wide consequence.", ("process:deploy-controller", "process:store-server"), "alter"),
     ("07-cicd-store-deploy", 17, "An attacker floods the deploy controller so store servers cannot poll.", "no-match", "Hard negative: that is the flooding reference, and it has a materially lower impact because a store keeps running the image it has.", ("process:deploy-controller",), "flood"),
     ("07-cicd-store-deploy", 18, "An attacker sets a release that crashes on start so stores stop trading.", "no-match", "The inverse of the previous pair, and no-match for the same reason.", ("process:deploy-controller", "process:store-server"), "alter"),
@@ -251,9 +255,9 @@ LABELS = [
     ("08-sso-identity-broker", 20, "A colleague holding a store-manager token voids transactions in a store they have nothing to do with, because only the group is checked.", "match", "Same escalation, same stated mechanism.", ("flow:colleague-to-store-admin-console:change-prices-and-void", "process:store-admin-console"), "abuse-grant"),
     ("08-sso-identity-broker", 20, "An attacker adds themselves to the store-manager group to gain the console's powers.", "no-match", "Hard negative: acquiring the group is the tampering reference against the directory; this lane is about what the group already grants.", ("process:store-admin-console", "store:directory"), "alter"),
     ("08-sso-identity-broker", 21, "Someone who has left keeps working access until the overnight sync catches up, and a token they already hold outlives even that.", "match", "Same escalation, and the candidate assembles the same three stated facts.", ("flow:identity-broker-to-hr-system:nightly-group-pull", "store:directory"), "abuse-grant"),
-    ("08-sso-identity-broker", 21, "A colleague who changes role keeps the groups from their old one until the nightly sync runs.", "no-match", "Hard negative: a plausible neighbouring claim about the same window, but the corpus enumerates the leaver and not the mover.", ("entity:colleague", "flow:identity-broker-to-hr-system:nightly-group-pull"), "abuse-grant"),
+    ("08-sso-identity-broker", 21, "A colleague who changes role keeps the groups from their old one until the nightly sync runs.", "unclear", "The candidate shares the stale-group mechanism and window but applies it to a role mover rather than the reference's leaver; the sentences do not establish whether that specificity changes finding identity.", ("entity:colleague", "flow:identity-broker-to-hr-system:nightly-group-pull"), "abuse-grant"),
     ("08-sso-identity-broker", 22, "An attacker who takes over the franchise provider signs in to our internal applications.", "match", "Same escalation, same mechanism.", ("entity:franchise-identity-provider", "flow:franchise-identity-provider-to-identity-broker:vouch-for-colleague"), "escalate"),
-    ("08-sso-identity-broker", 22, "An attacker on the franchise network reaches the corporate network directly.", "unsupported", "Unsupported, and the point of the case: the model gives the franchise party no network path in, only the right to assert an identity.", ("entity:franchise-identity-provider",), "escalate"),
+    ("08-sso-identity-broker", 22, "An attacker on the franchise network reaches the corporate network directly.", "unsupported", "Unsupported, and the point of the case: the model gives the franchise party no network path in, only the right to assert an identity.", ("entity:franchise-identity-provider",), "escalate", ("mixed",)),
     # ---------------------------------------------------------------- case 09
     ("09-cookbook-sokify-retail", 0, "An attacker calls the web API directly and it accepts the orders as though the app had sent them.", "match", "Same action, same target; the candidate states the outcome where the reference states the unknown behind it.", ("flow:mobile-app-to-web-api:api-traffic", "process:web-api"), "impersonate"),
     ("09-cookbook-sokify-retail", 0, "Anything that can reach the web API can act as the mobile app, since the API's authentication is unverified.", "match", "Same claim; the candidate cites the process where the reference cites the flow, which is an element-agreement difference, not a claim difference.", ("flow:mobile-app-to-web-api:api-traffic", "process:web-api"), "impersonate"),
@@ -261,7 +265,7 @@ LABELS = [
     ("09-cookbook-sokify-retail", 1, "An attacker with a copy of the catalogue spreadsheet drives its macros and the web API takes the SQL as the catalogue tool.", "match", "Pure paraphrase: same action, same mechanism.", ("flow:catalogue-spreadsheet-to-web-api:sql-statements", "process:catalogue-spreadsheet"), "impersonate"),
     ("09-cookbook-sokify-retail", 1, "An attacker steals a marketing employee's password and signs in to the catalogue tool.", "no-match", "Unsupported: the model describes no login on the spreadsheet, and inventing one turns a file-possession claim into a credential claim.", ("process:catalogue-spreadsheet",), "use-credential"),
     ("09-cookbook-sokify-retail", 2, "An attacker sends a customer a forged dispatch fax that appears to come from Sokify.", "match", "Same action, same target.", ("flow:fax-gateway-to-customer:confirmation-fax",), "forge"),
-    ("09-cookbook-sokify-retail", 2, "An attacker intercepts the confirmation fax in transit and reads the customer's address.", "no-match", "Hard negative: the same leg and the same stated weakness, but reading is not impersonating, and the corpus files the read separately.", ("flow:fax-gateway-to-customer:confirmation-fax",), "intercept"),
+    ("09-cookbook-sokify-retail", 2, "An attacker intercepts the confirmation fax in transit and reads the customer's address.", "no-match", "Hard negative: the same leg and the same stated weakness, but reading is not impersonating, and the corpus files the read separately.", ("flow:fax-gateway-to-customer:confirmation-fax",), "intercept", ("misclassified-lane",)),
     ("09-cookbook-sokify-retail", 3, "An attacker modifies an order in transit over the app's unencrypted connection to the API.", "match", "Same action, same flow.", ("flow:mobile-app-to-web-api:api-traffic",), "alter-in-transit"),
     ("09-cookbook-sokify-retail", 3, "An attacker reads order details out of the app's HTTP traffic.", "no-match", "Hard negative: same flow, same stated absence of TLS, but reading and altering are two claims and the corpus carries both.", ("flow:mobile-app-to-web-api:api-traffic",), "intercept"),
     ("09-cookbook-sokify-retail", 4, "An attacker uses the spreadsheet's macros to push a price change into the catalogue through the web API.", "match", "Same action, same path.", ("flow:catalogue-spreadsheet-to-web-api:sql-statements", "process:web-api"), "alter"),
@@ -276,7 +280,7 @@ LABELS = [
     ("09-cookbook-sokify-retail", 8, "An attacker deletes order records so a purchase cannot be proven afterwards.", "no-match", "Destroying evidence is a different action from never having captured it, and the corpus does not list it.", ("store:user-database",), "delete"),
     ("09-cookbook-sokify-retail", 9, "There is no way to tell which person made a catalogue change, because the API only ever sees SQL arriving from a spreadsheet.", "match", "Same claim, same mechanism.", ("flow:catalogue-spreadsheet-to-web-api:sql-statements", "process:web-api"), "unattributable"),
     ("09-cookbook-sokify-retail", 10, "Sokify has no evidence a confirmation reached the customer, since delivery to the dialled number is never confirmed.", "match", "Same claim; the candidate names the evidentiary gap the reference states.", ("flow:fax-gateway-to-customer:confirmation-fax",), "unattributable"),
-    ("09-cookbook-sokify-retail", 10, "The confirmation fax exposes the customer's name and address to whoever holds the dialled number.", "no-match", "The most valuable negative in this case: identical stated fact, different claim. One is the absence of proof of delivery, the other is disclosure to the wrong recipient, and a matcher that merges them collapses two lanes.", ("flow:fax-gateway-to-customer:confirmation-fax", "process:fax-gateway"), "read"),
+    ("09-cookbook-sokify-retail", 10, "The confirmation fax exposes the customer's name and address to whoever holds the dialled number.", "no-match", "The most valuable negative in this case: identical stated fact, different claim. One is the absence of proof of delivery, the other is disclosure to the wrong recipient, and a matcher that merges them collapses two lanes.", ("flow:fax-gateway-to-customer:confirmation-fax", "process:fax-gateway"), "read", ("misclassified-lane",)),
     ("09-cookbook-sokify-retail", 11, "An attacker sniffing the network reads customer details out of the app's plain HTTP calls to the API.", "match", "Same action, same flow.", ("flow:mobile-app-to-web-api:api-traffic",), "intercept"),
     ("09-cookbook-sokify-retail", 11, "Customer details leaving the mobile app are readable in transit, because the app talks to the API over HTTP.", "match", "Same read against the same traffic; the candidate cites the app where the reference cites the flow.", ("flow:mobile-app-to-web-api:api-traffic",), "intercept"),
     ("09-cookbook-sokify-retail", 11, "An attacker reads customers' card numbers out of the app's HTTP traffic.", "unsupported", "Unsupported, and deliberately so: the source states only that the database holds the card they paid with, never that cards cross this link. This is the invented fact the bootstrap made, preserved as a fixture.", ("flow:mobile-app-to-web-api:api-traffic",), "intercept"),
@@ -302,7 +306,7 @@ LABELS = [
     ("10-cookbook-generic-cms", 1, "An attacker uploads assets into the CDN bucket and the CDN serves them as if the web server had published them.", "match", "Same action, same target.", ("flow:web-server-to-cdn-bucket:asset-publish", "store:cdn-bucket"), "impersonate"),
     ("10-cookbook-generic-cms", 1, "An attacker replaces an asset already sitting in the bucket.", "no-match", "Hard negative: publishing as the web server and overwriting what is there are separate entries in separate lanes.", ("store:cdn-bucket",), "plant"),
     ("10-cookbook-generic-cms", 2, "An attacker rides a signed-in reader's session and acts as that reader on the site.", "match", "Same action, same target.", ("entity:reader", "flow:reader-to-web-server:page-requests"), "use-credential"),
-    ("10-cookbook-generic-cms", 2, "An attacker registers a reader account in someone else's name.", "no-match", "Different action against a different target, and registration is nowhere in the model.", None, None),
+    ("10-cookbook-generic-cms", 2, "An attacker registers a reader account in someone else's name.", "unsupported", "Registration is outside the model, so the claim cannot be grounded in any element. It also describes a different action from riding an existing session.", None, None, ("mixed",)),
     ("10-cookbook-generic-cms", 3, "An attacker on the network path injects modified script into an asset the reader is loading over HTTP.", "match", "Same action, same flow.", ("flow:reader-to-cdn:asset-fetch",), "alter-in-transit"),
     ("10-cookbook-generic-cms", 3, "An attacker replaces the asset in the CDN bucket so every reader receives the modified file.", "no-match", "The distinction this case exists to teach: modifying in transit and planting at rest are two claims, and both are in the corpus.", ("store:cdn-bucket",), "plant"),
     ("10-cookbook-generic-cms", 4, "An attacker who can write to the bucket swaps a published file and every visitor loads it.", "match", "Same action, same target.", ("store:cdn-bucket",), "plant"),
@@ -312,14 +316,14 @@ LABELS = [
     ("10-cookbook-generic-cms", 6, "An attacker with database access rewrites an article and the web server serves the altered page.", "match", "Same action, same target.", ("store:mysql-database",), "alter"),
     ("10-cookbook-generic-cms", 7, "A change made straight in the database leaves no CMS record of who made it.", "match", "Same claim, same stated mechanism.", ("flow:admin-to-mysql-database:direct-administration", "store:mysql-database"), "unattributable"),
     ("10-cookbook-generic-cms", 7, "The CMS cannot attribute direct database edits to anyone, because that path does not pass through it.", "match", "Same claim; the candidate cites the store where the reference cites the flow and the web server.", ("flow:admin-to-mysql-database:direct-administration", "process:web-server"), "unattributable"),
-    ("10-cookbook-generic-cms", 7, "An attacker deletes the CMS audit log to hide the change they made.", "no-match", "Unsupported: the model describes no log to delete, and the reference's point is that the path was never recorded in the first place.", None, None),
+    ("10-cookbook-generic-cms", 7, "An attacker deletes the CMS audit log to hide the change they made.", "unsupported", "The model describes no log to delete, so the claim cannot be grounded in any element. Deleting evidence also differs from the reference's absence of attribution.", None, None, ("mixed",)),
     ("10-cookbook-generic-cms", 8, "A reader denies writing a comment and nothing shows the comment came from their session.", "match", "Same claim, same mechanism.", ("entity:reader", "flow:reader-to-web-server:page-requests"), "unattributable"),
     ("10-cookbook-generic-cms", 9, "An attacker on the network path reads accounts and comments off the admin's unencrypted MySQL session.", "match", "Same action, same flow.", ("flow:admin-to-mysql-database:direct-administration",), "intercept"),
     ("10-cookbook-generic-cms", 9, "An attacker reads readers' page requests in transit.", "no-match", "Unsupported: that link is stated to be HTTPS, so the candidate asserts a weakness the model contradicts.", ("flow:reader-to-web-server:page-requests",), "intercept"),
     ("10-cookbook-generic-cms", 10, "An attacker who obtains the database files reads reader account records, since nothing establishes disk encryption.", "match", "Same action, same target.", ("store:mysql-database",), "read"),
     ("10-cookbook-generic-cms", 10, "An attacker reads account records off the wire from the admin's connection.", "no-match", "Hard negative: same records, at rest versus in transit, and the corpus carries both as distinct entries.", ("flow:admin-to-mysql-database:direct-administration",), "intercept"),
     ("10-cookbook-generic-cms", 11, "An attacker watching plain HTTP asset requests can tell which articles a reader opened.", "match", "Same action, same inference.", ("flow:reader-to-cdn:asset-fetch",), "intercept"),
-    ("10-cookbook-generic-cms", 11, "An attacker reads the reader's session cookie out of the HTTP asset request.", "unsupported", "Unsupported: the model says nothing about cookie scope, and the candidate turns a traffic-analysis claim into a session-theft one.", ("entity:reader", "flow:reader-to-cdn:asset-fetch"), "intercept"),
+    ("10-cookbook-generic-cms", 11, "An attacker reads the reader's session cookie out of the HTTP asset request.", "unsupported", "Unsupported: the model says nothing about cookie scope, and the candidate turns a traffic-analysis claim into a session-theft one.", ("entity:reader", "flow:reader-to-cdn:asset-fetch"), "intercept", ("mixed",)),
     ("10-cookbook-generic-cms", 12, "An attacker overwhelms the web server with requests and the public site stops responding.", "match", "Same action, same target.", ("process:web-server",), "flood"),
     ("10-cookbook-generic-cms", 13, "An attacker with bucket write access removes assets and pages render broken.", "match", "Same action, same consequence.", ("store:cdn-bucket",), "delete"),
     ("10-cookbook-generic-cms", 13, "An attacker replaces the bucket's assets with malicious ones.", "no-match", "Hard negative: same access, the tampering entry rather than the denial one.", ("store:cdn-bucket",), "plant"),
@@ -343,7 +347,7 @@ LABELS = [
     ("11-sparse-shift-scheduling", 6, "An attacker intercepts a manager's rota change on its way to the web app and alters it.", "match", "Same action, same flow.", ("flow:store-manager-to-scheduling-web-app:build-rota",), "alter-in-transit"),
     ("11-sparse-shift-scheduling", 6, "An attacker intercepts a manager's session and reads the rota in transit.", "no-match", "Hard negative on the same flow: reading and modifying are two claims, and the corpus carries the read separately.", ("flow:store-manager-to-scheduling-web-app:build-rota",), "intercept"),
     ("11-sparse-shift-scheduling", 7, "A manager who cut a colleague's hours denies having done it, and nothing records who made the change.", "match", "Paraphrase with the same mechanism.", ("flow:store-manager-to-scheduling-web-app:build-rota", "store:rota-database"), "unattributable"),
-    ("11-sparse-shift-scheduling", 7, "An attacker deletes the audit records of a rota change to hide it.", "no-match", "Unsupported: the model has no audit store to delete from, which is the reference's own point.", None, None),
+    ("11-sparse-shift-scheduling", 7, "An attacker deletes the audit records of a rota change to hide it.", "unsupported", "The model has no audit store to delete from, so the claim cannot be grounded in any element. Deleting evidence also differs from the reference's absence of attribution.", None, None, ("mixed",)),
     ("11-sparse-shift-scheduling", 8, "There is no record establishing which party fetched a particular payroll export.", "match", "Same claim stated as the condition rather than the dispute.", ("flow:payroll-system-to-file-share:collect-payroll-export", "store:file-share"), "unattributable"),
     ("11-sparse-shift-scheduling", 9, "An attacker who reaches the rota database reads colleague contact details out of it.", "match", "Same read action against the same target.", ("store:rota-database",), "read"),
     ("11-sparse-shift-scheduling", 9, "An attacker reads colleague contact details from the rota database, which is classified confidential and unencrypted.", "unsupported", "Unsupported on two counts: data classification is unknown and encryption at rest is unknown, so both asserted facts are invented.", ("store:rota-database",), "read"),
@@ -359,7 +363,7 @@ LABELS = [
     ("12-overclaiming-supplier-portal", 1, "An attacker gets into the portal as a category manager and approves a supplier's compliance paperwork.", "match", "Same action, same target.", ("entity:category-manager", "flow:category-manager-to-supplier-portal:review-documents"), "impersonate"),
     ("12-overclaiming-supplier-portal", 1, "An attacker signs in as a category manager, which the platform prevents because all access is fully authenticated.", "unsupported", "Treats the vendor's datasheet phrasing as a control in the model; the authentication attribute on that flow is unknown.", ("entity:category-manager", "flow:category-manager-to-supplier-portal:review-documents"), "impersonate"),
     ("12-overclaiming-supplier-portal", 2, "An attacker drops a file into the landing bucket that our side takes for the vendor's nightly push.", "match", "Same action, same target.", ("flow:portal-vendor-to-landing-bucket:push-nightly-extract", "store:landing-bucket"), "plant"),
-    ("12-overclaiming-supplier-portal", 2, "An attacker reads the nightly extract out of the landing bucket.", "no-match", "Hard negative: same element, same file, but reading is the information-disclosure entry and writing is this one.", ("store:landing-bucket",), "read"),
+    ("12-overclaiming-supplier-portal", 2, "An attacker reads the nightly extract out of the landing bucket.", "no-match", "Hard negative: same element, same file, but reading is the information-disclosure entry and writing is this one.", ("store:landing-bucket",), "read", ("misclassified-lane",)),
     ("12-overclaiming-supplier-portal", 3, "An attacker alters the CSV sitting in the landing bucket and the supplier master service loads the altered records without checking them.", "match", "Same action, same target; picked up as-is is stated in the source and both phrasings rely on it.", ("flow:supplier-master-service-to-landing-bucket:load-extract", "store:landing-bucket"), "alter"),
     ("12-overclaiming-supplier-portal", 3, "An attacker alters the extract while the vendor is transferring it.", "no-match", "Hard negative: tampering at rest in the bucket and tampering in transit are two entries in this case, deliberately kept apart.", ("flow:portal-vendor-to-landing-bucket:push-nightly-extract",), "alter-in-transit"),
     ("12-overclaiming-supplier-portal", 4, "An attacker on the path of the nightly transfer modifies the extract, since the source both claims end-to-end encryption and describes a plain CSV.", "match", "Same action, same flow, and the candidate names the same unresolved conflict.", ("flow:portal-vendor-to-landing-bucket:push-nightly-extract",), "alter-in-transit"),
@@ -367,7 +371,7 @@ LABELS = [
     ("12-overclaiming-supplier-portal", 5, "Someone with access inside the vendor platform edits a stored audit certificate so a supplier looks compliant.", "match", "Same action, same target.", ("store:document-store",), "alter"),
     ("12-overclaiming-supplier-portal", 5, "An attacker alters a compliance document in the vendor's platform, which stores documents without encryption.", "unsupported", "Unsupported: encryption at rest on the document store is unknown, and enterprise-grade encryption throughout is a marketing claim rather than a stated property either way.", ("store:document-store",), "alter"),
     ("12-overclaiming-supplier-portal", 6, "A category manager disputes an approval recorded against their name and we hold no audit trail of our own.", "match", "Paraphrase with the same mechanism.", ("flow:category-manager-to-supplier-portal:review-documents", "process:supplier-portal"), "unattributable"),
-    ("12-overclaiming-supplier-portal", 6, "A category manager disputes an approval, and the platform's audit log shows the wrong actor.", "no-match", "Unsupported: there is no audit log element in the model, which is precisely the reference's claim.", None, None),
+    ("12-overclaiming-supplier-portal", 6, "A category manager disputes an approval, and the platform's audit log shows the wrong actor.", "unsupported", "There is no audit log element in the model, so the claim cannot be grounded. A wrong recorded actor also differs from the reference's absence of an audit trail.", None, None, ("mixed",)),
     ("12-overclaiming-supplier-portal", 7, "The vendor and our team disagree over what a nightly extract contained, and nothing on our side recorded what arrived.", "match", "Same claim, same boundary.", ("flow:portal-vendor-to-landing-bucket:push-nightly-extract", "store:landing-bucket"), "unattributable"),
     ("12-overclaiming-supplier-portal", 8, "An attacker with access to our cloud account reads the supplier extract out of the landing bucket.", "match", "Same read action, same target.", ("store:landing-bucket",), "read"),
     ("12-overclaiming-supplier-portal", 9, "An attacker inside the vendor's platform reads supplier staff contact details from the stored documents.", "match", "Same action, same target.", ("store:document-store",), "read"),
@@ -380,7 +384,7 @@ LABELS = [
     ("12-overclaiming-supplier-portal", 14, "An attacker who influences the extract's contents gets the supplier master service to act on it beyond a plain data load.", "match", "Same escalation, same mechanism.", ("flow:supplier-master-service-to-landing-bucket:load-extract", "process:supplier-master-service"), "inject"),
     # ---------------------------------------------------------------- case 13
     ("13-dispatch-control-plane", 0, "An attacker who obtains the importer's API token posts work orders to the dispatch API as the importer.", "match", "Pure paraphrase: same action, same flow, same stated credential.", ("flow:schedule-importer-to-dispatch-api:post-work-orders", "process:dispatch-api"), "use-credential"),
-    ("13-dispatch-control-plane", 0, "An attacker guesses the importer's API token, which is too short to resist it.", "no-match", "Unsupported, and a different action: the source states the token was never rotated and states nothing about its length.", ("process:schedule-importer",), "guess-credential"),
+    ("13-dispatch-control-plane", 0, "An attacker guesses the importer's API token, which is too short to resist it.", "no-match", "Unsupported, and a different action: the source states the token was never rotated and states nothing about its length.", ("process:schedule-importer",), "guess-credential", ("mixed",)),
     ("13-dispatch-control-plane", 1, "An attacker opens a live status socket to the dispatch API as a duty engineer, since the handshake's authentication is not established.", "match", "Same action, same flow; hedged phrasing does not change the claim.", ("flow:dispatch-console-to-dispatch-api:live-job-status", "process:dispatch-api"), "impersonate"),
     ("13-dispatch-control-plane", 1, "An attacker steals a duty engineer's session token out of the browser and opens the socket with it.", "no-match", "Hard negative: recovering a session and opening an unauthenticated handshake are different actions, and the corpus carries only the second.", ("flow:dispatch-console-to-dispatch-api:live-job-status", "process:dispatch-api"), "recover-credential"),
     ("13-dispatch-control-plane", 2, "An attacker stands up a service that answers the importer's hourly pull in the partner's place.", "match", "Same action, same flow.", ("entity:scheduling-partner", "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed"), "impersonate"),
@@ -389,10 +393,10 @@ LABELS = [
     ("13-dispatch-control-plane", 4, "An attacker modifies the partner's XML document while it is in transit to the importer.", "no-match", "Hard negative: the reference's action is answering the pull, and in-transit modification is a distinct claim the corpus does not carry on a flow stated to run over HTTPS.", ("flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",), "alter-in-transit"),
     ("13-dispatch-control-plane", 5, "An attacker on the corporate network rewrites a crew move on its way to the dispatch API.", "match", "Same action, same flow.", ("flow:dispatch-console-to-dispatch-api:dispatch-requests",), "alter-in-transit"),
     ("13-dispatch-control-plane", 5, "An attacker on the corporate network reads a dispatch request in flight.", "no-match", "Hard negative: reading and altering the same flow are two lanes, and the corpus keeps them apart deliberately.", ("flow:dispatch-console-to-dispatch-api:dispatch-requests",), "intercept"),
-    ("13-dispatch-control-plane", 6, "An attacker inside the control plane alters job orders in the dispatch database.", "match", "Same action, same target.", ("store:dispatch-database",), "alter"),
+    ("13-dispatch-control-plane", 6, "An attacker inside the control plane alters job orders in the dispatch database.", "unclear", "The candidate alters existing job orders while the reference writes job orders directly. The sentences do not establish whether that action distinction changes finding identity.", ("store:dispatch-database",), "alter"),
     ("13-dispatch-control-plane", 7, "An attacker deletes documents from the schedule archive so no copy of the day's work survives.", "no-match", "Destruction rather than alteration, and the corpus does not carry it.", ("store:schedule-archive",), "delete"),
     ("13-dispatch-control-plane", 8, "A duty engineer disputes a crew move and nothing in the job order names a person.", "match", "Same claim stated as the condition rather than the dispute.", ("flow:dispatch-console-to-dispatch-api:dispatch-requests", "store:dispatch-database"), "unattributable"),
-    ("13-dispatch-control-plane", 8, "A duty engineer disputes a crew move and the dispatch API's audit log names the wrong actor.", "no-match", "Unsupported: there is no log element in the model, and the reference's claim is precisely that the job order carries no person.", None, None),
+    ("13-dispatch-control-plane", 8, "A duty engineer disputes a crew move and the dispatch API's audit log names the wrong actor.", "unsupported", "There is no log element in the model, so the claim cannot be grounded. A wrong recorded actor also differs from the reference's job order carrying no person.", None, None, ("mixed",)),
     ("13-dispatch-control-plane", 10, "An attacker on the corporate network reads crew job status off the open socket, whose transport is unstated.", "match", "Same read action, same flow.", ("flow:dispatch-console-to-dispatch-api:live-job-status",), "intercept"),
     ("13-dispatch-control-plane", 11, "An attacker who gets hold of a dispatch database backup reads crew mobile numbers.", "match", "A backup is a narrower instance of obtaining a copy; same action, same target.", ("store:dispatch-database",), "read"),
     ("13-dispatch-control-plane", 11, "An attacker reads crew names out of the schedule archive.", "no-match", "Unsupported: the archive holds the partner's schedule documents, and the model puts no crew details in it.", ("store:schedule-archive",), "read"),
@@ -417,26 +421,37 @@ def main() -> None:
         if case_dir.is_dir()
     }
     pairs = []
-    for case, index, candidate, label, note, elements, verb in LABELS:
+    for raw in LABELS:
+        if len(raw) not in (7, 8):
+            raise ValueError(f"label tuple has {len(raw)} fields, expected 7 or 8")
+        case = cast(str, raw[0])
+        index = cast(int, raw[1])
+        candidate = cast(str, raw[2])
+        label = cast(str, raw[3])
+        note = cast(str, raw[4])
+        elements = cast(tuple[str, ...] | None, raw[5])
+        verb = cast(str | None, raw[6])
+        annotations = cast(tuple[str, ...], raw[7]) if len(raw) == 8 else ()
         reference = threats_by_case[case][index]
-        pairs.append(
-            {
-                "case": case,
-                "category": reference["category"],
-                "reference_claim": reference["claim"],
-                # Free: the corpus already holds it, so no hand pass assigns it
-                # and no reworded reference can detach it from its claim.
-                "reference_element_ids": sorted(reference["affected_element_ids"]),
-                "candidate_claim": candidate,
-                "candidate_element_ids": None if elements is None else list(elements),
-                # Free, like the reference elements above: the corpus carries the
-                # reference's verb, so only the candidate's is a hand assignment.
-                "reference_verb": reference["verb"],
-                "candidate_verb": verb,
-                "label": label,
-                "note": note,
-            }
-        )
+        pair: dict[str, Any] = {
+            "case": case,
+            "category": reference["category"],
+            "reference_claim": reference["claim"],
+            # Free: the corpus already holds it, so no hand pass assigns it
+            # and no reworded reference can detach it from its claim.
+            "reference_element_ids": sorted(reference["affected_element_ids"]),
+            "candidate_claim": candidate,
+            "candidate_element_ids": None if elements is None else list(elements),
+            # Free, like the reference elements above: the corpus carries the
+            # reference's verb, so only the candidate's is a hand assignment.
+            "reference_verb": reference["verb"],
+            "candidate_verb": verb,
+            "label": label,
+            "note": note,
+        }
+        if annotations:
+            pair["annotations"] = sorted(annotations)
+        pairs.append(pair)
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(pairs, indent=2) + "\n")
