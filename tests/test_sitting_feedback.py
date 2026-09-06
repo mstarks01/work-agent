@@ -52,7 +52,6 @@ def client_for(tree: Path):
         sitting.LOCAL_SUBMITTER,
         "anonymous",
         drafts=drafts,
-        can_submit=False,
     )
     client = TestClient(
         sitting.create_app(session),

@@ -21,7 +21,7 @@ of it is left, whoever signed it. The draft is what re-opens a case, so a reader
 who records one still presses their own row and records it again.
 :func:`open_case` resolves every case id that arrives in a request against that
 list, so the refusal a signed case needs is the same rule that refuses a case id
-nobody wrote. The status reads :func:`evals.harness.sitting.clears`, and never
+nobody wrote. The status reads :func:`evals.review_submission.current_reviews`, and never
 the presence of an entry in ``reviews``: a drifted digest leaves an entry that
 clears nothing, and a rail keyed on the entry would grey a case CI asks somebody
 to read.
@@ -42,7 +42,7 @@ import secrets
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Annotated, TypeVar
+from typing import Annotated
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -51,6 +51,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from evals import review_submission as review_submissions
 from evals.harness import envelope as envelopes
 from evals.harness import roster as rosters
 from evals.harness import sitting as sittings
@@ -75,10 +76,6 @@ HELD = "`webapp/sitting.py`"
 _PAGE_GRANTS = Grants(script=True, style=True, connect=True)
 Line = envelopes.Line
 CaseId = Annotated[str, Field(max_length=120)]
-
-#: The session type a surface builds. Bound to :class:`Session`, so a
-#: surface's subclass comes back as itself rather than as the base.
-_S = TypeVar("_S", bound="Session")
 
 
 class Which(BaseModel):
@@ -111,7 +108,6 @@ class Session:
     rows: tuple[sittings.Row, ...] = ()
     prepared: dict[str, sittings.Prepared] = field(default_factory=dict)
     token: str = field(default_factory=lambda: secrets.token_urlsafe(24))
-    can_submit: bool = False
     dropped: set[str] = field(default_factory=set)
 
     @property
@@ -139,7 +135,7 @@ class Session:
     def refresh(self) -> tuple[sittings.Row, ...]:
         self.rows = sittings.rail(
             self.corpus_dir,
-            self.roster,
+            review_submissions.clearing_signatures(self.root),
             sittings.draft_states(self.drafts, self.submitted_by),
         )
         return self.rows
@@ -181,7 +177,6 @@ def create_app(session: Session, page: str, script: str) -> FastAPI:
                 readby=escape(session.submitted_for),
                 submitter=escape(session.submitted_by),
                 token=script_json(session.token),
-                cansubmit=script_json(session.can_submit),
                 minownlist=script_json(MIN_OWN_LIST),
             )
         )
@@ -400,28 +395,6 @@ def create_app(session: Session, page: str, script: str) -> FastAPI:
         _record(session, prepared, held, held.marks, held.missing, held.notes)
         return JSONResponse({"case": prepared.case_id, "state": held.state})
 
-    @app.post("/api/submit")
-    def open_the_pr(request: Request) -> JSONResponse:
-        refuse_cross_origin(request)
-        require_token(request, session)
-        if not session.can_submit:
-            raise HTTPException(
-                status_code=409,
-                detail="no authenticated gh login, so there is nothing to"
-                " submit as. Run the printed command yourself.",
-            )
-        carried = [row.case_id for row in session.carried()]
-        if not carried:
-            raise HTTPException(
-                status_code=409, detail="record the sitting before submitting it"
-            )
-        outcome = submit_spine.submission(session.root, "sitting")
-        kept = _delete_drafts(session, carried) if outcome.ok else []
-        return JSONResponse(
-            {**outcome.to_json(), "carried": carried, "kept": kept},
-            status_code=200 if outcome.ok else 409,
-        )
-
     return app
 
 
@@ -484,16 +457,6 @@ def _record(
     session.dropped.discard(prepared.case_id)
 
 
-def _delete_drafts(session: Session, cases: list[str]) -> list[str]:
-    kept = []
-    for case_id in cases:
-        try:
-            sittings.discard_draft(session.drafts, session.submitted_by, case_id)
-        except (sittings.DraftError, OSError) as exc:
-            kept.append(f"{case_id}: {exc}")
-    return kept
-
-
 def _stage_row(row: sittings.Row) -> dict[str, str]:
     return {"case": row.case_id, "number": row.number, "title": row.title}
 
@@ -531,26 +494,16 @@ def build_session(
     submitted_by: str,
     submitted_for: str | None = None,
     case: str | None = None,
-    can_submit: bool = False,
     drafts: Path | None = None,
-    *,
-    session_type: type[_S],
-) -> _S:
-    """The session a surface serves, with its rail already read.
-
-    ``session_type`` is the one thing a surface varies. A surface that reads a
-    second source for a case's status subclasses :class:`Session` and names the
-    subclass here, so the rest of this — the roster, the draft root, the
-    preselect check — has one reader rather than a copy per surface.
-    """
-    session = session_type(
+) -> Session:
+    """The session a surface serves, with its rail already read."""
+    session = Session(
         root=root,
         submitted_by=submitted_by,
         submitted_for=submitted_for or submitted_by,
         roster=rosters.load(root / submit_spine.ROSTER_FILE),
         drafts=drafts or sittings.draft_root(),
         preselect=case,
-        can_submit=can_submit,
     )
     session.refresh()
     if case is not None and case not in {row.case_id for row in session.rows}:
