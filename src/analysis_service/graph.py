@@ -1478,6 +1478,7 @@ def merge_drafts(
     corpus-sized model and 3.7 ms on one of 600 elements — three derivations in
     a two-framework job, so 0.14 ms and 11 ms. Deriving it again is cheaper than
     any structure that would let the two sets differ.
+    ``evals/bench/deterministic.py catalog`` re-derives the two figures.
 
     Then the mechanical half of the fan-in: :func:`join_drafts` fails closed if
     a draft cites an element the model does not contain, if two agents reused a
