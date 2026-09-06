@@ -130,7 +130,13 @@ from analysis_service import (
 from analysis_service.deployment import Deployment
 from analysis_service.frameworks import package_for
 from analysis_service.model_tiers import ModelTierConfig
-from analysis_service.vendors import CREDENTIAL_MODE_NOTES, vendor_for
+from analysis_service.vendors import (
+    CREDENTIAL_MODE_NOTES,
+    VENDOR_SDKS,
+    VendorName,
+    missing_sdk,
+    vendor_for,
+)
 from webapp.page import (
     LOOPBACK_HOSTS,
     Grants,
@@ -657,6 +663,11 @@ def _vendor_sections(
     to ask for one — which is a network call on page render, and it reaches the
     instance metadata service. So this page says what the deployment declared
     and what the platform has to supply, and leaves the answer to a run.
+
+    The client library a vendor's provider needs is reported beside its
+    variables, from the same table the build-time gate reads. Without that row
+    the page would mark every variable "set" while the run still failed at bind
+    time, which is exactly the drift this section exists not to have.
     """
     env = os.environ if env is None else env
     if tiers is None:
@@ -680,9 +691,28 @@ def _vendor_sections(
             f"<h3>{escape(vendor)}</h3>\n"
             f"<p>Credential mode: <code>{escape(mode.value)}</code>. "
             f"{escape(CREDENTIAL_MODE_NOTES[mode])}</p>\n"
-            f"<ul>{items}</ul>"
+            f"<ul>{items}{_sdk_item(vendor)}</ul>"
         )
     return "\n".join(sections)
+
+
+def _sdk_item(vendor: VendorName) -> str:
+    """One row for the client library this vendor needs, or nothing.
+
+    A vendor whose provider needs no library gets no row: an empty statement
+    reads as a missing one, and the section is a list of what an operator has
+    to arrange.
+    """
+    sdk = VENDOR_SDKS[vendor]
+    if sdk is None:
+        return ""
+    installed = missing_sdk(vendor) is None
+    css_class, label = ("set", "installed") if installed else ("not", "NOT INSTALLED")
+    return (
+        f"<li><code>{escape(sdk.module)}</code> "
+        f'<span class="{css_class}">{label}</span> — '
+        f"<code>pip install analysis-service[{escape(sdk.extra)}]</code></li>"
+    )
 
 
 def _env_var_item(var: str, is_set: bool) -> str:

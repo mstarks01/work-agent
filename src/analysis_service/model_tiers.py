@@ -29,8 +29,9 @@ vendor is reached the same way, and none of them is what an operator gets by
 doing nothing.
 
 Loading fails closed. An unselected tier, an unknown tier, vendor or node name,
-a floating model identifier from the file or from an env var, a node missing
-from the mapping, or a config version other than :data:`SUPPORTED_VERSION`
+a floating model identifier from the file or from an env var, an undeclared
+credential mode for a vendor that allows more than one, a node missing from the
+mapping, or a config version other than :data:`SUPPORTED_VERSION`
 raises :class:`ModelConfigError` rather than degrading. There is no cross-tier
 fallback and no compatibility shim for other schema versions.
 """
@@ -60,9 +61,10 @@ from analysis_service.vendors import (
 # fails its own check rather than being migrated in place.
 #
 # Version 7 adds the ``[credentials]`` table: a deployment declares which
-# credential mode it uses for a vendor that allows more than one. No vendor
-# allows more than one today, so every shipped file leaves the table out — what
-# version 7 carries is the loader rule, not a new key anybody fills in.
+# credential mode it uses for a vendor that allows more than one. Bedrock is the
+# vendor that has the choice, so a file selecting it names a mode there or in
+# ``ANALYSIS_MODEL_CREDENTIALS_BEDROCK``. Every shipped file leaves the table
+# out, because no shipped file selects a vendor at all.
 SUPPORTED_VERSION = 7
 
 TierName = Literal["base", "strong", "review"]
@@ -140,6 +142,7 @@ def critic_pairing_issues(resolve_tier) -> list[str]:
 _ENV_PREFIX = "ANALYSIS_MODEL_"
 _VENDOR_FIELD = "VENDOR"
 _MODEL_FIELD = "MODEL"
+_CREDENTIALS_STEM = f"{_ENV_PREFIX}CREDENTIALS"
 
 
 class ModelConfigError(ConfigError):
@@ -150,6 +153,22 @@ def env_vars_for(tier: TierName) -> tuple[str, str]:
     """The ``(vendor, model)`` override vars for one tier."""
     stem = f"{_ENV_PREFIX}{tier.upper()}"
     return f"{stem}_{_VENDOR_FIELD}", f"{stem}_{_MODEL_FIELD}"
+
+
+def credentials_env_var_for(vendor: VendorName) -> str:
+    """The var declaring one vendor's credential mode.
+
+    Keyed by vendor and not by tier, exactly as the ``[credentials]`` table is:
+    a mode describes the deployment's relationship with a vendor, and a per-tier
+    variable could name two identities for one vendor in one process.
+
+    This exists so a deployment can select a multi-mode vendor from the
+    environment alone. Every other selection already moves that way — a tier's
+    vendor and model both do — and a credential mode that moved only in the file
+    would mean a container image had to be rebuilt to run the vendor it already
+    carries.
+    """
+    return f"{_CREDENTIALS_STEM}_{vendor.upper()}"
 
 
 def validate_model_string(value: str, vendor: VendorName, source: str) -> str:
@@ -197,12 +216,13 @@ class ModelTierConfig(BaseModel):
     #: relationship with a vendor, and a per-tier key could name two identities
     #: for one vendor in one process.
     #:
-    #: Empty in every shipped file, because every vendor in
-    #: :data:`~analysis_service.vendors.CREDENTIAL_MODES` allows exactly one
-    #: mode. :meth:`_credential_mode_problems` is what makes the table
+    #: Empty in every shipped file, because no shipped file selects a vendor.
+    #: :meth:`_credential_mode_problems` is what makes the table
     #: self-completing: a key for a single-mode vendor is an error, and a
     #: missing key for a multi-mode vendor is an error, so a vendor row that
     #: gains a second mode cannot ship without an operator declaring one.
+    #: :func:`credentials_env_var_for` names the variable that fills it from the
+    #: environment.
     credentials: dict[VendorName, CredentialMode] = Field(default_factory=dict)
     #: How far each framework's criticism must sit from its own analysis. No
     #: default: a deployment states it, because inheriting ``shared`` is how a
@@ -367,6 +387,11 @@ def _apply_env_overrides(raw: dict[str, object], env: Mapping[str, str]) -> None
     and there is no build-time existence check — so it would die on node one of
     a paid-for job instead.
 
+    ``ANALYSIS_MODEL_CREDENTIALS_{VENDOR}`` folds into the ``[credentials]``
+    table the same way, and the loader's own rules are what judge the result: a
+    declaration for a single-mode vendor is an error whether it arrived from the
+    file or from the environment, and so is a mode the vendor does not allow.
+
     An unrecognised ``ANALYSIS_MODEL_*`` variable also raises rather than being
     silently ignored while the tier quietly runs the file's model.
 
@@ -379,6 +404,7 @@ def _apply_env_overrides(raw: dict[str, object], env: Mapping[str, str]) -> None
     no deployment could configure itself from the environment alone.
     """
     known = {var for tier in TIER_NAMES for var in env_vars_for(tier)}
+    known |= {credentials_env_var_for(vendor) for vendor in VENDOR_NAMES}
     unknown = sorted(
         var for var in env if var.startswith(_ENV_PREFIX) and var not in known
     )
@@ -387,6 +413,8 @@ def _apply_env_overrides(raw: dict[str, object], env: Mapping[str, str]) -> None
             f"unrecognised model override(s): {unknown};"
             f" expected {sorted(known)} (schema version {SUPPORTED_VERSION})"
         )
+
+    _apply_credential_overrides(raw, env)
 
     tiers_raw = raw.setdefault("tiers", {})
     if not isinstance(tiers_raw, dict):
@@ -418,6 +446,32 @@ def _apply_env_overrides(raw: dict[str, object], env: Mapping[str, str]) -> None
             if not value.strip():
                 raise ModelConfigError(f"{var} is set but empty")
             table[var.rsplit("_", 1)[-1].lower()] = value.strip()
+
+
+def _apply_credential_overrides(raw: dict[str, object], env: Mapping[str, str]) -> None:
+    """Fold ``ANALYSIS_MODEL_CREDENTIALS_{VENDOR}`` into the raw table.
+
+    The value is written through unvalidated: pydantic rejects a mode outside
+    :class:`~analysis_service.vendors.CredentialMode`, and
+    :meth:`ModelTierConfig._credential_mode_problems` rejects one the vendor
+    does not allow. Judging it here would be a second reader of both rules.
+    """
+    declared = {
+        vendor: env[var]
+        for vendor in VENDOR_NAMES
+        if (var := credentials_env_var_for(vendor)) in env
+    }
+    if not declared:
+        return
+    table = raw.setdefault("credentials", {})
+    if not isinstance(table, dict):
+        raise ModelConfigError("credentials: not a table")
+    for vendor, mode in declared.items():
+        if not mode.strip():
+            raise ModelConfigError(
+                f"{credentials_env_var_for(vendor)} is set but empty"
+            )
+        table[vendor] = mode.strip()
 
 
 def tiers_in_use(nodes_raw: object) -> set[str]:

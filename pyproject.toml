@@ -51,8 +51,31 @@ dependencies = [
     "google-genai>=2.9",
 ]
 
+[project.optional-dependencies]
+# One vendor's client library, per ADR 0023: a vendor SDK is an optional extra,
+# so a deployment that never selects the vendor does not carry it. Bedrock is
+# the first vendor row whose provider needs one — litellm's Converse handler
+# resolves credentials through a bare `import boto3` under both of that
+# vendor's credential modes, so `botocore` alone is not enough.
+#
+# A range and not an exact pin. The reason `google-adk` and `litellm` carry one
+# — this service reads their APIs directly — does not apply: litellm is the
+# caller here and this project reads none of boto3's API. The range is copied
+# from litellm 1.97.0's own `proxy` extra, so a litellm bump has to re-read it.
+#
+# `boto3` is deliberately absent from `BUILD_DISTRIBUTIONS`. It signs a request
+# and never changes what a node answers, and `build_identity()` fails closed on
+# a distribution it cannot find — so naming it there would leave every install
+# without this extra unable to produce an execution identity at all.
+bedrock = ["boto3>=1.43.1,<2.0"]
+
 [dependency-groups]
 dev = [
+    # The project's own bedrock extra, named rather than re-specified: the
+    # offline conformance suite binds an adapter for **every** vendor, and a
+    # vendor whose client library were absent would be the one vendor that
+    # suite could not cover. One place states the version range.
+    "analysis-service[bedrock]",
     "httpx>=0.27",
     "mypy>=1.18",
     "pip-audit>=2.9",

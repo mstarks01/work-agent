@@ -9,7 +9,10 @@ to a call) and a per-vendor reasoning kwarg (#15 made the surface uniform).
 from __future__ import annotations
 
 import re
+import sys
+import tomllib
 from dataclasses import FrozenInstanceError
+from pathlib import Path
 from typing import ClassVar, get_args
 
 import pytest
@@ -22,16 +25,22 @@ from analysis_service.vendors import (
     CREDENTIAL_MODES,
     REASONING_KWARG,
     VENDOR_NAMES,
+    VENDOR_SDKS,
     CredentialMode,
     ProviderAuthError,
     ServedTrust,
     Vendor,
+    VendorSdkError,
     claude_generation,
     join_served,
+    missing_sdk,
     openai_reasoning_model,
+    require_sdk,
     vendor_for,
     vendor_for_route,
 )
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 API_KEY = "sk-test-not-a-real-key"
 
@@ -55,6 +64,71 @@ class TestRouting:
     def test_unknown_vendor_raises(self):
         with pytest.raises(ValueError, match="unknown vendor"):
             vendor_for("cohere")
+
+
+class TestVendorSdks:
+    """The client library a vendor's provider needs, as a table nobody may skip."""
+
+    def test_every_vendor_says_whether_it_needs_a_client_library(self):
+        # ``None`` is an answer and an absent key is not: a row that never
+        # answered would raise at ``missing_sdk`` on the first build that
+        # selected it, rather than here.
+        assert set(VENDOR_SDKS) == set(VENDOR_NAMES)
+
+    def test_every_extra_the_table_names_exists_in_pyproject(self):
+        """The table checked against the file that would install from it.
+
+        Two readers of one fact — the registry names an extra and packaging
+        defines one — so they are checked against each other rather than each
+        against its own expectation. An extra named here and absent there sends
+        an operator to an install command that fails.
+        """
+        pyproject = tomllib.loads(
+            (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+        )
+        defined = set(pyproject["project"].get("optional-dependencies", {}))
+        named = {sdk.extra for sdk in VENDOR_SDKS.values() if sdk is not None}
+        assert named <= defined, (
+            f"these extras are named by the registry and defined nowhere:"
+            f" {sorted(named - defined)}"
+        )
+
+    def test_a_vendor_that_needs_nothing_reports_nothing_missing(self):
+        for name in VENDOR_NAMES:
+            if VENDOR_SDKS[name] is None:
+                assert missing_sdk(name) is None
+                require_sdk(name)
+
+    def test_an_absent_library_fails_closed_naming_the_extra(self, monkeypatch):
+        """The gate, driven with the module hidden rather than uninstalled.
+
+        The dev environment installs the extra, because the offline conformance
+        suite binds an adapter for every vendor. So the absent case is reached
+        by making the probe answer the way it would on an image without it,
+        which is the same call the gate makes.
+        """
+        monkeypatch.setattr(
+            "analysis_service.vendors.importlib.util.find_spec", lambda name: None
+        )
+        with pytest.raises(VendorSdkError) as raised:
+            require_sdk("bedrock")
+        message = str(raised.value)
+        assert "boto3" in message
+        assert "analysis-service[bedrock]" in message
+
+    def test_the_probe_never_imports_the_library(self, monkeypatch):
+        """Asking whether a library is there must not pull it in.
+
+        Two costs, and the first is why the rule exists.
+        ``tests/test_identity.py`` asserts that every module ``src/`` imports is
+        declared in ``project.dependencies``, so an ``import boto3`` here would
+        turn an optional extra into a hard dependency of the wheel. The second
+        is the diagnostic page, which calls this on every render and must not
+        pay a vendor SDK's import for it.
+        """
+        monkeypatch.delitem(sys.modules, "boto3", raising=False)
+        assert missing_sdk("bedrock") is None
+        assert "boto3" not in sys.modules
 
 
 class TestCredentialModes:
@@ -93,6 +167,40 @@ class TestCredentialModes:
     def test_the_key_var_is_vendor_scoped(self):
         assert vendor_for("anthropic").api_key_var == "ANALYSIS_ANTHROPIC_API_KEY"
         assert vendor_for("openai").api_key_var == "ANALYSIS_OPENAI_API_KEY"
+
+    def test_a_vendor_with_a_choice_refuses_to_answer_for_the_deployment(self):
+        """A caller that never learned about the choice must not make it.
+
+        Picking the first entry here would let a build authenticate under a
+        mode nobody declared. The config is what holds the answer, and this
+        raise is what sends the caller there.
+        """
+        with pytest.raises(ValueError, match="allows 2 credential modes"):
+            _ = vendor_for("bedrock").sole_credential_mode
+
+    def test_the_multi_mode_vendor_reads_its_own_variables_per_mode(self):
+        """Each mode names what it needs and nothing else.
+
+        The region is required under both, and is a credential under neither.
+        The key mode adds the bearer; the platform-identity mode adds nothing,
+        which is what lets the vendor's SDK resolve an identity of its own.
+        """
+        bedrock = vendor_for("bedrock")
+        env = {
+            "ANALYSIS_BEDROCK_API_KEY": API_KEY,
+            "ANALYSIS_BEDROCK_REGION": "us-east-1",
+        }
+        assert bedrock.credential_kwargs(env, CredentialMode.API_KEY) == {
+            "api_key": API_KEY,
+            "aws_region_name": "us-east-1",
+        }
+        assert bedrock.credential_kwargs(env, CredentialMode.IAM) == {
+            "aws_region_name": "us-east-1",
+        }
+        assert bedrock.secret_env_vars(CredentialMode.API_KEY) == (
+            "ANALYSIS_BEDROCK_API_KEY",
+        )
+        assert bedrock.secret_env_vars(CredentialMode.IAM) == ()
 
     def test_a_mode_a_vendor_does_not_allow_raises(self):
         with pytest.raises(ValueError, match="no 'api_key' credential mode"):
@@ -303,11 +411,20 @@ class TestPinnedFormRule:
         # API — Google Cloud spells 4.6-and-later identically.
         assert vertex.validate_model("claude-opus-5", source="t")
 
-    #: One identifier, one verdict, whatever vendor names it. A **family** rule
-    #: follows the family, so moving a tier between vendors must not change
-    #: which identifiers are legal. The dated and pre-4.6 forms are the cases
-    #: that decide it: they were refused on ``vertex`` and ``anthropic`` and
-    #: accepted on ``openai``, because that row listed the catch-all alone.
+    #: The vendors that spell the Claude family the bare way. A **family** rule
+    #: follows the family, so moving a tier between any two of these must not
+    #: change which identifiers are legal. The dated and pre-4.6 forms are the
+    #: cases that decide it: they were refused on ``vertex`` and ``anthropic``
+    #: and accepted on ``openai``, because that row listed the catch-all alone.
+    #:
+    #: Derived rather than listed, so a vendor row added tomorrow lands in one
+    #: of the two groups instead of in neither.
+    BARE_SPELLING: ClassVar[tuple[str, ...]] = tuple(
+        name for name in VENDOR_NAMES if name != "bedrock"
+    )
+
+    #: One identifier, one verdict, on every vendor that spells the family this
+    #: way.
     CLAUDE_VERDICTS: ClassVar[dict[str, bool]] = {
         "claude-opus-5": True,
         "claude-sonnet-4-6": True,
@@ -325,7 +442,7 @@ class TestPinnedFormRule:
         "claude-3-7-sonnet": False,
     }
 
-    @pytest.mark.parametrize("name", VENDOR_NAMES)
+    @pytest.mark.parametrize("name", BARE_SPELLING)
     @pytest.mark.parametrize(("model", "accepted"), sorted(CLAUDE_VERDICTS.items()))
     def test_a_claude_gets_one_verdict_whatever_vendor_names_it(
         self, name, model, accepted
@@ -345,6 +462,107 @@ class TestPinnedFormRule:
         else:
             with pytest.raises(ValueError):
                 vendor.validate_model(model, source="t")
+
+    @pytest.mark.parametrize(
+        "model", sorted(name for name, ok in CLAUDE_VERDICTS.items() if ok)
+    )
+    def test_every_pinned_claude_is_pinned_under_the_bedrock_spelling(self, model):
+        """Moving a Claude tier onto Bedrock changes the spelling and nothing else.
+
+        The portability property, and the half that must hold both ways: every
+        identifier the bare-spelling vendors pin is pinned there too, once the
+        family segment is in front of it.
+
+        The refusals are **not** mirrored, and that is a decision rather than a
+        gap. A dated form is refused where the vendor also serves the bare name
+        as a floating alias, because the two cannot be told apart; Bedrock
+        serves no such alias, so the same date is a published build there. That
+        is a property of the catalogue, and the cases sit below.
+        """
+        vendor = vendor_for("bedrock")
+        scoped = f"anthropic.{model}"
+        assert vendor.validate_model(scoped, source="t") == scoped
+
+    @pytest.mark.parametrize(
+        "model",
+        [
+            # The bare spelling, which is what a config copying an
+            # anthropic-direct tier row into the bedrock row produces. It meets
+            # the broad family and fails the strict shape, rather than passing
+            # unpinned through the catch-all.
+            "claude-opus-5",
+            "claude-sonnet-4-5-20250929-v1:0",
+            # Vertex's ``@date`` spelling, on one key against 148.
+            "anthropic.claude-haiku-4-5@20251001",
+            # The 2023 names, which carry no family name and generation.
+            "anthropic.claude-v1",
+            "anthropic.claude-v2:1",
+            "anthropic.claude-instant-v1",
+        ],
+    )
+    def test_a_bedrock_claude_outside_the_shape_is_refused(self, model):
+        with pytest.raises(ValueError):
+            vendor_for("bedrock").validate_model(model, source="t")
+
+    @pytest.mark.parametrize(
+        "model",
+        [
+            # A scope is matched as a shape and never enumerated: the pinned
+            # map carries seven, one of them hyphenated and one naming no
+            # region at all.
+            "us.anthropic.claude-opus-5",
+            "us-gov.anthropic.claude-sonnet-4-6",
+            "global.anthropic.claude-opus-5",
+            # A date passes here and nowhere else, because Bedrock serves no
+            # bare alias the dated form could be confused with.
+            "anthropic.claude-sonnet-4-5-20250929-v1:0",
+            "eu.anthropic.claude-3-5-sonnet-20241022-v2:0",
+            # A build tail is part of the canonical AWS identifier.
+            "anthropic.claude-opus-4-6-v1",
+        ],
+    )
+    def test_a_bedrock_claude_in_the_shape_is_pinned(self, model):
+        assert vendor_for("bedrock").validate_model(model, source="t") == model
+
+    @pytest.mark.parametrize("name", VENDOR_NAMES)
+    @pytest.mark.parametrize(
+        "model",
+        [
+            # A provisioned-throughput ARN, and an inference profile naming a
+            # family that has no shape rule at all.
+            "arn:aws:bedrock:us-east-1:123456789012:provisioned-model/abc",
+            "arn:aws:bedrock:us-east-1:123456789012:inference-profile/nova",
+        ],
+    )
+    def test_an_identifier_naming_a_resource_is_refused_on_every_vendor(
+        self, name, model
+    ):
+        """A resource is not a build, and the rule follows that rather than AWS.
+
+        Refused for every vendor, and outside the Claude shape, because both
+        reasons are properties of a resource identifier: it can be repointed at
+        other weights, so a blessed fingerprint would go on certifying it, and
+        it carries the account that owns it into a fingerprint and a report.
+        A rule that lived in the Claude shape would leave a Nova ARN accepted.
+        """
+        with pytest.raises(ValueError, match="cloud resource"):
+            vendor_for(name).validate_model(model, source="t")
+
+    @pytest.mark.parametrize(
+        "model",
+        [
+            # Everything else Bedrock serves reaches the catch-all, scope and
+            # all, where only the shared denylist applies.
+            "amazon.nova-pro-v1:0",
+            "us.amazon.nova-pro-v1:0",
+            "meta.llama3-70b-instruct-v1:0",
+            "mistral.mistral-large-2407-v1:0",
+        ],
+    )
+    def test_a_bedrock_model_outside_the_claude_family_reaches_the_catch_all(
+        self, model
+    ):
+        assert vendor_for("bedrock").validate_model(model, source="t") == model
 
     @pytest.mark.parametrize("name", ["anthropic", "vertex"])
     @pytest.mark.parametrize(
@@ -384,10 +602,15 @@ class TestPinnedFormRule:
         ``claude_generation`` returned ``(4, 20250514)`` — so the build-time
         sampling rule read a generation far above its floor and refused
         ``temperature`` on a Claude 4.0, which accepts it.
+
+        The two answers are separate on purpose. These vendors refuse the dated
+        *shape*, and the parse still reads the generation the identifier names,
+        because a date is not part of a version — the same identifier reaches
+        the parse from Bedrock, where the shape is legal.
         """
         with pytest.raises(ValueError, match="not pinned"):
             vendor_for(name).validate_model(model, source="t")
-        assert claude_generation(model) is None
+        assert claude_generation(model) == (4, 0)
 
     @pytest.mark.parametrize(
         ("model", "generation"),

@@ -49,9 +49,9 @@
 # shape where the vendor publishes one. Claude is the family that does: from 4.6
 # on, the identifier is dateless and carries the whole version
 # (`claude-opus-5`, `claude-sonnet-4-6`), it is a pinned snapshot rather than an
-# alias, and Vertex spells it the same way. This service runs Claude 4.6 and
-# later only; the pre-4.6 dated forms are rejected outright rather than
-# supported alongside.
+# alias, and Vertex spells it the same way. Bedrock spells the same family
+# `[<scope>.]anthropic.claude-...`, with an optional date and build tail, and
+# accepts the dated forms because it serves no bare alias to confuse them with.
 #
 # Pinning is a proxy, not the guarantee: the reproducibility guarantee is the
 # *served* build read back from every response and recorded per node execution.
@@ -60,7 +60,8 @@
 # enumerating builds is what keeps the Claude half from repeating that.
 #
 # ENV OVERRIDES are two vars per tier: ANALYSIS_MODEL_{BASE,STRONG}_VENDOR and
-# _MODEL. `_MODEL` alone is the ops case (retune on a deployed revision without
+# _MODEL, plus ANALYSIS_MODEL_CREDENTIALS_{VENDOR} for the [credentials] table
+# below. `_MODEL` alone is the ops case (retune on a deployed revision without
 # an image rebuild). `_VENDOR` alone is a build-time error — a cross-vendor pair
 # like anthropic + gemini-2.5-pro passes every downstream check and would die on
 # node one of a paid-for job. Any unrecognised ANALYSIS_MODEL_* var also raises,
@@ -72,7 +73,7 @@
 # default" true of the *mechanism* while the values said otherwise — the vendor
 # you got by doing nothing was Google's. Both tier tables are now absent, so a
 # run that has not chosen stops and says so rather than reaching a vendor nobody
-# picked. The three vendors are reached through one adapter and differ only in
+# picked. Every vendor is reached through one adapter and they differ only in
 # the credential mode each implies; none is cheaper to select than the others.
 
 version = 7
@@ -111,16 +112,26 @@ review_independence = "shared"
 # through each vendor's credentials; docs/Configuration.md has the rules.
 #
 # [tiers.base]
-# vendor = "<vertex|anthropic|openai>"
+# vendor = "<vertex|anthropic|openai|bedrock>"
 # model = "<model>"
 #
 # [tiers.strong]
-# vendor = "<vertex|anthropic|openai>"
+# vendor = "<vertex|anthropic|openai|bedrock>"
 # model = "<model>"
 #
 # [tiers.review]
-# vendor = "<vertex|anthropic|openai>"
+# vendor = "<vertex|anthropic|openai|bedrock>"
 # model = "<model>"
+#
+# A VENDOR THAT ALLOWS MORE THAN ONE CREDENTIAL MODE declares which one this
+# deployment uses, here or in ANALYSIS_MODEL_CREDENTIALS_{VENDOR}. Bedrock is
+# the one that does, and a missing declaration is a load error naming it:
+#
+# [credentials]
+# bedrock = "<api_key|iam>"
+#
+# A key for a vendor that allows a single mode is also an error, because there
+# is nothing to choose.
 #
 # `review` is NOT required while `review_independence = "shared"` leaves the
 # node map pointing criticism at `strong`, because nothing runs on it and the
@@ -141,6 +152,8 @@ review_independence = "shared"
 # profiles (src/analysis_service/conformance.py):
 #
 #   anthropic   base "claude-sonnet-4-6"     strong "claude-opus-5"
+#   bedrock     base "anthropic.claude-sonnet-4-6"
+#               strong "anthropic.claude-opus-5"
 #   openai      base "gpt-4o"                strong "gpt-5.6"
 #   vertex      base "gemini-2.5-flash"      strong "gemini-2.5-pro"
 #
@@ -162,6 +175,10 @@ review_independence = "shared"
 # The three tiers select independently, so a mixed set — a cheap workhorse from
 # one vendor, judgement from another, review from a third — is ordinary rather
 # than a special case.
+#
+# BEDROCK NEEDS ITS CLIENT LIBRARY IN THE IMAGE: `pip install
+# analysis-service[bedrock]`. The build refuses to bind a Bedrock tier without
+# it, and names the extra.
 
 [nodes]
 extract = "base"

@@ -272,8 +272,14 @@ class TestTheTableMatchesWhatTheTranslatorDoes:
     SERVED = "served-build-002"
 
     #: One canned provider response per vendor, in that vendor's own wire
-    #: shape, each naming :attr:`SERVED` where its API carries a model name.
-    #: Keyed by vendor, so a fourth row cannot be added without answering here.
+    #: shape, naming :attr:`SERVED` where that API carries a model name. Keyed
+    #: by vendor, so a row cannot be added without answering here.
+    #:
+    #: The Bedrock body names it nowhere, and that absence is the fact: a
+    #: Converse response carries no model identifier at all, so there is no
+    #: field a translator could read and the served half can only echo the
+    #: request. A body that invented one would test a wire shape AWS does not
+    #: send.
     BODIES: ClassVar[dict[str, dict]] = {
         "vertex": {
             "candidates": [
@@ -313,6 +319,12 @@ class TestTheTableMatchesWhatTheTranslatorDoes:
                 }
             ],
             "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+        },
+        "bedrock": {
+            "output": {"message": {"role": "assistant", "content": [{"text": "hi"}]}},
+            "stopReason": "end_turn",
+            "usage": {"inputTokens": 1, "outputTokens": 1, "totalTokens": 2},
+            "metrics": {"latencyMs": 1},
         },
     }
 

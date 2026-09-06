@@ -108,8 +108,8 @@ Where the config itself read cleanly — the credential and sampling cases — t
 page names the vendor your config selects, states the credential mode that
 vendor runs under, and lists **every** environment variable that vendor needs,
 marking the ones that are unset. It reports presence only and never prints a
-value. Vertex is shown because it needs the most variables of the three vendors,
-which is what makes the next point visible:
+value. Vertex is shown because it needs more variables than most, which is what
+makes the next point visible:
 
 ```
 vertex
@@ -120,6 +120,10 @@ this process runs in.
 ANALYSIS_VERTEX_PROJECT   NOT SET
 ANALYSIS_VERTEX_LOCATION  NOT SET
 ```
+
+A vendor whose provider needs a client library gets a row for that too, naming
+the extra that installs it. Without it the page would mark every variable set
+while the run still failed to bind.
 
 All of them at once, rather than one per restart — the underlying check raises on
 the first variable it finds missing, which would otherwise mean two restarts to
