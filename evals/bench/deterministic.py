@@ -17,10 +17,20 @@ Every timing is :func:`time.thread_time`, which is the clock the bounds in
 :mod:`analysis_service.grounding` are written against — node bodies run on a
 worker pool, and wall-clock on one of eight threads measures the other seven.
 
-**What it does not cover**, so nobody reads more into a green run than is there:
-worker-queue wait, report serialization, and the per-framework split between a
-STRIDE-only, an ASVS-only and a combined job. Those are named in #627's
-measurement section and are not measured here.
+**What the numbers say, so nobody optimises this layer again without reading
+it.** The ``pipeline`` case measures a whole scripted job. The deterministic
+bodies cost 4 ms of CPU on a STRIDE-only run and 47 ms on one carrying ASVS,
+and serializing the analysis costs 0.2 ms. A real job spends seconds per node
+waiting for a provider, so this layer is a rounding error on job latency —
+*except* in one place. Fuzzy quote repair is the only part whose cost is set by
+submitted text rather than by the model, which is why it carries three separate
+bounds and why it is the one thing here worth tuning.
+
+A node's recorded ``duration_ms`` runs about 1.3x to 2.5x its body's own wall
+time,
+because it starts when the node's last predecessor finished rather than when
+the body did. #627 warned about reading it as a CPU timing; that is the size of
+the error.
 
 Run it::
 
@@ -38,22 +48,34 @@ the file is identical rather than assume it.
 from __future__ import annotations
 
 import argparse
+import asyncio
+import contextlib
 import functools
 import json
 import random
 import sys
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from pathlib import Path
+from typing import Any, get_args
 
-from analysis_service import evidence
+from google.adk.workflow import FunctionNode
+
+from analysis_service import evidence, graph
 from analysis_service.critic import (
     _bound_element_references,
     _verify_quotes,
     duplicate_groups,
 )
+from analysis_service.execution import GraphExecutor
+from analysis_service.frameworks import (
+    PACKAGES,
+    FrameworkName,
+    FrameworkPackage,
+)
 from analysis_service.grounding import PreparedSource, prepare_source
 from analysis_service.report import Ground
+from analysis_service.sources import Source
 from analysis_service.system_model import ModelIndex, SystemModel
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -332,6 +354,186 @@ def case_catalog() -> None:
         )
 
 
+@contextlib.contextmanager
+def _timed_node_bodies() -> Iterator[dict[str, list[tuple[float, float]]]]:
+    """Record each deterministic node body's wall and CPU time, by node name.
+
+    The wrapper goes on the body *before* ``graph._node`` offloads it, so the
+    pair brackets exactly the synchronous call that runs on the worker thread.
+    The await around it is where the pool queue wait lives, and that is the
+    quantity this is here to separate out — a node's recorded ``duration_ms``
+    runs from its last predecessor finishing to its output being observed, so it
+    carries the wait, the body and the driver's own lag together.
+
+    Patching a private name is a benchmark's licence and not a pattern: it
+    composes with ``_node`` rather than restating it, so the wrapper this
+    measures is the shipped one. LLM nodes do not go through ``_node``, which is
+    why only the deterministic bodies appear here — and they are the subject.
+    """
+    recorded: dict[str, list[tuple[float, float]]] = {}
+    real_node = graph._node
+
+    def instrumented(func: Callable[..., Any], name: str) -> FunctionNode:
+        @functools.wraps(func)
+        def timed(**kwargs: Any) -> Any:
+            wall, cpu = time.perf_counter(), time.thread_time()
+            try:
+                return func(**kwargs)
+            finally:
+                recorded.setdefault(name, []).append(
+                    (time.perf_counter() - wall, time.thread_time() - cpu)
+                )
+
+        return real_node(timed, name)
+
+    graph._node = instrumented
+    try:
+        yield recorded
+    finally:
+        graph._node = real_node
+
+
+def _scripted_replies(frameworks: tuple[FrameworkName, ...]) -> dict[str, str]:
+    """One reply per LLM node: a valid model, and every lane finding nothing.
+
+    A lane that emits an empty claim set is a lane that ran and found nothing,
+    which the fan-in accepts. So this drives the whole topology — every lane,
+    every critic, the fan-in and assembly — while carrying no claims.
+
+    That is the case's scope and its limit. It measures what the *shape* of a
+    selection costs, which is what the split is about. What a claim costs is
+    what the other cases measure, over the model and the sources directly.
+    """
+    from tests.factories import valid_model
+
+    replies = {"extract": valid_model().model_dump_json()}
+    for name in frameworks:
+        nodes = graph.FrameworkNodes(name)
+        for lane in nodes.lanes:
+            replies[lane.node_name] = '{"claims": []}'
+        replies[nodes.node(graph.CRITIC_ROLE)] = '{"claims": []}'
+    return replies
+
+
+def _minimal_options(package: FrameworkPackage) -> dict[str, Any]:
+    """The smallest options one package's own model accepts.
+
+    A driver seeds a package's options per run and no package field carries a
+    default, so anything that drives the graph has to produce them. Read off the
+    package's own model rather than written down per package, so a package added
+    tomorrow needs no edit here.
+
+    A required field this cannot pick a value from raises rather than being
+    skipped or guessed at. The absent default exists to stop a value being
+    invented, and a benchmark is not the place to start.
+    """
+    chosen: dict[str, Any] = {}
+    for field, info in package.options.model_fields.items():
+        if not info.is_required():
+            continue
+        allowed = get_args(info.annotation)
+        if not allowed:
+            raise TypeError(
+                f"package {package.name!r} requires option {field!r}, and this"
+                f" benchmark cannot pick a value from {info.annotation!r}"
+            )
+        chosen[field] = allowed[0]
+    return chosen
+
+
+def _selections() -> list[tuple[FrameworkName, ...]]:
+    """Each package alone, then every package together.
+
+    Read from the registry, so a package added tomorrow brings two rows with it
+    and needs no edit: its own selection, and its place in the combined one.
+    """
+    every = tuple(sorted(PACKAGES))
+    return [(name,) for name in every] + ([every] if len(every) > 1 else [])
+
+
+def case_pipeline() -> None:
+    """Where a scripted job's deterministic time goes, by framework selection.
+
+    The three things #627's measurement section named and #628 did not measure:
+    the wait a node body spends in the pool queue against the CPU it then
+    spends, the report serialization, and the STRIDE-only / ASVS-only / combined
+    split.
+
+    **Every model is scripted, so the LLM time is about zero.** That is what
+    makes the deterministic layer visible at all, and it is equally why no
+    figure here is a production latency: a real job spends most of its wall
+    clock waiting for providers, and none of that appears below.
+
+    ``queue+lag`` is what a node's recorded ``duration_ms`` holds that its body
+    did not spend: the pool wait, plus the driver's own gap between a node
+    finishing and its output being observed. #627 warned that the recorded
+    figure is not an isolated CPU timing, and this is how far apart the two run.
+    """
+    from tests.factories import DESCRIPTION_TEXT, scripted_pipeline
+
+    for frameworks in _selections():
+        seeded = {name: _minimal_options(PACKAGES[name]) for name in frameworks}
+        with _timed_node_bodies() as bodies:
+            pipeline, _ = scripted_pipeline(
+                _scripted_replies(frameworks), frameworks=list(frameworks)
+            )
+
+            async def drive(built=pipeline, seeded=seeded):
+                executor = GraphExecutor(built, app_name="bench")
+                return await executor.run(
+                    [Source.description(DESCRIPTION_TEXT)],
+                    user_id="bench",
+                    extra_state={graph.STATE_FRAMEWORK_OPTIONS: seeded},
+                )
+
+            started = time.perf_counter()
+            run = asyncio.run(drive())
+            wall = time.perf_counter() - started
+
+        body_wall = sum(w for runs in bodies.values() for w, _ in runs)
+        body_cpu = sum(c for runs in bodies.values() for _, c in runs)
+        # Only the nodes this instrumented, so the comparison below is over one
+        # set. ``node_runs`` carries the LLM nodes too, and an LLM node's body
+        # never reaches ``_node``. Their durations are deliberately not summed:
+        # concurrent branches each count their own span, so the total swung
+        # between 0.9 s and 3.3 s run to run and measured the scheduler.
+        deterministic = (
+            sum(node.duration_ms for node in run.node_runs if node.node in bodies)
+            / 1000
+        )
+        analysis = graph.Analysis.from_state(run.final_state[graph.STATE_ANALYSIS])
+
+        # ``to_state`` plus a JSON dump is the serialization the graph actually
+        # pays: ``assemble`` writes exactly this into the session, and a driver
+        # reads it back. The envelope a job wraps around it is the runner's.
+        serialize_started = time.perf_counter()
+        for _ in range(20):
+            payload = json.dumps(analysis.to_state())
+        serialize = (time.perf_counter() - serialize_started) / 20
+
+        print(
+            f"  {'+'.join(frameworks):<14} {len(run.node_runs):3d} node runs"
+            f" ({len(bodies)} deterministic)"
+        )
+        print(f"      run wall                 {wall * 1000:8.1f} ms")
+        print(
+            f"      deterministic body       {body_cpu * 1000:8.1f} ms CPU"
+            f" / {body_wall * 1000:6.1f} ms wall"
+        )
+        print(
+            f"      ...as duration_ms says   {deterministic * 1000:8.1f} ms"
+            f"   ({deterministic / max(body_wall, 1e-9):.1f}x the body)"
+        )
+        print(
+            f"      body share of run wall   {body_wall / wall:8.0%}"
+            f"   (LLM nodes are scripted, so a real job's share is far smaller)"
+        )
+        print(
+            f"      serialize analysis       {serialize * 1000:8.1f} ms"
+            f"  ({len(payload):,} bytes)"
+        )
+
+
 def repaired_spans() -> list[list]:
     """Every repaired span the corpus sources produce, as comparable rows.
 
@@ -369,6 +571,7 @@ CASES: dict[str, Callable[[], None]] = {
     "retention": case_retention,
     "index": case_index,
     "catalog": case_catalog,
+    "pipeline": case_pipeline,
 }
 
 

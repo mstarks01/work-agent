@@ -129,9 +129,23 @@ evals/
 ## The benchmarks
 
 `bench/deterministic.py` measures the deterministic layer — quote repair, the
-model index, report assembly, the evidence catalog — with no model call and no
-credential. It exists because three merged changes carry timings in their commit
-messages, and a number nobody can re-derive is a number nobody can check.
+model index, report assembly, the evidence catalog, and a whole scripted job —
+with no model call and no credential. It exists because three merged changes
+carry timings in their commit messages, and a number nobody can re-derive is a
+number nobody can check.
+
+**What it found, which is worth reading before optimising this layer again.**
+The deterministic bodies of a whole scripted job cost about 3 ms of CPU on a
+STRIDE-only selection and about 48 ms on one carrying ASVS. Serializing the
+analysis costs 0.2 ms. A real job waits seconds per node on a provider, so this
+layer is a rounding error on job latency — with one exception. Fuzzy quote
+repair is the only part whose cost is set by *submitted text* rather than by the
+model, which is why it carries three separate bounds and why it is the part
+worth tuning.
+
+A node's recorded `duration_ms` runs about 1.3x to 2.5x its own body's wall
+time, because it starts when that node's last predecessor finished. Do not read
+it as a CPU timing.
 
 ```sh
 uv run python -m evals.bench.deterministic              # every case
