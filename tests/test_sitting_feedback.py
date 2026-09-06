@@ -8,8 +8,8 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from evals import review_submission as review_submissions
 from evals.harness import envelope as envelopes
-from evals.harness import review_submission as review_submissions
 from evals.harness import sitting as sittings
 from webapp import sitting
 from webapp.page import client_script
@@ -278,3 +278,13 @@ def test_submitted_case_remains_clickable_as_read_only(tmp_path: Path):
     assert "a spoofed device" in body["document"]
     assert client.get(f"/api/part-one?case={CASE}").status_code == 404
     assert "openReadOnly(row.case)" in client_script("sitting.js")
+
+
+def test_every_rail_state_has_a_label():
+    """The page reads the label off the server, so the table answers for
+    every state the rail can carry."""
+    from typing import get_args
+
+    from webapp.sitting import REVIEW_LABELS
+
+    assert set(REVIEW_LABELS) == set(get_args(sittings.RowState))
