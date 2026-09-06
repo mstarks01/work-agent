@@ -51,51 +51,8 @@ class ContributionChoice(BaseModel):
     author: str | None = Field(default=None, max_length=64)
 
 
-class Session(base.Session):
-    """The base review session plus merged JSON-review status."""
-
-    def refresh(self) -> tuple[sittings.Row, ...]:
-        rows = super().refresh()
-        signatures = review_submissions.clearing_signatures(self.root)
-        adjusted: list[sittings.Row] = []
-        for row in rows:
-            signature = signatures.get(row.case_id)
-            if signature is not None and row.state == "todo":
-                adjusted.append(
-                    sittings.Row(
-                        case_id=row.case_id,
-                        number=row.number,
-                        title=row.title,
-                        status=f"reviewed by {signature}",
-                        state="signed",
-                        pressable=False,
-                    )
-                )
-            else:
-                adjusted.append(row)
-        self.rows = tuple(adjusted)
-        return self.rows
-
-
-def build_session(
-    root: Path,
-    submitted_by: str,
-    submitted_for: str | None = None,
-    case: str | None = None,
-    can_submit: bool = False,
-    drafts: Path | None = None,
-) -> Session:
-    """This surface's session: the base one, built around the merged status."""
-    session = base.build_session(
-        root,
-        submitted_by,
-        submitted_for,
-        case,
-        can_submit,
-        drafts,
-        session_type=Session,
-    )
-    return session
+build_session = base.build_session
+Session = base.Session
 
 
 def _status_for(session: Session, row: sittings.Row) -> str:
@@ -225,49 +182,29 @@ def _read_only_payload(session: Session, case_id: str) -> dict[str, object]:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     merged = review_submissions.current_for_case(session.root, case_id)
-    if merged is not None:
-        text = sittings.document(
-            prepared,
-            merged.answers.own_list,
-            merged.answers.marks,
-            merged.answers.missing,
-            merged.answers.notes,
-            merged.envelope.submitted_by,
-            merged.envelope.submitted_for,
-            "the review page",
-        )
-        return {
-            "case": case_id,
-            "title": prepared.title,
-            "blocks": prepared.part_one_blocks,
-            "document": _display_document(text),
-            "reviewed_by": merged.signature,
-            "date": merged.envelope.generated,
-        }
-
-    case = sittings.load_case(session.corpus_dir / case_id)
-    recorded = next(
-        (
-            item
-            for item in reversed(case.meta.reviews)
-            if sittings.clears(case, item, session.roster, session.corpus_dir)
-        ),
-        None,
-    )
-    if recorded is None:
+    if merged is None:
         raise HTTPException(status_code=404, detail="that case has no locked review")
-    document = session.corpus_dir / case_id / recorded.document
-    try:
-        text = document.read_text(encoding="utf-8")
-    except OSError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    # Rendered from the submission rather than read from a committed file: the
+    # submission is the whole record, so the document a reader sees here and
+    # the document the reader wrote are one derivation of one set of answers.
+    text = sittings.document(
+        prepared,
+        merged.answers.own_list,
+        merged.answers.marks,
+        merged.answers.missing,
+        merged.answers.notes,
+        merged.envelope.submitted_by,
+        merged.envelope.submitted_for,
+        "the review page",
+    )
     return {
         "case": case_id,
         "title": prepared.title,
         "blocks": prepared.part_one_blocks,
         "document": _display_document(text),
-        "reviewed_by": sittings.naming(recorded.submitted_by, recorded.submitted_for),
-        "date": recorded.date,
+        "reviewed_by": merged.signature,
+        "date": merged.envelope.generated,
     }
 
 
@@ -415,7 +352,6 @@ ul.terms { list-style:none; padding:0; }.rec { border-left:3px solid #8886; }.fi
 </main>
 <script nonce="__CSP_NONCE__">
 const TOKEN = <!--token-->;
-const CAN_SUBMIT = <!--cansubmit-->;
 const MIN_OWN_LIST = <!--minownlist-->;
 </script>
 <script nonce="__CSP_NONCE__"><!--script--></script></body></html>
@@ -536,7 +472,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 1
     try:
-        session = build_session(root, submitted_by, submitted_for, args.case, False)
+        session = build_session(root, submitted_by, submitted_for, args.case)
     except CorpusError as exc:
         print(corpus_refusal(exc), file=sys.stderr)
         return 1

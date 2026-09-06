@@ -447,49 +447,6 @@ def is_submitted_for(value: str) -> bool:
     )
 
 
-class CaseSitting(BaseModel):
-    """One **Case Sitting**: who read this case, who carries it, and which bytes.
-
-    ``evals/BLESSING.md`` step 6 is one reading session over ``source.md``, the
-    model and every reference set together. Until an entry exists on a case,
-    nobody has done it — and the corpus shipped 13 cases in that state, which is
-    how a reference claim asserting a fact its own model does not hold survived
-    to review sitting 01. ``tests/test_case_review.py`` names every case still
-    waiting and fails on a new one that arrives without an entry.
-
-    **Two names, because they answer two questions.** ``submitted_by`` is the
-    GitHub login of the account whose PR carries the sitting — the accountable
-    half, bound to the authenticated login and checked by CI, and the only one
-    the roster, the **Standing** and :func:`~evals.harness.sitting.clears` ever
-    read. ``submitted_for`` is who did the reading. It equals ``submitted_by``
-    where a person reads their own case, and it is :data:`ANONYMOUS` where an
-    account submits for a reader whose own policy stops them taking part under
-    their name.
-
-    That split is what makes the record true in both shapes. One name forced a
-    proxied read into one of two lies: the submitter signs words they did not
-    write, or the read disappears.
-
-    ``document`` names the filled ``REVIEW-<login>.md`` committed beside the
-    case, under ``submitted_by``'s login, because that is the account whose
-    submission may write it.
-    """
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    #: The account that carries the sitting. Accountability lives here alone.
-    submitted_by: str = Field(pattern=rf"^{_LOGIN}$", max_length=MAX_NAME)
-    #: Who read the case: a login, or :data:`ANONYMOUS`. It is provenance and
-    #: never authority — a value here clears no case and carries no standing,
-    #: so no rule has to ask whether the name behind it is real.
-    submitted_for: str = Field(pattern=SUBMITTED_FOR_PATTERN, max_length=MAX_NAME)
-    #: ISO date. A sitting is a dated event; the reference set moves under it.
-    date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
-    read: list[ReadRecord] = Field(min_length=1)
-    document: str = Field(min_length=1)
-    notes: str = ""
-
-
 class CaseMetadata(BaseModel):
     """``case.json``: what the case is, where it came from, and who grades it."""
 
@@ -506,12 +463,6 @@ class CaseMetadata(BaseModel):
     # Non-empty: a case no framework grades is a case that scores nothing, and
     # a corpus quietly carrying one lowers no denominator visibly.
     frameworks: list[CaseFramework] = Field(min_length=1)
-    #: Every Case Sitting this case has had, oldest first, append-only — a
-    #: re-read is a new entry, never an edit (#327). Empty until a person
-    #: reads the case: the 13 cases that shipped unread are real, and a
-    #: required entry would make them unloadable rather than visibly
-    #: unreviewed.
-    reviews: list[CaseSitting] = Field(default_factory=list)
     notes: str = ""
 
 

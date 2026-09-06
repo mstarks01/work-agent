@@ -1,27 +1,28 @@
-"""Holding a **Case Sitting**: what it reads, and what it writes when it ends.
+"""Holding a **Case Sitting**: what it reads, and what a reader may say about it.
 
 The act is #327's, and ``evals/BLESSING.md`` step 6 is the method. This module
 is the part a front end does not get to reinvent. It holds which files a sitting
 must read, the digest of each as it stood, what a reader may say about one
-recorded finding and the key that mark files under, the append-only entry that
-records it and the one a surface may take back off, the line it clears in the
-unreviewed list and puts back, whether a recorded sitting clears its case at
-all, and the rail of every case with the status that rule gives it.
+recorded finding and the key that mark files under, the draft that carries their
+answers, and the rail of every case with the status it has.
 
-``webapp/sitting.py`` is one surface over this. The CLI path writes the same
-files by hand, and the checks cannot tell them apart, which is the point: one
-implementation of the rules. CI reads :func:`clears` through
-``tests/test_case_review.py``, so no surface can call a case read while CI still
-asks somebody to read it.
+**A sitting becomes a record by merging, and not before.**
+:mod:`evals.review_submission` is where one leaves this repository: one JSON
+file under ``evals/review/submissions``, carrying the reader's own list, their
+marks, their missing list, their notes and a digest of every file they read.
+Nothing here writes into a case directory or into the unreviewed list, so a
+reader who stops has nothing to clean up and a surface has nothing to undo.
+
+Which cases are read has **one reader**, and it is not here:
+:func:`evals.review_submission.current_reviews` answers it from the merged
+submissions, and the rail, the CI gate in ``tests/test_case_review.py`` and the
+printed count all ask that one function. So no surface can call a case read
+while CI still asks somebody to read it.
 
 Recording a sitting is one act, and so is taking it back. :func:`finish` writes
-the three files and says on the draft what it wrote. :func:`withdraw` takes off
-exactly that. They are a pair rather than two sequences a surface assembles,
-because what makes them correct is that the tree comes back byte for byte. A
-stray byte left under a case directory puts that case in the pull request, and a
-field one of them sets that the other forgets is a case that cannot be put back.
-The primitives they compose stay named, because a reader who follows one of them
-needs to see what it does.
+the reader's answers onto their draft and marks it finished. :func:`withdraw`
+puts it back to open, keeping every word they wrote. They are a pair rather than
+two sequences a surface assembles.
 
 The own list comes first, and that is a property rather than an instruction.
 What the order protects is the evidence in the filled document: it prints the
@@ -48,11 +49,9 @@ from __future__ import annotations
 
 import ast
 import hashlib
-import json
 import os
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal, get_args
 
@@ -65,14 +64,12 @@ from evals.harness.fingerprint import FingerprintError, key_claim
 from evals.harness.identity import FlowMap
 from evals.harness.reference import (
     CLAIMS_DIR,
-    CaseSitting,
     GoldenCase,
     ReadRecord,
     ReferenceClaim,
     load_case,
     load_corpus,
 )
-from evals.harness.roster import Roster
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CORPUS_DIR = REPO_ROOT / "evals" / "corpus"
@@ -110,7 +107,7 @@ Mark = Literal["agree", "reject", "duplicate"]
 #: The same three, for a surface that offers them and a check that reads them.
 MARKS: tuple[Mark, ...] = get_args(Mark)
 
-#: What the rail says about a case no sitting clears. The other status a row
+#: What the rail says about a case no submission clears. The other status a row
 #: can carry names the signer, and it is spelled where it is computed.
 TO_DO = "to do"
 
@@ -370,10 +367,11 @@ def required_files(frameworks: Iterable[str]) -> list[str]:
 def moved(case_dir: Path, digests: Mapping[str, str]) -> list[str]:
     """The named files whose bytes no longer match the digest beside them.
 
-    One comparison, and two questions asked of it. A recorded sitting asks
-    whether the bytes it signed still stand, through :func:`drifted`. A
-    **Draft Sitting** asks whether the text moved under a read in progress,
-    which is the warning the reader gets at open and at finish.
+    One comparison, and two questions asked of it. A merged submission asks
+    whether the bytes it signed still stand, through
+    :func:`evals.review_submission.current_reviews`. A **Draft Sitting** asks
+    whether the text moved under a read in progress, which is the warning the
+    reader gets at open and at finish.
 
     A file that is gone counts as moved, so a deleted source fails closed.
     """
@@ -409,44 +407,6 @@ def moved(case_dir: Path, digests: Mapping[str, str]) -> list[str]:
     return stale
 
 
-def drifted(case: GoldenCase, sitting: CaseSitting, corpus_dir: Path) -> list[str]:
-    """The read files whose bytes no longer match the sitting's digests.
-
-    The corpus directory is passed rather than defaulted, because a caller
-    that means a temporary tree must not silently read the shipped one.
-    """
-    return moved(
-        corpus_dir / case.meta.id,
-        {record.file: record.sha256 for record in sitting.read},
-    )
-
-
-def clears(
-    case: GoldenCase, sitting: CaseSitting, roster: Roster, corpus_dir: Path
-) -> bool:
-    """Whether this sitting takes its case off the unreviewed list.
-
-    A sitting clears when a rostered account carries it, every required file
-    was read, and the digests it recorded still match the tree (#327). This is
-    a different question from whether the case carries an entry: a drifted
-    digest leaves an entry that clears nothing, and the case is unread again.
-    Every surface that greys a case asks this one, so no page can call a case
-    read while CI still asks somebody to read it.
-
-    **The rostered name is ``submitted_by`` and only that.** ``submitted_for``
-    is provenance, so a read carried for an anonymous reader clears its case on
-    the submitter's standing, and no clearing rule has to decide what an
-    unnamed reader's judgement is worth.
-    """
-    required = set(required_files(declared.name for declared in case.meta.frameworks))
-    covered = not required - {record.file for record in sitting.read}
-    return (
-        covered
-        and sitting.submitted_by in roster
-        and not drifted(case, sitting, corpus_dir)
-    )
-
-
 @dataclass(frozen=True)
 class Row:
     """One rail row: a case a reader sees, and whether they may open it.
@@ -473,18 +433,18 @@ class Row:
 
 def rail(
     corpus_dir: Path,
-    roster: Roster,
+    signatures: Mapping[str, str] | None = None,
     drafts: Mapping[str, DraftStatus] | None = None,
 ) -> tuple[Row, ...]:
     """Every case in the corpus, in corpus order, with the status a reader reads.
 
-    **The status comes from :func:`clears`, never from the presence of an
-    entry in ``reviews``.** Those are different questions: a drifted digest
-    leaves an entry that clears nothing, CI puts that case back on the
-    unreviewed list, and a rail keyed on the entry would grey a case CI asks
-    somebody to read.
+    ``signatures`` says who cleared each case, from
+    :func:`evals.review_submission.clearing_signatures` — the one reader of
+    that question. It is passed in rather than read here because a submission
+    is a merged file rather than a fact about a case directory, and this
+    module is what a submission is validated against.
 
-    A case a sitting clears is not pressable once no draft of it is left,
+    A case a submission clears is not pressable once no draft of it is left,
     whoever signed it. The status names the signer, which reads correctly
     either way.
 
@@ -492,34 +452,12 @@ def rail(
     :func:`draft_states`. A caller that passes none gets the rail of a reader
     who holds no drafts, which is what the corpus alone can say.
     """
+    signed = signatures or {}
     held = drafts or {}
     return tuple(
-        _row(case, _signature(case, roster, corpus_dir), held.get(case.meta.id))
+        _row(case, signed.get(case.meta.id), held.get(case.meta.id))
         for case in load_corpus(corpus_dir)
     )
-
-
-def _signature(case: GoldenCase, roster: Roster, corpus_dir: Path) -> str | None:
-    """Who cleared this case, or ``None`` while nobody has.
-
-    A phrase rather than a login, because a proxied read has two names and a
-    row that printed one of them would say something untrue: *ada* alone hides
-    the reader, and the reader alone hides who answers for it. Where the two
-    match, the phrase is the one login.
-    """
-    return next(
-        (
-            _named(sitting)
-            for sitting in case.meta.reviews
-            if clears(case, sitting, roster, corpus_dir)
-        ),
-        None,
-    )
-
-
-def _named(sitting: CaseSitting) -> str:
-    """One recorded sitting's two names, as a rail row prints them."""
-    return naming(sitting.submitted_by, sitting.submitted_for)
 
 
 def naming(submitted_by: str, submitted_for: str) -> str:
@@ -732,6 +670,25 @@ def prepare(case_dir: Path) -> Prepared:
     )
 
 
+def check_marks(prepared: Prepared, marks: Mapping[str, Mark]) -> None:
+    """Refuse a mark key naming no recorded finding of this case.
+
+    **One reader, three callers.** :func:`finish` asks it when a reader
+    presses, :func:`document` asks it before it renders one, and
+    :func:`evals.review_submission.validate` asks it of a merged file. A key
+    the case does not carry is either a page that lost its targets or a request
+    that never read one, and either way the mark answers nothing.
+    """
+    unknown = sorted(
+        set(marks) - {target.fingerprint for target in prepared.mark_targets}
+    )
+    if unknown:
+        raise SittingError(
+            f"{prepared.case_id}: {', '.join(unknown)} names no recorded"
+            " finding of this case, so the mark answers nothing"
+        )
+
+
 def document(
     prepared: Prepared,
     own_list: list[str],
@@ -763,14 +720,7 @@ def document(
     targets or a request that never read one, and writing it would put a mark
     in the evidence that answers nothing.
     """
-    unknown = sorted(
-        set(marks) - {target.fingerprint for target in prepared.mark_targets}
-    )
-    if unknown:
-        raise SittingError(
-            f"{prepared.case_id}: {', '.join(unknown)} names no recorded"
-            " finding of this case, so the mark answers nothing"
-        )
+    check_marks(prepared, marks)
     lines = [
         f"# Case Sitting — `{prepared.case_id}`\n",
         f"\n**{prepared.title}**\n",
@@ -816,125 +766,6 @@ def _mark_line(target: MarkTarget, mark: Mark) -> str:
     prints.
     """
     return f"- `{mark}` — `{target.fingerprint}` — {' / '.join(target.claims)}"
-
-
-def record(
-    case_dir: Path,
-    submitted_by: str,
-    submitted_for: str,
-    read: list[ReadRecord],
-    document_name: str,
-    notes: str,
-    replaces: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    """Append the sitting to ``case.json``'s ``reviews``, and return the entry.
-
-    Append-only: a correction is a new entry, never an edit to one recorded
-    (#327). The file is rewritten whole because it is small and JSON has no
-    append, but nothing already in ``reviews`` is touched.
-
-    ``replaces`` is an entry the caller appended itself and now re-records.
-    It comes off before the new one goes on, so one submission and one case
-    never write two entries. **Only an entry this account submitted comes
-    off**, checked here rather than assumed of the caller: the entry reaches
-    this function from a **Draft Sitting**, which is a file the reader owns, so
-    a value in it is a value this module did not write. A sitting somebody else
-    submitted is untouchable, which is what keeps the rule above true.
-
-    ``submitted_for`` is written and never resolved: it names who read the
-    case, and :func:`clears` reads ``submitted_by``.
-    """
-    path = case_dir / "case.json"
-    raw = path.read_text(encoding="utf-8")
-    meta = json.loads(raw)
-    entry = {
-        "submitted_by": submitted_by,
-        "submitted_for": submitted_for,
-        "date": datetime.now(UTC).date().isoformat(),
-        "read": [{"file": item.file, "sha256": item.sha256} for item in read],
-        "document": document_name,
-        "notes": notes,
-    }
-    reviews = meta.setdefault("reviews", [])
-    if replaces is not None:
-        _yours(replaces, submitted_by)
-        if replaces in reviews:
-            reviews.remove(replaces)
-    reviews.append(entry)
-    _write_meta(path, meta, raw)
-    return entry
-
-
-def _yours(entry: Mapping[str, Any], submitted_by: str) -> None:
-    """Refuse an entry another account submitted.
-
-    Both the entry :func:`record` replaces and the entry :func:`unrecord`
-    removes arrive from a caller that read them off a **Draft Sitting** — a
-    file outside the repository that the reader owns. So "only your own
-    append comes off" is checked where the removal happens, rather than
-    assumed of the caller who supplied the value.
-
-    **It asks ``submitted_by`` and never ``submitted_for``.** The submitting
-    account is the one this process can prove, so reading the other field here
-    would let a draft name a reader and take somebody else's entry off.
-    """
-    named = entry.get("submitted_by")
-    if named != submitted_by:
-        raise SittingError(
-            f"that entry was submitted by {named!r} and you are"
-            f" {submitted_by!r}; a sitting somebody else submitted is not"
-            " yours to take off"
-        )
-
-
-def unrecord(case_dir: Path, submitted_by: str, entry: dict[str, Any]) -> bool:
-    """Take one of your own entries back off ``reviews``, and say whether it
-    was there.
-
-    The caller passes the entry :func:`record` returned. **Only an entry this
-    account submitted comes off**, for the reason :func:`_yours` gives — a
-    sitting somebody else submitted is untouchable here, exactly as it is
-    under ``replaces``.
-
-    This is what a reader who holds a recorded case back from a submission
-    needs, because the submission is built from the working tree: a case
-    whose entry stays behind is a case the pull request carries.
-
-    **An empty list comes off with the entry that made it.** A case nobody
-    has sat carries no ``reviews`` key at all, and :func:`record` is what
-    writes one, so leaving ``[]`` behind would keep the case in the diff with
-    a key that says nothing — and the pull request would carry a case the
-    reader dropped.
-    """
-    path = case_dir / "case.json"
-    _yours(entry, submitted_by)
-    raw = path.read_text(encoding="utf-8")
-    meta = json.loads(raw)
-    reviews = meta.get("reviews", [])
-    if entry not in reviews:
-        return False
-    reviews.remove(entry)
-    if not reviews:
-        meta.pop("reviews", None)
-    _write_meta(path, meta, raw)
-    return True
-
-
-def _write_meta(path: Path, meta: dict[str, Any], raw: str) -> None:
-    """Write the case metadata back, in the escaping the file already uses.
-
-    **An append reformats nothing else.** The corpus does not spell a
-    non-ASCII character one way: some files carry the character and some
-    carry the ``\\uXXXX`` escape, so a write that picked either would rewrite
-    unrelated lines in about a third of the cases. Matching what the file
-    already does means an append adds one entry to the diff and
-    :func:`unrecord` takes it away again, which is what lets a surface put a
-    case back the way it found it.
-    """
-    path.write_text(
-        json.dumps(meta, ensure_ascii=raw.isascii(), indent=2) + "\n",
-        encoding="utf-8",
-    )
 
 
 def _unreviewed_table(source: str) -> tuple[list[tuple[str, int, int]], int]:
@@ -1025,121 +856,6 @@ def _unreviewed_table(source: str) -> tuple[list[tuple[str, int, int]], int]:
     ], close
 
 
-def clear_unreviewed(root: Path, case_id: str) -> str:
-    """Remove this case's entry from ``UNREVIEWED``, and return what it removed.
-
-    The list names the cases nobody has read, so it is only accurate while a
-    case that gets read comes off it.
-
-    **It hands the removed lines back** because the reason in them is prose a
-    person wrote, and nothing can recompute it. A reader who holds a recorded
-    case back from a submission puts that case on the list again, and these
-    are the lines that go there. The answer is ``""`` where the list did not
-    name the case, so a caller that only asks whether it wrote reads it as a
-    falsehood.
-    """
-    path = root / UNREVIEWED_FILE
-    source = path.read_text(encoding="utf-8")
-    entries, _ = _unreviewed_table(source)
-    span = next(
-        ((start, end) for case, start, end in entries if case == case_id),
-        None,
-    )
-    if span is None:
-        return ""
-    start, end = span
-    lines = source.splitlines(keepends=True)
-    path.write_text("".join(lines[:start] + lines[end:]), encoding="utf-8")
-    return "".join(lines[start:end])
-
-
-def restore_unreviewed(root: Path, case_id: str, entry: str) -> bool:
-    """Put one case's ``UNREVIEWED`` entry back, and say whether it wrote.
-
-    The reverse of :func:`clear_unreviewed`, and the reason that function
-    returns its lines. A reader who holds a recorded case back from a
-    submission leaves that case unread, so the list has to name it again —
-    otherwise the count CI reads is a lie the pull request carries.
-
-    The entry goes in front of the first key that sorts after it, which is
-    where the table keeps it: the ids are numbered and the table is in corpus
-    order. A case the list already names is left alone, so putting one back
-    twice writes once.
-
-    **The entry is checked before it is written.** It is text from a
-    **Draft Sitting**, which is a file outside the repository, and it lands
-    in a module ``pytest`` imports — so text that is anything other than one
-    table entry for this case would be Python nobody wrote running in
-    everybody's checkout. :func:`_one_entry` decides that, and a value that
-    fails it changes nothing on disk.
-    """
-    _one_entry(case_id, entry)
-    path = root / UNREVIEWED_FILE
-    source = path.read_text(encoding="utf-8")
-    entries, close = _unreviewed_table(source)
-    if any(case == case_id for case, _, _ in entries):
-        return False
-    at = next((start for case, start, _ in entries if case > case_id), close)
-    lines = source.splitlines(keepends=True)
-    path.write_text("".join(lines[:at] + [entry] + lines[at:]), encoding="utf-8")
-    return True
-
-
-def _one_entry(case_id: str, entry: str) -> None:
-    """Refuse text that is not exactly one ``UNREVIEWED`` entry for this case.
-
-    Read as a dict literal of its own rather than by matching text, because
-    what has to be true is a shape and not a spelling: one string key equal
-    to this case, one string value, and nothing else in the fragment. Text
-    that closes the table and opens another parses as a module and never as
-    one expression, which is the whole of what this refuses.
-    """
-    try:
-        parsed = ast.parse(f"{{{entry}}}", mode="eval").body
-    except SyntaxError as exc:
-        raise SittingError(
-            f"{case_id}: that UNREVIEWED entry is not one table entry — {exc}"
-        ) from exc
-    keys = getattr(parsed, "keys", [])
-    values = getattr(parsed, "values", [])
-    ok = (
-        isinstance(parsed, ast.Dict)
-        and len(keys) == 1
-        and isinstance(keys[0], ast.Constant)
-        and keys[0].value == case_id
-        and isinstance(values[0], ast.Constant)
-        and isinstance(values[0].value, str)
-    )
-    if not ok:
-        raise SittingError(
-            f"{case_id}: that UNREVIEWED entry names something other than this"
-            " case, or carries something other than a reason"
-        )
-
-
-def without_unreviewed(source: str, cases: Iterable[str]) -> str:
-    """The unreviewed list with these cases' entries taken out, as text.
-
-    What is left is everything a sitting may not touch: the module's own
-    prose and code, and every entry naming a case the submission does not
-    carry. A caller compares this across a diff, so an edit anywhere but the
-    carried cases' own lines shows up as a difference.
-    """
-    entries, _ = _unreviewed_table(source)
-    drop = set(cases)
-    cut = {
-        number
-        for case, start, end in entries
-        if case in drop
-        for number in range(start, end)
-    }
-    return "".join(
-        line
-        for number, line in enumerate(source.splitlines(keepends=True))
-        if number not in cut
-    )
-
-
 def unreviewed_cases(root: Path) -> list[str]:
     """Every case the unreviewed list still names, in file order."""
     source = (root / UNREVIEWED_FILE).read_text(encoding="utf-8")
@@ -1195,86 +911,43 @@ def finish(
     missing: Iterable[str],
     notes: str,
 ) -> Draft:
-    """Record one sitting: three files written, and the draft that says so.
+    """Record one sitting onto its draft, which is the whole forward half.
 
-    The whole forward half of the act, in one place, because *Record the
-    sitting* and *Put back* reach it by two routes — one carrying what the
-    reader just typed, one carrying what their draft already holds — and the
-    two must write the same record.
+    *Record the sitting* and *Put back* reach this by two routes — one carrying
+    what the reader just typed, one carrying what their draft already holds —
+    and the two must write the same record, so the write is here rather than at
+    each route.
 
-    **A second press corrects the record rather than adding to it.** The entry
-    this reader appended comes off before the new one goes on, so a submission
-    never carries two entries by one reader for one case. An entry they did
-    not write is untouchable, which is what keeps ``reviews`` append-only.
+    **Nothing is written into the working tree.** A sitting becomes a record by
+    merging as one submission under ``evals/review/submissions``, and until then
+    it lives in the reader's draft, which sits outside the repository. So a
+    second press corrects the draft rather than appending to a file, and a
+    reader who stops has nothing to clean up.
 
-    **A re-record clears no line.** The case came off the unreviewed list at
-    the first press, so the lines the draft already holds stay.
+    A mark key naming no recorded finding refuses the press, through
+    :func:`check_marks` — the same reader a merged submission is checked by.
 
-    What the record left behind goes onto the draft, because :func:`withdraw`
-    takes back exactly what this put on and the draft is the only thing here
-    that outlives a process. The draft is saved before this returns, and it
-    stays until a submission carries it: the record is in the working tree by
-    now, and nothing is a record until it merges.
+    The draft is saved before this returns, because it is the only thing here
+    that outlives a process.
     """
-    case_dir = store.case_dir(prepared.case_id)
-    marks = dict(marks)
-    missing = list(missing)
-    text = document(
-        prepared,
-        draft.own_list,
-        marks,
-        missing,
-        notes,
-        store.submitted_by,
-        store.submitted_for,
-        store.held,
-    )
-    (case_dir / store.document_name).write_text(text, encoding="utf-8")
-    entry = record(
-        case_dir,
-        store.submitted_by,
-        store.submitted_for,
-        read_records(case_dir, prepared.files),
-        store.document_name,
-        notes,
-        replaces=draft.recorded,
-    )
-    cleared = clear_unreviewed(store.root, prepared.case_id)
-    draft.marks = marks
-    draft.missing = missing
+    check_marks(prepared, marks)
+    draft.marks = dict(marks)
+    draft.missing = list(missing)
     draft.notes = notes
-    draft.recorded = entry
-    draft.unreviewed_entry = cleared or draft.unreviewed_entry
     draft.state = "finished"
     save_draft(store.drafts, store.submitted_by, draft)
     return draft
 
 
 def withdraw(store: Store, prepared: Prepared, draft: Draft) -> Draft:
-    """Take one recorded sitting back out of the working tree.
+    """Take one recorded sitting back off its draft.
 
-    The exact inverse of :func:`finish`, and written beside it for that
-    reason: what one puts on, the other takes off, and a field added to one
-    that the other forgets is a case that cannot be put back.
+    The exact inverse of :func:`finish`, and written beside it for that reason:
+    what one puts on, the other takes off.
 
-    **The order is load-bearing.** The entry comes off first, because that is
-    what a submission reads a case directory for, and the untracked document
-    comes off last. A write that fails part way leaves the draft saying
-    ``finished``, so a surface still lists the case and the submission
-    checklist still refuses it — which is the safe direction.
-
-    **The reader keeps every word they wrote.** Only the two fields the record
-    set are cleared, so :func:`finish` writes the same record again from the
-    same draft.
+    **The reader keeps every word they wrote.** Only the state changes, so
+    :func:`finish` writes the same record again from the same draft.
     """
-    case_dir = store.case_dir(prepared.case_id)
-    if draft.recorded is not None:
-        unrecord(case_dir, store.submitted_by, draft.recorded)
-    if draft.unreviewed_entry:
-        restore_unreviewed(store.root, prepared.case_id, draft.unreviewed_entry)
-    (case_dir / store.document_name).unlink(missing_ok=True)
-    draft.recorded = None
-    draft.unreviewed_entry = ""
     draft.state = "open"
     save_draft(store.drafts, store.submitted_by, draft)
     return draft

@@ -6,16 +6,14 @@ missed issues, notes, and digests of the case material the reviewer saw. CI
 binds ``submitted_by`` to the pull-request author and validates the file against
 the corpus before merge.
 
-Existing case-local sittings remain readable for compatibility. New JSON
-submissions do not rewrite case metadata, generated Markdown, the bootstrap
-unreviewed list, or the voter roster. A later corpus edit does not rewrite old
-review evidence; it simply makes that review no longer current for the changed
+A submission rewrites nothing else: not case metadata, not generated
+Markdown, not the voter roster. A later corpus edit does not rewrite old review
+evidence either; it simply makes that review no longer current for the changed
 case until somebody reviews the new bytes.
 """
 
 from __future__ import annotations
 
-import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -23,10 +21,11 @@ from tempfile import TemporaryDirectory
 from evals.harness import envelope as envelopes
 from evals.harness import sitting as sittings
 from evals.harness import submit as submit_spine
+from evals.harness.envelope import relative_path, serialize, submission_name
 from evals.harness.reference import CorpusError
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-SUBMISSIONS_DIR = Path("evals/review/submissions")
+SUBMISSIONS_DIR = envelopes.SUBMISSIONS_DIR
 SUBMISSIONS_PREFIX = f"{SUBMISSIONS_DIR.as_posix()}/"
 
 
@@ -44,20 +43,6 @@ class MergedReview:
     @property
     def signature(self) -> str:
         return sittings.naming(self.envelope.submitted_by, self.envelope.submitted_for)
-
-
-def serialize(envelope: envelopes.Envelope) -> bytes:
-    """Canonical bytes for the committed review file."""
-    return (envelope.model_dump_json(indent=2) + "\n").encode("utf-8")
-
-
-def submission_name(envelope: envelopes.Envelope) -> str:
-    digest = hashlib.sha256(serialize(envelope)).hexdigest()[:12]
-    return f"review-{envelope.generated}-{envelope.submitted_by}-{digest}.json"
-
-
-def relative_path(envelope: envelopes.Envelope) -> str:
-    return (SUBMISSIONS_DIR / submission_name(envelope)).as_posix()
 
 
 def _case_problems(
@@ -92,11 +77,10 @@ def _case_problems(
             f"{case_id}: {', '.join(stale)} changed since the reviewer opened the case"
         )
 
-    known = {target.fingerprint for target in prepared.mark_targets}
-    if unknown := sorted(set(answers.marks) - known):
-        problems.append(
-            f"{case_id}: {', '.join(unknown)} names no recorded finding in this case"
-        )
+    try:
+        sittings.check_marks(prepared, answers.marks)
+    except sittings.SittingError as exc:
+        problems.append(str(exc))
     return problems
 
 
@@ -184,15 +168,23 @@ def clearing_signatures(root: Path) -> dict[str, str]:
 
 
 def unreviewed_cases(root: Path) -> list[str]:
-    """Cases needing review, preserving the canonical list when it is present."""
+    """Every corpus case no merged submission currently clears, in corpus order.
+
+    **The one reader of "is this case read".** It is derived from the corpus
+    and the merged submissions rather than from a list somebody maintains, so
+    the app, the CI gate and the printed count cannot answer it differently.
+
+    A case leaves this list when a submission covering it merges, and comes back
+    the moment any file that submission read changes — :func:`current_reviews`
+    drops a review whose digests no longer match, so the return is fail-closed
+    against a later corpus edit.
+    """
     current = current_reviews(root)
-    if (root / sittings.UNREVIEWED_FILE).is_file():
-        candidates = sittings.unreviewed_cases(root)
-    else:
-        candidates = [
-            case.meta.id for case in sittings.load_corpus(root / "evals" / "corpus")
-        ]
-    return [case_id for case_id in candidates if case_id not in current]
+    return [
+        case.meta.id
+        for case in sittings.load_corpus(root / "evals" / "corpus")
+        if case.meta.id not in current
+    ]
 
 
 def verify_pull_request(root: Path, author: str) -> list[str]:

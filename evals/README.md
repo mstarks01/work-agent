@@ -22,9 +22,9 @@ case 04 that asserted a fact its own model does not hold.
 **One case has been through `BLESSING.md` step 6, and twelve have not.** That is
 the reading session over a case's source, model and reference sets together, and
 it is what would catch the case-04 defect anywhere else. That act is a **Case
-Sitting**, recorded as an entry in the `reviews` list in the case's
-`case.json` — who read it, the digest of each file they read, and the filled
-document as evidence. Case `01-payments-checkout`, the control, carries one
+Sitting**, recorded as one JSON file under `evals/review/submissions/` — who
+read it, what they wrote before the sets opened, and the digest of each file
+they read. Case `01-payments-checkout`, the control, carries one
 dated 2026-08-23: the reader agreed with all 21 STRIDE claims and all 17 ASVS
 records, and changed none of them
 ([`REVIEW-02.md`](corpus/01-payments-checkout/REVIEW-02.md)).

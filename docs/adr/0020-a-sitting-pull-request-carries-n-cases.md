@@ -1,6 +1,9 @@
 # 20. A sitting pull request carries N cases
 
 - **Status**: accepted
+- **Amended by**: [ADR 24](0024-a-case-sitting-merges-as-one-file.md), which
+  replaces the record this one counts. A sitting merges as one file carrying
+  every case a reader read, so there is no per-case directory to count.
 - **Date**: 2026-08-28
 - **Amends**: [issue #327](https://github.com/mstarks01/work-agent/issues/327), which put
   one **Case Sitting** and the claim edits it justifies in one pull request. That rule
