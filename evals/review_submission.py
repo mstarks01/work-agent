@@ -46,44 +46,30 @@ class MergedReview:
         return sittings.naming(self.envelope.submitted_by, self.envelope.submitted_for)
 
 
+def covers(root: Path, case_id: str, answers: envelopes.CaseAnswers) -> list[str]:
+    """Which **Framework**s this sitting read. See
+    :func:`~evals.harness.sitting.covered_frameworks`."""
+    try:
+        return sittings.covered_frameworks(
+            root / "evals" / "corpus" / case_id, answers.opened_digests
+        )
+    except (CorpusError, sittings.SittingError, OSError, ValueError):
+        return []
+
+
 def _case_problems(
     root: Path, case_id: str, answers: envelopes.CaseAnswers
 ) -> list[str]:
-    case_dir = root / "evals" / "corpus" / case_id
+    """This case's answers, against the one reader every surface asks."""
     try:
-        prepared = sittings.prepare(case_dir)
+        return sittings.sitting_problems(
+            root / "evals" / "corpus" / case_id,
+            own_list=answers.own_list,
+            opened_digests=answers.opened_digests,
+            marks=answers.marks,
+        )
     except (CorpusError, sittings.SittingError, OSError, ValueError) as exc:
         return [f"{case_id}: {exc}"]
-
-    problems: list[str] = []
-    if not sittings.own_list_is_written(answers.own_list):
-        problems.append(
-            f"{case_id}: the independent list is shorter than "
-            f"{sittings.MIN_OWN_LIST} characters"
-        )
-
-    expected = set(prepared.files)
-    recorded = set(answers.opened_digests)
-    if missing := sorted(expected - recorded):
-        problems.append(f"{case_id}: the review carries no digest for {missing}")
-    if extra := sorted(recorded - expected):
-        problems.append(f"{case_id}: the review carries unexpected digests for {extra}")
-
-    stale = sittings.moved(
-        case_dir,
-        {name: answers.opened_digests.get(name, "") for name in prepared.files},
-    )
-    if stale:
-        problems.append(
-            f"{case_id}: {', '.join(stale)} changed since the reviewer opened the case"
-        )
-
-    for rule in (sittings.check_marks, sittings.check_every_finding_marked):
-        try:
-            rule(prepared, answers.marks)
-        except sittings.SittingError as exc:
-            problems.append(str(exc))
-    return problems
 
 
 def validate(
@@ -147,26 +133,88 @@ def repository_problems(root: Path) -> list[str]:
     return problems
 
 
-def current_reviews(root: Path) -> dict[str, MergedReview]:
-    """Newest merged review that still matches each case's current bytes."""
-    current: dict[str, MergedReview] = {}
+def current_reviews(root: Path) -> dict[str, dict[str, MergedReview]]:
+    """Which sitting currently covers each **Framework** of each case.
+
+    Keyed ``case -> framework -> review``, because coverage is per framework
+    and always was: ``tests/test_case_review.py`` says a case reviewed for one
+    framework stays unread for the other. A case reads as read when every
+    framework it declares has an entry here.
+
+    **Fail-closed against a later edit.** A submission drops out the moment any
+    file it read changes, so a corpus edit puts back exactly the frameworks
+    whose evidence moved and leaves the rest standing.
+
+    Later submissions win, which is how a second reader replaces a first.
+    """
+    covered: dict[str, dict[str, MergedReview]] = {}
     try:
         submissions = list(iter_submissions(root))
     except ReviewSubmissionError:
-        return current
+        return covered
     for path, envelope in submissions:
         for case_id, answers in envelope.cases.items():
-            if not _case_problems(root, case_id, answers):
-                current[case_id] = MergedReview(path, envelope, case_id, answers)
-    return current
+            if _case_problems(root, case_id, answers):
+                continue
+            review = MergedReview(path, envelope, case_id, answers)
+            for framework in covers(root, case_id, answers):
+                covered.setdefault(case_id, {})[framework] = review
+    return covered
+
+
+def declared(root: Path, case_id: str) -> list[str]:
+    """Every **Framework** this case declares, in its own order."""
+    try:
+        prepared = sittings.prepare(root / "evals" / "corpus" / case_id)
+    except (CorpusError, sittings.SittingError, OSError, ValueError):
+        return []
+    return list(prepared.part_two_blocks)
+
+
+def waiting(root: Path, case_id: str) -> list[str]:
+    """The frameworks of one case that no current sitting covers."""
+    covered = current_reviews(root).get(case_id, {})
+    return [name for name in declared(root, case_id) if name not in covered]
 
 
 def current_for_case(root: Path, case_id: str) -> MergedReview | None:
-    return current_reviews(root).get(case_id)
+    """The newest sitting covering any part of this case, for its document.
+
+    A case can be covered by two readers, and the read-only view shows one
+    document. It shows the newest, which is the one whose words answer the most
+    recent state of the case.
+    """
+    covered = current_reviews(root).get(case_id, {})
+    return max(covered.values(), key=lambda review: review.path.name, default=None)
 
 
 def clearing_signatures(root: Path) -> dict[str, str]:
-    return {case: review.signature for case, review in current_reviews(root).items()}
+    """Who cleared each **fully** covered case, for a rail that greys it.
+
+    A case with a framework still waiting carries no signature: work remains,
+    and a greyed row would put it out of a reader's reach.
+    """
+    return {
+        case_id: max(covered.values(), key=lambda r: r.path.name).signature
+        for case_id, covered in current_reviews(root).items()
+        if not waiting(root, case_id)
+    }
+
+
+def partial_signatures(root: Path) -> dict[str, str]:
+    """What a rail says about a case some sitting covers in part.
+
+    Named rather than derived at the surface, because the rail, the printed
+    count and a future reader all have to agree about what "partly read" is.
+    """
+    lines = {}
+    for case_id, covered in current_reviews(root).items():
+        left = waiting(root, case_id)
+        if not left:
+            continue
+        read = ", ".join(sorted(covered))
+        lines[case_id] = f"{', '.join(left)} waiting; {read} read"
+    return lines
 
 
 def unreviewed_cases(root: Path) -> list[str]:
@@ -176,16 +224,20 @@ def unreviewed_cases(root: Path) -> list[str]:
     and the merged submissions rather than from a list somebody maintains, so
     the app, the CI gate and the printed count cannot answer it differently.
 
-    A case leaves this list when a submission covering it merges, and comes back
-    the moment any file that submission read changes — :func:`current_reviews`
-    drops a review whose digests no longer match, so the return is fail-closed
-    against a later corpus edit.
+    A case leaves this list when every **Framework** it declares is covered,
+    and comes back the moment any file a covering sitting read changes —
+    :func:`current_reviews` drops a review whose digests no longer match, so the
+    return is fail-closed against a later corpus edit. A case that gains a
+    framework comes back too, carrying only that framework's work.
     """
-    current = current_reviews(root)
+    covered = current_reviews(root)
     return [
         case.meta.id
         for case in sittings.load_corpus(root / "evals" / "corpus")
-        if case.meta.id not in current
+        if any(
+            framework not in covered.get(case.meta.id, {})
+            for framework in declared(root, case.meta.id)
+        )
     ]
 
 
