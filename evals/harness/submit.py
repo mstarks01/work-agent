@@ -18,6 +18,11 @@ authenticated login, and it refuses a roster edit that raises the author's own
 standing. CI re-checks both. Running them here fails them early, at the machine
 where the fix is.
 
+A **Case Sitting** is not a kind here. It merges as one JSON file under
+``evals/review/submissions``, which :mod:`evals.review_submission` opens and
+validates on its own terms — one file, no allowlist to widen, and nothing in
+the working tree to package.
+
 On security: everything this module runs is an argument list with
 ``shell=False`` (A05), and every path it stages comes from the kind's allowlist
 rather than from the command line (A01). The packaging happens in a throwaway
@@ -28,9 +33,7 @@ carries beyond the allowlist can ride into the pull request.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
-import re
 import subprocess
 import tomllib
 from collections.abc import Callable, Iterator, Mapping, Sequence
@@ -42,24 +45,12 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
 
-from pydantic import ValidationError
-
-from evals.build_review_docs import GENERATED_DOCUMENT
 from evals.harness import baseline, comparison, ledger, roster
 from evals.harness.artifact import ProvenanceError
 from evals.harness.fingerprint import (
     FingerprintError,
     version_for,
     version_of,
-)
-from evals.harness.reference import CaseSitting
-from evals.harness.sitting import (
-    SittingError,
-    claim_files,
-    document_name,
-    required_files,
-    unreviewed_cases,
-    without_unreviewed,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -583,356 +574,9 @@ def _vote_closing(root: Path, author: str) -> str:
 
 # --- the sitting kind ---------------------------------------------------------
 
+
 #: Where the unreviewed list lives; a sitting PR deletes its case's line
 #: from it.
-CASE_REVIEW_TEST = "tests/test_case_review.py"
-
-
-def _sitting_cases(root: Path) -> list[str]:
-    """Every case this submission touches, sorted. One session, one PR."""
-    return _subdirs(root, KINDS["sitting"].prefix)
-
-
-#: The shape a declared framework name holds before it reaches a path. The
-#: allowlist derives a claim file from the case's own metadata, so a name
-#: carrying a separator would name a file outside the case's ``claims``
-#: directory (A01). A package nobody wrote yet still passes it: every package
-#: this repository ships is a lowercase slug.
-#:
-#: Length is part of the shape, and it was missing here while the other reader
-#: of this rule already had it: 300 lowercase letters are a slug, so a slug
-#: shape alone is not a bound. Both bounds are now
-#: :data:`~evals.harness.baseline.FRAMEWORK_NAME_MAX`, so the two readers cannot
-#: disagree about
-#: how long a name may be.
-_FRAMEWORK_NAME = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
-
-
-def _declared_frameworks(root: Path, case: str) -> list[str]:
-    """Every framework one case declares, in the order it declares them.
-
-    Fail-closed and quiet: a case whose metadata cannot be read, or whose
-    declaration is the wrong shape, declares nothing here. The checks that
-    read the metadata report that, and an allowlist which raised would answer
-    a scope question with a parse error.
-    """
-    path = root / KINDS["sitting"].prefix / case / "case.json"
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return []
-    declared = raw.get("frameworks") if isinstance(raw, dict) else None
-    if not isinstance(declared, list):
-        return []
-    names = [entry.get("name") for entry in declared if isinstance(entry, dict)]
-    return [
-        name
-        for name in names
-        if isinstance(name, str)
-        and len(name) <= baseline.FRAMEWORK_NAME_MAX
-        and _FRAMEWORK_NAME.fullmatch(name)
-    ]
-
-
-def _sitting_allowlist(root: Path, author: str) -> list[str]:
-    """A sitting may change an answer. It may never change the question.
-
-    Under each touched case: the case metadata, this reader's own filled
-    reading document, and one claim file per framework the case declares
-    (#388). The reference sets are the answer under review, so a reader who
-    corrects one does what #327 asks for. The sources and the blessed
-    **System Model** are the question, so an edit to either falls outside
-    and fails scope — a reader who rewrites the question makes their own
-    read unfalsifiable.
-
-    The claim files come from the case's own declaration rather than a list
-    here, so a **Framework Package** nobody wrote yet is covered the moment a
-    case declares it. The document name comes from the authenticated login
-    rather than from the appended entry, so no name the diff supplies can
-    widen the list.
-    """
-    allowed = [
-        f"{KINDS['sitting'].prefix}{case}/{name}"
-        for case in _sitting_cases(root)
-        for name in [
-            "case.json",
-            document_name(author),
-            *claim_files(_declared_frameworks(root, case)),
-        ]
-    ]
-    return [*allowed, CASE_REVIEW_TEST, ROSTER_FILE]
-
-
-def _new_sittings(root: Path, case: str) -> tuple[list[dict], list[str]]:
-    """The entries this PR appends, and what is wrong with the append.
-
-    ``reviews`` is append-only (#327): the base ref's entries must survive as
-    an exact prefix, and only what follows them is this submission's.
-    """
-    rel = f"evals/corpus/{case}/case.json"
-    try:
-        raw = json.loads((root / rel).read_text(encoding="utf-8"))
-        base_raw = _base_text(root, rel)
-        base = json.loads(base_raw) if base_raw else {}
-    except (OSError, json.JSONDecodeError) as exc:
-        return [], [f"{case}/case.json: cannot be read: {exc}"]
-    reviews = raw.get("reviews", []) if isinstance(raw, dict) else None
-    base_reviews = base.get("reviews", []) if isinstance(base, dict) else None
-    # Shape first: one malformed case refuses its own case, and every other
-    # one still reports. A slice of the wrong type raises out of the pass.
-    if not isinstance(reviews, list) or not isinstance(base_reviews, list):
-        return [], [f"{case}/case.json: no `reviews` list to append to"]
-    if reviews[: len(base_reviews)] != base_reviews:
-        return [], [
-            (
-                f"{case}/case.json rewrites recorded sittings; `reviews` is"
-                " append-only, and a correction is a new entry"
-            )
-        ]
-    new = reviews[len(base_reviews) :]
-    if not new:
-        return [], [f"{case}/case.json appends no sitting entry"]
-    return new, []
-
-
-def _appended(root: Path, case: str) -> list[dict]:
-    """The entries this PR appends to one case, without what refuses them.
-
-    :func:`_check_sitting_is_yours` prints every problem :func:`_new_sittings`
-    finds, so the checks that only read the entries stay quiet about them:
-    one problem, one message, whatever N is.
-    """
-    new, _ = _new_sittings(root, case)
-    return new
-
-
-def _check_sitting_is_yours(root: Path, author: str) -> Check:
-    """#327 check 1, failed early: every appended entry is submitted by the author.
-
-    This also carries the gate ADR 0020 took off the cardinality check: a case
-    directory in the diff whose metadata appends nothing refuses the whole
-    submission, so a submission cannot carry a case it did not sit.
-
-    **It reads ``submitted_by`` and never ``submitted_for``.** The submitting
-    account is what `gh` proves, and it stays bound to the author exactly as
-    #320 rules. ``submitted_for`` names who read the case, is free to be
-    :data:`~evals.harness.reference.ANONYMOUS` or another person, and is
-    checked by nothing here — because it grants nothing anywhere.
-    """
-    problems: list[str] = []
-    for case in _sitting_cases(root):
-        new, refusals = _new_sittings(root, case)
-        problems += refusals
-        for entry in new:
-            try:
-                sitting = CaseSitting.model_validate(entry)
-            except ValidationError as exc:
-                problems.append(
-                    f"{case}/case.json: an appended entry is malformed: {exc}"
-                )
-                continue
-            if sitting.submitted_by != author:
-                problems.append(
-                    f"{case}: an appended entry is submitted by"
-                    f" {sitting.submitted_by!r}; you are {author!r}, and a"
-                    " sitting only enters through its own submitter's PR"
-                    " (#320)"
-                )
-    return _check("every appended sitting is submitted by you", problems)
-
-
-def _check_sitting_evidence(root: Path, author: str) -> Check:
-    """The digests match the tree, and the filled document is committed."""
-    problems: list[str] = []
-    for case in _sitting_cases(root):
-        case_dir = root / "evals" / "corpus" / case
-        for entry in _appended(root, case):
-            try:
-                sitting = CaseSitting.model_validate(entry)
-            except ValidationError:
-                continue  # named by the naming check; one problem, one message
-            for record in sitting.read:
-                target = case_dir / record.file
-                if not target.is_file():
-                    problems.append(
-                        f"{case}/{record.file}: read but not in the case directory"
-                    )
-                elif hashlib.sha256(target.read_bytes()).hexdigest() != record.sha256:
-                    problems.append(
-                        f"{case}/{record.file}: the digest does not match the"
-                        " file; the entry signs the bytes that merge, so"
-                        " recompute it"
-                    )
-            problems += _document_problems(case, case_dir, sitting, author)
-    return _check("the digests and the document hold", problems)
-
-
-def _document_problems(
-    case: str, case_dir: Path, sitting: CaseSitting, author: str
-) -> list[str]:
-    """Whether the entry names the document this submission may write, and
-    whether that document says anything.
-
-    The old check was one `.is_file()` probe on whatever name the entry gave.
-    A name is not a path this repository resolves, but it is a claim, and the
-    probe let the claim be any file that happens to exist: `"source.md"`
-    satisfied it in every case directory, so an entry could clear a case while
-    committing no reading document at all.
-
-    Naming it is half. `document()` is the evidence that the method ran, and
-    `MIN_OWN_LIST` is the floor that makes a filled copy different from an empty
-    one -- enforced in the app and in the offline envelope, and until now on
-    neither side of a pull request. So `touch REVIEW-<login>.md` passed every
-    gate under the correct name, and constraining only the name would have moved
-    the same hole one step.
-    """
-    expected = document_name(author)
-    if sitting.document != expected:
-        return [
-            (
-                f"{case}: the entry names {sitting.document!r}, and a submission"
-                f" writes {expected!r}. The document carries the submitting"
-                " login, so an entry naming another is another submission's."
-            )
-        ]
-    path = case_dir / expected
-    if not path.is_file():
-        return [
-            (
-                f"{case}/{expected}: the filled document is the evidence, and"
-                " it is not committed beside the case"
-            )
-        ]
-    if not reads_as_a_reading_document(path):
-        return [
-            (
-                f"{case}/{expected}: this is not a reading document."
-                " `document()` writes a heading, a title and a byline, and the"
-                " evidence the method ran is that shape rather than any number"
-                " of bytes."
-            )
-        ]
-    return []
-
-
-def reads_as_a_reading_document(path: Path) -> bool:
-    """Whether the committed file is the document `sitting.document()` writes.
-
-    Its shape, not its length. The first version of this check compared the
-    whole file against `MIN_OWN_LIST`, which is a floor the app and the offline
-    envelope apply to *the reader's own list* -- so it read a different thing to
-    the same number, and twelve bytes of anything passed. Every generated
-    document is hundreds of characters, so a length could never see an empty own
-    list either.
-
-    Checking the shape is what a length was reaching for: a file that carries
-    the heading and the byline was produced by the writer, and the writer only
-    produces one after the own list passed `own_list_is_written` at the surface
-    that took it.
-    """
-    text = path.read_text(encoding="utf-8")
-    return "# Case Sitting" in text and "submitted by" in text
-
-
-def _check_sitting_covers(root: Path, author: str) -> Check:
-    """#327's derived rule: the read covers every framework the case declares."""
-    problems: list[str] = []
-    for case in _sitting_cases(root):
-        new = _appended(root, case)
-        if not new:
-            continue  # the naming check refuses a case that appends nothing
-        raw = json.loads(
-            (root / "evals" / "corpus" / case / "case.json").read_text(encoding="utf-8")
-        )
-        required = set(
-            required_files(declared["name"] for declared in raw.get("frameworks", []))
-        )
-        read = {
-            record.get("file")
-            for entry in new
-            if isinstance(entry, dict)
-            for record in entry.get("read", [])
-            if isinstance(record, dict)
-        }
-        if gap := sorted(required - read):
-            problems.append(
-                f"{case}: the appended sitting leaves {gap} unread; one sitting"
-                " signs the model and every declared framework's reference set"
-                " together"
-            )
-    return _check("the sitting covers every declared framework", problems)
-
-
-def _check_sitting_clears_unreviewed(root: Path, author: str) -> Check:
-    """Every carried case is off the unreviewed list.
-
-    Asked of the parsed table rather than of the file's text. A substring test
-    answers a slightly different question -- is this spelling present -- and the
-    difference between the two questions is a gap: a key respelled so the text
-    does not hold it, while :mod:`ast` still reads it as the same case, passes
-    the text reader and is removed by the parsed one, so the entry survives with
-    whatever it carries. One reader, so there is no second opinion to disagree
-    with.
-    """
-    cases = _sitting_cases(root)
-    if not cases:
-        return _check("every case's UNREVIEWED line is gone", [])
-    try:
-        listed = set(unreviewed_cases(root))
-    except SittingError as exc:
-        return _check("every case's UNREVIEWED line is gone", [str(exc)])
-    return _check(
-        "every case's UNREVIEWED line is gone",
-        [
-            f"{case}: delete its line from UNREVIEWED in {CASE_REVIEW_TEST}"
-            for case in cases
-            if case in listed
-        ],
-    )
-
-
-def _check_sitting_edits_only_the_list(root: Path, author: str) -> Check:
-    """The unreviewed list changed by the carried cases' lines and nothing else.
-
-    ``CASE_REVIEW_TEST`` is the one file outside a case directory that a
-    sitting may change, and it is a module ``pytest`` imports — so an
-    allowlist that admits it by path admits arbitrary Python running in
-    everybody's checkout. The scope check compares paths and cannot see that;
-    this compares content.
-
-    Both sides have the carried cases' entries taken out before they are
-    compared, so a reader who has not cleared a line yet fails
-    :func:`_check_sitting_clears_unreviewed` and not this. What is left is
-    the module's prose, its code, and every case this submission does not
-    carry.
-    """
-    cases = _sitting_cases(root)
-    if not cases:
-        return _check(_ONLY_THE_LIST, [])
-    base = _base_text(root, CASE_REVIEW_TEST)
-    if base is None:
-        return _check(
-            _ONLY_THE_LIST,
-            [f"{CASE_REVIEW_TEST}: the base ref has no such file to compare against"],
-        )
-    live = (root / CASE_REVIEW_TEST).read_text(encoding="utf-8")
-    try:
-        moved = without_unreviewed(live, cases) != without_unreviewed(base, cases)
-    except SittingError as exc:
-        # The message names the file already, so it goes out as it stands.
-        return _check(_ONLY_THE_LIST, [str(exc)])
-    refusal = (
-        f"{CASE_REVIEW_TEST} changed outside the lines this sitting clears;"
-        " a sitting deletes its cases' UNREVIEWED entries and nothing else"
-    )
-    return _check(_ONLY_THE_LIST, [refusal] if moved else [])
-
-
-#: Spelled once because the check names it twice and a checklist line is the
-#: contract a contributor reads.
-_ONLY_THE_LIST = "the unreviewed list changed only by those lines"
-
-
 def _check_author_rostered(root: Path, author: str) -> Check:
     problems = []
     try:
@@ -944,47 +588,6 @@ def _check_author_rostered(root: Path, author: str) -> Check:
     except roster.RosterError as exc:
         problems.append(str(exc))
     return _check("you have a roster line", problems)
-
-
-def _sitting_preflight(root: Path, author: str) -> list[Check]:
-    return [
-        check(root, author)
-        for check in (
-            partial(_check_subject_count, kind_name="sitting"),
-            partial(_check_scope, kind_name="sitting"),
-            _check_sitting_is_yours,
-            _check_sitting_evidence,
-            _check_sitting_covers,
-            _check_sitting_clears_unreviewed,
-            _check_sitting_edits_only_the_list,
-            _check_author_rostered,
-            _check_no_self_raise,
-        )
-    ]
-
-
-def _sitting_title(root: Path, author: str) -> str:
-    """``Sitting: <author>, <n> cases``, the vote kind's shape.
-
-    Its plural agreement too: the count reads for itself, and a branch on a
-    count is the thing this repository does not write.
-    """
-    return f"Sitting: {author}, {len(_sitting_cases(root))} cases"
-
-
-def _sitting_closing(root: Path, author: str) -> str:
-    standing = _standing_of(root, author)
-    cases = "\n".join(f"- {case}" for case in _sitting_cases(root))
-    return (
-        f"{cases}\n\n"
-        f"{REVIEW_SENTENCE} Each sitting above clears its case from"
-        f" UNREVIEWED, and standing {standing!r} labels the read — the"
-        " UNREVIEWED line means nobody read it, and a labelled read answers"
-        " that."
-    )
-
-
-# --- the baseline kind ---------------------------------------------------------
 
 
 def _baseline_prepare(root: Path, author: str, args: argparse.Namespace) -> None:
@@ -1132,20 +735,6 @@ KINDS: dict[str, Kind] = {
         allowlist=_vote_allowlist,
         title=_vote_title,
         closing=_vote_closing,
-    ),
-    "sitting": Kind(
-        prefix="evals/corpus/",
-        # `REVIEW.md` is written by `evals/build_review_docs.py` from the case
-        # it sits beside. The filled `REVIEW-<login>.md` is evidence and is
-        # not derived, so the two names part company here.
-        derived=frozenset({GENERATED_DOCUMENT}),
-        noun="sitting",
-        subject="case",
-        subjects="many",
-        preflight=_sitting_preflight,
-        allowlist=_sitting_allowlist,
-        title=_sitting_title,
-        closing=_sitting_closing,
     ),
     "baseline": Kind(
         prefix="evals/baselines/",

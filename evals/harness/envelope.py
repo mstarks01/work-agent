@@ -34,6 +34,7 @@ request, and nothing here reaches the network.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 from typing import Annotated
@@ -46,7 +47,7 @@ from evals.harness.reference import (
     MAX_NAME,
     SUBMITTED_FOR_PATTERN,
 )
-from evals.harness.sitting import Draft, Mark, SittingError, Store
+from evals.harness.sitting import Mark, SittingError, Store
 
 #: What this path calls itself in the evidence it writes. A read held on the
 #: offline page and imported here is not a read held on the local app, and the
@@ -239,15 +240,44 @@ def _refusals(
     return problems
 
 
+#: Where a merged submission lives, relative to the repository root.
+SUBMISSIONS_DIR = Path("evals/review/submissions")
+
+
+def serialize(envelope: Envelope) -> bytes:
+    """Canonical bytes for the committed review file."""
+    return (envelope.model_dump_json(indent=2) + "\n").encode("utf-8")
+
+
+def submission_name(envelope: Envelope) -> str:
+    """The one file name these bytes may be committed under.
+
+    Keyed by their own digest, so two readers cannot collide and an edited file
+    no longer matches its name — which is what
+    :func:`evals.review_submission.verify_pull_request` checks.
+    """
+    digest = hashlib.sha256(serialize(envelope)).hexdigest()[:12]
+    return f"review-{envelope.generated}-{envelope.submitted_by}-{digest}.json"
+
+
+def relative_path(envelope: Envelope) -> str:
+    """Where these bytes are committed, relative to the repository root."""
+    return (SUBMISSIONS_DIR / submission_name(envelope)).as_posix()
+
+
 def apply(envelope: Envelope, root: Path, drafts: Path | None = None) -> list[str]:
-    """Write every case in one envelope into the operator's tree.
+    """Write one envelope into the operator's tree as its submission file.
 
-    **Nothing is written until every case passes.** An envelope is one
-    reader's session, and a half-applied one leaves the operator deciding
-    which cases are real from a tree that no longer says. So the checks run
-    over the whole file first, and the writes run only after.
+    **Nothing is written until every case passes.** An envelope is one reader's
+    session, and a half-applied one leaves the operator deciding which cases are
+    real from a tree that no longer says. So the checks run over the whole file
+    first, and the write runs only after.
 
-    Returns the case ids written, in corpus order.
+    One file lands, under :func:`relative_path`, which is the same artifact the
+    app opens a pull request with. An offline reader and a reader at a keyboard
+    therefore contribute the same bytes, checked the same way.
+
+    Returns the case ids the envelope carries, in corpus order.
     """
     store = Store(
         root=root,
@@ -280,22 +310,9 @@ def apply(envelope: Envelope, root: Path, drafts: Path | None = None) -> list[st
     if problems:
         raise EnvelopeError("\n".join(problems))
 
-    for case_id in ordered:
-        answers = envelope.cases[case_id]
-        draft = Draft(
-            case=case_id,
-            clone=str(root),
-            own_list=[item.strip() for item in answers.own_list if item.strip()],
-            opened_digests=dict(answers.opened_digests),
-        )
-        sittings.finish(
-            store,
-            prepared[case_id],
-            draft,
-            marks=answers.marks,
-            missing=answers.missing,
-            notes=answers.notes,
-        )
+    target = root / relative_path(envelope)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(serialize(envelope))
     return ordered
 
 

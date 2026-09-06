@@ -14,10 +14,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import pathlib
 from pathlib import Path
 
 import pytest
 
+from evals import review_submission as reviews_module
 from evals.harness import envelope as envelopes
 from evals.harness import sitting as sittings
 from evals.harness.envelope import Envelope, EnvelopeError
@@ -64,63 +66,67 @@ def applied(tree: Path, env: Envelope) -> list[str]:
     return envelopes.apply(env, tree, drafts=drafts_root(tree))
 
 
-def reviews(tree: Path, case: str = CASE) -> list[dict]:
-    path = tree / "evals" / "corpus" / case / "case.json"
-    return json.loads(path.read_text(encoding="utf-8")).get("reviews", [])
+def written(tree: Path) -> list[pathlib.Path]:
+    """Every submission file in the tree, which a refusal leaves empty."""
+    directory = tree / envelopes.SUBMISSIONS_DIR
+    return sorted(directory.glob("*.json")) if directory.is_dir() else []
 
 
-class TestTheRoundTripRecordsTheRead:
-    def test_it_writes_the_entry_the_document_and_clears_the_line(self, tree):
+def submitted(tree: Path) -> dict:
+    """The one submission file an import writes, as JSON."""
+    files = sorted((tree / envelopes.SUBMISSIONS_DIR).glob("*.json"))
+    assert len(files) == 1, f"expected one submission, found {files}"
+    return json.loads(files[0].read_text(encoding="utf-8"))
+
+
+class TestTheRoundTripWritesOneSubmission:
+    """An offline reader and a reader at a keyboard contribute the same bytes."""
+
+    def test_it_writes_one_submission_file_and_clears_the_case(self, tree):
         assert applied(tree, envelope(tree)) == [CASE]
 
-        entry = reviews(tree)[0]
-        assert entry["submitted_by"] == "ada"
-        assert entry["submitted_for"] == ANONYMOUS
-        assert entry["document"] == "REVIEW-ada.md"
-        assert (tree / "evals" / "corpus" / CASE / "REVIEW-ada.md").is_file()
-        assert CASE not in sittings.unreviewed_cases(tree)
+        body = submitted(tree)
+        assert body["submitted_by"] == "ada"
+        assert body["submitted_for"] == ANONYMOUS
+        assert list(body["cases"]) == [CASE]
+        assert CASE not in reviews_module.unreviewed_cases(tree)
 
-    def test_the_recorded_digests_are_computed_here(self, tree):
-        """A `read` entry signs the bytes that merge, so the file cannot supply it.
+    def test_the_file_is_named_for_its_own_bytes(self, tree):
+        """The name is the digest, so an edited file no longer matches it."""
+        env = envelope(tree)
+        applied(tree, env)
 
-        The envelope carries digests for one purpose only — saying which words
-        the reader saw, which is what the drift check asks. Nothing in it
-        reaches the entry, and ``CaseAnswers`` has no field that could.
-        """
-        assert "read" not in envelopes.CaseAnswers.model_fields
+        (path,) = sorted((tree / envelopes.SUBMISSIONS_DIR).glob("*.json"))
+        assert path.name == envelopes.submission_name(env)
 
+    def test_the_digests_the_reader_saw_ride_in_the_submission(self, tree):
+        """The drift check reads these, so they say which words were read."""
         applied(tree, envelope(tree))
 
-        recorded = {row["file"]: row["sha256"] for row in reviews(tree)[0]["read"]}
+        recorded = submitted(tree)["cases"][CASE]["opened_digests"]
         assert recorded == digests_for(tree, CASE)
 
-    def test_the_document_names_the_surface_the_read_happened_on(self, tree):
+    def test_the_own_list_rides_in_the_submission(self, tree):
         applied(tree, envelope(tree))
 
-        text = (tree / "evals" / "corpus" / CASE / "REVIEW-ada.md").read_text("utf-8")
-        assert envelopes.HELD in text
-        assert f"Read by {ANONYMOUS}, submitted by ada." in text
-
-    def test_the_own_list_is_printed_above_the_recorded_sets(self, tree):
-        applied(tree, envelope(tree))
-
-        text = (tree / "evals" / "corpus" / CASE / "REVIEW-ada.md").read_text("utf-8")
-        assert text.index(OWN_LIST[0]) < text.index("The recorded `")
+        assert submitted(tree)["cases"][CASE]["own_list"] == OWN_LIST
 
     def test_many_cases_ride_in_one_envelope(self, tree):
         both = {CASE: answers(tree), OTHER: answers(tree, OTHER)}
 
         assert applied(tree, envelope(tree, both)) == sorted([CASE, OTHER])
-        assert reviews(tree, OTHER)
+        assert sorted(submitted(tree)["cases"]) == sorted([CASE, OTHER])
 
-    def test_it_leaves_a_draft_the_operator_can_still_drop(self, tree):
-        """An imported sitting is one the app can take back off before the press."""
+    def test_it_writes_nothing_into_the_case_directory(self, tree):
+        """A submission is one file, so an import leaves the corpus alone."""
+        before = sorted(p.name for p in (tree / "evals" / "corpus" / CASE).iterdir())
+
         applied(tree, envelope(tree))
 
-        held = sittings.load_draft(drafts_root(tree), "ada", CASE)
-        assert held is not None
-        assert held.state == "finished"
-        assert held.own_list == OWN_LIST
+        assert (
+            sorted(p.name for p in (tree / "evals" / "corpus" / CASE).iterdir())
+            == before
+        )
 
 
 class TestTheImportRefusesWhatWouldRecordWordsNobodyRead:
@@ -143,14 +149,14 @@ class TestTheImportRefusesWhatWouldRecordWordsNobodyRead:
 
         with pytest.raises(EnvelopeError, match="own list is shorter"):
             applied(tree, env)
-        assert not reviews(tree)
+        assert not written(tree)
 
     def test_a_mark_naming_no_recorded_finding(self, tree):
         env = envelope(tree, {CASE: answers(tree, marks={"stride:nope": "agree"})})
 
         with pytest.raises(EnvelopeError, match="names no recorded finding"):
             applied(tree, env)
-        assert not reviews(tree)
+        assert not written(tree)
 
     def test_a_file_that_moved_under_the_read(self, tree):
         """Days pass between the page and the import, and the text can move."""
@@ -160,7 +166,7 @@ class TestTheImportRefusesWhatWouldRecordWordsNobodyRead:
 
         with pytest.raises(EnvelopeError, match="changed since the page was built"):
             applied(tree, env)
-        assert not reviews(tree)
+        assert not written(tree)
 
     def test_one_bad_case_writes_none_of_them(self, tree):
         """A half-applied envelope leaves the operator unable to say what is real."""
@@ -170,8 +176,7 @@ class TestTheImportRefusesWhatWouldRecordWordsNobodyRead:
 
         with pytest.raises(EnvelopeError):
             applied(tree, env)
-        assert not reviews(tree)
-        assert not reviews(tree, OTHER)
+        assert not written(tree)
         assert CASE in sittings.unreviewed_cases(tree)
 
     def test_every_problem_arrives_in_one_message(self, tree):
@@ -267,7 +272,7 @@ class TestTheImportChecksWhoTheEnvelopeClaimsToBe:
     def _written(self, tree, path, monkeypatch, **fields):
         monkeypatch.setattr(sittings, "draft_root", lambda: drafts_root(tree))
         code = envelopes.command_import(self._args(tree, path, **fields))
-        return code, reviews(tree)
+        return code, written(tree)
 
     def _file(self, tree, tmp_path, **fields):
         path = tmp_path / "sitting.json"
@@ -311,7 +316,8 @@ class TestTheImportChecksWhoTheEnvelopeClaimsToBe:
         code, recorded = self._written(tree, path, monkeypatch)
 
         assert code == 0
-        assert recorded and recorded[-1]["submitted_by"] == "ada"
+        assert recorded
+        assert json.loads(recorded[-1].read_text("utf-8"))["submitted_by"] == "ada"
 
     def test_a_carried_read_is_recorded_when_the_operator_names_it(
         self, tree, tmp_path, monkeypatch
@@ -323,4 +329,5 @@ class TestTheImportChecksWhoTheEnvelopeClaimsToBe:
         code, recorded = self._written(tree, path, monkeypatch, submitted_for=ANONYMOUS)
 
         assert code == 0
-        assert recorded and recorded[-1]["submitted_for"] == ANONYMOUS
+        assert recorded
+        assert json.loads(recorded[-1].read_text("utf-8"))["submitted_for"] == ANONYMOUS
