@@ -58,7 +58,6 @@ from webapp.page import (
     LOOPBACK_HOSTS,
     Grants,
     SecurityHeaders,
-    escape,
     refuse_cross_origin,
     render,
     response,
@@ -68,7 +67,6 @@ from webapp.page import (
 HOST = "127.0.0.1"
 PORT = 8020
 REPO_ROOT = Path(__file__).resolve().parents[1]
-HELD = "`webapp/sitting.py`"
 _PAGE_GRANTS = Grants(script=True, style=True, connect=True)
 Line = envelopes.Line
 CaseId = Annotated[str, Field(max_length=120)]
@@ -112,7 +110,6 @@ class Session:
             submitted_by=self.submitted_by,
             submitted_for=self.submitted_for,
             drafts=self.drafts,
-            held=HELD,
         )
 
     @property
@@ -167,8 +164,6 @@ def create_app(session: Session, page: str, script: str) -> FastAPI:
                 page,
                 _PAGE_GRANTS,
                 script=script,
-                readby=escape(session.submitted_for),
-                submitter=escape(session.submitted_by),
                 token=script_json(session.token),
                 minownlist=script_json(MIN_OWN_LIST),
                 # Read off the one table, so a mark the method adds
@@ -182,8 +177,6 @@ def create_app(session: Session, page: str, script: str) -> FastAPI:
         rows = session.refresh()
         return JSONResponse(
             {
-                "submitted_by": session.submitted_by,
-                "submitted_for": session.submitted_for,
                 "todo": sum(1 for row in rows if row.state == "todo"),
                 "ready": sum(1 for row in rows if row.state == "finished"),
                 "preselect": session.preselect,
@@ -205,18 +198,22 @@ def create_app(session: Session, page: str, script: str) -> FastAPI:
     def part_one(case: CaseId) -> JSONResponse:
         prepared = open_case(session, case)
         held = held_draft(session, case)
-        work = held or sittings.Draft(case=prepared.case_id, clone=str(session.root))
+        work = held or sittings.Draft(case=prepared.case_id)
+        covered = review_submissions.current_reviews(session.root)
         return JSONResponse(
             {
                 "case": prepared.case_id,
                 "title": prepared.title,
-                "submitted_by": session.submitted_by,
-                "submitted_for": session.submitted_for,
                 "blocks": prepared.part_one_blocks,
-                "files": prepared.files,
                 "own_list": held.own_list if held else None,
                 "state": held.state if held else None,
-                "waiting": review_submissions.waiting(session.root, prepared.case_id),
+                # What a merged sitting already answered, and what still waits.
+                # The page says so where a reader returning for one set would
+                # otherwise wonder why the others arrive marked.
+                "covered": sorted(covered.get(prepared.case_id, {})),
+                "waiting": review_submissions.waiting(
+                    session.root, prepared.case_id, covered
+                ),
                 "marks": work.marks,
                 "missing": work.missing,
                 "notes": work.notes,
@@ -254,7 +251,6 @@ def create_app(session: Session, page: str, script: str) -> FastAPI:
             session,
             sittings.Draft(
                 case=prepared.case_id,
-                clone=str(session.root),
                 own_list=written,
                 opened_digests=opened,
             ),
@@ -346,8 +342,6 @@ def create_app(session: Session, page: str, script: str) -> FastAPI:
         ]
         return JSONResponse(
             {
-                "submitted_by": session.submitted_by,
-                "submitted_for": session.submitted_for,
                 "ready": [_stage_row(row) for row in carried],
                 "held_back": [_stage_row(row) for row in held_back],
                 "unfinished": sum(
@@ -435,7 +429,6 @@ def held_draft(session: Session, case_id: str) -> sittings.Draft | None:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     resumed = sittings.Draft(
         case=prepared.case_id,
-        clone=str(session.root),
         own_list=list(merged.answers.own_list),
         opened_digests=opened,
     )

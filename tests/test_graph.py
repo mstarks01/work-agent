@@ -2700,3 +2700,19 @@ class TestUnfenceIsTheInverseOfTheFence:
         )
 
         assert graph.rejection_issues(parked) == issues
+
+
+def test_a_fenced_value_and_a_fenced_source_share_one_layout():
+    """One spelling of the block a prompt cannot close.
+
+    ``render_fenced`` and ``render_sources`` both wrap a body in the shortest
+    fence it cannot close. The layout was written in both; it is read from
+    :func:`analysis_service.sources.fenced` now, and this holds the two to it.
+    """
+    from analysis_service.sources import Source, fenced, render_sources
+
+    value = {"notes": "a ``` run inside"}
+    assert graph.render_fenced(value) == fenced(graph.render(value))
+    source = Source.description("a ```` run inside")
+    body = render_sources([source]).split("\n\n", 1)[1]
+    assert body == fenced(body.split("\n", 1)[1].rsplit("\n", 1)[0])

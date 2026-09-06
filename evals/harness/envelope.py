@@ -49,11 +49,6 @@ from evals.harness.reference import (
 )
 from evals.harness.sitting import Mark, SittingError, Store
 
-#: What this path calls itself in the evidence it writes. A read held on the
-#: offline page and imported here is not a read held on the local app, and the
-#: filled document is where somebody later asks which it was.
-HELD = "the offline sitting page, imported with `run sitting-import`"
-
 #: The envelope format, so a file written by an older page refuses loudly
 #: rather than being read under rules it was not built for. There is one
 #: version and no compatibility path: a stale envelope is re-read, not
@@ -266,7 +261,6 @@ def apply(envelope: Envelope, root: Path, drafts: Path | None = None) -> list[st
         submitted_by=envelope.submitted_by,
         submitted_for=envelope.submitted_for,
         drafts=drafts or sittings.draft_root(),
-        held=HELD,
     )
     offered = _offered(store.corpus_dir)
     unknown = sorted(set(envelope.cases) - offered)

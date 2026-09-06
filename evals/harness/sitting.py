@@ -54,7 +54,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
-from typing import Any, Literal, get_args
+from typing import Literal, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
@@ -172,9 +172,9 @@ class Draft(BaseModel):
     is a defect that waits.
 
     ``opened_digests`` pins each required file to the bytes it held when the
-    draft opened. That is a different question from the digest in the case
-    metadata, which pins what a recorded sitting signed, and it is what lets
-    a surface tell the reader the text moved under a read in progress.
+    draft opened. That is a different question from the digests a merged
+    submission carries, which pin what a recorded sitting signed, and it is
+    what lets a surface tell the reader the text moved under a read in progress.
 
     **A hand-edited draft costs nothing this project can price, and nothing
     notices it.** A reader who types their own list into this file by hand
@@ -187,10 +187,6 @@ class Draft(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     case: str
-    #: The clone this draft was written from. It is in the file rather than in
-    #: the path so a reader who moves their checkout keeps their drafts and
-    #: gets a warning, rather than a silently empty store.
-    clone: str
     state: DraftState = "open"
     own_list: list[str] = Field(default_factory=list)
     #: Keyed by the finding's fingerprint, exactly as a mark is keyed
@@ -199,18 +195,6 @@ class Draft(BaseModel):
     missing: list[str] = Field(default_factory=list)
     notes: str = ""
     opened_digests: dict[str, str] = Field(default_factory=dict)
-    #: The entry the record appended to ``case.json``, or ``None`` while this
-    #: read is unrecorded. It is in the draft rather than in a surface's
-    #: memory because a reader records a case one day and re-records or drops
-    #: it the next. It is also the whole of what a surface may take back off:
-    #: an entry it did not write is untouchable, which is what keeps
-    #: ``reviews`` append-only.
-    recorded: dict[str, Any] | None = None
-    #: The ``UNREVIEWED`` entry the record removed, verbatim, or ``""`` where
-    #: it removed none. The reason in that entry is prose a person wrote and
-    #: nothing can recompute it, so a surface that puts the case back on the
-    #: list puts back the lines it took out.
-    unreviewed_entry: str = ""
 
 
 @dataclass(frozen=True)
@@ -790,8 +774,8 @@ def document(
 
     Only the filled copy shows the own list was written before the recorded
     sets were opened, which is the one thing a generated ``REVIEW.md`` cannot
-    show. ``submit sitting`` checks it exists; a reader checks it means
-    something.
+    show. It is a rendering of a submission's answers, which the read-only
+    view serves; nothing writes it beside a case.
 
     **It says whose words these are**, because the file name carries the
     submitting login and a proxied read is not that account's own list. The
@@ -1067,11 +1051,10 @@ class Store:
     Four values, because a surface that holds three of them and derives the
     fourth has half of this. ``corpus_dir`` and :attr:`document_name` are
     derived here for the same reason the rest of the rules are: a surface that
-    spelled the document name itself could spell one ``submit sitting`` does
-    not admit.
+    spelled the document name itself could spell a second one.
     """
 
-    #: The clone. The unreviewed list is read and written under it.
+    #: The clone. The corpus is read under it.
     root: Path
     #: The GitHub login this sitting binds to, and the one the pull request
     #: opens as. Every rule that grants anything reads this field.
@@ -1082,10 +1065,6 @@ class Store:
     submitted_for: str
     #: Where this reader's **Draft Sitting**s live, outside the repository.
     drafts: Path
-    #: The surface this sitting is held on, named in the filled document. No
-    #: default: a second surface arrived, and a default would have let it
-    #: write the first one's name into its own evidence.
-    held: str
 
     @property
     def corpus_dir(self) -> Path:

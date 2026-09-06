@@ -35,20 +35,24 @@ async function saveDraft() {
 
 // --- The rail --------------------------------------------------------------
 
-// The label is the server's, off `/api/review-states`, so it is spelled once.
-function railSymbol(status) {
-  if (status === "Reviewed" || status === "Submitted") return ["✓", "complete"];
-  if (status === "In progress") return ["…", "progressing"];
-  if (status === "Error") return ["!", "error"];
+// The state and the label both come off `/api/review-states`. The page keys
+// on the state — the vocabulary the rail already speaks — and spells no label
+// of its own, so a label the server changes changes nothing here.
+const DONE = ["finished", "signed"];
+
+function railSymbol(state) {
+  if (DONE.includes(state)) return ["✓", "complete"];
+  if (state === "draft") return ["…", "progressing"];
+  if (state === "error") return ["!", "error"];
   return ["", "pending"];
 }
 
 function railRow(row) {
   const item = document.createElement("li");
   item.dataset.case = row.case;
-  const status = row.reviewStatus;
+  const status = row.review.label;
   item.title = status + (row.status ? " — " + row.status : "");
-  const [symbol, cls] = railSymbol(status);
+  const [symbol, cls] = railSymbol(row.review.state);
   const icon = el("span", "state-icon " + cls, symbol);
   icon.setAttribute("aria-hidden", "true");
   const label = el("span", "label", row.number + "  " + row.title);
@@ -65,12 +69,25 @@ function railRow(row) {
   return item;
 }
 
+// A refusal is said where the count would go, rather than left as a page
+// that reads "reading the cases…" forever.
+async function getJson(path) {
+  const res = await fetch(path);
+  const d = await res.json();
+  if (!res.ok) throw new Error(d.detail || path + " refused");
+  return d;
+}
+
 async function loadRail() {
-  const [a, b] = await Promise.all([fetch("/api/rail"), fetch("/api/review-states")]);
-  const d = await a.json();
-  const states = await b.json();
-  rows = d.cases.map(r => ({...r, reviewStatus: states.states[r.case]}));
-  const remaining = rows.filter(r => !["Reviewed", "Submitted"].includes(r.reviewStatus)).length;
+  let d, states;
+  try {
+    [d, states] = await Promise.all([getJson("/api/rail"), getJson("/api/review-states")]);
+  } catch (err) {
+    $("left").textContent = err.message;
+    return {};
+  }
+  rows = d.cases.map(r => ({...r, review: states.states[r.case]}));
+  const remaining = rows.filter(r => !DONE.includes(r.review.state)).length;
   $("left").textContent = remaining + " remaining";
   $("cases").replaceChildren(...rows.map(railRow));
   $("start").disabled = !firstToDo();
@@ -93,7 +110,7 @@ function walkable() {
 }
 
 function firstToDo() {
-  return rows.find(r => r.pressable && r.reviewStatus === "Not reviewed");
+  return rows.find(r => r.pressable && r.review.state === "todo");
 }
 
 function updateWalk(id) {
@@ -128,6 +145,7 @@ function closeGuide() {
 // The gate re-arms per case, so a case arriving on the stage arrives blind.
 function blank() {
   $("partOne").textContent = "loading…";
+  $("waiting").classList.add("hidden");
   $("partTwo").replaceChildren();
   $("frameworkPicker").replaceChildren();
   for (const id of ["own", "missing", "notes"]) $(id).value = "";
@@ -141,6 +159,19 @@ function blank() {
   $("finish").textContent = "Record review";
   show("placeholder");
   for (const id of ["two", "done"]) hide(id);
+}
+
+// A case a merged sitting covers in part. The sets it answered arrive marked,
+// and the reader is told which set is theirs, so a locked list and a page of
+// marks they did not make are not a surprise.
+function waiting(d) {
+  const partial = d.covered.length && d.waiting.length;
+  $("waiting").classList.toggle("hidden", !partial);
+  $("waiting").textContent = partial
+    ? "A merged review already covers " + d.covered.join(", ") + ". The list and"
+      + " those marks ride forward locked; only " + d.waiting.join(", ")
+      + " waits for your marks."
+    : "";
 }
 
 // The text moved under a read in progress. It names files and no more.
@@ -172,6 +203,7 @@ async function openCase(id) {
   $("caseId").textContent = d.case;
   layout($("partOne"), d.blocks);
   warn(d.moved);
+  waiting(d);
   // A case takes one own list. Where a draft holds one — the reader's own, or
   // the one a merged sitting carries forward — the box comes back filled and
   // locked and the sets open.
@@ -531,10 +563,13 @@ const drop = id => stageAct("/api/drop", id);
 const putBack = id => stageAct("/api/put-back", id);
 
 async function loadStage() {
-  const [d, status] = await Promise.all([
-    fetch("/api/stage").then(r => r.json()),
-    fetch("/api/contribution-status").then(r => r.json()),
-  ]);
+  let d, status;
+  try {
+    [d, status] = await Promise.all([getJson("/api/stage"), getJson("/api/contribution-status")]);
+  } catch (err) {
+    $("ready").textContent = err.message;
+    return;
+  }
   contributionMode = status.mode;
   $("ready").textContent = d.ready.length + " cases are recorded locally. "
     + d.unfinished + " cases remain unfinished.";
@@ -602,7 +637,11 @@ $("submit").addEventListener("click", async () => {
   }
   if (d.mode === "direct") {
     $("contributeStatus").textContent = "Pull request opened";
-    $("result").textContent = d.url;
+    // A draft that would not delete stops nothing: the pull request is open,
+    // and the file is in a store only the reader can clear. So it is said
+    // here rather than dropped.
+    $("result").textContent = [d.url, ...(d.warnings.length
+      ? ["", "these drafts would not delete:", ...d.warnings] : [])].join("\n");
     show("result");
     return;
   }

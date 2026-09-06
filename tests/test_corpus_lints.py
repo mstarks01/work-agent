@@ -475,21 +475,25 @@ def test_the_check_covers_every_document_the_generator_writes():
     assert covered == set(build_review_docs.documents())
 
 
-def test_a_case_that_records_a_sitting_still_gets_a_document(tmp_path):
+def test_a_case_a_merged_sitting_covers_still_gets_a_document(tmp_path):
     """A sitting does not retire a case, so its document stays current.
 
     A second reader may sit the same case, and a change to any file a sitting
     read puts that case back on the unreviewed list. A generator that stopped
     here would let the document go stale exactly while somebody needed it.
+    A merged sitting lives under ``evals/review/submissions`` and writes
+    nothing into the case, so the generator has nothing to read it from and
+    documents every case alike.
     """
     source = verify_corpus.case_dirs()[-1]
-    case_dir = tmp_path / source.name
+    corpus = tmp_path / "evals" / "corpus"
+    case_dir = corpus / source.name
     shutil.copytree(source, case_dir)
-    meta = json.loads((case_dir / "case.json").read_text(encoding="utf-8"))
-    assert not meta.get("reviews"), "this case was chosen for having none"
-    meta["reviews"] = [
-        {"submitted_by": "ada", "submitted_for": "ada", "date": "2026-09-01"}
-    ]
-    (case_dir / "case.json").write_text(json.dumps(meta), encoding="utf-8")
+    submissions = tmp_path / "evals" / "review" / "submissions"
+    submissions.mkdir(parents=True)
+    (submissions / "review-2026-09-01-ada-000000000000.json").write_text(
+        json.dumps({"submitted_by": "ada", "cases": {source.name: {}}}),
+        encoding="utf-8",
+    )
 
-    assert case_dir in build_review_docs.documents(tmp_path)
+    assert case_dir in build_review_docs.documents(corpus)

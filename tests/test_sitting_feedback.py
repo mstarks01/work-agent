@@ -288,3 +288,67 @@ def test_every_rail_state_has_a_label():
     from webapp.sitting import REVIEW_LABELS
 
     assert set(REVIEW_LABELS) == set(get_args(sittings.RowState))
+
+
+def test_the_read_only_document_rewrite_reads_what_document_writes(tmp_path: Path):
+    """Two readers of one sentence, held together.
+
+    ``_display_document`` rewrites the heading and the provenance line that
+    :func:`evals.harness.sitting.document` writes. A change to that sentence
+    would make the rewrite a silent no-op, and the read-only view would show
+    the glossary's words where the page promises the reader's.
+    """
+    from webapp.sitting import _display_document
+
+    case_dir = tree_for(tmp_path) / "evals" / "corpus" / CASE
+    prepared = sittings.prepare(case_dir)
+    text = sittings.document(prepared, ["a list"], {}, [], "", "ada", "ada", "x")
+
+    shown = _display_document(text)
+
+    assert shown.startswith("# Review — ")
+    assert "Held through" not in shown
+    assert "The independent list below was written before" in shown
+
+
+def test_a_draft_that_will_not_delete_is_named_in_the_answer(
+    tmp_path: Path, monkeypatch
+):
+    """The pull request is open either way, and the file is in a store only
+    the reader can clear — so it is said, never dropped."""
+    tree = tree_for(tmp_path)
+    client, _ = client_for(tree)
+    record_one(client)
+    monkeypatch.setattr(sitting.submit_spine, "gh_login", lambda root: "ada")
+    monkeypatch.setattr(
+        sitting.review_submissions, "open_pull_request", lambda root, env: "url"
+    )
+
+    def stuck(drafts, login, case):
+        raise sittings.DraftError(f"{case}: the store is read-only")
+
+    monkeypatch.setattr(sitting.sittings, "discard_draft", stuck)
+    response = client.post("/api/contribute", json={"reviewer": "anonymous"})
+
+    assert response.status_code == 200
+    assert response.json()["warnings"] == [f"{CASE}: {CASE}: the store is read-only"]
+    assert "d.warnings" in client_script("sitting.js"), "the page says it"
+
+
+def test_review_states_hand_the_page_a_state_and_a_label(tmp_path: Path):
+    """The page keys on the state the rail speaks and spells no label.
+
+    A draft holding an own list and nothing else reads as ``todo``, which is
+    what the page's *Begin review* and its *remaining* count key on.
+    """
+    from webapp.sitting import REVIEW_LABELS
+
+    tree = tree_for(tmp_path)
+    client, _ = client_for(tree)
+    client.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
+
+    states = client.get("/api/review-states").json()["states"]
+
+    assert states[CASE] == {"state": "todo", "label": REVIEW_LABELS["todo"]}
+    for entry in states.values():
+        assert entry["label"] == REVIEW_LABELS[entry["state"]]

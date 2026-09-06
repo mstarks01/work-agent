@@ -10,7 +10,7 @@ sitting is pure reading time.
 The template is ``corpus/01-payments-checkout/REVIEW-02.md``, the first such
 document and the record of what a sitting needs: the sources verbatim, the model
 as tables, the reader's own list before the recorded sets, one mark per record,
-and the exact ``reviews`` entry to paste at the end. It is a template for the
+and the shape of the one file a sitting contributes at the end. It is a template for the
 shape and not for the mark names: it is a merged reader's own words, which a
 vocabulary sweep does not edit, so it still spells ``doubt`` and ``dup`` where
 :data:`~evals.harness.sitting.MARKS` now reads ``agree``, ``reject`` and

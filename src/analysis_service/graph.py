@@ -198,7 +198,7 @@ from analysis_service.skills import (
     compose_domain_skills,
     compose_lane_skills,
 )
-from analysis_service.sources import CARRIED_EVIDENCE_KINDS, fence_for
+from analysis_service.sources import CARRIED_EVIDENCE_KINDS, fenced
 from analysis_service.system_model import BoundaryCrossing, SystemModel
 from analysis_service.validation import ValidationIssue, parse_and_validate
 
@@ -977,9 +977,7 @@ def render_fenced(value: Any) -> str:
     as itself, so the two cannot be mixed: one written in the file would be the
     one a body could close.
     """
-    body = render(value)
-    fence = fence_for(body)
-    return f"{fence}\n{body}\n{fence}"
+    return fenced(render(value))
 
 
 def unfence(rendered: str) -> str:
