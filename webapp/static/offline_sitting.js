@@ -165,12 +165,17 @@ function bar(into) {
   const load = el("button", null, "Load a saved file");
   load.onclick = () => document.getElementById("file").click();
   b.appendChild(load);
+  const ready = finished();
   const publish = el("button", "go", "Open the pull request on GitHub");
-  publish.disabled = !done;
+  publish.disabled = !ready.length;
+  publish.title = ready.length
+    ? ready.length + " case(s) ready to publish"
+    : "Mark every record in a case before you publish it";
   publish.onclick = publishToGitHub;
   if (window.crypto && window.crypto.subtle) b.appendChild(publish);
-  b.appendChild(el("span", "hint", done + " case(s) started. Download to stop " +
-    "and load the same file to carry on — nothing is sent from this page."));
+  b.appendChild(el("span", "hint", done + " case(s) started, " + ready.length +
+    " ready to publish. Download to stop and load the same file to carry on — " +
+    "nothing is sent from this page."));
   into.appendChild(b);
 }
 
@@ -191,11 +196,20 @@ function draw() {
   window.scrollTo(0, 0);
 }
 
-function envelope() {
+// Every case whose records all carry a mark. A submission answers every
+// finding it read, so a case still in progress may be saved and may not be
+// published — the same split the app makes between a draft and the stage.
+function finished() {
+  return Object.keys(answers).filter(id => state(id)[0] === "finished");
+}
+
+function envelope(only) {
   const cases = {};
-  for (const [id, a] of Object.entries(answers))
+  for (const [id, a] of Object.entries(answers)) {
+    if (only && !only.includes(id)) continue;
     cases[id] = {own_list: a.own_list, marks: a.marks, missing: a.missing,
                  notes: a.notes, opened_digests: a.opened_digests};
+  }
   return {envelope: DATA.envelope, submitted_by: DATA.submitted_by,
           submitted_for: DATA.submitted_for, generated: DATA.generated,
           cases: cases};
@@ -240,8 +254,10 @@ async function contributionUrl(env) {
 // Opened from a click handler rather than from the promise, because a popup
 // blocker refuses a window a page opens after an await.
 async function publishToGitHub() {
+  const ready = finished();
+  if (!ready.length) return;
   const opened = window.open("", "_blank", "noopener");
-  const url = await contributionUrl(envelope());
+  const url = await contributionUrl(envelope(ready));
   if (opened) opened.location = url;
   else window.location = url;
 }

@@ -229,14 +229,14 @@ def _refusals(
             " so this read answers words that are no longer there. Generate"
             " the page again and ask for this case to be re-read."
         )
-    unknown = sorted(
-        set(answers.marks) - {target.fingerprint for target in prepared.mark_targets}
-    )
-    if unknown:
-        problems.append(
-            f"{case_id}: {', '.join(unknown)} names no recorded finding of this"
-            " case, so the mark answers nothing"
-        )
+    # Asked rather than re-derived. This module used to spell the mark rule a
+    # second time, so a change to it here and not there would have refused an
+    # offline reader's case and accepted the same case from the app.
+    for rule in (sittings.check_marks, sittings.check_every_finding_marked):
+        try:
+            rule(prepared, answers.marks)
+        except sittings.SittingError as exc:
+            problems.append(str(exc))
     return problems
 
 

@@ -98,17 +98,29 @@ def draft_file(tree, case, reviewer="ada") -> Path:
     return drafts_root(tree) / reviewer / f"{case}.json"
 
 
+def every_mark(app, case=CASE, value="agree"):
+    """A mark on every finding part two offers, which a record now needs."""
+    payload = app.get(f"/api/part-two?case={case}").json()
+    return {target["fingerprint"]: value for target in payload["marks"]}
+
+
 def read_and_record(app, case=CASE, notes="21 agree", missing=()):
     """One whole sitting through the app: the own list, then the record.
 
     The shortest route to a finished draft, which is the one thing the submit
-    stage, the pinned footer and the drop are all about.
+    stage, the pinned footer and the drop are all about. It answers every
+    finding, because :func:`~evals.harness.sitting.check_every_finding_marked`
+    refuses a record that leaves one unanswered.
     """
     app.post("/api/own-list", json={"case": case, "items": OWN_LIST})
-    app.get(f"/api/part-two?case={case}")
     return app.post(
         "/api/finish",
-        json={"case": case, "marks": {}, "missing": list(missing), "notes": notes},
+        json={
+            "case": case,
+            "marks": every_mark(app, case),
+            "missing": list(missing),
+            "notes": notes,
+        },
     )
 
 
@@ -158,6 +170,7 @@ def sign(tree, case, reviewer, own_list=("a spoofed device reports for another",
     :func:`evals.review_submission.current_reviews` asks for.
     """
     case_dir = tree / "evals" / "corpus" / case
+    prepared = sittings.prepare(case_dir)
     envelope = envelopes.Envelope.model_validate(
         {
             "envelope": envelopes.VERSION,
@@ -167,12 +180,12 @@ def sign(tree, case, reviewer, own_list=("a spoofed device reports for another",
             "cases": {
                 case: {
                     "own_list": list(own_list),
-                    "marks": {},
+                    "marks": {
+                        target.fingerprint: "agree" for target in prepared.mark_targets
+                    },
                     "missing": [],
                     "notes": "",
-                    "opened_digests": sittings.digests(
-                        case_dir, sittings.prepare(case_dir).files
-                    ),
+                    "opened_digests": sittings.digests(case_dir, prepared.files),
                 }
             },
         }
@@ -502,7 +515,12 @@ class TestTheMarks:
             for target in reversed(session.prepared[CASE].mark_targets)
         }
         assert len(first) > 1, "this case declares one framework"
-        self.marked(app, dict.fromkeys(first.values(), "reject"))
+        answers = {
+            target.fingerprint: "agree"
+            for target in session.prepared[CASE].mark_targets
+        }
+        answers.update(dict.fromkeys(first.values(), "reject"))
+        assert self.marked(app, answers).status_code == 200
 
         text = rendered_document(session)
         for framework, fingerprint in first.items():
@@ -510,10 +528,33 @@ class TestTheMarks:
             section = head.split("\n---\n")[0]
             assert fingerprint in section, f"{framework}'s mark landed elsewhere"
 
-    def test_a_sitting_with_no_marks_still_records(self, client):
+    def test_a_sitting_that_judges_nothing_is_refused(self, client):
+        """The bar is a judgement, not an open file.
+
+        A submission used to clear a case on the digests alone, so a reader
+        could open every set and record nothing about any claim — and CI
+        counted that case as read. The one defect a sitting exists to catch is
+        a claim asserting a fact its own model does not hold, and a reader
+        records that as a ``reject``.
+        """
         app, session, _ = client
-        assert self.marked(app, {}).status_code == 200
-        assert "### Marks" not in rendered_document(session)
+
+        refused = self.marked(app, {})
+
+        assert refused.status_code == 409
+        assert "carry no mark" in refused.json()["detail"]
+        assert session.draft(CASE).state != "finished", "and nothing is recorded"
+
+    def test_one_finding_short_is_still_refused(self, client):
+        """Every finding, because a fraction is a number nobody can defend."""
+        app, session, _ = client
+        targets = session.prepared[CASE].mark_targets
+        all_but_one = {target.fingerprint: "agree" for target in targets[1:]}
+
+        refused = self.marked(app, all_but_one)
+
+        assert refused.status_code == 409
+        assert f"1 of {len(targets)}" in refused.json()["detail"]
 
     def test_an_insertion_into_a_claim_file_re_points_no_mark(self, client):
         """A positional key would move every mark below the insertion."""
@@ -696,7 +737,13 @@ class TestTheRail:
         app = self.opened(tree)
         app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         app.post(
-            "/api/finish", json={"case": CASE, "marks": {}, "missing": [], "notes": ""}
+            "/api/finish",
+            json={
+                "case": CASE,
+                "marks": every_mark(app, CASE),
+                "missing": [],
+                "notes": "",
+            },
         )
         assert self.rows(app)[CASE]["status"] == "finished, not submitted"
         assert self.rows(app)[CASE]["state"] == "finished"
@@ -747,6 +794,8 @@ class TestEveryEndpointResolvesItsCase:
             "POST /api/finish": (
                 "post",
                 "/api/finish",
+                # No marks: the case is refused before a mark is read, and
+                # asking the app for its targets would refuse first.
                 {"case": case, "marks": {}, "missing": [], "notes": ""},
             ),
             "POST /api/drop": ("post", "/api/drop", {"case": case}),
@@ -994,7 +1043,13 @@ class TestTheWalkStaysBlind:
         app = browser(session_for(tree, "ada"))
         app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         recorded = app.post(
-            "/api/finish", json={"case": CASE, "marks": {}, "missing": [], "notes": ""}
+            "/api/finish",
+            json={
+                "case": CASE,
+                "marks": every_mark(app, CASE),
+                "missing": [],
+                "notes": "",
+            },
         )
         seen = recorded.text + self.everything(app, [OTHER])
         for claim in self.claims(tree, OTHER):
@@ -1051,7 +1106,12 @@ class TestTheWalk:
         app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         app.post(
             "/api/draft",
-            json={"case": CASE, "marks": {}, "missing": ["theirs"], "notes": "mine"},
+            json={
+                "case": CASE,
+                "marks": every_mark(app, CASE),
+                "missing": ["theirs"],
+                "notes": "mine",
+            },
         )
         came_back = app.get(f"/api/part-one?case={CASE}").json()
         assert came_back["own_list"] == OWN_LIST
@@ -1214,7 +1274,12 @@ class TestTheDraftSurvivesTheProcess:
         app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         app.post(
             "/api/finish",
-            json={"case": CASE, "marks": {}, "missing": ["mine"], "notes": "done"},
+            json={
+                "case": CASE,
+                "marks": every_mark(app, CASE),
+                "missing": ["mine"],
+                "notes": "done",
+            },
         )
         held = json.loads(draft_file(tree, CASE).read_text("utf-8"))
         assert held["state"] == "finished"
@@ -1253,7 +1318,7 @@ class TestReRecordingACase:
             "/api/finish",
             json={
                 "case": case,
-                "marks": {},
+                "marks": every_mark(app, case),
                 "missing": list(missing),
                 "notes": notes,
             },
@@ -1339,7 +1404,12 @@ class TestTheTextMovedUnderTheRead:
     def finish(self, app, case=CASE):
         return app.post(
             "/api/finish",
-            json={"case": case, "marks": {}, "missing": [], "notes": ""},
+            json={
+                "case": case,
+                "marks": every_mark(app, case),
+                "missing": [],
+                "notes": "",
+            },
         )
 
     def test_a_case_that_did_not_move_names_nothing(self, tree):
