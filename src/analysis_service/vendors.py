@@ -196,11 +196,18 @@ CREDENTIAL_MODE_NOTES: dict[CredentialMode, str] = {
 class _FormRule:
     """One model family's pinned-form rule.
 
-    ``family`` is the model-name prefix this rule covers; the empty string is the
-    vendor's catch-all. ``pinned`` is the canonical identifier's shape where the
-    vendor documents one — Claude's dateless ``claude-{name}-{major}[-{minor}]``.
-    Where a family's most specific stable identifier is the bare name (Gemini 2.5
-    and later ship no numbered builds), ``pinned`` is ``None`` and only the
+    ``family`` is a compiled pattern, matched at the *start* of the model
+    identifier; :data:`_CATCH_ALL` carries the empty pattern, which every
+    identifier matches. It is a pattern rather than a prefix because a family
+    has to be able to run broad while its pinned shape stays strict: a Bedrock
+    Claude spelled without ``anthropic.`` must reach this rule and fail the
+    shape with a hint, rather than pass unpinned through the catch-all. A
+    prefix cannot express that.
+
+    ``pinned`` is the canonical identifier's shape where the vendor documents
+    one — Claude's dateless ``claude-{name}-{major}[-{minor}]``. Where a
+    family's most specific stable identifier is the bare name (Gemini 2.5 and
+    later ship no numbered builds), ``pinned`` is ``None`` and only the
     denylist applies.
 
     **A rule constrains an identifier's shape, never its version.** This service
@@ -209,7 +216,7 @@ class _FormRule:
     is whether a *sampling param* may be sent, not whether the model may run.
     """
 
-    family: str
+    family: re.Pattern[str]
     pinned: re.Pattern[str] | None
     hint: str
 
@@ -290,7 +297,7 @@ _FLOATING_WORDS: dict[str, str] = {
 _CLAUDE_ID = re.compile(r"claude-[a-z]+-(?P<major>\d+)(?:-(?P<minor>\d{1,2})(?!\d))?")
 
 _CLAUDE_RULE = _FormRule(
-    family="claude-",
+    family=re.compile(r"claude-"),
     pinned=_CLAUDE_ID,
     hint=(
         "a Claude model ID is 'claude-<name>-<major>[-<minor>]',"
@@ -320,7 +327,7 @@ _CLAUDE_RULE = _FormRule(
 # :class:`_FormRule` says it does, and this is the family that demonstrates it.
 #
 # The o-series is a separate case again: it ships no dated form at all.
-_CATCH_ALL = _FormRule(family="", pinned=None, hint="")
+_CATCH_ALL = _FormRule(family=re.compile(""), pinned=None, hint="")
 
 # Which family rules each vendor applies, in order, with the catch-all last.
 #
@@ -500,7 +507,7 @@ class Vendor:
     def _rule_for(self, model: str) -> _FormRule:
         """The first family rule matching this model; the catch-all always does."""
         rules = _FORM_RULES[self.name]
-        return next(rule for rule in rules if model.startswith(rule.family))
+        return next(rule for rule in rules if rule.family.match(model) is not None)
 
     def credential_kwargs(
         self, env: Mapping[str, str], mode: CredentialMode
