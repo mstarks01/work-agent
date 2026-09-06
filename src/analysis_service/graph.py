@@ -1799,6 +1799,15 @@ def assemble_report(
     can only spend the time again — and :data:`STATE_ANALYSIS`, already written,
     is what says the pass happened.
 
+    **Two triggers that run at once are not serialized, and need not be.**
+    Node bodies run on the worker pool, and the gate is a read of the session
+    state followed by a write, so two triggers that both find every framework
+    finished before either writes both assemble. What keeps that safe is the
+    assembly, not the gate: it is a pure function of the parked artifacts, so
+    both passes write the same value and the second costs time and nothing
+    else. A lock here would buy one assembly instead of two identical ones,
+    at the price of a lock on the one node every framework's route ends at.
+
     **A join node is the wrong fix here**, and the run-time gate is why. ADK's
     ``JoinNode`` waits for *all* predecessors to complete, and a refused
     framework's subgraph never runs, so its terminal node never completes and the
