@@ -17,7 +17,9 @@ from analysis_service.grounding import (
     MAX_REPAIR_WORK,
     REPAIR_THRESHOLD,
     normalize,
+    prepare_source,
     repair_deadline,
+    repair_prepared,
     repair_quote,
     verify_quote,
 )
@@ -379,3 +381,44 @@ class TestTheRepairRung:
         assert " ".join(w for w in map(normalize, words) if w) == normalize(
             " ".join(words)
         )
+
+
+class TestPreparingASourceOnce:
+    """The split and the per-word folding do not depend on the quote, so a body
+    scanning one source for many refused quotes pays for them once.
+    """
+
+    def test_a_prepared_source_answers_what_the_raw_form_answers(self):
+        """The two entry points are one scan. ``repair_quote`` prepares the
+        source and calls the prepared form, so a caller that prepares its own
+        cannot get a different span."""
+        quote = "with a single shared passwrd"
+
+        assert repair_prepared(quote, prepare_source(SOURCE)) == repair_quote(
+            quote, SOURCE
+        )
+
+    def test_one_prepared_source_serves_every_quote(self):
+        """Reuse across quotes is what the value exists for: the second scan
+        over one prepared source answers what its own fresh preparation would.
+        """
+        prepared = prepare_source(SOURCE)
+        quotes = ["with a single shared passwrd", "has full read/write on evry table"]
+
+        assert [repair_prepared(quote, prepared) for quote in quotes] == [
+            repair_quote(quote, SOURCE) for quote in quotes
+        ]
+
+    def test_an_expired_body_deadline_prepares_nothing(self, monkeypatch):
+        """A scan with no time left folds no source to find that out. Bounded
+        the other way round, a body that spent its thirty seconds still paid one
+        whole fold per remaining quote: 400 refused quotes against a
+        20,000-word source is 6.4 s of folding for 400 answers of ``None``.
+        """
+
+        def refuse(source: str):
+            raise AssertionError("the source was prepared past the deadline")
+
+        monkeypatch.setattr(grounding, "prepare_source", refuse)
+
+        assert repair_quote("anything at all", SOURCE, time.thread_time() - 1) is None

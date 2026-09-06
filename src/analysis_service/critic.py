@@ -45,9 +45,12 @@ from typing import NamedTuple, get_args
 
 from analysis_service.frameworks import FrameworkPackage, FrameworkSchemas
 from analysis_service.grounding import (
+    PreparedSource,
+    deadline_spent,
     normalize,
+    prepare_source,
     repair_deadline,
-    repair_quote,
+    repair_prepared,
     verify_normalized,
 )
 from analysis_service.references import canonical, snap
@@ -70,7 +73,13 @@ from analysis_service.report import (
     UnverifiedGround,
     Verdict,
 )
-from analysis_service.system_model import DataFlow, Element, SystemModel, TrustBoundary
+from analysis_service.system_model import (
+    DataFlow,
+    Element,
+    ModelIndex,
+    SystemModel,
+    TrustBoundary,
+)
 
 # Most severe first — the order a graded framework's ``claims`` array carries.
 # The service holds the order because it holds
@@ -323,43 +332,22 @@ def _resolve_element_references(
     return _ReferenceCheck(drafts, unresolved, dropped)
 
 
-def _reach_of(places: Collection[str], system_model: SystemModel) -> frozenset[str]:
-    """``places`` plus every element one hop away in the graph.
-
-    A flow reaches its two endpoints. An element reaches the flows that touch
-    it and the elements at their far ends. Nothing further: the second hop is
-    the reach a description narrates, never the place an action lands.
-    """
-    flows = {
-        flow.id: (flow.source, flow.destination) for flow in system_model.data_flows
-    }
-    reach = set(places)
-    for place in places:
-        endpoints = flows.get(place)
-        if endpoints is not None:
-            reach.update(endpoints)
-            continue
-        for flow_id, (source, destination) in flows.items():
-            if place in (source, destination):
-                reach.update((flow_id, source, destination))
-    return frozenset(reach)
-
-
 def _bound_of(
-    claim: Claim, known_ids: Collection[str], system_model: SystemModel
+    claim: Claim, known_ids: Collection[str], index: ModelIndex
 ) -> frozenset[str]:
     """The element IDs a claim may cite, from its grounds or from its prose.
 
     A catalogued ground names an element or a flow, and the bound is one hop
-    from those (:func:`_reach_of`). A claim resting on quotes alone names none,
-    so its bound is exactly what its own prose cites — the same resolution
+    from those (:meth:`~analysis_service.system_model.ModelIndex.reach`). A
+    claim resting on quotes alone names none, so its bound is exactly what its
+    own prose cites — the same resolution
     :func:`mentioned_ids` gives coverage — with no hop, since a description
     that names an element has already put it in reach. A claim citing nothing
     anywhere has no bound and passes untouched.
     """
     places = {ground.place for ground in claim.grounds if ground.place}
     if places:
-        return _reach_of(places, system_model)
+        return index.reach(places)
     return frozenset(
         resolved
         for mention in mentioned_ids(claim.description)
@@ -368,7 +356,7 @@ def _bound_of(
 
 
 def _bound_element_references(
-    claims: Iterable[Claim], system_model: SystemModel
+    claims: Iterable[Claim], index: ModelIndex
 ) -> _ReferenceCheck:
     """Drop every cited element the claim's own grounds do not reach, and mark it.
 
@@ -378,12 +366,12 @@ def _bound_element_references(
     dropped with :data:`BEYOND_GROUNDS` as its reason, on the same terms as an
     ID the model does not contain, and a claim left with none is dropped.
     """
-    known_ids = {element.id for element in system_model.elements()}
+    known_ids = index.elements.keys()
     drafts: list[Claim] = []
     unresolved: list[UnresolvedReference] = []
     dropped: list[DroppedClaim] = []
     for claim in claims:
-        reach = _bound_of(claim, known_ids, system_model)
+        reach = _bound_of(claim, known_ids, index)
         if not reach:
             drafts.append(claim)
             continue
@@ -649,7 +637,7 @@ def _duplicate_id_issues(entries: Iterable[Claim | Ruling]) -> list[str]:
 
 
 def _ground_reference_issues(
-    claims: Iterable[Claim], system_model: SystemModel
+    claims: Iterable[Claim], system_model: SystemModel, index: ModelIndex
 ) -> list[str]:
     """Every catalogued grounds entry whose reference does not resolve.
 
@@ -660,13 +648,17 @@ def _ground_reference_issues(
     is this service's own defect and stays fatal. A quote's ``source_label`` is
     deliberately not here: that is the agent's, and a label naming no source is
     a quote that cannot be found, which :func:`_verify_quotes` marks.
+
+    ``index`` indexes ``system_model``. Both are handed in because the crossings
+    are derived from the whole model and an index cannot carry them: the
+    derivation fails closed on an invalid model, and an index is built over
+    models the validity gate has not seen yet.
     """
-    by_id = {element.id: element for element in system_model.elements()}
     crossing_ids = {crossing.flow_id for crossing in system_model.boundary_crossings()}
     issues = []
     for claim in claims:
         for ground in claim.grounds:
-            issues += _one_ground_issues(claim.id, ground, by_id, crossing_ids)
+            issues += _one_ground_issues(claim.id, ground, index.elements, crossing_ids)
     return issues
 
 
@@ -730,7 +722,7 @@ def _verify_quotes(claims: Sequence[Claim], sources: Mapping[str, str]) -> _Quot
 
     Three outcomes, at two different scopes, and the split is the whole policy.
     **Per entry**, a quote the ladder refused is offered to
-    :func:`~analysis_service.grounding.repair_quote` first: where the source holds
+    :func:`~analysis_service.grounding.repair_prepared` first: where the source holds
     a span near enough, the ground is rewritten to that span — the submitter's
     words, never the model's — and a :class:`~analysis_service.report.RepairedQuote`
     keeps what the agent wrote. Otherwise the quote is *marked* and still renders: 0
@@ -757,6 +749,18 @@ def _verify_quotes(claims: Sequence[Claim], sources: Mapping[str, str]) -> _Quot
     # against the same few submissions, so the per-quote form would re-fold whole
     # documents to reach the same answer.
     folded = {label: normalize(text) for label, text in sources.items()}
+    # And each source split and folded per word once, for the repair rung, which
+    # needs the source in a second shape. Filled as a source is first repaired
+    # against rather than up front: a body whose quotes all verify repairs
+    # nothing, and preparing every submission for it would be the whole cost of
+    # the rung with none of its work.
+    #
+    # What it holds for the length of the body is two tuples of words per source
+    # a refused quote named. That is bounded by the job's own sources, which the
+    # deployment caps as one total across all of them
+    # (``resilience.max_source_bytes``), and it is the retention reuse costs:
+    # a fold nobody keeps is a fold the next quote pays for again.
+    prepared: dict[str, PreparedSource] = {}
     # One deadline for every repair this body runs. Each scan is bounded on its
     # own, and a body runs one scan per refused quote: bounded per scan, a body
     # of four hundred adversarial quotes ran for hours after the job settled.
@@ -777,7 +781,19 @@ def _verify_quotes(claims: Sequence[Claim], sources: Mapping[str, str]) -> _Quot
             if ground.source_label not in sources:
                 unverified.append(index)
                 continue
-            repair = repair_quote(ground.text, sources[ground.source_label], deadline)
+            label = ground.source_label
+            if label not in prepared:
+                # The body's deadline, asked before the fold rather than inside
+                # the scan after it. A body that has spent its thirty seconds
+                # answers ``None`` for every quote that is left, and folding a
+                # whole submission to reach that answer is what this ordering
+                # removes: 400 refused quotes against a 20,000-word source is
+                # 6.4 s of folding for 400 answers of nothing.
+                if deadline_spent(deadline):
+                    unverified.append(index)
+                    continue
+                prepared[label] = prepare_source(sources[label])
+            repair = repair_prepared(ground.text, prepared[label], deadline)
             if repair is None:
                 unverified.append(index)
                 continue
@@ -881,7 +897,11 @@ def join_drafts(
     citation that is not wrong. Empty means the text check does not run — no
     quote is marked and no claim is dropped on one.
     """
-    known_ids = {element.id for element in system_model.elements()}
+    # One index for the whole fan-in. Each check below asks the model who
+    # carries an ID and what a flow runs between, once per claim and once per
+    # grounds entry within it, and each used to walk the model to answer.
+    index = ModelIndex.of(system_model)
+    known_ids = index.elements.keys()
     snapped = snap_drafts(
         [draft for lane in package.lanes for draft in drafts_by_lane.get(lane, ())],
         known_ids,
@@ -889,10 +909,10 @@ def join_drafts(
     )
     unique, duplicates = _drop_duplicate_ids(snapped)
     referenced = _resolve_element_references(unique, known_ids)
-    issues = _ground_reference_issues(referenced.drafts, system_model)
+    issues = _ground_reference_issues(referenced.drafts, system_model, index)
     if issues:
         raise DraftJoinError("; ".join(issues))
-    bounded = _bound_element_references(referenced.drafts, system_model)
+    bounded = _bound_element_references(referenced.drafts, index)
     checked = (
         _verify_quotes(bounded.drafts, sources)
         if sources
@@ -1023,7 +1043,7 @@ def _confirmed_on_unknown_issues(
 
 
 def endpoint_targets(
-    element_ids: Iterable[str], system_model: SystemModel
+    element_ids: Iterable[str], flows: Mapping[str, tuple[str, str]]
 ) -> frozenset[str]:
     """The cited elements with every flow replaced by its two endpoints.
 
@@ -1032,10 +1052,13 @@ def endpoint_targets(
     dropped, since a zone is the context a claim sits in rather than what it is
     about. The same fold ``evals/harness/identity.py`` applies when it scores,
     kept in step by ``tests/test_evals_identity.py``.
+
+    ``flows`` is each flow's ID against its two endpoints — a
+    :attr:`~analysis_service.system_model.ModelIndex.flow_endpoints` — rather
+    than the model, and the eval side's ``endpoint_form`` takes the same map.
+    A caller folding many claims builds it once: derived per call, the fold
+    walked every flow in the model for every claim it was asked about.
     """
-    flows = {
-        flow.id: (flow.source, flow.destination) for flow in system_model.data_flows
-    }
     targets: set[str] = set()
     for element_id in element_ids:
         if element_id.startswith(f"{TrustBoundary.id_prefix}:"):
@@ -1062,11 +1085,12 @@ def duplicate_groups(
     A draft with no verb belongs to a package whose identity is a catalog
     identifier, and its duplicates are ID collisions the join already refuses.
     """
+    flows = ModelIndex.of(system_model).flow_endpoints
     by_key: dict[tuple[str, frozenset[str]], list[str]] = {}
     for draft in drafts:
         if draft.verb is None:
             continue
-        key = (draft.verb, endpoint_targets(draft.affected_element_ids, system_model))
+        key = (draft.verb, endpoint_targets(draft.affected_element_ids, flows))
         by_key.setdefault(key, []).append(draft.id)
     return {
         draft_id: [other for other in ids if other != draft_id]

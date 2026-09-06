@@ -6,6 +6,7 @@ from pydantic import ValidationError
 from analysis_service.system_model import (
     DataFlow,
     ExternalEntity,
+    ModelIndex,
     Process,
     SystemModel,
     TrustBoundary,
@@ -239,3 +240,84 @@ class TestNormalizeElementIds:
         normalized = normalize_element_ids(model)
         assert "duplicate-id" not in {i.code for i in validate(model)}
         assert "duplicate-id" in {i.code for i in validate(normalized)}
+
+
+class TestModelIndex:
+    """The lookups a validated model answers repeatedly, computed once.
+
+    The index answers what the model answers — that is the whole contract — so
+    each test compares the two rather than asserting the index's own idea of a
+    right answer.
+    """
+
+    def test_every_element_is_found_by_id(self):
+        model = valid_model()
+
+        index = ModelIndex.of(model)
+
+        assert [index.get(element.id) for element in model.elements()] == (
+            model.elements()
+        )
+
+    def test_an_absent_id_answers_none(self):
+        assert ModelIndex.of(valid_model()).get("process:nonexistent") is None
+
+    def test_a_flow_reaches_its_two_endpoints(self):
+        model = valid_model()
+        flow = model.data_flows[0]
+
+        assert ModelIndex.of(model).reach([flow.id]) == frozenset(
+            {flow.id, flow.source, flow.destination}
+        )
+
+    def test_an_element_reaches_the_flows_that_touch_it(self):
+        """One hop from an element is the flows on it and the elements at their
+        far ends — never a second hop, which is reach a description narrates
+        rather than a place an action lands."""
+        model = valid_model()
+        flow = model.data_flows[0]
+
+        place = flow.source
+
+        reach = ModelIndex.of(model).reach([place])
+
+        touching = [
+            other
+            for other in model.data_flows
+            if place in (other.source, other.destination)
+        ]
+        assert reach == frozenset(
+            {place}
+            | {other.id for other in touching}
+            | {other.source for other in touching}
+            | {other.destination for other in touching}
+        )
+
+    def test_a_place_the_model_does_not_hold_reaches_only_itself(self):
+        assert ModelIndex.of(valid_model()).reach(["process:nonexistent"]) == (
+            frozenset({"process:nonexistent"})
+        )
+
+    def test_reach_is_the_union_over_the_places(self):
+        """Every caller hands ``reach`` a set, so one call over two places must
+        answer what two calls answer together."""
+        model = valid_model()
+        index = ModelIndex.of(model)
+        places = [element.id for element in model.zoned_elements()]
+
+        assert index.reach(places) == frozenset().union(
+            *(index.reach([place]) for place in places)
+        )
+
+    def test_the_index_does_not_follow_a_model_it_indexed(self):
+        """It is a snapshot, and normalization rewrites IDs in place. An index
+        that a model kept would answer for the IDs held before the rewrite, with
+        nothing at the call site to say so."""
+        model = valid_model()
+        index = ModelIndex.of(model)
+        renamed = model.processes[0].id
+
+        model.processes[0].id = "process:renamed"
+
+        assert index.get(renamed) is not None
+        assert index.get("process:renamed") is None

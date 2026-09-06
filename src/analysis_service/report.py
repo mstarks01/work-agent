@@ -1686,7 +1686,7 @@ class RepairedQuote(BaseModel):
     """A quote ground whose text the service replaced with the source's own span.
 
     The ladder refused what the agent wrote, and
-    :func:`~analysis_service.grounding.repair_quote` found a window of the named
+    :func:`~analysis_service.grounding.repair_prepared` found a window of the named
     source near enough to hand back. The ground now carries that window — the
     submitter's words — and this mark carries what the agent wrote, so the
     substitution is on the record rather than silent. ``similarity`` is the

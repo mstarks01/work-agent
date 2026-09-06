@@ -1472,6 +1472,13 @@ def merge_drafts(
     function of that model, so deriving it twice is what guarantees the set an
     agent chose from and the set its choice is resolved against are the same set.
 
+    **The second derivation stays, and the measurement is why.** Sharing one
+    catalog would have to carry it through the session, where a value a node can
+    reach is a value a node can change, and what it would buy is 0.048 ms on a
+    corpus-sized model and 3.7 ms on one of 600 elements — three derivations in
+    a two-framework job, so 0.14 ms and 11 ms. Deriving it again is cheaper than
+    any structure that would let the two sets differ.
+
     Then the mechanical half of the fan-in: :func:`join_drafts` fails closed if
     a draft cites an element the model does not contain, if two agents reused a
     claim ID, or if a grounds reference does not resolve — so the critic spends
@@ -1777,25 +1784,41 @@ def assemble_report(
     here because one model serves N blocks: deriving it per framework would put
     the same finding in the report N times.
 
-    **This node runs once per incoming trigger, so a two-framework job runs it
-    twice.** ADK schedules a ``FunctionNode`` on each trigger rather than on all
-    of its predecessors, and the earlier run builds the block of whichever
-    framework has not finished as empty: a framework reads as finished only once
-    its own router wrote its ``accepted`` marker. The final state is right
-    by construction — the last run is the one that follows the last subgraph, so
-    it sees every framework's artifacts — and it overwrites what the earlier run
-    left.
+    **This node is triggered once per framework, and it assembles on the last
+    of those triggers only.** ADK schedules a ``FunctionNode`` on each incoming
+    trigger rather than on all of its predecessors, so a two-framework job
+    reaches here twice. :func:`_framework_finished` is the gate: a trigger that
+    finds any selected framework still running returns without building
+    anything, and the trigger that finds them all finished builds the one
+    report. A two-framework job therefore builds one report rather than an
+    incomplete one it then overwrites.
+
+    Refusing the later triggers as well as the earlier ones is what makes it
+    exactly one. Once every framework is finished, every remaining trigger would
+    compose the same blocks from the same parked artifacts, so a second pass
+    can only spend the time again — and :data:`STATE_ANALYSIS`, already written,
+    is what says the pass happened.
 
     **A join node is the wrong fix here**, and the run-time gate is why. ADK's
     ``JoinNode`` waits for *all* predecessors to complete, and a refused
     framework's subgraph never runs, so its terminal node never completes and the
-    join would never fire. The wasted run is the price of a topology where a
-    framework may legitimately not run at all.
+    join would never fire. This gate reads each framework's own finished state
+    instead, where a refusal is one of the two ways to be finished.
     """
     model = SystemModel.model_validate(valid_model)
     state = keys.state(ctx)
     options = state.get(STATE_FRAMEWORK_OPTIONS) or {}
+    # Checked on every trigger, before the gate, because it is a driver contract
+    # rather than assembly work: a job whose options are missing says so on the
+    # first framework to finish rather than on the last.
     _check_options(frameworks, options)
+    pending = [
+        name
+        for name in frameworks
+        if not _framework_finished(state, FrameworkNodes(name))
+    ]
+    if pending or state.get(STATE_ANALYSIS) is not None:
+        return {"assembled": False, "pending_frameworks": pending}
     blocks = [
         _framework_block(
             FrameworkNodes(name),
@@ -1819,6 +1842,29 @@ def assemble_report(
         "rejected_count": sum(len(block.rejected_claims) for block in blocks),
         "framework_count": len(blocks),
     }
+
+
+def _framework_finished(state: SessionState, nodes: FrameworkNodes) -> bool:
+    """Has this framework reached a state its block can be built from?
+
+    Two ways, and a framework takes exactly one of them. Its own router wrote
+    the ``accepted`` marker, which is what says its critic reconciled; or its
+    precondition refused it at ``prepare``, which is what sent it down the
+    ``skip`` route with no subgraph to run at all. A framework part-way through
+    its lanes, or one whose critic is in the bounded re-ask, has taken neither.
+
+    The refusal half reads :data:`_REFUSAL_REASONS`, the same table that says
+    *why* a refused framework did not run, so what counts as a refusal is
+    written down once.
+
+    A graph entered past ``prepare`` wrote no precondition key, and
+    :func:`_refusal_reason` reads that absence as ``satisfied``. This reads it
+    the same way: such a framework is finished once it is accepted, and never
+    by refusal.
+    """
+    if state.get(nodes.key("accepted")):
+        return True
+    return str(state.get(nodes.key("precondition"))) in _REFUSAL_REASONS
 
 
 class MissingFrameworkOptions(ValueError):

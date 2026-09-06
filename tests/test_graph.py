@@ -23,7 +23,11 @@ from google.adk.workflow import FunctionNode, JoinNode
 from analysis_service import graph
 from analysis_service.binding import NodeBinding
 from analysis_service.critic import CriticOutputError
-from analysis_service.frameworks import PreconditionError, package_for
+from analysis_service.frameworks import (
+    PRECONDITION_RESULTS,
+    PreconditionError,
+    package_for,
+)
 from analysis_service.frameworks.stride import STRIDE
 from analysis_service.frameworks.stride.record import (
     STRIDE_CATEGORIES,
@@ -233,6 +237,19 @@ def _park(
     return ctx
 
 
+def finish(ctx, frameworks=FRAMEWORKS):
+    """Mark each selected framework as finished, the way its own router does.
+
+    ``assemble`` builds nothing until every selected framework has been accepted
+    or refused, so a test that drives it directly says which of the two
+    happened. The marker is safe on a refused framework too: it parked no
+    drafts, so there is nothing for the marker to unlock.
+    """
+    for name in frameworks:
+        ctx.state[graph.FrameworkNodes(name).key("accepted")] = True
+    return ctx
+
+
 def assemble(
     model,
     drafts,
@@ -251,6 +268,7 @@ def assemble(
     package's and so is parked under the framework's own key.
     """
     _park(ctx, drafts, reviewed_threats, marks, coverage, retrieved)
+    finish(ctx)
     return graph.assemble_report(
         model, ctx, KEYS, FRAMEWORKS, DISCLAIMERS, domain_packs=domain_packs
     )
@@ -1746,6 +1764,22 @@ def test_a_refused_framework_still_produces_a_block_that_states_the_reason(
     assert "does not apply" in block.scope[0].reason
 
 
+def test_every_precondition_result_is_answered_by_the_refusal_table():
+    """The table is checked against its registry, because the gate reads it.
+
+    ``_framework_finished`` reads a framework as finished when its parked
+    precondition string is in ``_REFUSAL_REASONS``. That makes the table
+    load-bearing for whether a job produces a report at all: a fourth
+    ``PreconditionResult`` that routes to ``skip`` and is missing here would
+    never be finished, every ``assemble`` trigger would report it pending, and
+    the job would end in ``GraphProducedNothing`` rather than in an analysis.
+
+    ``satisfied`` is the one result the table does not carry, because a
+    satisfied framework runs and finishes by its router's marker instead.
+    """
+    assert set(graph._REFUSAL_REASONS) | {"satisfied"} == set(PRECONDITION_RESULTS)
+
+
 def test_the_two_refusing_states_state_different_reasons(monkeypatch):
     """Never collapsed, because the remedy differs.
 
@@ -1897,6 +1931,7 @@ def test_the_refused_block_records_the_level_the_job_asked_for(domain_loader):
     graph.prepare_analysis(
         model, ctx, BOTH_KEYS, BOTH, domain_loader, repo_package_loaders(BOTH)
     )
+    finish(ctx, BOTH)
     graph.assemble_report(model, ctx, BOTH_KEYS, BOTH, BOTH_DISCLAIMERS)
 
     analysis = graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS])
@@ -1905,28 +1940,30 @@ def test_the_refused_block_records_the_level_the_job_asked_for(domain_loader):
     assert len(analysis.analyses[0].scope) == 253
 
 
-def test_assemble_runs_once_per_framework_and_the_last_run_is_the_whole_report(
+def test_assemble_is_triggered_per_framework_and_builds_on_the_last_trigger(
     domain_loader,
 ):
     """The topology's own cost, pinned rather than assumed.
 
     ADK schedules a ``FunctionNode`` on each incoming trigger, so two frameworks
-    trigger ``assemble`` twice: the earlier run builds the unfinished
-    framework's block from keys nothing wrote. What matters is that the later run
-    overwrites it, and that is what this holds. A join node is the wrong fix —
-    it waits for every predecessor, and a refused framework's subgraph never
-    completes.
+    trigger ``assemble`` twice. The trigger that arrives while STRIDE is still
+    running builds nothing at all and names what it is waiting for; the trigger
+    after STRIDE's router accepts builds the one report. A join node is the
+    wrong fix — it waits for every predecessor, and a refused framework's
+    subgraph never completes.
     """
     model = valid_model().model_dump(mode="json")
     ctx = FakeContext(**ASVS_OPTIONS)
     graph.prepare_analysis(
         model, ctx, BOTH_KEYS, BOTH, domain_loader, repo_package_loaders(BOTH)
     )
+    ctx.state[graph.FrameworkNodes("asvs").key("accepted")] = True
 
     # The first trigger: ASVS's half has landed, STRIDE's has not.
-    graph.assemble_report(model, ctx, BOTH_KEYS, BOTH, BOTH_DISCLAIMERS)
-    early = graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS])
-    assert early.analyses[1].claims == []
+    early = graph.assemble_report(model, ctx, BOTH_KEYS, BOTH, BOTH_DISCLAIMERS)
+
+    assert early == {"assembled": False, "pending_frameworks": ["stride"]}
+    assert graph.STATE_ANALYSIS not in ctx.state
 
     # The second: every framework's artifacts are parked, so this is the report.
     _park(ctx, [sample_draft("S-01").model_dump(mode="json")], None)
@@ -1941,6 +1978,81 @@ def test_assemble_runs_once_per_framework_and_the_last_run_is_the_whole_report(
     assert [claim.id for claim in final.analyses[1].claims] == ["S-01"]
 
 
+def test_a_refused_framework_is_finished_and_never_waited_for(domain_loader):
+    """The refusal half of the gate, which is what a join node cannot express.
+
+    ASVS refuses a non-web system, so its subgraph never runs and its
+    ``accepted`` marker is never written. A gate reading only that marker would
+    wait for it forever. Its ``skip`` route triggers ``assemble`` while STRIDE
+    is still running, and that trigger waits for STRIDE alone.
+    """
+    model = non_web_model().model_dump(mode="json")
+    ctx = FakeContext(**ASVS_OPTIONS)
+    graph.prepare_analysis(
+        model, ctx, BOTH_KEYS, BOTH, domain_loader, repo_package_loaders(BOTH)
+    )
+
+    early = graph.assemble_report(model, ctx, BOTH_KEYS, BOTH, BOTH_DISCLAIMERS)
+
+    assert early == {"assembled": False, "pending_frameworks": ["stride"]}
+
+    _park(
+        ctx,
+        [sample_draft("S-01").model_dump(mode="json")],
+        {"claims": [sample_ruling("S-01").model_dump(mode="json")]},
+    )
+    final = graph.assemble_report(model, ctx, BOTH_KEYS, BOTH, BOTH_DISCLAIMERS)
+
+    assert final["framework_count"] == 2
+
+
+def test_a_job_every_framework_refuses_assembles_on_its_one_trigger(monkeypatch):
+    """Every framework refused is every framework finished.
+
+    ``prepare`` emits one shared ``skip`` route however many frameworks it
+    refuses, so a job nobody runs reaches ``assemble`` once — and that one
+    trigger has to build the report, or the job never produces one.
+    """
+    carrying(monkeypatch, package_answering("refuted"))
+    ctx = FakeContext(**{NODES.key("precondition"): "refuted"})
+
+    output = graph.assemble_report(
+        valid_model().model_dump(mode="json"), ctx, KEYS, FRAMEWORKS, DISCLAIMERS
+    )
+
+    assert output["framework_count"] == 1
+    assert graph.STATE_ANALYSIS in ctx.state
+
+
+def test_a_trigger_after_the_report_is_built_builds_it_no_second_time(domain_loader):
+    """Exactly one assembly, not merely one that wins.
+
+    Two frameworks that finish before either of their triggers is scheduled both
+    find every framework finished. The second one would compose the same blocks
+    from the same parked artifacts, so it spends the time and changes nothing;
+    the written report is what says the pass already happened.
+    """
+    model = valid_model().model_dump(mode="json")
+    ctx = FakeContext(**ASVS_OPTIONS)
+    graph.prepare_analysis(
+        model, ctx, BOTH_KEYS, BOTH, domain_loader, repo_package_loaders(BOTH)
+    )
+    _park(
+        ctx,
+        [sample_draft("S-01").model_dump(mode="json")],
+        {"claims": [sample_ruling("S-01").model_dump(mode="json")]},
+    )
+    finish(ctx, BOTH)
+
+    first = graph.assemble_report(model, ctx, BOTH_KEYS, BOTH, BOTH_DISCLAIMERS)
+    built = ctx.state[graph.STATE_ANALYSIS]
+    second = graph.assemble_report(model, ctx, BOTH_KEYS, BOTH, BOTH_DISCLAIMERS)
+
+    assert first["framework_count"] == 2
+    assert second == {"assembled": False, "pending_frameworks": []}
+    assert ctx.state[graph.STATE_ANALYSIS] == built
+
+
 @pytest.mark.parametrize(
     "reviewed",
     [
@@ -1948,7 +2060,7 @@ def test_assemble_runs_once_per_framework_and_the_last_run_is_the_whole_report(
         pytest.param({"claims": []}, id="re-ask-replacing-a-malformed-ruling"),
     ],
 )
-def test_an_early_assemble_run_reads_an_unaccepted_framework_as_unfinished(
+def test_an_early_assemble_run_waits_for_an_unaccepted_framework(
     domain_loader, reviewed
 ):
     """The earlier trigger can land while a framework is still running.
@@ -1957,21 +2069,24 @@ def test_an_early_assemble_run_reads_an_unaccepted_framework_as_unfinished(
     ``reviewed`` yet, or the critic wrote a malformed ruling set that the router
     sent to the re-ask, and ``reviewed`` still holds it. Reading the drafts
     against either would raise ``CriticOutputError`` for every draft and fail
-    a job whose critic was still running. A framework its own router did not
-    accept reads as unfinished, and the later run builds its block.
+    a job whose critic was still running. Neither window is a finished
+    framework, so the earlier trigger builds nothing and the trigger after the
+    router accepts builds the report.
     """
     model = valid_model().model_dump(mode="json")
     ctx = FakeContext(**ASVS_OPTIONS)
     graph.prepare_analysis(
         model, ctx, BOTH_KEYS, BOTH, domain_loader, repo_package_loaders(BOTH)
     )
+    ctx.state[graph.FrameworkNodes("asvs").key("accepted")] = True
     ctx.state[NODES.key("drafts")] = [sample_draft("S-01").model_dump(mode="json")]
     if reviewed is not None:
         ctx.state[NODES.key("reviewed")] = reviewed
 
-    graph.assemble_report(model, ctx, BOTH_KEYS, BOTH, BOTH_DISCLAIMERS)
-    early = graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS])
-    assert early.analyses[1].claims == []
+    early = graph.assemble_report(model, ctx, BOTH_KEYS, BOTH, BOTH_DISCLAIMERS)
+
+    assert early["pending_frameworks"] == ["stride"]
+    assert graph.STATE_ANALYSIS not in ctx.state
 
     event = route(
         model, None, ctx, {"claims": [sample_ruling("S-01").model_dump(mode="json")]}
@@ -2052,25 +2167,28 @@ def test_assemble_survives_every_partial_state_a_framework_can_be_seen_in(
     """One row per prefix of the writer order: no prefix raises.
 
     An early ``assemble`` run sees another framework after any of its writer
-    nodes and before the next. Only the whole order carries the framework's
-    claims; every shorter prefix reads it as unfinished and builds an empty
-    block that the last run overwrites.
+    nodes and before the next. Only the whole order ends in the router's marker,
+    so only the whole order assembles; every shorter prefix waits, and names the
+    framework it is waiting for.
     """
     model = valid_model().model_dump(mode="json")
     ctx = FakeContext(**ASVS_OPTIONS)
     graph.prepare_analysis(
         model, ctx, BOTH_KEYS, BOTH, domain_loader, repo_package_loaders(BOTH)
     )
+    ctx.state[graph.FrameworkNodes("asvs").key("accepted")] = True
     for _, keys in FRAMEWORK_KEY_WRITERS[:finished]:
         for artifact, value in keys.items():
             ctx.state[NODES.key(artifact)] = value
 
-    graph.assemble_report(model, ctx, BOTH_KEYS, BOTH, BOTH_DISCLAIMERS)
-    analysis = graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS])
+    output = graph.assemble_report(model, ctx, BOTH_KEYS, BOTH, BOTH_DISCLAIMERS)
 
-    whole = finished == len(FRAMEWORK_KEY_WRITERS)
-    stride_block = analysis.analyses[1]
-    assert [claim.id for claim in stride_block.claims] == (["S-01"] if whole else [])
+    if finished != len(FRAMEWORK_KEY_WRITERS):
+        assert output == {"assembled": False, "pending_frameworks": ["stride"]}
+        assert graph.STATE_ANALYSIS not in ctx.state
+        return
+    analysis = graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS])
+    assert [claim.id for claim in analysis.analyses[1].claims] == ["S-01"]
 
 
 def test_prepare_refuses_a_selection_whose_options_are_missing(domain_loader):
@@ -2118,7 +2236,7 @@ def test_a_driver_that_seeds_no_options_is_told_which_framework_needs_what():
 
 def test_a_framework_needing_no_options_needs_nothing_seeded():
     """The STRIDE-only path is unchanged: an empty options model validates."""
-    ctx = FakeContext()
+    ctx = finish(FakeContext())
 
     graph.assemble_report(
         valid_model().model_dump(mode="json"), ctx, KEYS, FRAMEWORKS, DISCLAIMERS
@@ -2154,9 +2272,11 @@ def test_a_graph_entered_past_the_gate_reports_nothing_out_of_scope():
     """The analysis eval mode seeds a blessed model and runs no gate.
 
     An absent answer is not a refusal, and filling ``scope`` there would describe
-    one that never happened.
+    one that never happened. Such a framework is finished by its router alone:
+    with no precondition key to refuse it, its ``accepted`` marker is the only
+    way it reaches assembly.
     """
-    ctx = FakeContext()
+    ctx = finish(FakeContext())
 
     graph.assemble_report(
         valid_model().model_dump(mode="json"), ctx, KEYS, FRAMEWORKS, DISCLAIMERS

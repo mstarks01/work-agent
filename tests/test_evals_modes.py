@@ -84,14 +84,15 @@ def reaching_refs(case, element_ids) -> list[str]:
     Where nothing reaches every element the best partial reach is cited, and
     the drop of the rest is the point.
     """
-    from analysis_service.critic import _reach_of
+    from analysis_service.system_model import ModelIndex
 
     catalog = evidence_catalog(case.model)
+    index = ModelIndex.of(case.model)
     wanted = set(element_ids)
 
     def merit(ref: str) -> tuple[int, bool]:
         ground = catalog[ref]
-        reach = _reach_of({ground.element_id or ground.flow_id}, case.model)
+        reach = index.reach({ground.element_id or ground.flow_id})
         return len(wanted & reach), ref.startswith("unknown:")
 
     return [max(catalog, key=merit)]
