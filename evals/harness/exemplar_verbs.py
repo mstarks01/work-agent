@@ -155,7 +155,6 @@ class Collision:
     framework: FrameworkName
     lane: str
     verbs: tuple[str, str]
-    headings: tuple[str, str]
     shared_element_ids: tuple[str, ...]
 
 
@@ -269,7 +268,6 @@ def collisions(framework: FrameworkName) -> tuple[Collision, ...]:
                         framework=framework,
                         lane=entry.lane,
                         verbs=(left.verb, right.verb),
-                        headings=(left.heading, right.heading),
                         shared_element_ids=tuple(
                             sorted(set(left.element_ids) & set(right.element_ids))
                         ),
