@@ -170,11 +170,12 @@ jobs:
             echo
             echo "| Lane | Vendors | What it answers | State |"
             echo "| --- | --- | --- | --- |"
-            echo "| Offline conformance (this job) | vertex, anthropic, openai, bedrock | what a provider would be asked for | exercised |"
-            echo "| Provider smoke | vertex, anthropic, openai, bedrock | does the provider serve this graph | **unexercised** — no credentials configured |"
+            echo "| Offline conformance (this job) | vertex, anthropic, openai, bedrock, gemini | what a provider would be asked for | exercised |"
+            echo "| Provider smoke | vertex, anthropic, openai, bedrock, gemini | does the provider serve this graph | **unexercised** — no credentials configured |"
             echo "| Evals (live Vertex) | vertex | threat-model quality | **unexercised** — federation unprovisioned |"
             echo "| Evals (live API-key vendors) | anthropic, openai | threat-model quality | **unexercised** — dispatch-only, secrets unset |"
             echo "| Evals (any lane) | bedrock | threat-model quality | **unexercised** — no sweep lane; ruled out of scope |"
+            echo "| Evals (any lane) | gemini | threat-model quality | **unexercised** — no sweep lane; the vertex sweep already runs these models |"
             echo
             echo "See [.github/WORKLOAD_IDENTITY.md](.github/WORKLOAD_IDENTITY.md)"
             echo "and [docs/adr/0003-no-privileged-vendor.md](docs/adr/0003-no-privileged-vendor.md)."

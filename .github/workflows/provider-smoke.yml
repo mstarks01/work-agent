@@ -256,8 +256,8 @@ jobs:
           # before it could bind, and the smoke measured a file nobody ships.
           #
           # `addressing` names the non-secret variables a leg's vendor also
-          # needs, space separated. Anthropic and OpenAI address nothing beyond
-          # their key, so theirs is empty.
+          # needs, space separated. Anthropic, OpenAI and Gemini address
+          # nothing beyond their key, so theirs is empty.
           - vendor: anthropic
             secret_name: ANALYSIS_ANTHROPIC_API_KEY
             base_model: claude-sonnet-4-6
@@ -279,6 +279,15 @@ jobs:
             base_model: anthropic.claude-sonnet-4-6
             strong_model: anthropic.claude-opus-5
             addressing: ANALYSIS_BEDROCK_REGION
+          # The same models the vertex job above pins, behind an API key. Two
+          # legs for one set of weights is the point: the vertex job holds an
+          # identity and this leg holds a key, and the smoke asks whether
+          # each route serves the graph, not whether the weights do.
+          - vendor: gemini
+            secret_name: ANALYSIS_GEMINI_API_KEY
+            base_model: gemini-2.5-flash
+            strong_model: gemini-2.5-pro
+            addressing: ""
 
     env:
       ANALYSIS_MODEL_BASE_VENDOR: ${{ matrix.vendor }}
