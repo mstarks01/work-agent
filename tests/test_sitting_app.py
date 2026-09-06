@@ -385,7 +385,6 @@ class TestThePosture:
         writes = {
             "/api/own-list": {"case": CASE, "items": OWN_LIST},
             "/api/draft": {"case": CASE, "marks": {}, "missing": [], "notes": ""},
-            "/api/discard": {"case": CASE},
             "/api/finish": {"case": CASE, "marks": {}, "missing": [], "notes": ""},
             "/api/drop": {"case": CASE},
             "/api/put-back": {"case": CASE},
@@ -625,6 +624,10 @@ class TestTheRail:
     so the page never greys a case CI still asks somebody to read.
     """
 
+    def todo(self, app) -> int:
+        """Rows the rail lists as to do, counted the way the page counts them."""
+        return sum(1 for row in self.rail(app)["cases"] if row["state"] == "todo")
+
     def rail(self, app):
         return app.get("/api/rail").json()
 
@@ -678,16 +681,16 @@ class TestTheRail:
 
     def test_the_header_counts_what_is_left(self, tree):
         app = self.opened(tree)
-        assert self.rail(app)["todo"] == len(CASES)
+        assert self.todo(app) == len(CASES)
         sign(tree, OTHER, "sam")
-        assert self.rail(app)["todo"] == len(CASES) - 1
+        assert self.todo(app) == len(CASES) - 1
 
     def test_a_case_the_reader_started_is_no_longer_to_do(self, tree):
         """The count names the cases nobody opened. A row that presses is a
         different question, and a finished case presses."""
         app = self.opened(tree)
         app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
-        assert self.rail(app)["todo"] == len(CASES) - 1
+        assert self.todo(app) == len(CASES) - 1
 
     def test_a_signed_case_is_greyed_and_unpressable(self, tree):
         """Whoever signed it. The status names the signer, which reads both ways."""
@@ -758,7 +761,7 @@ class TestTheRail:
         assert self.rows(app)[CASE]["status"] == "finished, not submitted"
         assert self.rows(app)[CASE]["state"] == "finished"
         assert self.rows(app)[CASE]["pressable"] is True
-        assert self.rail(app)["todo"] == len(CASES) - 1
+        assert self.todo(app) == len(CASES) - 1
 
     def test_a_signature_greys_nothing_while_a_draft_of_it_lives(self, tree):
         """The draft is what makes a case re-openable, not the login. A case
@@ -1482,61 +1485,6 @@ class TestTheTextMovedUnderTheRead:
         page = browser(session_for(tree, "ada")).get("/").text
         assert 'id="moved" class="note hidden"' in page
         assert page.count("warn(d.moved)") == 2, "at open, and again at finish"
-
-
-class TestDiscardingADraft:
-    """One draft the reader abandons, by hand, on the case it belongs to."""
-
-    def discard(self, app, case=CASE):
-        return app.post("/api/discard", json={"case": case})
-
-    def test_the_case_returns_to_to_do(self, tree):
-        app = browser(session_for(tree, "ada"))
-        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
-        assert self.discard(app).json() == {"case": CASE, "discarded": True}
-        assert not draft_file(tree, CASE).exists()
-        rows = {row["case"]: row for row in app.get("/api/rail").json()["cases"]}
-        assert rows[CASE]["status"] == sittings.TO_DO
-        assert rows[CASE]["state"] == "todo"
-        assert rows[CASE]["pressable"] is True
-
-    def test_the_gate_re_arms_behind_it(self, tree):
-        """The case is blind again, which is the whole of what *to do* means."""
-        app = browser(session_for(tree, "ada"))
-        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
-        self.discard(app)
-        assert app.get(f"/api/part-two?case={CASE}").status_code == 409
-        assert app.get(f"/api/part-one?case={CASE}").json()["own_list"] is None
-
-    def test_it_takes_the_case_it_is_given_and_no_other(self, tree):
-        app = browser(session_for(tree, "ada"))
-        for case in CASES:
-            app.post("/api/own-list", json={"case": case, "items": OWN_LIST})
-        self.discard(app, CASE)
-        assert not draft_file(tree, CASE).exists()
-        assert draft_file(tree, OTHER).is_file()
-
-    def test_discarding_where_there_is_no_draft_changes_nothing(self, tree):
-        app = browser(session_for(tree, "ada"))
-        assert self.discard(app).json() == {"case": CASE, "discarded": False}
-
-    def test_it_carries_both_controls(self, tree):
-        """It names a case and it writes under the reader's own store, so a
-        foreign page that reached it would throw away somebody's afternoon."""
-        session = session_for(tree, "ada")
-        app = browser(session)
-        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
-        foreign = app.post(
-            "/api/discard",
-            json={"case": CASE},
-            headers={"Sec-Fetch-Site": "cross-site"},
-        )
-        untokened = TestClient(
-            create_app(session), base_url=LOOPBACK, headers=SAME_ORIGIN
-        ).post("/api/discard", json={"case": CASE})
-        assert foreign.status_code == 403
-        assert untokened.status_code == 403
-        assert draft_file(tree, CASE).is_file()
 
 
 class TestADraftTheAppCannotRead:

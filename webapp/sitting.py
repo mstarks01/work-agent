@@ -426,7 +426,7 @@ def create_app(session: Session) -> FastAPI:
         held.notes = ""
         base.save_draft(session, held)
         session.dropped.discard(prepared.case_id)
-        return JSONResponse({"case": prepared.case_id, "state": "open", "reset": True})
+        return JSONResponse({"case": prepared.case_id, "state": "open"})
 
     @app.get("/api/contribution-status")
     def contribution_status() -> JSONResponse:
@@ -467,7 +467,6 @@ def create_app(session: Session) -> FastAPI:
                 "ok": True,
                 "url": url,
                 "author": author,
-                "carried": cases,
                 "warnings": warnings,
             }
         )
