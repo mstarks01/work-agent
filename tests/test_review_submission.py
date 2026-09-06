@@ -39,7 +39,7 @@ def envelope_for(tree: Path, author: str = "ada") -> envelopes.Envelope:
         cases={
             CASE: envelopes.CaseAnswers(
                 own_list=OWN,
-                marks={},
+                marks={target.fingerprint: "agree" for target in prepared.mark_targets},
                 missing=["missing authorization context"],
                 notes="human note",
                 opened_digests=sittings.digests(

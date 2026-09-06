@@ -39,10 +39,16 @@ def digests_for(tree: Path, case: str) -> dict[str, str]:
     return sittings.digests(case_dir, sittings.prepare(case_dir).files)
 
 
+def every_mark(tree: Path, case: str = CASE) -> dict[str, str]:
+    """A mark on every recorded finding, which a submission now needs."""
+    prepared = sittings.prepare(tree / "evals" / "corpus" / case)
+    return {target.fingerprint: "agree" for target in prepared.mark_targets}
+
+
 def answers(tree: Path, case: str = CASE, **fields) -> dict:
     base = {
         "own_list": list(OWN_LIST),
-        "marks": {},
+        "marks": every_mark(tree, case),
         "missing": [],
         "notes": "",
         "opened_digests": digests_for(tree, case),

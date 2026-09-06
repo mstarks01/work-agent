@@ -66,13 +66,18 @@ def record_one(client: TestClient) -> None:
         client.post("/api/own-list", json={"case": CASE, "items": OWN_LIST}).status_code
         == 200
     )
-    assert client.get(f"/api/part-two?case={CASE}").status_code == 200
+    part_two = client.get(f"/api/part-two?case={CASE}")
+    assert part_two.status_code == 200
     assert (
         client.post(
             "/api/finish",
             json={
                 "case": CASE,
-                "marks": {},
+                # Every finding: a record that leaves one unanswered is refused.
+                "marks": {
+                    target["fingerprint"]: "agree"
+                    for target in part_two.json()["marks"]
+                },
                 "missing": ["a missed authorization edge"],
                 "notes": "reviewer context",
             },
@@ -91,7 +96,7 @@ def central_review(tree: Path, author: str = "ada") -> Path:
         cases={
             CASE: envelopes.CaseAnswers(
                 own_list=OWN_LIST,
-                marks={},
+                marks={target.fingerprint: "agree" for target in prepared.mark_targets},
                 missing=["a missed authorization edge"],
                 notes="reviewer context",
                 opened_digests=sittings.digests(

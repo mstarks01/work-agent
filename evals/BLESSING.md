@@ -388,8 +388,9 @@ something, so the sets cannot open on an empty box. The rule holds per case: **P
 **Next** in the case header walk the list, and a case you have not written a
 list for arrives blind however you reach it. Each recorded finding carries a
 control that takes `agree`, `reject` or `duplicate`, which is the same mark the
-by-hand path writes into a `> mark:` slot. When you finish a case it writes
-that case's record into your working tree.
+by-hand path writes into a `> mark:` slot. **Answer every one.** A case records
+only when no finding is left unmarked, because a set nobody judged is a set
+nobody tested — and **Record review** stays off until the count reaches zero.
 
 **One press submits every case you finished, as one pull request.** A footer
 under the list reads `Submit — N cases ready`, counts them, and is the way to

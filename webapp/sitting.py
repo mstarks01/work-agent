@@ -331,7 +331,7 @@ ul.terms { list-style:none; padding:0; }.rec { border-left:3px solid #8886; }.fi
 <textarea id="missing" placeholder="one potentially missed issue per line"></textarea>
 <h2>Notes</h2><p id="markCounts" class="note"></p><p class="hint">Counts are calculated automatically. Use notes only for context the structured choices do not capture.</p>
 <textarea id="notes" placeholder="optional context or explanation"></textarea>
-<p><button id="finish">Record review</button><span id="saveStatus" class="save-status" role="status"></span></p>
+<p><button id="finish" disabled>Record review</button><span id="saveStatus" class="save-status" role="status"></span></p><p id="finishHint" class="hint" role="status"></p>
 <p><button id="resetReview" type="button">Reset review answers</button></p><p class="hint">Reset clears Part 2 marks, missed issues, notes, and any recorded result for this case. Your independent Part 1 list remains locked because the model findings have already been revealed.</p>
 </section>
 <section id="done" class="hidden"><h2 id="doneTitle">Recorded</h2><p id="summary" class="note"></p><p class="note">This case is recorded locally. Continue to the next case when you are ready. At the end you can keep the results local or choose to contribute them.</p></section>

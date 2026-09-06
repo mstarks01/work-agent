@@ -57,6 +57,12 @@ def prepared_for(store: Store, case: str = CASE):
     return sittings.prepare(store.case_dir(case))
 
 
+def every_mark(store: Store, case: str = CASE) -> dict[str, str]:
+    """A mark on every recorded finding, which a record now needs."""
+    prepared = prepared_for(store, case)
+    return {target.fingerprint: "agree" for target in prepared.mark_targets}
+
+
 def open_draft(store: Store, case: str = CASE, **fields) -> Draft:
     """One reader's draft with their own list written, as the app leaves it."""
     prepared = prepared_for(store, case)
@@ -105,7 +111,7 @@ class TestRecordingWritesNothingIntoTheTree:
             store,
             prepared_for(store),
             open_draft(store),
-            marks={},
+            marks=every_mark(store),
             missing=[],
             notes="21 agree",
         )
@@ -119,7 +125,7 @@ class TestRecordingWritesNothingIntoTheTree:
             store,
             prepared_for(store),
             open_draft(store),
-            marks={},
+            marks=every_mark(store),
             missing=[],
             notes="",
         )
@@ -131,7 +137,7 @@ class TestRecordingWritesNothingIntoTheTree:
             store,
             prepared_for(store),
             open_draft(store),
-            marks={},
+            marks=every_mark(store),
             missing=["nobody rotates the key"],
             notes="21 agree",
         )
@@ -147,7 +153,7 @@ class TestRecordingWritesNothingIntoTheTree:
             store,
             prepared_for(store),
             open_draft(store),
-            marks={},
+            marks=every_mark(store),
             missing=[],
             notes="x",
         )
@@ -162,12 +168,17 @@ class TestRecordingWritesNothingIntoTheTree:
             store,
             prepared_for(store),
             open_draft(store),
-            marks={},
+            marks=every_mark(store),
             missing=[],
             notes="one",
         )
         second = sittings.finish(
-            store, prepared_for(store), first, marks={}, missing=[], notes="two"
+            store,
+            prepared_for(store),
+            first,
+            marks=every_mark(store),
+            missing=[],
+            notes="two",
         )
 
         assert second.notes == "two"
@@ -196,7 +207,7 @@ class TestWithdrawIsTheInverseOfFinish:
             store,
             prepared_for(store),
             open_draft(store),
-            marks={},
+            marks=every_mark(store),
             missing=[],
             notes="x",
         )
@@ -210,7 +221,7 @@ class TestWithdrawIsTheInverseOfFinish:
             store,
             prepared_for(store),
             open_draft(store),
-            marks={},
+            marks=every_mark(store),
             missing=["nobody rotates the key"],
             notes="21 agree",
         )
@@ -226,7 +237,7 @@ class TestWithdrawIsTheInverseOfFinish:
             store,
             prepared_for(store),
             open_draft(store),
-            marks={},
+            marks=every_mark(store),
             missing=[],
             notes="x",
         )
