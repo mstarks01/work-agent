@@ -84,6 +84,7 @@ import math
 import re
 import time
 import unicodedata
+from dataclasses import dataclass
 from difflib import SequenceMatcher
 
 #: How alike a source window and a refused quote must be, as a
@@ -315,7 +316,7 @@ def verify_normalized(quote: str, haystack: str) -> bool:
 
 
 def repair_deadline() -> float:
-    """The one deadline every :func:`repair_quote` in a node body shares.
+    """The one deadline every repair scan in a node body shares.
 
     An absolute :func:`time.thread_time` value, so it is right only on the
     thread that runs the scans: the caller builds it once and passes it to each
@@ -324,8 +325,57 @@ def repair_deadline() -> float:
     return time.thread_time() + MAX_REPAIR_SECONDS_PER_BODY
 
 
+@dataclass(frozen=True)
+class PreparedSource:
+    """One source split into words and folded, ready for any repair scan.
+
+    The scan needs the source twice: as words, so a candidate window hands back
+    the submitter's own spelling, and as folded words, so a window's normalized
+    form is its folded words joined. Neither depends on the quote, so a body
+    that scans one source for many refused quotes builds this once.
+
+    Built by :func:`prepare_source` and never mutated. It is a value derived
+    from the source text, so two of them over one source are equal by
+    construction and nothing has to invalidate one.
+    """
+
+    words: tuple[str, ...]
+    folded: tuple[str, ...]
+
+
+def prepare_source(source: str) -> PreparedSource:
+    """Split and fold one source, once.
+
+    Each source word is normalized once rather than once per window that covers
+    it, and once per source rather than once per refused quote. Both are the
+    same comparison for a fraction of the folding: the ladder's rungs are
+    per-character and the last one collapses whitespace, so a window's folded
+    form is its folded words joined.
+    """
+    words = source.split()
+    return PreparedSource(tuple(words), tuple(normalize(word) for word in words))
+
+
 def repair_quote(
     quote: str, source: str, deadline: float | None = None
+) -> tuple[str, float] | None:
+    """The raw-text form of :func:`repair_prepared`, for a caller holding text.
+
+    A caller scanning the same source for many refused quotes should call
+    :func:`prepare_source` once and :func:`repair_prepared` per quote — the
+    split and the per-word folding are the same answer for every quote, and
+    this form pays for them again on each call.
+
+    The body's ``deadline`` is checked **before** the source is prepared, so a
+    scan that has no time left does not fold a whole submission to discover it.
+    """
+    if deadline is not None and time.thread_time() > deadline:
+        return None
+    return repair_prepared(quote, prepare_source(source), deadline)
+
+
+def repair_prepared(
+    quote: str, source: PreparedSource, deadline: float | None = None
 ) -> tuple[str, float] | None:
     """The source's own span nearest a refused quote, or ``None``.
 
@@ -339,10 +389,8 @@ def repair_quote(
     both sides so the rungs the ladder already forgives cost nothing here. The
     best candidate wins if it reaches :data:`REPAIR_THRESHOLD`.
 
-    Each source word is normalized once rather than once per window that covers
-    it, which is the same comparison for a fraction of the folding: a window's
-    folded form is its folded words joined, because the ladder's rungs are
-    per-character and the last one collapses whitespace.
+    ``source`` is a :class:`PreparedSource` from :func:`prepare_source`, whose
+    docstring carries why the split and the folding sit outside this scan.
 
     A scan that spends :data:`MAX_REPAIR_WORK`, or runs past
     :data:`_REPAIR_DEADLINE_SECONDS`, or past the body's own ``deadline`` from
@@ -376,9 +424,9 @@ def repair_quote(
         return None
     if len(needle) > MAX_REPAIR_QUOTE_CHARS:
         return None
-    words = source.split()
+    words = source.words
+    folded = source.folded
     width = len(quote.split())
-    folded = [normalize(word) for word in words]
     best: tuple[str, float] | None = None
     budget = MAX_REPAIR_WORK
     matcher = SequenceMatcher(autojunk=False)
