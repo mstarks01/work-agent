@@ -760,7 +760,8 @@ def _verify_quotes(claims: Sequence[Claim], sources: Mapping[str, str]) -> _Quot
     # nobody keeps is a fold the next quote pays for again.
     #
     # Measured at 18x the source bytes, flat from 1,000 words to 50,000 -- one
-    # Python ``str`` per word, twice, is almost all of it. The shipped
+    # Python ``str`` per word, twice, is almost all of it, and
+    # ``evals/bench/deterministic.py retention`` re-derives it. The shipped
     # ``resilience.max_source_bytes`` is 102,400 bytes for a whole job, so a
     # body holds at most about 1.8 MiB and the eight-slot node pool about 14
     # MiB. It is bounded by that cap rather than by anything here, which is why

@@ -118,12 +118,36 @@ evals/
     build_pairs.py              the match fixtures and their labels (edit this)
     pairs.json                  generated from build_pairs.py (never hand-edit)
   harness/                      the scorer and the eval runner
+  bench/deterministic.py        offline timings for the deterministic layer (no model call)
   review/voters.toml            the roster: voter → standing, the only place standing lives
   review/votes/                 the vote ledger, one file per voter — the only human record here
   baselines/README.md           the published comparison over every merged Baseline (generated)
   baselines/<derived-name>/     merged Baselines: up to ten sweeps with their reports, per configuration
   runs/                         local sweeps (gitignored) — the private scratch area
 ```
+
+## The benchmarks
+
+`bench/deterministic.py` measures the deterministic layer — quote repair, the
+model index, report assembly, the evidence catalog — with no model call and no
+credential. It exists because three merged changes carry timings in their commit
+messages, and a number nobody can re-derive is a number nobody can check.
+
+```sh
+uv run python -m evals.bench.deterministic              # every case
+uv run python -m evals.bench.deterministic repair       # one case
+uv run python -m evals.bench.deterministic --spans out.json
+```
+
+It measures **one tree**. A before/after is two runs with a checkout between
+them. `--spans` writes every repaired span the corpus sources produce, so two
+trees that mean to agree about repairs can be diffed rather than assumed to
+agree — a timing-bounded scan given back time can inspect more candidates and
+land on a different span.
+
+It is not run by CI and is not a test. The figures are machine-dependent, so
+compare two runs on one machine and never a run here against a number from
+somewhere else.
 
 ## The harness
 

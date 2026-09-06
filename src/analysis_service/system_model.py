@@ -414,7 +414,8 @@ class ModelIndex:
     model to answer: which element carries this ID, which two elements does
     this flow run between, and which flows touch this element. A model of 200
     processes and 400 flows answered them 2,000 times in 0.104 s of a node
-    body's own CPU; over this index the same run costs 0.007 s.
+    body's own CPU; over this index the same run costs 0.003 s.
+    ``evals/bench/deterministic.py index`` re-derives both.
 
     **Built by an explicit call rather than cached on the model.**
     :func:`normalize_element_ids` rewrites element IDs in place, so an index a
