@@ -251,15 +251,23 @@ async function contributionUrl(env) {
   return "https://github.com/" + DATA.repo + "/new/" + DATA.branch + "?" + query;
 }
 
-// Opened from a click handler rather than from the promise, because a popup
-// blocker refuses a window a page opens after an await.
+// The window is opened from the click and before the await, because a popup
+// blocker refuses a window a page opens after one. `noopener` is set on the
+// window rather than passed as a feature: with the feature string,
+// `window.open` returns null by specification, so the page would have nowhere
+// to send the reader but its own tab — and their unsaved answers with it. The
+// reader's own tab is never navigated: a blocked window is said, not routed
+// around.
 async function publishToGitHub() {
   const ready = finished();
   if (!ready.length) return;
-  const opened = window.open("", "_blank", "noopener");
-  const url = await contributionUrl(envelope(ready));
-  if (opened) opened.location = url;
-  else window.location = url;
+  const opened = window.open("", "_blank");
+  if (!opened) {
+    alert("Your browser blocked the new tab. Allow pop-ups for this page and press again.");
+    return;
+  }
+  opened.opener = null;
+  opened.location = await contributionUrl(envelope(ready));
 }
 
 function restore(text) {

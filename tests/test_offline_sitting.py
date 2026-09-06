@@ -305,3 +305,67 @@ class TestThePageNamesASubmissionTheWayPythonDoes:
         )
 
         assert printed == envelopes.submission_name(envelope)
+
+
+class TestThePressLeavesThePageInPlace:
+    """The pull request opens in a new tab, and the reader's tab stays.
+
+    The page holds the reader's answers in memory. A press that navigated the
+    reader's own tab would take them to GitHub and drop every unsaved mark
+    behind it. ``window.open`` with ``noopener`` in its feature string returns
+    ``null`` by specification, so a fallback onto ``window.location`` was the
+    path every browser took. The block runs under ``node`` with a stubbed
+    window, in both states a browser can leave it.
+    """
+
+    def press(self, opened: str) -> dict:
+        node = shutil.which("node")
+        if node is None:
+            pytest.skip("no node on PATH to run the page's own block")
+        source = client_script("offline_sitting.js")
+        marker = "async function publishToGitHub"
+        assert marker in source, f"{marker!r} is gone; this test no longer finds it"
+        block = marker + source.split(marker)[1].split("\nfunction restore")[0]
+        harness = (
+            f"const opened = {opened};\n"
+            "const window = {open: () => opened, location: 'the page'};\n"
+            "let said = '';\n"
+            "const alert = text => { said = text; };\n"
+            "const finished = () => ['02-iot-fleet-telemetry'];\n"
+            "const envelope = () => ({});\n"
+            "const contributionUrl = async () => 'https://github.com/o/r/new/main';\n"
+            f"{block}\n"
+            "publishToGitHub().then(() => process.stdout.write(JSON.stringify({\n"
+            "  page: window.location, opened: opened && opened.location,\n"
+            "  said: said, opener: opened && opened.opener,\n"
+            "})));\n"
+        )
+        with tempfile.TemporaryDirectory() as scratch:
+            path = Path(scratch) / "press.cjs"
+            path.write_text(harness, encoding="utf-8")
+            done = subprocess.run(
+                [node, str(path)],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=False,
+            )
+        assert done.returncode == 0, done.stderr
+        return json.loads(done.stdout)
+
+    def test_the_new_tab_carries_the_reader_and_the_page_stays(self):
+        result = self.press("{opener: 'the page'}")
+
+        assert result["opened"] == "https://github.com/o/r/new/main"
+        assert result["opener"] is None, "the new tab cannot reach back"
+        assert result["page"] == "the page"
+
+    def test_a_blocked_tab_is_said_and_the_page_still_stays(self):
+        result = self.press("null")
+
+        assert result["page"] == "the page"
+        assert "blocked" in result["said"]
+
+    def test_noopener_is_never_a_feature_string(self):
+        """The feature makes ``window.open`` return null, which is the defect."""
+        assert '"noopener"' not in client_script("offline_sitting.js")
