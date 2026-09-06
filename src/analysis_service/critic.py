@@ -756,10 +756,15 @@ def _verify_quotes(claims: Sequence[Claim], sources: Mapping[str, str]) -> _Quot
     # the rung with none of its work.
     #
     # What it holds for the length of the body is two tuples of words per source
-    # a refused quote named. That is bounded by the job's own sources, which the
-    # deployment caps as one total across all of them
-    # (``resilience.max_source_bytes``), and it is the retention reuse costs:
-    # a fold nobody keeps is a fold the next quote pays for again.
+    # a refused quote named, and that is the retention reuse costs: a fold
+    # nobody keeps is a fold the next quote pays for again.
+    #
+    # Measured at 18x the source bytes, flat from 1,000 words to 50,000 -- one
+    # Python ``str`` per word, twice, is almost all of it. The shipped
+    # ``resilience.max_source_bytes`` is 102,400 bytes for a whole job, so a
+    # body holds at most about 1.8 MiB and the eight-slot node pool about 14
+    # MiB. It is bounded by that cap rather than by anything here, which is why
+    # the cap is the thing to read before raising it.
     prepared: dict[str, PreparedSource] = {}
     # One deadline for every repair this body runs. Each scan is bounded on its
     # own, and a body runs one scan per refused quote: bounded per scan, a body
