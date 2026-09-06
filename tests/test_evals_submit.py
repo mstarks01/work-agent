@@ -61,12 +61,6 @@ def unreviewed_line(case: str) -> str:
     return f'    "{case}": "unread",\n'
 
 
-def digest(path: Path) -> str:
-    import hashlib
-
-    return hashlib.sha256(path.read_bytes()).hexdigest()
-
-
 def seed_case(clone: Path, case: str) -> Path:
     """One unread corpus case: its sources, one claim file and its metadata."""
     case_dir = clone / "evals" / "corpus" / case
@@ -80,7 +74,6 @@ def seed_case(clone: Path, case: str) -> Path:
                 "id": case,
                 "sources": [{"kind": "description", "file": "source.md"}],
                 "frameworks": [{"name": "stride"}],
-                "reviews": [],
             },
             indent=2,
         )
@@ -123,59 +116,6 @@ def repo(tmp_path):
     git(clone, "commit", "-m", "seed")
     git(clone, "push", "-u", "origin", "main")
     return clone
-
-
-def prepare_sitting(
-    clone: Path,
-    case: str = CASE,
-    reviewer: str = "ada",
-    read_for: str | None = None,
-    read: list[str] | None = None,
-    document: str = "REVIEW-ada.md",
-    write_document: bool = True,
-    clear_unreviewed: bool = True,
-) -> Path:
-    """Ada's working state after a sitting: entry, evidence, the line gone."""
-    case_dir = clone / "evals" / "corpus" / case
-    files = (
-        read if read is not None else ["source.md", "model.json", "claims/stride.json"]
-    )
-    meta = json.loads((case_dir / "case.json").read_text(encoding="utf-8"))
-    meta["reviews"].append(
-        {
-            "submitted_by": reviewer,
-            "submitted_for": read_for or reviewer,
-            "date": "2026-08-26",
-            "read": [
-                {"file": name, "sha256": digest(case_dir / name)} for name in files
-            ],
-            "document": document,
-            "notes": "",
-        }
-    )
-    (case_dir / "case.json").write_text(
-        json.dumps(meta, indent=2) + "\n", encoding="utf-8"
-    )
-    if write_document:
-        # The shape `sitting.document()` writes. The fixture used to put
-        # fifteen bytes of prose here, which is why no test noticed that the
-        # evidence gate never checked what a reading document is.
-        (case_dir / document).write_text(
-            f"# Case Sitting — `{case}`\n\n**A case.**\n\n"
-            "Read by ada, submitted by ada.\n\n---\n\n## My own list\n\n"
-            "- a spoofed device\n",
-            encoding="utf-8",
-        )
-    if clear_unreviewed:
-        listing = clone / "tests" / "test_case_review.py"
-        listing.write_text(
-            listing.read_text(encoding="utf-8").replace(unreviewed_line(case), ""),
-            encoding="utf-8",
-        )
-    (clone / "evals" / "review" / "voters.toml").write_text(
-        ROSTER_WITH_ADA, encoding="utf-8"
-    )
-    return case_dir
 
 
 @pytest.fixture

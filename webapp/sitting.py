@@ -13,7 +13,7 @@ import re
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Literal, get_args
+from typing import Literal, NamedTuple, get_args
 
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -42,8 +42,9 @@ PORT = base.PORT
 LOCAL_SUBMITTER = "local-review"
 
 #: What the page calls each rail state. One table, keyed by
-#: :data:`~evals.harness.sitting.RowState` and read by the page off
-#: ``/api/review-states``, so the label is spelled here and nowhere else.
+#: :data:`~evals.harness.sitting.RowState`. ``/api/review-states`` hands the
+#: page the state and the label together, so the page keys its own behaviour
+#: on the state vocabulary the rail already speaks and spells no label itself.
 REVIEW_LABELS: dict[sittings.RowState, str] = {
     "todo": "Not reviewed",
     "draft": "In progress",
@@ -64,20 +65,28 @@ build_session = base.build_session
 Session = base.Session
 
 
-def _status_for(session: Session, row: sittings.Row) -> str:
-    """The label a rail row shows.
+class ReviewState(NamedTuple):
+    """One rail row as the page reads it: the state it keys on, and the label."""
+
+    state: sittings.RowState
+    label: str
+
+
+def _review_state(session: Session, row: sittings.Row) -> ReviewState:
+    """The state a rail row is in, as the page sees it.
 
     A draft holding an own list and nothing else reads as not started: the
     reader wrote the list, and the review is the marks that follow it.
     """
-    if row.state == "draft":
+    state = row.state
+    if state == "draft":
         held = session.draft(row.case_id)
         started = held is not None and (
             held.marks or held.missing or held.notes.strip()
         )
         if not started:
-            return REVIEW_LABELS["todo"]
-    return REVIEW_LABELS[row.state]
+            state = "todo"
+    return ReviewState(state, REVIEW_LABELS[state])
 
 
 def _author(value: str | None) -> str:
@@ -318,12 +327,11 @@ ul.terms { list-style:none; padding:0; }.rec { border-left:3px solid #8886; }.fi
   <h2>Start a review</h2>
   <p class="note">Begin with the first available case or choose any case from the left. Your independent assessment comes first; model findings remain hidden until you save it.</p>
   <p><button id="start">Begin review</button></p>
-  <template><!--readby--><!--submitter--></template>
 </div>
 
 <article id="case" class="hidden">
 <header><h2 id="caseTitle"></h2><p class="walk"><button id="previous">← Previous</button><span id="progressTop" class="progress"></span><button id="next">Next →</button></p></header>
-<p class="sub"><code id="caseId"></code></p><p id="moved" class="note hidden"></p>
+<p class="sub"><code id="caseId"></code></p><p id="moved" class="note hidden"></p><p id="waiting" class="note hidden"></p>
 <section><h2>System description</h2><div id="partOne" class="doc"></div></section>
 <section id="one"><h2>Part 1 — your independent review</h2>
 <p class="note">Before seeing any model findings, write the security concerns or unanswered questions you notice in the system description, one per line. <b>After you save and reveal the model findings, this list is locked.</b> Resetting clears Part 2 answers but does not allow this independent first pass to be changed.</p>
@@ -382,7 +390,11 @@ def create_app(session: Session) -> FastAPI:
     def review_states() -> JSONResponse:
         rows = session.refresh()
         return JSONResponse(
-            {"states": {row.case_id: _status_for(session, row) for row in rows}}
+            {
+                "states": {
+                    row.case_id: _review_state(session, row)._asdict() for row in rows
+                }
+            }
         )
 
     @app.get("/api/read-only")

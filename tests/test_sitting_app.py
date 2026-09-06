@@ -344,11 +344,11 @@ class TestThePosture:
         assert "frame-ancestors 'none'" in csp
 
     def test_every_writing_endpoint_refuses_a_cross_site_request(self, client):
-        """Not only ``/api/submit``.
+        """Not only ``/api/contribute``.
 
-        ``/api/finish`` writes the document, appends to ``case.json`` and sets
-        the flag ``/api/submit`` tests, so a foreign page that reaches it
-        decides what a later press publishes. ``/api/own-list`` satisfies the
+        ``/api/finish`` marks the draft finished, which is what a later press
+        carries, so a foreign page that reaches it decides what that press
+        publishes. ``/api/own-list`` satisfies the
         method's one rule, so a foreign page that reaches it opens the recorded
         sets for whoever asks next.
         """
@@ -1188,18 +1188,14 @@ class TestTheDraftSurvivesTheProcess:
         held = json.loads(draft_file(tree, CASE).read_text("utf-8"))
         assert set(held) == {
             "case",
-            "clone",
             "state",
             "own_list",
             "marks",
             "missing",
             "notes",
             "opened_digests",
-            "recorded",
-            "unreviewed_entry",
         }
         assert held["case"] == CASE
-        assert held["clone"] == str(tree), "the clone path is in the file"
         assert held["state"] == "open"
         assert held["own_list"] == OWN_LIST
 
@@ -1629,7 +1625,7 @@ class TestTheDraftStore:
 
     def test_a_saved_draft_round_trips(self, tmp_path):
         root = self.store(tmp_path)
-        written = sittings.Draft(case=CASE, clone=str(tmp_path), own_list=OWN_LIST)
+        written = sittings.Draft(case=CASE, own_list=OWN_LIST)
         path = sittings.save_draft(root, "ada", written)
         assert path == root / "ada" / f"{CASE}.json"
         assert sittings.load_draft(root, "ada", CASE) == written
@@ -1640,9 +1636,7 @@ class TestTheDraftStore:
     def test_the_store_is_the_reader_s_alone(self, tmp_path):
         """It holds an unsigned own list, which is nobody else's to read."""
         root = self.store(tmp_path)
-        path = sittings.save_draft(
-            root, "ada", sittings.Draft(case=CASE, clone=str(tmp_path))
-        )
+        path = sittings.save_draft(root, "ada", sittings.Draft(case=CASE))
         assert path.stat().st_mode & 0o777 == 0o600
         assert (root / "ada").stat().st_mode & 0o777 == 0o700
 
@@ -1674,13 +1668,13 @@ class TestTheDraftStore:
         root = self.store(tmp_path)
         path = sittings.draft_path(root, "ada", CASE)
         path.parent.mkdir(parents=True)
-        path.write_text(json.dumps({"case": OTHER, "clone": "/x"}), encoding="utf-8")
+        path.write_text(json.dumps({"case": OTHER}), encoding="utf-8")
         with pytest.raises(sittings.DraftError, match=OTHER):
             sittings.load_draft(root, "ada", CASE)
 
     def test_a_survey_reports_the_unreadable_one_and_keeps_going(self, tmp_path):
         root = self.store(tmp_path)
-        sittings.save_draft(root, "ada", sittings.Draft(case=CASE, clone="/x"))
+        sittings.save_draft(root, "ada", sittings.Draft(case=CASE))
         sittings.draft_path(root, "ada", OTHER).write_text("{", encoding="utf-8")
         held = sittings.draft_states(root, "ada")
         assert held[CASE].state == "open"
