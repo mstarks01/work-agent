@@ -2383,7 +2383,7 @@ class TestIntoReport:
         second field list this method exists to remove. Any name an
         ``Analysis`` and a ``Report`` both carry must arrive unchanged,
         and the marks count as the ``Analysis``'s own: it holds them on one
-        field, and the report spreads them across five.
+        field, and the report spreads them across the envelope and the blocks.
         """
         analysis = self.analysis()
         report = self.report(pipeline)

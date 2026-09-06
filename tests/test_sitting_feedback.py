@@ -12,6 +12,7 @@ from evals.harness import envelope as envelopes
 from evals.harness import review_submission as review_submissions
 from evals.harness import sitting as sittings
 from webapp import sitting
+from webapp.page import client_script
 
 CASE = "02-iot-fleet-telemetry"
 OTHER = "03-batch-data-pipeline"
@@ -144,7 +145,7 @@ def test_reviewer_copy_hides_repository_transport_details():
 
 
 def test_source_header_has_no_redundant_source_kind():
-    assert "block.source_kind" not in sitting._PAGE
+    assert "block.source_kind" not in client_script("sitting.js")
 
 
 def test_reset_keeps_the_independent_list_locked(tmp_path: Path):
@@ -272,4 +273,4 @@ def test_submitted_case_remains_clickable_as_read_only(tmp_path: Path):
     assert "# Review" in body["document"]
     assert "a spoofed device" in body["document"]
     assert client.get(f"/api/part-one?case={CASE}").status_code == 404
-    assert "openReadOnly(row.case)" in sitting._PAGE
+    assert "openReadOnly(row.case)" in client_script("sitting.js")

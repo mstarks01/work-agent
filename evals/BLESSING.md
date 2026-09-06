@@ -401,9 +401,10 @@ stage also says how many cases stay unfinished, so you never send four cases
 believing you sent five. Below the list it carries the written paths, the
 command and the paste text, each over every case the press carries. The button
 opens the pull request through the `gh` you are already signed in to. It binds
-to loopback and holds no credential of its own; `--no-submit` hides the button
-and keeps the command and the paste text. `--list` prints the cases nobody has
-read.
+to loopback and holds no credential of its own. With no `gh` login it hands you
+the same contribution as text to paste into a pull request you open yourself,
+so the way out never depends on a credential. `--list` prints the cases nobody
+has read.
 
 **Stop whenever you like.** The moment you post your own list, the app opens a
 **Draft Sitting** for that case and keeps your list, your marks, your missing

@@ -25,6 +25,7 @@ from fastapi.testclient import TestClient
 from evals import verify_corpus
 from evals.harness import sitting as sittings
 from evals.harness.reference import CorpusError
+from webapp.page import client_script
 from webapp.sitting import _PAGE, MIN_OWN_LIST, build_session, create_app
 from webapp.sitting import main as app_main
 
@@ -1273,7 +1274,7 @@ class TestTheWalk:
         """A dead row is off the offered list, so the walk never stops on one.
 
         The page takes its step over the same pressable rows that
-        :func:`webapp.sitting._open` resolves a request against, so a case the
+        :func:`webapp.sitting_base.open_case` resolves a request against, so a case the
         walk cannot reach is a case a request cannot open either.
         """
         assert "rows.filter(row => row.pressable)" in self.page(tree)
@@ -2015,7 +2016,10 @@ class TestTheSubmitStage:
         stage = self.stage(app)
         assert stage["ready"] == []
         assert stage["written"] == []
-        assert '$("waysOut").classList.toggle("hidden", !d.ready.length)' in _PAGE
+        assert (
+            '$("waysOut").classList.toggle("hidden", !d.ready.length)'
+            in client_script("sitting.js")
+        )
 
     def test_with_no_gh_login_the_ways_out_stay_and_the_button_never_appears(
         self, tree
@@ -2326,16 +2330,17 @@ class TestACorpusThatDoesNotLoad:
 class TestThePageParses:
     """A JavaScript string literal never spans a line, so the block parses.
 
-    ``_PAGE`` is a raw string, and the reason is this: a plain one turns every
-    ``\\n`` the page writes into the newline itself. The browser then meets a
-    string literal opened on one line and closed on the next, which is a
-    syntax error that stops the whole ``<script>`` block — so nothing on the
-    page works and no request is ever made. Nothing else here would notice,
-    because every test drives the endpoints rather than the page.
+    A string literal opened on one line and closed on the next is a syntax
+    error that stops the whole ``<script>`` block — so nothing on the page
+    works and no request is ever made. Nothing else here would notice, because
+    every test drives the endpoints rather than the page.
+
+    Read through :func:`~webapp.page.client_script`, so this reads the bytes
+    the app serves.
     """
 
     def script(self) -> str:
-        return _PAGE.split("<script")[1].split("</script>")[0]
+        return client_script("sitting.js")
 
     def test_no_string_literal_spans_a_line(self):
         spanning = [line for line in self.script().split("\n") if line.count('"') % 2]
@@ -2357,7 +2362,8 @@ class TestTheLayoutCoversTheCase:
 
     def kinds(self) -> set[str]:
         """The block kinds the page's own table carries a builder for."""
-        table = _PAGE.split("const BLOCKS = {")[1].split("}")[0]
+        table = client_script("sitting.js").split("const BLOCKS = {")[1]
+        table = table.split("}")[0]
         return {entry.split(":")[0].strip() for entry in table.split(",")}
 
     @pytest.mark.parametrize(
