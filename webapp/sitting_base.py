@@ -137,6 +137,7 @@ class Session:
             self.corpus_dir,
             review_submissions.clearing_signatures(self.root),
             sittings.draft_states(self.drafts, self.submitted_by),
+            review_submissions.partial_signatures(self.root),
         )
         return self.rows
 
@@ -212,7 +213,7 @@ def create_app(session: Session, page: str, script: str) -> FastAPI:
     def part_one(case: CaseId) -> JSONResponse:
         prepared = open_case(session, case)
         held = held_draft(session, case)
-        work = held or sittings.Draft(case=prepared.case_id, clone=str(session.root))
+        work = held or _carried(session, prepared)
         return JSONResponse(
             {
                 "case": prepared.case_id,
@@ -221,8 +222,12 @@ def create_app(session: Session, page: str, script: str) -> FastAPI:
                 "submitted_for": session.submitted_for,
                 "blocks": prepared.part_one_blocks,
                 "files": prepared.files,
-                "own_list": held.own_list if held else None,
+                # The carried list counts as written: a reader returning for a
+                # framework the case gained cannot write a blind one twice, and
+                # a fresh box would ask them to.
+                "own_list": work.own_list if (held or work.own_list) else None,
                 "state": held.state if held else None,
+                "waiting": review_submissions.waiting(session.root, prepared.case_id),
                 "marks": work.marks,
                 "missing": work.missing,
                 "notes": work.notes,
@@ -399,6 +404,29 @@ def create_app(session: Session, page: str, script: str) -> FastAPI:
         return JSONResponse({"case": prepared.case_id, "state": held.state})
 
     return app
+
+
+def _carried(session: Session, prepared: sittings.Prepared) -> sittings.Draft:
+    """A fresh draft, carrying what a merged sitting of this case already holds.
+
+    **The own list is written once.** A reader comes back to a case when it
+    gains a **Framework**, and by then they have read the recorded sets — so a
+    list they wrote now would be evidence of an order that did not happen. The
+    list they wrote blind is in their merged submission, and it rides forward
+    locked.
+
+    Their marks ride with it, so the findings they already judged stay judged
+    and only the new set is theirs to answer. A mark is keyed by the finding's
+    own fingerprint, so a mark carried here still names the finding it answered.
+    """
+    draft = sittings.Draft(case=prepared.case_id, clone=str(session.root))
+    merged = review_submissions.current_for_case(session.root, prepared.case_id)
+    if merged is None:
+        return draft
+    draft.own_list = list(merged.answers.own_list)
+    draft.marks = dict(merged.answers.marks)
+    draft.missing = list(merged.answers.missing)
+    return draft
 
 
 def require_token(request: Request, session: Session) -> None:

@@ -454,9 +454,16 @@ file and nothing else. A review pull request that changes anything else is
 refused, which is why nothing here asks you to edit a case, a list or the
 roster.
 
-`opened_digests` pins the bytes the sitting covered: a later pull request that
-edits a read file makes this review stop clearing its case, fail-closed, and the
-case goes back on the list.
+`opened_digests` pins the bytes the sitting covered, and it says which sets
+you read. A later pull request that edits a read file makes this review stop
+covering those sets, fail-closed, and they go back on the list.
+
+**A case that gains a framework waits for that one set.** Your sitting judged
+what existed, and it still stands. The rail says `<framework> waiting;
+<framework> read` rather than `to do`, the case opens with the list you wrote
+blind and the marks you already made, and the only work is the new set. You
+cannot write a second blind list once you have read the recorded sets, so the
+first one rides forward and stays locked.
 
 **The entry carries two names, because they answer two questions.**
 

@@ -546,15 +546,25 @@ class TestTheMarks:
         assert session.draft(CASE).state != "finished", "and nothing is recorded"
 
     def test_one_finding_short_is_still_refused(self, client):
-        """Every finding, because a fraction is a number nobody can defend."""
+        """Every finding, because a fraction is a number nobody can defend.
+
+        The count is per framework, so the message names the set the reader
+        left short rather than a total across two of them.
+        """
         app, session, _ = client
         targets = session.prepared[CASE].mark_targets
+        short = targets[0]
         all_but_one = {target.fingerprint: "agree" for target in targets[1:]}
 
         refused = self.marked(app, all_but_one)
 
         assert refused.status_code == 409
-        assert f"1 of {len(targets)}" in refused.json()["detail"]
+        detail = refused.json()["detail"]
+        assert (
+            f"1 of {len(sittings.targets_of(session.prepared[CASE], short.framework))}"
+            in detail
+        )
+        assert short.framework in detail
 
     def test_an_insertion_into_a_claim_file_re_points_no_mark(self, client):
         """A positional key would move every mark below the insertion."""
@@ -2133,3 +2143,104 @@ class TestTheRailAndTheGateAgree:
             path.name for path in (tree / "evals" / "corpus" / OTHER).iterdir()
         )
         assert after == before
+
+
+class TestAFrameworkArrivingOnAReadCase:
+    """A **Framework Package** a case gains after a sitting merged.
+
+    Nobody judges a set that did not exist when they read, so the case needs
+    that set judged and nothing else. What used to happen instead: the whole
+    case reverted to ``to do``, the reader was told a file had *changed* under
+    them when it was simply new, the unmarked count spanned both frameworks and
+    named neither, and the own list came back empty.
+
+    That last one is not a cost, it is a corruption. The method's one rule is
+    that the list is written before the sets open. A reader who has already
+    read the old sets cannot write a blind list a second time, so a fresh box
+    asks them for evidence of an order that did not happen.
+    """
+
+    def one_framework(self, tree, keep="stride"):
+        """Narrow the case to one declared framework, and return the other."""
+        case_dir = tree / "evals" / "corpus" / CASE
+        meta = json.loads((case_dir / "case.json").read_text("utf-8"))
+        kept = [item for item in meta["frameworks"] if item["name"] == keep]
+        later = [item for item in meta["frameworks"] if item["name"] != keep]
+        assert kept and later, "this case does not declare two frameworks"
+        meta["frameworks"] = kept
+        case_dir.joinpath("case.json").write_text(
+            json.dumps(meta, indent=2) + "\n", encoding="utf-8"
+        )
+        return meta, later
+
+    def arrives(self, tree, meta, later):
+        case_dir = tree / "evals" / "corpus" / CASE
+        meta["frameworks"] = meta["frameworks"] + later
+        case_dir.joinpath("case.json").write_text(
+            json.dumps(meta, indent=2) + "\n", encoding="utf-8"
+        )
+
+    def rows(self, tree):
+        app = browser(session_for(tree, "ada"))
+        return {row["case"]: row for row in app.get("/api/rail").json()["cases"]}
+
+    def test_the_merged_sitting_still_stands(self, tree):
+        """It judged what existed. Nothing about it became wrong."""
+        meta, later = self.one_framework(tree)
+        sign(tree, CASE, "sam")
+        self.arrives(tree, meta, later)
+
+        merged = next(iter(review_submissions.iter_submissions(tree)))[1]
+
+        assert review_submissions._case_problems(tree, CASE, merged.cases[CASE]) == []
+
+    def test_only_the_new_framework_waits(self, tree):
+        meta, later = self.one_framework(tree)
+        sign(tree, CASE, "sam")
+        self.arrives(tree, meta, later)
+
+        assert review_submissions.waiting(tree, CASE) == [later[0]["name"]]
+        assert CASE in review_submissions.unreviewed_cases(tree), "the gate agrees"
+
+    def test_the_rail_names_what_waits_rather_than_saying_to_do(self, tree):
+        """A row reading ``to do`` tells a reader their finished work is gone."""
+        meta, later = self.one_framework(tree)
+        sign(tree, CASE, "sam")
+        self.arrives(tree, meta, later)
+
+        row = self.rows(tree)[CASE]
+
+        assert row["status"] == f"{later[0]['name']} waiting; stride read"
+        assert row["status"] != sittings.TO_DO
+        assert row["pressable"] is True, "work remains, so the case opens"
+
+    def test_the_blind_own_list_and_the_marks_carry_forward(self, tree):
+        """The list was written once, before any set opened. It rides forward."""
+        meta, later = self.one_framework(tree)
+        sign(tree, CASE, "sam")
+        self.arrives(tree, meta, later)
+
+        app = browser(session_for(tree, "ada"))
+        payload = app.get(f"/api/part-one?case={CASE}").json()
+
+        assert payload["own_list"], "the reader is asked to write a sighted list"
+        assert payload["waiting"] == [later[0]["name"]]
+        carried = sittings.targets_of(
+            sittings.prepare(tree / "evals" / "corpus" / CASE), "stride"
+        )
+        assert len(payload["marks"]) == len(carried), (
+            "already-judged findings stay judged"
+        )
+
+    def test_nothing_says_a_file_changed_that_did_not(self, tree):
+        """The new set is new, not edited. A reader told otherwise hunts a ghost."""
+        meta, later = self.one_framework(tree)
+        sign(tree, CASE, "sam")
+        self.arrives(tree, meta, later)
+
+        merged = next(iter(review_submissions.iter_submissions(tree)))[1]
+        said = " ".join(
+            review_submissions._case_problems(tree, CASE, merged.cases[CASE])
+        )
+
+        assert "changed since" not in said

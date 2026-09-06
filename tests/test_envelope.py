@@ -153,7 +153,7 @@ class TestTheImportRefusesWhatWouldRecordWordsNobodyRead:
     def test_an_own_list_too_short_to_have_opened_the_sets(self, tree):
         env = envelope(tree, {CASE: answers(tree, own_list=["no"])})
 
-        with pytest.raises(EnvelopeError, match="own list is shorter"):
+        with pytest.raises(EnvelopeError, match="independent list is shorter"):
             applied(tree, env)
         assert not written(tree)
 
@@ -170,7 +170,7 @@ class TestTheImportRefusesWhatWouldRecordWordsNobodyRead:
         source = tree / "evals" / "corpus" / CASE / "source.md"
         source.write_text(source.read_text("utf-8") + "\na later edit\n", "utf-8")
 
-        with pytest.raises(EnvelopeError, match="changed since the page was built"):
+        with pytest.raises(EnvelopeError, match="changed since the reviewer opened"):
             applied(tree, env)
         assert not written(tree)
 
