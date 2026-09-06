@@ -18,9 +18,11 @@ is any good. Two kinds:
   every framework's reference set) and say whether the recorded set describes
   what could actually go wrong. Run `uv run python webapp/sitting.py`, pick a
   case from the list on the left, and do the whole thing in a browser, pull
-  request included;
-  [`evals/BLESSING.md`](evals/BLESSING.md) step 6 explains the method and the
-  by-hand path. 13 of the 13 cases are still waiting for one.
+  request included. It records as one JSON file and needs no write access;
+  [`evals/BLESSING.md`](evals/BLESSING.md) step 6 explains the method, and
+  `webapp/offline_sitting.py` writes the same sitting as one standalone page
+  for a reader who cannot clone at all. 13 of the 13 cases are still waiting
+  for one.
 
 Both are **free and offline**, and neither needs a provider key. A golden case
 carries its own sources, model and reference sets, so a Case Sitting is open
@@ -42,15 +44,20 @@ anything.
 
 - **One kind per pull request.** A vote, a sitting and a baseline each travel
   separately.
-- **`submit` opens the PR for you.** `python -m evals.harness.run submit
-  <vote|sitting|baseline>` runs the same checks CI runs, prints them as a
+- **A Case Sitting is one file, and the app opens the PR.** Press
+  **Contribute**. With `gh` signed in it opens the pull request for you,
+  forking first if you need one. Without `gh` it hands you the same one file
+  and a link to GitHub's upload page. Either way the pull request carries that
+  file and nothing else, and it needs no roster line.
+- **A vote or a baseline goes through `submit`.** `python -m evals.harness.run
+  submit <vote|baseline>` runs the same checks CI runs, prints them as a
   checklist, and opens the pull request through `gh`. Add `--dry-run` to stop
   after the checklist.
-- **You are registered automatically.** On your first submission, `submit`
-  adds your line to `evals/review/voters.toml` with standing `contributor`,
-  and it travels in the same pull request. Your GitHub login is your name in
-  every record here, and your **Standing** is what published numbers state
-  alongside the numbers themselves — see the glossary entry in
+- **A vote registers you automatically.** On your first one, `submit` adds your
+  line to `evals/review/voters.toml` with standing `contributor`, and it
+  travels in the same pull request. Your GitHub login is your name in every
+  record here, and your **Standing** is what published numbers state alongside
+  the numbers themselves — see the glossary entry in
   [`CONTEXT.md`](CONTEXT.md).
 
 ## Contributing code
