@@ -29,6 +29,7 @@ are the reference pairs declared in `analysis_service.conformance.REFERENCE_MODE
 | Vendor | `base` | `strong` | Credentials read by the code |
 | --- | --- | --- | --- |
 | Anthropic | `claude-sonnet-4-6` | `claude-opus-5` | `ANALYSIS_ANTHROPIC_API_KEY` |
+| Bedrock | `anthropic.claude-sonnet-4-6` | `anthropic.claude-opus-5` | `ANALYSIS_BEDROCK_API_KEY`, `ANALYSIS_BEDROCK_REGION` |
 | OpenAI | `gpt-4o` | `gpt-5.6` | `ANALYSIS_OPENAI_API_KEY` |
 | Vertex AI | `gemini-2.5-flash` | `gemini-2.5-pro` | `ANALYSIS_VERTEX_PROJECT`, `ANALYSIS_VERTEX_LOCATION` |
 
@@ -55,6 +56,42 @@ Then export the credentials for the vendor or vendors you selected.
 ```sh
 export ANALYSIS_ANTHROPIC_API_KEY=sk-ant-...
 ```
+
+### Bedrock
+
+Bedrock needs its client library, which is an optional extra:
+
+```sh
+uv sync --extra bedrock
+```
+
+Then choose a credential mode. Bedrock is the one vendor that offers two, so
+`config/model_tiers.toml` has to say which one you use:
+
+```toml
+[credentials]
+bedrock = "api_key"    # or "iam"
+```
+
+Under `api_key`, export the key and the region:
+
+```sh
+export ANALYSIS_BEDROCK_API_KEY=...
+export ANALYSIS_BEDROCK_REGION=us-east-1
+```
+
+An AWS short-term Bedrock key lasts twelve hours and nothing here refreshes it,
+so rotate the variable before it expires.
+
+Under `iam`, export the region alone:
+
+```sh
+export ANALYSIS_BEDROCK_REGION=us-east-1
+```
+
+Work Agent then passes no credential, and boto3's own chain resolves the
+identity — an attached role, `AWS_PROFILE`, or SSO. The identity needs
+`bedrock:InvokeModel` on the models you selected.
 
 ### OpenAI
 
@@ -83,7 +120,8 @@ vendor a tier the node map binds selects — the shipped map binds `base` and
 `strong`, so `review` needs neither a selection nor a credential until you move
 criticism onto it, and the loader asks for both at that edit. You may also select models through the matching
 `ANALYSIS_MODEL_BASE_{VENDOR,MODEL}`, `ANALYSIS_MODEL_STRONG_{VENDOR,MODEL}` and
-`ANALYSIS_MODEL_REVIEW_{VENDOR,MODEL}` environment variables. See
+`ANALYSIS_MODEL_REVIEW_{VENDOR,MODEL}` environment variables, and a credential
+mode through `ANALYSIS_MODEL_CREDENTIALS_{VENDOR}`. See
 [Configuration](Configuration.md#model-overrides-deploy-time-no-image-rebuild)
 for the exact override rules.
 

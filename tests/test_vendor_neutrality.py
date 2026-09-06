@@ -111,16 +111,22 @@ VOCABULARIES: tuple[tuple[str, frozenset], ...] = (
     ("CredentialMode", frozenset(CredentialMode)),
 )
 
+#: Every vendor name, as one alternation, built from the registry. Written down
+#: once and read by both scans below: a hand-kept list is the shape this module
+#: exists to catch, and a vendor missing from it would be scanned for by
+#: nothing at all.
+_ANY_VENDOR = "|".join(re.escape(name) for name in VENDOR_NAMES)
+
 #: A string literal naming a vendor. The name may sit anywhere inside the
 #: string and in any case, which is the blind spot the framework scan had to
 #: close twice: ``"an OpenAI reasoning model"`` in an error message names a
 #: vendor as surely as ``"openai"`` does.
-LITERAL = re.compile(r'"[^"]*\b(?:vertex|anthropic|openai)\b[^"]*"', re.IGNORECASE)
+LITERAL = re.compile(rf'"[^"]*\b(?:{_ANY_VENDOR})\b[^"]*"', re.IGNORECASE)
 
 #: A vendor's name inside an identifier, which :data:`LITERAL` cannot see.
 #: ``openai_reasoning_model`` is a vendor's name on a rule that runs for every
 #: vendor, and it is not a string literal.
-IN_WORD = re.compile(r"vertex|anthropic|openai", re.IGNORECASE)
+IN_WORD = re.compile(_ANY_VENDOR, re.IGNORECASE)
 
 #: Where a vendor literal is allowed, and why. Two readings live here and the
 #: reason has to say which:
@@ -138,10 +144,11 @@ DECLARED: dict[str, str] = {
     "src/analysis_service/vendors.py": (
         "The registry. `VendorName` is the closed type every other module"
         " reads, so this is the one place the names are spelled at all."
-        " Its four tables — VENDORS, CREDENTIAL_MODES, _CREDENTIAL_VARS and"
-        " _FORM_RULES — are keyed by vendor and self-completing."
-        " VERTEX_PROJECT_VAR and VERTEX_LOCATION_VAR name one vendor's own"
-        " addressing config, which no other vendor reads."
+        " Its six tables — VENDORS, CREDENTIAL_MODES, _CREDENTIAL_VARS,"
+        " _MODE_KWARGS, _FORM_RULES and VENDOR_SDKS — are keyed by vendor and"
+        " self-completing. VERTEX_PROJECT_VAR, VERTEX_LOCATION_VAR and"
+        " BEDROCK_REGION_VAR name one vendor's own addressing config, which no"
+        " other vendor reads."
     ),
     "src/analysis_service/conformance.py": (
         "REFERENCE_MODELS is a table keyed by vendor: the pair the offline"
@@ -181,6 +188,13 @@ OPEN_BY_DECISION: dict[str, str] = {
         "The other half of the same addressing pair, and the value #601 was"
         " about: it is required, it is not a credential, and the redactor that"
         " read it as one substituted a region out of provider error text."
+    ),
+    "BEDROCK_REGION_VAR": (
+        "One vendor's own addressing config, the same reading as the Vertex"
+        " pair above. AWS scopes a request to a region and the other providers"
+        " do not, so there is no neutral spelling to prefer and nothing for"
+        " another vendor to answer here. It is required under both of this"
+        " vendor's credential modes and is a credential under neither."
     ),
 }
 
@@ -313,7 +327,9 @@ def test_the_scan_finds_the_tables_we_already_know_about(tables):
         "analysis_service.vendors.VENDORS",
         "analysis_service.vendors.CREDENTIAL_MODES",
         "analysis_service.vendors._CREDENTIAL_VARS",
+        "analysis_service.vendors._MODE_KWARGS",
         "analysis_service.vendors._FORM_RULES",
+        "analysis_service.vendors.VENDOR_SDKS",
         "analysis_service.conformance.REFERENCE_MODELS",
     }
     assert expected <= set(tables), (

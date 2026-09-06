@@ -19,6 +19,7 @@ import shutil
 import subprocess
 import tempfile
 from collections.abc import Sequence
+from pathlib import Path
 from typing import get_args
 
 import pytest
@@ -35,6 +36,8 @@ from analysis_service.deployment import Deployment
 from analysis_service.vendors import ProviderAuthError
 from tests.factories import TEST_TIER_ENV, sample_selection
 from webapp.main import Analyses, Startup, create_app, render_report
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 SAME_ORIGIN = {"Sec-Fetch-Site": "same-origin"}
 
@@ -544,6 +547,50 @@ def test_a_config_failure_renders_the_diagnostic_instead_of_the_form(broken_clie
     assert "GOOGLE_APPLICATION_CREDENTIALS" not in page
     # Recovery is always fix-then-restart; there is no retry affordance.
     assert "restart" in page.lower()
+
+
+def test_the_diagnostic_reports_the_client_library_a_vendor_needs():
+    """The page's promise is that it names everything a run still needs.
+
+    A vendor whose provider needs a client library can have every variable set
+    and still fail at bind time. Without this row the page would mark the
+    deployment ready and the run would refuse — which is the drift the section
+    reads the registry to avoid.
+    """
+    from analysis_service.model_tiers import load_model_tiers
+    from webapp.main import _vendor_sections
+
+    tiers = load_model_tiers(
+        PROJECT_ROOT / "config" / "model_tiers.toml",
+        env={
+            "ANALYSIS_MODEL_BASE_VENDOR": "bedrock",
+            "ANALYSIS_MODEL_BASE_MODEL": "anthropic.claude-sonnet-4-6",
+            "ANALYSIS_MODEL_STRONG_VENDOR": "bedrock",
+            "ANALYSIS_MODEL_STRONG_MODEL": "anthropic.claude-opus-5",
+            "ANALYSIS_MODEL_CREDENTIALS_BEDROCK": "api_key",
+        },
+    )
+    section = _vendor_sections(tiers, env={})
+    assert "ANALYSIS_BEDROCK_REGION" in section
+    assert "boto3" in section
+    assert "analysis-service[bedrock]" in section
+
+
+def test_the_diagnostic_names_no_library_for_a_vendor_that_needs_none():
+    """An empty statement reads as a missing one, so there is no row at all."""
+    from analysis_service.model_tiers import load_model_tiers
+    from webapp.main import _vendor_sections
+
+    tiers = load_model_tiers(
+        PROJECT_ROOT / "config" / "model_tiers.toml",
+        env={
+            "ANALYSIS_MODEL_BASE_VENDOR": "anthropic",
+            "ANALYSIS_MODEL_BASE_MODEL": "claude-sonnet-4-6",
+            "ANALYSIS_MODEL_STRONG_VENDOR": "anthropic",
+            "ANALYSIS_MODEL_STRONG_MODEL": "claude-opus-5",
+        },
+    )
+    assert "pip install" not in _vendor_sections(tiers, env={})
 
 
 def test_the_diagnostic_never_prints_a_credential_value(broken_client, monkeypatch):

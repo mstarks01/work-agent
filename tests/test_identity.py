@@ -24,7 +24,12 @@ from analysis_service.identity import (
     served_trust_for,
 )
 from analysis_service.sampling import TierSampling
-from analysis_service.vendors import VENDOR_NAMES, Vendor, vendor_for
+from analysis_service.vendors import (
+    VENDOR_NAMES,
+    CredentialMode,
+    Vendor,
+    vendor_for,
+)
 
 # Deliberately not the installed versions: a fixture that happened to match the
 # running install would let a recomputation that ignores the recorded map pass.
@@ -272,8 +277,14 @@ class TestTheTableMatchesWhatTheTranslatorDoes:
     SERVED = "served-build-002"
 
     #: One canned provider response per vendor, in that vendor's own wire
-    #: shape, each naming :attr:`SERVED` where its API carries a model name.
-    #: Keyed by vendor, so a fourth row cannot be added without answering here.
+    #: shape, naming :attr:`SERVED` where that API carries a model name. Keyed
+    #: by vendor, so a row cannot be added without answering here.
+    #:
+    #: The Bedrock body names it nowhere, and that absence is the fact: a
+    #: Converse response carries no model identifier at all, so there is no
+    #: field a translator could read and the served half can only echo the
+    #: request. A body that invented one would test a wire shape AWS does not
+    #: send.
     BODIES: ClassVar[dict[str, dict]] = {
         "vertex": {
             "candidates": [
@@ -313,6 +324,12 @@ class TestTheTableMatchesWhatTheTranslatorDoes:
                 }
             ],
             "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+        },
+        "bedrock": {
+            "output": {"message": {"role": "assistant", "content": [{"text": "hi"}]}},
+            "stopReason": "end_turn",
+            "usage": {"inputTokens": 1, "outputTokens": 1, "totalTokens": 2},
+            "metrics": {"latencyMs": 1},
         },
     }
 
@@ -379,3 +396,63 @@ class TestTheTableMatchesWhatTheTranslatorDoes:
                 f"{name} is recorded as requested_echo, but the installed"
                 " translator read a name from the response body"
             )
+
+
+class TestAPlatformIdentityModePassesNoAmbientCredential:
+    """The claim is about litellm's behaviour, so litellm is what answers it.
+
+    `vendors.py` says an absent `api_key` sends litellm to the process
+    environment for a bearer token, and that an empty one states the
+    platform-identity choice positively. Neither half is decidable from this
+    repository's own tables, and a version bump could move either — so the
+    installed library is driven directly, offline, with a canned credential and
+    no network.
+    """
+
+    AMBIENT = "ambient-token-nobody-declared"
+
+    def _authorization(self, api_key: str | None) -> str:
+        # botocore ships no stubs, and this is the one call that needs its
+        # credential object rather than litellm's wrapper around it.
+        from botocore.credentials import Credentials  # type: ignore[import-untyped]
+        from litellm.llms.bedrock.base_aws_llm import BaseAWSLLM
+
+        prepared = BaseAWSLLM().get_request_headers(
+            credentials=Credentials(access_key="AK", secret_key="SK"),
+            aws_region_name="us-east-1",
+            extra_headers=None,
+            endpoint_url="https://bedrock-runtime.us-east-1.amazonaws.com/x",
+            data=b"{}",
+            headers={"Content-Type": "application/json"},
+            api_key=api_key,
+        )
+        return dict(prepared.headers).get("Authorization", "")
+
+    @pytest.fixture(autouse=True)
+    def _ambient_token(self, monkeypatch):
+        """The undeclared credential this mode has to ignore."""
+        monkeypatch.setenv("AWS_BEARER_TOKEN_BEDROCK", self.AMBIENT)
+
+    def test_an_absent_api_key_lets_the_ambient_token_authenticate(self):
+        """The behaviour the registry works around, pinned as its counter-example.
+
+        If a litellm bump stopped reading the variable, this fails and the
+        empty-string entry in `_MODE_KWARGS` becomes unnecessary rather than
+        wrong — which is a thing to find out here rather than to keep carrying.
+        """
+        assert self.AMBIENT in self._authorization(None)
+
+    def test_the_registry_kwargs_sign_from_the_resolved_identity(self):
+        """What this deployment actually sends under the platform-identity mode.
+
+        Read off `credential_kwargs` rather than restated, so the test and the
+        registry cannot come to disagree about which value is passed.
+        """
+        vendor = vendor_for("bedrock")
+        mode = CredentialMode.IAM
+        env = dict.fromkeys(vendor.required_env_vars(mode), "us-east-1")
+        kwargs = vendor.credential_kwargs(env, mode)
+
+        authorization = self._authorization(kwargs.get("api_key"))
+        assert self.AMBIENT not in authorization
+        assert authorization.startswith("AWS4-HMAC-SHA256")

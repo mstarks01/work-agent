@@ -59,7 +59,7 @@ until something runs on it. See
 [Review independence](#review-independence).
 
 ```toml
-version = 6
+version = 7
 review_independence = "shared"
 
 [tiers.base]
@@ -71,10 +71,24 @@ vendor = "anthropic"
 model = "claude-opus-5"
 ```
 
-Supported vendors are `vertex`, `anthropic` and `openai`. Every one is reached
-through a single adapter (LiteLLM); there is no per-vendor code path, and Gemini
-reaches Vertex the same way everything else does. The pair above is deliberately
+Supported vendors are `vertex`, `anthropic`, `openai` and `bedrock`. Every one
+is reached through a single adapter (LiteLLM); there is no per-vendor code path,
+and Gemini reaches Vertex the same way everything else does. The pair above is deliberately
 mixed, because that is an ordinary configuration rather than an advanced one.
+
+**A Bedrock model identifier carries the family segment.** Claude on Bedrock is
+`[<scope>.]anthropic.claude-<name>-<major>[-<minor>]`, with an optional date and
+an optional `-v<n>[:<m>]` build tail — `anthropic.claude-opus-5`, or
+`us.anthropic.claude-sonnet-4-5-20250929-v1:0`. The bare `claude-opus-5` is
+refused there, because it is not an identifier AWS serves; the error names the
+right spelling. Dated forms pass on Bedrock and are refused on `vertex` and
+`anthropic`, and that difference is a property of the catalogues rather than a
+special case: a date is refused where the vendor also serves the bare name as a
+floating alias, and Bedrock serves none.
+
+An ARN is refused for every vendor. It hides which model answers, so a blessed
+fingerprint would go on certifying a target somebody can repoint, and it carries
+the account that owns the resource into a fingerprint and a report.
 
 **"Gemini support" means Vertex-hosted Gemini.** `vendor = "vertex"` is the only
 route to a Gemini model here, and it carries Vertex's `iam` credential mode; the
@@ -100,6 +114,8 @@ like `vertex` + an API key cannot be written down:
 | `vertex` | `iam` | `ANALYSIS_VERTEX_PROJECT`, `ANALYSIS_VERTEX_LOCATION` |
 | `anthropic` | `api_key` | `ANALYSIS_ANTHROPIC_API_KEY` |
 | `openai` | `api_key` | `ANALYSIS_OPENAI_API_KEY` |
+| `bedrock` | `api_key` | `ANALYSIS_BEDROCK_API_KEY`, `ANALYSIS_BEDROCK_REGION` |
+| `bedrock` | `iam` | `ANALYSIS_BEDROCK_REGION` |
 
 `api_key` means the deployment passes the key, read only from the variable
 above. `iam` means **the platform supplies the identity**: the deployment passes
@@ -112,18 +128,45 @@ You may still set `GOOGLE_APPLICATION_CREDENTIALS`, and ADC will use it. It is
 not required, it is not named anywhere in the service, and the service never
 reads it.
 
-Every vendor above allows exactly one mode, so no deployment declares one. Where
-a vendor allows more than one, `model_tiers.toml` carries a `[credentials]`
-table keyed by vendor and the loader requires an entry:
+`bedrock` is the vendor that allows more than one mode, so a deployment that
+selects it says which one. `model_tiers.toml` carries a `[credentials]` table
+keyed by vendor, and the loader requires an entry:
 
 ```toml
 [credentials]
-# vendor = "mode"    # only for a vendor that allows more than one
+bedrock = "api_key"    # or "iam"
 ```
 
+`ANALYSIS_MODEL_CREDENTIALS_BEDROCK` sets the same value from the environment,
+and wins over the file — the same precedence a tier's own vendor and model
+override carries.
+
 A key for a single-mode vendor is an error, because it is not a choice. A
-missing key for a multi-mode vendor is an error too. Both rules read the same
-registry table the check reads, so neither can drift from it.
+missing key for a multi-mode vendor is an error too, but only where a tier
+selects that vendor: a vendor nobody calls needs no identity. Both rules read
+the same registry table the check reads, so neither can drift from it.
+
+Under `iam`, Work Agent passes an **empty** `api_key` rather than none at all.
+That is not a detail: LiteLLM reads `AWS_BEARER_TOKEN_BEDROCK` out of the
+process environment whenever no key is passed, authenticates with it and skips
+request signing. AWS tooling sets that variable for its own reasons, so an
+absent kwarg would let a credential this deployment never declared authenticate
+a run. Stating the choice is what closes it.
+
+**A Bedrock API key expires, and nothing here refreshes it.** AWS's short-term
+Bedrock key lasts twelve hours, and LiteLLM never refreshes a bearer token, so
+under `api_key` the operator rotates `ANALYSIS_BEDROCK_API_KEY` before it
+expires. Under `iam` the problem does not arise, because boto3 refreshes the
+identity it resolved. The service detects neither state, by decision: it holds
+no schedule and a key that still works is indistinguishable here from one that
+was renewed a minute ago.
+
+**Bedrock needs its client library in the image.** Install it with
+`pip install analysis-service[bedrock]`, which adds `boto3`. Both credential
+modes need it: LiteLLM's Converse handler resolves credentials through a bare
+`import boto3` before anything reads a bearer token. A tier that selects
+`bedrock` refuses to bind without it and names the extra; a deployment that
+never selects `bedrock` never carries it.
 
 Keys are read **only** from these vendor-scoped variables. LiteLLM's ambient
 `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` pickup is deliberately unused, so a

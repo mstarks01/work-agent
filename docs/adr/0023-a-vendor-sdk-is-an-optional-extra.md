@@ -30,7 +30,11 @@ needs a client library gets the same treatment.
 ### The registry names the SDK in a table, and the check is a probe
 
 `vendors.py` holds a table keyed by vendor. Each entry names the module to probe
-and the extra that supplies it, and a vendor that needs no SDK carries no entry.
+and the extra that supplies it, and a vendor that needs no SDK answers `None`.
+`None` rather than an absent key, because `tests/test_vendor_neutrality.py`
+finds every vendor-keyed table and requires it to answer for every vendor: a row
+that simply never appeared would raise at the first build that selected it,
+instead of at the guard built to catch exactly that.
 The check runs `importlib.util.find_spec`, never an `import`, for two reasons.
 An `import` would make the package's own AST scan
 (`tests/test_identity.py`) demand a hard dependency, which contradicts the
@@ -68,11 +72,26 @@ named in that tuple would make every install without the extra unable to produce
 an execution identity, which turns the optional extra back into a hard
 dependency.
 
-## Consequences
+### The offline lane installs the extra, and the missing branch is driven
 
-The offline CI lane does not install the extra, so it exercises the missing-SDK
-branch and no offline lane exercises the present-SDK branch.
+This reverses what this ADR first said, on a fact the first version missed. The
+offline conformance suite builds an adapter for **every** vendor, because that
+is how it establishes that the application treats them alike. Without the SDK,
+the vendor that needs one is the single vendor that suite cannot cover — which
+is the imbalance [#116](https://github.com/mstarks01/work-agent/issues/116)
+existed to remove, reappearing in the suite built to remove it.
+
+So the `dev` dependency group names the project's own extra, and one place still
+states the version range. The missing-SDK branch is driven directly instead: a
+test makes the probe answer the way it would on an image without the library,
+which is the same call the gate makes.
+
+## Consequences
 
 An operator who selects such a vendor installs `analysis-service[<vendor>]`. The
 bind-time error names the extra, so the instruction is in the failure rather
 than only in a guide.
+
+A deployment that installs the wheel without the extra and selects the vendor is
+refused at build time. No offline lane runs in that state, so the refusal is
+proved by driving the probe rather than by the absence of a package.
