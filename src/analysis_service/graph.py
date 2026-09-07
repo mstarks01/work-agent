@@ -140,6 +140,7 @@ from analysis_service.domains import select_domain_packs
 from analysis_service.evidence import (
     evidence_catalog,
     invalid_proposal_marks,
+    known_proposals,
     render_catalog,
     render_element_roster,
     resolve_proposals,
@@ -183,6 +184,7 @@ from analysis_service.report import (
     Job,
     LaneCoverage,
     NodeRun,
+    Refusal,
     Report,
     Ruling,
     SharedElementName,
@@ -1315,6 +1317,9 @@ def prepare_analysis(
                         model,
                         candidate_set,
                         options.get(name) or {},
+                        units=package.record.units_for(
+                            options.get(name) or {}, lane.lane
+                        ),
                         ruled_out=tuple(lane_ruled_out),
                     ),
                     "reference_notes": compose_notes(loader, notes),
@@ -1537,14 +1542,21 @@ def merge_drafts(
         lane: invalid_proposal_marks(batch.invalid, package, lane)
         for lane, batch in batches.items()
     }
+    # Identity before the split, so a proposal naming a requirement the
+    # framework does not have is marked whichever side of the split it would
+    # have taken (#659). The two marks per lane are one value from here on.
+    known: dict[str, list[Any]] = {}
+    for lane, batch in batches.items():
+        known[lane], unknown = known_proposals(batch.claims, package, lane)
+        invalid[lane] = invalid[lane].merged_with(unknown)
     # Split before resolving, because a deferred proposal must not become a
     # draft: the whole point is that it never reaches the critic. The package
     # decides which, since the unit and the reason are both its own.
     partitions = {
         lane: package.record.partition_proposals(
-            batch.claims, lane, CARRIED_EVIDENCE_KINDS
+            known[lane], lane, CARRIED_EVIDENCE_KINDS
         )
-        for lane, batch in batches.items()
+        for lane in batches
     }
     deferred: dict[str, str] = {}
     for _, reasons in partitions.values():
@@ -1860,18 +1872,18 @@ def _framework_finished(state: SessionState, nodes: FrameworkNodes) -> bool:
     ``skip`` route with no subgraph to run at all. A framework part-way through
     its lanes, or one whose critic is in the bounded re-ask, has taken neither.
 
-    The refusal half reads :data:`_REFUSAL_REASONS`, the same table that says
-    *why* a refused framework did not run, so what counts as a refusal is
-    written down once.
+    The refusal half reads :data:`_REFUSALS`, the same table that says *why*
+    a refused framework did not run, so what counts as a refusal is written
+    down once.
 
     A graph entered past ``prepare`` wrote no precondition key, and
-    :func:`_refusal_reason` reads that absence as ``satisfied``. This reads it
+    :func:`_refusal` reads that absence as ``satisfied``. This reads it
     the same way: such a framework is finished once it is accepted, and never
     by refusal.
     """
     if state.get(nodes.key("accepted")):
         return True
-    return str(state.get(nodes.key("precondition"))) in _REFUSAL_REASONS
+    return str(state.get(nodes.key("precondition"))) in _REFUSALS
 
 
 class MissingFrameworkOptions(ValueError):
@@ -1982,9 +1994,7 @@ def _framework_block(
             lanes=package.lanes,
             claims=(*claims, *rejected),
             options=options,
-            refusal_reason=_refusal_reason(
-                package, state.get(nodes.key("precondition"))
-            ),
+            refusal=_refusal(package, state.get(nodes.key("precondition"))),
             deferred=state.get(nodes.key("deferred")) or {},
             ruled_out=state.get(nodes.key("ruled_out")) or {},
         ),
@@ -2013,22 +2023,24 @@ def _framework_block(
 # because the remedy differs: ``refuted`` says do not name this framework for
 # this system, and ``undecidable`` says the input never said, which the
 # submitter answers by submitting more.
-_REFUSAL_REASONS: Mapping[str, str] = MappingProxyType(
+_REFUSALS: Mapping[str, Refusal] = MappingProxyType(
     {
-        "refuted": (
+        "refuted": Refusal(
+            "not-applicable",
             "the {framework} precondition refutes this system, so no {framework}"
-            " lane ran; this framework does not apply to a system of this shape"
+            " lane ran; this framework does not apply to a system of this shape",
         ),
-        "undecidable": (
+        "undecidable": Refusal(
+            "undecidable",
             "the input never says whether {framework} applies to this system, so"
-            " no {framework} lane ran; submitting more about the system settles it"
+            " no {framework} lane ran; submitting more about the system settles it",
         ),
     }
 )
 
 
-def _refusal_reason(package: FrameworkPackage, result: object) -> str:
-    """Why this framework did not run, or ``""`` when it did.
+def _refusal(package: FrameworkPackage, result: object) -> Refusal | None:
+    """Why this framework did not run, as a scope state and a reason, or ``None``.
 
     What the reason is *used for* is the block's own — the neutral base answers
     in lanes, and a package holding a requirement catalog answers in
@@ -2040,7 +2052,10 @@ def _refusal_reason(package: FrameworkPackage, result: object) -> str:
     model and runs no gate, and reporting a refusal there would describe one that
     never happened.
     """
-    return _REFUSAL_REASONS.get(str(result), "").format(framework=package.name)
+    refusal = _REFUSALS.get(str(result))
+    if refusal is None:
+        return None
+    return Refusal(refusal.state, refusal.reason.format(framework=package.name))
 
 
 # --- Assembly ---------------------------------------------------------------

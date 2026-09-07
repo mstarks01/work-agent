@@ -872,6 +872,7 @@ NEUTRAL_HOOKS: dict[str, str] = {
     "lane_diagnostics": "record",
     "misfiled": "record",
     "ruled_out": "record",
+    "units_for": "record",
     "settled_by_grounds": "record",
     "unit_of": "record",
     "rating_of": "record",

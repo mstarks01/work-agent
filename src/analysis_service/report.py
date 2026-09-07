@@ -32,7 +32,7 @@ from collections import Counter
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from datetime import datetime
 from types import MappingProxyType
-from typing import Annotated, Any, ClassVar, Literal, Self, get_args
+from typing import Annotated, Any, ClassVar, Literal, NamedTuple, Self, get_args
 
 from pydantic import (
     BaseModel,
@@ -218,6 +218,16 @@ from analysis_service.vendors import ServedTrust, vendor_for_route
 # the whole of the question, which is why the second spelling is a 3.0 change
 # rather than a minor one. The reason is a property rather than a package's
 # name: **a framework may need a fact the system model has no slot for.**
+#
+# 3.0 also respells one ``scope[].state`` value and adds a fourth (#659).
+# ``applicable`` is now ``not-raised``: the old word read as a verdict that
+# the unit applies, where the fact is only that no lane raised a claim on it.
+# ``undecidable`` is new, for a framework whose precondition could not tell
+# whether it applies at all; it was folded into ``not-applicable`` before,
+# which told a reader the unit was ruled out when the input had never said.
+# Both would be major on their own, and both ride 3.0 because it has never
+# shipped. The archived sweeps under ``evals/runs/`` were migrated by
+# ``evals/migrations/2026-09-07-scope-states.py``.
 SCHEMA_VERSION = "3.0"
 
 # The envelope's disclaimer, which is about the *service* rather than about any
@@ -821,6 +831,19 @@ class Claim(BaseModel):
         """
         del lane, carried
         return list(proposals), {}
+
+    @classmethod
+    def units_for(cls, options: Mapping[str, Any], lane: str) -> tuple[str, ...]:
+        """The units of ``lane`` a job with these options rules on, or ``()``.
+
+        A package whose options select which units apply — a level picking a
+        requirement set — names them here, and the lane agent's scope line
+        lists them so the agent rules on those and on no other (#659). The
+        neutral answer is empty: a framework whose claims are an open set has
+        no list of units to hand an agent, and renders nothing.
+        """
+        del options, lane
+        return ()
 
     @classmethod
     def ruled_out(
@@ -2148,8 +2171,20 @@ class BlockSummary(BaseModel):
     rejected_count: int = Field(ge=0)
 
 
+class Refusal(NamedTuple):
+    """Why a framework's lanes did not run: the scope state that says so, and the reason.
+
+    The graph's refusal table answers in this shape, and every scope builder
+    reads it, so the two refusing states of a **Precondition** reach the report
+    as two different scope states rather than as two reasons under one.
+    """
+
+    state: Literal["not-applicable", "undecidable"]
+    reason: str
+
+
 class ScopeEntry(BaseModel):
-    """One unit a framework considered and raised no claim about.
+    """One unit a framework raised no claim about.
 
     The positive half of an answer. A framework whose **Precondition** or whose
     own presence tests rule a unit out has to *say so*: dropping it leaves a
@@ -2162,21 +2197,27 @@ class ScopeEntry(BaseModel):
     own catalog; a report's reader does not. Self-containment is the property
     this payload enforces everywhere else.
 
-    **Three states, and the third is not a weaker second.** ``not-applicable``
-    says the unit does not apply to a system of this shape — a complete answer.
-    ``applicable`` says the framework considered it and raised nothing.
-    ``needs-other-evidence`` says the unit *does* apply and this job cannot
-    settle it, because the evidence that would is not the kind the job carries.
+    **Four states, and none is a weaker spelling of another.**
+    ``not-applicable`` says the unit does not apply to a system of this shape —
+    a complete answer. ``undecidable`` says the input never said whether the
+    framework applies at all, so no lane ran; the remedy is more input, which
+    is why it is not folded into ``not-applicable`` (#659). ``not-raised`` says
+    no lane raised a claim on the unit. It is a fact about the output, not a
+    verdict: the lanes were handed the unit and filed nothing, and nothing
+    here certifies that they weighed it. ``needs-other-evidence`` says the unit
+    *does* apply and this job cannot settle it, because the evidence that
+    would is not the kind the job carries.
 
-    That third state exists because collapsing it into either of the others
-    loses the distinction a reader most needs. Folded into ``not-applicable`` it
-    claims the unit was ruled out, which is false. Left as a **Claim** with a
-    ``needs-info`` **Verdict** it reads as *send more of the same input*, which
-    will never work — and a submitter cannot tell those apart. Its reason names
-    the kind of evidence that would settle it, so the answer is actionable in
-    the only way it can be: by supplying a different kind of input.
+    The last state exists because collapsing it into either of the finished
+    ones loses the distinction a reader most needs. Folded into
+    ``not-applicable`` it claims the unit was ruled out, which is false. Left
+    as a **Claim** with a ``needs-info`` **Verdict** it reads as *send more of
+    the same input*, which will never work — and a submitter cannot tell those
+    apart. Its reason names the kind of evidence that would settle it, so the
+    answer is actionable in the only way it can be: by supplying a different
+    kind of input.
 
-    Both non-``applicable`` states must state a reason, which is the rule
+    Every state but ``not-raised`` must state a reason, which is the rule
     :class:`Verdict` already applies to its two non-confirmed states.
 
     **STRIDE's list is empty**, and that is not an omission: STRIDE has no
@@ -2186,7 +2227,9 @@ class ScopeEntry(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     unit: str = Field(min_length=1, max_length=300)
-    state: Literal["applicable", "not-applicable", "needs-other-evidence"]
+    state: Literal[
+        "not-raised", "not-applicable", "undecidable", "needs-other-evidence"
+    ]
     reason: str = Field(default="", max_length=1000)
     #: The kind of evidence that would settle this unit, when the state says
     #: none available could. A field rather than a phrase inside ``reason``
@@ -2197,7 +2240,7 @@ class ScopeEntry(BaseModel):
 
     @model_validator(mode="after")
     def _check_shape(self) -> Self:
-        if self.state != "applicable" and not self.reason:
+        if self.state != "not-raised" and not self.reason:
             raise ValueError(
                 f"scope entry {self.unit!r} is {self.state} and must state a reason"
             )
@@ -2471,11 +2514,11 @@ class FrameworkAnalysis(BaseModel):
         lanes: Sequence[str],
         claims: Sequence[RuledClaim],
         options: Mapping[str, Any],
-        refusal_reason: str,
+        refusal: Refusal | None = None,
         deferred: Mapping[str, str] = MappingProxyType({}),
         ruled_out: Mapping[str, str] = MappingProxyType({}),
     ) -> list[ScopeEntry]:
-        """What this framework considered and raised no claim about.
+        """What this framework raised no claim about.
 
         Beside :meth:`summarize` and for the same reason: a package that answers
         in its own units overrides this next to the field it fills, and the
@@ -2488,9 +2531,10 @@ class FrameworkAnalysis(BaseModel):
         entry per lane when its **Precondition** refuses. A package whose own
         units are finer — a requirement set — answers in those instead.
 
-        ``refusal_reason`` is empty when the precondition let the lanes run.
-        ``options`` is the job's own selection for this framework, as the input
-        ladder validated it.
+        ``refusal`` is ``None`` when the precondition let the lanes run, and
+        otherwise the state and reason the graph's refusal table gives for the
+        precondition's answer. ``options`` is the job's own selection for this
+        framework, as the input ladder validated it.
 
         ``ruled_out`` maps a unit the package's own rules ruled out of this
         model to the reason, from :meth:`Claim.ruled_out`, and each becomes a
@@ -2502,7 +2546,7 @@ class FrameworkAnalysis(BaseModel):
         the first.
         """
         del claims, options
-        if not refusal_reason:
+        if refusal is None:
             return [
                 *(
                     ScopeEntry(unit=unit, state="not-applicable", reason=reason)
@@ -2519,7 +2563,7 @@ class FrameworkAnalysis(BaseModel):
                 ),
             ]
         return [
-            ScopeEntry(unit=lane, state="not-applicable", reason=refusal_reason)
+            ScopeEntry(unit=lane, state=refusal.state, reason=refusal.reason)
             for lane in lanes
         ]
 

@@ -1768,7 +1768,7 @@ def test_every_precondition_result_is_answered_by_the_refusal_table():
     """The table is checked against its registry, because the gate reads it.
 
     ``_framework_finished`` reads a framework as finished when its parked
-    precondition string is in ``_REFUSAL_REASONS``. That makes the table
+    precondition string is in ``_REFUSALS``. That makes the table
     load-bearing for whether a job produces a report at all: a fourth
     ``PreconditionResult`` that routes to ``skip`` and is missing here would
     never be finished, every ``assemble`` trigger would report it pending, and
@@ -1777,7 +1777,7 @@ def test_every_precondition_result_is_answered_by_the_refusal_table():
     ``satisfied`` is the one result the table does not carry, because a
     satisfied framework runs and finishes by its router's marker instead.
     """
-    assert set(graph._REFUSAL_REASONS) | {"satisfied"} == set(PRECONDITION_RESULTS)
+    assert set(graph._REFUSALS) | {"satisfied"} == set(PRECONDITION_RESULTS)
 
 
 def test_the_two_refusing_states_state_different_reasons(monkeypatch):
@@ -1786,7 +1786,7 @@ def test_the_two_refusing_states_state_different_reasons(monkeypatch):
     ``refuted`` says do not name this framework for this system. ``undecidable``
     says the input never said, which the submitter answers by submitting more.
     """
-    reasons = {}
+    entries = {}
     for result in ("refuted", "undecidable"):
         carrying(monkeypatch, package_answering(result))
         ctx = FakeContext(**{NODES.key("precondition"): result})
@@ -1794,10 +1794,14 @@ def test_the_two_refusing_states_state_different_reasons(monkeypatch):
             valid_model().model_dump(mode="json"), ctx, KEYS, FRAMEWORKS, DISCLAIMERS
         )
         analysis = graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS])
-        reasons[result] = analysis.analyses[0].scope[0].reason
+        entries[result] = analysis.analyses[0].scope[0]
 
-    assert reasons["refuted"] != reasons["undecidable"]
-    assert "never says" in reasons["undecidable"]
+    assert entries["refuted"].reason != entries["undecidable"].reason
+    assert "never says" in entries["undecidable"].reason
+    # And two states, not one state with two reasons: a reader grouping by
+    # state must not see an undecided framework as a ruled-out one (#659).
+    assert entries["refuted"].state == "not-applicable"
+    assert entries["undecidable"].state == "undecidable"
 
 
 # --- Two frameworks, one of them refused -------------------------------------
@@ -2716,3 +2720,40 @@ def test_a_fenced_value_and_a_fenced_source_share_one_layout():
     source = Source.description("a ```` run inside")
     body = render_sources([source]).split("\n\n", 1)[1]
     assert body == fenced(body.split("\n", 1)[1].rsplit("\n", 1)[0])
+
+
+def test_merge_marks_an_invented_key_before_the_deferral_split():
+    """#659: a deferred proposal naming a requirement the catalog does not hold
+    reached the deferred map, where the scope builder silently dropped it. The
+    identity check now runs on the whole batch, so the mark is written and the
+    deferred map never carries the key."""
+    from analysis_service.frameworks import PACKAGES
+    from analysis_service.frameworks.asvs.record import RequirementProposal
+
+    asvs_nodes = graph.FrameworkNodes("asvs")
+    asvs_keys = graph.GraphKeys.of(("asvs",))
+    state = {
+        graph.Lane("asvs", lane).drafts_key: {"claims": []}
+        for lane in PACKAGES["asvs"].lanes
+    }
+    state[graph.Lane("asvs", "authentication").drafts_key] = {
+        "claims": [
+            RequirementProposal(
+                requirement="99.99",
+                title="An invented requirement, deferred to code",
+                description="d",
+                needs_evidence="code",
+                evidence_refs=["crossing:flow:customer-to-web-app:login"],
+            ).model_dump(mode="json")
+        ]
+    }
+    ctx = FakeContext(**state)
+
+    output = graph.merge_drafts(
+        valid_model().model_dump(mode="json"), ctx, asvs_keys, asvs_nodes
+    )
+
+    assert output["draft_count"] == 0
+    assert ctx.state[asvs_nodes.key("deferred")] == {}
+    (mark,) = ctx.state[asvs_nodes.key("marks")]["unknown_claim_identities"]
+    assert mark["claim_id"] == "v5.0.0-6.99.99"
