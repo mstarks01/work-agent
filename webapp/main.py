@@ -292,6 +292,59 @@ def build_startup(env: Mapping[str, str] | None = None) -> Startup:
     )
 
 
+def _unit_order(unit: str) -> tuple[int | str, ...]:
+    """A unit identifier as a sort key, so ``V6.2.10`` follows ``V6.2.9``.
+
+    Numeric where a part is a number and textual where it is not, because the
+    shape of a unit belongs to the framework rather than to this page: ASVS's
+    ``V<chapter>.<section>.<requirement>`` sorts into the standard's own order,
+    and a package numbering its units another way still sorts stably.
+    """
+    return tuple(
+        int(part) if part.isdigit() else part for part in unit.lstrip("Vv").split(".")
+    )
+
+
+def unit_rows(report: Report) -> dict[str, list[dict[str, str]]]:
+    """Per framework, the units its block answers for, with each one's own text.
+
+    **The join is here because the knowledge is here.** Which claim rules on
+    which unit is a package's answer (``unit_of``) and what a unit says is a
+    package's answer (``text_of_unit``); the report page holds neither and must
+    not learn them. So the server pairs them and the page renders what it is
+    handed.
+
+    A framework whose claims are an open set contributes an empty list: no
+    claim names a unit and no unit has text, so the page renders no table for
+    it rather than a table of nothing.
+
+    The rows carry the unit, its text and the claim ruling on it. Everything
+    else a row shows — the state, the reason, the evidence a unit still needs —
+    the page reads off ``scope`` and the claim, which it already holds.
+    """
+    rows: dict[str, list[dict[str, str]]] = {}
+    for block in report.analyses:
+        record = package_for(block.framework).record
+        by_unit = {
+            unit: claim.id
+            for claim in block.all_claims()
+            if (unit := record.unit_of(claim))
+        }
+        units = sorted(
+            {entry.unit for entry in block.scope} | set(by_unit), key=_unit_order
+        )
+        rows[block.framework] = [
+            {
+                "unit": unit,
+                "text": record.text_of_unit(unit),
+                "claim_id": by_unit.get(unit, ""),
+            }
+            for unit in units
+            if record.text_of_unit(unit) or unit in by_unit
+        ]
+    return rows
+
+
 def render_report(report: Report) -> RenderedPage:
     """``report_view.html``, carrying this run's report.
 
@@ -315,6 +368,7 @@ def render_report(report: Report) -> RenderedPage:
         _REPORT_GRANTS,
         script=client_script("report_view.js"),
         report=script_json(report.model_dump(mode="json")),
+        units=script_json(unit_rows(report)),
     )
 
 
