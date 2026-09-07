@@ -40,28 +40,48 @@ async function saveDraft() {
 // of its own, so a label the server changes changes nothing here.
 const DONE = ["finished", "signed"];
 
+// The one state whose row does not press and carries a reason for it. Spelled
+// once, because the mark that draws it and the sentence that explains it have
+// to be about the same row.
+const ERROR = "error";
+
 function railSymbol(state) {
   if (DONE.includes(state)) return ["✓", "complete"];
   if (state === "draft") return ["…", "progressing"];
-  if (state === "error") return ["!", "error"];
+  if (state === ERROR) return ["!", "error"];
   return ["", "pending"];
+}
+
+// What a row says past its title: the state, and the reason where there is
+// one. Written once, so the tooltip, the accessible name and the visible
+// reason cannot say three different things about one row.
+function railStatus(row) {
+  return row.review.label + (row.status ? " — " + row.status : "");
 }
 
 function railRow(row) {
   const item = document.createElement("li");
   item.dataset.case = row.case;
-  const status = row.review.label;
-  item.title = status + (row.status ? " — " + row.status : "");
+  const status = railStatus(row);
+  item.title = status;
   const [symbol, cls] = railSymbol(row.review.state);
   const icon = el("span", "state-icon " + cls, symbol);
   icon.setAttribute("aria-hidden", "true");
-  const label = el("span", "label", row.number + "  " + row.title);
+  const name = row.number + "  " + row.title;
+  const label = el("span", "label", name);
+  // A row that will not press has to say why in the row. The reason lived in
+  // the tooltip alone, and a tooltip is read by neither a keyboard, a touch
+  // screen nor a screen reader — so the one row nobody can open was the one
+  // row that explained itself to nobody.
+  if (row.review.state === ERROR && row.status) {
+    label.append(el("span", "reason", row.status));
+  }
   const readonly = row.state === "signed";
   const clickable = row.pressable || readonly;
   const press = document.createElement(clickable ? "button" : "span");
   press.className = clickable ? "row" : "row dead";
   press.setAttribute("aria-label",
-    label.textContent + " — " + status + (readonly ? " — read only" : ""));
+    name + " — " + status + (readonly ? " — read only" : ""));
   press.append(icon, label);
   if (row.pressable) press.addEventListener("click", () => openCase(row.case));
   else if (readonly) press.addEventListener("click", () => openReadOnly(row.case));
