@@ -124,7 +124,8 @@
       "protocol": "MQTT",
       "authentication": "fleet-wide pre-shared key, shared by every device and never rotated",
       "data_description": "sensor readings tagged with a device identifier",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "write"
     },
     {
       "id": "flow:device-gateway-to-device-registry:look-up-device",
@@ -140,7 +141,8 @@
       "protocol": "Firestore API",
       "authentication": "unknown",
       "data_description": "device identifier, key material, customer assignment",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "read"
     },
     {
       "id": "flow:device-gateway-to-telemetry-normalizer:forward-readings",
@@ -156,7 +158,8 @@
       "protocol": "Pub/Sub",
       "authentication": "unknown",
       "data_description": "normalized sensor readings",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "write"
     },
     {
       "id": "flow:telemetry-normalizer-to-telemetry-lake:load-readings",
@@ -172,7 +175,8 @@
       "protocol": "BigQuery API",
       "authentication": "unknown",
       "data_description": "site addresses, occupancy patterns, readings",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "write"
     },
     {
       "id": "flow:sensor-node-to-firmware-bucket:poll-firmware",
@@ -188,7 +192,8 @@
       "protocol": "HTTPS",
       "authentication": "none; the bucket is public read",
       "data_description": "firmware image",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "read"
     },
     {
       "id": "flow:field-technician-to-sensor-node:local-service-session",
@@ -202,7 +207,8 @@
       "protocol": "local serial console",
       "authentication": "unknown",
       "data_description": "device configuration and diagnostics",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "read-write"
     },
     {
       "id": "flow:fleet-operator-to-telemetry-lake:query-dashboards",
@@ -218,7 +224,8 @@
       "protocol": "BigQuery API",
       "authentication": "company SSO",
       "data_description": "aggregated and raw customer readings",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "read"
     }
   ],
   "trust_boundaries": [

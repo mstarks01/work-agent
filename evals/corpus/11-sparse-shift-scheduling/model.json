@@ -110,7 +110,8 @@
       "protocol": "unknown",
       "authentication": "unknown",
       "data_description": "a colleague's own shifts",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "read"
     },
     {
       "id": "flow:store-manager-to-scheduling-web-app:build-rota",
@@ -127,7 +128,8 @@
       "protocol": "unknown",
       "authentication": "unknown",
       "data_description": "rota entries for a store",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "write"
     },
     {
       "id": "flow:scheduling-web-app-to-scheduling-service:rota-requests",
@@ -144,7 +146,8 @@
       "protocol": "unknown",
       "authentication": "unknown",
       "data_description": "rota reads and writes",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "read-write"
     },
     {
       "id": "flow:scheduling-service-to-rota-database:read-write-rotas",
@@ -161,7 +164,8 @@
       "protocol": "unknown",
       "authentication": "unknown",
       "data_description": "rota entries, colleague names, contact details and availability",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "read-write"
     },
     {
       "id": "flow:scheduling-service-to-file-share:write-payroll-export",
@@ -177,7 +181,8 @@
       "protocol": "unknown",
       "authentication": "unknown",
       "data_description": "the weekly payroll export",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "write"
     },
     {
       "id": "flow:payroll-system-to-file-share:collect-payroll-export",
@@ -193,7 +198,8 @@
       "protocol": "unknown",
       "authentication": "unknown",
       "data_description": "the weekly payroll export",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "read"
     }
   ],
   "trust_boundaries": [

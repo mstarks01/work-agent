@@ -113,7 +113,8 @@
       "protocol": "HTTPS",
       "authentication": "per-team API key in a header, never expired or rotated",
       "data_description": "inference request including end-user text",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "write"
     },
     {
       "id": "flow:inference-gateway-to-model-server:forward-request",
@@ -129,7 +130,8 @@
       "protocol": "unknown",
       "authentication": "none; accepted by network position",
       "data_description": "inference request payload",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "write"
     },
     {
       "id": "flow:model-server-to-model-registry:load-artifact",
@@ -145,7 +147,8 @@
       "protocol": "object storage API",
       "authentication": "model server's own service account",
       "data_description": "model artifact",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "read"
     },
     {
       "id": "flow:model-server-to-feature-store:read-features",
@@ -162,7 +165,8 @@
       "protocol": "Redis protocol",
       "authentication": "none",
       "data_description": "account age and spend bands per customer",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "read"
     },
     {
       "id": "flow:inference-gateway-to-inference-log:write-request-log",
@@ -178,7 +182,8 @@
       "protocol": "BigQuery API",
       "authentication": "unknown",
       "data_description": "raw prompts and model responses",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "write"
     },
     {
       "id": "flow:ml-engineer-to-model-registry:publish-artifact",
@@ -194,7 +199,8 @@
       "protocol": "object storage API",
       "authentication": "unknown; possibly a shared group account",
       "data_description": "model artifact",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "write"
     }
   ],
   "trust_boundaries": [

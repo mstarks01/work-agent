@@ -103,7 +103,8 @@
       "protocol": "HTTPS",
       "authentication": "session cookie issued after email and password login; no MFA",
       "data_description": "order contents, shipping address, card last-four",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "write"
     },
     {
       "id": "flow:card-processor-to-storefront-api:settlement-webhook",
@@ -119,7 +120,8 @@
       "protocol": "HTTPS POST",
       "authentication": "unknown",
       "data_description": "settlement confirmation for an order",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "write"
     },
     {
       "id": "flow:storefront-api-to-order-service:submit-order",
@@ -136,7 +138,8 @@
       "protocol": "gRPC",
       "authentication": "none; accepted by network position",
       "data_description": "order contents, shopper identifiers, shipping address",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "write"
     },
     {
       "id": "flow:order-service-to-orders-db:read-write-orders",
@@ -153,7 +156,8 @@
       "protocol": "PostgreSQL wire protocol",
       "authentication": "single shared application account with full read/write; password from an environment variable",
       "data_description": "order rows, shipping addresses, card last-four",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "read-write"
     },
     {
       "id": "flow:order-service-to-receipt-archive:append-receipt",
@@ -169,7 +173,8 @@
       "protocol": "HTTPS",
       "authentication": "order service's own service account",
       "data_description": "receipt recording the order written and that the order service wrote it",
-      "encryption_in_transit": "TLS"
+      "encryption_in_transit": "TLS",
+      "operations": "write"
     }
   ],
   "trust_boundaries": [

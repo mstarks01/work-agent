@@ -141,7 +141,8 @@
       "protocol": "unknown",
       "authentication": "unknown",
       "data_description": "Browsing activity and order details",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "read-write"
     },
     {
       "id": "flow:mobile-app-to-web-api:api-traffic",
@@ -158,7 +159,8 @@
       "protocol": "HTTP",
       "authentication": "unknown",
       "data_description": "Order placement traffic carrying customer details",
-      "encryption_in_transit": "none \u2014 the app talks to the web API over HTTP, not HTTPS"
+      "encryption_in_transit": "none \u2014 the app talks to the web API over HTTP, not HTTPS",
+      "operations": "unknown"
     },
     {
       "id": "flow:catalogue-spreadsheet-to-web-api:sql-statements",
@@ -175,7 +177,8 @@
       "protocol": "SQL statements over an unstated transport",
       "authentication": "unknown",
       "data_description": "SQL statements changing prices and product copy",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "read-write"
     },
     {
       "id": "flow:web-api-to-user-database:customer-records",
@@ -193,7 +196,8 @@
       "protocol": "unknown",
       "authentication": "unknown",
       "data_description": "Customer name, address, and the card they paid with",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "read-write"
     },
     {
       "id": "flow:web-api-to-sims:order-handover",
@@ -211,7 +215,8 @@
       "protocol": "unknown",
       "authentication": "unknown",
       "data_description": "The placed order, including the delivery address and the number stored against it",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "write"
     },
     {
       "id": "flow:sims-to-delivery-address-flat-file:address-write",
@@ -228,7 +233,8 @@
       "protocol": "unknown",
       "authentication": "unknown",
       "data_description": "Delivery address only",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "write"
     },
     {
       "id": "flow:sims-to-fax-gateway:dispatch-note",
@@ -245,7 +251,8 @@
       "protocol": "unknown",
       "authentication": "unknown",
       "data_description": "Dispatch note carrying the customer's name and address",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "write"
     },
     {
       "id": "flow:fax-gateway-to-customer:confirmation-fax",
@@ -262,7 +269,8 @@
       "protocol": "fax",
       "authentication": "the dialled destination is never verified; nobody checks the fax arrived at the right place",
       "data_description": "Order confirmation carrying the customer's name and address",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "write"
     }
   ],
   "trust_boundaries": [

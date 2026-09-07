@@ -132,7 +132,8 @@
       "protocol": "unknown",
       "authentication": "unknown",
       "data_description": "the colleague's sign-in, and back to them a signed token carrying their staff id and group list, good for twelve hours with no way to pull it back before it expires",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "unknown"
     },
     {
       "id": "flow:franchise-identity-provider-to-identity-broker:vouch-for-colleague",
@@ -148,7 +149,8 @@
       "protocol": "unknown",
       "authentication": "the broker accepts the provider's assertion as a sign-in; which colleagues the provider may vouch for is not written down",
       "data_description": "an assertion vouching for a franchise colleague",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "write"
     },
     {
       "id": "flow:colleague-to-store-admin-console:change-prices-and-void",
@@ -165,7 +167,8 @@
       "protocol": "unknown",
       "authentication": "the token alone: its store-manager group decides, the colleague's own store is never checked, and nothing calls back to the broker to re-check them",
       "data_description": "price changes and transaction voids against any store",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "write"
     },
     {
       "id": "flow:store-admin-console-to-identity-broker:fetch-public-key",
@@ -179,7 +182,8 @@
       "protocol": "unknown",
       "authentication": "unknown",
       "data_description": "the public half of the token signing key",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "read"
     },
     {
       "id": "flow:identity-broker-to-hr-system:nightly-group-pull",
@@ -195,7 +199,8 @@
       "protocol": "unknown",
       "authentication": "unknown",
       "data_description": "group membership changes and leavers, applied once a night",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "read"
     },
     {
       "id": "flow:identity-broker-to-directory:read-write-directory",
@@ -211,7 +216,8 @@
       "protocol": "unknown",
       "authentication": "unknown",
       "data_description": "colleague records and group memberships",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "read-write"
     },
     {
       "id": "flow:identity-broker-to-key-store:read-signing-key",
@@ -227,7 +233,8 @@
       "protocol": "unknown",
       "authentication": "unknown",
       "data_description": "the token signing key",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "read"
     },
     {
       "id": "flow:identity-broker-to-audit-log:write-sign-ins",
@@ -243,7 +250,8 @@
       "protocol": "unknown",
       "authentication": "unknown",
       "data_description": "sign-in records of unstated content",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "write"
     }
   ],
   "trust_boundaries": [

@@ -114,7 +114,8 @@
       "protocol": "unknown",
       "authentication": "unknown",
       "data_description": "source code branches",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "write"
     },
     {
       "id": "flow:developer-to-build-runner:manual-rebuild",
@@ -128,7 +129,8 @@
       "protocol": "unknown",
       "authentication": "unknown",
       "data_description": "an interactive login and a rebuild of main that any developer may trigger, requiring no merge and receiving no review",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "write"
     },
     {
       "id": "flow:build-runner-to-git-server:fetch-source",
@@ -144,7 +146,8 @@
       "protocol": "unknown",
       "authentication": "unknown",
       "data_description": "the source of the merged commit",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "read"
     },
     {
       "id": "flow:build-runner-to-public-package-registry:resolve-dependencies",
@@ -158,7 +161,8 @@
       "protocol": "unknown",
       "authentication": "none \u2014 the runner does not verify signatures on the packages it downloads",
       "data_description": "dependency packages named by the lockfile, which is taken as given",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "read"
     },
     {
       "id": "flow:build-runner-to-image-registry:push-image",
@@ -174,7 +178,8 @@
       "protocol": "unknown",
       "authentication": "unknown",
       "data_description": "the built container image, tagged with the commit sha",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "write"
     },
     {
       "id": "flow:build-runner-to-deploy-controller:set-current-release",
@@ -191,7 +196,8 @@
       "protocol": "unknown",
       "authentication": "a shared build token, the same for every pipeline, never rotated since the pipeline was set up",
       "data_description": "the image sha that should become the current release",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "write"
     },
     {
       "id": "flow:store-server-to-deploy-controller:poll-current-release",
@@ -205,7 +211,8 @@
       "protocol": "unknown",
       "authentication": "unknown",
       "data_description": "the image sha the estate should be on",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "read"
     },
     {
       "id": "flow:store-server-to-image-registry:pull-image",
@@ -221,7 +228,8 @@
       "protocol": "unknown",
       "authentication": "unknown",
       "data_description": "the container image for the current release",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "read"
     }
   ],
   "trust_boundaries": [

@@ -55,6 +55,7 @@ def flow(label, **overrides):
         "authentication": "workload identity",
         "data_description": "records",
         "encryption_in_transit": "TLS 1.3",
+        "operations": "unknown",
     }
     fields.update(overrides)
     return DataFlow(

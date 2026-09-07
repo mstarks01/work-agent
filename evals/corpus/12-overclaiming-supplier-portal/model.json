@@ -128,7 +128,8 @@
       "protocol": "unknown",
       "authentication": "username and password issued by the vendor",
       "data_description": "insurance certificates, food safety audits, and supplier staff contact details",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "write"
     },
     {
       "id": "flow:category-manager-to-supplier-portal:review-documents",
@@ -146,7 +147,8 @@
       "notes": "All access is fully authenticated and audited is a datasheet claim covering the platform generally; the source states how suppliers sign in and never states how category managers do, so this stays unknown.",
       "authentication": "unknown",
       "data_description": "document reviews, approvals and rejections",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "read-write"
     },
     {
       "id": "flow:supplier-portal-to-document-store:store-documents",
@@ -163,7 +165,8 @@
       "protocol": "unknown",
       "authentication": "unknown",
       "data_description": "uploaded compliance documents",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "write"
     },
     {
       "id": "flow:portal-vendor-to-landing-bucket:push-nightly-extract",
@@ -181,7 +184,8 @@
       "notes": "The source leaves this open: we were told the extract is encrypted end to end, and the landing bucket runbook says the file arrives as a plain CSV picked up as-is. The first names no layer and the second describes the file at rest in the bucket, so they are in tension without settling whether the channel was protected. Nothing in the source resolves it, so this is unknown rather than either encrypted or unencrypted, and the open question is itself a finding.",
       "authentication": "unknown",
       "data_description": "the nightly supplier data extract",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "write"
     },
     {
       "id": "flow:supplier-master-service-to-landing-bucket:load-extract",
@@ -198,7 +202,8 @@
       "protocol": "unknown",
       "authentication": "unknown",
       "data_description": "the nightly supplier data extract",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "read"
     },
     {
       "id": "flow:supplier-master-service-to-supplier-database:write-supplier-records",
@@ -215,7 +220,8 @@
       "protocol": "unknown",
       "authentication": "unknown",
       "data_description": "supplier records",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "write"
     }
   ],
   "trust_boundaries": [

@@ -42,6 +42,7 @@ def flow(source, destination, label, **overrides):
         "authentication": "workload identity",
         "data_description": "records",
         "encryption_in_transit": "TLS 1.3",
+        "operations": "unknown",
     }
     fields.update(overrides)
     slug = f"{source.split(':', 1)[-1]}-to-{destination.split(':', 1)[-1]}"
@@ -223,6 +224,32 @@ class TestFiring:
         model.data_flows[2].authentication = "unknown"
         hits = fired(model, "tampering-unverified-write-to-store")
         assert hits[0].facts["data_classification"] == "confidential"
+
+    def test_write_to_store_skips_a_flow_that_only_reads(self, model):
+        """A flow's direction is who initiates, so a read reached this rule too.
+
+        The lead told an agent a read-only path could be tampered with, which is
+        a claim about an operation the model records nothing about — until
+        ``operations`` did.
+        """
+        model.data_flows[2].authentication = "unknown"
+        model.data_flows[2].operations = "read"
+
+        assert fired(model, "tampering-unverified-write-to-store") == []
+
+    def test_write_to_store_still_fires_on_an_unstated_operation(self, model):
+        """``unknown`` is a question, not a read.
+
+        Nobody said what the connection carries, so a write cannot be ruled out
+        — and the fact rides on the lead so the agent argues from the model
+        rather than from the rule's name.
+        """
+        model.data_flows[2].authentication = "unknown"
+        model.data_flows[2].operations = "unknown"
+
+        hits = fired(model, "tampering-unverified-write-to-store")
+
+        assert hits and hits[0].facts["operations"] == "unknown"
 
     def test_unattributable_action_needs_a_graded_asset(self, model):
         hits = fired(model, "repudiation-unattributable-action")

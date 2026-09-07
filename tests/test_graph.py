@@ -933,7 +933,12 @@ def test_prepare_derives_crossings_rather_than_trusting_them(
 
     assert output["element_count"] == 7
     assert output["crossing_count"] == 1
-    assert output["evidence_count"] == 3
+    # Four, not three, since a flow says what it does: the login flow's
+    # `operations` is `unknown`, and an unstated attribute is a fact an agent
+    # may ground a question on. Nothing about the catalog changed to allow that
+    # — `_attribute_entry` reads every type-specific field through
+    # `control_state`, so the new field is catalogued the day it lands.
+    assert output["evidence_count"] == 4
     assert "flow:customer-to-web-app:login" in ctx.state[graph.STATE_BOUNDARY_CROSSINGS]
     assert "process:web-app" in ctx.state[graph.STATE_SYSTEM_MODEL]
 

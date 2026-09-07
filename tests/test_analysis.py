@@ -39,6 +39,7 @@ def flow(source, destination, label, **overrides):
         "authentication": "service account",
         "data_description": "records",
         "encryption_in_transit": "TLS 1.3",
+        "operations": "unknown",
     }
     fields.update(overrides)
     slug = f"{source.split(':', 1)[-1]}-to-{destination.split(':', 1)[-1]}"
