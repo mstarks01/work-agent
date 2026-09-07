@@ -111,6 +111,13 @@ class MarkdownLoader:
         self._root = Path(root).resolve()
         if not self._root.is_dir():
             raise FileNotFoundError(f"markdown root is not a directory: {root}")
+        # Read once, at construction, and never again. A loader is held by a
+        # built graph for the life of a deployment, and it reads knowledge and
+        # domain packs during jobs; reading the disk on each call let a file
+        # edited after startup change what a job was told without any identity
+        # moving (#675 D24). A file added, changed or removed after this line
+        # is not this loader's; an intentional reload builds a new one.
+        self._texts = self._snapshot()
 
     @property
     def root(self) -> Path:
@@ -118,10 +125,26 @@ class MarkdownLoader:
 
     def names(self) -> list[str]:
         """All loadable names, sorted."""
-        return sorted(
-            path.relative_to(self._root).with_suffix("").as_posix()
-            for path in self._root.rglob("*.md")
-        )
+        return sorted(self._texts)
+
+    def _snapshot(self) -> dict[str, str]:
+        """Every Markdown file under the root, by name, as it reads right now.
+
+        A path resolving outside the root — a symlink out — is left out, on
+        the rule :meth:`load` applies to a traversal: deny, and reveal nothing.
+        A file that is not UTF-8 fails here rather than on the first job that
+        asks for it, which is the fail-closed reading of a bad file.
+        """
+        texts = {}
+        for path in sorted(self._root.rglob("*.md")):
+            if not _inside(self._root, path):
+                continue
+            name = path.relative_to(self._root).with_suffix("").as_posix()
+            try:
+                texts[name] = path.read_text(encoding="utf-8")
+            except UnicodeDecodeError as exc:
+                raise MarkdownFormatError(f"{name}.md is not UTF-8: {exc}") from exc
+        return texts
 
     def readable(self, name: str) -> bool:
         """Whether :meth:`load` would return this name's text.
@@ -131,18 +154,18 @@ class MarkdownLoader:
         follows a symlink out of the root that :meth:`load` refuses -- so a
         package passed startup validation and failed on its first job.
         """
-        return _inside(self._root, self._root / f"{name}.md")
+        return name in self._texts
 
     def load(self, name: str) -> str:
-        path = self._root / f"{name}.md"
-        # A name resolving outside the root (traversal) is treated the same
-        # as absent — deny, don't reveal what lies outside. `_inside` does the
-        # resolving, so a name that cannot be resolved is refused the same way.
-        if not _inside(self._root, path):
+        """The text under ``name`` as it read when this loader was built.
+
+        A name resolving outside the root (traversal) was never snapshotted,
+        so it is refused the same way as an absent one — deny, and reveal
+        nothing about what lies outside.
+        """
+        try:
+            return self._texts[name]
+        except KeyError:
             raise MarkdownNotFoundError(
                 f"no markdown named {name!r} under {self._root}"
-            )
-        try:
-            return path.read_text(encoding="utf-8")
-        except UnicodeDecodeError as exc:
-            raise MarkdownFormatError(f"{name}.md is not UTF-8: {exc}") from exc
+            ) from None

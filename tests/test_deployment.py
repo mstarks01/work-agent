@@ -334,6 +334,17 @@ def test_drop_params_is_never_set_so_litellm_stays_fail_closed():
     assert "drop_params" not in nodes[CRITIC_NODE].model._additional_args
 
 
+def test_a_variable_set_after_construction_belongs_to_the_next_deployment():
+    """#675 D24: the deployment held the caller's live mapping."""
+    env = dict(VERTEX_TIERS)
+    deployment = Deployment.from_env(env=env)
+    env["SOMETHING_NEW"] = "set later"
+
+    assert "SOMETHING_NEW" not in deployment.env
+    with pytest.raises(TypeError):
+        deployment.env["SOMETHING_NEW"] = "set later"
+
+
 def test_env_overrides_the_retry_attempts_without_touching_the_model():
     deployment = Deployment.from_env(env=VERTEX_ENV | {"ANALYSIS_RETRY_ATTEMPTS": "5"})
     pipeline = deployment.pipeline(DEFAULT_FRAMEWORKS)

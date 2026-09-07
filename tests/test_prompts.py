@@ -119,12 +119,12 @@ class TestComposeAnalyzePrompt:
     def test_state_placeholders_survive_composition(self, loader, package_loader):
         assert "{lane}" in compose_analyze_prompt(loader, package_loader, "spoofing")
 
-    def test_missing_exemplar_file_fails_closed(
-        self, loader, package_loader, package_root
-    ):
+    def test_missing_exemplar_file_fails_closed(self, loader, package_root):
+        """The loader is built after the file is gone: a loader reads its tree
+        once at construction, so a deletion afterwards is the next loader's."""
         (package_root / "lanes" / "spoofing" / "exemplars.md").unlink()
         with pytest.raises(MarkdownNotFoundError):
-            compose_analyze_prompt(loader, package_loader, "spoofing")
+            compose_analyze_prompt(loader, MarkdownLoader(package_root), "spoofing")
 
 
 class TestComposePeerPrompts:
