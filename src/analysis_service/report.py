@@ -49,6 +49,7 @@ from pydantic import (
 from pydantic.json_schema import SkipJsonSchema
 
 from analysis_service.actions import ActionVerb
+from analysis_service.grounding import MovedKind, meaning_moved
 from analysis_service.sources import Source
 from analysis_service.system_model import BoundaryCrossing, SystemModel
 from analysis_service.vendors import ServedTrust, vendor_for_route
@@ -231,6 +232,14 @@ from analysis_service.vendors import ServedTrust, vendor_for_route
 # Both would be major on their own, and both ride 3.0 because it has never
 # shipped. The archived sweeps under ``evals/runs/`` were migrated by
 # ``evals/migrations/2026-09-07-scope-states.py``.
+#
+# 3.0 also adds two fields to ``repaired_quotes[]`` (#675): ``moved``, what
+# the substitution changed in the claim's own terms (a negation, a number),
+# required and checked on load against the two texts it is computed from; and
+# ``scan_complete``, whether the rung ranked every window, ``None`` where the
+# run predates the field. The 18 archived repairs were filled in by
+# ``evals/migrations/2026-09-07-repaired-quote-moved.py``, which recomputes
+# ``moved`` from the texts and records no ``scan_complete``.
 #
 # 3.0 also tightens what two ``coverage[]`` halves count (#675). A control is
 # ``unknown_controls_cited`` only where a draft's attribute ground names that
@@ -1796,6 +1805,19 @@ class RepairedQuote(BaseModel):
     is: an agent must not report on its own accuracy, and a field that said
     "this was repaired" on the ground itself would ride into the provider
     schemas as one the agent could set.
+
+    ``moved`` names what the substitution changed in the claim's own terms —
+    a negation, a number — as :func:`~analysis_service.grounding.meaning_moved`
+    computes it from ``written`` and the ground's text. Stored rather than left
+    for a reader to derive, because the critic and the viewer both route on
+    it, and checked on load against those two texts so it cannot drift from
+    them. ``similarity`` says how near the span was; it never says whether the
+    span supports the claim, and a reader who wants that reads ``moved``.
+
+    ``scan_complete`` is whether the rung ranked every window before it
+    answered. ``None`` is *not recorded*: the 18 repairs archived under
+    ``evals/runs/`` predate the field, and a default of ``True`` would claim a
+    fact about a scan nobody measured.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -1804,6 +1826,8 @@ class RepairedQuote(BaseModel):
     index: int = Field(ge=0)
     written: str = Field(min_length=1, max_length=1000)  # Ground.text's bound
     similarity: float = Field(ge=0.0, le=1.0)
+    moved: list[MovedKind]
+    scan_complete: bool | None = None
 
 
 # How much of a named element ID a mark carries. Exported for the reason
@@ -2745,24 +2769,34 @@ class FrameworkAnalysis(BaseModel):
         A repaired quote is checked the same way, for the same reason: the
         agent's words would be shown beside the wrong entry.
         """
-        grounds_count = {claim.id: len(claim.grounds) for claim in self.all_claims()}
+        grounds_by_id = {claim.id: claim.grounds for claim in self.all_claims()}
         issues = []
         indexed: list[tuple[str, UnverifiedGround | RepairedQuote]] = [
             *(("unverified ground", m) for m in self.unverified_grounds),
             *(("repaired quote", m) for m in self.repaired_quotes),
         ]
         for what, mark in indexed:
-            count = grounds_count.get(mark.claim_id)
-            if count is None:
+            grounds = grounds_by_id.get(mark.claim_id)
+            if grounds is None:
                 issues.append(
                     f"{what} names claim {mark.claim_id!r}, which"
                     f" is not in the {self.framework} analysis"
                 )
-            elif mark.index >= count:
+            elif mark.index >= len(grounds):
                 issues.append(
                     f"{what} names index {mark.index} on claim"
-                    f" {mark.claim_id!r}, which carries {count} grounds"
+                    f" {mark.claim_id!r}, which carries {len(grounds)} grounds"
                 )
+            elif isinstance(mark, RepairedQuote):
+                # ``moved`` is a fact about two texts the block carries, so the
+                # block re-derives it: a mark saying nothing moved beside a span
+                # that dropped a "not" would be the one reader lying to the rest.
+                moved = list(meaning_moved(mark.written, grounds[mark.index].text))
+                if mark.moved != moved:
+                    issues.append(
+                        f"{what} on claim {mark.claim_id!r} says {mark.moved!r}"
+                        f" moved, and the texts say {moved!r}"
+                    )
         return issues
 
     def _claim_mark_issues(self, marks: Iterable[ClaimMark], what: str) -> list[str]:

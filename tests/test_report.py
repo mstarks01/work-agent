@@ -448,6 +448,20 @@ class TestReportInvariants:
         with pytest.raises(ValidationError, match="not a derived boundary crossing"):
             sample_report(threats=[threat])
 
+    def test_a_repaired_quote_must_say_what_the_texts_moved(self):
+        """``moved`` is derived from two texts the block carries, so the block
+        re-derives it and refuses a mark that disagrees."""
+        threat = sample_threat()
+        mark = RepairedQuote(
+            claim_id="S-01",
+            index=0,
+            written="Customers log in to the web app",
+            similarity=0.95,
+            moved=["negation"],
+        )
+        with pytest.raises(ValidationError, match="moved, and the texts say"):
+            sample_report(threats=[threat], repaired_quotes=[mark])
+
     def test_absent_element_the_model_names_is_rejected(self):
         threat = sample_threat(grounds=[Ground(kind="absent-element", term="web app")])
         with pytest.raises(ValidationError, match="which the system model names"):
@@ -821,7 +835,9 @@ class TestRepairedQuoteMarks:
         report = sample_report(
             [sample_threat("S-01")],
             repaired_quotes=[
-                RepairedQuote(claim_id="S-01", index=0, written="w", similarity=0.95)
+                RepairedQuote(
+                    claim_id="S-01", index=0, written="w", similarity=0.95, moved=[]
+                )
             ],
         )
         assert report.analyses[0].repaired_quotes[0].written == "w"
@@ -840,7 +856,11 @@ class TestRepairedQuoteMarks:
                 [sample_threat("S-01")],
                 repaired_quotes=[
                     RepairedQuote(
-                        claim_id=claim_id, index=index, written="w", similarity=0.95
+                        claim_id=claim_id,
+                        index=index,
+                        written="w",
+                        similarity=0.95,
+                        moved=[],
                     )
                 ],
             )
