@@ -1,4 +1,4 @@
-"""Candidate-trigger recall over the real corpus, per framework.
+"""Same-lane target overlap over the real corpus, per framework.
 
 Credential-free and deterministic, so it gates on every PR: each package's
 rules and the blessed models are all it reads.
@@ -58,9 +58,12 @@ CORPUS = Path(__file__).resolve().parents[1] / "evals" / "corpus"
 #: The margin is for corpus growth, not for noise. This measurement is
 #: deterministic: it runs the rules over blessed models with no provider call,
 #: so an unchanged tree gives an identical number every time.
+#: The keys are ``overlap``, because that is what the number is: a rule fired
+#: in the claim's lane on an element the claim names. It was ``recall``, which
+#: read as detection recall and is not what any of the readings above measured.
 TRIGGER_FLOORS: dict[str, dict[str, float]] = {
-    "stride": {"must_find_recall": 0.70, "recall": 0.65},
-    "asvs": {"must_find_recall": 0.40, "recall": 0.34},
+    "stride": {"must_find_overlap": 0.70, "overlap": 0.65},
+    "asvs": {"must_find_overlap": 0.40, "overlap": 0.34},
 }
 
 #: Lanes whose rules fire on no reference claim anywhere in the corpus, with the
@@ -115,11 +118,11 @@ def totals(results):
 
 
 @pytest.mark.parametrize("framework", sorted(TRIGGER_FLOORS))
-def test_trigger_recall_holds_its_floor(totals, framework):
+def test_trigger_overlap_holds_its_floor(totals, framework):
     measured = totals[framework]
     floors = TRIGGER_FLOORS[framework]
-    assert measured["must_find_recall"] >= floors["must_find_recall"], measured
-    assert measured["recall"] >= floors["recall"], measured
+    assert measured["must_find_overlap"] >= floors["must_find_overlap"], measured
+    assert measured["overlap"] >= floors["overlap"], measured
 
 
 def test_every_framework_the_corpus_declares_is_measured(totals):

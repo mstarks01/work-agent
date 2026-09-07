@@ -173,9 +173,14 @@
   // applicability rather than on attacks.
   $("disclaimer").textContent = R.disclaimer;
 
+  // "in the model", never "analysed". `elements_analyzed` is the embedded
+  // model's own element count and nothing more: no stage records that an
+  // element was examined, and the coverage block below counts which elements a
+  // draft *cited*, which is a different fact again. The old wording told a
+  // reader every one of them had been looked at, which no field here supports.
   const frameworks = R.analyses.map(b => b.framework).join(", ");
   $("scope").textContent =
-    `${R.elements_analyzed} elements analysed under ${frameworks}`;
+    `${R.elements_analyzed} elements in the model, under ${frameworks}`;
 
   // One grounds entry. Every string here is model-authored or lifted verbatim
   // out of the submitter's own prose, so it goes in as text and never as markup.

@@ -281,6 +281,29 @@ class CaseScore:
         return {standing: counts.get(standing, 0) for standing in _STANDINGS}
 
     @property
+    def eligible_count(self) -> int:
+        """How many produced findings could ever raise :attr:`rejected_rate`.
+
+        The size of ``unlisted``, which is the only population
+        :func:`_standing_of_unmatched` keys and looks up. A matched finding
+        never reaches it; neither does a ``needs-info``, a lane error, or one
+        citing an element the blessed model does not hold. So this is smaller
+        than ``produced_count``, sometimes much smaller, and the gap is the
+        part of the report the rate says nothing about.
+        """
+        return len(self.unlisted)
+
+    @property
+    def reviewed_count(self) -> int:
+        """How many eligible findings a person has actually answered.
+
+        The numerator's real denominator. Rejections can only come from here,
+        so a rate over ``produced_count`` beside a ``reviewed_count`` of zero
+        is not a low false-positive rate — it is no measurement at all.
+        """
+        return self.eligible_count - self.standing_counts["unvoted"]
+
+    @property
     def rejected_rate(self) -> float:
         """The one gating Tier 3 number: hallucination is what destroys trust.
 
@@ -288,8 +311,27 @@ class CaseScore:
         for substance. An unvoted finding cannot raise it, so a sweep over a
         cold ledger reads 0.0 — beside an ``unvoted`` count that says how much
         of the answer is still waiting on a sitting.
+
+        **It is not a false-positive rate, and the denominator is why.** It
+        divides by every produced finding, while the numerator can only come
+        from :attr:`eligible_count` — so producing more conditional findings
+        lowers this number without a person reading one of them. Read it beside
+        :attr:`eligible_count` and :attr:`reviewed_count`, which
+        :meth:`to_json` carries for exactly that reason. The definition is
+        unchanged because it is what the recorded artifacts hold; what changed
+        is that the two denominators it hides now travel with it.
         """
         return ratio(self.standing_counts["rejected"], self.produced_count)
+
+    @property
+    def rejected_rate_of_reviewed(self) -> float:
+        """The same numerator over the findings somebody actually read.
+
+        The nearest honest thing to precision this harness can compute, and it
+        is still not precision: the reviewed set is whatever a sitting reached,
+        never a sample drawn to represent the rest.
+        """
+        return ratio(self.standing_counts["rejected"], self.reviewed_count)
 
     @property
     def unvoted_count(self) -> int:
@@ -316,6 +358,12 @@ class CaseScore:
                 "must_find_matched": self.must_find_matched,
                 "needs_info_unmatched": len(self.needs_info_unmatched),
                 "foreign": len(self.foreign),
+                # The two denominators `rejected_rate` hides. It divides by
+                # `produced`, and its numerator can only come from `eligible`
+                # — so the three counts have to travel together or the rate
+                # reads as a false-positive rate it is not.
+                "eligible": self.eligible_count,
+                "reviewed": self.reviewed_count,
                 "lane_errors": len(self.lane_errors),
                 **self.standing_counts,
             },
@@ -327,6 +375,7 @@ class CaseScore:
                 "element_accuracy": round(self.element_accuracy, 3),
                 "element_jaccard": round(self.element_jaccard, 3),
                 "rejected_rate": round(self.rejected_rate, 3),
+                "rejected_rate_of_reviewed": round(self.rejected_rate_of_reviewed, 3),
                 "severity_exact_rate": round(self.severity_exact_rate, 3),
             },
             "severity_confusion": self.severity_confusion,
@@ -748,6 +797,10 @@ def render(scores: Sequence[CaseScore]) -> None:
             + (f"  foreign {len(score.foreign)}" if score.foreign else "")
         )
     if scores:
+        # Named because the rows above are a mean over survivors. The artifact
+        # carries the same counts; printing one without the other is how a
+        # sweep that lost cases gets quoted as if it had not.
+        print(f"scored {len(scores)} case(s); every mean above divides by that")
         delta = exemplar_delta(scores)
         print(
             f"exemplar delta: near {delta['near_recall']:.2f}"
@@ -757,11 +810,18 @@ def render(scores: Sequence[CaseScore]) -> None:
 
 
 def published(blocks: Mapping[str, Any], metric: str) -> float | None:
-    """One metric's mean across this sweep's cases, for the comparison table.
+    """One metric's mean across the cases that **finished**, for the table.
 
     The knowledge that a STRIDE number lives at ``scores[].metrics`` stays
     here rather than in the generator, so a change to the block's shape is one
     edit in the module that owns it.
+
+    **Conditional on success, never end-to-end.** A case whose graph refused
+    its model, or whose fan-in rejected every draft, produces no score and so
+    contributes to neither half of this mean. A sweep that lost three cases
+    reads the same as one that lost none. The artifact's ``completion`` block
+    carries the ``attempted`` and ``scored`` counts this divides by, and they
+    are the numbers to quote beside any mean taken from here.
     """
     rows = blocks.get("scores") or []
     values = [

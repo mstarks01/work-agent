@@ -192,7 +192,7 @@ somewhere else.
 | `harness/coverage.py` | What each category agent was offered and how much of it its drafts cite, pooled over the sweep. |
 | `harness/filler.py` | Whether a package's required justifications say anything: questions pointed at an attribute the evidence catalog would refuse, and how concentrated its grounds are. |
 | `harness/stability.py` | Run-to-run stability: which references two or more finished sweeps agree on. Reads artifacts rather than re-running. |
-| `harness/triggers.py` | Candidate-trigger recall: whether `analysis_service.candidates` fired a rule in a reference claim's own lane, on an element that claim names. Costs no provider call. |
+| `harness/triggers.py` | Same-lane target overlap: whether `analysis_service.candidates` fired a rule in a reference claim's own lane, on an element that claim names. Nothing compares the rule's question to the claim's mechanism, so a hit can credit an unrelated concern about the same place — the published keys are `overlap`, not `recall`, for that reason. A miss is the sharper half: no rule in the lane named any element the claim is about. Costs no provider call. |
 | `harness/calibration.py` | Rule-vs-label agreement over the labelled fixtures — the scoreboard any rule change must clear. |
 | `harness/verbs.py` | The closed vocabulary of attacker actions, and what counts as one action. |
 | `harness/exemplar_verbs.py` | Which actions a package's shipped exemplars demonstrate against which its reference sets grade, and the exemplar pairs that name one place and two actions. Reads text and blessed models only, so it costs no provider call. |
@@ -429,6 +429,12 @@ the next sitting, and only the rate over it is a score.
 - **must-find recall** — did the tool find the threats a case marks as
   essential? Reported **per case**, never averaged: an average hides one case
   failing completely, which is the failure that matters most.
+
+  Where a sweep-wide mean *is* taken — the comparison table — it is a mean over
+  the cases that finished. A case whose graph refused its model produces no
+  score and lands in neither half. The artifact's `completion` block carries
+  `attempted`, `scored`, `failed` and `stopped_before` so a mean cannot be
+  quoted as if the whole corpus stood behind it.
 - **lane accuracy** — was each threat filed under the right STRIDE category? A
   misfiled threat counts as a category error, not a near-miss.
 - **element accuracy** — did the threat cite the right element? Scored, but never
@@ -439,6 +445,14 @@ the next sitting, and only the rate over it is a score.
   threat" standing that counts against the tool. It reads 0.0 over a cold
   ledger, beside an **unvoted** count that says how much of the answer still
   waits on a review sitting — a plausible, grounded extra never gates.
+
+  **It is not a false-positive rate, and the denominator is why.** It divides
+  by every threat produced, while only an unmatched, non-`needs-info`, in-lane
+  threat citing a modelled element can ever raise it. Producing more conditional
+  findings therefore lowers the number with nobody having read one. Read it
+  beside the **eligible** and **reviewed** counts the artifact carries, and
+  `rejected_rate_of_reviewed` beside those — which is still not precision,
+  because a sitting reaches whatever it reaches rather than a drawn sample.
 - **critic yield** — always read as a **pair**: how many junk threats the critic
   removed (good) *against* how many real threats it removed (bad). A kill count
   on its own tells you nothing about which of those two is happening.
