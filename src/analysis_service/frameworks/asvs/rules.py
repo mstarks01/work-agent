@@ -54,6 +54,7 @@ from analysis_service.analysis import (
     is_unverified,
     matches_term,
     names_term,
+    states_a_protocol,
 )
 from analysis_service.candidates import Match, Rule, clip_fact
 from analysis_service.frameworks import PreconditionResult
@@ -857,24 +858,6 @@ WEB_PROTOCOL_TERMS: tuple[str, ...] = (
 )
 
 
-def _states_a_protocol(protocol: str) -> bool:
-    """Whether this flow's ``protocol`` says anything at all about what it speaks.
-
-    **Read through the service's own leading-token rule**, not a bare prefix
-    test. :func:`~analysis_service.analysis.control_state` is what every other
-    reader of an attribute in this repo uses: it matches ``unknown`` or ``none``
-    as a *word*, so ``"unknownish binary framing"`` is a stated protocol and
-    ``"unknown; the team never said"`` is not. A prefix test read the first as
-    silence.
-
-    The empty string is silence too, and it has to be said separately because
-    ``control_state`` calls it ``stated`` — correctly, since for a *control* an
-    empty value is not evidence of anything. A protocol nobody filled in is the
-    same fact as one nobody knew, and both are what ``undecidable`` is for.
-    """
-    return bool(protocol.strip()) and control_state(protocol) == "stated"
-
-
 def asvs_precondition(model: SystemModel) -> PreconditionResult:
     """Is the target a web application or service?
 
@@ -927,7 +910,7 @@ def asvs_precondition(model: SystemModel) -> PreconditionResult:
     # No process to read: fall back to the flows, which is the whole of what a
     # model carrying only stores and entities can be asked.
     if not kinds:
-        silent = any(not _states_a_protocol(flow.protocol) for flow in model.data_flows)
+        silent = any(not states_a_protocol(flow.protocol) for flow in model.data_flows)
         return "undecidable" if silent or not model.data_flows else "refuted"
 
     return "undecidable" if "unknown" in kinds else "refuted"

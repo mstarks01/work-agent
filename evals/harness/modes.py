@@ -32,7 +32,7 @@ from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from typing import Any
 
-from analysis_service.analysis import control_state
+from analysis_service.analysis import control_state, states_a_protocol
 from analysis_service.deployment import Deployment
 from analysis_service.execution import GraphExecutor, GraphRun
 from analysis_service.frameworks import PACKAGES
@@ -151,16 +151,26 @@ def _tags(value: list[str]) -> str:
 #: and still catches the corpus's most repeated extraction failure: a control
 #: invented where the blessed model says ``unknown``.
 #:
-#: What is deliberately absent is every other free-text attribute —
-#: ``technology``, ``protocol``, ``data_description``. Two correct readings of
-#: one sentence word them differently, so an exact test on them reports
-#: disagreement that is not there. ``trust_zone`` is absent for the opposite
-#: reason: :attr:`ExtractionScore.crossings_match` already reads it, derived
-#: rather than compared string by string.
+#: ``interface_kind`` is a closed vocabulary too, and it is the one the ASVS
+#: precondition reads: a process extracted as ``web`` where the blessed model
+#: says ``non-web`` moves whether the framework runs at all. ``protocol`` is
+#: free text, so only its *state* is compared — stated or silent, through
+#: :func:`~analysis_service.analysis.states_a_protocol`, the same reader the
+#: precondition uses — because a silent protocol is what holds that gate open,
+#: and an extraction that invents one closes it (#659).
+#:
+#: What is deliberately absent is the wording of every free-text attribute —
+#: ``technology``, ``data_description``, the protocol's own text. Two correct
+#: readings of one sentence word them differently, so an exact test on them
+#: reports disagreement that is not there. ``trust_zone`` is absent for the
+#: opposite reason: :attr:`ExtractionScore.crossings_match` already reads it,
+#: derived rather than compared string by string.
 _SCORED_ATTRIBUTES: Mapping[str, Callable[[Any], str]] = {
     "kind": str,
     "exposure": str,
+    "interface_kind": str,
     "assets": _tags,
+    "protocol": lambda value: "stated" if states_a_protocol(value) else "silent",
     "authentication": control_state,
     "encryption_in_transit": control_state,
     "encryption_at_rest": control_state,
