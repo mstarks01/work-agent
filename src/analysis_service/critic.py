@@ -43,6 +43,7 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import NamedTuple, get_args
 
+from analysis_service.evidence import ground_issues
 from analysis_service.frameworks import FrameworkPackage, FrameworkSchemas
 from analysis_service.grounding import (
     PreparedSource,
@@ -78,6 +79,7 @@ from analysis_service.system_model import (
     ModelIndex,
     SystemModel,
     TrustBoundary,
+    attribute_names,
 )
 
 # Most severe first — the order a graded framework's ``claims`` array carries.
@@ -429,17 +431,6 @@ def _drop_duplicate_ids(
     return kept, dropped
 
 
-def _attribute_names(element: Element) -> frozenset[str]:
-    """The fields an element of this type actually has.
-
-    Attributes are fixed pydantic fields per element class, so "does this
-    element have an ``encryption_at_rest``" is mechanical and exact: an
-    ``ExternalEntity`` does not, and a reference naming one on it is a
-    hallucinated attribute rather than a debatable one.
-    """
-    return frozenset(type(element).model_fields)
-
-
 class CriticIssue(NamedTuple):
     """One unresolved-unknown problem, and the claim whose ruling carries it.
 
@@ -556,20 +547,30 @@ def _unresolved_unknown_ref_issues(
 ) -> list[CriticIssue]:
     """Every ``related_unknowns`` entry naming an element or attribute not there.
 
-    The ``attribute`` half is checked to the same depth as the grounds surface
-    below, and no deeper. Requiring the named attribute to actually *hold* the
-    ``unknown`` sentinel was refused: it encodes a judgement as a mechanical
-    rule and misfires on a stated-but-vague value — "some encryption" in
+    The ``attribute`` half is the element type's security-relevant fields —
+    :func:`~analysis_service.system_model.attribute_names`, the list the
+    evidence catalog walks — so ``name``, ``notes`` and ``description`` are
+    refused here exactly as no catalog entry is ever written for them. This
+    reader used to accept every pydantic field on the element, and the live
+    critic answered with a needs-info on ``notes`` in 14 of the 38 reports
+    archived under ``evals/runs/``: a question about a sentence, pointed at a
+    field that happened to resolve. The check stops at the attribute's
+    existence. Requiring the named attribute to actually *hold* the ``unknown``
+    sentinel was refused: it encodes a judgement as a mechanical rule and
+    misfires on a stated-but-vague value — "some encryption" in
     ``encryption_at_rest``, where a needs-info is legitimate and the field is
     not literally ``unknown``.
 
-    Depth is matched across the two sites rather than tuned per site, because
-    ``Ground``'s unknown-attribute branch and :class:`~analysis_service.report.UnknownRef`
-    are spelled identically on purpose — two different mechanical rules over two
-    identically-spelled field pairs is a distinction no reader would predict
-    from the spelling. What differs is the blast radius, and only that: a
-    failure here lands in ``review_issues`` and routes to the bounded
-    ``recritic`` re-ask, where a grounds failure kills the job outright.
+    A ``Ground``'s unknown-attribute branch is spelled identically to
+    :class:`~analysis_service.report.UnknownRef` and is checked one step
+    deeper, by catalog membership
+    (:func:`~analysis_service.evidence.ground_issues`). The two differ because
+    their writers differ: a ground is written by code out of the catalog, so
+    "is it in the catalog" is the invariant the writer held; a ref is written
+    by the critic, whose question about a stated value is a judgement. The
+    blast radius differs too: a failure here lands in ``review_issues`` and
+    routes to the bounded ``recritic`` re-ask, where a grounds failure kills
+    the job outright.
     """
     by_id = {element.id: element for element in system_model.elements()}
     issues = []
@@ -604,7 +605,7 @@ def _unresolved_unknown_ref_issues(
                         " model",
                     )
                 )
-            elif ref.attribute not in _attribute_names(element):
+            elif ref.attribute not in attribute_names(element):
                 # The available set is named, not just the missing one. An
                 # attribute is a fixed field per element *type*, so a critic
                 # reaching for `exposure` on an external entity has named a real
@@ -618,7 +619,7 @@ def _unresolved_unknown_ref_issues(
                         f"claim {ruling.id!r} hangs its needs-info verdict on"
                         f" attribute {ref.attribute!r}, which element"
                         f" {ref.element_id!r} does not have. That element has:"
-                        f" {', '.join(sorted(_attribute_names(element)))}."
+                        f" {', '.join(attribute_names(element))}."
                         " Name one of those, or state the question in"
                         " `subject` if it is not about this model at all",
                     )
@@ -633,78 +634,6 @@ def _duplicate_id_issues(entries: Iterable[Claim | Ruling]) -> list[str]:
         for claim_id, count in counts.items()
         if count > 1
     ]
-
-
-def _ground_reference_issues(
-    claims: Iterable[Claim], system_model: SystemModel, index: ModelIndex
-) -> list[str]:
-    """Every catalogued grounds entry whose reference does not resolve.
-
-    Set membership, one branch at a time: either attribute branch's
-    ``element_id`` and ``attribute`` against the model, a derived-fact's
-    ``flow_id`` against the crossings derived from that same model. Every such
-    ground is built by the service out of a catalog entry, so a failure here
-    is this service's own defect and stays fatal. A quote's ``source_label`` is
-    deliberately not here: that is the agent's, and a label naming no source is
-    a quote that cannot be found, which :func:`_verify_quotes` marks.
-
-    ``index`` indexes ``system_model``. Both are handed in because the crossings
-    are derived from the whole model and an index cannot carry them: the
-    derivation fails closed on an invalid model, and an index is built over
-    models the validity gate has not seen yet.
-    """
-    crossing_ids = {crossing.flow_id for crossing in system_model.boundary_crossings()}
-    issues = []
-    for claim in claims:
-        for ground in claim.grounds:
-            issues += _one_ground_issues(claim.id, ground, index.elements, crossing_ids)
-    return issues
-
-
-def _one_ground_issues(
-    claim_id: str,
-    ground: Ground,
-    by_id: Mapping[str, Element],
-    crossing_ids: Collection[str],
-) -> list[str]:
-    """The reference failure of one catalogued grounds entry, or nothing."""
-    issue = ""
-    if ground.kind == "quote":
-        return []
-    if ground.kind == "absent-element":
-        # Nothing to resolve: the term names no element by construction, and
-        # that the model names it nowhere was already checked against this same
-        # model by ``resolve_proposals``, which dropped it otherwise.
-        return []
-    if ground.kind == "derived-fact":
-        if ground.flow_id not in crossing_ids:
-            issue = (
-                f"claim {claim_id!r} grounds a derived fact in flow"
-                f" {ground.flow_id!r}, which is not a derived boundary crossing"
-            )
-    else:
-        # An unknown attribute and an absent one resolve identically: the check
-        # is that the element carries the attribute, never what its value says,
-        # for the reason ``related_unknowns`` gives above — a mechanical rule
-        # over a value is a judgement in disguise.
-        named = (
-            "an unknown attribute"
-            if ground.kind == "unknown-attribute"
-            else "an absent attribute"
-        )
-        element = by_id.get(ground.element_id)
-        if element is None:
-            issue = (
-                f"claim {claim_id!r} grounds {named} on element"
-                f" {ground.element_id!r}, which is not in the system model"
-            )
-        elif ground.attribute not in _attribute_names(element):
-            issue = (
-                f"claim {claim_id!r} grounds {named}"
-                f" {ground.attribute!r}, which element {ground.element_id!r}"
-                " does not have"
-            )
-    return [issue] if issue else []
 
 
 class _QuoteCheck(NamedTuple):
@@ -914,7 +843,7 @@ def join_drafts(
     )
     unique, duplicates = _drop_duplicate_ids(snapped)
     referenced = _resolve_element_references(unique, known_ids)
-    issues = _ground_reference_issues(referenced.drafts, system_model, index)
+    issues = ground_issues(referenced.drafts, system_model)
     if issues:
         raise DraftJoinError("; ".join(issues))
     bounded = _bound_element_references(referenced.drafts, index)

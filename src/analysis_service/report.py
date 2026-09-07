@@ -2662,7 +2662,17 @@ class FrameworkAnalysis(BaseModel):
         return issues
 
     def _reference_issues(self, known_element_ids: Collection[str]) -> list[str]:
-        """Every element ID this block names resolves in the shared model."""
+        """Every element ID this block names resolves in the shared model.
+
+        A verdict's ``related_unknowns`` is checked to the element and no
+        deeper. The critic seam refuses an attribute the element's type does
+        not declare (:func:`~analysis_service.critic._unresolved_unknown_ref_issues`),
+        and 14 of the 38 reports archived under ``evals/runs/`` carry a
+        needs-info on ``notes`` or ``description`` from before it did, so the
+        deeper rule here would refuse the archive. A claim's ``grounds`` are
+        not here either: they resolve against the model rather than its ID
+        set, and the envelope asks that in :meth:`Report._model_issues`.
+        """
         known = set(known_element_ids)
         issues = []
         for claim in self.all_claims():
@@ -2930,9 +2940,27 @@ class Report(BaseModel):
         known_ids = [element.id for element in self.system_model.elements()]
         for block in self.analyses:
             issues += block.block_issues(known_ids)
+        issues += self._model_issues()
         if issues:
             raise ValueError("; ".join(issues))
         return self
+
+    def _model_issues(self) -> list[str]:
+        """Every ground resolves in the embedded model's own evidence catalog.
+
+        Asked here rather than per block because the reader needs the model
+        and not its ID set, and one model serves every block. The reader is
+        the one the fan-in already runs
+        (:func:`~analysis_service.evidence.ground_issues`), so a loaded report
+        is held to what the service that wrote it was held to — an unknown on
+        an attribute the model states, or a crossing the model never derives,
+        does not ride in through a file. Imported at call time because the
+        evidence module is built on this one.
+        """
+        from analysis_service.evidence import ground_issues
+
+        claims = [claim for block in self.analyses for claim in block.all_claims()]
+        return ground_issues(claims, self.system_model)
 
     def _envelope_issues(self) -> list[str]:
         issues = []

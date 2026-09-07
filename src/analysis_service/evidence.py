@@ -200,6 +200,98 @@ def _attribute_entry(element: Element, attribute: str) -> tuple[str, Ground] | N
     return None
 
 
+def ground_issues(claims: Iterable[Claim], model: SystemModel) -> list[str]:
+    """Every catalogued ground these claims carry that ``model`` does not derive.
+
+    **The one reader of "is this ground one the service could have written
+    from this model", asked at both seams that hold grounds.** The fan-in
+    asks it of the drafts it joined, where every ground came out of the
+    catalog and a failure is this module's own defect. A **Report** asks it of
+    the claims it loads, where nothing built the grounds: a report handed to a
+    reviewer or a scorer is a file, and a file can carry an unknown on an
+    attribute the embedded model states, or a crossing the model never
+    derives. Membership in the catalog derived from the model in front of the
+    reader is the whole of the question, so it is asked as membership rather
+    than as a list of per-branch conditions that would have to agree with
+    :func:`evidence_catalog` by hand.
+
+    A quote is not here: its check is against the source text, which
+    :mod:`analysis_service.grounding` holds. An ``absent-element`` is the
+    branch whose referent is the whole model, and it is checked the way
+    :func:`_grounds_of` checked it when it was written — the model names the
+    term nowhere.
+
+    The message says which of the conditions failed, because the fan-in
+    raises it as the job's death and a re-ask cannot read a bare "not in the
+    catalog". The element and the attribute are checked before the state so a
+    ground naming a field the element's type does not carry is told so, and
+    one naming a real field is told what the model says about it instead.
+    """
+    catalog = evidence_catalog(model)
+    by_id = {element.id: element for element in model.elements()}
+    issues = []
+    for claim in claims:
+        for ground in claim.grounds:
+            issue = _one_ground_issue(claim.id, ground, catalog, by_id, model)
+            if issue:
+                issues.append(issue)
+    return issues
+
+
+def _one_ground_issue(
+    claim_id: str,
+    ground: Ground,
+    catalog: EvidenceCatalog,
+    by_id: Mapping[str, Element],
+    model: SystemModel,
+) -> str:
+    """Why one catalogued ground is not in this model's catalog, or ``""``."""
+    if ground.kind == "quote":
+        return ""
+    if ground.kind == "absent-element":
+        if names_term(model, ground.term):
+            return (
+                f"claim {claim_id!r} grounds an absence on {ground.term!r},"
+                " which the system model names"
+            )
+        return ""
+    if ground.kind == "derived-fact":
+        if crossing_evidence_ref(ground.flow_id) not in catalog:
+            return (
+                f"claim {claim_id!r} grounds a derived fact in flow"
+                f" {ground.flow_id!r}, which is not a derived boundary crossing"
+            )
+        return ""
+    named = (
+        "an unknown attribute"
+        if ground.kind == "unknown-attribute"
+        else "an absent attribute"
+    )
+    element = by_id.get(ground.element_id)
+    if element is None:
+        return (
+            f"claim {claim_id!r} grounds {named} on element"
+            f" {ground.element_id!r}, which is not in the system model"
+        )
+    if ground.attribute not in attribute_names(element):
+        return (
+            f"claim {claim_id!r} grounds {named} {ground.attribute!r}, which"
+            f" element {ground.element_id!r} does not have"
+        )
+    ref = (
+        unknown_evidence_ref(ground.element_id, ground.attribute)
+        if ground.kind == "unknown-attribute"
+        else absent_evidence_ref(ground.element_id, ground.attribute)
+    )
+    if ref in catalog:
+        return ""
+    state = control_state(getattr(element, ground.attribute))
+    return (
+        f"claim {claim_id!r} grounds {named} {ground.attribute!r} on element"
+        f" {ground.element_id!r}, which the system model reads as {state}"
+    )
+
+
 def render_catalog(catalog: Mapping[str, Ground]) -> str:
     """The catalog as a table an agent selects from rather than a list it reads.
 

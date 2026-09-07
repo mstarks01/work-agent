@@ -230,12 +230,14 @@ class TestJoinDrafts:
 
 
 class TestGroundReferences:
-    """Set membership at the fan-in, one branch at a time.
+    """Catalog membership at the fan-in, through the reader the report shares.
 
     Every failure here is fatal. There is no re-ask path for a category agent's
     drafts — ``repair`` is extraction-only and ``recritic`` is critic-only — so
-    an unresolved reference kills the job, which is why the checks are exactly
-    set membership and go no further.
+    an unresolved reference kills the job. The rule is
+    :func:`analysis_service.evidence.ground_issues`: a ground is one the
+    catalog derived from this model holds, and the same reader runs over every
+    report that loads.
     """
 
     def grounded(self, *grounds, threat_id="S-01"):
@@ -286,13 +288,21 @@ class TestGroundReferences:
         the job here — six lanes of drafts thrown away over a leading slash on
         a name whose element really does carry the field.
         """
-        drafts = self.grounded(
-            Ground(
-                kind="unknown-attribute",
-                element_id="process:web-app",
-                attribute="/exposure",
-            )
-        )
+        drafts = {
+            "spoofing": [
+                sample_draft(
+                    "S-01",
+                    affected_element_ids=["store:orders-db"],
+                    grounds=[
+                        Ground(
+                            kind="unknown-attribute",
+                            element_id="store:orders-db",
+                            attribute="/encryption_at_rest",
+                        )
+                    ],
+                )
+            ]
+        }
         assert join_drafts(drafts, STRIDE, model, SOURCES).drafts
 
     def test_a_pointer_spelled_attribute_the_element_lacks_still_fails(self, model):
@@ -319,19 +329,36 @@ class TestGroundReferences:
         with pytest.raises(DraftJoinError, match="an absent attribute"):
             join_drafts(drafts, STRIDE, model, SOURCES)
 
-    def test_an_absent_attribute_is_never_checked_against_its_value(self, model):
-        """Set membership only, matched to the depth ``related_unknowns`` is
-        checked at: requiring the attribute to actually read ``none`` would
-        encode a judgement as a mechanical rule, and the catalog is what
-        decided the branch in the first place."""
+    def test_an_unknown_ground_on_an_attribute_the_model_states_is_refused(self, model):
+        """The catalog decided the branch, so the branch is checked against it.
+
+        ``exposure`` on the web app reads ``internet-facing``: no catalog entry
+        exists for it, and a ground claiming it is unknown contradicts the
+        model. At the fan-in this cannot happen, because the service built the
+        ground from the catalog; the same reader runs over a loaded report,
+        where nothing built it.
+        """
         drafts = self.grounded(
             Ground(
-                kind="absent-attribute",
+                kind="unknown-attribute",
                 element_id="process:web-app",
                 attribute="exposure",
             )
         )
-        assert join_drafts(drafts, STRIDE, model, SOURCES).drafts
+        with pytest.raises(DraftJoinError, match="reads as stated"):
+            join_drafts(drafts, STRIDE, model, SOURCES)
+
+    def test_an_absent_ground_on_an_unknown_control_is_refused(self, model):
+        """The two attribute branches share their fields and not their state."""
+        drafts = self.grounded(
+            Ground(
+                kind="absent-attribute",
+                element_id="store:orders-db",
+                attribute="encryption_at_rest",
+            )
+        )
+        with pytest.raises(DraftJoinError, match="reads as unverified"):
+            join_drafts(drafts, STRIDE, model, SOURCES)
 
     def test_a_derived_fact_naming_a_flow_that_does_not_cross(self, model):
         drafts = self.grounded(
@@ -849,6 +876,32 @@ class TestAssembleThreats:
             )
         ]
         with pytest.raises(CriticOutputError, match="does not have"):
+            assemble_claims(drafts, rulings, model, SCHEMAS)
+
+    def test_a_needs_info_on_notes_names_no_attribute(self, model):
+        """``notes`` is a pydantic field and not a security attribute.
+
+        The reader is the evidence catalog's own list, so a field the catalog
+        never writes an entry for is refused here too, and the message names
+        the fields that would resolve. The live critic answered with ``notes``
+        or ``description`` in 14 of the 38 reports archived under
+        ``evals/runs/``, every one a question about a sentence pointed at a
+        field that happened to exist.
+        """
+        drafts = [sample_draft("S-01")]
+        rulings = [
+            sample_ruling(
+                "S-01",
+                verdict=Verdict(
+                    status="needs-info",
+                    reason="the note hints at a shared account",
+                    related_unknowns=[
+                        UnknownRef(element_id="process:web-app", attribute="notes")
+                    ],
+                ),
+            )
+        ]
+        with pytest.raises(CriticOutputError, match="That element has: technology"):
             assemble_claims(drafts, rulings, model, SCHEMAS)
 
     def test_empty_analysis_assembles_to_empty_arrays(self, model):

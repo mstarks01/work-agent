@@ -106,7 +106,9 @@ class TestGroundConcentration:
     def test_a_spread_reads_lower(self):
         quote = Ground(kind="quote", text="Shoppers sign in", source_label="note")
         unknown = Ground(
-            kind="unknown-attribute", element_id="store:orders-db", attribute="protocol"
+            kind="unknown-attribute",
+            element_id="store:orders-db",
+            attribute="encryption_at_rest",
         )
         report = _report(
             sample_threat("S-01", grounds=[quote]),
