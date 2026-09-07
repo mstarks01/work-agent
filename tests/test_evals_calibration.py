@@ -389,7 +389,7 @@ def test_the_merge_direction_refuses_a_package_with_no_contract():
 #: rulings on one requirement in one place — one vote answering for both.
 PACKAGE_COLLISIONS = {
     "stride": {"comparable_pairs": 287, "collisions": 3},
-    "asvs": {"comparable_pairs": 21, "collisions": 0},
+    "asvs": {"comparable_pairs": 22, "collisions": 0},
 }
 
 
