@@ -1,6 +1,6 @@
 # File Handling Exemplars
 
-Two drafts against exemplar system A. This chapter's precondition fails for this system, so the first draft is the chapter-wide exclusion and the second shows how a second requirement rests on the same absence without restating it. Both name the missing thing in `absent_elements`. That is the whole of what grounds an exclusion: the other ground kinds can only name something present, so a quote borrowed from an unrelated part of the model would justify nothing.
+Two drafts against exemplar system A. Nothing in this system accepts, generates or serves a file, so both drafts are exclusions: the first rules out a requirement that presupposes an upload, and the second shows how a requirement about stored files rests on the same absence without restating it. Both name the missing thing in `absent_elements`. That is the whole of what grounds an exclusion: the other ground kinds can only name something present, so a quote borrowed from an unrelated part of the model would justify nothing.
 
 ## V5.2.1 — This system accepts no uploaded file
 

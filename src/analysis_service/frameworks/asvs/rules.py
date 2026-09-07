@@ -58,7 +58,7 @@ from analysis_service.analysis import (
 )
 from analysis_service.candidates import Match, Rule, clip_fact
 from analysis_service.frameworks import PreconditionResult
-from analysis_service.frameworks.asvs.catalog import requirements_for
+from analysis_service.frameworks.asvs.catalog import requirements_for, sections_of
 from analysis_service.system_model import SystemModel
 
 __all__ = [
@@ -86,13 +86,16 @@ class PresenceTest:
     question: str
     terms: tuple[str, ...]
     attributes: tuple[str, ...] = TEXT_ATTRIBUTES
-    #: Whether this test firing nowhere rules its whole chapter out (#443).
-    #: True only where every requirement of the chapter presupposes the thing
-    #: the terms name — a file upload, a self-contained token, an OAuth flow, a
-    #: peer connection — so that its absence from the model is the answer.
-    #: False where a silent model may still have the thing: most systems
+    #: The sections this test firing nowhere rules out (#443, narrowed by
+    #: #659). Named only where every requirement of the section presupposes
+    #: the thing the terms name — a self-contained token, an OAuth flow, a peer
+    #: connection, an upload — so that its absence from the model is the
+    #: answer. A chapter whose later sections reach a system with no upload
+    #: at all (a file the application generates, a download it serves) names
+    #: only the sections that need one, and the rest stay with the lane. Empty
+    #: where a silent model may still have the thing: most systems
     #: authenticate a caller whether or not the submitter wrote "login".
-    decides_chapter: bool = False
+    decides: tuple[str, ...] = ()
 
     @property
     def rule_id(self) -> str:
@@ -277,13 +280,34 @@ PRESENCE_TESTS: tuple[PresenceTest, ...] = (
     ),
     PresenceTest(
         predicate="file-upload",
-        decides_chapter=True,
+        # V5.1 documents each upload feature and V5.2 validates what arrives,
+        # so both presuppose an upload. V5.3 and V5.4 do not: a path built
+        # from a user-supplied filename and a download the application serves
+        # reach a system that accepts nothing, so they stay with the lane and
+        # rule themselves out through ``REQUIREMENT_TESTS`` only where the
+        # model names no file at all (#659).
+        decides=("V5.1", "V5.2"),
         lane="file-handling",
         question=(
             "This system accepts an uploaded file. What limits its size, its"
             " type and where it lands?"
         ),
-        terms=("upload", "attachment", "multipart", "artifact", "registry"),
+        # The submitter's words for an upload, not the protocol's: a supplier
+        # "sends documents", a user "imports a CSV", a member "sets an avatar".
+        terms=(
+            "upload",
+            "attachment",
+            "multipart",
+            "artifact",
+            "registry",
+            "document",
+            "import",
+            "avatar",
+            "image",
+            "photo",
+            "csv",
+            "spreadsheet",
+        ),
     ),
     PresenceTest(
         predicate="authentication",
@@ -323,7 +347,7 @@ PRESENCE_TESTS: tuple[PresenceTest, ...] = (
     ),
     PresenceTest(
         predicate="self-contained-tokens",
-        decides_chapter=True,
+        decides=sections_of("self-contained-tokens"),
         lane="self-contained-tokens",
         question=(
             "This system carries a self-contained token. Which algorithms and"
@@ -352,7 +376,7 @@ PRESENCE_TESTS: tuple[PresenceTest, ...] = (
     ),
     PresenceTest(
         predicate="oauth",
-        decides_chapter=True,
+        decides=sections_of("oauth-and-oidc"),
         lane="oauth-and-oidc",
         question=(
             "This system uses OAuth or OIDC. Which grant, which redirect URIs"
@@ -526,7 +550,7 @@ PRESENCE_TESTS: tuple[PresenceTest, ...] = (
     ),
     PresenceTest(
         predicate="real-time-media",
-        decides_chapter=True,
+        decides=sections_of("webrtc"),
         lane="webrtc",
         question=(
             "This system carries real-time media or a peer connection. What"
@@ -724,11 +748,29 @@ STRUCTURAL_RULES: tuple[Rule, ...] = (
 #: Requirements whose own text names a technology, against the words a
 #: submitter writes for it (#455). Where none of the words appears at the
 #: start of a word anywhere in the model, the requirement is ruled out in code
-#: with the terms in the reason, the way a deciding chapter test rules its
-#: chapter out. Only requirements that presuppose the thing are here: V1.2.2
+#: with the terms in the reason, the way a deciding presence test rules its
+#: sections out. Only requirements that presuppose the thing are here: V1.2.2
 #: (URL building), V1.2.5 (OS commands) and V1.3.6 (outbound fetches) ask
 #: about what an application does, not what it names, and stay with the lane.
 #: Checked at import against the catalog, so a retired identifier fails closed.
+#: A file the application handles at all: what the storage and download
+#: sections of the file-handling chapter presuppose, where the upload sections
+#: presuppose an upload. "file" matches "files" and "filesystem" and not
+#: "profile", because a term matches at the start of a word.
+FILE_TERMS: tuple[str, ...] = (
+    "file",
+    "filename",
+    "download",
+    "export",
+    "pdf",
+    "document",
+    "attachment",
+    "upload",
+    "multipart",
+    "artifact",
+    "registry",
+)
+
 REQUIREMENT_TESTS: dict[str, tuple[str, ...]] = {
     "V1.2.6": ("ldap", "active directory", "directory service"),
     "V1.2.7": ("xpath", "xml"),
@@ -747,6 +789,9 @@ REQUIREMENT_TESTS: dict[str, tuple[str, ...]] = {
     "V4.4.2": ("websocket", "ws://", "wss://", "socket.io"),
     "V4.4.3": ("websocket", "ws://", "wss://", "socket.io"),
     "V4.4.4": ("websocket", "ws://", "wss://", "socket.io"),
+    **dict.fromkeys(
+        ("V5.3.1", "V5.3.2", "V5.3.3", "V5.4.1", "V5.4.2", "V5.4.3"), FILE_TERMS
+    ),
     **dict.fromkeys(
         ("V6.5.1", "V6.5.2", "V6.5.3", "V6.5.4", "V6.5.5"),
         (
@@ -788,25 +833,27 @@ REQUIREMENT_TESTS: dict[str, tuple[str, ...]] = {
 def ruled_out_requirements(model: SystemModel, level: int, lane: str) -> dict[str, str]:
     """The requirements of ``lane`` ruled out because the model names nothing they need.
 
-    Two readings, one answer. A deciding chapter test that fired nowhere rules
-    every requirement of the chapter out; a requirement in
+    Two readings, one answer. A deciding presence test that fired nowhere rules
+    every requirement of the sections it decides out; a requirement in
     :data:`REQUIREMENT_TESTS` whose own terms appear nowhere rules itself out.
     Each is keyed by the standard's own identifier against the reason a reader
     gets.
     """
     ruled_out: dict[str, str] = {}
     for test in PRESENCE_TESTS:
-        if test.lane != lane or not test.decides_chapter:
+        if test.lane != lane or not test.decides:
             continue
         if any(True for _ in _hits(model, test)):
             continue
         reason = (
             f"no element of this system names {test.predicate.replace('-', ' ')}"
-            f" ({', '.join(test.terms[:4])}, ...), and every requirement of this"
-            f" chapter presupposes one; ruled out in code by {test.rule_id}"
+            f" ({', '.join(test.terms[:4])}, ...), and every requirement of"
+            f" {', '.join(test.decides)} presupposes one; ruled out in code by"
+            f" {test.rule_id}"
         )
         for requirement in requirements_for(level, lane):
-            ruled_out[requirement.id] = reason
+            if requirement.section in test.decides:
+                ruled_out[requirement.id] = reason
     for requirement in requirements_for(level, lane):
         terms = REQUIREMENT_TESTS.get(requirement.id)
         if (

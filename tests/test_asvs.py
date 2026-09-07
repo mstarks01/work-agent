@@ -1105,6 +1105,51 @@ class TestAChapterRuledOutInCode:
             DraftRequirementRuling.ruled_out(model, {"level": 2}, "file-handling") == {}
         )
 
+    def test_a_generated_file_keeps_the_storage_and_download_sections(self):
+        """#659: a download built from a user-supplied filename reaches V5.3.2
+        and V5.4.1 with no upload anywhere, so the upload test decides only the
+        two sections that presuppose one."""
+        model = SystemModel.model_validate(
+            json.loads((CORPUS_DIR / "01-payments-checkout" / "model.json").read_text())
+        )
+        model.processes[
+            0
+        ].description += " It creates downloadable PDFs from user-supplied filenames."
+
+        out = DraftRequirementRuling.ruled_out(model, {"level": 2}, "file-handling")
+
+        assert {unit.rsplit(".", 1)[0] for unit in out} == {"V5.1", "V5.2"}
+        assert {"V5.3.2", "V5.4.1"}.isdisjoint(out)
+
+    def test_documents_from_customers_are_an_upload(self):
+        model = SystemModel.model_validate(
+            json.loads((CORPUS_DIR / "01-payments-checkout" / "model.json").read_text())
+        )
+        model.processes[0].description += " It receives documents from customers."
+
+        assert (
+            DraftRequirementRuling.ruled_out(model, {"level": 2}, "file-handling") == {}
+        )
+
+    def test_each_deciding_test_names_sections_its_chapter_has(self):
+        from analysis_service.frameworks.asvs.catalog import sections_of
+        from analysis_service.frameworks.asvs.rules import PRESENCE_TESTS
+
+        deciding = {test.predicate: test for test in PRESENCE_TESTS if test.decides}
+        assert set(deciding) == {
+            "file-upload",
+            "self-contained-tokens",
+            "oauth",
+            "real-time-media",
+        }
+        for test in deciding.values():
+            assert set(test.decides) <= set(sections_of(test.lane)), test.predicate
+        assert deciding["file-upload"].decides == ("V5.1", "V5.2")
+        # The other three still decide their whole chapter.
+        for predicate in ("self-contained-tokens", "oauth", "real-time-media"):
+            test = deciding[predicate]
+            assert test.decides == sections_of(test.lane)
+
     def test_a_ruled_out_unit_reaches_scope_as_not_applicable(self):
         entries = AsvsAnalysis.scope_entries(
             lanes=ASVS.lanes,
