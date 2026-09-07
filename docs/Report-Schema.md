@@ -200,8 +200,8 @@ carries prose. See
 It arrives from the job's own options, which the report also carries on `job`,
 and it makes the block self-contained: a reader holding one block can tell which
 requirement set produced the answer, and the block's own checks verify that every
-requirement in that set appears exactly once. **A level-filtered run is a fork of
-ASVS rather than ASVS**, and no output of one is a compliance result.
+requirement in that set appears exactly once. **A level-filtered run rules on the
+standard's own cumulative set for that level**, and no output of one is a compliance result.
 
 ### `scope` — what a framework considered and raised nothing about
 

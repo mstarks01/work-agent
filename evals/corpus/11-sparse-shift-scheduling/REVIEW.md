@@ -142,7 +142,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 ### authentication
 
-**A3.** `V6.1.1` — No documentation defines rate limiting or anti-automation for a sign-in reachable from colleagues' own phones.
+**A3.** `V6.1.1` — The input carries no documentation of rate limiting or anti-automation for a sign-in reachable from colleagues' own phones.
 
 - cites: `process:scheduling-web-app`
 - tier: must-find
@@ -164,7 +164,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 ### authorization
 
-**A5.** `V8.1.1` — No authorization documentation separates what a store manager may do from what a colleague may do.
+**A5.** `V8.1.1` — The input carries no authorization documentation separating what a store manager may do from what a colleague may do.
 
 - cites: `process:scheduling-web-app`, `process:scheduling-service`
 - tier: expected
@@ -409,7 +409,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "2507fd3081003c1c94427ef81dcea36f6ca92f5358c965789b49ec4af89b6a60",
       "model.json": "8a84e2d38125ddfd3c82971019a4d35d95f92de3689c6743cc3a449195a42420",
-      "claims/asvs.json": "70682bbd369bfa31b62dc3127d10f33c5636106d80a4f3ff997987fab3c2d58d",
+      "claims/asvs.json": "f841ac2558da934c05aaea4f8b56884082e3088adfa7fa2834d79c8ca979ed8c",
       "claims/stride.json": "b56e600389930164b345d4859160bc6fd77bc59df466b5ecf0af5e22bb8d67b0"
       }
     }

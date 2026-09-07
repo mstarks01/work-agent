@@ -26,7 +26,7 @@ A session cookie is an opaque reference, not a self-contained token. That is the
 }
 ```
 
-## V9.2.1 — No token audience check applies, and the one open credential does not change that
+## V9.2.1 — No token validity window applies, and the one open credential does not change that
 
 The webhook is the one place a token might have hidden, and its `authentication` reads `unknown`. That is not enough to bring the chapter in — but the draft says why the exclusion is safe rather than assuming it.
 
@@ -34,8 +34,8 @@ The webhook is the one place a token might have hidden, and its `authentication`
 {
   "requirement": "2.1",
   "needs_evidence": "",
-  "title": "No token audience check applies, and the one open credential does not change that",
-  "description": "V9.2.1 asks that a self-contained token's audience and issuer are checked before its claims are trusted. It does not apply here. The only credential this model leaves open is `authentication` on `flow:payments-provider-to-web-api:settlement-webhook`, which is never stated. An unstated credential is not evidence that a self-contained token exists, and no other flow or element names one. If the settlement webhook turns out to carry a signed token, this chapter applies and this ruling should be revisited.",
+  "title": "No token validity window applies, and the one open credential does not change that",
+  "description": "V9.2.1 asks that a self-contained token carrying a validity window is accepted only while the verification time falls inside it — for a JWT, that the `nbf` and `exp` claims are checked. It does not apply here. The only credential this model leaves open is `authentication` on `flow:payments-provider-to-web-api:settlement-webhook`, which is never stated. An unstated credential is not evidence that a self-contained token exists, and no other flow or element names one. If the settlement webhook turns out to carry a signed token, this chapter applies and this ruling should be revisited.",
   "affected_element_ids": [
     "flow:payments-provider-to-web-api:settlement-webhook"
   ],

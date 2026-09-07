@@ -7,7 +7,7 @@
       "process:identity-broker",
       "flow:colleague-to-identity-broker:sign-in"
     ],
-    "claim": "No documentation defines rate limiting or anti-automation on a sign-in colleagues reach from their own devices at home.",
+    "claim": "The input carries no documentation of rate limiting or anti-automation on a sign-in colleagues reach from their own devices at home.",
     "tier": "expected",
     "disposition": "needs-more-prose",
     "notes": "A documentation requirement: the subject sits outside the running system, so needs-info by construction."
@@ -62,7 +62,7 @@
     "claim": "Franchise colleagues and staff colleagues share one console and one token format, with no control keeping one tenant's operations off another's.",
     "tier": "must-find",
     "disposition": "gap-from-prose",
-    "notes": "Two tenants are stated \u2014 the organization's own stores and the franchise stores \u2014 and the store check that would separate them is stated to be absent."
+    "notes": "Two tenants are stated — the organization's own stores and the franchise stores — and the store check that would separate them is stated to be absent."
   },
   {
     "chapter": "self-contained-tokens",
@@ -112,7 +112,7 @@
     "claim": "Colleagues sign in from their own devices at home and no flow states its transport.",
     "tier": "must-find",
     "disposition": "needs-config",
-    "notes": "The broker is stated to be reachable from outside and its transport is stated nowhere. Applicability comes from what the broker presents, not from this silence \u2014 see ADR 0014."
+    "notes": "The broker is stated to be reachable from outside and its transport is stated nowhere. Applicability comes from what the broker presents, not from this silence — see ADR 0014."
   },
   {
     "chapter": "security-logging-and-error-handling",
@@ -122,7 +122,7 @@
       "store:audit-log",
       "flow:identity-broker-to-audit-log:write-sign-ins"
     ],
-    "claim": "An audit log exists and nobody has written down what it records or whether it covers the franchise route.",
+    "claim": "An audit log exists and the input carries nothing written down about what it records or whether it covers the franchise route.",
     "tier": "must-find",
     "disposition": "gap-from-prose",
     "notes": "The source states the gap in the inventory's own terms, which is what this requirement asks for."

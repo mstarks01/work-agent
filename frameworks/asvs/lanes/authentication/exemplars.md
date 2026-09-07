@@ -1,17 +1,17 @@
 # Authentication Exemplars
 
-Two drafts against exemplar system A. The first is written plainly because the submitter answered the question; the second is written conditionally because an attribute reads `unknown`. Keeping those two apart is most of the work in this lane.
+Two drafts against exemplar system A. A password login is stated, so both requirements apply, and both are open: the notes name no defence around the login and no parameter of the password. Neither draft turns the one thing the submitter did settle — no MFA — into a ruling about a requirement that asks something else.
 
-## V6.3.1 — Customer authentication is single-factor by the submitter's account
+## V6.3.1 — No control against credential stuffing or brute force is stated for the customer login
 
-`none` is an answer. The notes say MFA was never added, so this ruling is not conditional on anything and does not ask a question.
+The notes settle that MFA was never added. That answers a different requirement; this one asks what stands between an attacker and the password form, and the notes say nothing about it.
 
 ```json
 {
   "requirement": "3.1",
-  "needs_evidence": "",
-  "title": "Customer authentication is single-factor by the submitter's account",
-  "description": "V6.3.1 asks that multi-factor authentication is available and enforced according to the application's own security documentation. It applies here because `entity:customer` is a human external entity authenticated by `process:web-api` over `flow:customer-to-web-api:submit-payment`. The submitter states the answer rather than leaving it open: the mechanism is an email and password yielding a session cookie, and MFA was never added. So the input settles that no second factor exists on the customer path. What the input does not carry is the security documentation the requirement measures against, and that half remains open.",
+  "needs_evidence": "config",
+  "title": "No control against credential stuffing or brute force is stated for the customer login",
+  "description": "V6.3.1 asks that the defences the application's security documentation prescribes against credential stuffing and password brute force are actually in place. It applies here because `entity:customer` authenticates to `process:web-api` with an email and password over `flow:customer-to-web-api:submit-payment`, so a password login exists to attack. The notes describe the mechanism and say nothing about rate limiting, lockout or any other defence, and they carry no security documentation to measure against. The absence of MFA is a different fact and settles nothing here. The requirement applies and the input does not settle it; the login configuration `process:web-api` enforces would.",
   "affected_element_ids": [
     "entity:customer",
     "process:web-api",
@@ -28,7 +28,6 @@ Two drafts against exemplar system A. The first is written plainly because the s
   ]
 }
 ```
-
 ## V6.2.1 — No password length policy is stated for customer accounts
 
 A password exists, so the password requirements apply. Their subject is a parameter — a minimum length — and the input carries no parameter at all.

@@ -31,7 +31,7 @@
     "affected_element_ids": [
       "process:scheduling-web-app"
     ],
-    "claim": "No documentation defines rate limiting or anti-automation for a sign-in reachable from colleagues' own phones.",
+    "claim": "The input carries no documentation of rate limiting or anti-automation for a sign-in reachable from colleagues' own phones.",
     "tier": "must-find",
     "disposition": "gap-from-prose",
     "notes": "The source states the gap outright: nobody has written down how colleagues or managers sign in."
@@ -55,7 +55,7 @@
       "process:scheduling-web-app",
       "process:scheduling-service"
     ],
-    "claim": "No authorization documentation separates what a store manager may do from what a colleague may do.",
+    "claim": "The input carries no authorization documentation separating what a store manager may do from what a colleague may do.",
     "tier": "expected",
     "disposition": "needs-more-prose",
     "notes": "Documentation requirement; both roles reach the same app."

@@ -116,7 +116,7 @@ category.
 
 ---
 
-## Part 2 — the 8 recorded ASVS records
+## Part 2 — the 7 recorded ASVS records
 
 The narrower question, per record: **does this requirement apply to this system, and does the input show it satisfied?** An ASVS claim rules applicability and never a pass.
 
@@ -162,20 +162,9 @@ The narrower question, per record: **does this requirement apply to this system,
 > mark:
 
 
-### secure-communication
-
-**A5.** `V12.2.1` — An administrator reaches MySQL directly over a connection stated to carry no TLS.
-
-- cites: `entity:admin`, `store:mysql-database`, `flow:admin-to-mysql-database:direct-administration`
-- tier: must-find
-- recorded note: encryption_in_transit is stated absent on a human-to-store flow.
-
-> mark:
-
-
 ### validation-and-business-logic
 
-**A6.** `V2.2.2` — Nothing states which layer validates the content an administrator publishes.
+**A5.** `V2.2.2` — Nothing states which layer validates the content an administrator publishes.
 
 - cites: `process:web-server`, `entity:admin`
 - tier: expected
@@ -186,7 +175,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 ### authentication
 
-**A7.** `V6.2.1` — No password rule is stated for the reader sign-in the input mentions.
+**A6.** `V6.2.1` — No password rule is stated for the reader sign-in the input mentions.
 
 - cites: `entity:reader`, `process:web-server`
 - tier: expected
@@ -197,7 +186,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 ### authorization
 
-**A8.** `V8.2.1` — Nothing states what separates reader access from administrator access.
+**A7.** `V8.2.1` — Nothing states what separates reader access from administrator access.
 
 - cites: `entity:admin`, `entity:reader`, `process:web-server`
 - tier: expected
@@ -420,7 +409,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "11d2a58f0e1d5773054f0a72d222b3cc96f889cdd0206dd3656495a3d5fe8313",
       "model.json": "0d41862b4c44502f3cc436b7b5b7278ce7482eb14681dff770abbed6a4757968",
-      "claims/asvs.json": "3cecb0bb9bc8d81f79071e56c8c558f954db32ce64b3d8f090d0766c6faadca2",
+      "claims/asvs.json": "4f118b3b445626af7efe79965831888695abb3c07c4a96368f30053473fdb40f",
       "claims/stride.json": "c009d8fb390bfd8ed23cc59440a5967430112fa8a32cad71f7f0ab4bfa8b2cf2"
       }
     }

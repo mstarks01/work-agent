@@ -1,44 +1,47 @@
 # Secure Coding and Architecture Exemplars
 
-Two drafts against exemplar system A. This chapter's subject is code, and the input is prose — the first draft states that limit plainly. The second shows the part the model *does* answer: how the system is divided.
+Two drafts against exemplar system A. This chapter's subject is code and the components it is built from, and the input is prose — both drafts state that limit plainly rather than reasoning past it.
 
-## V15.2.1 — Defensive handling of untrusted data cannot be settled from this input
+## V15.2.1 — Whether the components sit inside their documented remediation windows cannot be settled from this input
 
-The honest ruling for a code-practice requirement. Saying the input carries prose rather than code is the answer, not an excuse.
+The honest ruling for a component-currency requirement. The model names the frameworks and nothing about their versions, their age, or the time frame the organization wrote down for them.
 
 ```json
 {
   "requirement": "2.1",
-  "needs_evidence": "code",
-  "title": "Defensive handling of untrusted data cannot be settled from this input",
-  "description": "V15.2.1 asks that the application handles untrusted data defensively throughout its code. It applies to this system: `process:web-api` accepts payment instructions from `entity:customer` across a boundary crossing, so untrusted data enters. The requirement's subject is the code that handles it, and this job carries a description of the system. So the requirement applies and this input cannot settle it — source access would.",
-  "affected_element_ids": [
-    "process:web-api"
-  ],
-  "evidence_refs": [
-    "crossing:flow:customer-to-web-api:submit-payment"
-  ],
-  "quotes": []
-}
-```
-
-## V15.3.1 — The ledger service's own exposure is never stated
-
-Separation is a structural fact and the model states it. The draft cites the zones rather than reasoning about code.
-
-```json
-{
-  "requirement": "3.1",
-  "needs_evidence": "prose",
-  "title": "The ledger service's own exposure is never stated",
-  "description": "V15.3.1 asks that components are separated so that a compromise of one is contained. The model answers part of this directly: `boundary:public-internet`, `boundary:dmz` and `boundary:core` divide the system, and `process:web-api` sits in the DMZ while `process:ledger-service` sits in the core. What is left open is `process:ledger-service`'s own `exposure`, which is never stated, so whether the core zone is actually reachable only through the DMZ is unsettled. The requirement applies and the input does not settle it.",
+  "needs_evidence": "people",
+  "title": "Whether the components sit inside their documented remediation windows cannot be settled from this input",
+  "description": "V15.2.1 asks that no component in the application has outlived the update and remediation time frames the organization documented for it. It applies to this system: `process:web-api` is described as FastAPI on Cloud Run and `process:ledger-service` as a Python worker, so both carry third-party components with a version and an age. The requirement's subject is those versions against a written time frame, and this job carries a description of the system rather than a dependency list or that document. So the requirement applies and this input cannot settle it.",
   "affected_element_ids": [
     "process:web-api",
     "process:ledger-service"
   ],
+  "evidence_refs": [],
+  "quotes": [
+    {
+      "text": "They submit payments through the web API, which is the only thing we expose to the internet.",
+      "source_label": "Payments platform notes"
+    }
+  ]
+}
+```
+## V15.3.1 — What the web API returns of an account record is never stated
+
+The notes describe what a customer sends and never what comes back. Whether a response carries a whole record or the fields the customer needs is a question about response code.
+
+```json
+{
+  "requirement": "3.1",
+  "needs_evidence": "code",
+  "title": "What the web API returns of an account record is never stated",
+  "description": "V15.3.1 asks that the application returns only the fields of a data object a caller needs, rather than the whole object. It applies here because `process:web-api` serves `entity:customer` over `flow:customer-to-web-api:submit-payment` and the data behind it lives in `store:accounts-db`, a store classified confidential and tagged `pii` and `financial`. The notes describe what a customer sends and never describe what the API sends back, so whether a response carries a whole account record or the fields the customer needs is open. The requirement applies and the input does not settle it; the response serialisers in `process:web-api` would.",
+  "affected_element_ids": [
+    "entity:customer",
+    "process:web-api",
+    "store:accounts-db"
+  ],
   "evidence_refs": [
-    "unknown:process:ledger-service:exposure",
-    "crossing:flow:web-api-to-ledger-service:post-transfer"
+    "crossing:flow:customer-to-web-api:submit-payment"
   ],
   "quotes": []
 }

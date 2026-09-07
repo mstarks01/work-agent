@@ -165,13 +165,13 @@ The narrower question, per record: **does this requirement apply to this system,
 > mark:
 
 
-### authentication
+### configuration
 
-**A5.** `V6.2.10` — The per-team API key is never expired or rotated.
+**A5.** `V13.2.1` — The calling service authenticates to the inference gateway with a per-team API key that is never expired or rotated, an unchanging credential on a backend link.
 
 - cites: `entity:calling-service`, `flow:calling-service-to-inference-gateway:submit-inference-request`
 - tier: must-find
-- recorded note: Stated outright, so the ruling is plain.
+- recorded note: Stated outright, so the ruling is plain. V6.2.10 is about user passwords and forbids forced rotation, so it was the wrong home for this fact.
 
 > mark:
 
@@ -453,7 +453,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
       "model.json": "e0a3a1a0bf67fefcbd10b510e4ed5e7a15f2e47651bc5cdc8f660899de65d37c",
-      "claims/asvs.json": "3985e6d73b9aa5b5dc8f1b72eee1930c67fab410a2d4710041b39df07339ad31",
+      "claims/asvs.json": "58ad524c77d21fab0aec0967b5992f86fd36130159c2f20ed76e09b475130998",
       "claims/stride.json": "219c4116a56305055f1ff4ce543c246ab37e0bb5e3082e83523044d56d5fb94d"
       }
     }

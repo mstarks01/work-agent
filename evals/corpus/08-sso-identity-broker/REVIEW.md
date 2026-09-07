@@ -145,7 +145,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 ### authentication
 
-**A1.** `V6.1.1` — No documentation defines rate limiting or anti-automation on a sign-in colleagues reach from their own devices at home.
+**A1.** `V6.1.1` — The input carries no documentation of rate limiting or anti-automation on a sign-in colleagues reach from their own devices at home.
 
 - cites: `entity:colleague`, `process:identity-broker`, `flow:colleague-to-identity-broker:sign-in`
 - tier: expected
@@ -235,7 +235,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 ### security-logging-and-error-handling
 
-**A10.** `V16.1.1` — An audit log exists and nobody has written down what it records or whether it covers the franchise route.
+**A10.** `V16.1.1` — An audit log exists and the input carries nothing written down about what it records or whether it covers the franchise route.
 
 - cites: `process:identity-broker`, `store:audit-log`, `flow:identity-broker-to-audit-log:write-sign-ins`
 - tier: must-find
@@ -525,7 +525,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "36115502847aa04640666b0dd9f458881e6f7f8968e4d499b58983b3403dc721",
       "model.json": "825c92681b885f7d36968302a5a38e904c206d9e5ba62936e754b4e3fb5ca6bb",
-      "claims/asvs.json": "871f331895356803f29970c254fb2e418b8c23550f562cc63b234b28e8ad6340",
+      "claims/asvs.json": "e0a6a7e5ffcf04f53e4bf21dfb613faf7f9e386d04ddfd0d24ebf22f6af87652",
       "claims/stride.json": "9bd0d3203a0a3bcb8ca80ed0de9efbc1b1a35a6c621653e1206e65e19c3dd849"
       }
     }
