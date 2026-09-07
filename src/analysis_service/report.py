@@ -969,6 +969,28 @@ class RuledClaim(Claim):
 
     verdict: Verdict
 
+    def rules_on_unit(self) -> bool:
+        """Whether this ruling says something about the unit the claim names.
+
+        A rejection has three causes and only one of them is a ruling. Rejected
+        for ``evidence``, the critic says the unit does not apply to a system of
+        this shape, which is an answer. Rejected for ``lane`` or ``duplicate``,
+        the critic says the *draft* was in the wrong place or was a second copy,
+        and says nothing about the unit — which then stays unruled, exactly as
+        if no lane had drafted it. A rejection recorded before the cause was a
+        field carries ``None`` and reads as a ruling, because that is what every
+        reader made of it at the time.
+
+        **One reader.** The scope builder that decides which units a block
+        still has to list, the coverage check that audits it, and the eval
+        scorer that counts a rejection all ask this rather than reading the
+        status, because reading the status alone is how a misfiled draft came to
+        mark its requirement "does not apply" (#657).
+        """
+        if self.verdict.status != "rejected":
+            return True
+        return self.verdict.rejected_because in (None, "evidence")
+
 
 class QuoteCandidate(BaseModel):
     """A span an agent claims is in one of the job's sources, and which source.

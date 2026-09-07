@@ -1636,3 +1636,50 @@ class TestASpentBodyDeadlineFoldsNoSource:
         checked = critic._verify_quotes(claims, {"description": source})
 
         assert [repair.claim_id for repair in checked.repaired] == ["S-01"]
+
+
+class TestADuplicateRejectionOfAUnitBearingDraftIsMalformed:
+    """#657: a package that names a unit decides duplication by its identifier."""
+
+    def _asvs_draft(self):
+        from analysis_service.frameworks.asvs.record import DraftRequirementRuling
+
+        return DraftRequirementRuling.model_validate(
+            {
+                **sample_draft("S-01").model_dump(
+                    exclude={"category", "verb", "severity", "mitigations"}
+                ),
+                "id": "v5.0.0-6.2.1",
+                "chapter": "authentication",
+            }
+        )
+
+    def test_it_is_re_asked_on_a_draft_that_names_a_unit(self):
+        from analysis_service.critic import review_issues
+
+        draft = self._asvs_draft()
+        rulings = [
+            sample_ruling(
+                draft.id,
+                verdict=ProposedVerdict(
+                    status="rejected", reason="dup", rejected_because="duplicate"
+                ),
+            )
+        ]
+        problems = review_issues([draft], rulings, valid_model())
+        assert any("decided by its identifier" in m for m in problems.messages)
+
+    def test_it_passes_on_a_draft_that_names_none(self):
+        from analysis_service.critic import review_issues
+
+        draft = sample_draft("S-01")
+        rulings = [
+            sample_ruling(
+                "S-01",
+                verdict=ProposedVerdict(
+                    status="rejected", reason="dup", rejected_because="duplicate"
+                ),
+            )
+        ]
+        problems = review_issues([draft], rulings, valid_model())
+        assert not any("decided by its identifier" in m for m in problems.messages)

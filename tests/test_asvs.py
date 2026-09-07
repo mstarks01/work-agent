@@ -56,6 +56,7 @@ from analysis_service.report import (
     FrameworkSelection,
     Ground,
     QuoteCandidate,
+    RejectionStep,
     Report,
     ScopeEntry,
     Verdict,
@@ -1167,3 +1168,105 @@ class TestARequirementRuledOutByItsOwnTerms:
         assert "V6.8.3" in auth
         # The password requirements name nothing the model lacks.
         assert "V6.2.1" not in auth
+
+
+class TestARejectionThatDoesNotRuleLeavesItsRequirementListed:
+    """#657: a misfiled or duplicate draft never marks its requirement not-applicable."""
+
+    @staticmethod
+    def _rejected(requirement: str, cause: RejectionStep):
+        from analysis_service.frameworks.asvs.record import RequirementRuling
+        from analysis_service.report import Ground, Verdict
+
+        return RequirementRuling(
+            id=f"v5.0.0-{requirement[1:]}",
+            framework="asvs",
+            framework_version="5.0.0",
+            chapter="encoding-and-sanitization",
+            title="t",
+            description="d",
+            affected_element_ids=[],
+            grounds=[Ground(kind="absent-element", term="ldap")],
+            verdict=Verdict(status="rejected", reason="r", rejected_because=cause),
+        )
+
+    def test_an_evidence_rejection_covers_its_requirement(self):
+        entries = AsvsAnalysis.scope_entries(
+            lanes=list(LANES),
+            claims=[self._rejected("V1.2.4", "evidence")],
+            options={"level": 1},
+            refusal_reason="",
+        )
+        assert "V1.2.4" not in {entry.unit for entry in entries}
+
+    @pytest.mark.parametrize("cause", ["lane", "duplicate"])
+    def test_a_lane_or_duplicate_rejection_leaves_it_applicable(self, cause):
+        entries = AsvsAnalysis.scope_entries(
+            lanes=list(LANES),
+            claims=[self._rejected("V1.2.4", cause)],
+            options={"level": 1},
+            refusal_reason="",
+        )
+        by_unit = {entry.unit: entry for entry in entries}
+        assert by_unit["V1.2.4"].state == "applicable"
+
+    def test_the_coverage_check_agrees_with_the_scope_builder(self):
+        """The two readers of *is this requirement ruled* cannot disagree."""
+        rejected = self._rejected("V1.2.4", "lane")
+        entries = AsvsAnalysis.scope_entries(
+            lanes=list(LANES),
+            claims=[rejected],
+            options={"level": 1},
+            refusal_reason="",
+        )
+        block = AsvsAnalysis(
+            framework="asvs",
+            framework_version="5.0.0",
+            disclaimer="d",
+            claims=[],
+            rejected_claims=[rejected],
+            scope=entries,
+            level=1,
+            summary=AsvsAnalysis.summarize([], [rejected]),
+        )
+        assert not [
+            issue for issue in block.block_issues(set()) if "appear in" in issue
+        ]
+
+
+class TestABlockWrittenBeforeTheCauseWasReadStillLoads:
+    """#657: the archive lists no lane-rejected requirement, and still appears once."""
+
+    def test_named_in_the_audit_array_and_unlisted_is_not_missing(self):
+        rejected = TestARejectionThatDoesNotRuleLeavesItsRequirementListed._rejected(
+            "V1.2.4", "lane"
+        )
+        as_evidence = rejected.model_copy(
+            update={
+                "verdict": rejected.verdict.model_copy(
+                    update={"rejected_because": "evidence"}
+                )
+            }
+        )
+        # Built as the old scope builder built it: the evidence cause covers
+        # the requirement, so no entry lists it.
+        entries = AsvsAnalysis.scope_entries(
+            lanes=list(LANES),
+            claims=[as_evidence],
+            options={"level": 1},
+            refusal_reason="",
+        )
+        assert "V1.2.4" not in {entry.unit for entry in entries}
+        block = AsvsAnalysis(
+            framework="asvs",
+            framework_version="5.0.0",
+            disclaimer="d",
+            claims=[],
+            rejected_claims=[rejected],
+            scope=entries,
+            level=1,
+            summary=AsvsAnalysis.summarize([], [rejected]),
+        )
+        assert not [
+            issue for issue in block.block_issues(set()) if "appear in" in issue
+        ]
