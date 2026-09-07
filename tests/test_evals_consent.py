@@ -631,14 +631,18 @@ class TestADirtyTreeIsNamedBeforeTheSpend:
 class TestAStoppedSweepSaysSo:
     """A partial record must not read as a whole one (#334)."""
 
-    def artifact(self, stopped, cases):
+    def artifact(self, stopped, cases, payloads=()):
         from dataclasses import replace
 
         from analysis_service.certification import CertifyResult
         from evals.harness.artifact import build
         from evals.harness.instruments import ModeRun, Sweep
 
-        run = replace(ModeRun.empty(("stride",)), stopped_before=stopped)
+        run = replace(
+            ModeRun.empty(("stride",)),
+            stopped_before=stopped,
+            payloads=list(payloads),
+        )
         return build(
             mode="end-to-end",
             cases=cases,
@@ -648,7 +652,7 @@ class TestAStoppedSweepSaysSo:
             usage={},
             latency={},
             structural_failures=[],
-            payloads=[],
+            payloads=list(payloads),
             trusted=False,
             sweep=Sweep(run=run),
             commit=ARTIFACT_COMMIT,
@@ -664,6 +668,32 @@ class TestAStoppedSweepSaysSo:
         # And the cases it claims are only the ones that ran, which is what
         # makes it fail the Baseline full-corpus rule rather than pass it.
         assert artifact["cases"] == ["01"]
+
+    def test_the_completion_block_carries_what_the_means_divide_by(self):
+        """A mean over survivors reads like a mean over the corpus without it.
+
+        Scoring iterates the cases that produced a report, so a sweep that lost
+        three cases publishes the same shaped aggregate as one that lost none.
+        These four counts are what separates them.
+        """
+        artifact = self.artifact(
+            ("04",),
+            ["01", "02", "03"],
+            payloads=[
+                {"case": "01"},
+                {"case": "02", "run_failure": "the graph refused the model"},
+                {"case": "03", "grounds_failure": {"kind": "groundless"}},
+            ],
+        )
+
+        assert artifact["completion"] == {
+            "attempted": 3,
+            # `ModeRun.empty` scored nothing, which is the honest reading of a
+            # sweep whose instruments never ran.
+            "scored": 0,
+            "failed": 2,
+            "stopped_before": 1,
+        }
 
 
 class TestTheSweepLoopPassesTheCasesThatRan:

@@ -1,11 +1,25 @@
-"""Candidate-trigger recall: did deterministic analysis see the lead at all?
+"""Same-lane target overlap: did deterministic analysis raise a lead here at all?
 
-This is a separate number from finding recall, and it answers a narrower
+This is a separate number from finding recall, and it answers a much narrower
 question. For each reference claim the corpus says a working tool must report,
 it asks whether :mod:`analysis_service.candidates` fired a rule in that claim's
 lane, on at least one of the elements it is about. It says nothing about whether
 the agent then found the claim. That is finding recall, and the harness scores
 it elsewhere over produced reports.
+
+**The published keys are ``overlap``, not ``recall``, and the distance between
+those two words is the whole caveat.** A hit needs the lane to agree and one
+cited element to be shared, and nothing compares the rule's question to the
+claim's mechanism — so a hit can credit a rule that raised an entirely different
+concern about the same place. Case 13 reads 19/19 with two of its hits like
+that: the stale importer-token claim is credited by other flows' unknown
+authentication, and the XXE disclosure claim by unprotected transit on the
+archive path. Neither shows the mechanism was recognised. A number named
+``recall`` invites exactly the reading this cannot support, so the word is gone
+from what a reader quotes.
+
+A miss is the sharper half and stays trustworthy: no rule in the lane named any
+element the claim is about, so there was no structural lead to take up.
 
 It runs per framework, over each package's own rules and its own reference set.
 ASVS's 17 rules matter here more than STRIDE's 11 rather than less: #160
@@ -199,10 +213,13 @@ def summarize(results: Sequence[CaseTriggerRecall]) -> dict[str, float | int]:
         "references": total,
         "unscoreable": sum(result.unscoreable for result in results),
         "triggered": triggered,
-        "recall": round(triggered / total, 4) if total else 0.0,
+        # `overlap`, never `recall`. The numerator counts claims whose lane
+        # fired a rule on an element they name, which is not the same fact as
+        # the claim being recognised -- see this module's opening.
+        "overlap": round(triggered / total, 4) if total else 0.0,
         "must_find_references": must_total,
         "must_find_triggered": must_triggered,
-        "must_find_recall": round(must_triggered / must_total, 4)
+        "must_find_overlap": round(must_triggered / must_total, 4)
         if must_total
         else 0.0,
     }

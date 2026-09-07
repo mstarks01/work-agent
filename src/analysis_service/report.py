@@ -2333,7 +2333,17 @@ class LaneCoverage(BaseModel):
     elements_cited: int = Field(ge=0)
     boundary_crossings: int = Field(ge=0)
     boundary_crossings_cited: int = Field(ge=0)
+    #: Every ``(element, attribute)`` pair in this lane's scope whose control
+    #: the model does not verify. One element with three unstated controls is
+    #: three.
     unknown_controls: int = Field(ge=0)
+    #: Of those pairs, how many sit on an **element** some draft cited —
+    #: **never** how many of the attributes a draft discussed. Nothing records
+    #: which attribute a draft was about, so one citation of an element counts
+    #: every unstated control it holds. That makes this the loosest of the four
+    #: ``*_cited`` halves, and it is loose in the flattering direction, so read
+    #: it as an upper bound on attention rather than as coverage of the
+    #: controls themselves.
     unknown_controls_cited: int = Field(ge=0)
 
     # Each ``*_cited`` half against the total it is cited out of. Every row here

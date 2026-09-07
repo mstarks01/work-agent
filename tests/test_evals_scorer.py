@@ -168,6 +168,73 @@ def test_an_unvoted_unmatched_threat_is_visible_and_never_gates(case, no_votes):
     assert unlisted_for_promotion([score]) == []
 
 
+class TestTheRejectedRateCarriesItsDenominators:
+    """A rate whose numerator comes from a subset of its denominator.
+
+    ``rejected_rate`` divides by every produced finding, and only an unmatched,
+    non-``needs-info``, in-lane finding citing a blessed element can ever raise
+    it. So the number falls when a run produces more of what it cannot count,
+    and read alone it looks like a false-positive rate. The three counts travel
+    together now.
+    """
+
+    def test_a_matched_finding_is_produced_and_never_eligible(self, case, no_votes):
+        listed = case.stride_claims()[0]
+        produced = [
+            produced_threat(1, listed.category, listed.claim),
+            produced_threat(2, "spoofing", "A grounded but unlisted claim."),
+        ]
+        matcher = ScriptedMatcher([(listed.claim, listed.claim)])
+
+        score = score_case(case, produced, matcher, no_votes)
+
+        assert score.produced_count == 2
+        assert len(score.matched) == 1
+        assert score.eligible_count == 1, "the matched finding cannot be voted down"
+
+    def test_nothing_reviewed_reads_as_zero_either_way(self, case, no_votes):
+        produced = [produced_threat(1, "spoofing", "A grounded but unlisted claim.")]
+
+        score = score_case(case, produced, ScriptedMatcher(), no_votes)
+
+        assert score.eligible_count == 1
+        assert score.reviewed_count == 0
+        assert score.rejected_rate == 0.0
+        assert score.rejected_rate_of_reviewed == 0.0, (
+            "no reviewer answered, so there is no rate rather than a good one"
+        )
+
+    def test_the_reviewed_rate_reads_the_denominator_a_person_supplied(self, case):
+        produced = [
+            produced_threat(1, "spoofing", "An attacker abuses a made-up service."),
+            produced_threat(
+                2,
+                "spoofing",
+                "A second unlisted claim.",
+                element_ids=("process:storefront-api",),
+            ),
+        ]
+        votes = Ledger(
+            [vote_on(case, produced[0], "down", reason="unsupported-by-the-model")]
+        )
+
+        score = score_case(case, produced, ScriptedMatcher(), votes)
+
+        assert (score.eligible_count, score.reviewed_count) == (2, 1)
+        assert score.rejected_rate == 0.5
+        assert score.rejected_rate_of_reviewed == 1.0
+
+    def test_the_artifact_carries_all_three(self, case, no_votes):
+        produced = [produced_threat(1, "spoofing", "A grounded but unlisted claim.")]
+
+        payload = score_case(case, produced, ScriptedMatcher(), no_votes).to_json()
+
+        assert payload["counts"]["produced"] == 1
+        assert payload["counts"]["eligible"] == 1
+        assert payload["counts"]["reviewed"] == 0
+        assert "rejected_rate_of_reviewed" in payload["metrics"]
+
+
 def test_a_pooled_finding_feeds_promotion(case):
     produced = [produced_threat(1, "spoofing", "A grounded but unlisted claim.")]
     votes = Ledger([vote_on(case, produced[0], "up")])

@@ -332,6 +332,7 @@ ENVELOPE_KEYS: tuple[str, ...] = (
     "frameworks",
     "stopped",
     "series",
+    "completion",
 )
 
 #: Every key an artifact of this version carries. The envelope's, plus each
@@ -340,6 +341,27 @@ ENVELOPE_KEYS: tuple[str, ...] = (
 DECLARED_KEYS: frozenset[str] = frozenset(ENVELOPE_KEYS).union(
     *(instrument.keys for instrument in INSTRUMENTS.values())
 )
+
+
+def _completion(sweep: Sweep, cases: Sequence[str]) -> dict[str, int]:
+    """The denominators every aggregate in the artifact is conditional on.
+
+    A case appears in ``mode_output`` whatever happened to it, and carries a
+    ``run_failure`` or a ``grounds_failure`` key when it did not finish. Counted
+    from there rather than from ``structural_failures``, which holds one entry
+    per *issue* and includes issues a finished report raised.
+    """
+    failed = sum(
+        1
+        for payload in sweep.run.payloads
+        if "run_failure" in payload or "grounds_failure" in payload
+    )
+    return {
+        "attempted": len(cases),
+        "scored": len(sweep.scores),
+        "failed": failed,
+        "stopped_before": len(sweep.run.stopped_before),
+    }
 
 
 def build(
@@ -374,6 +396,11 @@ def build(
     a sweep that cannot name its own repository state should stop before it
     spends the money — ``command_run`` resolves both in its first second. By
     the time this runs, the answer has already been paid for.
+
+    ``completion`` is what every aggregate below it is conditional on. Scoring
+    iterates the cases that produced a report, so a mean recall is a mean over
+    survivors — and a sweep where three cases died reads exactly like one where
+    all thirteen finished, unless the counts travel beside the numbers.
     """
     artifact = {
         "artifact_version": ARTIFACT_VERSION,
@@ -406,6 +433,11 @@ def build(
         # numbers. ``None`` from a mode that scored nothing, which is a sweep
         # with no series rather than a sweep whose series were empty.
         "series": dict(series) if series is not None else {},
+        # What the aggregates are conditional on. `attempted` counts the cases
+        # the sweep reached, `scored` the ones an instrument could read, and
+        # the gap is cases that failed or were refused. Every mean in the
+        # blocks below divides by `scored`, never by `attempted`.
+        "completion": _completion(sweep, cases),
         # Every instrument's own keys, from the table that also printed them.
         # One source for the printed line and the written number is what stops
         # the two disagreeing.
