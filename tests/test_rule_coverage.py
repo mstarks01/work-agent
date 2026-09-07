@@ -32,7 +32,7 @@ import pytest
 
 from analysis_service.candidates import generate_candidates
 from analysis_service.frameworks import PACKAGES
-from analysis_service.knowledge import MAX_CASES, MAX_NOTES, select_documents
+from analysis_service.knowledge import MAX_CASES, MAX_NOTES, select_per_lane
 from analysis_service.system_model import SystemModel
 from analysis_service.validation import parse_and_validate
 
@@ -123,22 +123,12 @@ def test_every_exempted_rule_is_a_rule_some_package_declares(models):
 #: package gate holds that the document exists and its rule IDs resolve, and
 #: ``test_knowledge_lints`` holds that a rule has material — and neither asks
 #: whether the material is ever *selected*.
+#: The two STRIDE worked cases that used to sit here are reachable now. They
+#: were never less relevant — over the whole corpus every selection was a tie at
+#: one matched rule, and declaration order sent all 39 to the first-declared
+#: document. The tie-break reads what the job has already sent, so a lane that
+#: ties spends its slot on material the job has not.
 UNSELECTED: dict[str, str] = {
-    "stride:stated-control-outside-the-model": (
-        "Selected by spoofing-unverified-boundary-auth and"
-        " tampering-unverified-write-to-store, and both lanes lose the one-case"
-        " cap to unknown-is-not-absent, which matches three rules against this"
-        " one's two. Ranking is match count then declaration order, so a"
-        " broader document wins every lane they share. This is a selection gap"
-        " rather than a corpus gap: the rules fire, and the material is"
-        " unreachable behind MAX_CASES."
-    ),
-    "stride:two-threats-one-flow": (
-        "The same shape."
-        " information-disclosure-unprotected-sensitive-transit and"
-        " tampering-unverified-write-to-store both fire, and both lanes'"
-        " one slot goes to unknown-is-not-absent or chained-benign-facts."
-    ),
     "asvs:real-time-media-and-signalling": (
         "The other reading, and a corpus gap rather than a selection one: its"
         " only rule is webrtc-real-time-media, which UNEXERCISED already records"
@@ -157,21 +147,30 @@ def selected_documents(models: list[SystemModel]) -> set[str]:
     sets, which is the only way to answer what an agent is handed. Counting the
     documents a rule *could* select answers a different question, and it is the
     question the package gate already answers.
+
+    Through :func:`~analysis_service.knowledge.select_per_lane`, because a
+    lane's tie-break reads what earlier lanes were sent — so calling
+    ``select_documents`` per lane here would measure a selection the graph does
+    not make, and this lint would go on reporting a document as unreachable
+    after it stopped being so.
     """
     reached: set[str] = set()
     for name, package in PACKAGES.items():
         for model in models:
             fired = generate_candidates(model, package.lanes, package.rules)
-            for block in fired.values():
-                rule_ids = {candidate.rule_id for candidate in block.candidates}
-                for table, limit in (
-                    (package.knowledge.cases, MAX_CASES),
-                    (package.knowledge.notes, MAX_NOTES),
-                ):
-                    reached.update(
-                        f"{name}:{document}"
-                        for document in select_documents(table, rule_ids, limit)
-                    )
+            fired_by_lane = [
+                {candidate.rule_id for candidate in fired[lane].candidates}
+                for lane in package.lanes
+            ]
+            for table, limit in (
+                (package.knowledge.cases, MAX_CASES),
+                (package.knowledge.notes, MAX_NOTES),
+            ):
+                reached.update(
+                    f"{name}:{document}"
+                    for chosen in select_per_lane(table, fired_by_lane, limit)
+                    for document in chosen
+                )
     return reached
 
 
