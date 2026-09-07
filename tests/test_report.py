@@ -405,6 +405,54 @@ class TestReportInvariants:
         with pytest.raises(ValidationError, match="not in the embedded system model"):
             sample_report(threats=[threat])
 
+    def test_ground_on_an_attribute_the_element_lacks_is_rejected(self):
+        """A loaded report is held to the fan-in's own ground rule.
+
+        Nothing built the grounds of a report read from a file, so membership
+        in the catalog derived from the embedded model is asked again here.
+        """
+        threat = sample_threat(
+            grounds=[
+                Ground(
+                    kind="unknown-attribute",
+                    element_id="store:orders-db",
+                    attribute="made_up",
+                )
+            ]
+        )
+        with pytest.raises(ValidationError, match="does not have"):
+            sample_report(threats=[threat])
+
+    def test_unknown_ground_on_a_stated_attribute_is_rejected(self):
+        threat = sample_threat(
+            grounds=[
+                Ground(
+                    kind="unknown-attribute",
+                    element_id="process:web-app",
+                    attribute="exposure",
+                )
+            ]
+        )
+        with pytest.raises(ValidationError, match="reads as stated"):
+            sample_report(threats=[threat])
+
+    def test_derived_fact_on_a_flow_that_does_not_cross_is_rejected(self):
+        threat = sample_threat(
+            grounds=[
+                Ground(
+                    kind="derived-fact",
+                    flow_id="flow:web-app-to-orders-db:store-order",
+                )
+            ]
+        )
+        with pytest.raises(ValidationError, match="not a derived boundary crossing"):
+            sample_report(threats=[threat])
+
+    def test_absent_element_the_model_names_is_rejected(self):
+        threat = sample_threat(grounds=[Ground(kind="absent-element", term="web app")])
+        with pytest.raises(ValidationError, match="which the system model names"):
+            sample_report(threats=[threat])
+
     def test_duplicate_threat_ids_are_rejected(self):
         duplicate = sample_threat(threat_id="S-01")
         with pytest.raises(ValidationError, match="more than once"):

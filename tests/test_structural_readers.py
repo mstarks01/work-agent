@@ -151,6 +151,15 @@ def _dangling_unknown(report: Report) -> None:
     ]
 
 
+def _ground_the_model_does_not_derive(report: Report) -> None:
+    """An unknown on an attribute the embedded model states."""
+    report.analyses[0].claims[0].grounds.append(
+        Ground(
+            kind="unknown-attribute", element_id="process:web-app", attribute="exposure"
+        )
+    )
+
+
 def _repeated_claim_id(report: Report) -> None:
     block = report.analyses[0]
     block.claims.append(block.claims[0])
@@ -285,6 +294,12 @@ FAULTS: Mapping[str, Fault] = {
     # The rules only the shipped validator carries. Each holds offline because
     # a report the gate reads parsed as a `Report` first.
     "a mark names a claim the block does not carry": Fault(_mark_naming_no_claim, APP),
+    # The gate resolves grounds against the model's ID set and no deeper. The
+    # service's reader is catalog membership, run at the fan-in and again on
+    # every report that loads, so the gate has nothing this rule would add.
+    "a ground names a fact the embedded model does not derive": Fault(
+        _ground_the_model_does_not_derive, APP
+    ),
     "a reference mark names a claim the block does not carry": Fault(
         _reference_mark_naming_no_claim, APP
     ),

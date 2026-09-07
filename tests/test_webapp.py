@@ -869,7 +869,9 @@ def report_with_markup_everywhere():
 
     Grounds included: a quote's ``text`` is submitter prose copied verbatim by
     rule, and its ``source_label`` is a caller-chosen string, so the grounds
-    rail is now the newest place on the page where untrusted text lands.
+    rail is now the newest place on the page where untrusted text lands. An
+    attribute ground carries no prose: its two fields are references the
+    report refuses unless they resolve in the embedded model's catalog.
     """
     from analysis_service.report import Ground, Mitigation, Severity, Verdict
     from tests.factories import sample_report, sample_threat
@@ -879,11 +881,6 @@ def report_with_markup_everywhere():
         description=MARKUP_PAYLOAD,
         grounds=[
             Ground(kind="quote", text=MARKUP_PAYLOAD, source_label=MARKUP_PAYLOAD),
-            Ground(
-                kind="unknown-attribute",
-                element_id=MARKUP_PAYLOAD,
-                attribute=MARKUP_PAYLOAD,
-            ),
         ],
         severity=Severity(
             likelihood="medium", impact="high", justification=MARKUP_PAYLOAD

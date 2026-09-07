@@ -86,10 +86,12 @@ def draft_threat(
     No verdict and no confidence: those are the critic's, and critic yield
     exists to measure what the critic did with drafts exactly this shape.
 
-    ``grounds`` is an ``unknown-attribute`` on the first cited element rather
-    than a quote, because nothing on the eval side scores grounds and a quote
-    would need a source to be verifiable against. The eval-side reference set
-    carries no grounds at all — a hand-authored one would be graded by nothing.
+    ``grounds`` is a scripted quote, because nothing on the eval side scores
+    grounds and a quote is the one kind no model is consulted for: an
+    ``unknown-attribute`` must be one the evidence catalog derives from the
+    case's model, and a helper that knows no model cannot write one that is.
+    The eval-side reference set carries no grounds at all — a hand-authored
+    one would be graded by nothing.
     """
     return DraftThreat(
         id=f"{CATEGORY_LETTERS[category]}-{sequence:02d}",
@@ -102,13 +104,7 @@ def draft_threat(
         # Overridable, because a scorer test that wants two drafts to be one
         # finding — or two — sets exactly this and the elements beside it.
         verb=verb,
-        grounds=[
-            Ground(
-                kind="unknown-attribute",
-                element_id=next(iter(element_ids)),
-                attribute="authentication",
-            )
-        ],
+        grounds=[Ground(kind="quote", text="scripted", source_label="scripted")],
         severity=Severity(
             likelihood=likelihood, impact=impact, justification="scripted"
         ),
