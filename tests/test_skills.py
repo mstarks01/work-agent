@@ -92,6 +92,25 @@ class TestLoadingSkillFiles:
         with pytest.raises(MarkdownNotFoundError):
             MarkdownLoader(package_root).load("lanes/nonexistent/skill")
 
+    def test_the_snapshot_is_taken_at_construction(self, tmp_path):
+        """#675 D24: a file edited after startup changed what a job was told.
+
+        The loader reads every file once when it is built. A file changed,
+        added or removed afterwards is the next loader's, so a running
+        deployment's prompts and knowledge cannot move under it.
+        """
+        (tmp_path / "a.md").write_text("first", encoding="utf-8")
+        loader = MarkdownLoader(tmp_path)
+        (tmp_path / "a.md").write_text("second", encoding="utf-8")
+        (tmp_path / "b.md").write_text("new", encoding="utf-8")
+        (tmp_path / "a.md").unlink()
+
+        assert loader.load("a") == "first"
+        assert loader.names() == ["a"]
+        assert not loader.readable("b")
+        with pytest.raises(MarkdownNotFoundError):
+            loader.load("b")
+
     def test_traversal_outside_root_raises(self, package_root):
         (package_root.parent / "outside.md").write_text("secret")
         with pytest.raises(MarkdownNotFoundError):

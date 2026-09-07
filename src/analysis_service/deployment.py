@@ -52,6 +52,7 @@ import os
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any, Self
 
 from analysis_service.binding import (
@@ -207,7 +208,10 @@ class Deployment:
     paths: ConfigPaths
     require_certified: bool = False
     # Held only to derive each vendor's credentials when the adapters are built.
-    # Out of repr and equality: a deployment in a log must not carry a key.
+    # Out of repr and equality: a deployment in a log must not carry a key. A
+    # copy taken by :meth:`from_env`, never the caller's live mapping: a
+    # deployment reads the environment it was built from, and a variable set
+    # afterwards belongs to the next deployment built (#675 D24).
     env: Mapping[str, str] = field(default_factory=dict, repr=False, compare=False)
     _built: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
 
@@ -241,7 +245,7 @@ class Deployment:
             frameworks=frameworks,
             paths=paths,
             require_certified=_flag(env, REQUIRE_CERTIFIED_VAR),
-            env=env,
+            env=MappingProxyType(dict(env)),
         )
 
     def selection(
