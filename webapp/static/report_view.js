@@ -10,6 +10,11 @@
   // `append` is the primitive that makes this cheap: it takes nodes and
   // strings, and a string always becomes a text node, never markup.
   const R = JSON.parse(document.getElementById("report").textContent);
+  // The units each framework answers for, joined server-side: this page knows
+  // no package, so which claim rules on which unit and what a unit says are
+  // both handed to it. Same escape, same discipline — every string below is
+  // still untrusted and still goes in as text.
+  const UNITS = JSON.parse(document.getElementById("units").textContent);
   const $ = (id) => document.getElementById(id);
   const el = (tag, cls, text) => {
     const n = document.createElement(tag);
@@ -51,6 +56,29 @@
   };
   const lbl = (text) => el("span", "lbl", text);
   const cell = (...kids) => { const n = el("td"); n.append(...kids); return n; };
+
+  // What a scope state means to a reader, and the class that colours it. The
+  // wording is the point: `not-raised` used to read as `applicable`, which
+  // told a reader the unit applies when the only fact is that no lane filed
+  // on it (#659). Each says what happened, and none of them says "satisfied".
+  const SCOPE_STATE = {
+    "not-raised": ["No claim filed",
+      "The lane ran and raised nothing on this unit. That is not a finding that it is met, and not a ruling that it applies."],
+    "not-applicable": ["Does not apply",
+      "Ruled out for a system of this shape."],
+    "undecidable": ["Never decided",
+      "The input never said whether this framework applies at all, so no lane ran."],
+    "needs-other-evidence": ["Needs other evidence",
+      "The unit applies and this input cannot settle it. Supplying the evidence named below can."],
+  };
+
+  // The same for a claim's verdict, in this service's terms rather than the
+  // schema's. No verdict here reports a pass, and the wording says so.
+  const VERDICT_STATE = {
+    "confirmed": ["Gap", "Applies, and the input does not show it satisfied."],
+    "needs-info": ["Needs info", "Applies, and the input does not settle it."],
+    "rejected": ["Rejected", "The critic ruled this draft out. The reason says which check ended it."],
+  };
 
   // Each branch named in its own words, so the four read as different *kinds*
   // of justification rather than four formattings of one. The two attribute
@@ -328,6 +356,72 @@
   // and its two claim arrays. Nothing here reaches back into the envelope
   // except for the element count, which is a fact about the one shared model
   // and so is stated once at the top rather than N times.
+  // One row per unit the framework answers for: what the standard asks, what
+  // this run concluded, and why. The grouped counts above answer "how much";
+  // this answers "which, and on what grounds", which no count can (#659).
+  //
+  // Collapsed by default through `details`, because a level-3 ASVS block
+  // carries 345 of these and a reader opens the two they care about. No
+  // scripted toggling: the element does it, keyboard included.
+  function unitTable(block) {
+    const rows = UNITS[block.framework] || [];
+    if (!rows.length) return null;
+    const byUnit = {};
+    block.scope.forEach(e => { byUnit[e.unit] = e; });
+    const byId = {};
+    [...block.claims, ...block.rejected_claims].forEach(c => { byId[c.id] = c; });
+
+    const wrap = el("div", "units");
+    wrap.append(el("h3", null, `Every requirement this run answered for (${rows.length})`));
+    rows.forEach(row => {
+      const claim = row.claim_id ? byId[row.claim_id] : null;
+      const entry = byUnit[row.unit];
+      const [label, meaning] = claim
+        ? (VERDICT_STATE[claim.verdict.status] || ["Ruled", ""])
+        : (SCOPE_STATE[entry ? entry.state : "not-raised"] || ["Listed", ""]);
+
+      const box = el("details", "unit");
+      const head = el("summary");
+      head.append(code(row.unit), el("span", "state", label));
+      // The requirement's own words on the closed row, so a reader scanning
+      // the list can tell which identifiers matter without opening any.
+      if (row.text) head.append(el("span", "gist", row.text));
+      box.append(head);
+
+      const body = el("div", "unit-body");
+      if (row.text) {
+        body.append(el("div", "lbl", `What ${block.framework} ${block.framework_version} asks`));
+        body.append(el("p", "req", row.text));
+      }
+      body.append(el("div", "lbl", "This run"));
+      body.append(el("p", null, meaning));
+      if (claim) {
+        body.append(proseEl("p", "t", claim.title));
+        body.append(proseEl("p", null, claim.description));
+        if (claim.verdict.reason) {
+          body.append(el("div", "lbl", "Review"));
+          body.append(proseEl("p", null, claim.verdict.reason));
+        }
+        (claim.verdict.related_unknowns || []).forEach(u => {
+          body.append(el("div", "lbl", "Still to answer"));
+          body.append(proseEl("p", null,
+            u.subject || `${u.attribute} on ${u.element_id}`));
+        });
+      } else if (entry) {
+        if (entry.reason) body.append(proseEl("p", null, entry.reason));
+        // A deferral is a work item, not a count: name the artifact that
+        // settles it where the payload names one.
+        if (entry.needs) {
+          body.append(el("div", "lbl", "What would settle it"));
+          body.append(el("p", null, `Evidence of kind: ${entry.needs}`));
+        }
+      }
+      box.append(body);
+      wrap.append(box);
+    });
+    return wrap;
+  }
+
   function renderBlock(block) {
     const marks = marksOf(block);
     const section = el("section", "analysis");
@@ -335,10 +429,17 @@
     section.append(el("div", "disclaimer-block", block.disclaimer));
 
     const tiles = el("div", "tiles");
+    // The deferred count rides beside the claim counts rather than only inside
+    // the scope summary: a requirement this job cannot settle is work the
+    // submitter can act on, and a total that omits it reads as less to do
+    // than there is (#659).
+    const deferredCount =
+      block.scope.filter(e => e.state === "needs-other-evidence").length;
     [
       [block.summary.claim_count, "Actionable claims"],
       [block.summary.needs_info_count, "Needs info"],
       [block.summary.rejected_count, "Rejected"],
+      [deferredCount, "Needs other evidence"],
     ].forEach(([n, k]) => {
       const t = el("div","tile");
       t.append(el("div","n",String(n)), el("div","k",k));
@@ -390,6 +491,9 @@
       }
       section.append(wrap);
     }
+
+    const units = unitTable(block);
+    if (units) section.append(units);
 
     // What the service dropped for naming something this framework does not
     // have. There is no card to hang these on, so they are listed here: a

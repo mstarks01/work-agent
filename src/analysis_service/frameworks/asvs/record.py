@@ -193,9 +193,9 @@ class DraftRequirementRuling(Claim):
         return requirement_of(draft.id)
 
     @classmethod
-    def unit_text(cls, draft: Claim) -> str:
-        """The catalog's words for the requirement this draft rules on."""
-        return requirement_text(requirement_of(draft.id))
+    def text_of_unit(cls, unit: str) -> str:
+        """The catalog's words for one requirement, or ``""`` for an unknown ID."""
+        return requirement_text(unit)
 
     @classmethod
     def partition_proposals(

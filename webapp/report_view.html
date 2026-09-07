@@ -97,6 +97,26 @@
   /* Rulings the service discarded. Set apart from the disclaimer because it
      reports on this run rather than on the method, and kept quiet because it
      is a note about what is missing, not a finding. */
+  /* one row per unit the framework answered for */
+  .units { margin: 20px 0 8px; }
+  .units h3 { font-size: 0.95rem; margin: 0 0 8px; }
+  .unit { border: 1px solid var(--border); border-radius: 8px; background: var(--surface);
+    margin-bottom: 6px; }
+  .unit > summary { cursor: pointer; padding: 8px 12px; display: flex; gap: 10px;
+    align-items: baseline; font-size: 0.85rem; }
+  .unit > summary::-webkit-details-marker { display: none; }
+  .unit > summary code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    flex: 0 0 auto; }
+  .unit .state { flex: 0 0 auto; color: var(--muted); text-transform: uppercase;
+    letter-spacing: 0.05em; font-size: 0.68rem; }
+  .unit .gist { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; }
+  .unit[open] .gist { display: none; }
+  .unit-body { padding: 0 12px 12px; font-size: 0.86rem; }
+  .unit-body p { margin: 2px 0 10px; }
+  .unit-body p.req { color: var(--ink-2); }
+  .unit-body p.t { font-weight: 600; }
+
   .dropped { color: var(--ink-2); font-size: 0.82rem; margin: 0 0 16px;
     padding-left: 12px; border-left: 2px solid var(--sev-medium); }
   .dropped ul { margin: 4px 0 0; padding-left: 18px; }
@@ -238,6 +258,10 @@
 <!-- webapp/main.py replaces the contents of the block below with the run's
      report JSON, every `<` escaped, before serving this page. -->
 <script type="application/json" id="report" nonce="__CSP_NONCE__"><!--report--></script>
+
+<!-- The units each framework answers for, with each one's own text, joined by
+     webapp/main.py because the page knows no package. Escaped the same way. -->
+<script type="application/json" id="units" nonce="__CSP_NONCE__"><!--units--></script>
 
 <script nonce="__CSP_NONCE__"><!--script--></script>
 </body>
