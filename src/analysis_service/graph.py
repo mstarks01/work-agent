@@ -184,6 +184,7 @@ from analysis_service.report import (
     InputRef,
     Job,
     LaneCoverage,
+    ModelRepair,
     NodeRun,
     Refusal,
     Report,
@@ -203,7 +204,12 @@ from analysis_service.skills import (
 )
 from analysis_service.sources import CARRIED_EVIDENCE_KINDS, fenced
 from analysis_service.system_model import BoundaryCrossing, SystemModel
-from analysis_service.validation import ValidationIssue, parse_and_validate
+from analysis_service.validation import (
+    ValidationIssue,
+    parse_and_validate,
+    repair_scope,
+    restore_unimplicated,
+)
 
 if TYPE_CHECKING:
     # Type-only, so composing a graph costs no provider-library import and the
@@ -560,6 +566,13 @@ STATE_ELEMENT_ROSTER = "element_roster"
 STATE_DOMAIN_SKILLS = "domain_skills"
 STATE_PREVIOUS_MODEL = "previous_model"
 STATE_VALIDATION_ISSUES = "validation_issues"
+# The machine-readable half of what ``validate`` parks for ``repair``: the
+# normalized model the issues cite and the scope a repair of them may change,
+# read back by ``revalidate`` to put every uncited element back (#675 D01).
+STATE_REPAIR_BASELINE = "repair_baseline"
+# What the repair pass was allowed to change and what it changed anyway,
+# written by ``revalidate`` and carried onto the report by ``assemble``.
+STATE_MODEL_REPAIR = "model_repair"
 
 STATE_EXTRACTED_MODEL = "extracted_model"
 STATE_VALID_MODEL = "valid_model"
@@ -647,6 +660,8 @@ SHARED_STRUCTURED_KEYS: frozenset[str] = frozenset(
         STATE_ANALYSIS,
         STATE_REJECTION,
         STATE_FRAMEWORK_OPTIONS,
+        STATE_REPAIR_BASELINE,
+        STATE_MODEL_REPAIR,
     }
 )
 
@@ -851,6 +866,9 @@ class Analysis:
     # something a node holds. :meth:`context` joins them where the driver stamps
     # the rest of the run's static provenance.
     domain_packs: list[str]
+    # What the repair pass was allowed to change and what it changed anyway;
+    # ``None`` where no repair ran.
+    model_repair: ModelRepair | None = None
 
     def context(self, instruction_sha256: str) -> AnalysisContext:
         """This analysis's context block, given the built graph's digest.
@@ -899,6 +917,7 @@ class Analysis:
             # subject is the shared model rather than any framework's claim.
             shared_element_names=self.marks.shared_element_names,
             elements_analyzed=len(self.system_model.elements()),
+            model_repair=self.model_repair,
             analysis_context=self.context(pipeline.instruction_sha256),
             execution=ExecutionEnvelope(
                 identity_version=IDENTITY_VERSION,
@@ -918,6 +937,11 @@ class Analysis:
             "analyses": [block.model_dump(mode="json") for block in self.analyses],
             "marks": self.marks.model_dump(mode="json"),
             "domain_packs": list(self.domain_packs),
+            "model_repair": (
+                None
+                if self.model_repair is None
+                else self.model_repair.model_dump(mode="json")
+            ),
         }
 
     @classmethod
@@ -943,6 +967,11 @@ class Analysis:
             analyses=[_block_of(block) for block in data["analyses"]],
             marks=AnalysisMarks.model_validate(data["marks"]),
             domain_packs=list(data["domain_packs"]),
+            model_repair=(
+                None
+                if data["model_repair"] is None
+                else ModelRepair.model_validate(data["model_repair"])
+            ),
         )
 
 
@@ -1107,10 +1136,28 @@ def validate_extraction(
             f"nothing was written to {STATE_EXTRACTED_MODEL!r}, so there is no"
             f" model to validate. {_TRUNCATION_HINT}"
         )
+    state = keys.state(ctx)
     model, issues = parse_and_validate(
         extracted_model, normalize_ids=True, sources=source_texts or {}
     )
-    state = keys.state(ctx)
+    # The second pass, over what ``repair`` returned: every element the
+    # issues did not name is put back as it was, then the whole is validated
+    # again, so a "while I'm here" edit never reaches the report and the
+    # repair prompt's rule is enforced rather than asked for. Only a parsed
+    # model can be overlaid; a repair that fails the schema outright is parked
+    # as-is and takes the invalid edge, which from here is the rejection.
+    baseline = state.get(STATE_REPAIR_BASELINE)
+    if baseline is not None and model is not None:
+        repair = ModelRepair(scope=baseline["scope"], implicated=baseline["implicated"])
+        if repair.scope == "elements":
+            overlaid, restored = restore_unimplicated(
+                baseline["model"], model.model_dump(mode="json"), repair.implicated
+            )
+            repair = repair.model_copy(update={"restored": restored})
+            model, issues = parse_and_validate(
+                overlaid, normalize_ids=True, sources=source_texts or {}
+            )
+        state.put(STATE_MODEL_REPAIR, repair.model_dump(mode="json"))
     if issues or model is None:
         parked = extracted_model if model is None else model.model_dump(mode="json")
         # Fenced for the same reason as the agents' copy: this is the model
@@ -1119,6 +1166,11 @@ def validate_extraction(
         state.prompt(
             STATE_VALIDATION_ISSUES,
             render_fenced([issue.model_dump(mode="json") for issue in issues]),
+        )
+        scope, implicated = repair_scope(issues)
+        state.put(
+            STATE_REPAIR_BASELINE,
+            {"model": parked, "scope": scope, "implicated": implicated},
         )
         return _routed(ROUTE_INVALID, {"issue_count": len(issues)})
 
@@ -1886,12 +1938,14 @@ def assemble_report(
         )
         for name in frameworks
     ]
+    repair = state.get(STATE_MODEL_REPAIR)
     analysis = Analysis(
         system_model=model,
         boundary_crossings=model.boundary_crossings(),
         analyses=blocks,
         marks=_model_marks(model),
         domain_packs=list(domain_packs or []),
+        model_repair=None if repair is None else ModelRepair.model_validate(repair),
     )
     state.put(STATE_ANALYSIS, analysis.to_state())
     return {

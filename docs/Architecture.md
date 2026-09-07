@@ -62,6 +62,10 @@ run's three outcomes.
 - **validate** is a mechanical gate. Failures route to **repair** (one bounded
   pass over the original text) and revalidate; a model that still fails, or is
   over the [150-element cap](Configuration.md), ends as a **rejection**.
+  Revalidate puts every element the issues did not name back as it was before
+  it checks the whole, and the report's
+  [`model_repair`](Report-Schema.md#model_repair--what-the-repair-pass-was-allowed-to-change)
+  says which ones it had to.
 - **prepare** derives the per-analysis context, all of it a pure function of the
   validated model: the boundary crossings; the **deterministic candidates** for
   each lane; the **domain packs** this system earns; and the system model as the
