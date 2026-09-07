@@ -9,11 +9,14 @@ what it looks like.
 
 The shape of the answer differs too. STRIDE's scorer reports recall against an
 open list, and asks a person about whatever else a run produced, because "the
-corpus did not list it" cannot mean "it is wrong". Here it can. A run at level
-``L`` rules on
+corpus did not list it" cannot mean "it is wrong". A finite catalog does not
+change that on its own. A run at level ``L`` rules on
 :func:`~analysis_service.frameworks.asvs.catalog.requirements_for` and nothing
-else, so the complement of the reference set is a real negative, and all four
-cells of a confusion matrix are reachable.
+else, so every cell of a confusion matrix is *reachable* — but the complement
+of a case's reference set is a set of negatives only when a person read the
+case as complete (``reference_set == "exhaustive"``). On a sampled case an
+unlisted requirement the run applied is unjudged, not wrong, and the only
+negatives the case holds are the records it labels ``not-applicable``.
 
 What counts as applied follows from the package. An ASVS claim never reports a
 pass, because verification needs source code and the people who built the
@@ -68,10 +71,22 @@ class ApplicabilityError(ValueError):
 class ApplicabilityScore:
     """One case's ASVS answer, as the four cells and the two recall figures.
 
-    ``excluded`` is a count where the other cells are lists. It is the bulk of
-    the matrix — a level-2 run rules on far more requirements than any case
-    expects a ruling on — and naming several hundred identifiers a run correctly
-    said nothing about would bury the three lists a reader is there for.
+    ``expected`` holds the case's positive records alone. A record labelled
+    ``not-applicable`` is an explicit negative, listed in ``negatives``: a run
+    that applies one lands in ``negatives_applied``, and a run that excludes
+    one is right and loses nothing here. Folding the negatives into
+    ``expected`` made a correct exclusion a recall miss (#659).
+
+    ``excluded`` is a count where the other cells are lists, and it is
+    complement arithmetic: the requirements in the universe that the case did
+    not list and the run did not apply. On a sampled case that includes every
+    requirement nobody judged, so it is a size, not a count of verified correct
+    exclusions. Naming several hundred identifiers a run said nothing about
+    would bury the three lists a reader is there for.
+
+    ``over_applied`` is what the run applied that the case did not list. On a
+    sampled case that is *unlisted*, not wrong, which is why
+    :attr:`precision` refuses to read it there.
 
     ``off_catalog`` is its own cell rather than folded into ``over_applied``.
     A claim naming a requirement outside the level's set is a different defect
@@ -93,6 +108,9 @@ class ApplicabilityScore:
     reference_set: str
     universe: int
     expected: tuple[str, ...]
+    #: The requirements the case labels ``not-applicable``: the only true
+    #: negatives a sampled case holds.
+    negatives: tuple[str, ...]
     must_find: tuple[str, ...]
     matched: tuple[str, ...]
     missed: tuple[str, ...]
@@ -104,6 +122,9 @@ class ApplicabilityScore:
     matched_by_deferral: tuple[str, ...]
     must_find_missed: tuple[str, ...]
     over_applied: tuple[str, ...]
+    #: Explicit negatives the run applied anyway: a judged false positive,
+    #: which ``over_applied`` on a sampled case is not.
+    negatives_applied: tuple[str, ...]
     rejected: tuple[str, ...]
     off_catalog: tuple[str, ...]
     excluded: int
@@ -155,12 +176,14 @@ class ApplicabilityScore:
             "reference_set": self.reference_set,
             "universe": self.universe,
             "expected": len(self.expected),
+            "negatives": list(self.negatives),
             "must_find": len(self.must_find),
             "matched": list(self.matched),
             "missed": list(self.missed),
             "matched_by_deferral": list(self.matched_by_deferral),
             "must_find_missed": list(self.must_find_missed),
             "over_applied": list(self.over_applied),
+            "negatives_applied": list(self.negatives_applied),
             "rejected": list(self.rejected),
             "off_catalog": list(self.off_catalog),
             "excluded": self.excluded,
@@ -235,10 +258,12 @@ def score_applicability(
         for reference in case.references.get(FRAMEWORK) or ()
         if isinstance(reference, ReferenceRequirement)
     ]
-    expected = {reference.requirement for reference in references}
+    positives, negatives = split_references(references)
+    expected = {reference.requirement for reference in positives}
     must_find = {
-        reference.requirement for reference in references if reference.must_find
+        reference.requirement for reference in positives if reference.must_find
     }
+    negative = {reference.requirement for reference in negatives}
 
     # Both arrays, because the critic's rejections land in ``rejected_claims``
     # and the report validator forbids one sitting in ``claims``. Reading
@@ -261,7 +286,7 @@ def score_applicability(
 
     matched = expected & in_universe
     missed = expected - in_universe
-    over_applied = in_universe - expected
+    over_applied = in_universe - expected - negative
     matched_by_deferral = matched & (deferred_units - applied)
 
     return ApplicabilityScore(
@@ -271,17 +296,38 @@ def score_applicability(
         reference_set=declared(case).reference_set,
         universe=len(universe),
         expected=tuple(sorted(expected)),
+        negatives=tuple(sorted(negative)),
         must_find=tuple(sorted(must_find)),
         matched=tuple(sorted(matched)),
         missed=tuple(sorted(missed)),
         matched_by_deferral=tuple(sorted(matched_by_deferral)),
         must_find_missed=tuple(sorted(must_find - in_universe)),
         over_applied=tuple(sorted(over_applied)),
+        negatives_applied=tuple(sorted(negative & in_universe)),
         rejected=tuple(sorted(rejected)),
         off_catalog=tuple(sorted(off_catalog)),
-        # The fourth cell: in the universe, not expected, and not applied.
-        excluded=len(universe - expected - in_universe),
+        # The fourth cell, as arithmetic: in the universe, listed by nobody,
+        # and not applied. It is a size rather than a count of verified
+        # exclusions, and the dataclass says so.
+        excluded=len(universe - expected - negative - in_universe),
     )
+
+
+def split_references(
+    references: Iterable[ReferenceRequirement],
+) -> tuple[list[ReferenceRequirement], list[ReferenceRequirement]]:
+    """A case's ASVS records as ``(positives, negatives)``.
+
+    **The one reader of what an expected requirement is.** A record labelled
+    ``not-applicable`` says the requirement does *not* apply, so it belongs in
+    no expected set: a run that excludes it is right. Both scorers that build
+    an expected set read it here, so they cannot disagree about which records
+    count.
+    """
+    records = list(references)
+    positives = [ref for ref in records if ref.disposition != "not-applicable"]
+    negatives = [ref for ref in records if ref.disposition == "not-applicable"]
+    return positives, negatives
 
 
 # ---------------------------------------------------------------------------
@@ -430,7 +476,9 @@ class DispositionScore:
     ``unreached`` is the requirements a case judged that the run said nothing
     about. They are excluded from :attr:`accuracy` rather than counted wrong,
     because the recall figure beside this one already charges them, and charging
-    them twice would make one miss move two metrics.
+    them twice would make one miss move two metrics. :attr:`coverage` carries
+    the share that was reached, so ``accuracy`` is never read without the
+    denominator it is conditional on.
 
     ``unjudged`` counts records carrying no expected disposition. It is the
     corpus's own gap, and it rides in the artifact so a reader can tell a small
@@ -455,6 +503,17 @@ class DispositionScore:
     def accuracy(self) -> float:
         """Of the judged requirements the run answered, how many it answered right."""
         return len(self.correct) / len(self.judged) if self.judged else 0.0
+
+    @property
+    def coverage(self) -> float:
+        """Of the judged requirements, the share the run answered at all.
+
+        The denominator :attr:`accuracy` is conditional on. A run that answers
+        one requirement correctly and reaches no other scores full accuracy
+        and no coverage, and the pair says so where either alone would not.
+        """
+        reached = len(self.judged) + len(self.unreached)
+        return len(self.judged) / reached if reached else 0.0
 
     @property
     def needs_other_evidence(self) -> tuple[Judged, ...]:
@@ -522,6 +581,7 @@ class DispositionScore:
             "judged": len(self.judged),
             "correct": len(self.correct),
             "accuracy": round(self.accuracy, 4),
+            "coverage": round(self.coverage, 4),
             "unreached": list(self.unreached),
             "unjudged": self.unjudged,
             "needs_other_evidence": len(self.needs_other_evidence),
@@ -606,6 +666,7 @@ def pooled_dispositions(scores: Sequence[DispositionScore]) -> Mapping[str, Any]
     """
     judged = sum(len(score.judged) for score in scores)
     correct = sum(len(score.correct) for score in scores)
+    unreached = sum(len(score.unreached) for score in scores)
     reachable = sum(len(score.needs_other_evidence) for score in scores)
     routed_right = sum(
         1 for score in scores for entry in score.needs_other_evidence if entry.ok
@@ -625,7 +686,15 @@ def pooled_dispositions(scores: Sequence[DispositionScore]) -> Mapping[str, Any]
         "judged": judged,
         "correct": correct,
         "accuracy": round(correct / judged, 4) if judged else 0.0,
-        "unreached": sum(len(score.unreached) for score in scores),
+        # Correct over every judged record, reached or not: the unconditional
+        # figure a headline should carry, beside the conditional one above.
+        "correct_of_expected": (
+            round(correct / (judged + unreached), 4) if judged + unreached else 0.0
+        ),
+        "coverage": round(judged / (judged + unreached), 4)
+        if judged + unreached
+        else 0.0,
+        "unreached": unreached,
         "unjudged": sum(score.unjudged for score in scores),
         "needs_other_evidence": reachable,
         "false_prose_requests": false_prose,
@@ -678,7 +747,9 @@ def render_dispositions(scores: Sequence[DispositionScore]) -> None:
     print(
         f"pooled over {totals['cases']} cases:"
         f" accuracy {totals['accuracy']:.0%}"
-        f" ({totals['correct']}/{totals['judged']}),"
+        f" ({totals['correct']}/{totals['judged']})"
+        f" over {totals['coverage']:.0%} coverage"
+        f" ({totals['judged']}/{totals['judged'] + totals['unreached']} reached),"
         f" {totals['unjudged']} records carry no expected disposition"
         " (instrument, non-gating)"
     )
@@ -755,6 +826,8 @@ def pooled(scores: Sequence[ApplicabilityScore]) -> Mapping[str, Any]:
         "must_find_recall": (
             round((must_find - must_find_missed) / must_find, 4) if must_find else 0.0
         ),
+        "negatives": sum(len(score.negatives) for score in scores),
+        "negatives_applied": sum(len(score.negatives_applied) for score in scores),
         "precision": round(read_matched / applied, 4) if applied else None,
         "precision_cases": len(read),
         "off_catalog": sum(len(score.off_catalog) for score in scores),
@@ -820,13 +893,22 @@ class ApplicabilityYield:
     the ruling that a requirement does not apply to a system of this shape. So
     "what did the critic destroy, and how much of it was real" reads:
 
-    * ``earned`` — requirements it rejected that the case did not expect. The
-      critic doing its job, and the direct counterpart of ``unsupported_killed``.
+    * ``earned`` — requirements it rejected that the case labels
+      ``not-applicable``. The critic doing its job, and the direct counterpart
+      of ``unsupported_killed``.
     * ``destroyed`` — requirements it rejected that the case *did* expect. **The
       number that can veto the pattern here**, exactly as ``matched_killed``
       does for STRIDE.
+    * ``unlisted`` — requirements it rejected that the case says nothing
+      about. On a sampled reference set that is unjudged rather than earned:
+      the case did not list the requirement, and did not rule it out either.
 
-    Only the pair means anything. A rejection count alone reads as either.
+    Only ``rejected`` rulings count. A draft the critic sent back for its lane
+    or as a duplicate says nothing about its requirement
+    (:meth:`~analysis_service.report.RuledClaim.rules_on_unit`), so it can
+    neither destroy nor earn one.
+
+    A rejection count alone reads as either working or breaking things.
 
     **No second scoring pass.** STRIDE's yield works by scoring one case twice
     through the identity rule, which is cheap because the rule is a pure
@@ -840,6 +922,7 @@ class ApplicabilityYield:
     rejected: tuple[str, ...]
     destroyed: tuple[str, ...]
     earned: tuple[str, ...]
+    unlisted: tuple[str, ...]
 
     @property
     def rejection_rate(self) -> float:
@@ -860,6 +943,7 @@ class ApplicabilityYield:
             "rejected": len(self.rejected),
             "destroyed": list(self.destroyed),
             "earned": list(self.earned),
+            "unlisted": list(self.unlisted),
             "rejection_rate": round(self.rejection_rate, 3),
             "destroyed_rate": round(self.destroyed_rate, 3),
         }
@@ -875,23 +959,29 @@ def score_yield(
     came back, and a draft the fan-in never delivered was never the critic's to
     rule on.
     """
-    expected = {
-        reference.requirement
+    positives, negatives = split_references(
+        reference
         for reference in case.references.get(FRAMEWORK) or ()
         if isinstance(reference, ReferenceRequirement)
-    }
+    )
+    expected = {reference.requirement for reference in positives}
+    negative = {reference.requirement for reference in negatives}
     # Read from the list a claim sits in, not from its verdict: the two lists
     # *are* the critic's decision, and re-deriving it from the verdict would be
-    # a second definition of the same split.
+    # a second definition of the same split. What the verdict does say is the
+    # rejection's cause, and a lane or duplicate rejection rules on nothing.
     confirmed = _requirements(block.claims)
-    rejected = _requirements(block.rejected_claims)
+    rejected = _requirements(
+        [claim for claim in block.rejected_claims if claim.rules_on_unit()]
+    )
     return ApplicabilityYield(
         case=case.id,
         drafts=len(drafts),
         confirmed=tuple(sorted(confirmed)),
         rejected=tuple(sorted(rejected)),
         destroyed=tuple(sorted(rejected & expected)),
-        earned=tuple(sorted(rejected - expected)),
+        earned=tuple(sorted(rejected & negative)),
+        unlisted=tuple(sorted(rejected - expected - negative)),
     )
 
 
@@ -919,6 +1009,7 @@ def aggregate_yield(yields: Sequence[ApplicabilityYield]) -> Mapping[str, Any]:
         "rejected": rejected,
         "destroyed": destroyed,
         "earned": sum(len(entry.earned) for entry in yields),
+        "unlisted": sum(len(entry.unlisted) for entry in yields),
         "rejection_rate": round(rejected / drafts, 3) if drafts else 0.0,
         "destroyed_rate": round(destroyed / rejected, 3) if rejected else 0.0,
     }
@@ -942,14 +1033,14 @@ def render(scores: Sequence[ApplicabilityScore]) -> None:
     print("\nASVS applicability (mechanical, catalog match)")
     print(
         f"{'case':<26} {'lvl':>3} {'rec':>6} {'must':>6} {'prec':>6}"
-        f" {'miss':>5} {'defr':>5} {'over':>5} {'rej':>5} {'off':>4}"
+        f" {'miss':>5} {'defr':>5} {'unlst':>5} {'neg!':>5} {'rej':>5} {'off':>4}"
     )
     for score in scores:
         print(
             f"{score.case:<26} {score.level:>3} {score.recall:>6.0%}"
             f" {score.must_find_recall:>6.0%} {_rate(score.precision):>6}"
             f" {len(score.missed):>5} {len(score.matched_by_deferral):>5}"
-            f" {len(score.over_applied):>5}"
+            f" {len(score.over_applied):>5} {len(score.negatives_applied):>5}"
             f" {len(score.rejected):>5} {len(score.off_catalog):>4}"
         )
     totals = pooled(scores)
@@ -960,6 +1051,7 @@ def render(scores: Sequence[ApplicabilityScore]) -> None:
         f" precision {_rate(totals['precision'])}"
         f" (over {totals['precision_cases']} of {totals['cases']} cases read"
         " as exhaustive),"
+        f" negatives applied {totals['negatives_applied']}/{totals['negatives']},"
         f" off-catalog {totals['off_catalog']}"
         " (instrument, non-gating)"
     )
@@ -1021,20 +1113,22 @@ def render_yield(yields: Sequence[ApplicabilityYield]) -> None:
         return
     print("\nASVS critic yield (mechanical, catalog match)")
     print(
-        f"{'case':<26} {'drafts':>7} {'confirmed':>10} {'rejected':>9} {'earned':>7} {'destroyed':>10}"
+        f"{'case':<26} {'drafts':>7} {'confirmed':>10} {'rejected':>9}"
+        f" {'earned':>7} {'destroyed':>10} {'unlisted':>9}"
     )
     for entry in yields:
         print(
             f"{entry.case:<26} {entry.drafts:>7} {len(entry.confirmed):>10}"
             f" {len(entry.rejected):>9} {len(entry.earned):>7}"
-            f" {len(entry.destroyed):>10}"
+            f" {len(entry.destroyed):>10} {len(entry.unlisted):>9}"
         )
     totals = aggregate_yield(yields)
     print(
         f"pooled: rejected {totals['rejected']}/{totals['drafts']}"
         f" ({totals['rejection_rate']:.0%}),"
         f" earned {totals['earned']}, destroyed {totals['destroyed']}"
-        f" ({totals['destroyed_rate']:.0%} of rejections)"
+        f" ({totals['destroyed_rate']:.0%} of rejections),"
+        f" unlisted {totals['unlisted']}"
         " (instrument, non-gating)"
     )
 
