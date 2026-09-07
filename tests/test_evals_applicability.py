@@ -622,9 +622,10 @@ def test_a_lane_or_duplicate_rejection_neither_destroys_nor_earns(case):
                 ruling(expected[0], "rejected", rejected_because="lane"),
                 ruling(expected[1], "rejected", rejected_because="duplicate"),
                 ruling(expected[2], "rejected"),
+                ruling(expected[3], "rejected", rejected_because="reasoning"),
             ],
         ),
-        drafts=[object(), object(), object()],
+        drafts=[object(), object(), object(), object()],
     )
 
     assert critic.rejected == (expected[2],)
@@ -1035,6 +1036,7 @@ class TestARejectionThatDoesNotRuleIsNotCountedAsOne:
                 ruling("V1.2.4", "rejected", rejected_because="evidence"),
                 ruling("V1.2.5", "rejected", rejected_because="lane"),
                 ruling("V1.2.6", "rejected", rejected_because="duplicate"),
+                ruling("V1.2.7", "rejected", rejected_because="reasoning"),
             ]
         )
         assert applied == set()

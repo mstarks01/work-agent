@@ -186,7 +186,7 @@ an empty list where STRIDE narrows it.
 
 **An ASVS claim never reports a pass.** `confirmed` means the requirement applies
 and the input does not show it satisfied; `needs-info` means the input does not
-settle it; `rejected` with `rejected_because` of `evidence` means the requirement does not apply; a rejection for `lane` or `duplicate` answers nothing about it, and the requirement stays listed in `scope`. Verification needs
+settle it; `rejected` with `rejected_because` of `evidence` means the requirement does not apply; a rejection for `reasoning`, `lane` or `duplicate` answers nothing about it, and the requirement stays listed in `scope` as `not-raised`. Verification needs
 source code, configuration and the people who built the system, and a job here
 carries prose. See
 [ADR 0013](adr/0013-asvs-rules-applicability-and-never-a-pass.md).
