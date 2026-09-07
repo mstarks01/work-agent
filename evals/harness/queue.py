@@ -264,6 +264,7 @@ def _keyed(
     for finding in findings:
         value, components = key_claim(
             finding.framework,
+            finding.case,
             finding.lane,
             finding.element_ids,
             flows_by_case.get(finding.case, {}),

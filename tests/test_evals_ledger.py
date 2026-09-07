@@ -30,9 +30,16 @@ from evals.harness.ledger import (
     write_all,
 )
 
+#: Every vote below is cast against case ``"01"``, and ``cast`` stamps that as
+#: the components' scope. The helper carries it so a test that recomputes an
+#: expected key composes the same components ``cast`` stored.
+CASE = "01"
 
-def components(target="process:a", verb="read"):
-    return Components("stride", "information-disclosure", (target,), verb=verb)
+
+def components(target="process:a", verb="read", scope=CASE):
+    return Components(
+        "stride", "information-disclosure", (target,), verb=verb, scope=scope
+    )
 
 
 def test_every_reason_has_a_gloss_and_one_home():
@@ -168,7 +175,9 @@ def test_a_rekey_needs_no_revote(tmp_path):
     assert [vote.fingerprint for vote in moved] != [
         vote.fingerprint for vote in original.votes
     ]
-    assert all(vote.fingerprint.startswith("v2:") for vote in moved)
+    assert all(
+        vote.fingerprint.startswith(f"v{version_for('stride')}:") for vote in moved
+    )
     assert [vote.verdict for vote in moved] == [vote.verdict for vote in original.votes]
 
     write_all(moved, path)
@@ -282,8 +291,8 @@ def test_every_package_keys_its_own_votes(tmp_path):
 def _components_for(framework):
     """One package's claim components, each satisfying its own version."""
     if framework == "asvs":
-        return Components("asvs", "V6", ("process:a",), identifier="6.2.1")
-    return Components("stride", "spoofing", ("process:a",), verb="read")
+        return Components("asvs", "V6", ("process:a",), identifier="6.2.1", scope=CASE)
+    return Components("stride", "spoofing", ("process:a",), verb="read", scope=CASE)
 
 
 def test_a_rekey_moves_each_row_under_its_own_frameworks_rule(tmp_path):
@@ -295,7 +304,42 @@ def test_a_rekey_moves_each_row_under_its_own_frameworks_rule(tmp_path):
 
     moved = rekey(load(path).votes)
 
-    assert sorted(vote.fingerprint.split(":")[0] for vote in moved) == ["v2", "v3"]
+    assert sorted(vote.fingerprint.split(":")[0] for vote in moved) == [
+        f"v{version_for('stride')}",
+        f"v{version_for('asvs')}",
+    ]
+
+
+class TestTheScopeIsTheCase:
+    """A row states its system twice, so the two spellings are held together.
+
+    ``case`` is what a reviewer reads and ``components.scope`` is what the key
+    is made of. Left to drift, a vote would be filed under one system and
+    answer for a finding in another — which is the collision versions 4 and 5
+    close, arriving by the other door.
+    """
+
+    def test_cast_stamps_the_scope_from_the_case(self):
+        recorded = cast(components(scope=""), "03-batch-data-pipeline", "up", "ada")
+
+        assert recorded.components.scope == "03-batch-data-pipeline"
+
+    def test_two_cases_casting_one_place_are_two_findings(self):
+        pipeline = cast(components(scope=""), "03-batch-data-pipeline", "up", "ada")
+        portal = cast(components(scope=""), "12-overclaiming-portal", "up", "ada")
+
+        assert pipeline.fingerprint != portal.fingerprint
+
+    def test_a_row_scoped_to_another_case_is_refused(self):
+        honest = cast(components(scope=""), "03-batch-data-pipeline", "up", "ada")
+        elsewhere = replace(honest.components, scope="12-overclaiming-portal")
+
+        with pytest.raises(LedgerError, match="the scope is the case"):
+            replace(
+                honest,
+                components=elsewhere,
+                fingerprint=fingerprint(elsewhere, version=version_for("stride")),
+            )
 
 
 class TestTheKeyIsComputedNeverStated:
@@ -312,7 +356,9 @@ class TestTheKeyIsComputedNeverStated:
 
     def test_a_row_whose_key_names_another_finding_is_refused(self):
         mine = _components_for("stride")
-        theirs = Components("stride", "tampering", ("store:victim",), verb="alter")
+        theirs = Components(
+            "stride", "tampering", ("store:victim",), verb="alter", scope=CASE
+        )
         honest = cast(mine, "01", "down", "ada", reason="not-a-threat")
 
         with pytest.raises(LedgerError, match="computed, never stated"):
@@ -323,7 +369,7 @@ class TestTheKeyIsComputedNeverStated:
     def test_an_honest_row_is_untouched(self):
         recorded = cast(_components_for("stride"), "01", "up", "ada")
 
-        assert recorded.fingerprint.startswith("v2:")
+        assert recorded.fingerprint.startswith(f"v{version_for('stride')}:")
 
     def test_a_framework_no_rule_keys_is_refused_at_the_row(self):
         """Before, it loaded and pooled, and then refused the maintainer's

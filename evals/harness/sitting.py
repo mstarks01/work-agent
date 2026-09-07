@@ -669,6 +669,7 @@ def _key_of(
     try:
         value, _ = key_claim(
             framework,
+            case_id,
             claim.lane,
             claim.affected_element_ids,
             flows,

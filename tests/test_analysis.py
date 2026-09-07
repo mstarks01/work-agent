@@ -18,6 +18,7 @@ from analysis_service.analysis import (
     outbound_flows,
     reachable_from,
     sensitive_assets,
+    states_a_protocol,
     unknown_controls,
     zone_kinds,
 )
@@ -120,11 +121,25 @@ class TestControlState:
             ("none; accepted by network position", "absent"),
             ("none — the runner does not verify signatures", "absent"),
             ("company SSO", "stated"),
-            ("", "stated"),
+            ("", "unverified"),
+            ("   ", "unverified"),
         ],
     )
     def test_classifies_from_the_leading_token(self, value, expected):
         assert control_state(value) == expected
+
+    def test_a_blank_control_is_unverified_and_never_stated(self):
+        """The audit's reproduced defect: silence used to read as a control.
+
+        A model whose ``authentication`` was an empty string passed the validity
+        gate, and ``is_unverified`` then said the flow carried a verified
+        control — which suppressed every candidate rule that asks about a
+        missing one. The gate reports the blank now, and this is what holds if
+        one arrives anyway.
+        """
+        assert control_state("") == "unverified"
+        assert is_unverified("")
+        assert not states_a_protocol("")
 
     def test_a_stated_mechanism_with_a_gap_is_still_stated(self):
         """ "no MFA" describes a control that exists; absence would delete it."""

@@ -23,6 +23,8 @@ from __future__ import annotations
 import collections
 import dataclasses
 import itertools
+from dataclasses import replace
+from typing import ClassVar
 
 import pytest
 
@@ -34,6 +36,7 @@ from evals.harness.calibration import (
     measure_merges,
 )
 from evals.harness.identity import (
+    ClaimPair,
     IdentityError,
     MechanicalIdentity,
     SubsetVerbIdentity,
@@ -265,6 +268,90 @@ def test_a_candidate_with_no_assigned_elements_is_refused():
 
     with pytest.raises(IdentityError, match="no element IDs are assigned"):
         MechanicalIdentity().equivalent(unassigned.to_claim_pair())
+
+
+class TestAClaimThatNamesNoPlaceMatchesNothing:
+    """The counterexample the audit asked for: a citation that normalizes away.
+
+    ``endpoint_form`` drops a Trust Boundary, so a claim citing only one
+    resolves to the empty set — and the empty set is a subset of every set.
+    ``endpoint_subset`` therefore said *yes* to every reference in the lane
+    that shared the candidate's verb, and the whole rule reduced to a verb
+    comparison. STRIDE's ``min_length=1`` did not stop it: a boundary is an
+    **Element** with an **Element ID** like any other, so a boundary-only
+    citation is a legal draft that reaches the matcher.
+    """
+
+    CASE = "01-payments-checkout"
+    REFERENCE = ("flow:shopper-to-storefront-api:place-order", "entity:shopper")
+    FLOWS: ClassVar[dict[str, dict[str, tuple[str, str]]]] = {
+        CASE: {
+            "flow:shopper-to-storefront-api:place-order": (
+                "entity:shopper",
+                "process:storefront-api",
+            )
+        }
+    }
+
+    def _pair(self, candidate_ids):
+        return ClaimPair(
+            case=self.CASE,
+            category="spoofing",
+            reference_claim="An attacker replays a shopper's session cookie.",
+            candidate_claim="Anything at all.",
+            reference_element_ids=self.REFERENCE,
+            candidate_element_ids=candidate_ids,
+            reference_verb="replay",
+            candidate_verb="replay",
+        )
+
+    def test_a_boundary_only_candidate_does_not_match(self):
+        ruling = SubsetVerbIdentity(self.FLOWS).equivalent(
+            self._pair(("boundary:public-internet",))
+        )
+
+        assert not ruling.match
+        assert "resolves to no place" in ruling.rationale
+
+    def test_a_boundary_only_reference_does_not_match_either(self):
+        """Symmetric, because ``endpoint_subset`` compares both directions."""
+        pair = replace(
+            self._pair(self.REFERENCE),
+            reference_element_ids=("boundary:public-internet",),
+        )
+
+        assert not SubsetVerbIdentity(self.FLOWS).equivalent(pair).match
+
+    def test_a_real_place_still_matches(self):
+        """The guard refuses malformed input, never an ordinary looser grain."""
+        ruling = SubsetVerbIdentity(self.FLOWS).equivalent(
+            self._pair(("entity:shopper",))
+        )
+
+        assert ruling.match
+
+    def test_a_boundary_beside_a_real_place_is_unaffected(self):
+        """A zone cited *alongside* a place is dropped, which was always right."""
+        ruling = SubsetVerbIdentity(self.FLOWS).equivalent(
+            self._pair(("entity:shopper", "boundary:public-internet"))
+        )
+
+        assert ruling.match
+
+    def test_no_corpus_reference_resolves_to_nothing(self, corpus, flows_by_case):
+        """So the guard moved no measured number, and would if one appeared."""
+        placeless = [
+            (case.id, claim.claim)
+            for case in corpus
+            for framework in case.frameworks
+            for claim in case.claims_for(framework)
+            if claim.affected_element_ids
+            and not endpoint_form(
+                claim.affected_element_ids, flows_by_case.get(case.id, {})
+            )
+        ]
+
+        assert placeless == []
 
 
 #: The verb half, measured over the cases that carry verbs — which is case 01

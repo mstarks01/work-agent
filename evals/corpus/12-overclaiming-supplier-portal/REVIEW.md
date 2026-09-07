@@ -102,7 +102,7 @@ Not part of the question, but the records cite these names, so you need them.
 - `process:supplier-portal` — The datasheet's phrases — secure by design, enterprise-grade encryption throughout, fully authenticated and audited, fully compliant — name no technology and state no verifiable control, so none of them set an attribute here.
 - `store:document-store` — Enterprise-grade encryption throughout is a vendor marketing claim about the platform, not a stated property of this store, so encryption_at_rest is unknown rather than encrypted.
 - `flow:category-manager-to-supplier-portal:review-documents` — All access is fully authenticated and audited is a datasheet claim covering the platform generally; the source states how suppliers sign in and never states how category managers do, so this stays unknown.
-- `flow:portal-vendor-to-landing-bucket:push-nightly-extract` — The source contradicts itself here: we were told the extract is encrypted end to end, and the landing bucket runbook says the file arrives as a plain CSV picked up as-is. Neither statement is privileged over the other and nothing in the source resolves them, so this is unknown rather than either encrypted or unencrypted, and the conflict is itself a finding.
+- `flow:portal-vendor-to-landing-bucket:push-nightly-extract` — The source leaves this open: we were told the extract is encrypted end to end, and the landing bucket runbook says the file arrives as a plain CSV picked up as-is. The first names no layer and the second describes the file at rest in the bucket, so they are in tension without settling whether the channel was protected. Nothing in the source resolves it, so this is unknown rather than either encrypted or unencrypted, and the open question is itself a finding.
 
 **Assumptions**
 
@@ -281,7 +281,7 @@ on either of them. That is the finding this sitting exists for.
 
 - cites: `flow:portal-vendor-to-landing-bucket:push-nightly-extract`
 - tier: must-find · severity: medium/high · verb: `alter-in-transit`
-- recorded note: This is the case's central reference. The correct handling of we were told it is encrypted end to end against the runbook's plain CSV is needs-info on an unresolved conflict; both a confident encrypted and a confident unencrypted are wrong, and the latter is worse.
+- recorded note: This is the case's central reference. The correct handling of we were told it is encrypted end to end against the runbook's plain CSV is needs-info on an unresolved question; the first names no layer and the second describes the file at rest, so neither settles the channel. Both a confident encrypted and a confident unencrypted are wrong, and the latter is worse.
 
 > mark:
 
@@ -422,9 +422,9 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
-      "model.json": "33f40cfae742117671099ebbda6dc2e5768631cae7e494318fde3638048337c9",
+      "model.json": "bea1d05bf07ec2d5bec4adefabaab5bea6005a507358557d6d9b0bc381a376cf",
       "claims/asvs.json": "52c00ea520ff7d309bfb232c3c53f582862a1139bad518535449fc3dc69f57eb",
-      "claims/stride.json": "9180dccc19d0b67acbf92c65005f0c9095e3c7761fc059251eeb24eecfbac152"
+      "claims/stride.json": "327cc5e15d9c46c69ea9f67a3a83cc9721fa8630d7d829bf116e87be72e3361e"
       }
     }
   }

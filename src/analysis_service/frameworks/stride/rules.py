@@ -150,6 +150,15 @@ def _unprotected_transit_crossing(model: SystemModel) -> Iterator[Match]:
 
 
 def _unverified_write_to_store(model: SystemModel) -> Iterator[Match]:
+    """A store reached by a flow that names no verified caller.
+
+    **This finds a connection, never an operation.** A
+    :class:`~analysis_service.system_model.DataFlow`'s direction is who
+    initiates, so a service that only *reads* a database is modelled the same
+    way as one that writes it, and both arrive here. The model carries no field
+    that separates the two, so the rule's question asks which operations the
+    connection carries rather than telling an agent it is a write.
+    """
     stores = {store.id: store for store in model.data_stores}
     for flow in model.data_flows:
         store = stores.get(flow.destination)
@@ -192,17 +201,28 @@ def _unattributable_action(model: SystemModel) -> Iterator[Match]:
 
 
 def _unprotected_sensitive_transit(model: SystemModel) -> Iterator[Match]:
+    """An unprotected flow whose own tags, or whose endpoints', name an asset.
+
+    **The flow's own ``assets`` are read first, because they are the closest
+    statement of what the channel carries.** Reading only the endpoints made the
+    rule miss a graded flow between two ungraded elements: case 02's telemetry
+    publish tags ``pii`` while the node and the gateway tag nothing, and its
+    ``must-find`` disclosure reference drew no lead at all. An endpoint's tags
+    stay in the union — a store holding ``financial`` says what a flow reaching
+    it moves, and a submitter who tags the store and not the flow has still said
+    it.
+    """
     by_id = {element.id: element for element in model.elements()}
     for flow in model.data_flows:
         if not is_unverified(flow.encryption_in_transit):
             continue
-        endpoints = [by_id.get(flow.source), by_id.get(flow.destination)]
+        carriers = [flow, by_id.get(flow.source), by_id.get(flow.destination)]
         assets = sorted(
             {
                 asset
-                for endpoint in endpoints
-                if endpoint is not None
-                for asset in sensitive_assets(endpoint)
+                for carrier in carriers
+                if carrier is not None
+                for asset in sensitive_assets(carrier)
             }
         )
         if not assets:
@@ -212,7 +232,10 @@ def _unprotected_sensitive_transit(model: SystemModel) -> Iterator[Match]:
             {
                 "encryption_in_transit": _clip(flow.encryption_in_transit),
                 "encryption_state": control_state(flow.encryption_in_transit),
-                "endpoint_assets": ", ".join(assets),
+                # Named for the union it now holds. It was `endpoint_assets`
+                # while the endpoints were the only side read, and a fact key
+                # that says where a value came from has to keep saying it.
+                "assets_in_transit": ", ".join(assets),
             },
         )
 
@@ -370,9 +393,10 @@ RULES: tuple[Rule, ...] = (
         rule_id="tampering-unverified-write-to-store",
         lane="tampering",
         question=(
-            "This flow writes into a data store without a verified caller"
-            " identity. What can be written, and what downstream reader trusts"
-            " what it finds there?"
+            "This flow opens a connection to a data store and states no"
+            " verified caller identity. The model records who initiates, not"
+            " which operations run, so: can this caller write, what could it"
+            " change, and what downstream reader trusts what it finds there?"
         ),
         find=_unverified_write_to_store,
     ),

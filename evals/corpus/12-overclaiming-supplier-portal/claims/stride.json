@@ -70,7 +70,7 @@
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "This is the case's central reference. The correct handling of we were told it is encrypted end to end against the runbook's plain CSV is needs-info on an unresolved conflict; both a confident encrypted and a confident unencrypted are wrong, and the latter is worse.",
+    "notes": "This is the case's central reference. The correct handling of we were told it is encrypted end to end against the runbook's plain CSV is needs-info on an unresolved question; the first names no layer and the second describes the file at rest, so neither settles the channel. Both a confident encrypted and a confident unencrypted are wrong, and the latter is worse.",
     "verb": "alter-in-transit"
   },
   {

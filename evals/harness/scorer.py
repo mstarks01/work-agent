@@ -61,7 +61,7 @@ from analysis_service.frameworks.stride.record import (
     Threat,
 )
 from analysis_service.report import SeverityLevel, derive_severity_level
-from evals.harness.fingerprint import components_for, fingerprint, version_for
+from evals.harness.fingerprint import key_claim
 from evals.harness.identity import ClaimPair, Matcher
 from evals.harness.ledger import Ledger
 from evals.harness.reference import GoldenCase, ReferenceThreat
@@ -605,15 +605,17 @@ def _standing_of_unmatched(
     reviewer can resolve.
 
     The fingerprint is computed exactly the way the review queue computes it,
-    from the same components under the same per-framework version, so a vote
-    cast from the queue lands on the finding scored here by construction.
+    because it is the same call: :func:`~evals.harness.fingerprint.key_claim`
+    is the one spelling of which version keys a package and which components
+    that version reads. This function used to compose the parts itself — read
+    the version, build the components, hash them — which was a second reader of
+    one rule, and the two would have disagreed the first time either moved.
     """
     unlisted: list[UnlistedThreat] = []
     needs_info: list[str] = []
     foreign: list[str] = []
     flows = {flow.id: (flow.source, flow.destination) for flow in case.model.data_flows}
     blessed_ids = {element.id for element in case.model.elements()}
-    version = version_for("stride")
 
     for position in unmatched_positions:
         threat = produced[position]
@@ -625,14 +627,14 @@ def _standing_of_unmatched(
         if not blessed_ids.issuperset(threat.affected_element_ids):
             foreign.append(threat.id)
             continue
-        components = components_for(
+        value, _ = key_claim(
             "stride",
+            case.id,
             threat.category,
             tuple(threat.affected_element_ids),
             flows,
             verb=threat.verb,
         )
-        value = fingerprint(components, version=version)
         unlisted.append(
             UnlistedThreat(
                 threat_id=threat.id,

@@ -178,7 +178,7 @@
       "source": "entity:portal-vendor",
       "destination": "store:landing-bucket",
       "protocol": "unknown",
-      "notes": "The source contradicts itself here: we were told the extract is encrypted end to end, and the landing bucket runbook says the file arrives as a plain CSV picked up as-is. Neither statement is privileged over the other and nothing in the source resolves them, so this is unknown rather than either encrypted or unencrypted, and the conflict is itself a finding.",
+      "notes": "The source leaves this open: we were told the extract is encrypted end to end, and the landing bucket runbook says the file arrives as a plain CSV picked up as-is. The first names no layer and the second describes the file at rest in the bucket, so they are in tension without settling whether the channel was protected. Nothing in the source resolves it, so this is unknown rather than either encrypted or unencrypted, and the open question is itself a finding.",
       "authentication": "unknown",
       "data_description": "the nightly supplier data extract",
       "encryption_in_transit": "unknown"

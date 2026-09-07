@@ -141,11 +141,23 @@ def endpoint_subset(
     the process — and neither is wrong. Subset accepts that; equality calls it a
     different claim.
 
+    **A side that resolves to nothing is not a subset of anything here.** The
+    empty set is a subset of every set, so a claim citing only a
+    :func:`comparable_elements` drops — a Trust Boundary — used to match every
+    target set in its lane that shared its verb. That is not a claim written at
+    a looser grain; it is a claim that names no place, and the rule has nothing
+    to compare it against. Refusing it is the same answer
+    :class:`SubsetVerbIdentity` gives a pair with no verb, reached one step
+    later: no corpus reference resolves to nothing, so this refuses malformed
+    input and no measured pair.
+
     On its own this over-merges, which is why nothing calls it alone:
     :class:`SubsetVerbIdentity` is the rule, and this is one half of it.
     """
     left = endpoint_form(left_ids, flows)
     right = endpoint_form(right_ids, flows)
+    if not left or not right:
+        return False
     return left <= right or right <= left
 
 
@@ -190,17 +202,33 @@ class SubsetVerbIdentity:
                 " of this rule cannot answer; assign both from"
                 " evals.harness.verbs, or score MechanicalIdentity instead"
             )
+        flows = self._flows.get(pair.case, {})
         elements = endpoint_subset(
-            pair.reference_element_ids,
-            pair.candidate_element_ids,
-            self._flows.get(pair.case, {}),
+            pair.reference_element_ids, pair.candidate_element_ids, flows
         )
         action = same_action(pair.reference_verb, pair.candidate_verb)
+        placeless = [
+            side
+            for side, ids in (
+                ("reference", pair.reference_element_ids),
+                ("candidate", pair.candidate_element_ids),
+            )
+            if not endpoint_form(ids, flows)
+        ]
+        # A side that names no place is a different answer from two sides that
+        # name two places, and the run artifact carries the rationale for
+        # exactly this kind of reading. Saying "neither element set contains
+        # the other" over an empty side would describe the refusal as an
+        # ordinary disagreement about targets.
+        elements_said = (
+            f"the {' and '.join(placeless)} set resolves to no place"
+            if placeless
+            else f"{'one' if elements else 'neither'} element set contains the other"
+        )
         return ClaimRuling(
             match=elements and action,
             rationale=(
-                f"{'one' if elements else 'neither'} element set contains"
-                f" the other;"
+                f"{elements_said};"
                 f" {pair.reference_verb} vs {pair.candidate_verb}"
                 f" {'is one action' if action else 'are two actions'}"
             ),
