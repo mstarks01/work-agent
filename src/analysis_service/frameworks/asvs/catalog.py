@@ -47,6 +47,7 @@ __all__ = [
     "is_published_requirement",
     "provenance_issues",
     "requirement_id",
+    "requirement_text",
     "requirements_for",
 ]
 
@@ -198,6 +199,21 @@ def requirement_id(lane: str, key: object) -> str:
 
 
 _REQUIREMENT_IDS: frozenset[str] = frozenset(req.id for req in REQUIREMENTS)
+_TEXT_BY_ID: Mapping[str, str] = MappingProxyType(
+    {req.id: req.text for req in REQUIREMENTS}
+)
+
+
+def requirement_text(requirement_id: str) -> str:
+    """The standard's own words for one requirement, or ``""`` for an ID it lacks.
+
+    What the critic is handed beside each draft, so a verdict is reached
+    against the requirement rather than against the draft's paraphrase of it
+    (#659). Empty rather than raising for an unknown ID: the fan-in has
+    already dropped and marked any draft naming one, and this is reached with
+    a draft the report will carry.
+    """
+    return _TEXT_BY_ID.get(requirement_id, "")
 
 
 def is_published_requirement(lane: str, key: object) -> bool:

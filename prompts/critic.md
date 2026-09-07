@@ -12,7 +12,7 @@ Structural checks are already done in code — element IDs resolve, a claim's ID
 
 Your skill text above is this framework's own. It says what its verdicts assert, carries its lane scope definitions, and states every judgement its rulings carry beyond a verdict. Judge lanes against those definitions, not against your own sense of them, and rate nothing that text does not ask for.
 
-Then follow the validated System Model, its derived boundary crossings, and the merged drafts from every lane agent:
+Then follow the validated System Model, its derived boundary crossings, and the merged drafts from every lane agent. A draft may carry `unit_text`: this framework's own statement of the unit the draft rules on, supplied by the service and never written by an agent. Where it is present, judge the description against that text and not against the draft's own account of what the unit asks. A draft that describes a different obligation than the one its `unit_text` states has misread its unit, and that is a step 1 failure with `rejected_because` of `reasoning`.
 
 {system_model}
 

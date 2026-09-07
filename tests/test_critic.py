@@ -1683,3 +1683,32 @@ class TestADuplicateRejectionOfAUnitBearingDraftIsMalformed:
         ]
         problems = review_issues([draft], rulings, valid_model())
         assert not any("decided by its identifier" in m for m in problems.messages)
+
+
+def test_ruling_view_carries_the_unit_text_a_package_supplies():
+    """#659: the critic judges against the requirement, not the paraphrase.
+
+    STRIDE has no unit text, so its view carries no key; an ASVS draft carries
+    the catalog's words for the requirement it rules on.
+    """
+    from analysis_service.frameworks.asvs.catalog import requirement_text
+    from analysis_service.frameworks.asvs.record import RequirementRuling
+    from analysis_service.report import Ground, Verdict
+
+    (stride_view,) = critic._ruling_view([sample_draft("S-01", "spoofing")])
+    asvs = RequirementRuling(
+        id="v5.0.0-6.2.1",
+        framework="asvs",
+        framework_version="5.0.0",
+        chapter="authentication",
+        title="t",
+        description="d",
+        affected_element_ids=[],
+        grounds=[Ground(kind="derived-fact", flow_id="flow:customer-to-web-app:login")],
+        verdict=Verdict(status="confirmed"),
+    )
+    (asvs_view,) = critic._ruling_view([asvs])
+
+    assert "unit_text" not in stride_view
+    assert asvs_view["unit_text"] == requirement_text("V6.2.1")
+    assert "8 characters" in asvs_view["unit_text"]

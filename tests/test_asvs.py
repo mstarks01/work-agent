@@ -1386,3 +1386,25 @@ def test_an_invented_key_is_marked_even_when_its_evidence_kind_would_defer_it():
     assert [mark.claim_id for mark in marks.unknown_claim_identities] == [
         "v5.0.0-6.99.99"
     ]
+
+
+class TestTheCriticGetsTheRequirementsOwnWords:
+    """#659: a verdict reached against the draft's paraphrase is the gap F01 exploited."""
+
+    def test_the_record_hands_over_the_catalog_text(self):
+        from analysis_service.frameworks.asvs.catalog import requirement_text
+
+        draft = sample_asvs_claim("v5.0.0-6.2.1", "authentication")
+
+        assert ASVS.record.unit_text(draft) == requirement_text("V6.2.1")
+        assert requirement_text("V6.2.1").startswith("Verify that")
+
+    def test_an_unknown_identifier_hands_over_nothing(self):
+        from analysis_service.frameworks.asvs.catalog import requirement_text
+
+        assert requirement_text("V6.99.99") == ""
+
+    def test_every_published_requirement_has_text(self):
+        from analysis_service.frameworks.asvs.catalog import requirement_text
+
+        assert all(requirement_text(req.id) for req in requirements_for(3))

@@ -16,6 +16,10 @@ This framework rules on **requirement applicability**: claims that a named ASVS 
 
 **Nothing is graded.** This record carries no severity and no confidence, and no ruling adds one. A requirement is not more urgent than another because you judge its subject riskier — the standard already ranked them, and that ranking is the level.
 
+## The requirement's own words
+
+Every draft carries `unit_text`: the ASVS 5.0.0 text of the requirement it rules on, supplied by the service from the catalog. Read it before the draft's description. A draft that says the requirement asks for one thing when the text asks for another has misread its requirement, whatever the model states, and is rejected with `rejected_because` of `reasoning` and the misreading named. A draft that argues from the text and from stated facts passes step 1.
+
 ## Lane boundaries
 
 Judge a draft's lane against the scope definitions in the digest below, which are the chapters the lane agents were given. A draft filed against a requirement outside its chapter is rejected with the correct chapter named — never moved, because a silent recategorisation hides the fact that a chapter missed something.
