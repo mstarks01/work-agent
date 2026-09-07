@@ -10,6 +10,15 @@ all: every other check in the repo passes a dead rule silently.
 rule; ``test_knowledge_lints`` checks a rule has reference material, which a
 dead rule has too. So this is the one place a rule's own firing is asserted.
 
+The second half asks the mirror question one layer up: which knowledge
+**documents** does any lane of any blessed model actually receive? A document
+registered against rules that fire can still reach nobody, because selection
+ranks by match count and keeps one case and two notes per lane — so a broader
+document wins every lane they share and a narrower one is unreachable at full
+maintenance cost. The package gate holds that a document exists and its rule IDs
+resolve, and neither it nor ``test_knowledge_lints`` asks whether the material
+is ever selected.
+
 Deterministic over the blessed ``model.json`` and free of provider calls, which
 is why it gates on every PR rather than waiting for a sweep.
 """
@@ -21,7 +30,9 @@ from pathlib import Path
 
 import pytest
 
+from analysis_service.candidates import generate_candidates
 from analysis_service.frameworks import PACKAGES
+from analysis_service.knowledge import MAX_CASES, MAX_NOTES, select_documents
 from analysis_service.system_model import SystemModel
 from analysis_service.validation import parse_and_validate
 
@@ -101,3 +112,109 @@ def test_every_exempted_rule_is_a_rule_some_package_declares(models):
         f"UNEXERCISED names rules no package declares: "
         f"{sorted(set(UNEXERCISED) - known)}"
     )
+
+
+#: Registered knowledge documents no corpus case's selection ever reaches, each
+#: with the reason. **The mirror of :data:`UNEXERCISED`, one layer up.** That
+#: table catches a rule nothing fires; this catches a document whose rules fire
+#: and which the per-lane cap never keeps, so an agent never receives it.
+#:
+#: The two failures look identical from every other check in the repo — the
+#: package gate holds that the document exists and its rule IDs resolve, and
+#: ``test_knowledge_lints`` holds that a rule has material — and neither asks
+#: whether the material is ever *selected*.
+UNSELECTED: dict[str, str] = {
+    "stride:stated-control-outside-the-model": (
+        "Selected by spoofing-unverified-boundary-auth and"
+        " tampering-unverified-write-to-store, and both lanes lose the one-case"
+        " cap to unknown-is-not-absent, which matches three rules against this"
+        " one's two. Ranking is match count then declaration order, so a"
+        " broader document wins every lane they share. This is a selection gap"
+        " rather than a corpus gap: the rules fire, and the material is"
+        " unreachable behind MAX_CASES."
+    ),
+    "stride:two-threats-one-flow": (
+        "The same shape."
+        " information-disclosure-unprotected-sensitive-transit and"
+        " tampering-unverified-write-to-store both fire, and both lanes'"
+        " one slot goes to unknown-is-not-absent or chained-benign-facts."
+    ),
+    "asvs:real-time-media-and-signalling": (
+        "The other reading, and a corpus gap rather than a selection one: its"
+        " only rule is webrtc-real-time-media, which UNEXERCISED already records"
+        " as firing on no corpus case. A document selected by a rule that never"
+        " fires is unreachable for a reason that is fixed one layer down, so"
+        " the Golden Case carrying a call or screen-share feature closes both"
+        " entries at once."
+    ),
+}
+
+
+def selected_documents(models: list[SystemModel]) -> set[str]:
+    """Every ``package:document`` some lane of some blessed model would receive.
+
+    Drives the shipped selector at the shipped caps, over the real candidate
+    sets, which is the only way to answer what an agent is handed. Counting the
+    documents a rule *could* select answers a different question, and it is the
+    question the package gate already answers.
+    """
+    reached: set[str] = set()
+    for name, package in PACKAGES.items():
+        for model in models:
+            fired = generate_candidates(model, package.lanes, package.rules)
+            for block in fired.values():
+                rule_ids = {candidate.rule_id for candidate in block.candidates}
+                for table, limit in (
+                    (package.knowledge.cases, MAX_CASES),
+                    (package.knowledge.notes, MAX_NOTES),
+                ):
+                    reached.update(
+                        f"{name}:{document}"
+                        for document in select_documents(table, rule_ids, limit)
+                    )
+    return reached
+
+
+def registered_documents() -> set[str]:
+    return {
+        f"{name}:{document}"
+        for name, package in PACKAGES.items()
+        for table in (package.knowledge.cases, package.knowledge.notes)
+        for document in table
+    }
+
+
+def test_no_document_is_unreachable_without_a_stated_reason(models):
+    """Material nobody receives is material that cannot help, at full cost.
+
+    A document registered against rules that fire still reaches no agent when a
+    broader document outranks it in every lane they share — the ranking is
+    match count then declaration order, and the caps are one case and two notes
+    per lane. Nothing else in the repo can see that, because every other check
+    stops at the registration.
+    """
+    unreachable = sorted(registered_documents() - selected_documents(models))
+    undeclared = sorted(set(unreachable) - set(UNSELECTED))
+
+    assert not undeclared, (
+        f"these knowledge documents reach no lane of any corpus case:"
+        f" {undeclared}. Either a case that would select them is missing, or a"
+        " broader document takes their slot in every lane — say which in"
+        " UNSELECTED. A document nobody receives is prompt material paying"
+        " maintenance and buying nothing."
+    )
+
+
+def test_the_unselected_list_does_not_rot(models):
+    """A document that starts being selected has to leave, or it excuses nothing."""
+    stale = sorted(set(UNSELECTED) & selected_documents(models))
+    assert not stale, (
+        f"these documents are selected now and still listed as unreachable:"
+        f" {stale}. Remove them from UNSELECTED."
+    )
+
+
+def test_every_unselected_entry_names_a_registered_document():
+    """A renamed document must not leave its excuse behind, silently covering nothing."""
+    unknown = sorted(set(UNSELECTED) - registered_documents())
+    assert not unknown, f"UNSELECTED names documents no package registers: {unknown}"
