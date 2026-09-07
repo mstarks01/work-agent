@@ -215,7 +215,11 @@
       const repaired = marks.repaired.get(`${claimId}#${index}`);
       if (repaired) {
         const note = el("div", "cite unverified");
-        note.append(`\u270e replaced the agent's wording (similarity ${repaired.similarity}): `);
+        const moved = (repaired.moved || []).length
+          ? ` \u2014 changed a ${repaired.moved.join(" and a ")}`
+          : "";
+        const scan = repaired.scan_complete === false ? ", scan cut short" : "";
+        note.append(`\u270e replaced the agent's wording (similarity ${repaired.similarity}${scan})${moved}: `);
         note.append(document.createTextNode(repaired.written));
         row.append(note);
       }

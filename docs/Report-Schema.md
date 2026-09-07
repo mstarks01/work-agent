@@ -428,6 +428,8 @@ class RepairedQuote:
     index: int  # position in that claim's `grounds` list
     written: str  # what the agent wrote
     similarity: float  # the ratio that licensed the replacement
+    moved: list[str]  # what the span changed: "negation", "number", or nothing
+    scan_complete: bool | None  # did the rung rank every window; None if not recorded
 ```
 
 The ladder refused what the agent wrote, and the repair rung
@@ -439,8 +441,15 @@ never also in `unverified_grounds`.
 
 The rung never accepts the agent's words: it replaces them. What can go wrong
 is a replacement that says something different from what the claim rests on.
-The critic reads the replaced span, and the mark shows the difference to a
-reader. See [ADR 0018](adr/0018-the-repair-rung.md).
+`moved` is the mechanical part of that: the negation tokens and the number
+tokens of the two texts, compared as multisets, so a span that put a "not"
+back or changed a figure is named as such. It is computed from `written` and
+the ground's text and checked against them on load. `similarity` says how
+near the span was and never whether it supports the claim. The critic reads
+the replaced span with `written` and `moved` beside it, and the viewer shows
+the difference to a reader. `scan_complete` is `False` where the work budget
+or a deadline stopped the scan before every window was ranked, so the span is
+the best found by then. See [ADR 0018](adr/0018-the-repair-rung.md).
 
 ## `dropped_claims` — claims the service dropped for a fault in one entry
 
@@ -999,6 +1008,10 @@ class TokenUsage:
 > - Each block carries `repaired_quotes`. A quote ground's `text` is no longer
 >   always what the agent wrote: where the ladder refused it and the source
 >   held a near span, the text is that span and this list carries the agent's.
+> - `repaired_quotes[]` carries `moved`, what the substitution changed in the
+>   claim's own terms, and `scan_complete`, whether the rung ranked every
+>   window. `moved` is required and was filled in on the 18 archived
+>   repairs by recomputation; `scan_complete` is `None` on them.
 > - `coverage[].unknown_controls_cited` counts a control only where a draft's
 >   attribute ground names that element and that attribute, and
 >   `coverage[].candidates_cited` counts a lead only where one draft cites

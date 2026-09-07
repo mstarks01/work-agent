@@ -86,6 +86,7 @@ import time
 import unicodedata
 from dataclasses import dataclass
 from difflib import SequenceMatcher
+from typing import Literal, NamedTuple
 
 #: How alike a source window and a refused quote must be, as a
 #: :class:`difflib.SequenceMatcher` ratio over their normalized forms, for the
@@ -388,7 +389,7 @@ def _needle_of(quote: str) -> str:
 
 def repair_quote(
     quote: str, source: str, deadline: float | None = None
-) -> tuple[str, float] | None:
+) -> Repair | None:
     """The raw-text form of :func:`repair_prepared`, for a caller holding text.
 
     A caller scanning the same source for many refused quotes should call
@@ -408,9 +409,70 @@ def repair_quote(
     return repair_prepared(quote, prepare_source(source), deadline)
 
 
+#: What a repair can move between the agent's words and the source's span.
+#: Closed, because a reader routes on it: a negation flips what the span
+#: asserts, and a number changes what it measures. Neither is a tidy.
+MovedKind = Literal["negation", "number"]
+
+_NEGATIONS = frozenset(
+    {"not", "no", "never", "none", "nor", "neither", "without", "cannot"}
+)
+_TOKEN_EDGE = ".,;:!?()[]{}\"'"
+
+
+class Repair(NamedTuple):
+    """One repair the rung licensed: the span, the ratio, and whether the scan ran out.
+
+    ``complete`` is ``False`` where the work budget or a deadline stopped the
+    scan before it ranked every window, so the span is the best found by then
+    and a better one may sit later. The caller records it rather than acting on
+    it: the docstring on :func:`repair_prepared` says why a truncated answer is
+    still returned, and this is what lets a reader tell the two apart.
+    """
+
+    span: str
+    similarity: float
+    complete: bool
+
+
+def meaning_moved(written: str, span: str) -> tuple[MovedKind, ...]:
+    """Which meaning-bearing tokens differ between what the agent wrote and the span.
+
+    A repair inside :data:`REPAIR_THRESHOLD` can still flip what a quote
+    asserts: "does not encrypt" and "does encrypt" are three characters apart
+    on a forty-character quote. The substitution is right — the span is the
+    submitter's words — and the reader of the result has to be told that the
+    words changed what the claim rests on. This is the minimum mechanical
+    safeguard and not an entailment check: it compares the negation tokens and
+    the number tokens of the two texts as multisets, folded through
+    :func:`normalize`, and names each class that differs. A changed principal or
+    a changed control term is a judgement and stays with the critic.
+    """
+    moved: list[MovedKind] = []
+    written_tokens = _tokens(written)
+    span_tokens = _tokens(span)
+    if sorted(_negations(written_tokens)) != sorted(_negations(span_tokens)):
+        moved.append("negation")
+    if sorted(_numbers(written_tokens)) != sorted(_numbers(span_tokens)):
+        moved.append("number")
+    return tuple(moved)
+
+
+def _tokens(text: str) -> list[str]:
+    return [token.strip(_TOKEN_EDGE) for token in normalize(text).split()]
+
+
+def _negations(tokens: list[str]) -> list[str]:
+    return [t for t in tokens if t in _NEGATIONS or t.endswith("n't")]
+
+
+def _numbers(tokens: list[str]) -> list[str]:
+    return [t for t in tokens if any(char.isdigit() for char in t)]
+
+
 def repair_prepared(
     quote: str, source: PreparedSource, deadline: float | None = None
-) -> tuple[str, float] | None:
+) -> Repair | None:
     """The source's own span nearest a refused quote, or ``None``.
 
     Run only after :func:`verify_quote` said no. The answer is a span cut from
@@ -433,8 +495,8 @@ def repair_prepared(
     ``None`` without scanning.
 
     **A truncated scan can return a good span where a better one sat later**,
-    and the caller cannot tell a truncated answer from a complete one. Both
-    alternatives are worse: refusing the answer throws away a correct match --
+    and the answer says so in :attr:`Repair.complete`. Both alternatives to
+    returning it are worse: refusing the answer throws away a correct match --
     measured, the median case finds its span at window 1,500 and is cut off at
     window 26,445 -- and scanning to the end is what the bound exists to stop.
     Returning nothing is right only when nothing reached the threshold. It does not discard that answer: the
@@ -459,7 +521,7 @@ def repair_prepared(
     words = source.words
     folded = source.folded
     width = len(quote.split())
-    best: tuple[str, float] | None = None
+    best: Repair | None = None
     budget = MAX_REPAIR_WORK
     matcher = SequenceMatcher(autojunk=False)
     deadline = min(time.thread_time() + _REPAIR_DEADLINE_SECONDS, deadline or math.inf)
@@ -475,16 +537,23 @@ def repair_prepared(
             # 0 of 50,000,000 and ran 8.4 seconds.
             budget -= _PRUNE_COST * len(span)
             if budget < 0 or time.thread_time() > deadline:
-                return best
+                return _truncated(best)
             matcher.set_seq1(span)
             if matcher.quick_ratio() < REPAIR_THRESHOLD:
                 continue
             budget -= _COMPARE_COST * len(span) * len(needle)
             if budget < 0 or time.thread_time() > deadline:
-                return best
+                return _truncated(best)
             ratio = matcher.ratio()
-            if ratio >= REPAIR_THRESHOLD and (best is None or ratio > best[1]):
-                best = (" ".join(words[start : start + count]), ratio)
+            if ratio >= REPAIR_THRESHOLD and (best is None or ratio > best.similarity):
+                best = Repair(" ".join(words[start : start + count]), ratio, True)
+                # Complete, though the scan stops here: no later window can
+                # rank above a certain match, so the answer cannot change.
                 if ratio >= _CERTAIN:
                     return best
     return best
+
+
+def _truncated(best: Repair | None) -> Repair | None:
+    """The best span so far, marked as found by a scan that did not finish."""
+    return None if best is None else best._replace(complete=False)

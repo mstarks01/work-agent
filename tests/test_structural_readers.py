@@ -51,6 +51,7 @@ from analysis_service.frameworks.stride.record import Threat
 from analysis_service.report import (
     FrameworkAnalysis,
     Ground,
+    RepairedQuote,
     Report,
     ScopeEntry,
     UnknownRef,
@@ -160,6 +161,22 @@ def _ground_the_model_does_not_derive(report: Report) -> None:
     )
 
 
+def _repair_misstating_what_moved(report: Report) -> None:
+    """A repaired-quote mark whose ``moved`` the two texts contradict."""
+    block = report.analyses[0]
+    claim = block.claims[0]
+    quote = next(i for i, ground in enumerate(claim.grounds) if ground.kind == "quote")
+    block.repaired_quotes.append(
+        RepairedQuote(
+            claim_id=claim.id,
+            index=quote,
+            written=claim.grounds[quote].text,
+            similarity=0.95,
+            moved=["number"],
+        )
+    )
+
+
 def _repeated_claim_id(report: Report) -> None:
     block = report.analyses[0]
     block.claims.append(block.claims[0])
@@ -223,6 +240,12 @@ def _no_block_for_the_selected_framework(report: Report) -> None:
 
 def _grades_harm(package: FrameworkPackage) -> bool:
     return package.carries_severity()
+
+
+def _quotes_something(package: FrameworkPackage) -> bool:
+    """Whether this file's sound block for the package carries a quote ground."""
+    block = BLOCKS[package.name]()
+    return any(ground.kind == "quote" for ground in block.claims[0].grounds)
 
 
 def _every_package(package: FrameworkPackage) -> bool:
@@ -299,6 +322,12 @@ FAULTS: Mapping[str, Fault] = {
     # every report that loads, so the gate has nothing this rule would add.
     "a ground names a fact the embedded model does not derive": Fault(
         _ground_the_model_does_not_derive, APP
+    ),
+    # ``moved`` is derived from two texts the block carries. The gate reads a
+    # mark's placement and nothing of its content, so the service alone holds
+    # a mark to the texts it is about.
+    "a repaired quote misstates what moved": Fault(
+        _repair_misstating_what_moved, APP, spelled_by=_quotes_something
     ),
     "a reference mark names a claim the block does not carry": Fault(
         _reference_mark_naming_no_claim, APP

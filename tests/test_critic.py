@@ -652,8 +652,46 @@ class TestQuoteVerification:
         assert (mark.claim_id, mark.index) == ("S-01", 0)
         assert mark.written == "Customers log in to the web app which stores orders"
         assert 0.9 <= mark.similarity <= 1.0
+        assert mark.moved == []
+        assert mark.scan_complete is True
         assert joined.marks.unverified_grounds == []
         assert joined.marks.dropped_claims == []
+
+    def test_a_repair_that_flips_a_negation_is_marked_as_such(self, model):
+        """The span is substituted, as ADR 0018 decided, and the mark says
+        the substitution put a negation back — the safeguard #675 D15 asked
+        for, so a reader never takes a 0.95 similarity for support."""
+        sources = {
+            LABEL: "Customers log in to the web app, which does not store orders."
+        }
+        drafts = self.quoting(
+            "Customers log in to the web app, which does store orders."
+        )
+
+        joined = join_drafts(drafts, STRIDE, model, sources)
+
+        (draft,) = joined.drafts
+        assert draft.grounds[0].text == sources[LABEL]
+        (mark,) = joined.marks.repaired_quotes
+        assert mark.moved == ["negation"]
+
+    def test_the_critic_is_shown_what_a_repair_moved(self, model):
+        drafts = self.quoting("Customers log in to the web app which stores orders")
+        joined = join_drafts(drafts, STRIDE, model, SOURCES)
+
+        (view,) = critic.critic_view(
+            joined.drafts, model, repaired=joined.marks.repaired_quotes
+        )
+
+        assert view["repaired_quotes"] == [
+            {
+                "index": 0,
+                "written": "Customers log in to the web app which stores orders",
+                "moved": [],
+            }
+        ]
+        (plain,) = critic.critic_view(joined.drafts, model)
+        assert "repaired_quotes" not in plain
 
     def test_a_claim_whose_every_ground_fails_is_dropped_and_marked(self, model):
         """The claim, not the job: one misquote on a claim that carries nothing
