@@ -42,10 +42,8 @@ import time
 from collections.abc import Mapping, Sequence
 from typing import Self
 
-from pydantic import ValidationError
-
 from analysis_service.deployment import Deployment
-from analysis_service.frameworks import package_for
+from analysis_service.frameworks import PACKAGES
 from analysis_service.jobs import (
     JobRecord,
     NodeCallback,
@@ -53,6 +51,7 @@ from analysis_service.jobs import (
     PipelineRunner,
 )
 from analysis_service.report import FrameworkName, FrameworkSelection
+from analysis_service.selection import SelectionError, resolve_selection
 from analysis_service.sources import Source, SourceLimits
 
 logger = logging.getLogger(__name__)
@@ -107,23 +106,21 @@ class Engine:
         deadline_seconds: float,
         frameworks: Sequence[FrameworkSelection],
     ) -> None:
-        if not frameworks:
-            raise EngineInputError("an engine must be built for at least one framework")
-        # The same rung the HTTP route applies, applied to every other caller.
-        # A package's options model declares no default, so a selection missing a
-        # value it needs is refused here rather than reaching a block that cannot
-        # be built — which would fail after every node had been paid for.
-        for selection in frameworks:
-            try:
-                package_for(selection.name).options.model_validate(selection.options)
-            except ValidationError as exc:
-                raise EngineInputError(
-                    f"options for framework {selection.name!r} are invalid: {exc}"
-                ) from exc
+        # The same rule the HTTP route and the web app apply, read through the
+        # one reader all three share. The constructor holds no deployment, so
+        # the names are held to the packages this build carries; which of
+        # those a deployment enables is the runner's own check
+        # (:meth:`~analysis_service.deployment.Deployment.selection`). A
+        # package's options model declares no default, so a selection missing
+        # a value it needs is refused here rather than reaching a block that
+        # cannot be built — which would fail after every node had been paid for.
+        try:
+            self._frameworks = resolve_selection(list(PACKAGES), frameworks)
+        except SelectionError as exc:
+            raise EngineInputError(str(exc)) from exc
         self._runner = runner
         self._limits = limits
         self._deadline_seconds = deadline_seconds
-        self._frameworks = list(frameworks)
 
     @classmethod
     def from_config(

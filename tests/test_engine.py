@@ -156,6 +156,13 @@ def test_a_bare_string_is_refused_with_the_call_to_write_instead():
         asyncio.run(engine.analyze("a web app storing orders"))
 
 
+def test_a_repeated_framework_is_refused_at_the_engine_too():
+    """#675 D23: the engine did not look for a repeat the route refused."""
+    twice = [sample_selection()[0], sample_selection()[0]]
+    with pytest.raises(EngineInputError, match="repeats"):
+        engine_for(StubPipelineRunner(), frameworks=twice)
+
+
 def test_no_sources_at_all_is_a_caller_error():
     engine = engine_for(StubPipelineRunner())
 

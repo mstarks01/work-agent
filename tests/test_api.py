@@ -820,6 +820,15 @@ class TestFrameworksListIsBounded:
     at most once, so no legitimate request is affected.
     """
 
+    def test_a_repeated_framework_is_refused_and_named(self):
+        client, _ = make_client()
+        twice = [{"name": "stride"}, {"name": "stride"}]
+        response = client.post(
+            "/v1/jobs", json=submission(frameworks=twice), headers=auth()
+        )
+        assert response.status_code == 422
+        assert "repeats stride" in response.json()["detail"]
+
     def test_a_frameworks_list_longer_than_the_registry_is_refused(self):
         client, _ = make_client()
         over_long = [{"name": "stride"}, {"name": "asvs"}, {"name": "stride"}]
