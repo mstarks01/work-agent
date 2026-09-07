@@ -147,6 +147,39 @@ def _rule_of(test: PresenceTest) -> Rule:
 # chapters, and a rule belongs to exactly one lane, so the two carry the same
 # terms and put a different question. The last six close the chapters that had
 # no rule, and so no retrieval either.
+#: The submitter's words for an upload, not the protocol's: a supplier "sends
+#: documents", a user "imports a CSV", a member "sets an avatar".
+UPLOAD_TERMS: tuple[str, ...] = (
+    "upload",
+    "attachment",
+    "multipart",
+    "artifact",
+    "registry",
+    "document",
+    "import",
+    "avatar",
+    "image",
+    "photo",
+    "csv",
+    "spreadsheet",
+)
+
+#: A file the application handles at all: what the storage and download
+#: sections of the file-handling chapter presuppose, where the upload sections
+#: presuppose an upload. **Every upload term is a file term**, because an
+#: upload is a file: the two tables are one table and a suffix, so a model that
+#: keeps the upload sections can never lose the storage and download sections
+#: (#659). "file" matches "files" and "filesystem" and not "profile", because a
+#: term matches at the start of a word.
+FILE_TERMS: tuple[str, ...] = (
+    *UPLOAD_TERMS,
+    "file",
+    "filename",
+    "download",
+    "export",
+    "pdf",
+)
+
 PRESENCE_TESTS: tuple[PresenceTest, ...] = (
     PresenceTest(
         predicate="database",
@@ -292,22 +325,7 @@ PRESENCE_TESTS: tuple[PresenceTest, ...] = (
             "This system accepts an uploaded file. What limits its size, its"
             " type and where it lands?"
         ),
-        # The submitter's words for an upload, not the protocol's: a supplier
-        # "sends documents", a user "imports a CSV", a member "sets an avatar".
-        terms=(
-            "upload",
-            "attachment",
-            "multipart",
-            "artifact",
-            "registry",
-            "document",
-            "import",
-            "avatar",
-            "image",
-            "photo",
-            "csv",
-            "spreadsheet",
-        ),
+        terms=UPLOAD_TERMS,
     ),
     PresenceTest(
         predicate="authentication",
@@ -753,24 +771,6 @@ STRUCTURAL_RULES: tuple[Rule, ...] = (
 #: (URL building), V1.2.5 (OS commands) and V1.3.6 (outbound fetches) ask
 #: about what an application does, not what it names, and stay with the lane.
 #: Checked at import against the catalog, so a retired identifier fails closed.
-#: A file the application handles at all: what the storage and download
-#: sections of the file-handling chapter presuppose, where the upload sections
-#: presuppose an upload. "file" matches "files" and "filesystem" and not
-#: "profile", because a term matches at the start of a word.
-FILE_TERMS: tuple[str, ...] = (
-    "file",
-    "filename",
-    "download",
-    "export",
-    "pdf",
-    "document",
-    "attachment",
-    "upload",
-    "multipart",
-    "artifact",
-    "registry",
-)
-
 REQUIREMENT_TESTS: dict[str, tuple[str, ...]] = {
     "V1.2.6": ("ldap", "active directory", "directory service"),
     "V1.2.7": ("xpath", "xml"),
