@@ -159,7 +159,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 ### authentication
 
-**A4.** `V6.1.1` — No documentation defines rate limiting or anti-automation on the supplier sign-in.
+**A4.** `V6.1.1` — The input carries no documentation of rate limiting or anti-automation on the supplier sign-in.
 
 - cites: `process:supplier-portal`
 - tier: expected
@@ -208,7 +208,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 ### secure-coding-and-architecture
 
-**A9.** `V15.1.1` — The whole portal is a third-party product and no documentation defines remediation time frames for it.
+**A9.** `V15.1.1` — The whole portal is a third-party product and the input carries no documented remediation time frames for it.
 
 - cites: `process:supplier-portal`, `entity:portal-vendor`
 - tier: must-find
@@ -423,7 +423,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
       "model.json": "33f40cfae742117671099ebbda6dc2e5768631cae7e494318fde3638048337c9",
-      "claims/asvs.json": "c2f4a400c6c8ebc8ed4d316fec47e9d162c2c525958b26f5fca40f1daec68814",
+      "claims/asvs.json": "52c00ea520ff7d309bfb232c3c53f582862a1139bad518535449fc3dc69f57eb",
       "claims/stride.json": "9180dccc19d0b67acbf92c65005f0c9095e3c7761fc059251eeb24eecfbac152"
       }
     }

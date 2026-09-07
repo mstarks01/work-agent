@@ -49,16 +49,16 @@
     "notes": "The stated credential is an opaque key rather than a self-contained token; the exclusion is the answer."
   },
   {
-    "chapter": "authentication",
-    "requirement": "V6.2.10",
+    "chapter": "configuration",
+    "requirement": "V13.2.1",
     "affected_element_ids": [
       "entity:calling-service",
       "flow:calling-service-to-inference-gateway:submit-inference-request"
     ],
-    "claim": "The per-team API key is never expired or rotated.",
+    "claim": "The calling service authenticates to the inference gateway with a per-team API key that is never expired or rotated, an unchanging credential on a backend link.",
     "tier": "must-find",
     "disposition": "gap-from-prose",
-    "notes": "Stated outright, so the ruling is plain."
+    "notes": "Stated outright, so the ruling is plain. V6.2.10 is about user passwords and forbids forced rotation, so it was the wrong home for this fact."
   },
   {
     "chapter": "authorization",

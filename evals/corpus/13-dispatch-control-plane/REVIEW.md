@@ -198,7 +198,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 ### authentication
 
-**A6.** `V6.1.1` — No documentation states how an engineer signs in to the console or what limits repeated attempts.
+**A6.** `V6.1.1` — The input carries no documentation of how an engineer signs in to the console or what limits repeated attempts.
 
 - cites: `flow:duty-engineer-to-dispatch-console:open-console`, `process:dispatch-console`
 - tier: expected
@@ -437,7 +437,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
       "model.json": "90442f479e5cdf65ae37a8f1eee316597e4d1e8ada27ffa1ad4f8a755f205307",
-      "claims/asvs.json": "fdb36c6cd743efe0728d850a4cfb6056e0efae443984a9f44cc9e8fc36cec574",
+      "claims/asvs.json": "7bb59489a4cd2fc4aa86b436b4a19fcd5c90635fd283d3bc58126e23935f5262",
       "claims/stride.json": "07a43e4387e0f3d490edbdf732259e37957f4a09394d4e23e5203fca2d4558f3"
       }
     }

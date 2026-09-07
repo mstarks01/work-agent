@@ -805,7 +805,7 @@ def test_the_disclaimer_states_the_compliance_boundary():
 
 @pytest.mark.parametrize("lane", LANES)
 def test_no_lane_skill_calls_a_run_compliance(lane):
-    """A level-filtered run is a fork of the standard rather than the standard."""
+    """A level-filtered run is a partial verification, never a compliance result."""
     skill = package_loader.load(lane_skill_doc(lane))
     body = split_sections(skill)["Guardrails"]
 

@@ -140,11 +140,11 @@ The narrower question, per record: **does this requirement apply to this system,
 
 ### configuration
 
-**A3.** `V13.3.1` — Two configuration stores are named and nothing says whether either holds a secret or how.
+**A3.** `V13.3.1` — Both configuration stores hold the credentials their process needs, and nothing says whether a secrets management solution holds or injects them.
 
 - cites: `store:web-application-config`, `store:worker-config`
 - tier: must-find
-- recorded note: Both stores carry unknown technology and classification.
+- recorded note: The source says the stores hold credentials. Where those credentials come from is a deployment fact the description does not carry.
 
 > mark:
 
@@ -407,7 +407,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "20b0aa82c922766db2353cade33f7a26b38c60a3c7061244ef4686b7a647778b",
       "model.json": "68fe8bcf41cbbc60cac575dee317700e76db8101fec46da8f3ac89598f4a75df",
-      "claims/asvs.json": "067e81430d13c11e7d4191add2bd23113e27e282618b1c084ea09115ff6dd7c0",
+      "claims/asvs.json": "43c808a4d4edd2d00c0e159b813d66413e9b73df74129920516d33ea502a0991",
       "claims/stride.json": "18ff482a563387a6a4815393dfc0a44ec56f1e2df224d0ae6bce940ba48f29ef"
       }
     }

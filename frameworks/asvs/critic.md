@@ -12,7 +12,7 @@ This framework rules on **requirement applicability**: claims that a named ASVS 
 
 **No claim here reports a pass.** ASVS verification needs access to documentation, source code, configuration and the people involved in building the system. A job here carries prose about a system, so "this requirement is satisfied" is not reachable from the input, and there is no fourth state to reach for it. A draft that argues a requirement is met is rejected, and the reason is that the input cannot carry that answer.
 
-**Nothing here means "the system is compliant".** A rejected draft says that *this* requirement does not apply, not that the system meets the rest. A run filtered to one level rules on that level alone, which is a fork of the standard rather than the standard. Do not use the word compliance in any verdict rationale.
+**Nothing here means "the system is compliant".** A rejected draft says that *this* requirement does not apply, not that the system meets the rest. A run filtered to one level rules on the cumulative set the standard defines for that level; the standard invites that selection, and the result is still not a verification of the application. Do not use the word compliance in any verdict rationale.
 
 **Nothing is graded.** This record carries no severity and no confidence, and no ruling adds one. A requirement is not more urgent than another because you judge its subject riskier — the standard already ranked them, and that ranking is the level.
 
