@@ -233,6 +233,10 @@ from analysis_service.vendors import ServedTrust, vendor_for_route
 # shipped. The archived sweeps under ``evals/runs/`` were migrated by
 # ``evals/migrations/2026-09-07-scope-states.py``.
 #
+# 3.0 also adds ``model_repair`` to the envelope (#675): what the repair pass
+# was allowed to change and which elements it changed anyway and had put
+# back. ``None`` where no repair ran, and on archived runs that did.
+#
 # 3.0 also adds two fields to ``repaired_quotes[]`` (#675): ``moved``, what
 # the substitution changed in the claim's own terms (a negation, a number),
 # required and checked on load against the two texts it is computed from; and
@@ -1602,6 +1606,26 @@ class ExecutionEnvelope(BaseModel):
     )
 
 
+class ModelRepair(BaseModel):
+    """What the one repair pass was allowed to change, and what it changed anyway.
+
+    Recorded by the revalidate gate. ``scope`` is ``elements`` when every
+    issue named an element, and then ``implicated`` is those elements: the
+    repair may change them, add elements, and nothing else, and every other
+    element is put back as it was. ``restored`` names the ones that had to be,
+    because the repair changed or dropped an element the issues never cited.
+    ``scope`` is ``whole`` when an issue named no element — a fault over the
+    whole object — and then nothing is put back, because no narrower patch
+    could answer it; ``implicated`` and ``restored`` are empty.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    scope: Literal["elements", "whole"]
+    implicated: list[str] = Field(default_factory=list)
+    restored: list[str] = Field(default_factory=list)
+
+
 class AnalysisContext(BaseModel):
     """What informed the analysis, as distinct from what proves a finding.
 
@@ -2910,6 +2934,11 @@ class Report(BaseModel):
     # each block copies: N copies would be N chances to disagree about one
     # number. It left ``Summary`` in this cutover for exactly that reason.
     elements_analyzed: int = Field(default=0, ge=0)
+    # How the model was repaired, where it was. ``None`` where no repair pass
+    # ran; a report whose ``nodes`` name the repair node and carry ``None``
+    # here predates the field. Envelope-level because it is about the shared
+    # model, like ``shared_element_names``.
+    model_repair: ModelRepair | None = None
     # What was in front of the agents that is *not* one framework's: the
     # instruction digest of the built graph, and the domain packs this job's
     # model earned. Context, not evidence — see :class:`AnalysisContext`. The

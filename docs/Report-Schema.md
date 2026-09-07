@@ -45,6 +45,7 @@ class Report:
         SharedElementName
     ]  # different-typed elements sharing one name slug
     elements_analyzed: int
+    model_repair: ModelRepair | None  # what the repair pass could change, and did
     analysis_context: (
         AnalysisContext | None
     )  # what informed the analysis (never what proves it)
@@ -594,6 +595,25 @@ envelope beside the model it describes rather than on any block. It is
 recomputable from the
 report's own embedded `system_model`, by design.
 
+## `model_repair` — what the repair pass was allowed to change
+
+```python
+class ModelRepair:
+    scope: str  # "elements" or "whole"
+    implicated: list[str]  # the elements the validation issues named
+    restored: list[str]  # elements the repair changed anyway, put back
+```
+
+`None` where no repair pass ran. The repair prompt asks for every element
+the issues did not name to come back byte-identical; the revalidate gate
+enforces it. When every issue named an element, `scope` is `elements`: the
+repair may change those elements and add elements, and every other element is
+restored from the model the issues were computed against, with its ID in
+`restored`. When an issue named no element, a fault over the whole object,
+`scope` is `whole` and nothing is restored, because no narrower patch could
+answer it. A report whose `nodes` name the repair node and carry `None` here
+predates the field.
+
 ## `coverage` — what each lane was offered
 
 A claim count says how much a lane agent found. It cannot say whether a lane
@@ -1008,6 +1028,9 @@ class TokenUsage:
 > - Each block carries `repaired_quotes`. A quote ground's `text` is no longer
 >   always what the agent wrote: where the ladder refused it and the source
 >   held a near span, the text is that span and this list carries the agent's.
+> - The envelope carries `model_repair`: what the repair pass was allowed to
+>   change and which elements it changed anyway and had put back. `None`
+>   where no repair ran, and on archived runs that did.
 > - `repaired_quotes[]` carries `moved`, what the substitution changed in the
 >   claim's own terms, and `scan_complete`, whether the rung ranked every
 >   window. `moved` is required and was filled in on the 18 archived

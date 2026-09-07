@@ -299,7 +299,12 @@ def test_an_eval_report_carries_every_field_production_stamps(case):
         "boundary_crossings",
         "analyses",
         "shared_element_names",
+        "model_repair",
     }
+    # The decision for ``model_repair``: an eval run enters the graph past
+    # extraction, so no repair pass ran and the envelope says so with ``None``,
+    # which is a fact about this run rather than a field the seam forgot.
+    assert run.report.model_repair is None
     block = run.report.analyses[0]
     assert len(block.coverage) == len(STRIDE_CATEGORIES)
     assert run.report.shared_element_names == [
