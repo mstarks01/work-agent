@@ -1131,6 +1131,22 @@ class TestAChapterRuledOutInCode:
             DraftRequirementRuling.ruled_out(model, {"level": 2}, "file-handling") == {}
         )
 
+    def test_an_upload_is_a_file_so_no_upload_word_loses_the_later_sections(self):
+        """A table with a hole, found on review of #667: six upload words were
+        not file words, so "users import a CSV" kept V5.1 and V5.2 and ruled
+        V5.3 and V5.4 out. The file table is now the upload table and a suffix."""
+        from analysis_service.frameworks.asvs.rules import FILE_TERMS, UPLOAD_TERMS
+
+        assert set(UPLOAD_TERMS) <= set(FILE_TERMS)
+        model = SystemModel.model_validate(
+            json.loads((CORPUS_DIR / "01-payments-checkout" / "model.json").read_text())
+        )
+        model.processes[0].description += " Merchants import a CSV of prices."
+
+        assert (
+            DraftRequirementRuling.ruled_out(model, {"level": 2}, "file-handling") == {}
+        )
+
     def test_each_deciding_test_names_sections_its_chapter_has(self):
         from analysis_service.frameworks.asvs.catalog import sections_of
         from analysis_service.frameworks.asvs.rules import PRESENCE_TESTS
