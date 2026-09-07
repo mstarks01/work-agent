@@ -61,6 +61,7 @@ __all__ = [
     "compose_cases",
     "compose_notes",
     "select_documents",
+    "select_per_lane",
 ]
 
 # Per lane, per job. Lanes run in parallel and each pays its own tokens, so
@@ -78,25 +79,71 @@ MAX_CASES = 1
 
 
 def select_documents(
-    index: Mapping[str, tuple[str, ...]], fired: Collection[str], limit: int
+    index: Mapping[str, tuple[str, ...]],
+    fired: Collection[str],
+    limit: int,
+    seen: Collection[str] = (),
 ) -> tuple[str, ...]:
     """The documents these fired rules earn, most-matched first, capped.
 
-    Ranked by how many of the lane's fired rules name a document, with
-    declaration order as the tie-break — fixed in the package's source, so two
-    runs over one model select the same documents in the same order and the
-    composed instruction is byte-identical. That stability is the same property
-    :func:`~analysis_service.domains.select_domain_packs` needs and for the same
+    Ranked by how many of the lane's fired rules name a document. Then by
+    whether this job has already sent it — ``seen`` — and only then by
+    declaration order, fixed in the package's source. Two runs over one model
+    therefore select the same documents in the same order and the composed
+    instruction is byte-identical, which is the property
+    :func:`~analysis_service.domains.select_domain_packs` needs for the same
     reason: an instruction that reordered between runs would make two otherwise
-    identical jobs send different bytes.
+    identical jobs send different bytes. ``seen`` keeps that, because the caller
+    accumulates it over the package's own declared lane order.
+
+    **Match count still decides first, and the tie-break is why ``seen``
+    exists.** Over the whole corpus every single selection was a tie at one
+    matched rule, so declaration order alone chose all 39 of them and sent every
+    one to the first-declared document — leaving two registered worked cases
+    that no lane of any case ever received. They were not less relevant; they
+    were later in the file. Breaking a tie toward material this job has not sent
+    spends the same budget on more of the corpus, and a better-matched document
+    still wins outright.
+
+    ``seen`` is per job and per table, never global: a note and a worked case
+    are different material under different caps, and a document one job sent
+    says nothing about the next.
     """
     fired_set = set(fired)
+    already = set(seen)
     matched = [
-        (-hits, position, name)
+        (-hits, name in already, position, name)
         for position, (name, rules) in enumerate(index.items())
         if (hits := len(fired_set.intersection(rules)))
     ]
-    return tuple(name for _, _, name in sorted(matched)[:limit])
+    return tuple(name for *_, name in sorted(matched)[:limit])
+
+
+def select_per_lane(
+    index: Mapping[str, tuple[str, ...]],
+    fired_by_lane: Sequence[Collection[str]],
+    limit: int,
+) -> list[tuple[str, ...]]:
+    """One table's selection for each of a job's lanes, in the order given.
+
+    **The one reader of the accumulation.** :func:`select_documents` breaks a
+    tie toward material this job has not sent, which means the answer for one
+    lane depends on the lanes before it — so *how* the running set is carried is
+    part of the rule and not a caller's detail. The graph and the offline
+    coverage lint both come through here, or the lint would report a selection
+    the service does not make.
+
+    ``fired_by_lane`` is the fired rule IDs per lane, in the package's declared
+    lane order. That order is fixed in the package's source, so the result is
+    the same on every run over one model.
+    """
+    seen: list[str] = []
+    selected = []
+    for fired in fired_by_lane:
+        chosen = select_documents(index, fired, limit, seen=seen)
+        seen.extend(chosen)
+        selected.append(chosen)
+    return selected
 
 
 def _compose(loader: MarkdownLoader, prefix: str, names: Sequence[str]) -> str:

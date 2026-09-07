@@ -23,6 +23,7 @@ from analysis_service.knowledge import (
     compose_cases,
     compose_notes,
     select_documents,
+    select_per_lane,
 )
 from analysis_service.markdown_loader import MarkdownLoader
 
@@ -92,6 +93,60 @@ class TestSelection:
         fired = {rule.rule_id for rule in STRIDE.rules[:5]}
         assert select_notes(fired) == select_notes(fired)
         assert select_cases(fired) == select_cases(fired)
+
+    def test_a_better_match_beats_material_the_job_has_not_sent(self):
+        """``seen`` is a tie-break and never a re-ranking.
+
+        Deprioritising a well-matched document because another lane's agent saw
+        it would spend this lane's slot on worse material. Match count decides
+        first, and only a tie reads what the job has spent.
+        """
+        fired = {
+            "spoofing-unverified-boundary-auth",
+            "spoofing-unverified-external-caller",
+        }
+        best = select_documents(NOTES, fired, MAX_NOTES)[0]
+
+        assert best == "identity-at-a-boundary"
+        assert select_documents(NOTES, fired, MAX_NOTES, seen=[best])[0] == best, (
+            "a two-rule match lost its place to a one-rule match"
+        )
+
+    def test_a_tie_goes_to_material_the_job_has_not_sent(self):
+        """The whole of what ``seen`` buys, and the defect it repairs.
+
+        Over the blessed corpus every selection was a tie at one matched rule,
+        so declaration order alone chose all 39 and sent every one to the
+        first-declared document — leaving two registered worked cases that no
+        lane of any case ever received. They were not less relevant; they were
+        later in the file.
+        """
+        tied = {"spoofing-unverified-boundary-auth"}
+        first = select_documents(CASES, tied, MAX_CASES)
+
+        assert first == ("unknown-is-not-absent",)
+        assert select_documents(CASES, tied, MAX_CASES, seen=first) == (
+            "stated-control-outside-the-model",
+        )
+
+    def test_a_lane_run_is_stable_and_follows_the_lane_order(self):
+        """``select_per_lane`` is the one reader of the accumulation.
+
+        A lane's answer depends on the lanes before it, so how the running set
+        is carried is part of the rule rather than a caller's detail — the graph
+        and the offline coverage lint both come through here.
+        """
+        boundary = {"spoofing-unverified-boundary-auth"}
+        run = select_per_lane(CASES, [boundary, boundary, boundary], MAX_CASES)
+
+        assert run == [
+            ("unknown-is-not-absent",),
+            ("stated-control-outside-the-model",),
+            # Both are spent, so the tie falls back to declaration order and the
+            # third lane repeats rather than receiving nothing.
+            ("unknown-is-not-absent",),
+        ]
+        assert run == select_per_lane(CASES, [boundary] * 3, MAX_CASES)
 
     def test_an_unknown_rule_id_selects_nothing_rather_than_raising(self):
         """A rule with no material is a gap in the corpus, not a failed job.
