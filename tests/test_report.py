@@ -796,3 +796,48 @@ class TestRepairedQuoteMarks:
                     )
                 ],
             )
+
+
+class TestARulingRulesOnItsUnit:
+    """#657: only an evidence rejection says the unit does not apply."""
+
+    def _ruled(self, status, cause=None):
+        from analysis_service.report import Ground, RuledClaim, Verdict
+
+        return RuledClaim(
+            id="X-01",
+            framework="stride",
+            framework_version="1.0",
+            title="t",
+            description="d",
+            affected_element_ids=["process:p"],
+            grounds=[
+                Ground(
+                    kind="unknown-attribute",
+                    element_id="process:p",
+                    attribute="authentication",
+                )
+            ],
+            verdict=Verdict(
+                status=status,
+                reason="" if status == "confirmed" else "r",
+                rejected_because=cause,
+                related_unknowns=(
+                    [{"element_id": "process:p", "attribute": "authentication"}]
+                    if status == "needs-info"
+                    else []
+                ),
+            ),
+        )
+
+    def test_every_non_rejected_verdict_rules(self):
+        assert self._ruled("confirmed").rules_on_unit()
+        assert self._ruled("needs-info").rules_on_unit()
+
+    def test_an_evidence_rejection_rules_and_the_other_two_do_not(self):
+        assert self._ruled("rejected", "evidence").rules_on_unit()
+        assert not self._ruled("rejected", "lane").rules_on_unit()
+        assert not self._ruled("rejected", "duplicate").rules_on_unit()
+
+    def test_a_rejection_archived_before_the_cause_existed_reads_as_a_ruling(self):
+        assert self._ruled("rejected", None).rules_on_unit()

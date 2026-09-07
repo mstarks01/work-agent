@@ -206,13 +206,17 @@ def applied_requirements(claims: Sequence[RuledClaim]) -> tuple[set[str], set[st
     Returns ``(applied, rejected)`` as sets of the standard's identifiers.
     A claim whose ID does not parse contributes to neither: the block's own
     checks report a malformed ID, and counting it here as a miss would charge one
-    defect to a metric that is not about it.
+    defect to a metric that is not about it. Neither does a rejection that does
+    not rule on its unit — a draft the critic sent back for its lane or as a
+    duplicate — because :meth:`~analysis_service.report.RuledClaim.rules_on_unit`
+    is the one reader of that distinction and it says the requirement was never
+    answered.
     """
     applied: set[str] = set()
     rejected: set[str] = set()
     for claim in claims:
         requirement = requirement_of(claim.id)
-        if not requirement:
+        if not requirement or not claim.rules_on_unit():
             continue
         target = applied if claim.verdict.status in APPLIES else rejected
         target.add(requirement)
@@ -331,8 +335,11 @@ def observe(
 
     A requirement reaches a reader through exactly one of these: the fan-in
     hands ``scope_entries`` every ruled claim, so a requirement a claim covers
-    gets no scope entry, and one the critic rejected is covered. The order below
-    states that invariant rather than breaking a tie.
+    gets no scope entry, and one the critic rejected for evidence is covered. A
+    rejection that does not rule — for the lane, or as a duplicate — covers
+    nothing, so ``rejected_by_id`` omits it and the requirement is read off its
+    scope entry (#657). The order below states that invariant rather than
+    breaking a tie.
 
     **An ``applicable`` scope entry reads as silence, and that is a decision.**
     It is the state ``scope_entries`` gives every requirement no claim covers —
@@ -554,7 +561,7 @@ def score_dispositions(
     rejected_by_id = {
         requirement_of(claim.id): claim
         for claim in block.rejected_claims
-        if requirement_of(claim.id)
+        if requirement_of(claim.id) and claim.rules_on_unit()
     }
     scope_by_unit = {entry.unit: entry for entry in block.scope}
 

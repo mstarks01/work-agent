@@ -1024,6 +1024,38 @@ def unsettled_drafts(drafts: Sequence[Claim]) -> list[Claim]:
     return [draft for draft in drafts if type(draft).settled_by_grounds(draft) is None]
 
 
+def _duplicate_on_unit_issues(
+    drafts: Sequence[Claim], rulings: Iterable[Ruling]
+) -> list[CriticIssue]:
+    """Every ``duplicate`` rejection of a draft that rules on a unit of its own.
+
+    A package whose drafts name a unit — a catalog requirement — decides
+    duplication by that unit's identifier, and :func:`_drop_duplicate_ids` has
+    already dropped the second copy before any critic reads the set. So a
+    ``duplicate`` rejection here can only mean the critic judged two rulings on
+    two *different* requirements to be one concern, which is a ruling the
+    standard does not have: each requirement is its own question. The re-ask
+    asks for the answer to that question instead. A package whose drafts name
+    no unit is untouched, because there the critic is the only reader of
+    duplication.
+    """
+    unit_by_id = {draft.id: type(draft).unit_of(draft) for draft in drafts}
+    return [
+        CriticIssue(
+            ruling.id,
+            f"claim {ruling.id!r} rules on {unit_by_id[ruling.id]!r}, and a"
+            " duplicate of a unit-bearing draft is decided by its identifier"
+            " before you see it, so rejecting it as a duplicate of another"
+            " requirement names no check: rule on this requirement, or reject it"
+            " for evidence with the fact that rules it out",
+        )
+        for ruling in rulings
+        if ruling.verdict.status == "rejected"
+        and ruling.verdict.rejected_because == "duplicate"
+        and unit_by_id.get(ruling.id)
+    ]
+
+
 def _confirmed_on_unknown_issues(
     drafts: Sequence[Claim], rulings: Iterable[Ruling]
 ) -> list[CriticIssue]:
@@ -1187,6 +1219,7 @@ def review_issues(
     dropped = sorted(drafted_ids - ruled_ids)
     per_ruling = (
         _confirmed_on_unknown_issues(drafts, rulings)
+        + _duplicate_on_unit_issues(drafts, rulings)
         + _verdict_shape_issues(rulings)
         + _unresolved_unknown_ref_issues(rulings, system_model)
     )

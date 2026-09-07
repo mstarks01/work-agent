@@ -112,6 +112,7 @@ from evals.harness.provenance import (
     ProvenanceError,
     RunProvenance,
     provenance_of,
+    tree_identity,
 )
 from evals.harness.reference import (
     CorpusError,
@@ -249,6 +250,11 @@ def _write_reports(out: str, mode: str, runs: Mapping[str, modes.AnalysisRun]) -
             + "\n",
             "utf-8",
         )
+        # The lanes' own emissions, before the fan-in routed anything away.
+        # ``score`` does not read them: they exist so a reader can ask what a
+        # lane answered, which the drafts no longer say.
+        proposals = directory / f"{case_id}.proposals.json"
+        proposals.write_text(json.dumps(dict(run.proposals), indent=2) + "\n", "utf-8")
         total_bytes += path.stat().st_size + drafts.stat().st_size
     print(f"{len(runs)} report(s) written to {directory} ({total_bytes / 1024:.0f} KB)")
 
@@ -417,6 +423,7 @@ async def _run_mode(
             sampling=deployment.sampling,
             tiers_config_version=deployment.tiers.version,
             build=build_identity(),
+            tree=tree_identity(),
         ),
         # The union across the graphs the sweep built. Certification reports a
         # tier that presented no fingerprint as *unexercised*, so a node that

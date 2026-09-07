@@ -44,7 +44,9 @@ record that promotion would bless.
 
 from __future__ import annotations
 
+import subprocess
 from collections.abc import Iterable, Mapping
+from pathlib import Path
 from typing import Any, Self
 
 from pydantic import (
@@ -200,6 +202,12 @@ class RunProvenance(BaseModel):
     #: verifying machine. The instruction digest is *not* here: it varies with
     #: the framework selection a case declares, so it rides on each execution.
     build: dict[str, str]
+    #: The checkout the sweep ran from: the commit, with ``-dirty`` when the
+    #: working tree differed from it, or empty for an artifact written before
+    #: this was recorded. The installed versions above name a release; a sweep
+    #: runs from a checkout, and two same-day merges once made an archive
+    #: unreadable with nothing on disk saying which tree produced it (#657).
+    tree: str = ""
     sampling_config_version: int
     tiers_config_version: int
     sampling: dict[TierName, TierSampling]
@@ -355,6 +363,36 @@ def _unique(values: Iterable[str]) -> tuple[str, ...]:
     return tuple(sorted(set(values)))
 
 
+def tree_identity(root: Path | None = None) -> str:
+    """The commit this checkout is at, ``-dirty`` when the tree differs from it.
+
+    Empty where there is no checkout to ask — an installed copy, or a tree
+    without ``git`` — so an artifact never carries a guess. Read once per sweep,
+    beside :func:`~analysis_service.identity.build_identity`, because the two
+    answer different questions: the build names a release, and this names the
+    exact tree a release does not.
+    """
+    cwd = str(root) if root is not None else None
+    try:
+        head = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        status = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+    except (OSError, subprocess.CalledProcessError):
+        return ""
+    return f"{head}-dirty" if status.strip() else head
+
+
 def provenance_of(
     executions: Iterable[NodeRun],
     *,
@@ -362,6 +400,7 @@ def provenance_of(
     sampling: SamplingConfig,
     tiers_config_version: int,
     build: Mapping[str, str],
+    tree: str = "",
 ) -> RunProvenance:
     """Build the record from the node runs a sweep performed.
 
@@ -427,6 +466,7 @@ def provenance_of(
         # version it stamps is the one that computed the fingerprints beside it.
         identity_version=IDENTITY_VERSION,
         build=dict(build),
+        tree=tree,
         sampling_config_version=sampling.version,
         tiers_config_version=tiers_config_version,
         sampling=dict(sampling.tiers),
