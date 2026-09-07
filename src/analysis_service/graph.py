@@ -135,6 +135,7 @@ from analysis_service.critic import (
     critic_view,
     join_drafts,
     review,
+    unsettled_drafts,
 )
 from analysis_service.domains import select_domain_packs
 from analysis_service.evidence import (
@@ -488,6 +489,15 @@ One route rather than one per framework, because every ``skip`` edge has the
 same target: ``assemble``. See
 :attr:`FrameworkNodes.skip_route`, which reads it, for the whole of the
 argument."""
+ROUTE_REVIEW = "review"
+ROUTE_SETTLED = "settled"
+"""The fan-in's two routes. ``merge`` takes ``review`` when at least one draft
+is left for the critic to rule on, and ``settled`` when code ruled every draft
+its grounds settle (#439) or the lanes drafted nothing — then the critic is
+not called at all, and ``router`` reads an empty ruling set that
+:func:`~analysis_service.critic.complete_rulings` fills from the drafts alone.
+A critic shown nothing to rule on is a paid call that returns nothing, and
+the empty view it would have read is not evidence of anything."""
 ROUTE_ACCEPT = "accept"
 ROUTE_REVISE = "revise"
 """The critic re-ask route. ``route_review`` takes it when the critic's output
@@ -1470,8 +1480,12 @@ def merge_drafts(
     keys: GraphKeys,
     nodes: FrameworkNodes,
     source_texts: dict | None = None,
-) -> dict[str, Any]:
+) -> Event:
     """Merge one framework's lane agents' proposals into the list its critic sees.
+
+    Routes on what is left for the critic: ``review`` when any draft is
+    unsettled, ``settled`` when code ruled every one or there is none, so a
+    critic is never called to read an empty view (:data:`ROUTE_REVIEW`).
 
     **One of these per selected framework.** Each fans in only its own lanes, so
     two frameworks' drafts never meet: they are ruled by different critics
@@ -1646,12 +1660,15 @@ def merge_drafts(
         nodes.key("draft_view"),
         render_fenced(critic_view(merged, model, repaired=marks.repaired_quotes)),
     )
-    return {
-        "framework": nodes.name,
-        "draft_count": len(merged),
-        "unverified_count": len(marks.unverified_grounds),
-        "unresolved_mention_count": len(marks.unresolved_mentions),
-    }
+    return _routed(
+        ROUTE_REVIEW if unsettled_drafts(merged) else ROUTE_SETTLED,
+        {
+            "framework": nodes.name,
+            "draft_count": len(merged),
+            "unverified_count": len(marks.unverified_grounds),
+            "unresolved_mention_count": len(marks.unresolved_mentions),
+        },
+    )
 
 
 def route_review(
@@ -1700,6 +1717,11 @@ def route_review(
     framework's own ``merge`` has none, and an empty draft set with an empty
     ruling set reconciles, which is the honest reading of a framework that
     drafted nothing.
+
+    An absent *reviewed* key beside drafts every one of which code settled is
+    the ``settled`` route out of ``merge``: the critic was never called, and
+    :func:`~analysis_service.critic.complete_rulings` fills the ruling set from
+    the drafts' own grounds, so the same check reconciles and takes ``accept``.
     """
     model = SystemModel.model_validate(valid_model)
     state = keys.state(ctx)
@@ -2268,7 +2290,8 @@ class _FrameworkSubgraph:
     out to the lanes, join, merge, critic, route, one bounded re-ask, look again
     — so it is built once here and instantiated per selection. Holding the built
     nodes together is what lets :func:`build_pipeline` name the edges without
-    re-deriving a single node name.
+    re-deriving a single node name. ``merge`` routes around the critic when
+    code settled every draft (:data:`ROUTE_SETTLED`), straight to ``router``.
     """
 
     nodes: FrameworkNodes
@@ -2289,7 +2312,9 @@ class _FrameworkSubgraph:
         """This framework's own edges, converging on the one shared assemble node."""
         return [
             *((agent, self.join) for agent in self.agents),
-            (self.join, self.merge, self.critic, self.router),
+            (self.join, self.merge),
+            (self.merge, {ROUTE_REVIEW: self.critic, ROUTE_SETTLED: self.router}),
+            (self.critic, self.router),
             (self.router, {ROUTE_ACCEPT: assemble, ROUTE_REVISE: self.recritic}),
             (self.recritic, self.rereview),
             (
@@ -2315,7 +2340,7 @@ def _framework_subgraph(
     schemas = nodes.schemas
     reviewed_key = nodes.key("reviewed")
 
-    def merge(valid_model: dict, ctx, source_texts: dict | None = None):
+    def merge(valid_model: dict, ctx, source_texts: dict | None = None) -> Event:
         return merge_drafts(valid_model, ctx, keys, nodes, source_texts)
 
     def route(valid_model: dict, ctx) -> Event:

@@ -78,9 +78,11 @@ def reaching_refs(case, element_ids) -> list[str]:
     The fan-in bounds ``affected_element_ids`` to one hop from the places a
     claim's grounds name (#441), so a scripted draft has to cite a fact that
     reaches the elements it stands in for, or the service drops them. One
-    entry, because these tests count grounds per draft; an ``unknown:`` entry
-    over a ``crossing:`` where both reach, because the scripted critic rules
-    a conditional draft ``needs-info`` and that is the case worth exercising.
+    entry, because these tests count grounds per draft; a ``crossing:`` entry
+    over an ``unknown:`` where both reach, because code rules a draft resting
+    on an unknown before any critic reads (#439) and routes around the critic
+    when that leaves nothing (#675 D22) — so a sweep whose every draft cited
+    an unknown would stamp no critic node, and these tests read that node.
     Where nothing reaches every element the best partial reach is cited, and
     the drop of the rest is the point.
     """
@@ -93,7 +95,7 @@ def reaching_refs(case, element_ids) -> list[str]:
     def merit(ref: str) -> tuple[int, bool]:
         ground = catalog[ref]
         reach = index.reach({ground.element_id or ground.flow_id})
-        return len(wanted & reach), ref.startswith("unknown:")
+        return len(wanted & reach), not ref.startswith("unknown:")
 
     return [max(catalog, key=merit)]
 

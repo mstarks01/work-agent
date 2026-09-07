@@ -1007,16 +1007,18 @@ def test_merge_joins_drafts_in_canonical_order():
             tampering=[sample_proposal("T-01", "tampering")],
         )
     )
-    output = graph.merge_drafts(valid_model().model_dump(mode="json"), ctx, KEYS, NODES)
+    event = graph.merge_drafts(valid_model().model_dump(mode="json"), ctx, KEYS, NODES)
 
     # The fan-in names its own framework: a run carries one of these per
     # selection, and a trace that did not say which would read as one merge.
-    assert output == {
+    assert event.output == {
         "framework": "stride",
         "draft_count": 2,
         "unverified_count": 0,
         "unresolved_mention_count": 0,
     }
+    # Two drafts on quotes and derived facts are the critic's to rule.
+    assert event.actions.route == graph.ROUTE_REVIEW
     assert [d["id"] for d in ctx.state[NODES.key("drafts")]] == ["S-01", "T-01"]
     assert "S-01" in ctx.state[NODES.key("draft_view")]
 
@@ -1090,7 +1092,9 @@ def test_merge_accepts_a_lane_that_ran_and_found_nothing():
     """Empty is a finding; absent is a failure. The check is on the key."""
     ctx = FakeContext(**analyze_state(spoofing=[sample_proposal("S-01", "spoofing")]))
 
-    output = graph.merge_drafts(valid_model().model_dump(mode="json"), ctx, KEYS, NODES)
+    output = graph.merge_drafts(
+        valid_model().model_dump(mode="json"), ctx, KEYS, NODES
+    ).output
 
     assert output == {
         "framework": "stride",
@@ -1130,7 +1134,9 @@ def test_merge_drops_and_marks_a_claim_about_a_hallucinated_element():
     proposal = sample_proposal("S-01", affected_element_ids=["process:invented"])
     ctx = FakeContext(**analyze_state(spoofing=[proposal]))
 
-    output = graph.merge_drafts(valid_model().model_dump(mode="json"), ctx, KEYS, NODES)
+    output = graph.merge_drafts(
+        valid_model().model_dump(mode="json"), ctx, KEYS, NODES
+    ).output
 
     assert output["draft_count"] == 0
     marks = ctx.state[NODES.key("marks")]
@@ -1147,7 +1153,9 @@ def test_merge_refuses_a_draft_on_a_unit_the_rules_ruled_out(monkeypatch):
     ctx = FakeContext(**analyze_state(spoofing=[sample_proposal("S-01")]))
     ctx.state[NODES.key("ruled_out")] = {"S-01": "ruled out in code by a test"}
 
-    output = graph.merge_drafts(valid_model().model_dump(mode="json"), ctx, KEYS, NODES)
+    output = graph.merge_drafts(
+        valid_model().model_dump(mode="json"), ctx, KEYS, NODES
+    ).output
 
     assert output["draft_count"] == 0
     (dropped,) = ctx.state[NODES.key("marks")]["dropped_claims"]
@@ -1166,7 +1174,9 @@ def test_merge_drops_and_marks_a_proposal_that_fails_its_schema():
     )
     ctx = FakeContext(**state)
 
-    output = graph.merge_drafts(valid_model().model_dump(mode="json"), ctx, KEYS, NODES)
+    output = graph.merge_drafts(
+        valid_model().model_dump(mode="json"), ctx, KEYS, NODES
+    ).output
 
     assert output["draft_count"] == 1
     (mark,) = ctx.state[NODES.key("marks")]["dropped_claims"]
@@ -2754,11 +2764,13 @@ def test_merge_marks_an_invented_key_before_the_deferral_split():
     }
     ctx = FakeContext(**state)
 
-    output = graph.merge_drafts(
+    event = graph.merge_drafts(
         valid_model().model_dump(mode="json"), ctx, asvs_keys, asvs_nodes
     )
 
-    assert output["draft_count"] == 0
+    assert event.output["draft_count"] == 0
+    # Nothing left for a critic: the merge routes around it.
+    assert event.actions.route == graph.ROUTE_SETTLED
     assert ctx.state[asvs_nodes.key("deferred")] == {}
     (mark,) = ctx.state[asvs_nodes.key("marks")]["unknown_claim_identities"]
     assert mark["claim_id"] == "v5.0.0-6.99.99"

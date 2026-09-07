@@ -86,9 +86,11 @@ run's three outcomes.
   entry. It also computes the per-lane
   [`coverage`](Report-Schema.md#coverage--what-each-lane-was-offered) account
   over the drafts.
-  Then that framework's **critic** rules on all of them in one pass — verdicts,
-  dedupe, severity calibration — spending judgement only on what code cannot
-  check. **Each package carries its own critic, blind to every other
+  Then that framework's **critic** rules on the drafts code did not settle, in
+  one pass — verdicts, dedupe, severity calibration — spending judgement only
+  on what code cannot check. A draft resting on an `unknown` is ruled
+  `needs-info` in code before the critic reads, and when that leaves nothing
+  to rule on, or the lanes drafted nothing, the critic is not called. **Each package carries its own critic, blind to every other
   framework**: two frameworks' subgraphs never touch between `prepare` and
   `assemble`, because a critic rules its own framework's claims against its own
   framework's question.

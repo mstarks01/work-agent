@@ -147,6 +147,42 @@ def test_a_clean_run_produces_a_report():
     assert graph.REJECT_NODE not in visited
 
 
+def test_a_critic_with_nothing_to_rule_on_is_not_called():
+    """#675 D22: code rules a draft resting on an unknown (#439), and when that
+    leaves nothing, the critic is a paid call reading an empty view. ``merge``
+    routes straight to the router, which reconciles the code rulings alone."""
+    replies = {
+        "extract": valid_model().model_dump_json(),
+        graph.analyze_node_name("stride", "spoofing"): proposal_json(
+            "S-01",
+            "spoofing",
+            affected_element_ids=["store:orders-db"],
+            quotes=[],
+            evidence_refs=["unknown:store:orders-db:encryption_at_rest"],
+        ),
+    }
+    pipeline, models = build(replies)
+    outcome, visited = run(pipeline, job())
+
+    assert isinstance(outcome, PipelineCompleted)
+    (claim,) = block(outcome.report).claims
+    assert claim.verdict.status == "needs-info"
+    assert CRITIC not in visited
+    assert models[CRITIC].seen == []
+    assert CRITIC not in {node.node for node in outcome.report.nodes}
+
+
+def test_lanes_that_draft_nothing_call_no_critic():
+    replies = {"extract": valid_model().model_dump_json()}
+    pipeline, models = build(replies)
+    outcome, visited = run(pipeline, job())
+
+    assert isinstance(outcome, PipelineCompleted)
+    assert block(outcome.report).claims == []
+    assert CRITIC not in visited
+    assert models[CRITIC].seen == []
+
+
 def test_an_unfindable_quote_is_marked_on_the_report_and_still_renders():
     """The per-entry half of the policy, end to end.
 
