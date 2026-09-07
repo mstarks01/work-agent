@@ -642,6 +642,43 @@ def _load_references(
     return references
 
 
+#: A field ``case.json`` no longer has, and where the record it held went now.
+#: Keyed by the field, because a cutover retires a field rather than a case: a
+#: reader whose working tree still carries one meets it at their next launch,
+#: and this line is where they learn what to do about it. The paths are pinned
+#: against the code that writes them by ``tests/test_corpus_lints.py``.
+RETIRED_FIELDS = {
+    "reviews": (
+        "a sitting is one JSON file under evals/review/submissions and nothing"
+        " else (ADR 24). Delete the field to load the case; the app writes the"
+        " submission, and your draft under ~/.local/state/work-agent/sittings"
+        " is untouched"
+    ),
+}
+
+
+def _case_refusal(case_dir: Path, error: ValidationError) -> str:
+    """What one bad ``case.json`` says, as a sentence rather than a frame.
+
+    ``str(ValidationError)`` carries an error tag, a truncated repr of the
+    value and a link to pydantic's documentation. None of that names what the
+    reader must change, and a retired field needs one thing said that pydantic
+    cannot know: where the record it held lives now.
+    """
+    said = []
+    for detail in error.errors():
+        field = ".".join(str(part) for part in detail["loc"]) or "case.json"
+        if detail["type"] == "extra_forbidden":
+            retired = RETIRED_FIELDS.get(field)
+            said.append(
+                f"{field} is not a field case.json has"
+                + (f" — {retired}" if retired else "")
+            )
+        else:
+            said.append(f"{field}: {detail['msg']}")
+    return f"{case_dir.name}: case.json: {'; '.join(said)}"
+
+
 def load_case(case_dir: Path | str) -> GoldenCase:
     """Load and check one golden case directory."""
     case_dir = Path(case_dir)
@@ -652,7 +689,7 @@ def load_case(case_dir: Path | str) -> GoldenCase:
     try:
         meta = CaseMetadata.model_validate(_read_json(case_dir / "case.json"))
     except ValidationError as exc:
-        raise CorpusError(f"{case_dir.name}: case.json: {exc}") from exc
+        raise CorpusError(_case_refusal(case_dir, exc)) from exc
     if meta.id != case_dir.name:
         raise CorpusError(
             f"{case_dir.name}: case.json id {meta.id!r} does not match the"
