@@ -204,12 +204,15 @@ from analysis_service.vendors import ServedTrust, vendor_for_route
 # the model, and every other branch can only name something present.**
 #
 # 3.0 also carries ``rejected_because`` on a verdict: which of the critic's
-# three checks — the draft's own substance, the lane it was filed in, or another
+# checks — the draft's own substance, the lane it was filed in, or another
 # draft already covering it — ended a rejected draft. A consumer reading the
 # rejected array as an audit trail had to parse the reason prose for this and can
 # now read a field. It rides 3.0 because 3.0 has never shipped, and it is
 # additive: ``None`` is the honest answer for a rejection recorded before the
-# field, so a report written then still validates and still reads.
+# field, so a report written then still validates and still reads. The
+# substance check answers in two values, ``evidence`` and ``reasoning``, because
+# only the first rules on the draft's unit (#659); a consumer switching over the
+# three it knew meets a fourth, which also rides the unshipped 3.0.
 #
 # A ``needs-info`` verdict names what has to be answered in one of two
 # spellings: an element and one of its attributes, or a ``subject`` — a question
@@ -262,18 +265,24 @@ Rating = Literal["low", "medium", "high"]
 SeverityLevel = Literal["low", "medium", "high", "critical"]
 VerdictStatus = Literal["confirmed", "needs-info", "rejected"]
 
-# Which of the critic's three checks killed a rejected draft. The rejected array
-# is an audit trail, and a reader has to be able to tell which step ended a
+# Which of the critic's checks killed a rejected draft. The rejected array is
+# an audit trail, and a reader has to be able to tell which step ended a
 # draft; the reason says it in prose, and this says it in a field the code reads.
 #
 # **The steps, not a package's reasons.** ``prompts/critic.md`` numbers three
-# checks and every package's own critic text names the same three in its own
-# words, because the property is neutral: a draft can fail on its own substance,
-# on where it was filed, or on another draft already covering it. A framework
-# that ruled a unit out of scope and one that rejected an attacker action both
-# answer ``evidence``; the vocabulary describes the check rather than what the
-# check was about, so it answers for a package nobody has written.
-RejectionStep = Literal["evidence", "lane", "duplicate"]
+# checks and every package's own critic text names the same in its own words,
+# because the property is neutral: a draft can fail on its own substance, on
+# where it was filed, or on another draft already covering it. The first check
+# has two outcomes, and they are two values because they say different things
+# about the draft's *unit* (#659). ``evidence`` says the model's stated facts
+# settle that the draft's subject is not there — a framework that ruled a
+# requirement out of scope and one that rejected an attacker action on a stated
+# fact both answer it, and it rules on the unit. ``reasoning`` says the draft
+# asserts or infers what the model does not state, so the draft fails and the
+# unit stays open: a package answering in units lists it as ``not-raised``.
+# The vocabulary describes the check rather than what the check was about, so
+# it answers for a package nobody has written.
+RejectionStep = Literal["evidence", "reasoning", "lane", "duplicate"]
 
 # One value in a report's per-tier sampling clear block. Wide on purpose: it is
 # every scalar type a resolved sampling param can hold, and the block is a
@@ -995,13 +1004,16 @@ class RuledClaim(Claim):
     def rules_on_unit(self) -> bool:
         """Whether this ruling says something about the unit the claim names.
 
-        A rejection has three causes and only one of them is a ruling. Rejected
+        A rejection has four causes and only one of them is a ruling. Rejected
         for ``evidence``, the critic says the unit does not apply to a system of
-        this shape, which is an answer. Rejected for ``lane`` or ``duplicate``,
-        the critic says the *draft* was in the wrong place or was a second copy,
-        and says nothing about the unit — which then stays unruled, exactly as
-        if no lane had drafted it. A rejection recorded before the cause was a
-        field carries ``None`` and reads as a ruling, because that is what every
+        this shape, which is an answer. Rejected for ``reasoning``, the critic
+        says the *draft's argument* does not hold — it asserted or inferred what
+        the model does not state — and says nothing about the unit, which stays
+        open (#659). Rejected for ``lane`` or ``duplicate``, the critic says the
+        draft was in the wrong place or was a second copy, and again says
+        nothing about the unit. All three leave it unruled, exactly as if no
+        lane had drafted it. A rejection recorded before the cause was a field
+        carries ``None`` and reads as a ruling, because that is what every
         reader made of it at the time.
 
         **One reader.** The scope builder that decides which units a block

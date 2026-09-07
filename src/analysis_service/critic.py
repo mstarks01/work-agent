@@ -528,7 +528,7 @@ def _verdict_shape_issues(rulings: Iterable[Ruling]) -> list[CriticIssue]:
                     ruling.id,
                     f"claim {ruling.id!r} is rejected but names no check in"
                     " rejected_because, so nothing says which of evidence,"
-                    " lane or duplicate ended it",
+                    " reasoning, lane or duplicate ended it",
                 )
             )
         if verdict.status != "rejected" and verdict.rejected_because is not None:
