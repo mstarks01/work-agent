@@ -876,6 +876,7 @@ NEUTRAL_HOOKS: dict[str, str] = {
     "settled_by_grounds": "record",
     "unit_of": "record",
     "unit_text": "record",
+    "text_of_unit": "record",
     "rating_of": "record",
     "scope_entries": "block",
     "summarize": "block",

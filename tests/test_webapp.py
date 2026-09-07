@@ -1239,7 +1239,15 @@ PAGE_SCRIPTS = {
 #: holds values rather than code: a page's injected values keep their escape
 #: at the template, where :func:`~webapp.page.script_json` decides how each is
 #: spelled, and only the code moves to a file.
+#:
+#: Two shapes, and both are rules rather than a list of blessed names. A block
+#: of ``const NAME = <!--field-->;`` lines is a page's injected values. A block
+#: that is one placeholder and nothing else is a payload
+#: (``<!--report-->``, ``<!--units-->``) or the code slot (``<!--script-->``).
+#: Named individually, this table grew an entry per payload and the next one
+#: failed a check that had nothing to say about it.
 _VALUE_BLOCK = re.compile(r"^\s*(?:const \w+ = <!--\w+-->;\s*)+$")
+_PAYLOAD_BLOCK = re.compile(r"^\s*<!--\w+-->\s*$")
 
 
 @pytest.mark.parametrize("source", sorted(PAGE_SCRIPTS))
@@ -1251,10 +1259,12 @@ def test_a_page_template_carries_no_script_body(source):
     lint in this file used to do. In a file it is JavaScript that a linter can
     parse and ``node`` can run.
 
-    Two block shapes stay legal. ``<!--script-->`` is the slot
-    :func:`~webapp.page.render` fills from the file, and a block of nothing but
-    ``const NAME = <!--field-->;`` lines is the page's injected values, which
-    keep their escape at the template.
+    Two block shapes stay legal, and both are stated as shapes rather than as
+    a list of names. A block of nothing but ``const NAME = <!--field-->;``
+    lines is the page's injected values, which keep their escape at the
+    template. A block that is one ``<!--name-->`` placeholder and nothing else
+    is the code slot :func:`~webapp.page.render` fills from a file, or a JSON
+    payload it fills through :func:`~webapp.page.script_json`.
     """
     blocks = re.findall(
         # Anchored to the start of a line, which is where a template opens one.
@@ -1267,8 +1277,7 @@ def test_a_page_template_carries_no_script_body(source):
     written = [
         block
         for block in blocks
-        if block.strip() not in {"<!--script-->", "<!--report-->"}
-        and not _VALUE_BLOCK.fullmatch(block)
+        if not _PAYLOAD_BLOCK.fullmatch(block) and not _VALUE_BLOCK.fullmatch(block)
     ]
     assert written == [], (
         f"{source} writes a script block of its own. Move the code to"
@@ -1295,3 +1304,76 @@ def test_every_client_script_belongs_to_a_page():
         f"webapp/static holds {sorted(on_disk - named)} that no page names, and"
         f" the table names {sorted(named - on_disk)} that is not there."
     )
+
+
+class TestTheReportPageGetsARowPerUnit:
+    """#659 F18: grouped counts say how much, and never which or on what grounds."""
+
+    def _asvs_report(self):
+        import json
+        from pathlib import Path as _Path
+
+        from analysis_service.report import Report
+
+        archive = sorted(_Path("evals/runs").rglob("*.report.json"))
+        for path in archive:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            if any(b["framework"] == "asvs" for b in raw.get("analyses", ())):
+                return Report.model_validate(raw)
+        pytest.skip("no archived ASVS report to read")
+
+    def test_every_unit_carries_the_standards_own_words(self):
+        from webapp.main import unit_rows
+
+        report = self._asvs_report()
+        (block,) = [b for b in report.analyses if b.framework == "asvs"]
+
+        rows = unit_rows(report)["asvs"]
+
+        assert len(rows) == len(block.scope) + len({c.id for c in block.all_claims()})
+        assert all(row["text"].startswith("Verify that") for row in rows)
+
+    def test_the_rows_sort_into_the_standards_own_order(self):
+        from webapp.main import unit_rows
+
+        rows = unit_rows(self._asvs_report())["asvs"]
+        units = [row["unit"] for row in rows]
+
+        # Numeric, so V6.2.10 follows V6.2.9 rather than V6.2.1.
+        assert units == sorted(
+            units, key=lambda u: [int(p) for p in u.lstrip("V").split(".")]
+        )
+
+    def test_a_claim_names_the_unit_it_rules_on(self):
+        from webapp.main import unit_rows
+
+        report = self._asvs_report()
+        (block,) = [b for b in report.analyses if b.framework == "asvs"]
+        ruled = {row["unit"]: row["claim_id"] for row in unit_rows(report)["asvs"]}
+
+        for claim in block.all_claims():
+            unit = claim.id.split("-", 1)[1]
+            assert ruled[f"V{unit}"] == claim.id
+
+    def test_a_framework_with_an_open_claim_set_gets_no_rows(self):
+        """STRIDE names no unit and quotes no catalog, so the page draws no table."""
+        from tests.factories import sample_report, sample_threat
+        from webapp.main import unit_rows
+
+        report = sample_report(threats=[sample_threat()])
+
+        assert unit_rows(report) == {"stride": []}
+
+    def test_the_payload_reaches_the_page_escaped(self):
+        from tests.factories import sample_report, sample_threat
+
+        report = sample_report(threats=[sample_threat(title="</script>")])
+        html = render_report(report).html
+
+        payload = re.search(
+            r'<script type="application/json" id="units"[^>]*>(.*?)</script>',
+            html,
+            re.DOTALL,
+        )
+        assert payload is not None
+        assert "</script>" not in payload.group(1)

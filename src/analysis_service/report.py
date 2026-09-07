@@ -949,18 +949,34 @@ class Claim(BaseModel):
         return ""
 
     @classmethod
+    def text_of_unit(cls, unit: str) -> str:
+        """This framework's own statement of one unit, or ``""``.
+
+        **One reader of what a unit says**, asked by the two places that need
+        it: the critic view, through :meth:`unit_text`, and the report page,
+        which lists a row per unit and would otherwise show a reader an
+        identifier and a verdict with no way to tell whether either is right.
+        A second lookup would be a second answer to one question.
+
+        The neutral answer is empty: a framework whose claims are an open set
+        has no catalog to quote, so it supplies no text and both callers
+        render none.
+        """
+        del unit
+        return ""
+
+    @classmethod
     def unit_text(cls, draft: Claim) -> str:
         """The framework's own statement of the unit a draft rules on, or ``""``.
 
         A package holding a catalog hands the critic the requirement's text
         beside each draft, so the verdict is reached against what the standard
         asks rather than against the draft's paraphrase of it — which is the
-        gap a wrong exemplar exploited (#659). The neutral answer is empty: a
-        framework whose claims are an open set has no text a draft could be
-        judged against, and the view carries nothing.
+        gap a wrong exemplar exploited (#659). Reads
+        :meth:`text_of_unit`, so the critic and the report page cannot
+        disagree about what a unit says.
         """
-        del draft
-        return ""
+        return cls.text_of_unit(cls.unit_of(draft))
 
     @classmethod
     def rating_of(cls, draft: Claim) -> tuple[str, str] | None:
