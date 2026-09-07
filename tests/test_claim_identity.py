@@ -63,13 +63,52 @@ MATCHER_WIDER_THAN_FINGERPRINT = 2
 #: between claims that are *not* distinct does not belong here; it belongs
 #: merged in the corpus.
 UNSEPARATED: dict[str, str] = {
+    "01-payments-checkout | elevation-of-privilege |"
+    " process:order-service, process:storefront-api": (
+        "**The verb does not separate this one, and it is the only entry here"
+        " the shipped rule actually merges.** Both are `escalate` against the"
+        " same two processes: one says the order service grants privilege on"
+        " network position, the other says compromising the exposed API pivots"
+        " into the core zone. The first names the grant and the second names"
+        " the path, and the corpus records them as one must-find and one"
+        " expected. Whether that is one finding written twice is a review"
+        " question rather than one this test can settle -- and until it is"
+        " settled, a vote on either answers for both."
+    ),
+    "01-payments-checkout | information-disclosure |"
+    " process:order-service, store:orders-db": (
+        "Reading PII off the unprotected connection and recovering the database"
+        " password out of the process environment are `intercept` and"
+        " `recover-credential` against one pair of elements. The verb separates"
+        " them, which is what #201 argues it is for."
+    ),
+    "07-cicd-store-deploy | tampering |"
+    " process:deploy-controller, process:store-server": (
+        "Altering the controller's release record and altering the answer to a"
+        " store's poll are `alter` and `alter-in-transit`: one changes what the"
+        " estate is told to run, the other changes what one store receives."
+        " Different controls, and the verb separates them."
+    ),
+    "07-cicd-store-deploy | tampering | process:store-server, store:image-registry": (
+        "Replacing the image at rest under its tag and altering it as a store"
+        " pulls it are `plant` and `alter-in-transit` -- registry integrity"
+        " against transport protection. The verb separates them."
+    ),
     "09-cookbook-sokify-retail | tampering |"
-    " flow:catalogue-spreadsheet-to-web-api:sql-statements, process:web-api": (
+    " process:catalogue-spreadsheet, process:web-api": (
         "Driving the macros to change prices through the API, and appending"
         " further SQL to the statements those macros send, are two attacker"
         " actions against one flow: the first uses the interface as built, the"
         " second escapes it. Both are must-find, and merging them would hide"
-        " the injection finding behind the price-change one."
+        " the injection finding behind the price-change one. `alter` against"
+        " `inject`, so the verb separates them."
+    ),
+    "13-dispatch-control-plane | elevation-of-privilege |"
+    " process:dispatch-api, process:dispatch-console": (
+        "A cross-site request the browser is made to send, and script served"
+        " from the console's own origin, are `ride-session` and `inject`."
+        " Origin policy answers the first and content control answers the"
+        " second, so the verb separates them."
     ),
 }
 
@@ -91,8 +130,19 @@ def identity_key(case: GoldenCase, claim: ReferenceThreat) -> str:
     records what it costs on this corpus: it merges an order of magnitude more
     reference claims than equality does, every one of them a pair a reviewer
     ruled distinct.
+
+    **The elements are endpoint-resolved, because the shipped rule resolves
+    them.** This read raw ``affected_element_ids`` and so answered about a key
+    nothing uses: a claim citing a flow and a claim citing the process at its
+    end landed on two keys here and on one in
+    :func:`~evals.harness.fingerprint.components_for`. It reported **one**
+    collision where the shipped fold finds **six**, so five pairs this file
+    exists to surface were invisible — including the only one the ledger will
+    actually merge. Resolving here is not a relaxation of the equality rule
+    above; it is the same rule over the same spelling of a place.
     """
-    elements = ", ".join(sorted(claim.affected_element_ids))
+    flows = {flow.id: (flow.source, flow.destination) for flow in case.model.data_flows}
+    elements = ", ".join(sorted(endpoint_form(claim.affected_element_ids, flows)))
     return f"{case.meta.id} | {claim.category} | {elements}"
 
 
