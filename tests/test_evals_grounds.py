@@ -170,7 +170,11 @@ class TestRepairedQuotes:
             [grounded(1, quote(), quote("b"))],
             [],
             [],
-            [RepairedQuote(claim_id="S-01", index=1, written="w", similarity=0.9)],
+            [
+                RepairedQuote(
+                    claim_id="S-01", index=1, written="w", similarity=0.9, moved=[]
+                )
+            ],
         )
 
         assert measurement.repaired_count == 1

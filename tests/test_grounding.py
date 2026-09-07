@@ -16,6 +16,7 @@ from analysis_service.grounding import (
     MAX_REPAIR_QUOTE_CHARS,
     MAX_REPAIR_WORK,
     REPAIR_THRESHOLD,
+    meaning_moved,
     normalize,
     prepare_source,
     repair_deadline,
@@ -125,10 +126,10 @@ class TestTheRepairRung:
         )
 
         assert repair is not None
-        span, similarity = repair
-        assert span == "a single shared password out of an environment variable,"
-        assert similarity >= REPAIR_THRESHOLD
-        assert verify_quote(span, SOURCE)
+        assert repair.span == "a single shared password out of an environment variable,"
+        assert repair.similarity >= REPAIR_THRESHOLD
+        assert repair.complete
+        assert verify_quote(repair.span, SOURCE)
 
     def test_a_dropped_word_is_repaired(self):
         """Six characters on forty-six are inside the threshold. The same drop
@@ -422,3 +423,73 @@ class TestPreparingASourceOnce:
         monkeypatch.setattr(grounding, "prepare_source", refuse)
 
         assert repair_quote("anything at all", SOURCE, time.thread_time() - 1) is None
+
+
+class TestWhatARepairMoved:
+    """The mechanical half of "the span says something different" (#675 D15).
+
+    A repair inside the threshold can flip what a quote asserts. The rung
+    still substitutes — ADR 0018 — and names what moved, so the critic and the
+    reader are told the span is not the agent's evidence.
+    """
+
+    def test_a_dropped_not_is_a_moved_negation(self):
+        source = "The service does not encrypt the backups at rest."
+        quote = "The service does encrypt the backups at rest."
+        repair = repair_quote(quote, source)
+
+        assert repair is not None
+        assert repair.span == source
+        assert meaning_moved(quote, repair.span) == ("negation",)
+
+    def test_a_changed_figure_is_a_moved_number(self):
+        assert meaning_moved("rotated every 90 days", "rotated every 30 days") == (
+            "number",
+        )
+
+    def test_a_contraction_counts_as_a_negation(self):
+        assert meaning_moved("it doesn't log", "it does log") == ("negation",)
+
+    def test_a_tidy_moves_nothing(self):
+        assert (
+            meaning_moved(
+                "a single shared password from an environment variable",
+                "a single shared password out of an environment variable,",
+            )
+            == ()
+        )
+
+    def test_both_classes_are_named_in_a_fixed_order(self):
+        assert meaning_moved("not 3 keys", "5 keys") == ("negation", "number")
+
+
+class TestATruncatedScanSaysSo:
+    """#675 D14: the caller could not tell a cut-short answer from a finished one."""
+
+    def test_a_scan_the_budget_stops_is_marked_incomplete(self, monkeypatch):
+        source = " ".join(
+            f"the {n} quick brown foxes jumped over a lazy dog near" for n in range(400)
+        )
+        words = source.split()
+        quote = " ".join(words[10:26]).replace("quick", "quikc")
+        # Enough work to reach and rank the window at word 10, not enough to
+        # rank the thousands after it.
+        monkeypatch.setattr("analysis_service.grounding.MAX_REPAIR_WORK", 400_000)
+
+        repair = repair_quote(quote, source)
+
+        assert repair is not None
+        assert repair.similarity >= REPAIR_THRESHOLD
+        assert not repair.complete
+
+    def test_a_scan_that_ranks_every_window_is_complete(self):
+        source = " ".join(
+            f"the {n} quick brown foxes jumped over a lazy dog near" for n in range(40)
+        )
+        words = source.split()
+        quote = " ".join(words[-16:]).replace("lazy", "lzay")
+
+        repair = repair_quote(quote, source)
+
+        assert repair is not None
+        assert repair.complete

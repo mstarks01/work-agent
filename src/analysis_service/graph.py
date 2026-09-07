@@ -1642,7 +1642,10 @@ def merge_drafts(
     # pairs it would otherwise hunt for computed onto them. The re-ask builds
     # its own view through the same function, so the two passes cannot disagree
     # about what a critic reads.
-    state.prompt(nodes.key("draft_view"), render_fenced(critic_view(merged, model)))
+    state.prompt(
+        nodes.key("draft_view"),
+        render_fenced(critic_view(merged, model, repaired=marks.repaired_quotes)),
+    )
     return {
         "framework": nodes.name,
         "draft_count": len(merged),

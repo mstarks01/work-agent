@@ -51,7 +51,17 @@ so a reader can see what changed.
 "not" is within the threshold, and the rung will put the "not" back. The claim
 then rests on a span that contradicts it. That is the correct outcome for the
 report — the submitter's words are shown — and the critic reads the replaced
-span, so the claim is its to reject. The mark makes the difference visible.
+span, so the claim is its to reject. The mark makes the difference visible,
+and names the mechanical part of it: `moved` records whether a negation or a
+number differs between the agent's words and the span, computed from the two
+texts and checked against them on load. The critic is shown `written` and
+`moved` beside the draft, so a span that flipped what the agent quoted is
+read as such rather than as the agent's evidence. Nothing here judges
+support; a changed principal or control term stays the critic's to see.
+
+**A truncated scan says so.** The work budget and the deadlines stop a scan
+before it ranks every window, and the span returned is the best found by
+then. `scan_complete` on the mark records which case a reader is looking at.
 
 **Framework parity.** The rung runs in the shared fan-in on every quote ground
 of every package. A framework whose claims often carry one quote and nothing

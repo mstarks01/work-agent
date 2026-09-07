@@ -48,6 +48,7 @@ from analysis_service.frameworks import FrameworkPackage, FrameworkSchemas
 from analysis_service.grounding import (
     PreparedSource,
     deadline_spent,
+    meaning_moved,
     normalize,
     prepare_source,
     repair_deadline,
@@ -731,14 +732,15 @@ def _verify_quotes(claims: Sequence[Claim], sources: Mapping[str, str]) -> _Quot
             if repair is None:
                 unverified.append(index)
                 continue
-            span, similarity = repair
-            grounds[index] = ground.model_copy(update={"text": span})
+            grounds[index] = ground.model_copy(update={"text": repair.span})
             repairs.append(
                 RepairedQuote(
                     claim_id=claim.id,
                     index=index,
                     written=ground.text,
-                    similarity=round(similarity, 3),
+                    similarity=round(repair.similarity, 3),
+                    moved=list(meaning_moved(ground.text, repair.span)),
+                    scan_complete=repair.complete,
                 )
             )
         if len(unverified) == len(grounds):
@@ -1324,6 +1326,7 @@ def _ruling_view(
     drafts: Sequence[Claim],
     duplicates: Mapping[str, Sequence[str]] = MappingProxyType({}),
     rated_unlike: Mapping[str, Sequence[str]] = MappingProxyType({}),
+    repaired: Sequence[RepairedQuote] = (),
 ) -> list[dict]:
     """The drafts as a critic reads them: no recommendations, no empty branches.
 
@@ -1355,6 +1358,11 @@ def _ruling_view(
     the same pair on every draft in one critic's prompt — it rules one
     framework's drafts — so they are a constant repeated per claim.
     """
+    repairs_by_claim: dict[str, list[dict]] = {}
+    for mark in repaired:
+        repairs_by_claim.setdefault(mark.claim_id, []).append(
+            {"index": mark.index, "written": mark.written, "moved": mark.moved}
+        )
     views = []
     for draft in drafts:
         view = draft.model_dump(
@@ -1362,6 +1370,13 @@ def _ruling_view(
             exclude={*_DRAFT_UNRULED_FIELDS, "framework", "framework_version"},
             exclude_defaults=True,
         )
+        # Computed, never drafted: which quote grounds the service rewrote to
+        # the source's own span, what the agent wrote, and what the rewrite
+        # moved. The critic reads the span as the ground's text already; this
+        # is what tells it the span is not the agent's evidence, and that a
+        # negation or a number changed between the two.
+        if draft.id in repairs_by_claim:
+            view["repaired_quotes"] = repairs_by_claim[draft.id]
         # Computed, never drafted: the IDs of the other drafts naming the same
         # action at the same place (:func:`~analysis_service.critic.duplicate_groups`),
         # so the critic's duplicate step reads a pair instead of hunting for it.
@@ -1392,6 +1407,7 @@ def critic_view(
     system_model: SystemModel,
     *,
     only: Collection[str] | None = None,
+    repaired: Sequence[RepairedQuote] = (),
 ) -> list[dict]:
     """The drafts a critic is shown, with everything computed for it already.
 
@@ -1407,12 +1423,18 @@ def critic_view(
     leave a draft paired with nothing and read as unique. ``only`` narrows what
     is *rendered* and nothing else: the re-ask reproduces rulings rather than
     drafts, and an ID is the whole of a claim it need not read.
+
+    ``repaired`` is the fan-in's :class:`~analysis_service.report.RepairedQuote`
+    marks, rendered onto the draft each one names so the evidence step reads
+    what the agent wrote beside the span the service put in its place. The
+    first pass hands them in; the re-ask hands in none, because its job is
+    structural and it is told not to re-decide a verdict.
     """
     shown = unsettled_drafts(drafts)
     duplicates = duplicate_groups(shown, system_model)
     rated_unlike = rating_disagreements(shown)
     chosen = shown if only is None else [d for d in shown if d.id in only]
-    return _ruling_view(chosen, duplicates, rated_unlike)
+    return _ruling_view(chosen, duplicates, rated_unlike, repaired)
 
 
 @dataclass(frozen=True)
