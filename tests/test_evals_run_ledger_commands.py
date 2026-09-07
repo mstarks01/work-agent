@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 
-from evals.harness.fingerprint import Components
+from evals.harness.fingerprint import Components, version_for
 from evals.harness.ledger import append, cast, load
 from evals.harness.run import main, reports_dir
 
@@ -54,7 +54,9 @@ def test_rekey_moves_every_key_and_keeps_every_vote(tmp_path):
     assert main(["rekey", "--ledger", str(led), "--yes"]) == 0
 
     moved = load(led)
-    assert all(vote.fingerprint.startswith("v2:") for vote in moved)
+    assert all(
+        vote.fingerprint.startswith(f"v{version_for('stride')}:") for vote in moved
+    )
     assert [v.verdict for v in moved] == [v.verdict for v in original.votes]
     assert [v.voter for v in moved] == [v.voter for v in original.votes]
     assert [v.components for v in moved] == [v.components for v in original.votes]

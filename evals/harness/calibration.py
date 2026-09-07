@@ -470,8 +470,10 @@ def _asvs_collides(left: Any, right: Any, flows: FlowMap) -> bool:
     """One requirement ruled in one place: what the fingerprint keys.
 
     No verb, because a claim naming a catalog requirement composes none —
-    :data:`~evals.harness.fingerprint.VERSION_FOR` keys this package at version
-    3, which reads the identifier where STRIDE's version 2 reads the action.
+    :data:`~evals.harness.fingerprint.VERSION_FOR` keys this package at a
+    version reading the identifier where STRIDE's reads the action. Both read
+    the scope, and it is not compared here because a collision is only ever
+    asked within one case.
     The comparison is exactly the components that version hashes, so a
     ``True`` here is a fingerprint collision and one vote answering for two
     findings.

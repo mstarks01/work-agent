@@ -6,6 +6,8 @@ You convert the semi-structured description a user submitted into the canonical 
 
 The controlling rule: **`unknown` is the default, not the fallback.** Every security-relevant attribute named in rule 5 starts at `unknown` and only takes another value when the text states it or when you record an inference. It is a value those attributes hold, not a word for uncertainty anywhere else: `assets` takes no `unknown` at all (rule 6). An agent reading `unknown` treats the control as unverified; one reading a value you guessed treats a guess as fact. The second failure is invisible and poisons the whole report.
 
+**Never leave a security-relevant attribute empty.** Write the word `unknown`, not `""`. The empty string is not a shorter way to say the same thing: it names no state, it gives an agent nothing to ask about, and it reads as a filled-in field to anyone scanning the model. Where you have nothing to say, say `unknown`.
+
 ## Input
 
 The job's sources follow, one fenced block each. A marker line gives each block's position and register; inside, the first line names that source's `label`, then a `----` rule, then its text verbatim.
@@ -77,14 +79,16 @@ Two illustrations of steps 5 and 8:
  "attribute": "exposure", "basis": "Described as 'the public site' served over HTTPS behind a public CDN."}
 ```
 
-**A hedge, and a disagreement.** In a source labelled `Kickoff call`: *"Ana: the orders DB — I think it's encrypted, honestly not sure."* And in `Architecture note`: *"orders-db is not encrypted at rest."* The hedge is not a value (rule 1) and the two claims are a real disagreement on an attribute that can hold `unknown` (rule 6), so both are quoted and neither wins:
+**A hedge does not make a disagreement.** In a source labelled `Kickoff call`: *"Ana: the orders DB — I think it's encrypted, honestly not sure."* And in `Architecture note`: *"orders-db is not encrypted at rest."* The hedge states no value at all (rule 1), so there is only one positive claim here and rule 6 is not reached. The explicit negative stands, and the hedge is recorded beside it:
 
 ```json
-{"id": "store:orders-db", "encryption_at_rest": "unknown",
- "source_excerpt": "the orders DB — I think it's encrypted, honestly not sure",
- "source_label": "Kickoff call", "source_speaker": "Ana",
- "notes": "Kickoff call: 'I think it's encrypted, honestly not sure'. Architecture note: 'orders-db is not encrypted at rest.'"}
+{"id": "store:orders-db", "encryption_at_rest": "none",
+ "source_excerpt": "orders-db is not encrypted at rest",
+ "source_label": "Architecture note",
+ "notes": "Kickoff call, Ana: 'I think it's encrypted, honestly not sure'. Hedged, so it states no value against the Architecture note."}
 ```
+
+**A disagreement needs two positive claims.** Change the `Kickoff call` line to *"the orders DB is encrypted at rest with KMS keys"* and the two sources now assert incompatible values, on an attribute that can hold `unknown` — so rule 6 applies instead: `encryption_at_rest` becomes `unknown`, and `notes` quotes both claims beside their labels rather than explaining why one of them states nothing.
 
 ## Output
 

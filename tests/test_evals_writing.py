@@ -27,6 +27,7 @@ from tests.test_asvs import _block as asvs_block
 from tests.test_asvs import sample_asvs_claim
 
 FLOWS: dict[str, tuple[str, str]] = {}
+CASE = "01-payments-checkout"
 
 
 def vote(
@@ -42,12 +43,12 @@ def vote(
 ) -> Vote:
     """One vote on the finding the same components would key."""
     value, components = key_claim(
-        framework, lane, element_ids, FLOWS, verb=verb, identifier=identifier
+        framework, CASE, lane, element_ids, FLOWS, verb=verb, identifier=identifier
     )
     return Vote(
         fingerprint=value,
         components=components,
-        case="01-payments-checkout",
+        case=CASE,
         verdict=verdict,  # type: ignore[arg-type]
         voter=voter,
         recorded="2026-08-20T10:00:00Z",
@@ -169,7 +170,7 @@ class TestEveryPackageIsGradedOnItsProse:
     """Neutral by construction: prose quality is nobody's framework's property."""
 
     def test_an_asvs_claim_is_measured_under_its_own_key(self):
-        """ASVS keys at version 3: its chapter, its elements, its requirement."""
+        """ASVS keys on its chapter, its elements and its requirement."""
         report = sample_report(analyses=[asvs_block(1, [sample_asvs_claim()])])
         votes = Ledger(
             [

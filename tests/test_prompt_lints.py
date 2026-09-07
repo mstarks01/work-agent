@@ -854,6 +854,7 @@ EXTRACTION_FAILURE_RULES: dict[str, str] = {
     "unverifiable-excerpt": "a short verbatim quote",
     "assumption-on-unknown": "An attribute you left `unknown` inferred nothing and "
     "takes no entry",
+    "blank-control": "Never leave a security-relevant attribute empty",
 }
 
 

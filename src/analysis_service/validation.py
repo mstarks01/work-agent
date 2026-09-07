@@ -28,11 +28,12 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, ValidationError
 
-from analysis_service.analysis import control_state
+from analysis_service.analysis import CONTROL_ATTRIBUTES, control_state
 from analysis_service.grounding import normalize, verify_normalized
 from analysis_service.references import canonical
 from analysis_service.system_model import (
     CORE_ASSET_TAGS,
+    UNKNOWN,
     Assumption,
     Element,
     SystemModel,
@@ -51,6 +52,7 @@ IssueCode = Literal[
     "too-many-elements",
     "unverifiable-excerpt",
     "assumption-on-unknown",
+    "blank-control",
 ]
 
 # Admission cap on model size. Deliberately loose: it is a
@@ -157,6 +159,8 @@ def validate(
                     )
                 )
 
+        issues.extend(_blank_control_issues(element))
+
     for zoned in model.zoned_elements():
         if zoned.trust_zone not in boundary_ids:
             issues.append(
@@ -198,6 +202,42 @@ def validate(
 
     issues.extend(_citation_issues(elements, sources))
     return issues
+
+
+def _blank_control_issues(element: Element) -> list[ValidationIssue]:
+    """Every control attribute this element leaves blank, addressed to repair.
+
+    The free-text control fields carry a maximum length and no minimum, so an
+    empty ``authentication`` used to reach analysis intact: it passed this gate,
+    and :func:`~analysis_service.analysis.control_state` then called it
+    ``stated``, which suppressed the candidate rules that ask about a missing
+    control and the evidence row beside them. A model whose gate said *ready*
+    was quietly asserting a control nobody described.
+
+    ``unknown`` is the value ``prompts/extract.md`` asks for, and it is not the
+    same fact as an empty string, so this reports rather than rewrites: the
+    repair pass writes the sentinel and the source of the blank stays visible.
+    ``control_state`` now reads a blank as ``unverified`` whatever happens here,
+    so the two answers agree if one arrives anyway.
+
+    Walks :data:`~analysis_service.analysis.CONTROL_ATTRIBUTES` — the one
+    registry of which attributes are controls — rather than testing every string
+    field: ``technology`` and ``data_description`` are prose about the element,
+    and neither states a control whose absence is a finding.
+    """
+    return [
+        ValidationIssue(
+            code="blank-control",
+            message=f"{attribute!r} is empty; a control nobody described is"
+            f" {UNKNOWN!r}, which is a value an analyst can act on, and an"
+            " empty string is not",
+            element_id=element.id,
+            field=attribute,
+        )
+        for attribute in CONTROL_ATTRIBUTES
+        if attribute in type(element).model_fields
+        and not str(getattr(element, attribute)).strip()
+    ]
 
 
 def _states_nothing(value: object) -> bool:
