@@ -268,7 +268,12 @@ def test_the_measurement_rides_in_the_case_payload(monkeypatch, case):
     measured = {entry["framework"]: entry for entry in payload["grounds"]}
     assert set(measured) == {"stride"}
     stride = measured["stride"]
-    assert stride["counts"]["unknown-attribute"] == len(STRIDE_CATEGORIES)
+    # One catalog ground per draft, whichever kind best reaches the cited
+    # elements (``reaching_refs``), so the kinds sum to the drafts and no
+    # quote is among them.
+    counts = stride["counts"]
+    assert counts["quote"] == 0
+    assert counts["grounds"] == len(STRIDE_CATEGORIES)
     assert stride["metrics"]["grounds_per_threat"] == 1.0
 
 
