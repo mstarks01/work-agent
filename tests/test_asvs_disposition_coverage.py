@@ -129,3 +129,30 @@ def test_the_disposition_table_matches_the_evidence_kinds_production_can_ask_for
 
     assert set(DISPOSITION_FOR_EVIDENCE) == kinds
     assert set(DISPOSITION_FOR_EVIDENCE.values()) <= set(get_args(AsvsDisposition))
+
+
+def test_the_corpus_exercises_the_alternate_route():
+    """A field no record uses is a mechanism nothing tests (#659).
+
+    Widening is per record and each one is a judgement, so this asserts the
+    corpus uses the field at all rather than pinning which records do. The
+    label read that #226 owes may add more.
+    """
+    widened = {
+        f"{case_id}:{record.requirement}": record.also_acceptable
+        for case_id, records in _corpus().items()
+        for record in records
+        if record.also_acceptable
+    }
+
+    assert widened, (
+        "no ASVS record names a second acceptable route, so `also_acceptable`"
+        " is a mechanism nothing exercises"
+    )
+    # Every alternate is a route, which the record model already refuses to
+    # break; asserted here too because this is the file that reads the corpus.
+    assert all(
+        set(routes)
+        <= {"needs-more-prose", "needs-code", "needs-config", "needs-people"}
+        for routes in widened.values()
+    )

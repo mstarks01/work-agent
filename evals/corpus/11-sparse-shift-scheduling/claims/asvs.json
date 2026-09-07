@@ -23,7 +23,10 @@
     "claim": "Colleagues reach the scheduling web app from their own phones and no cookie attribute is stated.",
     "tier": "expected",
     "disposition": "needs-config",
-    "notes": "The source says nobody documented how colleagues or managers sign in, which is the silence this requirement lands in."
+    "notes": "The source says nobody documented how colleagues or managers sign in, which is the silence this requirement lands in. The attribute is set by whatever emits Set-Cookie, which is the application or the layer in front of it, so either route settles it.",
+    "also_acceptable": [
+      "needs-code"
+    ]
   },
   {
     "chapter": "authentication",

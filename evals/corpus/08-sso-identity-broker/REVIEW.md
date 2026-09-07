@@ -247,7 +247,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 - cites: `store:audit-log`
 - tier: expected
-- recorded note: Follows V16.1.1: with no inventory there is nothing stating the fields.
+- recorded note: Follows V16.1.1: with no inventory there is nothing stating the fields. The fields on an entry come from the call site or from the logging configuration, so either route settles it.
 
 > mark:
 
@@ -525,7 +525,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "36115502847aa04640666b0dd9f458881e6f7f8968e4d499b58983b3403dc721",
       "model.json": "825c92681b885f7d36968302a5a38e904c206d9e5ba62936e754b4e3fb5ca6bb",
-      "claims/asvs.json": "ed7cccc5972d41769e7275de9470d157e3a8fa3163eb4e6ad033b1c0e69c0610",
+      "claims/asvs.json": "083161f0dc258424d850b926b2ab1f7a820721ce152856c39855d12291b3816a",
       "claims/stride.json": "9bd0d3203a0a3bcb8ca80ed0de9efbc1b1a35a6c621653e1206e65e19c3dd849"
       }
     }

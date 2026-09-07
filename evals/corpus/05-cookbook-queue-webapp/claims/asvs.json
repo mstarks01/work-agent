@@ -10,7 +10,10 @@
     "claim": "No security response header is described for the one encrypted browser-facing link.",
     "tier": "must-find",
     "disposition": "needs-config",
-    "notes": "tech:browser-frontend fires; the chapter applies and every header is unstated."
+    "notes": "tech:browser-frontend fires; the chapter applies and every header is unstated. The header is emitted by the application or by the layer in front of it, so either route settles it.",
+    "also_acceptable": [
+      "needs-code"
+    ]
   },
   {
     "chapter": "web-frontend-security",
@@ -22,7 +25,10 @@
     "claim": "Nothing states whether the web application sets any cookie or with which attributes.",
     "tier": "expected",
     "disposition": "needs-config",
-    "notes": "A browser client is stated; the cookie question is open rather than answered."
+    "notes": "A browser client is stated; the cookie question is open rather than answered. The attribute is set by whatever emits Set-Cookie, which is the application or the layer in front of it, so either route settles it.",
+    "also_acceptable": [
+      "needs-code"
+    ]
   },
   {
     "chapter": "configuration",
