@@ -21,6 +21,15 @@ the number the corpus grades and the one worth defending.
 
 It does not gate, like the rest of the instruments. The spread this reports is
 the input to any future threshold rather than a threshold itself.
+
+Two kinds of difference between the runs, handled two ways. A difference that
+changes what the spread *means* — another mode, another model — is reported by
+:func:`comparability_warnings` and the comparison goes ahead, because a chosen
+comparison across configurations is a real question. A difference that makes
+the arithmetic meaningless is refused by :func:`compare_runs`: a reference
+index is a coordinate into one corpus, so two runs scored against two corpus
+digests, or two counts of one case's references, share no coordinate system
+and would have produced a spread — or a negative ``never`` — out of nothing.
 """
 
 from __future__ import annotations
@@ -55,6 +64,8 @@ class ScoredRun:
     """
 
     label: str
+    #: The corpus every reference coordinate below indexes into.
+    corpus_digest: str
     mode: str
     models: dict[str, Any]
     matched: dict[Scope, frozenset[str]]
@@ -154,6 +165,7 @@ def read_run(artifact: EvalArtifact) -> ScoredRun:
         )
     return ScoredRun(
         label=artifact.path.name,
+        corpus_digest=artifact.corpus_digest,
         mode=artifact.mode,
         models=dict(artifact.block("models")),
         matched=matched,
@@ -190,6 +202,7 @@ def compare_runs(runs: Sequence[ScoredRun]) -> list[CaseStability]:
     """
     if len(runs) < 2:
         raise ValueError("stability needs at least two scored runs")
+    _refuse_incomparable(runs)
     shared = frozenset.intersection(*(run.cases for run in runs))
     if not shared:
         raise ValueError("the runs share no scored case, so nothing is comparable")
@@ -198,9 +211,15 @@ def compare_runs(runs: Sequence[ScoredRun]) -> list[CaseStability]:
     for scope in sorted(shared):
         framework, case_id = scope
         sets = [run.matched[scope] for run in runs]
-        references = runs[0].references[scope]
+        references = _one_reference_count(runs, scope)
         always = len(frozenset.intersection(*sets))
         ever = len(frozenset.union(*sets))
+        if ever > references:
+            raise ValueError(
+                f"{framework}/{case_id}: the runs match {ever} distinct references"
+                f" and the case has {references}, so a matched index names a"
+                " reference the case does not hold"
+            )
         stability.append(
             CaseStability(
                 framework=framework,
@@ -215,6 +234,49 @@ def compare_runs(runs: Sequence[ScoredRun]) -> list[CaseStability]:
             )
         )
     return stability
+
+
+def _refuse_incomparable(runs: Sequence[ScoredRun]) -> None:
+    """The differences no warning can caveat: refused before any set is read.
+
+    The same artifact named twice is one measurement counted as two, and it
+    would report a case as perfectly stable on the strength of agreeing with
+    itself. Two corpus digests are two coordinate systems: reference ``3`` of
+    a case in one corpus is whichever claim sat third in *that* file, and the
+    matched sets would be intersected as though the indices meant one thing.
+    """
+    labels = [run.label for run in runs]
+    repeated = sorted({label for label in labels if labels.count(label) > 1})
+    if repeated:
+        raise ValueError(
+            f"the same artifact is named more than once: {', '.join(repeated)}"
+        )
+    digests = sorted({run.corpus_digest for run in runs})
+    if len(digests) > 1:
+        raise ValueError(
+            "the runs were scored against different corpora"
+            f" ({', '.join(digest[:12] for digest in digests)}), so a reference"
+            " index in one names nothing in the other; re-run over one corpus"
+        )
+
+
+def _one_reference_count(runs: Sequence[ScoredRun], scope: Scope) -> int:
+    """The case's reference count, which every run must agree on.
+
+    One corpus digest should make this unanimous, and the check is here because
+    "should" is what the ``never`` bucket used to rest on: it read the first
+    run's count against a union over every run, and two counts produced a
+    negative number where the numbers were simply about different lists.
+    """
+    counts = sorted({run.references[scope] for run in runs})
+    if len(counts) > 1:
+        framework, case_id = scope
+        raise ValueError(
+            f"{framework}/{case_id}: the runs disagree about how many references"
+            f" the case has ({', '.join(str(count) for count in counts)}), so"
+            " their matched sets index different lists"
+        )
+    return counts[0]
 
 
 def aggregate_stability(stability: Sequence[CaseStability]) -> dict[str, Any]:
