@@ -163,7 +163,13 @@ there is no longer a pattern to check it against, because a check would hide a
 bad composition rather than catch it.
 
 `StrideAnalysis` adds `missing_mitigations` to the block, and its `summary` adds
-`by_category` and `by_severity` to the neutral three counts.
+`by_category`, `by_severity` and `by_severity_confirmed` to the neutral three
+counts. The severity map is cut twice on purpose. A block's claims are the
+confirmed and the `needs-info` together, and the rubric rates a claim resting on
+an unstated control *as if the control were absent* — so a conditional claim can
+reach the top band on a fact nobody described, and one pooled map let "three
+critical" read as three settled findings. Subtract for the conditional count
+rather than reading a third map that could disagree with these two.
 
 ### ASVS's own record
 
@@ -786,7 +792,8 @@ class BlockSummary:  # on every framework block
 
 class StrideSummary(BlockSummary):  # what STRIDE's block carries
     by_category: dict[StrideCategory, int]
-    by_severity: dict[SeverityLevel, int]
+    by_severity: dict[SeverityLevel, int]  # every claim, both verdicts
+    by_severity_confirmed: dict[SeverityLevel, int]  # of those, the confirmed
 ```
 
 `summary` is computed from its own block's contents and must match them, so it

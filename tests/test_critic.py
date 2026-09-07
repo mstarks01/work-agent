@@ -133,6 +133,88 @@ class TestJoinDrafts:
         assert (mark.claim_id, mark.title) == ("S-01", "second")
         assert "repeats the ID" in mark.reason
 
+    def _conditional(
+        self,
+        threat_id,
+        title,
+        element="store:orders-db",
+        attribute="encryption_at_rest",
+    ):
+        """A draft an ``unknown`` ground settles, so no critic ever sees it."""
+        return sample_draft(
+            threat_id,
+            "information-disclosure",
+            title=title,
+            verb="read",
+            affected_element_ids=[element],
+            grounds=[
+                Ground(
+                    kind="unknown-attribute",
+                    element_id=element,
+                    attribute=attribute,
+                )
+            ],
+        )
+
+    def test_two_conditional_drafts_at_one_place_become_one(self, model):
+        """The duplicate no reader would otherwise make.
+
+        A draft its grounds settle is ruled in code and never shown to a critic,
+        and ``critic_view`` computes the duplicate pairs over the shown set — so
+        both of these reached the report and nothing compared them.
+        """
+        drafts = {
+            "information-disclosure": [
+                self._conditional("D-01", "first"),
+                self._conditional("D-02", "second"),
+            ]
+        }
+
+        joined = join_drafts(drafts, STRIDE, model)
+
+        assert [draft.title for draft in joined.drafts] == ["first"]
+        (mark,) = joined.marks.dropped_claims
+        assert (mark.claim_id, mark.title) == ("D-02", "second")
+        assert "'D-01'" in mark.reason
+
+    def test_two_conditional_drafts_at_two_places_both_survive(self, model):
+        """The key is the action and the place, not the fact they are both open."""
+        drafts = {
+            "information-disclosure": [
+                self._conditional("D-01", "the store"),
+                self._conditional(
+                    "D-02",
+                    "the flow",
+                    "flow:web-app-to-orders-db:store-order",
+                    "encryption_in_transit",
+                ),
+            ]
+        }
+
+        joined = join_drafts(drafts, STRIDE, model)
+
+        assert len(joined.drafts) == 2
+        assert joined.marks.dropped_claims == []
+
+    def test_a_reviewable_draft_is_left_to_the_critic(self, model):
+        """Code drops only what no critic will read.
+
+        A draft resting on stated facts is shown, so its duplicates are the
+        critic's to rule on — and rejecting one there is a judgement about which
+        description is better, which code has no business making.
+        """
+        drafts = {
+            "information-disclosure": [
+                sample_draft("D-01", "information-disclosure", title="first"),
+                sample_draft("D-02", "information-disclosure", title="second"),
+            ]
+        }
+
+        joined = join_drafts(drafts, STRIDE, model)
+
+        assert [draft.title for draft in joined.drafts] == ["first", "second"]
+        assert joined.marks.dropped_claims == []
+
     def test_a_lane_and_its_drafts_cannot_disagree_about_the_category(self, model):
         """There is nothing left here to check, and that is the point.
 
