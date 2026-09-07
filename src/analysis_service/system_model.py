@@ -169,6 +169,32 @@ class DataFlow(_Element):
     authentication: str = Field(max_length=200)
     data_description: str = Field(max_length=1000)
     encryption_in_transit: str = Field(max_length=200)
+    #: What the initiator does at the destination — the fact ``direction`` does
+    #: **not** carry. A service reading a database and a service writing one are
+    #: the same shape without this, so a rule about writes fired on both and told
+    #: an agent a read-only path could be tampered with.
+    #:
+    #: A closed vocabulary because it is a question with a finite answer, unlike
+    #: a control whose value is the mechanism the submitter described. ``unknown``
+    #: is the extraction sentinel and the honest default: a description that says
+    #: a service "talks to" a store settles nothing, and the evidence catalog
+    #: turns that into a fact an agent can ground a question on, because
+    #: :func:`~analysis_service.analysis.control_state` reads the word.
+    #:
+    #: It is not a **Control**: no control is missing when a flow only reads, so
+    #: it stays out of :data:`~analysis_service.analysis.CONTROL_ATTRIBUTES` and
+    #: an ``unknown`` here is never counted as an unstated control.
+    #:
+    #: **The default is the one place a default is honest.** Every other
+    #: attribute is required, so an extraction that omits one fails rather than
+    #: reading as silence. This one carries ``unknown`` because a report written
+    #: before the field existed has to keep loading — every artifact under
+    #: ``evals/runs/`` predates it — and ``unknown`` is exactly what those
+    #: models say about operations: nobody stated them. A live extraction is
+    #: still asked for the value by ``prompts/extract.md`` and graded on it by
+    #: the extraction scorer, so omitting it costs an attribute against the
+    #: blessed model rather than passing unnoticed.
+    operations: Literal["read", "write", "read-write", "unknown"] = "unknown"
 
 
 class TrustBoundary(_Element):

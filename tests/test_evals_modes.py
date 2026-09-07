@@ -527,6 +527,7 @@ def test_the_sweep_aggregate_splits_by_element_type_and_attribute(case):
         "flow.assets",
         "process.assets",
         "store.assets",
+        "flow.operations",
         "flow.protocol",
         "flow.authentication",
         "flow.encryption_in_transit",

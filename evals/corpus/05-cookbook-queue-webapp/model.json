@@ -114,7 +114,8 @@
       "protocol": "HTTP/S",
       "authentication": "unknown",
       "data_description": "application requests and responses",
-      "encryption_in_transit": "encrypted (marked as the one encrypted link)"
+      "encryption_in_transit": "encrypted (marked as the one encrypted link)",
+      "operations": "unknown"
     },
     {
       "id": "flow:web-application-to-message-queue:enqueue-job",
@@ -130,7 +131,8 @@
       "protocol": "unknown",
       "authentication": "unknown",
       "data_description": "job messages",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "write"
     },
     {
       "id": "flow:background-worker-to-message-queue:consume-job",
@@ -146,7 +148,8 @@
       "protocol": "unknown",
       "authentication": "unknown",
       "data_description": "job messages",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "read-write"
     },
     {
       "id": "flow:background-worker-to-database:read-write-records",
@@ -162,7 +165,8 @@
       "protocol": "unknown",
       "authentication": "unknown",
       "data_description": "application records and log records",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "read-write"
     },
     {
       "id": "flow:web-application-to-web-application-config:read-configuration",
@@ -178,7 +182,8 @@
       "protocol": "unknown",
       "authentication": "unknown",
       "data_description": "settings and message-queue credentials",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "read"
     },
     {
       "id": "flow:background-worker-to-worker-config:read-configuration",
@@ -194,7 +199,8 @@
       "protocol": "unknown",
       "authentication": "unknown",
       "data_description": "settings and database credentials",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "read"
     }
   ],
   "trust_boundaries": [

@@ -117,7 +117,8 @@
       "authentication": "unknown",
       "data_description": "the engineer's sign-in",
       "encryption_in_transit": "unknown",
-      "notes": "The source states nobody wrote down how an engineer signs in."
+      "notes": "The source states nobody wrote down how an engineer signs in.",
+      "operations": "unknown"
     },
     {
       "id": "flow:dispatch-console-to-dispatch-api:dispatch-requests",
@@ -133,7 +134,8 @@
       "protocol": "unknown",
       "authentication": "unknown",
       "data_description": "dispatch actions: moving a crew and changing a depot's work for the day",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "write"
     },
     {
       "id": "flow:dispatch-console-to-dispatch-api:live-job-status",
@@ -150,7 +152,8 @@
       "authentication": "unknown",
       "data_description": "live job status for the crews on screen",
       "encryption_in_transit": "unknown",
-      "notes": "The source states nobody wrote down whether the socket runs over TLS, whether its handshake is authenticated, or whether it checks the session again once open."
+      "notes": "The source states nobody wrote down whether the socket runs over TLS, whether its handshake is authenticated, or whether it checks the session again once open.",
+      "operations": "read"
     },
     {
       "id": "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
@@ -167,7 +170,8 @@
       "authentication": "unknown",
       "data_description": "tomorrow's planned work, as an XML document",
       "encryption_in_transit": "encrypted (HTTPS)",
-      "notes": "The source states nothing was written down about how the partner identifies our importer, or how our importer identifies the partner."
+      "notes": "The source states nothing was written down about how the partner identifies our importer, or how our importer identifies the partner.",
+      "operations": "read"
     },
     {
       "id": "flow:schedule-importer-to-schedule-archive:store-schedule-documents",
@@ -183,7 +187,8 @@
       "protocol": "unknown",
       "authentication": "unknown",
       "data_description": "the partner's XML schedule documents",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "write"
     },
     {
       "id": "flow:schedule-importer-to-dispatch-api:post-work-orders",
@@ -200,7 +205,8 @@
       "protocol": "unknown",
       "authentication": "an API token issued when the importer was built and never rotated since",
       "data_description": "the work orders parsed out of the partner's feed",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "write"
     },
     {
       "id": "flow:dispatch-api-to-dispatch-database:read-write-job-orders",
@@ -217,7 +223,8 @@
       "protocol": "unknown",
       "authentication": "unknown",
       "data_description": "job orders, crew names and crew mobile numbers",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "read-write"
     }
   ],
   "trust_boundaries": [

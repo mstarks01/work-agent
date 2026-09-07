@@ -170,6 +170,7 @@ _SCORED_ATTRIBUTES: Mapping[str, Callable[[Any], str]] = {
     "exposure": str,
     "interface_kind": str,
     "assets": _tags,
+    "operations": str,
     "protocol": lambda value: "stated" if states_a_protocol(value) else "silent",
     "authentication": control_state,
     "encryption_in_transit": control_state,

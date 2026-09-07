@@ -124,7 +124,8 @@
       "protocol": "local",
       "authentication": "unknown",
       "data_description": "player input and game output",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "read-write"
     },
     {
       "id": "flow:game-client-to-lobby:matchmaking",
@@ -138,7 +139,8 @@
       "protocol": "TCP 1234",
       "authentication": "unknown",
       "data_description": "matchmaking requests and match assignments",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "unknown"
     },
     {
       "id": "flow:game-client-to-game-servers:gameplay-traffic",
@@ -152,7 +154,8 @@
       "protocol": "TCP 1235",
       "authentication": "unknown",
       "data_description": "gameplay actions and state updates",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "unknown"
     },
     {
       "id": "flow:lobby-to-game-servers:hand-over-match",
@@ -166,7 +169,8 @@
       "protocol": "unknown",
       "authentication": "unknown",
       "data_description": "match composition and player identifiers",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "write"
     },
     {
       "id": "flow:lobby-to-player-database:read-players",
@@ -182,7 +186,8 @@
       "protocol": "unknown",
       "authentication": "unknown",
       "data_description": "player account records",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "read"
     },
     {
       "id": "flow:game-servers-to-stats-database:read-write-stats",
@@ -198,7 +203,8 @@
       "protocol": "unknown",
       "authentication": "unknown",
       "data_description": "match statistics",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "read-write"
     },
     {
       "id": "flow:game-servers-to-player-database:update-players",
@@ -215,7 +221,8 @@
       "protocol": "unknown",
       "authentication": "unknown",
       "data_description": "player progression and match results",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "write"
     },
     {
       "id": "flow:customer-support-to-moderation-website:moderate-accounts",
@@ -231,7 +238,8 @@
       "protocol": "unknown",
       "authentication": "unknown",
       "data_description": "moderation actions on player accounts",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "read-write"
     },
     {
       "id": "flow:moderation-website-to-player-database:read-write-players",
@@ -247,7 +255,8 @@
       "protocol": "unknown",
       "authentication": "unknown",
       "data_description": "player account records and moderation state",
-      "encryption_in_transit": "unknown"
+      "encryption_in_transit": "unknown",
+      "operations": "read-write"
     }
   ],
   "trust_boundaries": [
