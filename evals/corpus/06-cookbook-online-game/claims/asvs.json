@@ -35,7 +35,10 @@
     "claim": "The moderation website is browser-delivered and no cookie attribute is stated.",
     "tier": "expected",
     "disposition": "needs-config",
-    "notes": "`interface_kind: web` puts this system in the chapter. Expected rather than must-find because the source names no session mechanism at all."
+    "notes": "`interface_kind: web` puts this system in the chapter. Expected rather than must-find because the source names no session mechanism at all. The attribute is set by whatever emits Set-Cookie, which is the application or the layer in front of it, so either route settles it.",
+    "also_acceptable": [
+      "needs-code"
+    ]
   },
   {
     "chapter": "authentication",

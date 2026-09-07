@@ -10,7 +10,10 @@
     "claim": "Sign-in exists for some readers and no cookie attribute is stated for the session it creates.",
     "tier": "must-find",
     "disposition": "needs-config",
-    "notes": "The submitter says the mechanism and session handling are not stated, which is the requirement."
+    "notes": "The submitter says the mechanism and session handling are not stated, which is the requirement. The attribute is set by whatever emits Set-Cookie, which is the application or the layer in front of it, so either route settles it.",
+    "also_acceptable": [
+      "needs-code"
+    ]
   },
   {
     "chapter": "web-frontend-security",

@@ -135,7 +135,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 - cites: `entity:colleague`, `process:scheduling-web-app`, `flow:colleague-to-scheduling-web-app:view-shifts`
 - tier: expected
-- recorded note: The source says nobody documented how colleagues or managers sign in, which is the silence this requirement lands in.
+- recorded note: The source says nobody documented how colleagues or managers sign in, which is the silence this requirement lands in. The attribute is set by whatever emits Set-Cookie, which is the application or the layer in front of it, so either route settles it.
 
 > mark:
 
@@ -409,7 +409,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "2507fd3081003c1c94427ef81dcea36f6ca92f5358c965789b49ec4af89b6a60",
       "model.json": "8a84e2d38125ddfd3c82971019a4d35d95f92de3689c6743cc3a449195a42420",
-      "claims/asvs.json": "f841ac2558da934c05aaea4f8b56884082e3088adfa7fa2834d79c8ca979ed8c",
+      "claims/asvs.json": "5aa40048cd72a41cfaf7079d760a9a6aee4bf16a197e22203d32d60c39a54e6f",
       "claims/stride.json": "b56e600389930164b345d4859160bc6fd77bc59df466b5ecf0af5e22bb8d67b0"
       }
     }

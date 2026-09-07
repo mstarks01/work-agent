@@ -32,6 +32,7 @@ from evals import verify_corpus
 from evals.harness.applicability import (
     APPLIES,
     ApplicabilityError,
+    Judged,
     Observation,
     applied_requirements,
     declared_level,
@@ -1050,3 +1051,80 @@ class TestARejectionThatDoesNotRuleIsNotCountedAsOne:
         score = score_dispositions(read_case, block)
         assert expected in score.unreached
         assert expected not in {judged.requirement for judged in score.judged}
+
+
+class TestARecordMayAcceptASecondRoute:
+    """#659 F16: one required kind treats two defensible paths as exclusive.
+
+    A response header is emitted by the application or by the layer in front of
+    it. Both settle the obligation, and scoring whichever the corpus did not
+    write down as wrong punishes a correct run and pushes tuning toward the
+    corpus's own habits.
+    """
+
+    def test_the_alternate_route_scores_correct(self):
+        assert satisfies("needs-config", deferred_as("code"), ("prose",)) is False
+        assert (
+            satisfies("needs-config", deferred_as("code"), ("prose",), ("needs-code",))
+            is True
+        )
+
+    def test_a_route_nobody_listed_is_still_wrong(self):
+        """Widening is per record, never a general amnesty."""
+        assert (
+            satisfies(
+                "needs-config", deferred_as("people"), ("prose",), ("needs-code",)
+            )
+            is False
+        )
+
+    def test_the_run_that_matched_the_first_choice_still_scores(self):
+        assert (
+            satisfies(
+                "needs-config", deferred_as("config"), ("prose",), ("needs-code",)
+            )
+            is True
+        )
+
+    def test_wrong_kind_drops_an_accepted_route(self, case):
+        """One reader: ``wrong_kind`` reads ``ok``, so it follows automatically."""
+        reference = next(
+            r for r in case.references["asvs"] if r.requirement == "V3.3.1"
+        )
+        assert reference.also_acceptable, "the corpus record must carry one"
+
+        block = DispositionBlock(
+            scope=[deferred(reference.requirement, "code")],
+        )
+        score = score_dispositions(case, block, carried=("prose",))
+        (judged,) = [entry for entry in score.judged if entry.requirement == "V3.3.1"]
+
+        assert judged.ok
+        assert judged.also_acceptable == ("needs-code",)
+        assert "V3.3.1" not in {entry.requirement for entry in score.wrong_kind}
+
+    def test_the_artifact_names_the_routes_it_accepted(self):
+        entry = Judged(
+            requirement="V3.3.1",
+            expected="needs-config",
+            observed=Observation("deferred", "code"),
+            ok=True,
+            also_acceptable=("needs-code",),
+        )
+
+        assert entry.to_json()["also_acceptable"] == ["needs-code"]
+        # A record with one route says nothing, rather than an empty list.
+        assert (
+            "also_acceptable"
+            not in Judged(
+                requirement="V1.2.4",
+                expected="needs-code",
+                observed=Observation("deferred", "code"),
+                ok=True,
+            ).to_json()
+        )
+
+
+def deferred_as(kind: str) -> Observation:
+    """One run's answer: withheld, and naming the evidence that would settle it."""
+    return Observation("deferred", kind)
