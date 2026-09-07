@@ -1204,8 +1204,8 @@ class TestARejectionThatDoesNotRuleLeavesItsRequirementListed:
         )
         assert "V1.2.4" not in {entry.unit for entry in entries}
 
-    @pytest.mark.parametrize("cause", ["lane", "duplicate"])
-    def test_a_lane_or_duplicate_rejection_leaves_it_not_raised(self, cause):
+    @pytest.mark.parametrize("cause", ["reasoning", "lane", "duplicate"])
+    def test_a_rejection_that_does_not_rule_leaves_it_not_raised(self, cause):
         entries = AsvsAnalysis.scope_entries(
             lanes=list(LANES),
             claims=[self._rejected("V1.2.4", cause)],
