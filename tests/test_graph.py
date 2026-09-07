@@ -892,6 +892,60 @@ def test_validate_parks_the_normalized_model_the_issues_cite():
     assert "id-mismatch" not in ctx.state[graph.STATE_VALIDATION_ISSUES]
 
 
+def test_revalidate_puts_every_uncited_element_back_and_records_it():
+    """#675 D01: the repair prompt asked for it; the gate now enforces it."""
+    broken = valid_model().model_dump(mode="json")
+    broken["data_flows"][0]["destination"] = "process:does-not-exist"
+    ctx = FakeContext()
+    assert graph.validate_extraction(ctx, KEYS, broken).actions.route == (
+        graph.ROUTE_INVALID
+    )
+    baseline = ctx.state[graph.STATE_REPAIR_BASELINE]
+    assert baseline["scope"] == "elements"
+    # The flow's ID is derived from its endpoints, so the issue names the
+    # broken flow under its derived ID, and the repaired flow arrives under a
+    # new one: a delete the issue licensed plus an add, both permitted.
+    assert baseline["implicated"] == ["flow:customer-to-does-not-exist:login"]
+
+    repaired = valid_model().model_dump(mode="json")
+    repaired["processes"][0]["technology"] = "rewritten while I was here"
+    event = graph.validate_extraction(ctx, KEYS, repaired)
+
+    assert event.actions.route == graph.ROUTE_VALID
+    published = ctx.state[graph.STATE_VALID_MODEL]
+    assert published["processes"][0]["technology"] == "Python/FastAPI on Cloud Run"
+    flows = {flow["id"]: flow for flow in published["data_flows"]}
+    assert flows["flow:customer-to-web-app:login"]["destination"] == "process:web-app"
+    assert ctx.state[graph.STATE_MODEL_REPAIR] == {
+        "scope": "elements",
+        "implicated": ["flow:customer-to-does-not-exist:login"],
+        "restored": ["process:web-app"],
+    }
+
+
+def test_revalidate_leaves_a_whole_model_repair_alone():
+    """No trust zones is a fault over the whole object; nothing is put back."""
+    broken = valid_model().model_dump(mode="json")
+    broken["trust_boundaries"] = []
+    ctx = FakeContext()
+    graph.validate_extraction(ctx, KEYS, broken)
+    assert ctx.state[graph.STATE_REPAIR_BASELINE]["scope"] == "whole"
+
+    repaired = valid_model().model_dump(mode="json")
+    repaired["processes"][0]["technology"] = "rewritten"
+    event = graph.validate_extraction(ctx, KEYS, repaired)
+
+    assert event.actions.route == graph.ROUTE_VALID
+    assert ctx.state[graph.STATE_VALID_MODEL]["processes"][0]["technology"] == (
+        "rewritten"
+    )
+    assert ctx.state[graph.STATE_MODEL_REPAIR] == {
+        "scope": "whole",
+        "implicated": [],
+        "restored": [],
+    }
+
+
 def test_validate_routes_invalid_on_unparseable_output():
     ctx = FakeContext()
     event = graph.validate_extraction(ctx, KEYS, {"processes": "not a list"})

@@ -40,4 +40,4 @@ Never satisfy a rule by asserting a fact the text does not contain. Where the sc
 
 ## Output
 
-Emit the complete repaired System Model — the whole object, not a diff and not a patch — in the same shape as extraction, with no commentary. The diff against the previous model should touch only the elements and fields the issues named.
+Emit the complete repaired System Model — the whole object, not a diff and not a patch — in the same shape as extraction, with no commentary. The diff against the previous model should touch only the elements and fields the issues named. The service enforces that: an element the issues did not name is put back as it was, whatever you returned for it, and the report records which.

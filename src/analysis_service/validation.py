@@ -22,9 +22,9 @@ and denies — never silently auto-repairs.
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Collection, Mapping
+from collections.abc import Collection, Mapping, Sequence
 from types import MappingProxyType
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, ValidationError
 
@@ -33,6 +33,7 @@ from analysis_service.grounding import normalize, verify_normalized
 from analysis_service.references import canonical
 from analysis_service.system_model import (
     CORE_ASSET_TAGS,
+    ELEMENT_GROUPS,
     UNKNOWN,
     Assumption,
     Element,
@@ -446,3 +447,64 @@ def parse_and_validate(
     if normalize_ids:
         model = normalize_element_ids(model, sources)
     return model, validate(model, extra_asset_tags, max_elements, sources)
+
+
+def repair_scope(issues: Sequence[ValidationIssue]) -> tuple[str, list[str]]:
+    """What a repair of these issues may change: the scope, and the elements it names.
+
+    ``"elements"`` when every issue names an element: the repair may change
+    those elements, add elements, and nothing else. ``"whole"`` when any issue
+    has no element to name — a schema fault over the whole object, no trust
+    zones, too many elements — because there is no narrower patch that could
+    answer it, and a whole re-extraction is the honest reading rather than a
+    preservation repair that preserved nothing.
+    """
+    if any(issue.element_id is None for issue in issues):
+        return "whole", []
+    return "elements", sorted(
+        {issue.element_id for issue in issues if issue.element_id}
+    )
+
+
+def restore_unimplicated(
+    previous: Mapping[str, Any],
+    repaired: Mapping[str, Any],
+    implicated: Collection[str],
+) -> tuple[dict[str, Any], list[str]]:
+    """The repaired model with every element the issues did not name put back.
+
+    ``prompts/repair.md`` asks for untouched elements byte-identical and
+    forbids a "while I'm here" edit; this is what enforces it (#675 D01). Both
+    arguments are JSON dumps, the previous one normalized — the model the
+    issues were computed against. Per element group: an element the issues
+    named keeps whatever the repair made of it, deleted included; an element
+    they did not name reads as it did before, whether the repair changed or
+    dropped it, and its ID is returned so the report can say so; an element
+    the repair added is kept, since a dangling reference is sometimes answered
+    by the element it was pointing at. That last rule is also what lets an
+    endpoint repair through: a flow's ID is derived from its endpoints, so
+    repointing one arrives as the cited flow deleted and a new flow added,
+    and both halves are permitted. ``assumptions`` are the repair's own:
+    the prompt tells it to add one for every value it inferred, and the gate
+    checks each against the model.
+    """
+    named = set(implicated)
+    result: dict[str, Any] = dict(repaired)
+    restored: list[str] = []
+    for group in ELEMENT_GROUPS:
+        before = {entry["id"]: entry for entry in previous.get(group, ())}
+        after = {entry["id"]: entry for entry in repaired.get(group, ())}
+        merged = []
+        for element_id, entry in before.items():
+            if element_id in named:
+                if element_id in after:
+                    merged.append(after[element_id])
+                continue
+            if after.get(element_id) != entry:
+                restored.append(element_id)
+            merged.append(entry)
+        merged += [
+            entry for element_id, entry in after.items() if element_id not in before
+        ]
+        result[group] = merged
+    return result, sorted(restored)

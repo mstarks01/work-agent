@@ -534,6 +534,30 @@ def test_an_invalid_extraction_is_repaired_once_and_then_analyzed():
     assert DESCRIPTION_TEXT in repair_instruction  # original text
 
 
+def test_a_repair_that_edits_an_uncited_element_is_undone_on_the_report():
+    """#675 D01, end to end: the report carries the previous element and says so."""
+    broken = valid_model().model_dump(mode="json")
+    broken["data_flows"][0]["destination"] = "process:does-not-exist"
+    repaired = valid_model().model_dump(mode="json")
+    repaired["processes"][0]["technology"] = "rewritten while I was here"
+    replies = happy_replies() | {
+        "extract": json.dumps(broken),
+        "repair": json.dumps(repaired),
+    }
+
+    pipeline, _ = build(replies)
+    outcome, _ = run(pipeline, job())
+
+    assert isinstance(outcome, PipelineCompleted)
+    report = outcome.report
+    assert report.system_model.get("process:web-app").technology == (
+        "Python/FastAPI on Cloud Run"
+    )
+    assert report.model_repair is not None
+    assert report.model_repair.scope == "elements"
+    assert report.model_repair.restored == ["process:web-app"]
+
+
 def test_a_model_that_fails_twice_is_rejected_with_its_issues():
     broken = valid_model().model_dump(mode="json")
     broken["data_flows"][0]["destination"] = "process:does-not-exist"

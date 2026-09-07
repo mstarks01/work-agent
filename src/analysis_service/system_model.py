@@ -19,7 +19,7 @@ import re
 from collections.abc import Collection, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import ClassVar, Literal
+from typing import ClassVar, Literal, get_args, get_origin
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -336,14 +336,8 @@ class SystemModel(BaseModel):
     assumptions: list[Assumption] = Field(default_factory=list)
 
     def elements(self) -> list[Element]:
-        """All elements in a stable order."""
-        return [
-            *self.external_entities,
-            *self.processes,
-            *self.data_stores,
-            *self.data_flows,
-            *self.trust_boundaries,
-        ]
+        """All elements in a stable order: :data:`ELEMENT_GROUPS`, each in list order."""
+        return [element for group in ELEMENT_GROUPS for element in getattr(self, group)]
 
     def zoned_elements(self) -> list[ZonedElement]:
         """The elements that carry a ``trust_zone``, in a stable order."""
@@ -505,6 +499,19 @@ class ModelIndex:
             else:
                 reach.update(endpoints)
         return frozenset(reach)
+
+
+#: The five fields of a :class:`SystemModel` that hold elements, in the order
+#: :meth:`SystemModel.elements` walks them. Read off the model's own fields —
+#: every list-typed field whose items are an element — so a sixth group joins
+#: here, the walk and the repair overlay together, or not at all.
+ELEMENT_GROUPS: tuple[str, ...] = tuple(
+    name
+    for name, info in SystemModel.model_fields.items()
+    if get_origin(info.annotation) is list
+    and isinstance(get_args(info.annotation)[0], type)
+    and issubclass(get_args(info.annotation)[0], _Element)
+)
 
 
 def _rewrite_id(element: Element, rewrites: dict[str, str]) -> None:
