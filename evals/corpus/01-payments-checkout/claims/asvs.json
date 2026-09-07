@@ -108,17 +108,30 @@
     "notes": "A framework default is not evidence about the token."
   },
   {
-    "chapter": "authorization",
-    "requirement": "V8.2.2",
+    "chapter": "configuration",
+    "requirement": "V13.2.2",
     "affected_element_ids": [
       "process:order-service",
       "store:orders-db",
       "flow:order-service-to-orders-db:read-write-orders"
     ],
-    "claim": "One shared account holds full read and write on every order record.",
+    "claim": "The order service reaches the orders database through one application account holding full read and write on every table.",
     "tier": "must-find",
     "disposition": "gap-from-prose",
-    "notes": "Stated outright, so the ruling is plain rather than conditional."
+    "notes": "Stated outright, so the ruling is plain. The fact is a backend account's privilege, which is this requirement's subject; whether the application restricts a shopper to their own orders is V8.2.2 and a separate question."
+  },
+  {
+    "chapter": "authorization",
+    "requirement": "V8.2.2",
+    "affected_element_ids": [
+      "entity:shopper",
+      "process:order-service",
+      "store:orders-db"
+    ],
+    "claim": "Shoppers place orders and nothing states whether the order service restricts a shopper to their own order records.",
+    "tier": "expected",
+    "disposition": "needs-code",
+    "notes": "A shared database account says nothing about object-level checks above it. The authorization code in the order service would settle it."
   },
   {
     "chapter": "cryptography",
@@ -151,10 +164,10 @@
       "process:order-service",
       "flow:order-service-to-orders-db:read-write-orders"
     ],
-    "claim": "The database password is held in an environment variable rather than a secret store.",
+    "claim": "The database password reaches the worker through an environment variable, and nothing says whether a secrets manager holds or injects it.",
     "tier": "must-find",
-    "disposition": "gap-from-prose",
-    "notes": "Stated outright by the submitter."
+    "disposition": "needs-config",
+    "notes": "The source says how the process reads the secret, not where it is kept. A vault injects environment variables, so the deployment configuration settles it."
   },
   {
     "chapter": "data-protection",

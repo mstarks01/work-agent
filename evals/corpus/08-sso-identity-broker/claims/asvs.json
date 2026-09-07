@@ -84,10 +84,10 @@
       "process:store-admin-console",
       "store:key-store"
     ],
-    "claim": "One signing key issues tokens for every application and nothing distinguishes the audience a token was issued for.",
+    "claim": "One signing key issues tokens for every application, and nothing states whether a token carries an audience restriction or whether an application checks one.",
     "tier": "must-find",
-    "disposition": "gap-from-prose",
-    "notes": "The source states the shared key directly. This requirement is the one a shared issuing key lands on, which is why the case is scored at level 2."
+    "disposition": "needs-code",
+    "notes": "The source states the shared key directly, which is what makes this requirement apply. The audience claim and its check are code facts the description does not carry."
   },
   {
     "chapter": "cryptography",
