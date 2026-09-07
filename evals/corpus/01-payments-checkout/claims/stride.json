@@ -11,7 +11,7 @@
       "likelihood": "high",
       "impact": "high"
     },
-    "notes": "Single-factor session with no MFA on an internet-facing endpoint; the canonical finding for this flow.",
+    "notes": "A stolen session cookie is replayed on an internet-facing endpoint; the canonical finding for this flow. The MFA gap is a separate weakness on the sign-in that issued the cookie: MFA raises the cost of obtaining one and does nothing about replaying one already taken, so a countermeasure here is binding or expiring the session rather than strengthening the login.",
     "verb": "replay"
   },
   {
