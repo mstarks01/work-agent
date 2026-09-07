@@ -25,15 +25,20 @@ the assertion this design refuses to trust. The fields are therefore named for
 citation, and the number that means something is the aggregate across a corpus
 rather than any one lane on any one case.
 
-Two of the four halves are looser than their names suggest, and both are loose
-in the flattering direction:
+Two of the four halves are counted at the grain their names promise, and the
+grain is a property of the drafts rather than of this module:
 
-- ``unknown_controls_cited`` counts an ``(element, attribute)`` pair whenever
-  some draft cited the **element**. Nothing records which attribute a draft was
-  about, so one citation of a store counts every unstated control it holds.
-- Every ``*_cited`` half is a union across the lane's drafts, so a candidate
-  counts as taken up when one draft cited one of its elements and another draft
-  cited the rest. No single draft need have treated the lead.
+- ``unknown_controls_cited`` counts an ``(element, attribute)`` pair only where
+  some draft carries an attribute **ground** on exactly that pair. A ground is
+  the one place a draft records which control it rests on, so a citation of the
+  store credits the store's controls one at a time, never all at once.
+- ``candidates_cited`` counts a lead only where **one draft** cites every
+  element the lead names. Two drafts that each cite half of a flow's endpoints
+  have each looked at half, and a lead is one structural condition rather than
+  the union of what a lane mentioned.
+
+``elements_cited`` and ``boundary_crossings_cited`` stay unions across the
+lane's drafts, because each names one element and there is nothing to split.
 
 The counts are taken over the drafts the fan-in resolved, which is before the
 join drops one for a quote its source does not carry or a target its grounds do
@@ -189,7 +194,9 @@ def build_coverage(
             candidates.get(lane),
             element_ids=elements,
             crossing_flow_ids=[crossing.flow_id for crossing in crossings],
-            control_element_ids=[control.element_id for control in controls],
+            control_pairs=[
+                (control.element_id, control.attribute) for control in controls
+            ],
         )
         for lane in package.lanes
     ]
@@ -203,9 +210,22 @@ def _row(
     *,
     element_ids: Collection[str],
     crossing_flow_ids: list[str],
-    control_element_ids: list[str],
+    control_pairs: list[tuple[str, str]],
 ) -> LaneCoverage:
     cited = cited_element_ids(drafts, element_ids)
+    # Per draft as well as pooled, because a lead is one condition: a rule
+    # fires on a flow together with the endpoints it is about, and two drafts
+    # that between them name every endpoint have each treated part of it.
+    cited_per_draft = [cited_element_ids([draft], element_ids) for draft in drafts]
+    # The pair a draft rests on is the pair its attribute ground names, and it
+    # names exactly one, so a store with three unstated controls is credited
+    # for the one the draft is about.
+    grounded_pairs = {
+        (ground.element_id, ground.attribute)
+        for draft in drafts
+        for ground in draft.grounds
+        if ground.kind in ("unknown-attribute", "absent-attribute")
+    }
     offered = candidate_set.candidates if candidate_set else ()
     return LaneCoverage(
         lane=lane,
@@ -213,12 +233,10 @@ def _row(
         rules=len(package.rules_for(lane)),
         rules_fired=len({candidate.rule_id for candidate in offered}),
         candidates=len(offered),
-        # A candidate counts as cited when *every* element it names is cited:
-        # a rule fires on a flow together with the endpoints it is about, and
-        # a draft that picked up one endpoint for unrelated reasons has not
-        # taken up the lead.
         candidates_cited=sum(
-            1 for candidate in offered if set(candidate.element_ids) <= cited
+            1
+            for candidate in offered
+            if any(set(candidate.element_ids) <= ids for ids in cited_per_draft)
         ),
         elements=len(element_ids),
         elements_cited=len(cited),
@@ -226,8 +244,8 @@ def _row(
         boundary_crossings_cited=sum(
             1 for flow_id in crossing_flow_ids if flow_id in cited
         ),
-        unknown_controls=len(control_element_ids),
+        unknown_controls=len(control_pairs),
         unknown_controls_cited=sum(
-            1 for element_id in control_element_ids if element_id in cited
+            1 for pair in control_pairs if pair in grounded_pairs
         ),
     )

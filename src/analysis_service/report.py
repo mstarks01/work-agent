@@ -231,6 +231,14 @@ from analysis_service.vendors import ServedTrust, vendor_for_route
 # Both would be major on their own, and both ride 3.0 because it has never
 # shipped. The archived sweeps under ``evals/runs/`` were migrated by
 # ``evals/migrations/2026-09-07-scope-states.py``.
+#
+# 3.0 also tightens what two ``coverage[]`` halves count (#675). A control is
+# ``unknown_controls_cited`` only where a draft's attribute ground names that
+# element *and* that attribute, where it used to be credited for every control
+# on any element a draft cited; a candidate is ``candidates_cited`` only where
+# one draft cites every element it names, where a union across the lane's
+# drafts used to do. Both are a meaning change to an existing field and would
+# be major on their own. Archived rows carry the old, larger numbers.
 SCHEMA_VERSION = "3.0"
 
 # The envelope's disclaimer, which is about the *service* rather than about any
@@ -2337,13 +2345,12 @@ class LaneCoverage(BaseModel):
     #: the model does not verify. One element with three unstated controls is
     #: three.
     unknown_controls: int = Field(ge=0)
-    #: Of those pairs, how many sit on an **element** some draft cited —
-    #: **never** how many of the attributes a draft discussed. Nothing records
-    #: which attribute a draft was about, so one citation of an element counts
-    #: every unstated control it holds. That makes this the loosest of the four
-    #: ``*_cited`` halves, and it is loose in the flattering direction, so read
-    #: it as an upper bound on attention rather than as coverage of the
-    #: controls themselves.
+    #: Of those pairs, how many some draft rests on — an attribute ground
+    #: naming exactly that element and that attribute. A draft that cites the
+    #: element and grounds nothing on the control credits nothing here: the
+    #: ground is the one record of which control a draft was about, and a
+    #: citation of a store says nothing about which of its three unstated
+    #: controls the agent had in mind.
     unknown_controls_cited: int = Field(ge=0)
 
     # Each ``*_cited`` half against the total it is cited out of. Every row here
