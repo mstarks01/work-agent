@@ -25,6 +25,21 @@ the assertion this design refuses to trust. The fields are therefore named for
 citation, and the number that means something is the aggregate across a corpus
 rather than any one lane on any one case.
 
+Two of the four halves are looser than their names suggest, and both are loose
+in the flattering direction:
+
+- ``unknown_controls_cited`` counts an ``(element, attribute)`` pair whenever
+  some draft cited the **element**. Nothing records which attribute a draft was
+  about, so one citation of a store counts every unstated control it holds.
+- Every ``*_cited`` half is a union across the lane's drafts, so a candidate
+  counts as taken up when one draft cited one of its elements and another draft
+  cited the rest. No single draft need have treated the lead.
+
+The counts are taken over the drafts the fan-in resolved, which is before the
+join drops one for a quote its source does not carry or a target its grounds do
+not reach. A draft that does not reach the report can therefore still have
+raised a number here.
+
 The service computes it at the fan-in, over the drafts rather than the ruled
 claims. Coverage is a fact about what the agents did with the system, and a
 draft the critic later rejects was still part of the system being examined.
