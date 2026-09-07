@@ -200,6 +200,78 @@ def test_the_aggregate_pools_over_references_not_over_cases(repeat):
     assert totals["worst_case_recall_spread"] == 0.0
 
 
+def test_two_corpora_are_refused_rather_than_compared(tmp_path, sampling):  # noqa: F811
+    """A reference index is a coordinate into one corpus.
+
+    Two runs over two corpus digests share no coordinate system, so their
+    matched sets cannot be intersected; #675 D18 reproduced a comparison that
+    did exactly that and reported a negative ``never``.
+    """
+    record = provenance(sampling)
+    runs = load_runs(
+        [
+            write_run(
+                tmp_path, "a.json", record, [score("01-payments-checkout", 4, [0])]
+            ),
+            write_run(
+                tmp_path,
+                "b.json",
+                record,
+                [score("01-payments-checkout", 4, [1])],
+                corpus_digest="1" * 64,
+            ),
+        ]
+    )
+
+    with pytest.raises(ValueError, match="different corpora"):
+        compare_runs(runs)
+
+
+def test_two_reference_counts_for_one_case_are_refused(tmp_path, sampling):  # noqa: F811
+    """One digest should make the count unanimous; the check does not rest on it."""
+    record = provenance(sampling)
+    runs = load_runs(
+        [
+            write_run(
+                tmp_path, "a.json", record, [score("01-payments-checkout", 1, [0])]
+            ),
+            write_run(
+                tmp_path, "b.json", record, [score("01-payments-checkout", 2, [1])]
+            ),
+        ]
+    )
+
+    with pytest.raises(ValueError, match="disagree about how many references"):
+        compare_runs(runs)
+
+
+def test_a_matched_index_past_the_reference_count_is_refused(tmp_path, sampling):  # noqa: F811
+    record = provenance(sampling)
+    runs = load_runs(
+        [
+            write_run(
+                tmp_path, "a.json", record, [score("01-payments-checkout", 2, [0])]
+            ),
+            write_run(
+                tmp_path, "b.json", record, [score("01-payments-checkout", 2, [1, 7])]
+            ),
+        ]
+    )
+
+    with pytest.raises(ValueError, match="names a reference the case does not hold"):
+        compare_runs(runs)
+
+
+def test_the_same_artifact_twice_is_one_measurement(tmp_path, sampling):  # noqa: F811
+    record = provenance(sampling)
+    path = write_run(
+        tmp_path, "a.json", record, [score("01-payments-checkout", 4, [0])]
+    )
+
+    with pytest.raises(ValueError, match="named more than once"):
+        compare_runs(load_runs([path, path]))
+
+
 def test_a_malformed_score_block_is_refused_by_name(tmp_path, sampling):  # noqa: F811
     """A file to re-produce, not a defect in the comparison."""
     path = write_run(
