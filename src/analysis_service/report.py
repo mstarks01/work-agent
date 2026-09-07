@@ -949,6 +949,20 @@ class Claim(BaseModel):
         return ""
 
     @classmethod
+    def unit_text(cls, draft: Claim) -> str:
+        """The framework's own statement of the unit a draft rules on, or ``""``.
+
+        A package holding a catalog hands the critic the requirement's text
+        beside each draft, so the verdict is reached against what the standard
+        asks rather than against the draft's paraphrase of it — which is the
+        gap a wrong exemplar exploited (#659). The neutral answer is empty: a
+        framework whose claims are an open set has no text a draft could be
+        judged against, and the view carries nothing.
+        """
+        del draft
+        return ""
+
+    @classmethod
     def rating_of(cls, draft: Claim) -> tuple[str, str] | None:
         """The two ratings a draft carries, where this framework grades harm.
 
