@@ -584,3 +584,28 @@ class TestPromoteCommand:
         assert main(["promote", str(artifact), "--yes"]) == 0
 
         assert "max_output_tokens = 12288" in sampling_copy.read_text(encoding="utf-8")
+
+
+class TestTheTreeIsRecorded:
+    """#657: an artifact names the checkout it ran from, or says it cannot."""
+
+    def test_provenance_carries_the_tree_it_is_given(self, sampling):
+        record = provenance_of(
+            sweep(sampling),
+            tier_of=tier_of,
+            sampling=sampling,
+            tiers_config_version=TIERS_VERSION,
+            build=build_identity(),
+            tree="abc123-dirty",
+        )
+        assert record.tree == "abc123-dirty"
+
+    def test_an_older_record_reads_with_no_tree(self, sampling):
+        assert provenance(sampling).tree == ""
+
+    def test_the_identity_is_read_from_a_checkout(self, tmp_path):
+        from evals.harness.provenance import tree_identity
+
+        assert tree_identity(tmp_path) == ""
+        here = tree_identity()
+        assert here == "" or len(here.split("-")[0]) == 40

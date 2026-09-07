@@ -28,7 +28,7 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from typing import Any
 
@@ -116,6 +116,12 @@ class AnalysisRun:
 
     report: Report
     drafts: Mapping[FrameworkName, tuple[Claim, ...]]
+    #: Each lane's emission as the node dumped it, keyed by framework then by
+    #: lane, before the fan-in routed anything away. A draft no longer carries
+    #: ``needs_evidence`` — the fan-in strips it once it has decided whether the
+    #: proposal becomes a draft — so without this the lane's own answer to *what
+    #: would settle this* cannot be audited after the run (#657).
+    proposals: Mapping[FrameworkName, Mapping[str, Any]] = field(default_factory=dict)
 
     @property
     def merged_drafts(self) -> tuple[DraftThreat, ...]:
@@ -777,14 +783,21 @@ def _run_from_graph(
     # per framework (#167), so a scorer reads its own package's drafts against
     # its own reference set and two packages' records never meet.
     drafts: dict[FrameworkName, tuple[Claim, ...]] = {}
+    proposals: dict[FrameworkName, dict[str, Any]] = {}
     for name in pipeline.frameworks:
-        key = FrameworkNodes(name).key("drafts")
+        nodes = FrameworkNodes(name)
+        key = nodes.key("drafts")
         if key not in state:
             raise EvalRunError(
                 f"{case.id}: graph produced a {name} analysis with no drafts"
             )
         record = PACKAGES[name].record
         drafts[name] = tuple(record.model_validate(draft) for draft in state[key])
+        proposals[name] = {
+            lane.lane: state[lane.drafts_key]
+            for lane in nodes.lanes
+            if lane.drafts_key in state
+        }
 
     now = datetime.now(UTC)
     report = result.into_report(
@@ -801,7 +814,7 @@ def _run_from_graph(
         nodes=graph_run.node_runs,
         pipeline=pipeline,
     )
-    return AnalysisRun(report=report, drafts=drafts)
+    return AnalysisRun(report=report, drafts=drafts, proposals=proposals)
 
 
 MODE_ENTRIES: dict[str, Entry] = {

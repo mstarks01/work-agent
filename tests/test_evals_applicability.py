@@ -21,7 +21,13 @@ import pytest
 from analysis_service.frameworks import PACKAGES
 from analysis_service.frameworks.asvs.catalog import requirements_for
 from analysis_service.frameworks.asvs.record import RequirementRuling
-from analysis_service.report import Ground, UnknownRef, Verdict, VerdictStatus
+from analysis_service.report import (
+    Ground,
+    RejectionStep,
+    UnknownRef,
+    Verdict,
+    VerdictStatus,
+)
 from evals import verify_corpus
 from evals.harness.applicability import (
     APPLIES,
@@ -74,6 +80,7 @@ def ruling(
     requirement: str,
     status: VerdictStatus = "confirmed",
     description: str = "d",
+    rejected_because: RejectionStep = "evidence",
 ) -> RequirementRuling:
     """One ruled claim carrying the standard's identifier, as the graph builds it.
 
@@ -96,7 +103,7 @@ def ruling(
             # A rejection names the check that ended it, exactly as production
             # builds it: these stand for a requirement ruled not applicable,
             # which is the critic's first step.
-            rejected_because="evidence" if status == "rejected" else None,
+            rejected_because=rejected_because if status == "rejected" else None,
             # The review seam binds the fields to the status: needs-info must
             # name the unknown it is waiting on, exactly as production builds it.
             related_unknowns=(
@@ -903,3 +910,27 @@ def test_evidence_kind_accuracy_counts_what_was_right_and_not_what_was_named(cas
     assert totals["false_not_applicable"] == 1
     assert totals["accuracy"] == 0.0
     assert totals["evidence_kind_accuracy"] == 0.0
+
+
+class TestARejectionThatDoesNotRuleIsNotCountedAsOne:
+    """#657, on the scorer: a lane or duplicate rejection answers nothing."""
+
+    def test_applied_requirements_puts_it_in_neither_set(self):
+        applied, rejected = applied_requirements(
+            [
+                ruling("V1.2.4", "rejected", rejected_because="evidence"),
+                ruling("V1.2.5", "rejected", rejected_because="lane"),
+                ruling("V1.2.6", "rejected", rejected_because="duplicate"),
+            ]
+        )
+        assert applied == set()
+        assert rejected == {"V1.2.4"}
+
+    def test_the_disposition_scorer_reads_it_as_unreached(self, read_case):
+        expected = read_case.references["asvs"][0].requirement
+        block = DispositionBlock(
+            rejected_claims=[ruling(expected, "rejected", rejected_because="lane")]
+        )
+        score = score_dispositions(read_case, block)
+        assert expected in score.unreached
+        assert expected not in {judged.requirement for judged in score.judged}

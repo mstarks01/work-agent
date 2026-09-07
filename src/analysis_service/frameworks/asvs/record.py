@@ -400,7 +400,7 @@ class AsvsAnalysis(FrameworkAnalysis):
         cls,
         *,
         lanes: Sequence[str],
-        claims: Sequence[Claim],
+        claims: Sequence[RuledClaim],
         options: Mapping[str, Any],
         refusal_reason: str,
         deferred: Mapping[str, str] = MappingProxyType({}),
@@ -425,7 +425,7 @@ class AsvsAnalysis(FrameworkAnalysis):
         # Through the package's own options model rather than by reading the key,
         # so the one declaration of what a level is decides here too.
         level = AsvsOptions.model_validate(options).level
-        ruled = {requirement_of(claim.id) for claim in claims}
+        ruled = {requirement_of(claim.id) for claim in claims if claim.rules_on_unit()}
         return [
             ScopeEntry(
                 unit=requirement.id,
@@ -537,12 +537,17 @@ class AsvsAnalysis(FrameworkAnalysis):
         asked for.
         """
         expected = {req.id for req in requirements_for(self.level)}
-        ruled = {
-            requirement_of(claim.id) for claim in (*self.claims, *self.rejected_claims)
-        }
+        every = (*self.claims, *self.rejected_claims)
+        named = {requirement_of(claim.id) for claim in every}
+        # Appearing and being answered are two facts. A draft the critic sent
+        # back for its lane or as a duplicate still appears, in the audit array,
+        # and answers nothing — so its requirement is listed in ``scope`` as
+        # well, and that pair is not a duplication. A block written before the
+        # cause was read lists no such requirement, and still appears once.
+        ruled = {requirement_of(claim.id) for claim in every if claim.rules_on_unit()}
         listed = {entry.unit for entry in self.scope}
         issues = []
-        missing = sorted(expected - ruled - listed)
+        missing = sorted(expected - named - listed)
         if missing:
             issues.append(
                 f"level {self.level} requirements appear in neither the claims nor"
