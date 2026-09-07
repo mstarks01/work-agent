@@ -149,14 +149,25 @@ def _rule_of(test: PresenceTest) -> Rule:
 # no rule, and so no retrieval either.
 #: The submitter's words for an upload, not the protocol's: a supplier "sends
 #: documents", a user "imports a CSV", a member "sets an avatar".
+#:
+#: **Two are anchored, because a prefix match made them nearly always true.**
+#: A term matches at the start of a word, so bare ``document`` answered for
+#: "documented policy" and "documentation", and bare ``import`` answered for
+#: "important". Both words are ordinary in a description of any system, and a
+#: predicate that fires on every model tests nothing. The inflections are
+#: listed rather than stemmed: this module matches text, and a stemmer is a
+#: second rule about English that nothing here would test.
 UPLOAD_TERMS: tuple[str, ...] = (
     "upload",
     "attachment",
     "multipart",
     "artifact",
     "registry",
-    "document",
-    "import",
+    "document$",
+    "documents$",
+    "import$",
+    "imports$",
+    "imported$",
     "avatar",
     "image",
     "photo",
