@@ -44,6 +44,7 @@ from analysis_service.frameworks.asvs.catalog import (
     LANES,
     AsvsLevel,
     requirement_id,
+    requirement_text,
     requirements_for,
 )
 from analysis_service.frameworks.asvs.rules import ruled_out_requirements
@@ -200,6 +201,11 @@ class DraftRequirementRuling(Claim):
     def unit_of(cls, draft: Claim) -> str:
         """The requirement a draft rules on, which is this framework's unit."""
         return requirement_of(draft.id)
+
+    @classmethod
+    def unit_text(cls, draft: Claim) -> str:
+        """The catalog's words for the requirement this draft rules on."""
+        return requirement_text(requirement_of(draft.id))
 
     @classmethod
     def partition_proposals(

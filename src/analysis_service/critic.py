@@ -1391,6 +1391,12 @@ def _ruling_view(
         # which is the pair step 4 calibrates across.
         if draft.id in rated_unlike:
             view["rated_unlike"] = list(rated_unlike[draft.id])
+        # The framework's own words for the unit this draft rules on, so the
+        # evidence step judges the description against the requirement rather
+        # than against the draft's paraphrase of it (#659). Absent for a
+        # framework whose claims are an open set.
+        if text := type(draft).unit_text(draft):
+            view["unit_text"] = text
         views.append(view)
     return views
 
