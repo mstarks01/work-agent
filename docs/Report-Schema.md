@@ -208,7 +208,7 @@ standard's own cumulative set for that level**, and no output of one is a compli
 ```python
 class ScopeEntry:
     unit: str  # the requirement, lane or unit considered
-    state: "applicable" | "not-applicable" | "needs-other-evidence"
+    state: "not-raised" | "not-applicable" | "undecidable" | "needs-other-evidence"
     reason: str  # required unless applicable
     needs: (
         str  # the kind of evidence that would settle it; set iff needs-other-evidence
@@ -219,7 +219,7 @@ A framework whose own presence tests rule a unit out has to **say so**: dropping
 it silently leaves a reader unable to tell "considered and cleared" from "never
 looked". The complement is not derived — every unit appears.
 
-**Three states, and the third is not a weaker second.**
+**Four states, and none is a weaker spelling of another.**
 
 - `not-applicable` — the unit does not apply to a system of this shape. A
   finished answer, with the reason: either the framework's **Precondition**
@@ -228,14 +228,19 @@ looked". The complement is not derived — every unit appears.
   requirement whose own technology is named nowhere). A draft the lane files
   on such a unit anyway is refused at the fan-in and listed in
   `dropped_claims`.
-- `applicable` — the framework considered the unit and raised nothing.
+- `undecidable` — the framework's **Precondition** could not tell whether the
+  framework applies to this system at all, so no lane ran. The remedy is more
+  input, which is why it is not folded into `not-applicable`.
+- `not-raised` — no lane filed a claim on the unit. A fact about the output,
+  not a verdict that the unit applies: the lanes were handed the unit and
+  filed nothing, and nothing in the report certifies that they weighed it.
 - `needs-other-evidence` — the unit applies, a lane raised it, and the service
   withheld the claim because settling it needs evidence of a kind the job does
   not carry: `code`, `config` or `people`, where a job carries `prose`. The
   kind sits in `needs` as a field rather than a phrase in `reason`, so a reader
   can group by it. The answer is actionable by supplying that kind of input.
 
-Both non-`applicable` states must state a reason, which is the rule `Verdict`
+Every state but `not-raised` must state a reason, which is the rule `Verdict`
 already applies to its two non-confirmed states. `needs` is set if and only if
 the state is `needs-other-evidence`.
 
@@ -247,9 +252,10 @@ lists requirement identifiers, which at level 1 is 70 entries and at level 3 is
 entry here.
 
 A framework whose **Precondition** refuses the system fills this list and nothing
-else. Its block carries no claims and no coverage, and every unit appears here as
-`not-applicable` with the reason: either the framework does not apply to a system
-of this shape, or the input never said. The two reasons stay apart because the
+else. Its block carries no claims and no coverage, and every unit appears here in
+the precondition's own state with its reason: `not-applicable` when the
+framework does not apply to a system of this shape, `undecidable` when the input
+never said. The two stay apart as states, not only as reasons, because the
 remedy differs. A refusal is not a job failure — a job naming two frameworks, one
 of them refused, still carries the other's analysis.
 

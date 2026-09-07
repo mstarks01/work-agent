@@ -54,6 +54,7 @@ from analysis_service.report import (
     FrameworkAnalysis,
     Proposal,
     ProposalBatch,
+    Refusal,
     RuledClaim,
     Ruling,
     RulingBatch,
@@ -180,6 +181,12 @@ class DraftRequirementRuling(Claim):
     # move with it: a proposal that validates must resolve into a claim that
     # validates, which is the rule `Proposal.verb`'s own comment states.
     verb: SkipJsonSchema[None] = None
+
+    @classmethod
+    def units_for(cls, options: Mapping[str, Any], lane: str) -> tuple[str, ...]:
+        """The chapter's requirement identifiers at the level the job asked for."""
+        level = AsvsOptions.model_validate(options).level
+        return tuple(requirement.id for requirement in requirements_for(level, lane))
 
     @classmethod
     def ruled_out(
@@ -351,21 +358,26 @@ def build_asvs_summary(
 
 def _scope_state(
     unit: str,
-    refusal_reason: str,
+    refusal: Refusal | None,
     deferred: Mapping[str, str],
     ruled_out: Mapping[str, str] = MappingProxyType({}),
-) -> Literal["applicable", "not-applicable", "needs-other-evidence"]:
-    """Which of the three states one unlisted requirement is in.
+) -> Literal["not-raised", "not-applicable", "undecidable", "needs-other-evidence"]:
+    """Which of the four states one unlisted requirement is in.
 
-    Order matters. A refused **Precondition** rules out every requirement, so it
-    wins over anything a lane said — a lane that never ran cannot have deferred
-    anything, and if the two ever disagreed the precondition is the older and
-    broader fact. After that a deferred requirement is the one this job could
-    not settle, and everything else was considered and raised nothing.
+    Order matters. A refused **Precondition** answers for every requirement in
+    its own state — ``not-applicable`` when it refuted the system,
+    ``undecidable`` when the input never said — so it wins over anything a
+    lane said: a lane that never ran cannot have deferred anything, and if the
+    two ever disagreed the precondition is the older and broader fact. After
+    that a ruled-out requirement is one the package's own rules settled, a
+    deferred requirement is one this job could not settle, and everything
+    else is ``not-raised``: no lane filed on it, and nothing here says why.
     """
-    if refusal_reason or unit in ruled_out:
+    if refusal is not None:
+        return refusal.state
+    if unit in ruled_out:
         return "not-applicable"
-    return "needs-other-evidence" if unit in deferred else "applicable"
+    return "needs-other-evidence" if unit in deferred else "not-raised"
 
 
 class AsvsAnalysis(FrameworkAnalysis):
@@ -404,7 +416,7 @@ class AsvsAnalysis(FrameworkAnalysis):
         lanes: Sequence[str],
         claims: Sequence[RuledClaim],
         options: Mapping[str, Any],
-        refusal_reason: str,
+        refusal: Refusal | None = None,
         deferred: Mapping[str, str] = MappingProxyType({}),
         ruled_out: Mapping[str, str] = MappingProxyType({}),
     ) -> list[ScopeEntry]:
@@ -418,10 +430,11 @@ class AsvsAnalysis(FrameworkAnalysis):
 
         Two shapes, by whether the precondition let the lanes run:
 
-        * refused — every requirement in the level is ``not-applicable``, and the
-          reason is the precondition's own.
-        * satisfied — every requirement no claim covers is ``applicable``, which
-          reads as *considered and nothing raised* rather than as *ruled out*.
+        * refused — every requirement in the level carries the precondition's
+          own state and reason: ``not-applicable`` for a refuted system,
+          ``undecidable`` for an input that never said.
+        * satisfied — every requirement no claim, deferral or rule covers is
+          ``not-raised``: no lane filed on it, which is all the block knows.
         """
         del lanes
         # Through the package's own options model rather than by reading the key,
@@ -431,8 +444,8 @@ class AsvsAnalysis(FrameworkAnalysis):
         return [
             ScopeEntry(
                 unit=requirement.id,
-                state=_scope_state(requirement.id, refusal_reason, deferred, ruled_out),
-                reason=refusal_reason
+                state=_scope_state(requirement.id, refusal, deferred, ruled_out),
+                reason=(refusal.reason if refusal else "")
                 or ruled_out.get(requirement.id, "")
                 or (
                     f"applies, and settling it needs {deferred[requirement.id]}"
@@ -441,12 +454,12 @@ class AsvsAnalysis(FrameworkAnalysis):
                 ),
                 needs=(
                     ""
-                    if refusal_reason or requirement.id in ruled_out
+                    if refusal or requirement.id in ruled_out
                     else deferred.get(requirement.id, "")
                 ),
             )
             for requirement in requirements_for(level)
-            if refusal_reason or requirement.id not in ruled
+            if refusal or requirement.id not in ruled
         ]
 
     def block_issues(self, known_element_ids):

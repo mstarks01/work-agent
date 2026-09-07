@@ -735,14 +735,14 @@ class TestADeferredRequirementApplies:
 
     def test_a_scope_entry_of_another_state_does_not_count(self, case):
         """Only `needs-other-evidence` is a withholding. `not-applicable` is an
-        answer, and `applicable` is *considered and nothing raised*."""
+        answer, and `not-raised` is *no lane filed on it*."""
         expected = [reference.requirement for reference in case.references["asvs"]]
 
         score = score_applicability(
             case,
             Block(
                 (ruling(r) for r in expected[1:]),
-                scope=[Scoped(expected[0], state="applicable")],
+                scope=[Scoped(expected[0], state="not-raised")],
             ),
         )
 
@@ -802,14 +802,25 @@ class TestObservingOneRequirement:
 
         assert observe("V1.2.4", *_surfaces(block)) == Observation("deferred", "code")
 
-    def test_an_applicable_scope_entry_reads_as_silence(self):
+    def test_a_not_raised_scope_entry_reads_as_silence(self):
         """The decision #471 left open, made here.
 
-        ``applicable`` is *considered and nothing raised*, which for a listed
-        requirement is the miss recall already charges. Reading it as a seventh
-        disposition would put one failure in two metrics.
+        ``not-raised`` is *no lane filed on it*, which for a listed requirement
+        is the miss recall already charges. Reading it as a seventh disposition
+        would put one failure in two metrics.
         """
-        entry = Scoped("V1.2.4", state="applicable", reason="")
+        entry = Scoped("V1.2.4", state="not-raised", reason="")
+        block = DispositionBlock(scope=[entry])
+
+        assert observe("V1.2.4", *_surfaces(block)).kind == "silent"
+
+    def test_an_undecidable_scope_entry_reads_as_silence(self):
+        """The framework never ran, so nothing answered the requirement (#659).
+
+        It was ``not-applicable`` before, which scored a correct exclusion
+        for a run that never decided anything.
+        """
+        entry = Scoped("V1.2.4", state="undecidable", reason="the input never says")
         block = DispositionBlock(scope=[entry])
 
         assert observe("V1.2.4", *_surfaces(block)).kind == "silent"

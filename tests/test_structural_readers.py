@@ -100,7 +100,7 @@ def _asvs_block() -> FrameworkAnalysis:
         level=1,
         claims=[claim],
         scope=AsvsAnalysis.scope_entries(
-            lanes=ASVS.lanes, claims=[claim], options={"level": 1}, refusal_reason=""
+            lanes=ASVS.lanes, claims=[claim], options={"level": 1}
         ),
         summary=AsvsAnalysis.summarize([claim], []),
     )

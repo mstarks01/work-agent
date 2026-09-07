@@ -24,7 +24,11 @@ import pytest
 from pydantic import ValidationError
 
 from analysis_service.engine import Engine, EngineInputError
-from analysis_service.evidence import evidence_catalog, resolve_proposals
+from analysis_service.evidence import (
+    evidence_catalog,
+    known_proposals,
+    resolve_proposals,
+)
 from analysis_service.frameworks import (
     PACKAGES,
     SCHEMAS,
@@ -56,6 +60,7 @@ from analysis_service.report import (
     FrameworkSelection,
     Ground,
     QuoteCandidate,
+    Refusal,
     RejectionStep,
     Report,
     ScopeEntry,
@@ -428,13 +433,13 @@ def test_a_claim_naming_an_unpublished_requirement_is_dropped_and_marked():
         ),
     ]
 
-    resolution = resolve_proposals(proposals, catalog, ASVS, "authentication", model)
+    known, marks = known_proposals(proposals, ASVS, "authentication")
+    resolution = resolve_proposals(known, catalog, ASVS, "authentication", model)
 
     assert [draft.id for draft in resolution.drafts] == ["v5.0.0-6.2.1"]
-    assert [
-        (mark.claim_id, mark.title)
-        for mark in resolution.marks.unknown_claim_identities
-    ] == [("v5.0.0-6.99.99", "An invented requirement")]
+    assert [(mark.claim_id, mark.title) for mark in marks.unknown_claim_identities] == [
+        ("v5.0.0-6.99.99", "An invented requirement")
+    ]
 
 
 def test_a_framework_that_mints_its_own_ids_marks_nothing_unknown():
@@ -675,7 +680,7 @@ def sample_asvs_claim(
 def _block(
     level: AsvsLevel,
     claims: Sequence[RequirementRuling] = (),
-    refusal_reason: str = "",
+    refusal: Refusal | None = None,
 ) -> AsvsAnalysis:
     """One ASVS block, built the way ``assemble`` builds it.
 
@@ -693,7 +698,7 @@ def _block(
             lanes=ASVS.lanes,
             claims=claims,
             options={"level": level},
-            refusal_reason=refusal_reason,
+            refusal=refusal,
         ),
         summary=AsvsAnalysis.summarize(claims, []),
     )
@@ -714,7 +719,10 @@ def test_a_refused_framework_lists_the_level_as_not_applicable_with_the_reason()
     knows. ASVS owns a catalog, so it answers in requirements — which is what the
     standard asks of a report.
     """
-    block = _block(1, refusal_reason="the asvs precondition refutes this system")
+    block = _block(
+        1,
+        refusal=Refusal("not-applicable", "the asvs precondition refutes this system"),
+    )
 
     assert len(block.scope) == 70
     assert all(entry.state == "not-applicable" for entry in block.scope)
@@ -754,7 +762,7 @@ def test_a_scope_entry_outside_the_level_still_fails_the_report():
         update={
             "scope": [
                 *block.scope,
-                ScopeEntry(unit="V6.2.9", state="applicable", reason=""),
+                ScopeEntry(unit="V6.2.9", state="not-raised", reason=""),
             ]
         }
     )
@@ -907,7 +915,6 @@ class TestAJobDefersWhatItsInputCannotSettle:
             lanes=list(LANES),
             claims=[],
             options={"level": 1},
-            refusal_reason="",
             deferred={"V1.2.4": "code"},
         )
         by_unit = {entry.unit: entry for entry in entries}
@@ -916,7 +923,7 @@ class TestAJobDefersWhatItsInputCannotSettle:
         assert by_unit["V1.2.4"].needs == "code"
         assert "needs code" in by_unit["V1.2.4"].reason
         # Everything else it raised nothing about stays as it was.
-        assert by_unit["V1.2.5"].state == "applicable"
+        assert by_unit["V1.2.5"].state == "not-raised"
 
     def test_a_refused_precondition_still_wins(self):
         """A lane that never ran cannot have deferred anything."""
@@ -924,7 +931,7 @@ class TestAJobDefersWhatItsInputCannotSettle:
             lanes=list(LANES),
             claims=[],
             options={"level": 1},
-            refusal_reason="not a web application",
+            refusal=Refusal("not-applicable", "not a web application"),
             deferred={"V1.2.4": "code"},
         )
 
@@ -1103,7 +1110,6 @@ class TestAChapterRuledOutInCode:
             lanes=ASVS.lanes,
             claims=[],
             options={"level": 2},
-            refusal_reason="",
             ruled_out={
                 "V17.1.1": "no peer connection; ruled out in code by webrtc-real-time-media"
             },
@@ -1195,20 +1201,18 @@ class TestARejectionThatDoesNotRuleLeavesItsRequirementListed:
             lanes=list(LANES),
             claims=[self._rejected("V1.2.4", "evidence")],
             options={"level": 1},
-            refusal_reason="",
         )
         assert "V1.2.4" not in {entry.unit for entry in entries}
 
     @pytest.mark.parametrize("cause", ["lane", "duplicate"])
-    def test_a_lane_or_duplicate_rejection_leaves_it_applicable(self, cause):
+    def test_a_lane_or_duplicate_rejection_leaves_it_not_raised(self, cause):
         entries = AsvsAnalysis.scope_entries(
             lanes=list(LANES),
             claims=[self._rejected("V1.2.4", cause)],
             options={"level": 1},
-            refusal_reason="",
         )
         by_unit = {entry.unit: entry for entry in entries}
-        assert by_unit["V1.2.4"].state == "applicable"
+        assert by_unit["V1.2.4"].state == "not-raised"
 
     def test_the_coverage_check_agrees_with_the_scope_builder(self):
         """The two readers of *is this requirement ruled* cannot disagree."""
@@ -1217,7 +1221,6 @@ class TestARejectionThatDoesNotRuleLeavesItsRequirementListed:
             lanes=list(LANES),
             claims=[rejected],
             options={"level": 1},
-            refusal_reason="",
         )
         block = AsvsAnalysis(
             framework="asvs",
@@ -1254,7 +1257,6 @@ class TestABlockWrittenBeforeTheCauseWasReadStillLoads:
             lanes=list(LANES),
             claims=[as_evidence],
             options={"level": 1},
-            refusal_reason="",
         )
         assert "V1.2.4" not in {entry.unit for entry in entries}
         block = AsvsAnalysis(
@@ -1270,3 +1272,117 @@ class TestABlockWrittenBeforeTheCauseWasReadStillLoads:
         assert not [
             issue for issue in block.block_issues(set()) if "appear in" in issue
         ]
+
+
+class TestTheCatalogCarriesItsOwnProvenance:
+    """#659: the loader's version was a constant nothing compared to the payload."""
+
+    def test_the_shipped_catalog_matches_both_pins(self):
+        from analysis_service.frameworks.asvs import catalog
+
+        assert (
+            catalog.provenance_issues(catalog._PAYLOAD_VERSION, catalog._PAYLOAD_SHA256)
+            == []
+        )
+
+    def test_a_payload_from_another_release_is_refused(self):
+        from analysis_service.frameworks.asvs.catalog import (
+            CATALOG_SHA256,
+            provenance_issues,
+        )
+
+        (issue,) = provenance_issues("4.0.3", CATALOG_SHA256)
+        assert "4.0.3" in issue and "5.0.0" in issue
+
+    def test_an_edit_that_keeps_the_version_is_refused(self):
+        from analysis_service.frameworks.asvs.catalog import (
+            ASVS_VERSION,
+            provenance_issues,
+        )
+
+        (issue,) = provenance_issues(ASVS_VERSION, "0" * 64)
+        assert "CATALOG_SHA256" in issue
+
+
+class TestTheScopeLineNamesTheUnitsAtTheLevel:
+    """#659: the roster carries every level; the scope line names the selected one."""
+
+    def test_the_record_names_the_lane_s_requirements_at_the_level(self):
+        units = ASVS.record.units_for({"level": 1}, "authentication")
+
+        assert units == tuple(
+            requirement.id for requirement in requirements_for(1, "authentication")
+        )
+        assert all(requirement_of(f"v5.0.0-{u[1:]}") == u for u in units)
+
+    def test_a_higher_level_lists_more_and_never_fewer(self):
+        one = set(ASVS.record.units_for({"level": 1}, "session-management"))
+        two = set(ASVS.record.units_for({"level": 2}, "session-management"))
+
+        assert one < two
+
+    def test_the_scope_line_lists_them_and_says_no_other(self):
+        from analysis_service.coverage import lane_scope
+
+        line = lane_scope(
+            "authentication",
+            ASVS,
+            valid_model(),
+            None,
+            {"level": 1},
+            units=ASVS.record.units_for({"level": 1}, "authentication"),
+        )
+
+        assert "on no other" in line
+        for unit in ASVS.record.units_for({"level": 1}, "authentication"):
+            assert unit in line
+        assert "V6.2.10" not in line  # a level-2 requirement stays off a level-1 line
+
+
+class TestAnUndecidedPreconditionIsItsOwnScopeState:
+    """#659: the refusal used to reach the scope as not-applicable either way."""
+
+    def test_every_requirement_reads_undecidable_with_the_reason(self):
+        entries = AsvsAnalysis.scope_entries(
+            lanes=list(LANES),
+            claims=[],
+            options={"level": 1},
+            refusal=Refusal("undecidable", "the input never says whether asvs applies"),
+            deferred={"V1.2.4": "code"},
+        )
+
+        assert {entry.state for entry in entries} == {"undecidable"}
+        assert all("never says" in entry.reason for entry in entries)
+        assert all(entry.needs == "" for entry in entries)
+
+    def test_the_block_still_lists_the_level_exactly_once(self):
+        block = _block(
+            1,
+            refusal=Refusal("undecidable", "the input never says whether asvs applies"),
+        )
+
+        assert len(block.scope) == 70
+        assert block.block_issues(known_element_ids=()) == []
+
+
+def test_an_invented_key_is_marked_even_when_its_evidence_kind_would_defer_it():
+    """#659: the identity check ran after the deferral split, so a deferred
+    proposal naming ``99.99`` vanished — the scope builder walks the catalog and
+    never met the key. It is now checked on the whole batch first."""
+    proposals = [
+        RequirementProposal(
+            requirement="99.99",
+            title="An invented requirement, deferred to code",
+            description="d",
+            needs_evidence="code",
+            evidence_refs=["crossing:flow:customer-to-web-app:login"],
+        ),
+    ]
+
+    known, marks = known_proposals(proposals, ASVS, "authentication")
+    kept, deferred = ASVS.record.partition_proposals(known, "authentication", ["prose"])
+
+    assert known == [] and kept == [] and deferred == {}
+    assert [mark.claim_id for mark in marks.unknown_claim_identities] == [
+        "v5.0.0-6.99.99"
+    ]
