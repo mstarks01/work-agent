@@ -54,6 +54,7 @@ IssueCode = Literal[
     "unverifiable-excerpt",
     "assumption-on-unknown",
     "blank-control",
+    "ambiguous-control",
 ]
 
 # Admission cap on model size. Deliberately loose: it is a
@@ -161,6 +162,7 @@ def validate(
                 )
 
         issues.extend(_blank_control_issues(element))
+        issues.extend(_ambiguous_control_issues(element))
 
     for zoned in model.zoned_elements():
         if zoned.trust_zone not in boundary_ids:
@@ -239,6 +241,54 @@ def _blank_control_issues(element: Element) -> list[ValidationIssue]:
         if attribute in type(element).model_fields
         and not str(getattr(element, attribute)).strip()
     ]
+
+
+#: Leading words that read as an absence and are not the absence sentinel. A
+#: control value starting with one — "no MFA on the password login", "not
+#: stated", "without TLS" — is read as *stated* by the leading-token rule,
+#: because the rest of the sentence usually names a mechanism that exists;
+#: but the same words also open a sentence that means the control is absent
+#: or was never mentioned. The two readings differ in whether a candidate
+#: rule fires, so the gate refuses the shape and the repair pass picks one.
+AMBIGUOUS_CONTROL_LEADS: frozenset[str] = frozenset(
+    {"no", "not", "without", "never", "neither", "nor", "n/a", "na", "nil"}
+)
+
+
+def _ambiguous_control_issues(element: Element) -> list[ValidationIssue]:
+    """Every control whose leading word is a negation other than ``none``.
+
+    The extraction contract gives a control three shapes: ``unknown`` for a
+    control the input never mentions, ``none`` for one it says is not there,
+    and otherwise the mechanism, named first. A value leading with ``no`` or
+    ``not`` is none of the three and is read differently by a person and by
+    :func:`~analysis_service.analysis.control_state` (#675 D02). Refused here
+    rather than reclassified: which of the three the writer meant is a fact
+    about the input, and the repair pass has the input in front of it. The
+    corpus and every archived model were checked and carry no such value.
+    """
+    issues = []
+    for attribute in CONTROL_ATTRIBUTES:
+        if attribute not in type(element).model_fields:
+            continue
+        value = str(getattr(element, attribute))
+        lead = (
+            value.strip().split(maxsplit=1)[0].rstrip(",;:.").lower()
+            if value.strip()
+            else ""
+        )
+        if lead in AMBIGUOUS_CONTROL_LEADS:
+            issues.append(
+                ValidationIssue(
+                    code="ambiguous-control",
+                    message=f"{attribute!r} opens with {lead!r}: write {UNKNOWN!r} for a"
+                    " control the input never mentions, 'none' for one it says is not"
+                    " there, and otherwise name the mechanism first",
+                    element_id=element.id,
+                    field=attribute,
+                )
+            )
+    return issues
 
 
 def _states_nothing(value: object) -> bool:
