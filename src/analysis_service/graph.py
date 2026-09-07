@@ -161,7 +161,7 @@ from analysis_service.knowledge import (
     MAX_NOTES,
     compose_cases,
     compose_notes,
-    select_documents,
+    select_per_lane,
 )
 from analysis_service.markdown_loader import MarkdownLoader, estimate_tokens
 from analysis_service.model_tiers import ReviewIndependence, TierName
@@ -1290,9 +1290,23 @@ def prepare_analysis(
         routes.append(nodes.run_route)
         loader = package_loaders[name]
         candidates = generate_candidates(model, package.lanes, package.rules)
+        # Selected for every lane at once, because a lane's tie-break reads what
+        # earlier lanes were sent: `select_per_lane` is the one reader of that
+        # accumulation, so the offline coverage lint measures the selection this
+        # job actually makes rather than a second spelling of it.
+        fired_by_lane = [
+            {candidate.rule_id for candidate in candidates[lane.lane].candidates}
+            for lane in nodes.lanes
+        ]
+        notes_by_lane = select_per_lane(
+            package.knowledge.notes, fired_by_lane, MAX_NOTES
+        )
+        cases_by_lane = select_per_lane(
+            package.knowledge.cases, fired_by_lane, MAX_CASES
+        )
         retrieved: list[str] = []
         ruled_out: dict[str, str] = {}
-        for lane in nodes.lanes:
+        for position, lane in enumerate(nodes.lanes):
             candidate_set = candidates[lane.lane]
             # The package's own rules may rule a lane's units out of this model
             # before its agent runs; the agent is told, and the block's scope
@@ -1303,9 +1317,8 @@ def prepare_analysis(
             ruled_out.update(lane_ruled_out)
             # Retrieval is by *fired* rule, so a lane that triggered nothing gets
             # nothing: the material follows the leads rather than the lane.
-            fired = {candidate.rule_id for candidate in candidate_set.candidates}
-            notes = select_documents(package.knowledge.notes, fired, MAX_NOTES)
-            cases = select_documents(package.knowledge.cases, fired, MAX_CASES)
+            notes = notes_by_lane[position]
+            cases = cases_by_lane[position]
             # Keyed by the placeholder each fills, which is the vocabulary the
             # prompt file uses; the lane turns that into its own four state keys.
             lane_state = lane.state(
