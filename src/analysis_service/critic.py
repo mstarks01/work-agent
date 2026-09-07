@@ -923,7 +923,7 @@ def join_drafts(
         if sources
         else _QuoteCheck(list(bounded.drafts), [], [], [])
     )
-    kept = checked.drafts
+    kept, settled_duplicates = _drop_settled_duplicates(checked.drafts, index)
     return JoinedDrafts(
         drafts=kept,
         marks=AnalysisMarks(
@@ -936,9 +936,66 @@ def join_drafts(
                 *referenced.dropped,
                 *bounded.dropped,
                 *checked.groundless,
+                *settled_duplicates,
             ],
         ).merged_with(package.record.claim_marks(kept)),
     )
+
+
+def _drop_settled_duplicates(
+    claims: Sequence[Claim], index: ModelIndex
+) -> tuple[list[Claim], list[DroppedClaim]]:
+    """Keep one of each set of drafts whose grounds settle them alike.
+
+    **The one duplicate check no reader would otherwise make.** A draft its own
+    grounds settle is ruled in code and never shown to a critic (#439), and
+    :func:`critic_view` computes :func:`duplicate_groups` over the shown set —
+    so two conditional drafts naming one action at one place both reach the
+    report, and nothing anywhere compares them. The critic cannot: it is not
+    given them.
+
+    Runs last in the fan-in, on the drafts that survived every other check, so
+    the targets it compares are the ones the report will carry rather than the
+    ones an agent wrote. The key is :func:`duplicate_groups`'s own — the verb
+    and the endpoint-resolved targets — because these are the same duplicates,
+    found at a different seam.
+
+    **First wins, and the choice is deterministic rather than good.** Lane order
+    is the package's own, so two runs of one input drop the same copy. Picking
+    the better-written of the two would be a judgement, and judgement is the
+    critic's; what code can do here is stop one finding being reported twice.
+
+    A draft carrying no verb belongs to a package whose identity is a catalog
+    identifier, and its duplicates are ID collisions :func:`_drop_duplicate_ids`
+    already refused. Those pass through untouched.
+    """
+    flows = index.flow_endpoints
+    seen: dict[tuple[str, frozenset[str]], str] = {}
+    kept: list[Claim] = []
+    dropped: list[DroppedClaim] = []
+    for claim in claims:
+        settled = type(claim).settled_by_grounds(claim) is not None
+        if not settled or claim.verb is None:
+            kept.append(claim)
+            continue
+        key = (claim.verb, endpoint_targets(claim.affected_element_ids, flows))
+        first = seen.get(key)
+        if first is None:
+            seen[key] = claim.id
+            kept.append(claim)
+            continue
+        dropped.append(
+            DroppedClaim.of(
+                claim_id=claim.id,
+                title=claim.title,
+                reason=(
+                    f"names the same action at the same place as {first!r}, and"
+                    " both rest on an unstated control, so no critic sees either"
+                    " to rule on the pair"
+                ),
+            )
+        )
+    return kept, dropped
 
 
 def complete_rulings(
