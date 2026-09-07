@@ -362,11 +362,21 @@
       block.scope.forEach(e => { (byState[e.state] = byState[e.state] || []).push(e); });
       const wrap = el("div", "meta");
       wrap.append(el("div", null,
-        `${block.scope.length} units considered with no claim raised`));
+        `${block.scope.length} units with no claim raised`));
 
       const ruledOut = (byState["not-applicable"] || []).length;
       if (ruledOut) {
         wrap.append(el("div", null, `\u00a0\u00a0${ruledOut} ruled out — does not apply`));
+      }
+      const undecided = (byState["undecidable"] || []).length;
+      if (undecided) {
+        wrap.append(el("div", null,
+          `\u00a0\u00a0${undecided} undecidable — the input never says whether this framework applies`));
+      }
+      const notRaised = (byState["not-raised"] || []).length;
+      if (notRaised) {
+        wrap.append(el("div", null,
+          `\u00a0\u00a0${notRaised} not raised — no lane filed a claim; not a verdict that they apply`));
       }
       const deferred = byState["needs-other-evidence"] || [];
       if (deferred.length) {

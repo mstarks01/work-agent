@@ -22,6 +22,7 @@ where the data is read, and it raises the same error a malformed package raises.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from collections import Counter
 from collections.abc import Mapping
@@ -35,6 +36,7 @@ from analysis_service.frameworks import FrameworkPackageError
 __all__ = [
     "ASVS_LEVELS",
     "ASVS_VERSION",
+    "CATALOG_SHA256",
     "CHAPTERS",
     "CHAPTER_NUMBERS",
     "LANES",
@@ -43,6 +45,7 @@ __all__ = [
     "Chapter",
     "Requirement",
     "is_published_requirement",
+    "provenance_issues",
     "requirement_id",
     "requirements_for",
 ]
@@ -66,6 +69,13 @@ AsvsLevel = Literal[1, 2, 3]
 ASVS_LEVELS: tuple[AsvsLevel, ...] = get_args(AsvsLevel)
 
 _CATALOG_PATH = Path(__file__).with_name("catalog.json")
+
+#: The SHA-256 of the catalog file this build was reviewed against. A catalog
+#: edit that does not move this constant fails the import, so the file cannot
+#: drift from the release it claims to reproduce without a reviewer saying
+#: so here (#659). Update it in the same change as the file, with the upstream
+#: tag the new bytes were compared to.
+CATALOG_SHA256 = "6cc52a42534e234d09cd16d5f389fd466ac254ec4bb9ce851954c3ed1b11fb21"
 
 
 @dataclass(frozen=True)
@@ -105,15 +115,47 @@ class Requirement:
     text: str
 
 
-def _load(path: Path) -> tuple[tuple[Chapter, ...], tuple[Requirement, ...]]:
-    """Read the published catalog off disk."""
-    payload = json.loads(path.read_text(encoding="utf-8"))
+def _load(
+    path: Path,
+) -> tuple[tuple[Chapter, ...], tuple[Requirement, ...], str, str]:
+    """Read the published catalog off disk: chapters, requirements, version, digest."""
+    raw = path.read_bytes()
+    payload = json.loads(raw.decode("utf-8"))
     chapters = tuple(Chapter(**entry) for entry in payload["chapters"])
     requirements = tuple(Requirement(**entry) for entry in payload["requirements"])
-    return chapters, requirements
+    return (
+        chapters,
+        requirements,
+        str(payload.get("version", "")),
+        hashlib.sha256(raw).hexdigest(),
+    )
 
 
-CHAPTERS, REQUIREMENTS = _load(_CATALOG_PATH)
+def provenance_issues(version: str, digest: str) -> list[str]:
+    """Everything that says the catalog on disk is not the one this build claims.
+
+    Two checks, and they catch different edits. The version check catches a
+    payload regenerated from another release under the same loader; the digest
+    catches any edit at all, including one that keeps the version string. The
+    loader's own version was a constant nothing compared to the payload, so a
+    stale or hand-edited file loaded silently.
+    """
+    issues = []
+    if version != ASVS_VERSION:
+        issues.append(
+            f"the catalog payload says ASVS {version or '<no version>'} and this"
+            f" package declares {ASVS_VERSION}"
+        )
+    if digest != CATALOG_SHA256:
+        issues.append(
+            f"the catalog file's SHA-256 is {digest}, not the reviewed"
+            f" {CATALOG_SHA256}; if the edit is intended, update CATALOG_SHA256"
+            " in the same change"
+        )
+    return issues
+
+
+CHAPTERS, REQUIREMENTS, _PAYLOAD_VERSION, _PAYLOAD_SHA256 = _load(_CATALOG_PATH)
 
 #: This package's lanes, in chapter order. The chapter order is the standard's,
 #: and it is not alphabetical: V1 through V17 is how the standard numbers its
@@ -186,7 +228,7 @@ def is_published_requirement(lane: str, key: object) -> bool:
 
 def _catalog_issues() -> list[str]:
     """Everything wrong with the catalog on disk, as messages."""
-    issues: list[str] = []
+    issues: list[str] = provenance_issues(_PAYLOAD_VERSION, _PAYLOAD_SHA256)
     if not CHAPTERS:
         issues.append("the catalog declares no chapters")
     if not REQUIREMENTS:

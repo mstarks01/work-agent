@@ -387,13 +387,14 @@ def observe(
     scope entry (#657). The order below states that invariant rather than
     breaking a tie.
 
-    **An ``applicable`` scope entry reads as silence, and that is a decision.**
+    **A ``not-raised`` scope entry reads as silence, and that is a decision.**
     It is the state ``scope_entries`` gives every requirement no claim covers —
-    *considered, and nothing raised*. For a case that listed the requirement,
-    that is the miss the recall figure already charges, so naming it a seventh
-    disposition would put one failure in two metrics. A case cannot expect it,
-    which is why :data:`~evals.harness.reference.AsvsDisposition` has no word
-    for it.
+    no lane filed on it. For a case that listed the requirement, that is the
+    miss the recall figure already charges, so naming it a seventh disposition
+    would put one failure in two metrics. A case cannot expect it, which is
+    why :data:`~evals.harness.reference.AsvsDisposition` has no word for it.
+    An ``undecidable`` entry reads the same way: the framework never ran, so
+    the requirement was never answered, and recall charges that once.
     """
     claim = applied_by_id.get(requirement)
     if claim is not None:

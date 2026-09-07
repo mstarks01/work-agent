@@ -52,6 +52,7 @@ def lane_scope(
     model: SystemModel,
     candidate_set: CandidateSet | None,
     options: Mapping[str, object] = MappingProxyType({}),
+    units: Sequence[str] = (),
     ruled_out: Sequence[str] = (),
 ) -> str:
     """One lane's denominators and its job's options, as a line the agent reads.
@@ -78,12 +79,24 @@ def lane_scope(
     package's own field names against the values the input ladder validated:
     this module knows no package, and a framework with no options renders
     nothing extra.
+
+    ``units`` is what the package says this lane rules on under those options
+    — for a catalog framework, the requirement identifiers at the selected
+    level. Listed so the agent has the closed set in front of it and files on
+    no requirement above the level (#659); a framework with open units hands
+    an empty list and renders nothing extra.
     """
     offered = candidate_set.candidates if candidate_set else ()
     fired = len({candidate.rule_id for candidate in offered})
     selected = "".join(
         f" This job asked for {package.name} with {name} {value}."
         for name, value in sorted(options.items())
+    )
+    listed = (
+        f" This lane rules on {len(units)} units under those options and on no"
+        f" other: {', '.join(units)}."
+        if units
+        else ""
     )
     excluded = (
         f" {len(ruled_out)} units of this lane were ruled out in code and are on"
@@ -96,7 +109,7 @@ def lane_scope(
         f"{len(model.boundary_crossings())} boundary crossings, "
         f"{len(unknown_controls(model))} unstated controls. "
         f"{len(package.rules_for(lane))} {lane} rules ran; {fired} fired, "
-        f"raising {len(offered)} candidates.{selected}{excluded}\n"
+        f"raising {len(offered)} candidates.{selected}{listed}{excluded}\n"
     )
 
 

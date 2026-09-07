@@ -445,26 +445,19 @@ def resolve_proposals(
     :func:`~analysis_service.critic.join_drafts` applies to unverified quotes:
     marked per entry, dropped per claim. Nothing here raises on what an agent
     cited.
+
+    Every proposal handed in names an identifier its framework has: the
+    fan-in runs :func:`known_proposals` first, on the whole batch, so an
+    invented key is marked there rather than here.
     """
     key_field = schemas_for(package.name).key_field
     carried = _RESOLVED_AWAY | _ROUTED_AWAY | {key_field}
     drafts: list[Claim] = []
     unresolved_evidence: list[UnresolvedEvidence] = []
-    unknown_identities: list[UnknownClaimIdentity] = []
     groundless: list[DroppedClaim] = []
     for proposal in proposals:
         key = getattr(proposal, key_field)
         claim_id = package.compose_id(lane, key)
-        # Before the evidence, because a claim naming a requirement its own
-        # framework does not have is not a claim whose grounds are worth
-        # resolving. Dropped and marked on the #138 rule: an agent composing a
-        # well-formed reference to something absent costs its entry, never the
-        # run. A package that mints its own IDs answers ``True`` here always.
-        if not package.id_rule.knows(lane, key):
-            unknown_identities.append(
-                UnknownClaimIdentity(claim_id=claim_id, title=proposal.title)
-            )
-            continue
         grounds, unresolved = _grounds_of(proposal, catalog, model)
         # A per-reference mark names a claim the block carries, so a claim that
         # is dropped gets none: its groundless mark names the references instead.
@@ -511,10 +504,42 @@ def resolve_proposals(
         drafts,
         AnalysisMarks(
             unresolved_evidence=unresolved_evidence,
-            unknown_claim_identities=unknown_identities,
             dropped_claims=groundless,
         ),
     )
+
+
+def known_proposals(
+    proposals: Iterable[Proposal], package: FrameworkPackage, lane: str
+) -> tuple[list[Proposal], AnalysisMarks]:
+    """The proposals naming an identifier their framework has, and a mark per other.
+
+    **Runs before the fan-in splits a lane's proposals**, so it reaches every
+    one of them: a proposal naming ``99.99`` is dropped and marked whether the
+    agent ruled on it or set it aside for evidence the job does not carry.
+    When this check sat inside :func:`resolve_proposals` it saw only the kept
+    half, and a deferred proposal with an invented key vanished — the scope
+    builder walks the catalog and never met the key (#659).
+
+    Dropped and marked on the #138 rule: an agent composing a well-formed
+    reference to something absent costs its entry, never the run. A package
+    that mints its own IDs answers ``True`` for every key, so its list of
+    marks stays empty by construction.
+    """
+    key_field = schemas_for(package.name).key_field
+    known: list[Proposal] = []
+    unknown: list[UnknownClaimIdentity] = []
+    for proposal in proposals:
+        key = getattr(proposal, key_field)
+        if package.id_rule.knows(lane, key):
+            known.append(proposal)
+            continue
+        unknown.append(
+            UnknownClaimIdentity(
+                claim_id=package.compose_id(lane, key), title=proposal.title
+            )
+        )
+    return known, AnalysisMarks(unknown_claim_identities=unknown)
 
 
 def invalid_proposal_marks(
