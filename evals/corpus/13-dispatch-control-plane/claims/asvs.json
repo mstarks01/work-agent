@@ -22,7 +22,10 @@
     "claim": "Nothing states which origins the dispatch API returns in its Access-Control-Allow-Origin header.",
     "tier": "must-find",
     "disposition": "needs-config",
-    "notes": "The source states the policy exists and states that nobody recorded its origins, so this is an unknown somebody registered rather than an absent control."
+    "notes": "The source states the policy exists and states that nobody recorded its origins, so this is an unknown somebody registered rather than an absent control. The header is emitted by the application or by the layer in front of it, so either route settles it.",
+    "also_acceptable": [
+      "needs-code"
+    ]
   },
   {
     "chapter": "web-frontend-security",

@@ -45,9 +45,16 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 
 from analysis_service.frameworks.asvs.record import AsvsChapter
 from analysis_service.frameworks.stride.record import StrideCategory
@@ -273,11 +280,51 @@ class ReferenceRequirement(ReferenceClaim):
     ``tests/test_asvs_disposition_coverage.py``, and excluded from the
     disposition metrics rather than scored as a wrong answer. A record whose
     disposition is unjudged still scores for applicability.
+
+    ``also_acceptable`` names the other routes that settle this requirement
+    just as well. A single required answer treats implementation-dependent
+    verification paths as mutually exclusive, and they are not: a response
+    header is set in application code or in infrastructure configuration, and
+    either one answers the obligation (#659). Scoring the second as wrong
+    punishes a defensible run and pushes tuning toward whichever route the
+    corpus happened to write down.
+
+    Only a *route* belongs here — one of the four evidence dispositions. An
+    alternate is a second way to reach the same answer, never a second answer:
+    a record cannot say "this is a gap, and also nobody can tell", so
+    ``gap-from-prose`` and ``not-applicable`` take none.
     """
 
     chapter: AsvsChapter
     requirement: str = Field(pattern=r"^V\d{1,2}\.\d{1,2}\.\d{1,2}$")
     disposition: AsvsDisposition | None = None
+    also_acceptable: tuple[AsvsDisposition, ...] = ()
+
+    @model_validator(mode="after")
+    def _check_routes(self) -> Self:
+        if not self.also_acceptable:
+            return self
+        routes = set(DISPOSITION_FOR_EVIDENCE.values())
+        if self.disposition not in routes:
+            raise ValueError(
+                f"{self.requirement} expects {self.disposition!r} and names"
+                " alternate routes; only a record expecting evidence has a"
+                f" route to be an alternative to (one of {sorted(routes)})"
+            )
+        stray = sorted(set(self.also_acceptable) - routes)
+        if stray:
+            raise ValueError(
+                f"{self.requirement} names {stray} as an alternate route, and a"
+                " route is a kind of evidence rather than a different answer"
+            )
+        if self.disposition in self.also_acceptable:
+            raise ValueError(
+                f"{self.requirement} repeats its own disposition"
+                f" {self.disposition!r} as an alternate route"
+            )
+        if len(set(self.also_acceptable)) != len(self.also_acceptable):
+            raise ValueError(f"{self.requirement} repeats an alternate route")
+        return self
 
     @property
     def lane(self) -> str:

@@ -284,8 +284,11 @@ RECORD_FIELDS: Mapping[FrameworkName, frozenset[str]] = {
 #: name, so both answer for a package nobody has written.
 #: ``tests/test_asvs_disposition_coverage.py`` counts the records still missing
 #: one, exactly as the verb count does.
+#: ``also_acceptable`` rides beside ``disposition`` on the same argument: a
+#: framework that routes a requirement to a kind of evidence can have more than
+#: one route that settles it, and a framework that defers nothing has none.
 OPTIONAL_RECORD_FIELDS: Mapping[FrameworkName, frozenset[str]] = {
-    "asvs": frozenset({"disposition"}),
+    "asvs": frozenset({"disposition", "also_acceptable"}),
     "stride": frozenset({"verb"}),
 }
 RECORD_CHECKS: Mapping[

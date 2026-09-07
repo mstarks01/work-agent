@@ -109,7 +109,10 @@
     "claim": "Nothing states what of an inference request is written to the confidential request log.",
     "tier": "must-find",
     "disposition": "needs-code",
-    "notes": "The log is confidential and its content is never described."
+    "notes": "The log is confidential and its content is never described. What reaches the log comes from the call site or from the logging configuration, so either route settles it.",
+    "also_acceptable": [
+      "needs-config"
+    ]
   },
   {
     "chapter": "configuration",

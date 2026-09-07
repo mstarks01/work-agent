@@ -125,7 +125,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 - cites: `entity:browser`, `process:web-application`, `flow:browser-to-web-application:page-request`
 - tier: must-find
-- recorded note: tech:browser-frontend fires; the chapter applies and every header is unstated.
+- recorded note: tech:browser-frontend fires; the chapter applies and every header is unstated. The header is emitted by the application or by the layer in front of it, so either route settles it.
 
 > mark:
 
@@ -133,7 +133,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 - cites: `process:web-application`, `flow:browser-to-web-application:page-request`
 - tier: expected
-- recorded note: A browser client is stated; the cookie question is open rather than answered.
+- recorded note: A browser client is stated; the cookie question is open rather than answered. The attribute is set by whatever emits Set-Cookie, which is the application or the layer in front of it, so either route settles it.
 
 > mark:
 
@@ -407,7 +407,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "20b0aa82c922766db2353cade33f7a26b38c60a3c7061244ef4686b7a647778b",
       "model.json": "68fe8bcf41cbbc60cac575dee317700e76db8101fec46da8f3ac89598f4a75df",
-      "claims/asvs.json": "43c808a4d4edd2d00c0e159b813d66413e9b73df74129920516d33ea502a0991",
+      "claims/asvs.json": "8a73f7df8642a1ab3ac7b9421efd5e7737520b21e00c3fa3dc5247b22ebe9839",
       "claims/stride.json": "18ff482a563387a6a4815393dfc0a44ec56f1e2df224d0ae6bce940ba48f29ef"
       }
     }

@@ -416,8 +416,16 @@ def satisfies(
     disposition: str,
     observation: Observation,
     carried: Collection[str] = CARRIED_EVIDENCE_KINDS,
+    also_acceptable: Collection[str] = (),
 ) -> bool:
-    """Whether one run's answer is the one this case expected.
+    """Whether one run's answer is one this case accepts.
+
+    **``also_acceptable`` is a second route, not a second answer.** A record
+    may hold that a response header is settled by application code or by
+    infrastructure configuration; either reading is right, and scoring the one
+    the corpus did not write down as wrong punishes a defensible run (#659).
+    Every route is tried, and one hit is enough. A record naming none behaves
+    exactly as before.
 
     **``carried`` is read, never assumed**, and that is the whole reason this is
     a function rather than a lookup table. Which kinds of evidence become a
@@ -438,6 +446,16 @@ def satisfies(
         return observation.kind in {"rejected", "not-applicable"}
     if disposition == "gap-from-prose":
         return observation.kind == "confirmed"
+    return any(
+        _routed(route, observation, carried)
+        for route in (disposition, *also_acceptable)
+    )
+
+
+def _routed(
+    disposition: str, observation: Observation, carried: Collection[str]
+) -> bool:
+    """Whether the run reached the evidence one route asks for."""
     wanted = EVIDENCE_FOR_DISPOSITION[disposition]
     if wanted in carried:
         return observation.kind == "needs-info"
@@ -452,15 +470,22 @@ class Judged:
     expected: str
     observed: Observation
     ok: bool
+    #: The other routes this record accepts. Carried into the artifact so a
+    #: reader can tell an answer that scored right on an alternate from one
+    #: that matched the case's first choice.
+    also_acceptable: tuple[str, ...] = ()
 
     def to_json(self) -> dict[str, Any]:
-        return {
+        entry = {
             "requirement": self.requirement,
             "expected": self.expected,
             "observed": self.observed.kind,
             "needs": self.observed.needs,
             "ok": self.ok,
         }
+        if self.also_acceptable:
+            entry["also_acceptable"] = list(self.also_acceptable)
+        return entry
 
 
 @dataclass(frozen=True)
@@ -644,7 +669,13 @@ def score_dispositions(
                 requirement=reference.requirement,
                 expected=reference.disposition,
                 observed=observation,
-                ok=satisfies(reference.disposition, observation, carried),
+                ok=satisfies(
+                    reference.disposition,
+                    observation,
+                    carried,
+                    reference.also_acceptable,
+                ),
+                also_acceptable=tuple(reference.also_acceptable),
             )
         )
 

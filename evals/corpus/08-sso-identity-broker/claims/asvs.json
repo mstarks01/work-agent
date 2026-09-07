@@ -136,7 +136,10 @@
     "claim": "Nothing states what metadata a sign-in entry carries, so nothing says an investigation could reconstruct one.",
     "tier": "expected",
     "disposition": "needs-code",
-    "notes": "Follows V16.1.1: with no inventory there is nothing stating the fields."
+    "notes": "Follows V16.1.1: with no inventory there is nothing stating the fields. The fields on an entry come from the call site or from the logging configuration, so either route settles it.",
+    "also_acceptable": [
+      "needs-config"
+    ]
   },
   {
     "chapter": "data-protection",

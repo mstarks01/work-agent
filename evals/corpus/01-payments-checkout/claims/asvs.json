@@ -47,7 +47,10 @@
     "claim": "The shopper session cookie is named and none of its attributes is stated.",
     "tier": "must-find",
     "disposition": "needs-config",
-    "notes": "A browser-delivered credential puts this system in the chapter; the attributes are the requirement."
+    "notes": "A browser-delivered credential puts this system in the chapter; the attributes are the requirement. The attribute is set by whatever emits Set-Cookie, which is the application or the layer in front of it, so either route settles it.",
+    "also_acceptable": [
+      "needs-code"
+    ]
   },
   {
     "chapter": "api-and-web-service",
