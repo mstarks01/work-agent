@@ -855,6 +855,7 @@ EXTRACTION_FAILURE_RULES: dict[str, str] = {
     "assumption-on-unknown": "An attribute you left `unknown` inferred nothing and "
     "takes no entry",
     "blank-control": "Never leave a security-relevant attribute empty",
+    "ambiguous-control": "never open a control with `no`, `not` or `without`",
 }
 
 

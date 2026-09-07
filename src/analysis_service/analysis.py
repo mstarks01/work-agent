@@ -129,7 +129,10 @@ def control_state(value: str) -> ControlState:
     ``unverified`` for ``unknown`` and for a blank value, ``absent`` for
     ``none``, ``stated`` for everything else. Reading only the leading token is
     what keeps this from becoming a natural-language classifier with a security
-    opinion.
+    opinion. It is safe only because the validity gate refuses a value that
+    opens with any other negation — ``no``, ``not``, ``without`` — and sends it
+    to repair (``ambiguous-control``), so a value that reaches a reader leads
+    with one of the two sentinels or with the mechanism.
 
     **A blank value is a control nobody stated, so it reads as ``unverified``.**
     It used to read as ``stated``, on the reasoning that no validated model
