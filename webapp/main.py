@@ -130,6 +130,7 @@ from analysis_service import (
 from analysis_service.deployment import Deployment
 from analysis_service.frameworks import package_for
 from analysis_service.model_tiers import ModelTierConfig
+from analysis_service.selection import SelectionError, resolve_selection
 from analysis_service.vendors import (
     CREDENTIAL_MODE_NOTES,
     VendorName,
@@ -421,6 +422,11 @@ def create_app(
             body = await request.json()
             sources = [Source.model_validate(source) for source in body["sources"]]
             selection = _selection(state.frameworks, body["frameworks"])
+        except SelectionError as exc:
+            # Names the framework and the field it wanted, or the name the
+            # install does not carry, and nothing about this deployment. Safe
+            # to show, and the only way a submitter learns what to change.
+            return JSONResponse({"message": str(exc)}, status_code=400)
         except (ValidationError, ValueError, KeyError, TypeError):
             return JSONResponse(
                 {
@@ -484,42 +490,31 @@ def create_app(
 def _selection(
     carried: Sequence[FrameworkName], requested: object
 ) -> list[FrameworkSelection]:
-    """One submission's selection: allow-listed, de-duplicated, in carried order.
+    """One submission's selection: checked by the shared reader, in carried order.
 
     **The checkboxes decide nothing.** What arrives is a list of names and
-    options from a page the submitter controls, so this re-derives the selection
-    from ``carried`` rather than trusting the order or the membership of what
-    was sent. Three things fall out of deriving it that way rather than
-    filtering in place: a name this install does not carry is refused instead of
-    reaching :meth:`~analysis_service.deployment.Deployment.selection` as a
-    sentence about configuration, a name sent twice runs once instead of
-    building a graph with two blocks of it, and the block order of every report
-    is ``config/frameworks.toml`` order rather than whatever the page posted.
-
-    Options ride through untouched and are *not* checked here. Each package
-    declares its own options model and the engine's constructor is where it
-    runs, so this stays the one thing this app can decide — which frameworks
-    exist — and names no framework and no option to decide it.
+    options from a page the submitter controls, so it is held to
+    :func:`~analysis_service.selection.resolve_selection` — the one reader the
+    HTTP route and the engine share — and then ordered by ``carried`` rather
+    than by what the page posted, so the block order of every report is
+    ``config/frameworks.toml`` order. A name sent twice is refused, as the
+    route refuses it: collapsing it would answer a submission with a selection
+    nobody made.
 
     Raises ``TypeError`` for a body whose ``frameworks`` is not a list,
-    ``ValueError`` for an empty or non-carried selection, and
     ``ValidationError`` for an entry that is not a
-    :class:`~analysis_service.report.FrameworkSelection`. The route answers all
-    three as one 400.
+    :class:`~analysis_service.report.FrameworkSelection`, and
+    :class:`~analysis_service.selection.SelectionError` — a ``ValueError`` — for
+    a selection the install cannot run. The route answers all three as one 400.
     """
     if not isinstance(requested, list):
         raise TypeError("'frameworks' must be a list of framework selections")
     picked = {
         selection.name: selection
-        for selection in (
-            FrameworkSelection.model_validate(entry) for entry in requested
+        for selection in resolve_selection(
+            carried, [FrameworkSelection.model_validate(entry) for entry in requested]
         )
     }
-    unknown = sorted(name for name in picked if name not in carried)
-    if unknown:
-        raise ValueError(f"this install does not carry {unknown}")
-    if not picked:
-        raise ValueError("a submission must select at least one framework")
     return [picked[name] for name in carried if name in picked]
 
 

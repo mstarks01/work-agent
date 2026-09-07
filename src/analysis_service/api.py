@@ -26,11 +26,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime
 from http import HTTPStatus
-from typing import Annotated, Any, cast
+from typing import Annotated, Any
 from uuid import uuid4
 
 import anyio.to_thread
@@ -43,7 +42,6 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
-    ValidationError,
 )
 from starlette._utils import get_route_path
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -57,7 +55,7 @@ from analysis_service.auth import (
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.deployment import Deployment
 from analysis_service.errors import ConfigError
-from analysis_service.frameworks import PACKAGES, package_for
+from analysis_service.frameworks import PACKAGES
 from analysis_service.jobs import (
     TERMINAL_STATUSES,
     Admission,
@@ -70,6 +68,7 @@ from analysis_service.jobs import (
 )
 from analysis_service.parsing import ascii_int
 from analysis_service.report import FrameworkName, FrameworkSelection
+from analysis_service.selection import SelectionError, resolve_selection
 from analysis_service.sources import Source, SourceLimits, plain_name
 from analysis_service.validation import ValidationIssue
 
@@ -328,53 +327,16 @@ def _resolve_selection(
 ) -> list[FrameworkSelection]:
     """The submission's framework selection, or the 422 that refuses it.
 
-    Three rungs, all of them shape rather than budget, and all refused before a
-    job record exists — which is the point: a name this install does not carry
-    can never reach the registry, so every later lookup is a defect rather than
-    a caller's mistake.
-
-    A repeat is refused rather than collapsed. ``analyses`` is a list in the
-    report so a dropped block is visible, and silently de-duplicating here would
-    hand back one block for two the caller asked for — the same invisible loss,
-    moved one layer earlier.
+    The rule is :func:`~analysis_service.selection.resolve_selection`, the one
+    reader every entry point shares; this translates its refusal into the
+    status the input ladder answers shape faults with. Refused before a job
+    record exists, so a name this install does not carry never reaches the
+    registry and every later lookup is a defect rather than a caller's mistake.
     """
-    names = [entry.name for entry in requested]
-    repeated = sorted(name for name, count in Counter(names).items() if count > 1)
-    if repeated:
-        raise HTTPException(
-            status_code=422,
-            detail=f"frameworks repeats {', '.join(repeated)};"
-            " name each framework at most once",
-        )
-    unknown = [name for name in names if name not in carried]
-    if unknown:
-        raise HTTPException(
-            status_code=422,
-            detail=f"this service does not carry {', '.join(unknown)};"
-            f" it carries {', '.join(carried)}",
-        )
-
-    selections = []
-    for entry in requested:
-        # The check above is the narrowing: a name that reaches here is one this
-        # deployment carries, and a carried name is a FrameworkName by
-        # construction. The cast is what says so to the type checker, which
-        # cannot read a membership test over a Literal.
-        name = cast(FrameworkName, entry.name)
-        # Validated against the package's own options model, which declares no
-        # defaulted field — so an option this framework requires and the caller
-        # omitted is refused here rather than filled in with a value the caller
-        # never chose.
-        try:
-            package_for(name).options.model_validate(entry.options)
-        except ValidationError as exc:
-            raise HTTPException(
-                status_code=422,
-                detail=f"options for framework {entry.name!r} are invalid:"
-                f" {exc.error_count()} problem(s)",
-            ) from None
-        selections.append(FrameworkSelection(name=name, options=dict(entry.options)))
-    return selections
+    try:
+        return resolve_selection(carried, requested)
+    except SelectionError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
 
 
 def _withheld_report(request: Request, record: JobRecord) -> JSONResponse | None:
