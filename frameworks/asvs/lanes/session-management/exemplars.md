@@ -2,16 +2,16 @@
 
 Two drafts against exemplar system A. A session cookie is stated, so the chapter applies; almost everything the chapter asks about it is unstated.
 
-## V7.4.1 — No session timeout is stated for the customer session
+## V7.4.1 — Nothing says a terminated customer session stops being accepted
 
-Lifetime is two requirements, not one — idle and absolute — and this draft rules on one of them.
+Termination is the subject, not lifetime: what the backend does once logout or expiry has happened. A session that lives on after either is the failure this requirement names.
 
 ```json
 {
   "requirement": "4.1",
-  "needs_evidence": "config",
-  "title": "No session timeout is stated for the customer session",
-  "description": "V7.4.1 asks that a session expires after a period of inactivity. It applies here because `flow:customer-to-web-api:submit-payment` carries a session cookie issued after a password login, so this system holds a session rather than authenticating each request independently. The notes say the cookie is issued and say nothing about when it stops being accepted. The requirement applies and the input does not settle it. The idle timeout `process:web-api` enforces would settle it.",
+  "needs_evidence": "code",
+  "title": "Nothing says a terminated customer session stops being accepted",
+  "description": "V7.4.1 asks that once a session is terminated — by logout or by expiry — the application refuses any further use of it, which for a stateful session means invalidating it at the backend. It applies here because `flow:customer-to-web-api:submit-payment` carries a session cookie issued after a password login, so this system holds a session rather than authenticating each request independently. The notes say the cookie is issued and say nothing about logout, expiry, or whether `process:web-api` invalidates the session record when either happens. The requirement applies and the input does not settle it; the session handling in `process:web-api` would.",
   "affected_element_ids": [
     "entity:customer",
     "process:web-api",
@@ -26,7 +26,6 @@ Lifetime is two requirements, not one — idle and absolute — and this draft r
   ]
 }
 ```
-
 ## V7.2.3 — The session token's generation is never described
 
 Generation is the requirement the input can least often settle, and assuming a framework default would be inventing a fact the model does not state.

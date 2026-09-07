@@ -379,8 +379,10 @@ class AsvsAnalysis(FrameworkAnalysis):
 
     **The block reports no pass and says so.** ``disclaimer`` carries the
     package's own text, and the word compliance appears in neither: a
-    level-filtered run is a fork of ASVS rather than ASVS, and this service rules
-    applicability rather than conformance.
+    level-filtered run rules on the cumulative set the standard defines for that
+    level and on nothing above it, which is a partial verification and not a
+    compliance result, and this service rules applicability rather than
+    conformance.
     """
 
     claims: list[RequirementRuling] = Field(default_factory=list)  # type: ignore[assignment]

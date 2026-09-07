@@ -31,10 +31,10 @@
       "store:web-application-config",
       "store:worker-config"
     ],
-    "claim": "Two configuration stores are named and nothing says whether either holds a secret or how.",
+    "claim": "Both configuration stores hold the credentials their process needs, and nothing says whether a secrets management solution holds or injects them.",
     "tier": "must-find",
-    "disposition": "needs-more-prose",
-    "notes": "Both stores carry unknown technology and classification."
+    "disposition": "needs-config",
+    "notes": "The source says the stores hold credentials. Where those credentials come from is a deployment fact the description does not carry."
   },
   {
     "chapter": "secure-coding-and-architecture",

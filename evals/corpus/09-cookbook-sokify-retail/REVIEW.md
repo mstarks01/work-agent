@@ -170,11 +170,11 @@ The narrower question, per record: **does this requirement apply to this system,
 
 ### secure-coding-and-architecture
 
-**A4.** `V15.3.1` — Nothing states what subset of a customer record reaches the delivery address file.
+**A4.** `V15.3.1` — The web API serves customer records to the mobile app and nothing states which fields a response carries.
 
-- cites: `process:sims`, `store:delivery-address-flat-file`, `flow:sims-to-delivery-address-flat-file:address-write`
+- cites: `process:mobile-app`, `process:web-api`, `flow:mobile-app-to-web-api:api-traffic`
 - tier: must-find
-- recorded note: A flat file holding addresses only, written from a store holding more.
+- recorded note: The delivery file receives addresses only, and the source says so. The open subset question is what the API returns to the app.
 
 > mark:
 
@@ -450,7 +450,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "603873a0d569ba3f0ac4a91a363086b54bae022cf432862d17be9eec9465e4ea",
       "model.json": "74673857e4d774b062ea84ae8a2e1d281c7c33d0ab25a2c84ece6021c8f46a8a",
-      "claims/asvs.json": "ff0f20db9ad28a8bb6f19ed1f0cde58703e4dac6d1524ff49db7e9cbd27f408f",
+      "claims/asvs.json": "fa211c11c2a82bf649b5518b6d7120ece7720af93b570fdcfb1a56b15a0b0adb",
       "claims/stride.json": "33f48cb7d16f23f0d627279af76e3c66acdf37011ca3fbd319b9a9965af07c2a"
       }
     }

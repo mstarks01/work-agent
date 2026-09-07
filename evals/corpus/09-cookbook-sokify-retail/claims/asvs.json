@@ -42,14 +42,14 @@
     "chapter": "secure-coding-and-architecture",
     "requirement": "V15.3.1",
     "affected_element_ids": [
-      "process:sims",
-      "store:delivery-address-flat-file",
-      "flow:sims-to-delivery-address-flat-file:address-write"
+      "process:mobile-app",
+      "process:web-api",
+      "flow:mobile-app-to-web-api:api-traffic"
     ],
-    "claim": "Nothing states what subset of a customer record reaches the delivery address file.",
+    "claim": "The web API serves customer records to the mobile app and nothing states which fields a response carries.",
     "tier": "must-find",
     "disposition": "needs-code",
-    "notes": "A flat file holding addresses only, written from a store holding more."
+    "notes": "The delivery file receives addresses only, and the source says so. The open subset question is what the API returns to the app."
   },
   {
     "chapter": "authentication",

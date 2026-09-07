@@ -18,7 +18,7 @@
     "affected_element_ids": [
       "process:storefront-api"
     ],
-    "claim": "No documented input validation rules exist for the order payload the storefront API accepts.",
+    "claim": "The input carries no documented input validation rules for the order payload the storefront API accepts.",
     "tier": "expected",
     "disposition": "needs-more-prose",
     "notes": "A documentation requirement: the subject is outside the running system, so needs-info by construction."
@@ -79,10 +79,10 @@
       "entity:shopper",
       "flow:shopper-to-storefront-api:place-order"
     ],
-    "claim": "The shopper login carries no second factor and no stated anti-automation control.",
+    "claim": "The shopper login carries no stated control against credential stuffing or password brute force.",
     "tier": "must-find",
-    "disposition": "gap-from-prose",
-    "notes": "The submitter states there is no MFA, so this half is settled rather than open."
+    "disposition": "needs-config",
+    "notes": "The submitter states there is no MFA, which is a different requirement. The anti-automation controls are unstated rather than absent, and the login configuration would settle them."
   },
   {
     "chapter": "session-management",

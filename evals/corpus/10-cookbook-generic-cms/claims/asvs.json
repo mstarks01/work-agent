@@ -52,19 +52,6 @@
     "notes": "tech:database fires on a MySQL store reached from an internet-facing process."
   },
   {
-    "chapter": "secure-communication",
-    "requirement": "V12.2.1",
-    "affected_element_ids": [
-      "entity:admin",
-      "store:mysql-database",
-      "flow:admin-to-mysql-database:direct-administration"
-    ],
-    "claim": "An administrator reaches MySQL directly over a connection stated to carry no TLS.",
-    "tier": "must-find",
-    "disposition": "gap-from-prose",
-    "notes": "encryption_in_transit is stated absent on a human-to-store flow."
-  },
-  {
     "chapter": "validation-and-business-logic",
     "requirement": "V2.2.2",
     "affected_element_ids": [

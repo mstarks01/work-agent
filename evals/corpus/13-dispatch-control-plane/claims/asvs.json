@@ -39,7 +39,9 @@
   {
     "chapter": "api-and-web-service",
     "requirement": "V4.4.1",
-    "affected_element_ids": ["flow:dispatch-console-to-dispatch-api:live-job-status"],
+    "affected_element_ids": [
+      "flow:dispatch-console-to-dispatch-api:live-job-status"
+    ],
     "claim": "Nothing states whether the live job status WebSocket runs over TLS.",
     "tier": "must-find",
     "disposition": "needs-config",
@@ -64,7 +66,7 @@
       "flow:duty-engineer-to-dispatch-console:open-console",
       "process:dispatch-console"
     ],
-    "claim": "No documentation states how an engineer signs in to the console or what limits repeated attempts.",
+    "claim": "The input carries no documentation of how an engineer signs in to the console or what limits repeated attempts.",
     "tier": "expected",
     "disposition": "gap-from-prose",
     "notes": "The source states the sign-in was never written down, which is the documentation this requirement asks for."

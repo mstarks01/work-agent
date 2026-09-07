@@ -43,7 +43,7 @@
     "affected_element_ids": [
       "process:supplier-portal"
     ],
-    "claim": "No documentation defines rate limiting or anti-automation on the supplier sign-in.",
+    "claim": "The input carries no documentation of rate limiting or anti-automation on the supplier sign-in.",
     "tier": "expected",
     "disposition": "needs-more-prose",
     "notes": "Documentation requirement. The datasheet's 'fully authenticated' is not a control the input states."
@@ -106,7 +106,7 @@
       "process:supplier-portal",
       "entity:portal-vendor"
     ],
-    "claim": "The whole portal is a third-party product and no documentation defines remediation time frames for it.",
+    "claim": "The whole portal is a third-party product and the input carries no documented remediation time frames for it.",
     "tier": "must-find",
     "disposition": "needs-more-prose",
     "notes": "The source states the organization runs no part of the portal, which makes the third-party rule the central one for this case."

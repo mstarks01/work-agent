@@ -156,7 +156,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 ### authentication
 
-**A4.** `V6.1.1` — No documentation defines rate limiting or anti-automation for the moderation website.
+**A4.** `V6.1.1` — The input carries no documentation of rate limiting or anti-automation for the moderation website.
 
 - cites: `process:moderation-website`
 - tier: expected
@@ -167,7 +167,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 ### authorization
 
-**A5.** `V8.1.1` — No authorization documentation defines which support staff may act on which player accounts.
+**A5.** `V8.1.1` — The input carries no authorization documentation saying which support staff may act on which player accounts.
 
 - cites: `process:moderation-website`
 - tier: expected
@@ -406,7 +406,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "17e797d0315fdd53d5acf05962ca0ae8a23e08f84779f8528ade6422c34577a3",
       "model.json": "e3de5aaf7a1fc873d64ae86563d6e8ebaae122e9521f127c748be28823e5477b",
-      "claims/asvs.json": "fd84e0d091783940b0350f9e56c5f53e830e31cf03a8a97d689c65fc7437a171",
+      "claims/asvs.json": "1af5ed1771eedd4df8afed236c5e74cb709a6a3c334822798c1a675980e43f20",
       "claims/stride.json": "415ce911e658da6582476ef6bd0b1953d41e17493dd5b062d2143ca9954fe770"
       }
     }

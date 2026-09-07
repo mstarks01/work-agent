@@ -43,7 +43,7 @@
     "affected_element_ids": [
       "process:moderation-website"
     ],
-    "claim": "No documentation defines rate limiting or anti-automation for the moderation website.",
+    "claim": "The input carries no documentation of rate limiting or anti-automation for the moderation website.",
     "tier": "expected",
     "disposition": "needs-more-prose",
     "notes": "A documentation requirement: the subject sits outside the running system, so needs-info by construction."
@@ -54,7 +54,7 @@
     "affected_element_ids": [
       "process:moderation-website"
     ],
-    "claim": "No authorization documentation defines which support staff may act on which player accounts.",
+    "claim": "The input carries no authorization documentation saying which support staff may act on which player accounts.",
     "tier": "expected",
     "disposition": "needs-more-prose",
     "notes": "Documentation requirement, as V6.1.1."

@@ -11,7 +11,7 @@ The exclusion, resting on the authentication mechanisms the model states across 
   "requirement": "4.1",
   "needs_evidence": "",
   "title": "This system runs no OAuth or OIDC flow",
-  "description": "V10.4.1 governs the handling of an authorization code between a client and an authorization server. It does not apply here. No element in this model is an authorization server: the four elements are a web API, a ledger service, an accounts database and an audit bucket. The authentication mechanisms the flows state are a session cookie after a password login, an unstated webhook credential, network position, a shared static password and a service account. None of them is a delegated grant, so the requirement has no subject in this system.",
+  "description": "V10.4.1 asks that an authorization server checks a redirect URI against the allowlist registered for that client, by exact string comparison. It does not apply here. No element in this model is an authorization server: the four elements are a web API, a ledger service, an accounts database and an audit bucket. The authentication mechanisms the flows state are a session cookie after a password login, an unstated webhook credential, network position, a shared static password and a service account. None of them is a delegated grant, so the requirement has no subject in this system.",
   "affected_element_ids": [],
   "evidence_refs": [],
   "absent_elements": [
