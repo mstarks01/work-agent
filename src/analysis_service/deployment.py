@@ -78,9 +78,10 @@ from analysis_service.graph import (
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.model_tiers import ModelTierConfig, TierName, load_model_tiers
 from analysis_service.pipeline import AdkPipelineRunner
-from analysis_service.report import FrameworkName
+from analysis_service.report import FrameworkName, FrameworkSelection
 from analysis_service.resilience import ResilienceConfig, load_resilience
 from analysis_service.sampling import SamplingConfig, load_sampling
+from analysis_service.selection import SelectionError, resolve_selection
 
 # Two layouts resolve to the same defaults, not fetched at run time either way.
 # A wheel built from this project bundles prompts/, domains/, frameworks/ and
@@ -256,18 +257,18 @@ class Deployment:
 
         Order is the caller's and is preserved: it is the order the report's
         blocks carry, and the envelope checks the two agree.
+
+        Read through :func:`~analysis_service.selection.resolve_selection`,
+        the one reader of the rule, over bare selections: this seam holds
+        names and no options, and the options were checked where the
+        selection was built.
         """
-        if not frameworks:
-            raise ConfigError(
-                "a job must select at least one framework;"
-                f" this deployment carries {list(self.frameworks)}"
+        try:
+            resolve_selection(
+                self.frameworks, [FrameworkSelection(name=name) for name in frameworks]
             )
-        unknown = [name for name in frameworks if name not in self.frameworks]
-        if unknown:
-            raise ConfigError(
-                f"this deployment does not carry {unknown};"
-                f" it carries {list(self.frameworks)}"
-            )
+        except SelectionError as exc:
+            raise ConfigError(str(exc)) from exc
         return tuple(frameworks)
 
     def tier_of(self, graph_node: str) -> TierName:

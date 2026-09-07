@@ -329,10 +329,15 @@ def test_the_block_order_is_the_installs_order_not_the_pages(client):
     assert frameworks_of(client, body) == list(CARRIED)
 
 
-def test_a_framework_named_twice_runs_once(client):
-    """Otherwise a page could double its own cost and break the envelope."""
+def test_a_framework_named_twice_is_refused(client):
+    """As the HTTP route refuses it, through the one reader both share.
+
+    It used to run once. Collapsing a repeat answers a submission with a
+    selection nobody made, and the route already said so; the page never
+    sends a repeat, so nothing legitimate is affected.
+    """
     body = posted("A web app talks to a database.", frameworks=["asvs", "asvs"])
-    assert frameworks_of(client, body) == ["asvs"]
+    assert client.post("/analyze", json=body, headers=SAME_ORIGIN).status_code == 400
 
 
 def test_a_framework_this_install_does_not_carry_is_refused(tiers):

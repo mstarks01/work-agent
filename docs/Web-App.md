@@ -48,8 +48,9 @@ block in it, and every block reads the same extracted model. So STRIDE threats
 and ASVS requirement rulings arrive together, against one system, from one run.
 
 The server decides what runs, not the page. A submission naming a framework this
-install does not carry is refused, a framework named twice runs once, and the
-block order is the config file's order rather than the page's. A submission that
+install does not carry is refused, a framework named twice is refused, and the
+block order is the config file's order rather than the page's. The rule is the
+one the HTTP route and the engine read, so the three entry points agree. A submission that
 leaves out an option its framework needs is refused before any model runs, with a
 message naming the field.
 
