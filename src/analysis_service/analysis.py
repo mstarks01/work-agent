@@ -67,6 +67,7 @@ __all__ = [
     "outbound_flows",
     "reachable_from",
     "sensitive_assets",
+    "states_a_protocol",
     "unknown_controls",
     "zone_kinds",
 ]
@@ -135,6 +136,27 @@ def control_state(value: str) -> ControlState:
     if match is None:
         return "stated"
     return "unverified" if match.group(1).lower() == UNKNOWN else "absent"
+
+
+def states_a_protocol(protocol: str) -> bool:
+    """Whether a flow's ``protocol`` says anything at all about what it speaks.
+
+    **Read through the service's own leading-token rule**, not a bare prefix
+    test. :func:`control_state` is what every other reader of an attribute in
+    this repo uses: it matches ``unknown`` or ``none`` as a *word*, so
+    ``"unknownish binary framing"`` is a stated protocol and ``"unknown; the
+    team never said"`` is not. A prefix test read the first as silence.
+
+    The empty string is silence too, and it has to be said separately because
+    :func:`control_state` calls it ``stated`` — correctly, since for a
+    *control* an empty value is not evidence of anything. A protocol nobody
+    filled in is the same fact as one nobody knew.
+
+    One reader for two callers: the ASVS precondition, which holds its answer
+    open on a silent protocol, and the extraction scorer, which checks that a
+    silent protocol stays silent.
+    """
+    return bool(protocol.strip()) and control_state(protocol) == "stated"
 
 
 def is_unverified(value: str) -> bool:

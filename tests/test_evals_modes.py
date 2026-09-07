@@ -521,16 +521,40 @@ def test_the_sweep_aggregate_splits_by_element_type_and_attribute(case):
         "boundary.kind",
         "entity.kind",
         "process.exposure",
+        "process.interface_kind",
         "boundary.assets",
         "entity.assets",
         "flow.assets",
         "process.assets",
         "store.assets",
+        "flow.protocol",
         "flow.authentication",
         "flow.encryption_in_transit",
         "store.encryption_at_rest",
         "store.data_classification",
     ]
+
+
+def test_the_two_attributes_the_asvs_precondition_reads_are_scored(case):
+    """A non-web process must stay non-web, and a silent protocol silent.
+
+    Both decide whether ASVS runs at all, and neither was compared before
+    (#659). The protocol is compared by state rather than wording: two correct
+    readings of "over gRPC" spell it differently, and neither is an invention.
+    """
+    reworded = edited(case.model, "data_flows", 0, protocol="HTTP over TLS")
+    invented = edited(case.model, "data_flows", 0, protocol="unknown")
+    retyped = edited(case.model, "processes", 0, interface_kind="non-web")
+
+    assert score_of(case, reworded).differing == ()
+    assert [
+        (check.attribute, check.blessed, check.extracted)
+        for check in score_of(case, invented).differing
+    ] == [("protocol", "stated", "silent")]
+    assert [
+        (check.attribute, check.blessed, check.extracted)
+        for check in score_of(case, retyped).differing
+    ] == [("interface_kind", "web", "non-web")]
 
 
 def test_an_extraction_that_produced_nothing_compares_no_attributes(case):

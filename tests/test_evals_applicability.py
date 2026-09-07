@@ -195,6 +195,79 @@ def test_the_four_cells_partition_the_level_s_universe(case):
     assert counted == score.universe == len(universe)
 
 
+class TestAnExplicitNegativeIsNotAnExpectedPositive:
+    """A ``not-applicable`` record says the requirement does not apply.
+
+    Two corpus cases carry one. Folding them into ``expected`` charged a run
+    that correctly excluded the requirement with a recall miss, so an otherwise
+    perfect run could not reach full recall while being right (#659).
+    """
+
+    @pytest.fixture(scope="class")
+    def negative_case(self, corpus):
+        case = next(entry for entry in corpus if entry.id == "04-ml-inference-service")
+        assert [
+            ref.requirement
+            for ref in case.references["asvs"]
+            if ref.disposition == "not-applicable"
+        ] == ["V9.1.1"]
+        return case
+
+    def positives(self, case):
+        return [
+            ref.requirement
+            for ref in case.references["asvs"]
+            if ref.disposition != "not-applicable"
+        ]
+
+    def test_excluding_it_is_a_success_in_every_cell(self, negative_case):
+        score = score_applicability(
+            negative_case,
+            Block(
+                (ruling(r) for r in self.positives(negative_case)),
+                rejected_claims=[ruling("V9.1.1", "rejected")],
+            ),
+        )
+
+        assert score.recall == 1.0
+        assert score.must_find_recall == 1.0
+        assert score.missed == ()
+        assert score.negatives == ("V9.1.1",)
+        assert score.negatives_applied == ()
+        assert "V9.1.1" not in score.expected
+        assert score.rejected == ("V9.1.1",)
+
+    def test_applying_it_is_a_judged_false_positive(self, negative_case):
+        score = score_applicability(negative_case, Block([ruling("V9.1.1")]))
+
+        assert score.negatives_applied == ("V9.1.1",)
+        # Not ``over_applied``: that cell is unjudged on a sampled case, and
+        # this one the case did judge.
+        assert score.over_applied == ()
+
+    def test_the_critic_rejecting_it_is_earned(self, negative_case):
+        from evals.harness.applicability import score_yield
+
+        critic = score_yield(
+            negative_case,
+            RuledBlock(claims=[], rejected_claims=[ruling("V9.1.1", "rejected")]),
+            drafts=[object()],
+        )
+
+        assert critic.earned == ("V9.1.1",)
+        assert critic.destroyed == ()
+        assert critic.unlisted == ()
+
+    def test_the_pooled_figures_carry_the_negatives(self, negative_case):
+        score = score_applicability(negative_case, Block([ruling("V9.1.1")]))
+
+        totals = pooled([score])
+
+        assert totals["negatives"] == 1
+        assert totals["negatives_applied"] == 1
+        assert totals["expected"] == len(self.positives(negative_case))
+
+
 def test_a_rejected_ruling_is_not_an_applied_one(read_case):
     """``rejected`` is the critic saying the requirement does not apply.
 
@@ -523,10 +596,40 @@ def test_the_critic_pair_reads_both_sides(case):
     )
 
     assert critic.destroyed == (expected[1],)
-    assert critic.earned == (unexpected,)
+    # The case did not list it, and did not rule it out either: on a sampled
+    # reference set that rejection is unjudged, not earned (#659).
+    assert critic.earned == ()
+    assert critic.unlisted == (unexpected,)
     assert critic.confirmed == (expected[0],)
     assert critic.rejection_rate == pytest.approx(2 / 3)
     assert critic.destroyed_rate == 0.5
+
+
+def test_a_lane_or_duplicate_rejection_neither_destroys_nor_earns(case):
+    """It rules on nothing, and the one reader of that is ``rules_on_unit``.
+
+    The main scorer already declined to count such a rejection; yield read the
+    list alone and charged a misfiled draft as a destroyed requirement (#659).
+    """
+    from evals.harness.applicability import score_yield
+
+    expected = [reference.requirement for reference in case.references["asvs"]]
+    critic = score_yield(
+        case,
+        RuledBlock(
+            claims=[],
+            rejected_claims=[
+                ruling(expected[0], "rejected", rejected_because="lane"),
+                ruling(expected[1], "rejected", rejected_because="duplicate"),
+                ruling(expected[2], "rejected"),
+            ],
+        ),
+        drafts=[object(), object(), object()],
+    )
+
+    assert critic.rejected == (expected[2],)
+    assert critic.destroyed == (expected[2],)
+    assert critic.earned == ()
 
 
 def test_the_split_comes_from_the_list_a_claim_sits_in(case):
