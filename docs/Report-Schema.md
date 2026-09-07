@@ -602,14 +602,21 @@ class LaneCoverage:
     rules: int  # deterministic triggers defined in this lane
     rules_fired: int  # of those, how many produced a candidate here
     candidates: int  # structural leads handed to this agent
-    candidates_cited: int  # leads whose every element the drafts cite
+    candidates_cited: int  # leads whose every element one draft cites
     elements: int  # elements in the system model
     elements_cited: int
     boundary_crossings: int
     boundary_crossings_cited: int
     unknown_controls: int  # attributes stating no verified control
-    unknown_controls_cited: int
+    unknown_controls_cited: int  # of those, the pairs some draft grounds on
 ```
+
+Two of the `*_cited` halves are counted at the grain their names promise.
+`unknown_controls_cited` credits an `(element, attribute)` pair only where a
+draft carries an attribute ground naming exactly that pair, so citing a store
+does not credit every unstated control it holds. `candidates_cited` credits a
+lead only where one draft cites every element the lead names, so two drafts
+that between them mention a flow's two endpoints have not taken up the lead.
 
 Every number is computed in code, from the system model, the deterministic
 candidate triggers and the agent's own drafts. None of it is asserted by a
@@ -992,6 +999,11 @@ class TokenUsage:
 > - Each block carries `repaired_quotes`. A quote ground's `text` is no longer
 >   always what the agent wrote: where the ladder refused it and the source
 >   held a near span, the text is that span and this list carries the agent's.
+> - `coverage[].unknown_controls_cited` counts a control only where a draft's
+>   attribute ground names that element and that attribute, and
+>   `coverage[].candidates_cited` counts a lead only where one draft cites
+>   every element it names. Both used to be credited from a union of what the
+>   lane's drafts cited, and archived rows carry those larger numbers.
 >
 > **There is no version gate and none is needed.** `Report` forbids unknown
 > fields, so a 2.10 payload carrying `threats` at the top level is refused by
