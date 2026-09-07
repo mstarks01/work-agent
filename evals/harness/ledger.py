@@ -185,6 +185,21 @@ class Vote:
                 f"{self.reason!r} is not a reason code; the set is"
                 f" {', '.join(sorted(REASONS))}"
             )
+        # A row states the case twice: once as the descriptive `case` a reviewer
+        # reads, and once inside `components.scope`, which the key is made of.
+        # Two spellings of one fact drift, and this one drifts silently -- the
+        # fingerprint would name a system the row does not claim to be about,
+        # and `rekey` would carry that forward for ever. `cast` stamps the scope
+        # from the case so no caller composes them separately; this refuses the
+        # pair a hand-built row could still disagree on. An empty scope is a row
+        # keyed under a version that does not read one, which still has to load.
+        if self.components.scope and self.components.scope != self.case:
+            raise LedgerError(
+                f"this vote is recorded against case {self.case!r} and its"
+                f" components are keyed to {self.components.scope!r}; the scope"
+                " is the case, and a row keyed to another system would answer"
+                " for a finding nobody voted on"
+            )
         # The key is computed, never stated. A row arrives from a contributor's
         # pull request, and until this ran nothing recomputed it: the stored
         # string was taken on the row's word, while `components` -- the fields
@@ -307,9 +322,15 @@ def cast(
     an action verb an ASVS claim does not carry, so every ASVS vote raised
     instead of recording. ``version`` stays overridable for a caller re-keying a
     row deliberately.
+
+    ``components`` is stamped with ``case`` as its scope, so the fields the key
+    is made of and the case the row is filed under cannot disagree. A caller
+    that composed both separately would be the second reader of one fact, and
+    the disagreement would be sixteen hex characters nobody could read.
     """
     if version is None:
         version = version_for(components.framework)
+    components = replace(components, scope=case)
     return Vote(
         fingerprint=fingerprint(components, version=version),
         components=components,

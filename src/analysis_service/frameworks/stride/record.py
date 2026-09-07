@@ -57,7 +57,8 @@ __all__ = [
     "build_stride_summary",
 ]
 
-#: This package's own ruleset version — the 12 candidate rules, the 6 lanes and
+#: This package's own ruleset version — the candidate rules in
+#: :data:`~analysis_service.frameworks.stride.rules.RULES`, the 6 lanes and
 #: the text under ``frameworks/stride/``. STRIDE is not a published standard with
 #: releases, so the value names **this repo's** ruleset rather than anyone
 #: else's. It is required and non-empty on every claim for the reason a

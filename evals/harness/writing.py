@@ -96,6 +96,7 @@ def measure_case(
         produced += 1
         value, _ = key_claim(
             framework,
+            case_id,
             getattr(claim, lane_of),
             tuple(claim.affected_element_ids),
             flows,

@@ -30,8 +30,8 @@ recorded labels, where element agreement alone scores 201/311.
 
 Version 2 is the default. :class:`~analysis_service.report.Claim` carries the
 verb, and :class:`~analysis_service.frameworks.stride.record.DraftThreat`
-requires it, so a finding out of a live run fingerprints at version 2 as a
-reference claim does.
+requires it, so a finding out of a live run fingerprints as a reference claim
+does.
 
 Version 3 reads a catalog identifier instead of an action. A package whose
 claims name a requirement in a published catalog is already identified, so the
@@ -39,6 +39,17 @@ rule that keys it is place plus that identifier: ASVS's ``V6.2.1``, in the
 chapter it was ruled in, over the elements it names. Version 1 keyed such a
 claim by place alone, which made two requirements ruled on one element in one
 chapter a single fingerprint, and let one vote answer for both.
+
+Versions 4 and 5 add the **scope** a claim was reached in, and they are what
+:data:`VERSION_FOR` now names. Versions 1 to 3 read a place as an **Element ID**
+and nothing more, so two systems that spell one element alike shared a
+fingerprint: ``store:landing-bucket`` is a slug two corpus cases both derive, and
+case 03's disclosure claim about partner extracts keyed identically to case 12's
+about a supplier extract. One vote answered for both, and a queue built over
+both cases showed only the first. An element ID is unique inside one **System
+Model** and says nothing across two, so the scope is the missing half of the
+place. :data:`READS_SCOPE` says which versions read it, and a version that does
+refuses an empty one the way version 2 refuses a missing verb.
 
 Every version stays computable, and that is not a compatibility shim. Which rule
 keys a package is :data:`VERSION_FOR`, and the entries follow from what a
@@ -78,8 +89,8 @@ from evals.harness.verbs import check_verb
 #: finding it produces, which is the question its author should answer: does
 #: this package's claim carry its own identity, or compose one?
 VERSION_FOR: dict[FrameworkName, int] = {
-    "stride": 2,
-    "asvs": 3,
+    "stride": 4,
+    "asvs": 5,
 }
 
 #: Which field on a claim names the lane it was reached in. **Keyed, never
@@ -115,7 +126,7 @@ IDENTIFIER_OF: dict[FrameworkName, Callable[[str], str] | None] = {
 #: Every version this module can compute. A key missing here raises rather than
 #: falling back — a fingerprint quietly computed under the wrong rule is a vote
 #: silently attached to the wrong finding.
-SUPPORTED_VERSIONS = (1, 2, 3)
+SUPPORTED_VERSIONS = (1, 2, 3, 4, 5)
 
 #: Which component each version reads on top of the framework, lane and targets
 #: every version hashes. ``None`` says this version reads those three alone.
@@ -133,6 +144,30 @@ EXTRA_COMPONENT: dict[int, str | None] = {
     1: None,
     2: "verb",
     3: "identifier",
+    4: "verb",
+    5: "identifier",
+}
+
+#: Which versions read the scope a claim was reached in. **Keyed, never
+#: branched**, for the reason :data:`EXTRA_COMPONENT` is, and checked against
+#: :data:`SUPPORTED_VERSIONS` in both directions by
+#: ``tests/test_evals_fingerprint.py``.
+#:
+#: A separate table rather than another :data:`EXTRA_COMPONENT` entry, because
+#: the scope is not an alternative to the verb or the identifier — it sits
+#: beside whichever of those a version already reads, which is why one change
+#: produced two new versions rather than one.
+#:
+#: ``False`` on 1, 2 and 3 is what keeps those values meaning what they meant.
+#: A version's whole purpose is that a stored value cannot be silently
+#: re-interpreted, so the fix is a version that reads more, never a redefinition
+#: of one that already shipped.
+READS_SCOPE: dict[int, bool] = {
+    1: False,
+    2: False,
+    3: False,
+    4: True,
+    5: True,
 }
 
 
@@ -162,6 +197,13 @@ class Components:
     #: one. ``None`` for a package that composes an identity instead, and
     #: version 3 refuses to hash without it.
     identifier: str | None = None
+    #: Which system this claim was reached in — the case ID, everywhere a claim
+    #: is keyed today. The other half of a place: an **Element ID** is unique
+    #: inside one **System Model** and two models may derive one slug, so
+    #: without this a claim about one system keys identically to a claim about
+    #: another. ``""`` for the versions :data:`READS_SCOPE` says do not read it;
+    #: a version that does refuses an empty one.
+    scope: str = ""
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -170,6 +212,7 @@ class Components:
             "targets": list(self.targets),
             "verb": self.verb,
             "identifier": self.identifier,
+            "scope": self.scope,
         }
 
     @classmethod
@@ -181,6 +224,7 @@ class Components:
                 targets=tuple(raw["targets"]),
                 verb=raw.get("verb"),
                 identifier=raw.get("identifier"),
+                scope=raw.get("scope", ""),
             )
         except (KeyError, TypeError) as exc:
             raise FingerprintError(f"malformed components: {exc}") from exc
@@ -247,8 +291,8 @@ def version_for(framework: FrameworkName) -> int:
     except KeyError:
         raise FingerprintError(
             f"no fingerprint version is declared for {framework!r};"
-            " add it to VERSION_FOR — 2 if its claims compose an identity from"
-            " an action and a place, 3 if they name a catalog requirement"
+            " add it to VERSION_FOR — 4 if its claims compose an identity from"
+            " an action and a place, 5 if they name a catalog requirement"
         ) from None
 
 
@@ -259,6 +303,7 @@ def components_for(
     flows: FlowMap,
     verb: str | None = None,
     identifier: str | None = None,
+    scope: str = "",
 ) -> Components:
     """Build the components for one claim, resolving its elements once.
 
@@ -277,6 +322,7 @@ def components_for(
         targets=tuple(sorted(endpoint_form(element_ids, flows))),
         verb=verb,
         identifier=identifier,
+        scope=scope,
     )
 
 
@@ -298,19 +344,28 @@ def fingerprint(components: Components, version: int) -> str:
             f" ({', '.join(str(known) for known in SUPPORTED_VERSIONS)})"
         )
     parts = [components.framework, components.lane, *sorted(components.targets)]
-    if version == 2:
+    if READS_SCOPE[version]:
+        if not components.scope:
+            raise FingerprintError(
+                f"version {version} reads the scope a claim was reached in and"
+                " this claim names none; pass the case ID, whose absence would"
+                " key two systems' claims about one element slug alike"
+            )
+        parts.append(components.scope)
+    if EXTRA_COMPONENT[version] == "verb":
         if components.verb is None:
             raise FingerprintError(
-                "version 2 reads the action verb and this claim carries none;"
-                " assign one from evals.harness.verbs, or fingerprint at"
-                " version 1"
+                f"version {version} reads the action verb and this claim"
+                " carries none; assign one from evals.harness.verbs, or"
+                " fingerprint at version 1"
             )
         parts.append(check_verb(components.verb))
-    if version == 3:
+    if EXTRA_COMPONENT[version] == "identifier":
         if not components.identifier:
             raise FingerprintError(
-                "version 3 reads a catalog identifier and this claim names"
-                " none; key a claim that composes its identity at version 2"
+                f"version {version} reads a catalog identifier and this claim"
+                " names none; key a claim that composes its identity at a"
+                " version that reads an action"
             )
         parts.append(components.identifier)
     # NUL joins the parts because it cannot occur in any of them, so no value
@@ -321,6 +376,7 @@ def fingerprint(components: Components, version: int) -> str:
 
 def key_claim(
     framework: FrameworkName,
+    scope: str,
     lane: str,
     element_ids: Iterable[str],
     flows: FlowMap,
@@ -331,15 +387,22 @@ def key_claim(
 
     The single spelling of "which version keys this package, and which
     component that version reads". Every site that keys a produced claim goes
-    through here — the review queue, the writing instrument and the tests that
-    stand in for both — so a finding counted under one key and asked about
-    under another cannot happen by one site being edited and another missed.
+    through here — the review queue, the scorer, the sitting page, the writing
+    instrument and the tests that stand in for them — so a finding counted under
+    one key and asked about under another cannot happen by one site being edited
+    and another missed.
+
+    ``scope`` is positional and second, beside the framework, because it is the
+    half of a place an **Element ID** does not carry and a caller that omitted
+    it would key two systems' claims alike. Every caller holds a case ID at the
+    point it keys, so there is nothing to default to.
 
     **Offer everything the claim carries.** ``verb`` and ``identifier`` are
     both taken and :data:`EXTRA_COMPONENT` drops whichever the version does not
     read, rather than each caller deciding. A caller that guessed would compose
     a verb into an ASVS key, and the ledger would hold two spellings of one
-    finding with nothing to say which was right.
+    finding with nothing to say which was right. :data:`READS_SCOPE` drops the
+    scope on the same terms.
 
     Returns the fingerprint first because every caller wants it, and the
     components beside it because the queue stores them on the vote — that is
@@ -355,6 +418,7 @@ def key_claim(
         flows,
         verb=verb if reads == "verb" else None,
         identifier=identifier if reads == "identifier" else None,
+        scope=scope if READS_SCOPE[version] else "",
     )
     return fingerprint(components, version=version), components
 

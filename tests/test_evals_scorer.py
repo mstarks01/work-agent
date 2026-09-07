@@ -164,7 +164,7 @@ def test_an_unvoted_unmatched_threat_is_visible_and_never_gates(case, no_votes):
     }
     assert score.rejected_rate == 0.0
     assert score.unvoted_count == 1
-    assert score.unlisted[0].fingerprint.startswith("v2:")
+    assert score.unlisted[0].fingerprint.startswith(f"v{version_for('stride')}:")
     assert unlisted_for_promotion([score]) == []
 
 

@@ -126,12 +126,24 @@ class UnknownControl(BaseModel):
 def control_state(value: str) -> ControlState:
     """Classify one control attribute from its leading token alone.
 
-    ``unverified`` for ``unknown``, ``absent`` for ``none``, ``stated`` for
-    everything else — including the empty string, which no validated model
-    carries for these attributes and which is not evidence of anything if it
-    somehow arrives. Reading only the leading token is what keeps this from
-    becoming a natural-language classifier with a security opinion.
+    ``unverified`` for ``unknown`` and for a blank value, ``absent`` for
+    ``none``, ``stated`` for everything else. Reading only the leading token is
+    what keeps this from becoming a natural-language classifier with a security
+    opinion.
+
+    **A blank value is a control nobody stated, so it reads as ``unverified``.**
+    It used to read as ``stated``, on the reasoning that no validated model
+    carries one — and nothing enforced that, because the free-text control
+    fields carry a maximum length and no minimum. An empty ``authentication``
+    therefore passed :func:`~analysis_service.validation.validate` and then made
+    :func:`is_unverified` false, which suppressed every candidate rule that asks
+    about a missing control and the evidence row beside it. The gate now reports
+    a blank field to the repair pass as well (``blank-control``), and this is
+    the reading that holds if one arrives anyway: silence about a control is the
+    same fact as a control nobody knew.
     """
+    if not value.strip():
+        return "unverified"
     match = _LEADING_CONTROL_TOKEN_RE.match(value)
     if match is None:
         return "stated"
@@ -147,16 +159,17 @@ def states_a_protocol(protocol: str) -> bool:
     ``"unknownish binary framing"`` is a stated protocol and ``"unknown; the
     team never said"`` is not. A prefix test read the first as silence.
 
-    The empty string is silence too, and it has to be said separately because
-    :func:`control_state` calls it ``stated`` — correctly, since for a
-    *control* an empty value is not evidence of anything. A protocol nobody
-    filled in is the same fact as one nobody knew.
+    A protocol nobody filled in is the same fact as one nobody knew, and
+    :func:`control_state` answers that directly: a blank value is
+    ``unverified`` there, so this needs no separate empty-string test of its
+    own. It used to carry one, because ``control_state`` read a blank as
+    ``stated``.
 
     One reader for two callers: the ASVS precondition, which holds its answer
     open on a silent protocol, and the extraction scorer, which checks that a
     silent protocol stays silent.
     """
-    return bool(protocol.strip()) and control_state(protocol) == "stated"
+    return control_state(protocol) == "stated"
 
 
 def is_unverified(value: str) -> bool:

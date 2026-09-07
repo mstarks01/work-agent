@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import pytest
 
-from evals.harness.fingerprint import components_for
+from evals.harness.fingerprint import components_for, version_for
 from evals.harness.ledger import Ledger, cast
 from evals.harness.queue import (
     PRIORITIES,
@@ -53,7 +53,12 @@ def finding(
 def value_of(item):
     """The components the queue would build for this finding, at its own version."""
     return components_for(
-        "stride", "spoofing", item.element_ids, FLOWS["01"], verb=item.verb
+        "stride",
+        "spoofing",
+        item.element_ids,
+        FLOWS["01"],
+        verb=item.verb,
+        scope=item.case,
     )
 
 
@@ -128,7 +133,11 @@ def test_a_second_voter_is_not_told_how_the_first_one_voted():
     pooled = finding(title="Ada said yes", target="process:p")
     untouched = finding(title="Nobody voted", target="process:n")
     ledger = Ledger()
-    ledger.votes.append(cast(value_of(pooled), "01-payments-checkout", "up", "ada"))
+    # The finding's own case, so ada's vote really does key onto it. It read
+    # "01-payments-checkout" against a finding filed under "01", which the key
+    # ignored before the scope entered it and which would now quietly make this
+    # a test about two unpooled findings.
+    ledger.votes.append(cast(value_of(pooled), pooled.case, "up", "ada"))
 
     items = build([pooled, untouched], FLOWS, ledger, voter="bob")
 
@@ -205,8 +214,9 @@ def test_a_stride_finding_with_no_verb_fails_closed():
 def test_each_framework_is_keyed_by_its_own_rule():
     """A sweep carries both packages, and they do not identify claims alike.
 
-    ASVS composes no verb, so keying it at version 2 would read a field it never
-    has; STRIDE names no requirement, so version 3 would read one it never has.
+    ASVS composes no verb, so keying it under STRIDE's rule would read a field
+    it never has; STRIDE names no requirement, so ASVS's rule would read one it
+    never has.
     The version rides in the value, so the two cannot be compared by accident
     either.
     """
@@ -224,8 +234,8 @@ def test_each_framework_is_keyed_by_its_own_rule():
         item.finding.framework: item for item in build([stride, asvs], FLOWS, Ledger())
     }
 
-    assert items["stride"].fingerprint.startswith("v2:")
-    assert items["asvs"].fingerprint.startswith("v3:")
+    assert items["stride"].fingerprint.startswith(f"v{version_for('stride')}:")
+    assert items["asvs"].fingerprint.startswith(f"v{version_for('asvs')}:")
 
 
 def test_two_requirements_in_one_chapter_are_two_questions():
@@ -305,7 +315,10 @@ class TestNeedsEvidenceIsNotAnAnswer:
         led.votes.append(
             cast(
                 value_of(item),
-                "01-payments-checkout",
+                # The finding's own case. It read "01-payments-checkout" while
+                # the finding said "01", which cost nothing while the key
+                # ignored the case and mis-keys the vote now that it does not.
+                item.case,
                 "needs-evidence",
                 "ada",
                 sitting=sitting,

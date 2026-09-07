@@ -20,6 +20,7 @@ from evals.harness.fingerprint import (
     EXTRA_COMPONENT,
     IDENTIFIER_OF,
     LANE_FIELD,
+    READS_SCOPE,
     SUPPORTED_VERSIONS,
     VERSION_FOR,
     Components,
@@ -112,6 +113,17 @@ def test_every_supported_version_declares_what_it_reads():
     assert set(EXTRA_COMPONENT) == set(SUPPORTED_VERSIONS)
 
 
+def test_every_supported_version_declares_whether_it_reads_the_scope():
+    """:data:`READS_SCOPE` against its registry, on ``EXTRA_COMPONENT``'s terms.
+
+    A second table keyed by version is a second place to forget an entry, so it
+    is checked the same way and in the same test file. A version missing here
+    raises a ``KeyError`` inside ``fingerprint`` rather than quietly keying a
+    claim without its scope.
+    """
+    assert set(READS_SCOPE) == set(SUPPORTED_VERSIONS)
+
+
 @pytest.mark.parametrize("version", SUPPORTED_VERSIONS)
 def test_the_table_and_the_hash_agree_about_what_a_version_reads(version):
     """``EXTRA_COMPONENT`` says what ``fingerprint`` refuses to hash without.
@@ -119,9 +131,11 @@ def test_the_table_and_the_hash_agree_about_what_a_version_reads(version):
     The table decides what ``key_claim`` composes and ``fingerprint`` decides
     what it will not hash. Those are two spellings of one fact, so a version
     whose entry names a component the hash does not require — or omits one it
-    does — is the drift this pins.
+    does — is the drift this pins. :data:`READS_SCOPE` is held to the same bar
+    below, over the same versions.
     """
-    without = Components("stride", "spoofing", ("process:a",))
+    scope = "01-payments-checkout" if READS_SCOPE[version] else ""
+    without = Components("stride", "spoofing", ("process:a",), scope=scope)
     reads = EXTRA_COMPONENT[version]
     if reads is None:
         assert fingerprint(without, version=version)
@@ -130,6 +144,25 @@ def test_the_table_and_the_hash_agree_about_what_a_version_reads(version):
         fingerprint(without, version=version)
     supplied = replace(without, **{reads: "read" if reads == "verb" else "V6.2.1"})
     assert fingerprint(supplied, version=version)
+
+
+@pytest.mark.parametrize("version", SUPPORTED_VERSIONS)
+def test_a_version_that_reads_the_scope_refuses_an_empty_one(version):
+    """The scope half of the rule above: declared means required.
+
+    A version keyed ``True`` in :data:`READS_SCOPE` and willing to hash without
+    a scope would be the defect this fixed, one table away: the value would
+    look like a version-4 key and carry a version-1 place.
+    """
+    full = Components(
+        "stride", "spoofing", ("process:a",), verb="read", identifier="V6.2.1"
+    )
+    if not READS_SCOPE[version]:
+        assert fingerprint(replace(full, scope=""), version=version)
+        return
+    with pytest.raises(FingerprintError, match="scope"):
+        fingerprint(replace(full, scope=""), version=version)
+    assert fingerprint(replace(full, scope="01-payments-checkout"), version=version)
 
 
 def test_an_undeclared_framework_raises_rather_than_defaulting():
@@ -155,9 +188,53 @@ def test_each_package_names_its_lane_in_its_own_terms():
 
 
 def test_the_declared_versions_follow_from_what_a_claim_carries():
-    """STRIDE composes an identity; ASVS's claims name one in a catalog."""
-    assert version_for("stride") == 2
-    assert version_for("asvs") == 3
+    """STRIDE composes an identity; ASVS's claims name one in a catalog.
+
+    Both live versions read the scope, which is why neither is the version its
+    package started on: an element slug is unique inside one **System Model**
+    and two models may derive the same one.
+    """
+    assert version_for("stride") == 4
+    assert version_for("asvs") == 5
+    assert READS_SCOPE[version_for("stride")]
+    assert READS_SCOPE[version_for("asvs")]
+
+
+class TestTwoSystemsAreTwoPlaces:
+    """Version 4 and 5's reason, over the two corpus claims that collided.
+
+    ``store:landing-bucket`` is a slug case 03 and case 12 both derive, and both
+    cases record a ``read`` disclosure claim about it. Under version 2 they
+    fingerprinted alike, so the review queue showed one and hid the other, and a
+    vote on either answered for both — across two systems, two source texts, and
+    two tiers.
+    """
+
+    PLACE = ("stride", "information-disclosure", ("store:landing-bucket",))
+
+    def test_one_element_slug_in_two_systems_is_two_findings(self):
+        pipeline = Components(*self.PLACE, verb="read", scope="03-batch-data-pipeline")
+        portal = Components(*self.PLACE, verb="read", scope="12-overclaiming-portal")
+
+        assert fingerprint(pipeline, version=4) != fingerprint(portal, version=4)
+
+    def test_the_version_that_could_not_tell_them_apart_still_cannot(self):
+        """Version 2 is unchanged, which is what a version is for.
+
+        Redefining a shipped version would make one stored value mean two
+        things. The fix is a version that reads more.
+        """
+        place = Components(*self.PLACE, verb="read")
+
+        assert fingerprint(
+            replace(place, scope="03-batch-data-pipeline"), version=2
+        ) == fingerprint(replace(place, scope="12-overclaiming-portal"), version=2)
+
+    def test_one_claim_keys_the_same_twice(self):
+        first = Components(*self.PLACE, verb="read", scope="03-batch-data-pipeline")
+        second = Components(*self.PLACE, verb="read", scope="03-batch-data-pipeline")
+
+        assert fingerprint(first, version=4) == fingerprint(second, version=4)
 
 
 class TestACatalogIdentifierIsHalfTheKey:
