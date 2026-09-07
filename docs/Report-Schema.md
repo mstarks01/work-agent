@@ -224,7 +224,7 @@ looked". The complement is not derived — every unit appears.
 - `not-applicable` — the unit does not apply to a system of this shape. A
   finished answer, with the reason: either the framework's **Precondition**
   refused the model, or the package's own rules ruled the unit out before its
-  lane ran (a chapter whose deciding presence test fired nowhere, or a
+  lane ran (a section whose deciding presence test fired nowhere, or a
   requirement whose own technology is named nowhere). A draft the lane files
   on such a unit anyway is refused at the fan-in and listed in
   `dropped_claims`.

@@ -49,6 +49,7 @@ __all__ = [
     "requirement_id",
     "requirement_text",
     "requirements_for",
+    "sections_of",
 ]
 
 #: The release of the standard this catalog carries. It names **the standard's
@@ -185,6 +186,19 @@ def requirements_for(level: int, lane: str | None = None) -> tuple[Requirement, 
         requirement
         for requirement in REQUIREMENTS
         if requirement.level <= level and (lane is None or requirement.lane == lane)
+    )
+
+
+def sections_of(lane: str) -> tuple[str, ...]:
+    """The sections of one chapter, as the standard numbers them (``V5.1``)."""
+    return tuple(
+        sorted(
+            {
+                requirement.section
+                for requirement in REQUIREMENTS
+                if requirement.lane == lane
+            }
+        )
     )
 
 
