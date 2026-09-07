@@ -1147,6 +1147,59 @@ class TestAChapterRuledOutInCode:
             DraftRequirementRuling.ruled_out(model, {"level": 2}, "file-handling") == {}
         )
 
+    @pytest.mark.parametrize(
+        "sentence",
+        [
+            "The documented retention policy covers every order.",
+            "Documentation for the API lives in the wiki.",
+            "It is important that settlement runs nightly.",
+        ],
+    )
+    def test_an_ordinary_word_is_not_an_upload(self, sentence):
+        """A prefix match made ``document`` and ``import`` nearly always true.
+
+        Both words are ordinary in any description, so an unanchored term
+        answered for "documented", "documentation" and "important" and the
+        predicate stopped testing anything.
+        """
+        model = SystemModel.model_validate(
+            json.loads((CORPUS_DIR / "01-payments-checkout" / "model.json").read_text())
+        )
+        base = DraftRequirementRuling.ruled_out(model, {"level": 2}, "file-handling")
+        model.processes[0].description += " " + sentence
+
+        out = DraftRequirementRuling.ruled_out(model, {"level": 2}, "file-handling")
+
+        # The sentence carries no file, so it moves nothing: this model names
+        # no upload and no file, and every section stays ruled out.
+        assert out == base
+        assert {unit.rsplit(".", 1)[0] for unit in out} == {
+            "V5.1",
+            "V5.2",
+            "V5.3",
+            "V5.4",
+        }
+
+    @pytest.mark.parametrize(
+        "sentence",
+        [
+            "Suppliers send compliance documents through the portal.",
+            "A supplier attaches one document per audit.",
+            "Merchants import a CSV of prices.",
+            "The nightly job imports partner records.",
+            "Prices are imported from the vendor feed.",
+        ],
+    )
+    def test_the_real_upload_words_still_answer(self, sentence):
+        model = SystemModel.model_validate(
+            json.loads((CORPUS_DIR / "01-payments-checkout" / "model.json").read_text())
+        )
+        model.processes[0].description += " " + sentence
+
+        assert (
+            DraftRequirementRuling.ruled_out(model, {"level": 2}, "file-handling") == {}
+        )
+
     def test_each_deciding_test_names_sections_its_chapter_has(self):
         from analysis_service.frameworks.asvs.catalog import sections_of
         from analysis_service.frameworks.asvs.rules import PRESENCE_TESTS
