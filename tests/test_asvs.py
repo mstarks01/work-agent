@@ -37,6 +37,7 @@ from analysis_service.frameworks import (
     selectable_without_options,
     validate_package,
 )
+from analysis_service.frameworks.asvs import rules
 from analysis_service.frameworks.asvs.catalog import (
     ASVS_VERSION,
     CHAPTERS,
@@ -1044,21 +1045,6 @@ class TestThisPackageCarriesNoActionVerb:
         assert "verb" in ThreatProposal.model_json_schema()["properties"]
 
 
-def test_a_javascript_system_does_not_keep_the_jndi_requirement():
-    """#455: ``java`` reached ``javascript`` and kept V1.3.8 in the lane."""
-    from analysis_service.analysis import names_term
-    from analysis_service.frameworks.asvs.rules import REQUIREMENT_TESTS
-
-    model = SystemModel.model_validate(
-        json.loads((CORPUS_DIR / "01-payments-checkout" / "model.json").read_text())
-    )
-    model.processes[0].description += " The storefront is a JavaScript front end."
-    terms = REQUIREMENT_TESTS["V1.3.8"]
-    assert not any(names_term(model, term) for term in terms)
-    model.processes[0].description += " It queries a Java directory service."
-    assert any(names_term(model, term) for term in terms)
-
-
 def test_the_unit_of_a_draft_is_its_requirement():
     """The fan-in refuses a draft on a ruled-out unit through this hook (#443)."""
     from analysis_service.frameworks.asvs.record import DraftRequirementRuling
@@ -1075,219 +1061,69 @@ def test_the_unit_of_a_draft_is_its_requirement():
     assert DraftRequirementRuling.unit_of(draft) == "V6.2.1"
 
 
-class TestAChapterRuledOutInCode:
-    """#443: a deciding presence test that fires nowhere rules its chapter out."""
+class TestNothingIsRuledOutByVocabulary:
+    """#659: the exclusions are gone, and this is the guard that keeps them gone.
 
-    def test_corpus01_at_level_2_rules_out_four_chapters(self):
-        model = SystemModel.model_validate(
-            json.loads((CORPUS_DIR / "01-payments-checkout" / "model.json").read_text())
-        )
-        ruled_out: dict[str, str] = {}
-        for lane in ASVS.lanes:
-            ruled_out.update(
-                DraftRequirementRuling.ruled_out(model, {"level": 2}, lane)
-            )
+    A word list decided which requirements left the analysis. Absence of a
+    word is not absence of the thing, so every miss was a requirement silently
+    dropped, and every fix was a word added after somebody noticed. The lists
+    remain as candidate rules, where a miss costs a lead the agent can still
+    find for itself.
+    """
 
-        by_chapter_test = {
-            unit.split(".")[0]
-            for unit, reason in ruled_out.items()
-            if "ruled out in code by" in reason
-        }
-        assert by_chapter_test == {"V5", "V9", "V10", "V17"}
-
-    def test_a_model_naming_the_thing_rules_nothing_out(self):
-        model = SystemModel.model_validate(
-            json.loads((CORPUS_DIR / "01-payments-checkout" / "model.json").read_text())
-        )
-        model.processes[0].description += " Shoppers upload a receipt image."
-
-        assert (
-            DraftRequirementRuling.ruled_out(model, {"level": 2}, "file-handling") == {}
-        )
-
-    def test_a_generated_file_keeps_the_storage_and_download_sections(self):
-        """#659: a download built from a user-supplied filename reaches V5.3.2
-        and V5.4.1 with no upload anywhere, so the upload test decides only the
-        two sections that presuppose one."""
-        model = SystemModel.model_validate(
-            json.loads((CORPUS_DIR / "01-payments-checkout" / "model.json").read_text())
-        )
-        model.processes[
-            0
-        ].description += " It creates downloadable PDFs from user-supplied filenames."
-
-        out = DraftRequirementRuling.ruled_out(model, {"level": 2}, "file-handling")
-
-        assert {unit.rsplit(".", 1)[0] for unit in out} == {"V5.1", "V5.2"}
-        assert {"V5.3.2", "V5.4.1"}.isdisjoint(out)
-
-    def test_documents_from_customers_are_an_upload(self):
-        model = SystemModel.model_validate(
-            json.loads((CORPUS_DIR / "01-payments-checkout" / "model.json").read_text())
-        )
-        model.processes[0].description += " It receives documents from customers."
-
-        assert (
-            DraftRequirementRuling.ruled_out(model, {"level": 2}, "file-handling") == {}
-        )
-
-    def test_an_upload_is_a_file_so_no_upload_word_loses_the_later_sections(self):
-        """A table with a hole, found on review of #667: six upload words were
-        not file words, so "users import a CSV" kept V5.1 and V5.2 and ruled
-        V5.3 and V5.4 out. The file table is now the upload table and a suffix."""
-        from analysis_service.frameworks.asvs.rules import FILE_TERMS, UPLOAD_TERMS
-
-        assert set(UPLOAD_TERMS) <= set(FILE_TERMS)
-        model = SystemModel.model_validate(
-            json.loads((CORPUS_DIR / "01-payments-checkout" / "model.json").read_text())
-        )
-        model.processes[0].description += " Merchants import a CSV of prices."
-
-        assert (
-            DraftRequirementRuling.ruled_out(model, {"level": 2}, "file-handling") == {}
-        )
-
-    @pytest.mark.parametrize(
-        "sentence",
-        [
-            "The documented retention policy covers every order.",
-            "Documentation for the API lives in the wiki.",
-            "It is important that settlement runs nightly.",
-        ],
-    )
-    def test_an_ordinary_word_is_not_an_upload(self, sentence):
-        """A prefix match made ``document`` and ``import`` nearly always true.
-
-        Both words are ordinary in any description, so an unanchored term
-        answered for "documented", "documentation" and "important" and the
-        predicate stopped testing anything.
-        """
-        model = SystemModel.model_validate(
-            json.loads((CORPUS_DIR / "01-payments-checkout" / "model.json").read_text())
-        )
-        base = DraftRequirementRuling.ruled_out(model, {"level": 2}, "file-handling")
-        model.processes[0].description += " " + sentence
-
-        out = DraftRequirementRuling.ruled_out(model, {"level": 2}, "file-handling")
-
-        # The sentence carries no file, so it moves nothing: this model names
-        # no upload and no file, and every section stays ruled out.
-        assert out == base
-        assert {unit.rsplit(".", 1)[0] for unit in out} == {
-            "V5.1",
-            "V5.2",
-            "V5.3",
-            "V5.4",
-        }
-
-    @pytest.mark.parametrize(
-        "sentence",
-        [
-            "Suppliers send compliance documents through the portal.",
-            "A supplier attaches one document per audit.",
-            "Merchants import a CSV of prices.",
-            "The nightly job imports partner records.",
-            "Prices are imported from the vendor feed.",
-        ],
-    )
-    def test_the_real_upload_words_still_answer(self, sentence):
-        model = SystemModel.model_validate(
-            json.loads((CORPUS_DIR / "01-payments-checkout" / "model.json").read_text())
-        )
-        model.processes[0].description += " " + sentence
-
-        assert (
-            DraftRequirementRuling.ruled_out(model, {"level": 2}, "file-handling") == {}
-        )
-
-    def test_each_deciding_test_names_sections_its_chapter_has(self):
-        from analysis_service.frameworks.asvs.catalog import sections_of
-        from analysis_service.frameworks.asvs.rules import PRESENCE_TESTS
-
-        deciding = {test.predicate: test for test in PRESENCE_TESTS if test.decides}
-        assert set(deciding) == {
-            "file-upload",
-            "self-contained-tokens",
-            "oauth",
-            "real-time-media",
-        }
-        for test in deciding.values():
-            assert set(test.decides) <= set(sections_of(test.lane)), test.predicate
-        assert deciding["file-upload"].decides == ("V5.1", "V5.2")
-        # The other three still decide their whole chapter.
-        for predicate in ("self-contained-tokens", "oauth", "real-time-media"):
-            test = deciding[predicate]
-            assert test.decides == sections_of(test.lane)
-
-    def test_a_ruled_out_unit_reaches_scope_as_not_applicable(self):
-        entries = AsvsAnalysis.scope_entries(
-            lanes=ASVS.lanes,
-            claims=[],
-            options={"level": 2},
-            ruled_out={
-                "V17.1.1": "no peer connection; ruled out in code by webrtc-real-time-media"
-            },
-        )
-
-        (entry,) = [entry for entry in entries if entry.unit == "V17.1.1"]
-        assert entry.state == "not-applicable"
-        assert "ruled out in code" in entry.reason
-        assert entry.needs == ""
-
-
-class TestARequirementRuledOutByItsOwnTerms:
-    """#455: a requirement naming a technology the model names nowhere."""
-
-    def test_the_table_names_only_published_requirements(self):
-        from analysis_service.frameworks.asvs.rules import REQUIREMENT_TESTS
-
-        published = {requirement.id for requirement in requirements_for(3)}
-        assert set(REQUIREMENT_TESTS) <= published
-        assert all(terms for terms in REQUIREMENT_TESTS.values())
-
-    def test_no_blessed_reference_is_ruled_out_by_code(self):
-        """The two tables can never sit narrower than the corpus.
-
-        A reference whose own claim says the requirement does not apply is the
-        one exception: ruling it out in code is that answer, given earlier.
-        """
-        ruled: list[tuple[str, str]] = []
+    def test_no_corpus_model_loses_a_requirement_to_code(self):
         for case_dir in sorted(CORPUS_DIR.iterdir()):
-            claims_path = case_dir / "claims" / "asvs.json"
-            if not claims_path.exists():
+            case_path = case_dir / "case.json"
+            if not case_path.exists():
                 continue
-            case = json.loads((case_dir / "case.json").read_text())
-            level = next(
-                f["options"]["level"] for f in case["frameworks"] if f["name"] == "asvs"
+            entry = next(
+                (
+                    f
+                    for f in json.loads(case_path.read_text())["frameworks"]
+                    if f["name"] == "asvs"
+                ),
+                None,
             )
+            if entry is None:
+                continue
             model = SystemModel.model_validate(
                 json.loads((case_dir / "model.json").read_text())
             )
-            out: dict[str, str] = {}
             for lane in ASVS.lanes:
-                out.update(
-                    DraftRequirementRuling.ruled_out(model, {"level": level}, lane)
-                )
-            ruled += [
-                (case_dir.name, claim["requirement"])
-                for claim in json.loads(claims_path.read_text())
-                if claim["requirement"] in out and "not apply" not in claim["claim"]
-            ]
-        assert ruled == []
+                assert (
+                    DraftRequirementRuling.ruled_out(
+                        model, {"level": entry["options"]["level"]}, lane
+                    )
+                    == {}
+                ), f"{case_dir.name}/{lane}"
 
-    def test_corpus01_rules_out_graphql_and_federation_but_not_a_named_thing(self):
+    def test_the_package_inherits_the_neutral_hook(self):
+        """It overrides nothing, which is the written statement that it rules
+        nothing out. A package that can refute a unit from *stated* facts may
+        still override; silence is what this one stopped reading."""
+        from analysis_service.report import Claim
+
+        assert "ruled_out" not in vars(DraftRequirementRuling)
+        assert DraftRequirementRuling.ruled_out.__func__ is Claim.ruled_out.__func__
+
+    def test_every_requirement_still_appears_exactly_once(self):
+        """The block's own rule, which the exclusions used to satisfy."""
+        block = _block(1)
+
+        assert len(block.scope) == 70
+        assert block.block_issues(known_element_ids=()) == []
+
+    def test_the_upload_words_still_raise_a_candidate(self):
+        """The vocabulary keeps its honest job: a lead for the lane agent."""
+        from analysis_service.frameworks.asvs.rules import PRESENCE_TESTS
+
+        (upload,) = [t for t in PRESENCE_TESTS if t.predicate == "file-upload"]
         model = SystemModel.model_validate(
             json.loads((CORPUS_DIR / "01-payments-checkout" / "model.json").read_text())
         )
-        api = DraftRequirementRuling.ruled_out(
-            model, {"level": 2}, "api-and-web-service"
-        )
-        auth = DraftRequirementRuling.ruled_out(model, {"level": 2}, "authentication")
-
-        assert {"V4.3.1", "V4.4.1"} <= set(api)
-        assert "V6.8.3" in auth
-        # The password requirements name nothing the model lacks.
-        assert "V6.2.1" not in auth
+        assert not list(rules._hits(model, upload))
+        model.processes[0].description += " Suppliers upload compliance documents."
+        assert list(rules._hits(model, upload))
 
 
 class TestARejectionThatDoesNotRuleLeavesItsRequirementListed:

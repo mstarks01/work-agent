@@ -47,7 +47,6 @@ from analysis_service.frameworks.asvs.catalog import (
     requirement_text,
     requirements_for,
 )
-from analysis_service.frameworks.asvs.rules import ruled_out_requirements
 from analysis_service.report import (
     MAX_CLAIMS_PER_BATCH,
     BlockSummary,
@@ -62,7 +61,6 @@ from analysis_service.report import (
     ScopeEntry,
     build_block_summary,
 )
-from analysis_service.system_model import SystemModel
 
 __all__ = [
     "ASVS_ID_FORMAT",
@@ -188,14 +186,6 @@ class DraftRequirementRuling(Claim):
         """The chapter's requirement identifiers at the level the job asked for."""
         level = AsvsOptions.model_validate(options).level
         return tuple(requirement.id for requirement in requirements_for(level, lane))
-
-    @classmethod
-    def ruled_out(
-        cls, model: SystemModel, options: Mapping[str, Any], lane: str
-    ) -> dict[str, str]:
-        """The chapter's requirements at the level, where its deciding test fired nowhere."""
-        level = AsvsOptions.model_validate(options).level
-        return ruled_out_requirements(model, level, lane)
 
     @classmethod
     def unit_of(cls, draft: Claim) -> str:

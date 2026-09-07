@@ -53,22 +53,18 @@ from analysis_service.analysis import (
     control_state,
     is_unverified,
     matches_term,
-    names_term,
     states_a_protocol,
 )
 from analysis_service.candidates import Match, Rule, clip_fact
 from analysis_service.frameworks import PreconditionResult
-from analysis_service.frameworks.asvs.catalog import requirements_for, sections_of
 from analysis_service.system_model import SystemModel
 
 __all__ = [
     "PRESENCE_TESTS",
-    "REQUIREMENT_TESTS",
     "RULES",
     "STRUCTURAL_RULES",
     "WEB_PROTOCOL_TERMS",
     "asvs_precondition",
-    "ruled_out_requirements",
 ]
 
 
@@ -86,16 +82,6 @@ class PresenceTest:
     question: str
     terms: tuple[str, ...]
     attributes: tuple[str, ...] = TEXT_ATTRIBUTES
-    #: The sections this test firing nowhere rules out (#443, narrowed by
-    #: #659). Named only where every requirement of the section presupposes
-    #: the thing the terms name — a self-contained token, an OAuth flow, a peer
-    #: connection, an upload — so that its absence from the model is the
-    #: answer. A chapter whose later sections reach a system with no upload
-    #: at all (a file the application generates, a download it serves) names
-    #: only the sections that need one, and the rest stay with the lane. Empty
-    #: where a silent model may still have the thing: most systems
-    #: authenticate a caller whether or not the submitter wrote "login".
-    decides: tuple[str, ...] = ()
 
     @property
     def rule_id(self) -> str:
@@ -148,7 +134,10 @@ def _rule_of(test: PresenceTest) -> Rule:
 # terms and put a different question. The last six close the chapters that had
 # no rule, and so no retrieval either.
 #: The submitter's words for an upload, not the protocol's: a supplier "sends
-#: documents", a user "imports a CSV", a member "sets an avatar".
+#: documents", a user "imports a CSV", a member "sets an avatar". **These raise
+#: a candidate and rule nothing out** (#659): a word nobody listed is a lead
+#: this lane never gets, which the lane agent can still find for itself, and
+#: which is the whole of what a vocabulary can honestly cost.
 #:
 #: **Two are anchored, because a prefix match made them nearly always true.**
 #: A term matches at the start of a word, so bare ``document`` answered for
@@ -175,21 +164,6 @@ UPLOAD_TERMS: tuple[str, ...] = (
     "spreadsheet",
 )
 
-#: A file the application handles at all: what the storage and download
-#: sections of the file-handling chapter presuppose, where the upload sections
-#: presuppose an upload. **Every upload term is a file term**, because an
-#: upload is a file: the two tables are one table and a suffix, so a model that
-#: keeps the upload sections can never lose the storage and download sections
-#: (#659). "file" matches "files" and "filesystem" and not "profile", because a
-#: term matches at the start of a word.
-FILE_TERMS: tuple[str, ...] = (
-    *UPLOAD_TERMS,
-    "file",
-    "filename",
-    "download",
-    "export",
-    "pdf",
-)
 
 PRESENCE_TESTS: tuple[PresenceTest, ...] = (
     PresenceTest(
@@ -324,13 +298,6 @@ PRESENCE_TESTS: tuple[PresenceTest, ...] = (
     ),
     PresenceTest(
         predicate="file-upload",
-        # V5.1 documents each upload feature and V5.2 validates what arrives,
-        # so both presuppose an upload. V5.3 and V5.4 do not: a path built
-        # from a user-supplied filename and a download the application serves
-        # reach a system that accepts nothing, so they stay with the lane and
-        # rule themselves out through ``REQUIREMENT_TESTS`` only where the
-        # model names no file at all (#659).
-        decides=("V5.1", "V5.2"),
         lane="file-handling",
         question=(
             "This system accepts an uploaded file. What limits its size, its"
@@ -376,7 +343,6 @@ PRESENCE_TESTS: tuple[PresenceTest, ...] = (
     ),
     PresenceTest(
         predicate="self-contained-tokens",
-        decides=sections_of("self-contained-tokens"),
         lane="self-contained-tokens",
         question=(
             "This system carries a self-contained token. Which algorithms and"
@@ -405,7 +371,6 @@ PRESENCE_TESTS: tuple[PresenceTest, ...] = (
     ),
     PresenceTest(
         predicate="oauth",
-        decides=sections_of("oauth-and-oidc"),
         lane="oauth-and-oidc",
         question=(
             "This system uses OAuth or OIDC. Which grant, which redirect URIs"
@@ -579,7 +544,6 @@ PRESENCE_TESTS: tuple[PresenceTest, ...] = (
     ),
     PresenceTest(
         predicate="real-time-media",
-        decides=sections_of("webrtc"),
         lane="webrtc",
         question=(
             "This system carries real-time media or a peer connection. What"
@@ -772,126 +736,6 @@ STRUCTURAL_RULES: tuple[Rule, ...] = (
         find=_crossing_from_an_entity,
     ),
 )
-
-
-#: Requirements whose own text names a technology, against the words a
-#: submitter writes for it (#455). Where none of the words appears at the
-#: start of a word anywhere in the model, the requirement is ruled out in code
-#: with the terms in the reason, the way a deciding presence test rules its
-#: sections out. Only requirements that presuppose the thing are here: V1.2.2
-#: (URL building), V1.2.5 (OS commands) and V1.3.6 (outbound fetches) ask
-#: about what an application does, not what it names, and stay with the lane.
-#: Checked at import against the catalog, so a retired identifier fails closed.
-REQUIREMENT_TESTS: dict[str, tuple[str, ...]] = {
-    "V1.2.6": ("ldap", "active directory", "directory service"),
-    "V1.2.7": ("xpath", "xml"),
-    "V1.2.8": ("latex", "tex$"),
-    "V1.2.10": ("csv", "spreadsheet", "excel", "export"),
-    "V1.3.1": ("wysiwyg", "rich text", "html editor", "markdown"),
-    "V1.3.5": ("markdown", "css", "xsl", "template"),
-    "V1.3.7": ("template",),
-    "V1.3.8": ("jndi", "java$"),
-    "V1.3.9": ("memcache",),
-    "V1.3.11": ("mail", "smtp", "imap", "email"),
-    "V1.5.1": ("xml", "soap", "xslt", "xsd", "svg"),
-    "V4.3.1": ("graphql",),
-    "V4.3.2": ("graphql",),
-    "V4.4.1": ("websocket", "ws://", "wss://", "socket.io"),
-    "V4.4.2": ("websocket", "ws://", "wss://", "socket.io"),
-    "V4.4.3": ("websocket", "ws://", "wss://", "socket.io"),
-    "V4.4.4": ("websocket", "ws://", "wss://", "socket.io"),
-    **dict.fromkeys(
-        ("V5.3.1", "V5.3.2", "V5.3.3", "V5.4.1", "V5.4.2", "V5.4.3"), FILE_TERMS
-    ),
-    **dict.fromkeys(
-        ("V6.5.1", "V6.5.2", "V6.5.3", "V6.5.4", "V6.5.5"),
-        (
-            "lookup secret",
-            "totp",
-            "one-time",
-            "otp",
-            "out-of-band",
-            "authenticator app",
-            "backup code",
-            "recovery code",
-            "mfa",
-            "second factor",
-            "two-factor",
-            "2fa",
-        ),
-    ),
-    **dict.fromkeys(
-        ("V6.6.1", "V6.6.2", "V6.6.3"),
-        ("sms", "phone", "pstn", "out-of-band", "otp", "one-time", "push notification"),
-    ),
-    **dict.fromkeys(
-        ("V6.8.1", "V6.8.2", "V6.8.3", "V6.8.4", "V7.1.3", "V7.6.1", "V7.6.2"),
-        (
-            "identity provider",
-            "idp",
-            "saml",
-            "federat",
-            "sso",
-            "single sign",
-            "oidc",
-            "openid",
-            "relying party",
-        ),
-    ),
-}
-
-
-def ruled_out_requirements(model: SystemModel, level: int, lane: str) -> dict[str, str]:
-    """The requirements of ``lane`` ruled out because the model names nothing they need.
-
-    Two readings, one answer. A deciding presence test that fired nowhere rules
-    every requirement of the sections it decides out; a requirement in
-    :data:`REQUIREMENT_TESTS` whose own terms appear nowhere rules itself out.
-    Each is keyed by the standard's own identifier against the reason a reader
-    gets.
-    """
-    ruled_out: dict[str, str] = {}
-    for test in PRESENCE_TESTS:
-        if test.lane != lane or not test.decides:
-            continue
-        if any(True for _ in _hits(model, test)):
-            continue
-        reason = (
-            f"no element of this system names {test.predicate.replace('-', ' ')}"
-            f" ({', '.join(test.terms[:4])}, ...), and every requirement of"
-            f" {', '.join(test.decides)} presupposes one; ruled out in code by"
-            f" {test.rule_id}"
-        )
-        for requirement in requirements_for(level, lane):
-            if requirement.section in test.decides:
-                ruled_out[requirement.id] = reason
-    for requirement in requirements_for(level, lane):
-        terms = REQUIREMENT_TESTS.get(requirement.id)
-        if (
-            requirement.id in ruled_out
-            or terms is None
-            or any(names_term(model, term) for term in terms)
-        ):
-            continue
-        ruled_out[requirement.id] = (
-            f"no element of this system names what {requirement.id} presupposes"
-            f" ({', '.join(terms[:4])}{', ...' if len(terms) > 4 else ''});"
-            " ruled out in code"
-        )
-    return ruled_out
-
-
-def _requirement_test_issues() -> list[str]:
-    """Every key of :data:`REQUIREMENT_TESTS` the catalog does not publish."""
-    published = {requirement.id for requirement in requirements_for(3)}
-    return [key for key in REQUIREMENT_TESTS if key not in published]
-
-
-if _requirement_test_issues():
-    raise ValueError(
-        "REQUIREMENT_TESTS names requirements the catalog does not publish:"
-        f" {_requirement_test_issues()}"
-    )
 
 
 RULES: tuple[Rule, ...] = (
