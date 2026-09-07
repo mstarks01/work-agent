@@ -410,7 +410,18 @@ class StrideSummary(BlockSummary):
     """
 
     by_category: dict[StrideCategory, int] = Field(default_factory=dict)
+    #: Every claim the block carries, by band. **Both verdicts**: a block's
+    #: claims are the confirmed and the ``needs-info`` together, since only a
+    #: rejected claim moves to the other array.
     by_severity: dict[SeverityLevel, int] = Field(default_factory=dict)
+    #: The confirmed half of the map above, so "three critical" cannot read as
+    #: three settled findings when two of them are open questions. The rubric
+    #: rates a claim resting on an unstated control *as if the control were
+    #: absent* — deliberately, and conservatively — so a conditional claim can
+    #: reach the top band on a control nobody described. Pooling the two hid
+    #: exactly that. The remainder is the conditional count, and a reader
+    #: subtracts rather than being handed a third map that could disagree.
+    by_severity_confirmed: dict[SeverityLevel, int] = Field(default_factory=dict)
 
 
 def build_stride_summary(
@@ -420,18 +431,27 @@ def build_stride_summary(
 
     The three neutral counts come from :func:`build_block_summary`, so the
     envelope's per-block recount and this cannot disagree about them.
+
+    The severity map is cut twice, over one walk: every claim, and the confirmed
+    ones. Two walks would be two chances to disagree about one number.
     """
     neutral = build_block_summary(threats, rejected_threats)
     by_category: dict[StrideCategory, int] = {}
     by_severity: dict[SeverityLevel, int] = {}
+    by_severity_confirmed: dict[SeverityLevel, int] = {}
     for threat in threats:
         by_category[threat.category] = by_category.get(threat.category, 0) + 1
         level = derive_severity_level(
             threat.severity.likelihood, threat.severity.impact
         )
         by_severity[level] = by_severity.get(level, 0) + 1
+        if threat.verdict.status == "confirmed":
+            by_severity_confirmed[level] = by_severity_confirmed.get(level, 0) + 1
     return StrideSummary(
-        **neutral.model_dump(), by_category=by_category, by_severity=by_severity
+        **neutral.model_dump(),
+        by_category=by_category,
+        by_severity=by_severity,
+        by_severity_confirmed=by_severity_confirmed,
     )
 
 

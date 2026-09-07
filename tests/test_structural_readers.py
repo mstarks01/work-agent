@@ -220,14 +220,29 @@ def _every_package(package: FrameworkPackage) -> bool:
     return True
 
 
+def _both_where_harm_is_graded(package: FrameworkPackage) -> str:
+    """Which readers refuse a rejected verdict left in ``claims``.
+
+    The shipped validator always does. The offline gate reaches it only through
+    the block summary's confirmed severity map, which a package that grades
+    nothing does not carry — so for that package the gate stays silent and the
+    row says so rather than the file carrying an exemption nobody can read.
+    """
+    return BOTH if package.carries_severity() else APP
+
+
 @dataclass(frozen=True)
 class Fault:
     """One way a report can be unsound, and the readers that refuse it."""
 
     #: Breaks a sound report in place.
     mutate: Mutation
-    #: :data:`BOTH` or :data:`APP`.
-    refused_by: str
+    #: :data:`BOTH` or :data:`APP` — or a callable answering per package, for a
+    #: fault whose *reach* is a property of the package rather than of the
+    #: fault. There is one: the gate reaches a rejected verdict left in
+    #: ``claims`` through the summary's confirmed severity map, which only a
+    #: package that grades harm carries.
+    refused_by: str | Callable[[FrameworkPackage], str]
     #: Which packages can spell this fault, as a property of the package rather
     #: than as its name. A fault every record can carry takes every package.
     spelled_by: Callable[[FrameworkPackage], bool] = field(default=_every_package)
@@ -258,9 +273,17 @@ FAULTS: Mapping[str, Fault] = {
     "boundary_crossings are not the model's own crossings": Fault(
         _crossings_not_derived, BOTH
     ),
+    # The gate reaches this one through the summary rather than through a rule
+    # of its own: `by_severity_confirmed` counts the confirmed claims, so a
+    # rejected verdict left in `claims` makes the recount disagree. It moved
+    # here from the app-only list when that field landed, and it is the shape
+    # this file exists to notice -- a reader gaining a rule for free is as much
+    # a drift between the two as a reader losing one.
+    "a rejected verdict sits in claims": Fault(
+        _rejected_verdict_in_claims, _both_where_harm_is_graded
+    ),
     # The rules only the shipped validator carries. Each holds offline because
     # a report the gate reads parsed as a `Report` first.
-    "a rejected verdict sits in claims": Fault(_rejected_verdict_in_claims, APP),
     "a mark names a claim the block does not carry": Fault(_mark_naming_no_claim, APP),
     "a reference mark names a claim the block does not carry": Fault(
         _reference_mark_naming_no_claim, APP
@@ -317,7 +340,12 @@ def test_the_readers_agree_about_this_fault(framework, fault):
         " Every row here is a rule Report enforces; if this one moved, move"
         " the row."
     )
-    assert gate_refuses(report) == (row.refused_by == BOTH), (
+    expected = (
+        row.refused_by
+        if isinstance(row.refused_by, str)
+        else row.refused_by(package_for(framework))
+    )
+    assert gate_refuses(report) == (expected == BOTH), (
         f"over {framework}, the offline gate and the shipped validator now"
         f" disagree about whether {fault} is a fault. Give the gate the rule,"
         f" or move this row between {BOTH!r} and {APP!r} and say in the"

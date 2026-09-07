@@ -548,11 +548,18 @@
           s.style.background = svar(l);
           mix.append(s);
         });
+        // Each band says how many of its claims are confirmed. The rubric
+        // rates a claim resting on an unstated control as if the control were
+        // absent, so a conditional claim reaches the top band on a fact nobody
+        // stated — and "3 critical" alone reads as three settled findings.
+        const confirmed = block.summary.by_severity_confirmed || {};
         present.forEach(l => {
           const item = el("div");
           const swatch = el("span", "swatch");
           swatch.style.background = svar(l);
-          item.append(swatch, `${SEV[l][0]} \u00b7 ${by[l]}`);
+          const open = by[l] - (confirmed[l] || 0);
+          const split = open ? ` (${confirmed[l] || 0} confirmed, ${open} to answer)` : "";
+          item.append(swatch, `${SEV[l][0]} \u00b7 ${by[l]}${split}`);
           legend.append(item);
         });
         wrap.append(mix, legend);
