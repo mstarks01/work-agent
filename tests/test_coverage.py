@@ -6,6 +6,7 @@ from analysis_service.candidates import generate_candidates
 from analysis_service.coverage import build_coverage, cited_element_ids, lane_scope
 from analysis_service.frameworks.stride import STRIDE
 from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
+from analysis_service.report import Ground
 from tests.factories import sample_draft, valid_model
 
 
@@ -120,13 +121,64 @@ def test_crossings_and_unknown_controls_are_counted_against_citations(
         "T-01",
         category="tampering",
         affected_element_ids=["flow:customer-to-web-app:login", "store:orders-db"],
+        grounds=[
+            Ground(
+                kind="unknown-attribute",
+                element_id="store:orders-db",
+                attribute="encryption_at_rest",
+            )
+        ],
     )
     row = coverage_for(
         "tampering", build_coverage({"tampering": [draft]}, candidates, model, STRIDE)
     )
     assert row.boundary_crossings == 1
     assert row.boundary_crossings_cited == 1
-    assert row.unknown_controls_cited >= 1
+    assert row.unknown_controls_cited == 1
+
+
+def test_citing_an_element_credits_none_of_its_controls(model, candidates):
+    """The pair a draft rests on is the pair its ground names, and only that.
+
+    #675 D20: one citation of a store used to credit every unstated control it
+    holds. A draft that cites the store and grounds on a quote says nothing
+    about which control it was about, so it credits none.
+    """
+    draft = sample_draft(
+        "T-01", category="tampering", affected_element_ids=["store:orders-db"]
+    )
+    row = coverage_for(
+        "tampering", build_coverage({"tampering": [draft]}, candidates, model, STRIDE)
+    )
+    assert row.unknown_controls >= 2
+    assert row.unknown_controls_cited == 0
+
+
+def test_a_lead_is_taken_up_by_one_draft_not_by_the_lane(model, candidates):
+    """Two drafts that each cite one endpoint have each treated half a lead."""
+    lane = "information-disclosure"
+    lead = next(
+        candidate
+        for candidate in candidates[lane].candidates
+        if len(candidate.element_ids) > 1
+    )
+    halves = [
+        sample_draft(f"I-0{index}", category=lane, affected_element_ids=[element_id])
+        for index, element_id in enumerate(lead.element_ids, start=1)
+    ]
+    whole = sample_draft(
+        "I-01", category=lane, affected_element_ids=list(lead.element_ids)
+    )
+    split = coverage_for(
+        lane, build_coverage({lane: halves}, candidates, model, STRIDE)
+    )
+    joined = coverage_for(
+        lane, build_coverage({lane: [whole]}, candidates, model, STRIDE)
+    )
+    # The same elements are cited either way, so any other lead is credited
+    # alike; the one that names them all is credited only when one draft does.
+    assert split.elements_cited == joined.elements_cited
+    assert joined.candidates_cited == split.candidates_cited + 1
 
 
 def test_coverage_is_stable_across_calls(model, candidates):
