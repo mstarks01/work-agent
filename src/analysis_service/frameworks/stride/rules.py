@@ -150,25 +150,47 @@ def _unprotected_transit_crossing(model: SystemModel) -> Iterator[Match]:
 
 
 def _unverified_write_to_store(model: SystemModel) -> Iterator[Match]:
-    """A store reached by a flow that names no verified caller.
+    """A store an unverified caller may write, by the flow's own ``operations``.
 
-    **This finds a connection, never an operation.** A
-    :class:`~analysis_service.system_model.DataFlow`'s direction is who
-    initiates, so a service that only *reads* a database is modelled the same
-    way as one that writes it, and both arrive here. The model carries no field
-    that separates the two, so the rule's question asks which operations the
-    connection carries rather than telling an agent it is a write.
+    A :class:`~analysis_service.system_model.DataFlow`'s direction is who
+    initiates, so a service that only *reads* a database used to arrive here
+    exactly as one that writes it — and the lead told an agent a read-only path
+    could be tampered with. ``operations`` is the field that separates them, and
+    a flow stating ``read`` is skipped.
+
+    ``unknown`` still fires, and that is the point of raising a lead rather than
+    a finding: nobody said what the connection carries, so a write cannot be
+    ruled out. The facts carry the value, so the agent argues from what the
+    model says rather than from the rule's name.
+
+    **This deliberately loses three corpus triggers, one of them a must-find,
+    and the losses name the next rule rather than argue against this one.** All
+    three are the same shape: a store the model shows only being *read* — case
+    02's device registry, case 03's Airflow metadata database, case 04's feature
+    store — where the reference is about an attacker writing it over a path
+    nobody drew. The old credit came from reading a read as a write, so the lead
+    was right by accident about a fact this rule cannot see.
+
+    What those references actually rest on is that the store is unauthenticated
+    *at all*, so anyone who reaches the network writes it. That is authority
+    rather than operations, the model carries no field for it, and inventing one
+    here would be the same mistake in the other direction. It is the next
+    structured fact, in the order #671 finding 11 asks for: facts first, then
+    the rules that read them.
     """
     stores = {store.id: store for store in model.data_stores}
     for flow in model.data_flows:
         store = stores.get(flow.destination)
         if store is None or not is_unverified(flow.authentication):
             continue
+        if flow.operations == "read":
+            continue
         yield (
             (flow.id, store.id),
             {
                 "authentication": _clip(flow.authentication),
                 "authentication_state": control_state(flow.authentication),
+                "operations": flow.operations,
                 "data_classification": _clip(store.data_classification),
             },
         )
@@ -393,10 +415,11 @@ RULES: tuple[Rule, ...] = (
         rule_id="tampering-unverified-write-to-store",
         lane="tampering",
         question=(
-            "This flow opens a connection to a data store and states no"
-            " verified caller identity. The model records who initiates, not"
-            " which operations run, so: can this caller write, what could it"
-            " change, and what downstream reader trusts what it finds there?"
+            "This flow may write into a data store without a verified caller"
+            " identity — read `operations` for what the model says it carries,"
+            " and treat `unknown` as a question rather than as a write. What"
+            " can be written, and what downstream reader trusts what it finds"
+            " there?"
         ),
         find=_unverified_write_to_store,
     ),
