@@ -202,11 +202,11 @@ The narrower question, per record: **does this requirement apply to this system,
 
 > mark:
 
-**A7.** `V9.2.4` — One signing key issues tokens for every application and nothing distinguishes the audience a token was issued for.
+**A7.** `V9.2.4` — One signing key issues tokens for every application, and nothing states whether a token carries an audience restriction or whether an application checks one.
 
 - cites: `process:identity-broker`, `process:store-admin-console`, `store:key-store`
 - tier: must-find
-- recorded note: The source states the shared key directly. This requirement is the one a shared issuing key lands on, which is why the case is scored at level 2.
+- recorded note: The source states the shared key directly, which is what makes this requirement apply. The audience claim and its check are code facts the description does not carry.
 
 > mark:
 
@@ -525,7 +525,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "36115502847aa04640666b0dd9f458881e6f7f8968e4d499b58983b3403dc721",
       "model.json": "825c92681b885f7d36968302a5a38e904c206d9e5ba62936e754b4e3fb5ca6bb",
-      "claims/asvs.json": "e0a6a7e5ffcf04f53e4bf21dfb613faf7f9e386d04ddfd0d24ebf22f6af87652",
+      "claims/asvs.json": "ed7cccc5972d41769e7275de9470d157e3a8fa3163eb4e6ad033b1c0e69c0610",
       "claims/stride.json": "9bd0d3203a0a3bcb8ca80ed0de9efbc1b1a35a6c621653e1206e65e19c3dd849"
       }
     }
