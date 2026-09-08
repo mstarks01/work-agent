@@ -57,7 +57,7 @@ from evals.harness.calibration import (
 from evals.harness.identity import MechanicalIdentity, SubsetVerbIdentity
 from evals.harness.reference import load_corpus
 from evals.harness.run import _flows_by_case
-from evals.harness.sitting import unreviewed_cases
+from evals.review_submission import unreviewed_cases
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
