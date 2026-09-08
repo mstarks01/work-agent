@@ -11,7 +11,12 @@ translates :class:`SelectionError` into its own refusal — a 422, a 400, an
 
 Four conditions, in the order a caller can act on them. The list is
 non-empty; no name repeats; every name is one ``carried`` holds; and each
-package's own options model accepts the options it was given. A repeat is
+package's own options model accepts the options it was given. The first three
+are about names alone and live in :func:`resolve_names`, because one seam holds
+names and no options: a built graph is looked up by the frameworks it runs, and
+two jobs naming the same frameworks with different options share one. A reader
+of that seam that checked options would refuse every package whose options
+carry a required field, on every job, whatever the job said. A repeat is
 refused rather than collapsed because ``analyses`` is a list in the report so
 a dropped block is visible, and de-duplicating here would hand back one block
 for two the caller asked for — the same invisible loss, one layer earlier.
@@ -59,16 +64,22 @@ class SelectionError(ValueError):
     """
 
 
-def resolve_selection(
-    carried: Collection[FrameworkName], requested: Sequence[Requested]
-) -> list[FrameworkSelection]:
-    """The selection as the job will carry it, or the :class:`SelectionError` refusing it."""
-    if not requested:
+def resolve_names(
+    carried: Collection[FrameworkName], names: Sequence[str]
+) -> list[FrameworkName]:
+    """The names as the job will carry them, or the :class:`SelectionError` refusing them.
+
+    The three name conditions and nothing about options. This is what a seam
+    holding bare names reads — :meth:`~analysis_service.deployment.Deployment.selection`,
+    which looks a built graph up by the frameworks it runs — and what
+    :func:`resolve_selection` reads first, so the two cannot disagree about a
+    name.
+    """
+    if not names:
         raise SelectionError(
             "a job must select at least one framework;"
             f" this install carries {', '.join(carried)}"
         )
-    names = [entry.name for entry in requested]
     repeated = sorted(name for name, count in Counter(names).items() if count > 1)
     if repeated:
         raise SelectionError(
@@ -84,8 +95,17 @@ def resolve_selection(
     # is one ``carried`` holds, and a carried name is a FrameworkName by
     # construction. The cast says so to the type checker, which cannot read a
     # membership test over a Literal.
+    return [cast(FrameworkName, name) for name in names]
+
+
+def resolve_selection(
+    carried: Collection[FrameworkName], requested: Sequence[Requested]
+) -> list[FrameworkSelection]:
+    """The selection as the job will carry it, or the :class:`SelectionError` refusing it."""
+    names = resolve_names(carried, [entry.name for entry in requested])
     narrowed = [
-        (cast(FrameworkName, entry.name), dict(entry.options)) for entry in requested
+        (name, dict(entry.options))
+        for name, entry in zip(names, requested, strict=True)
     ]
     # Validated against the package's own options model, which declares no
     # defaulted field — so an option this framework requires and the caller

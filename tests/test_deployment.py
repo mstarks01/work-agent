@@ -391,6 +391,21 @@ def test_an_offline_resolver_short_circuits_the_credential_check():
     assert pipeline.node_models[graph.EXTRACT_NODE] == "scripted"
 
 
+def test_every_carried_package_builds_from_its_bare_name():
+    """The harness names a package, never its options, and a job record looks
+    its runner up the same way. A package whose options require a field — an
+    ASVS level — has to build from the name alone, because the options ride
+    on the job and not on the graph. #690 read the full selection rule here
+    and refused every such package on every job, and no test built one."""
+    deployment = Deployment.from_env(env=VERTEX_TIERS)
+    carried = tuple(deployment.frameworks)
+
+    assert deployment.selection(carried) == carried
+    pipeline = deployment.pipeline(carried, resolve_model=lambda tier_node: "scripted")
+
+    assert pipeline.frameworks == carried
+
+
 # --- The removed-temperature gate -------------------------------------------
 
 # Anthropic removed `temperature` from Claude 4.7 onward. The pinned LiteLLM
