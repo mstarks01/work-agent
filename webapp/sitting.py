@@ -280,7 +280,9 @@ ul.terms { list-style:none; padding:0; }.rec { border-left:3px solid #8886; }
 .fields code.id { background:#8881; border:1px solid var(--line); border-radius:6px;
   padding:1px .4rem; }
 .mark { display:flex; gap:.6rem; align-items:baseline; margin-top:.8rem; padding-top:.7rem; border-top:1px solid var(--line); }
-.aside { color:var(--dim); font-size:.85rem; }.framework-picker { border:0; padding:0; margin:1rem 0; }
+.aside { color:var(--dim); font-size:.85rem; }
+details.standard { margin:.3rem 0 .1rem; font-size:.88rem; } details.standard summary { cursor:pointer; color:var(--dim); font-weight:600; }
+.quote { margin:.4rem 0 .2rem; padding-left:.8rem; border-left:2px solid var(--line); }.framework-picker { border:0; padding:0; margin:1rem 0; }
 .framework-picker label { margin-right:1rem; } details.framework { border:1px solid var(--line); border-radius:8px; padding:.75rem 1rem; margin:.8rem 0; }
 .save-status { margin-left:.7rem; color:var(--dim); }.line { display:flex; justify-content:space-between; gap:1rem; padding:.5rem 0; }
 .attribution { border:1px solid var(--line); border-radius:8px; padding:.8rem 1rem; margin:1rem 0; }.attribution label { display:block; margin:.4rem 0; }

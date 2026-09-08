@@ -38,6 +38,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from analysis_service.frameworks import PACKAGES
+from analysis_service.frameworks.asvs.catalog import ASVS_VERSION, requirement_text
 
 EVALS = Path(__file__).resolve().parent
 CORPUS = EVALS / "corpus"
@@ -297,6 +298,9 @@ def stride_part(claims: list[dict]) -> dict:
                 "label": str(number),
                 "identifier": None,
                 "title": claim["claim"],
+                # A framework whose claims carry no catalog identifier has no
+                # published sentence to quote beside the claim.
+                "standard": None,
                 "fields": _fields(
                     [_field(None, *claim["affected_element_ids"], code=True)],
                     [
@@ -319,6 +323,25 @@ def stride_part(claims: list[dict]) -> dict:
     }
 
 
+def _standard(requirement: str) -> dict:
+    """The standard's own sentence for one requirement, with its attribution.
+
+    A page prints it under the claim, closed until the reader opens it, so a
+    reader rules on the requirement rather than on the claim's paraphrase of
+    it. The sentence is CC BY-SA 4.0 text out of the governed catalog, so the
+    block carries the attribution the licence asks for, and the reading
+    document does not print it: ``REVIEW.md`` is an Apache-2.0 file, and
+    ``tests/test_license_lints.py`` refuses the sentence there. The corpus
+    lint has already refused a record naming a requirement the catalog lacks,
+    so the text is never empty here.
+    """
+    return {
+        "label": f"ASVS {ASVS_VERSION} requirement text",
+        "text": requirement_text(requirement),
+        "source": f"OWASP ASVS {ASVS_VERSION}, CC BY-SA 4.0",
+    }
+
+
 def asvs_part(records: list[dict]) -> dict:
     """ASVS's part: does this requirement apply, and is it shown satisfied?"""
     groups: list[dict] = []
@@ -330,6 +353,7 @@ def asvs_part(records: list[dict]) -> dict:
                 "label": f"A{number}",
                 "identifier": record["requirement"],
                 "title": record["claim"],
+                "standard": _standard(record["requirement"]),
                 "fields": _fields(
                     [_field(None, *record["affected_element_ids"], code=True)],
                     _note_row(record),
@@ -382,7 +406,12 @@ def _printed(field: dict) -> str:
 
 
 def part_markdown(rendered: dict, part: int) -> str:
-    """One framework's part as the reading document prints it."""
+    """One framework's part as the reading document prints it.
+
+    A record's ``standard`` block stays out of the document by decision: the
+    document is a committed Apache-2.0 file, and the block holds ShareAlike
+    text. The identifier is printed, and citing one carries no obligation.
+    """
     lines = [f"## Part {part} — {rendered['heading']}\n", *rendered["intro"]]
     for group in rendered["groups"]:
         lines.append(f"\n### {group['name']}\n")

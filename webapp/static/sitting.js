@@ -352,6 +352,18 @@ function fieldRow(row) {
   return li;
 }
 
+// The standard's own sentence for a record that names one, closed until the
+// reader opens it. The claim stays the anchor; the sentence is what the
+// reader rules the claim against, and the summary says what opens so the
+// reader knows the words are there.
+function standardText(standard) {
+  const details = el("details", "standard");
+  details.append(el("summary", null, "Show the " + standard.label));
+  details.append(el("p", "quote", standard.text));
+  details.append(el("p", "aside", standard.source));
+  return details;
+}
+
 function recordCard(record, target, values, answered, framework) {
   const card = el("div", "card rec");
   const head = el("div", "head");
@@ -359,6 +371,7 @@ function recordCard(record, target, values, answered, framework) {
   if (record.identifier) head.append(el("code", "id", record.identifier));
   head.append(el("h4", null, record.title));
   card.append(head);
+  if (record.standard) card.append(standardText(record.standard));
   if (record.fields.length) {
     const list = el("ul", "fields");
     for (const row of record.fields) list.append(fieldRow(row));

@@ -167,6 +167,9 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .rec{border:1px solid var(--line);border-radius:8px;padding:11px 13px;
 margin:10px 0;background:var(--card)}
 .rec .meta{color:var(--dim);font-size:12px;margin-top:5px}
+.rec details{margin-top:5px;font-size:13px}
+.rec summary{cursor:pointer;color:var(--dim);font-weight:600}
+.rec .quote{margin:5px 0 2px;padding-left:9px;border-left:2px solid var(--line)}
 .marks{margin-top:8px;display:flex;gap:14px;flex-wrap:wrap;font-size:13px}
 .marks label{cursor:pointer}
 .bar{position:sticky;bottom:0;background:var(--bg);border-top:1px solid var(--line);
