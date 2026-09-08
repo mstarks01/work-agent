@@ -183,7 +183,7 @@ class TestTheImportRefusesWhatWouldRecordWordsNobodyRead:
         with pytest.raises(EnvelopeError):
             applied(tree, env)
         assert not written(tree)
-        assert CASE in sittings.unreviewed_cases(tree)
+        assert CASE in reviews_module.unreviewed_cases(tree)
 
     def test_every_problem_arrives_in_one_message(self, tree):
         """The reader is a day away by email, so one round trip carries them all."""

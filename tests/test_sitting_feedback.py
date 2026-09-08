@@ -242,7 +242,7 @@ def test_direct_contribution_opens_one_json_pr_and_cleans_local_record(
     assert list(captured["envelope"].cases) == [CASE]
     assert session.draft(CASE) is None
     assert not (tree / "evals" / "corpus" / CASE / "REVIEW-local-review.md").exists()
-    assert CASE in sittings.unreviewed_cases(tree)
+    assert CASE in review_submissions.unreviewed_cases(tree)
 
 
 def test_direct_failure_preserves_local_review(tmp_path: Path, monkeypatch):
