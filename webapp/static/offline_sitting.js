@@ -188,7 +188,9 @@ function bar(into) {
   if (window.crypto && window.crypto.subtle) b.appendChild(publish);
   b.appendChild(el("span", "hint", done + " case(s) started, " + ready.length +
     " ready to publish. Download to stop and load the same file to carry on — " +
-    "nothing is sent from this page."));
+    "nothing is sent from this page. On GitHub, an account without write access " +
+    "presses Propose changes; an account with write access presses Commit changes " +
+    "and then chooses Create a new branch, because the default commits straight to main."));
   into.appendChild(b);
 }
 
