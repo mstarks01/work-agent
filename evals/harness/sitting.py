@@ -47,7 +47,6 @@ whole path is free.
 
 from __future__ import annotations
 
-import ast
 import hashlib
 import os
 from collections.abc import Iterable, Mapping, Sequence
@@ -838,101 +837,6 @@ def _mark_line(target: MarkTarget, mark: Mark) -> str:
     prints.
     """
     return f"- `{mark}` — `{target.fingerprint}` — {' / '.join(target.claims)}"
-
-
-def _unreviewed_table(source: str) -> tuple[list[tuple[str, int, int]], int]:
-    """Each ``UNREVIEWED`` entry as ``(case id, first line, last line)``, and
-    the line the table closes on.
-
-    Read through :mod:`ast` rather than by matching text, because the entry
-    prose is arbitrary English: counting brackets to find where an entry ends
-    works only while no reason writes one, and the reasons cite issues. The
-    parser knows where every entry starts, so an entry runs to the line before
-    the next one — which is what carries the trailing comma, the closing
-    parenthesis and any comment with it, whatever shape they were written in.
-
-    Line numbers are 0-based and the end is exclusive, ready to slice.
-
-    A source that will not parse raises a :class:`SittingError` like every
-    other answer this gives, because one caller is a submission check reading
-    a file somebody edited — and a checklist line is what a contributor can
-    act on, where a traceback is not.
-    """
-    try:
-        tree = ast.parse(source)
-    except SyntaxError as exc:
-        raise SittingError(
-            f"{UNREVIEWED_FILE}: this file will not parse — {exc}"
-        ) from exc
-    tables = [
-        node.value
-        for node in ast.walk(tree)
-        if isinstance(node, ast.AnnAssign | ast.Assign)
-        and isinstance(node.value, ast.Dict)
-        and any(
-            isinstance(target, ast.Name) and target.id == "UNREVIEWED"
-            for target in (
-                [node.target] if isinstance(node, ast.AnnAssign) else node.targets
-            )
-        )
-    ]
-    if not tables:
-        raise SittingError(f"{UNREVIEWED_FILE}: no UNREVIEWED table to read")
-    # Exactly one, rather than the first of several. Reading the first is a
-    # disagreement with Python, which binds the last -- so a decoy empty table
-    # above the real one makes this answer "no cases listed" about a file that
-    # lists them, and a checker built on that answer is checking a table nobody
-    # imports. There is one list; a file with two is malformed, and saying so is
-    # cheaper than picking a winner and being right by convention.
-    if len(tables) > 1:
-        raise SittingError(
-            f"{UNREVIEWED_FILE}: {len(tables)} UNREVIEWED tables; there is one"
-            " list, and a reader cannot tell which of two a checker meant"
-        )
-    table = tables[0]
-
-    starts = [
-        (key.value, key.lineno - 1)
-        for key in table.keys
-        if isinstance(key, ast.Constant) and isinstance(key.value, str)
-    ]
-    if len(starts) != len(table.keys):
-        raise SittingError(
-            f"{UNREVIEWED_FILE}: UNREVIEWED holds a key that is not a string"
-        )
-    # A dict value is an arbitrary expression, and this table is a module
-    # `pytest` imports: importing it evaluates every value. A reason is prose,
-    # so anything but a string literal here is something other than a reason,
-    # and a submission may not carry it. Refused at the one place that reads the
-    # table, because a check that read it some other way is a second opinion
-    # about what an entry is -- and a disagreement between two readers of this
-    # file is exactly what lets a value through.
-    if any(
-        not (isinstance(value, ast.Constant) and isinstance(value.value, str))
-        for value in table.values
-    ):
-        raise SittingError(
-            f"{UNREVIEWED_FILE}: UNREVIEWED holds a value that is not a string"
-            " literal, and importing this module would evaluate it"
-        )
-    close = (table.end_lineno or 0) - 1
-    # An empty table names no case and bounds nothing. It is the day the last
-    # case is read, and the pairing below has no entry to close.
-    if not starts:
-        return [], close
-    # The closing brace bounds the last entry; every other one ends where the
-    # next begins. `end_lineno` on the value would stop before the `),`.
-    bounds = [line for _, line in starts[1:]] + [close]
-    return [
-        (case, start, end) for (case, start), end in zip(starts, bounds, strict=True)
-    ], close
-
-
-def unreviewed_cases(root: Path) -> list[str]:
-    """Every case the unreviewed list still names, in file order."""
-    source = (root / UNREVIEWED_FILE).read_text(encoding="utf-8")
-    entries, _ = _unreviewed_table(source)
-    return [case for case, _, _ in entries]
 
 
 def covered_frameworks(
