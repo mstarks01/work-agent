@@ -38,12 +38,11 @@ raised, so the graph can route a malformed first pass to its bounded re-ask
 
 from __future__ import annotations
 
-import re
 from collections import Counter
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any, NamedTuple, get_args
+from typing import Any, NamedTuple
 
 from analysis_service.frameworks import FrameworkSchemas
 from analysis_service.references import snap
@@ -57,8 +56,6 @@ from analysis_service.report import (
     Verdict,
 )
 from analysis_service.system_model import (
-    DataFlow,
-    Element,
     ModelIndex,
     SystemModel,
     TrustBoundary,
@@ -81,40 +78,6 @@ class AssembledClaims(NamedTuple):
 
     claims: list[RuledClaim]
     rejected_claims: list[RuledClaim]
-
-
-_FLOW_PREFIX = DataFlow.id_prefix
-_OTHER_PREFIXES = sorted(
-    element.id_prefix for element in get_args(Element) if element is not DataFlow
-)
-_SLUG = r"[a-z0-9-]+"
-_MENTION_RE = re.compile(
-    rf"\b(?:{_FLOW_PREFIX}:{_SLUG}:{_SLUG}|(?:{'|'.join(_OTHER_PREFIXES)}):{_SLUG})",
-    re.IGNORECASE,
-)
-
-
-def mentioned_ids(description: str) -> list[str]:
-    """Every element ID a description names in prose, in the order written.
-
-    Deliberately narrow: a token has to open with one of the five real type
-    prefixes and a colon, which is a shape ordinary English does not produce —
-    ``"Process: the web app"`` has a space and does not match. The cost of that
-    narrowness is a miss rather than a false alarm, which is the right way
-    round for a check whose output annotates a finding a human will read.
-
-    Measured over the 18 hand-authored descriptions in STRIDE's own lane
-    exemplars, the closest thing the repo holds to real agent prose: **24 distinct IDs
-    extracted, 0 of them spurious** — every token found is one of the two
-    exemplar systems' 24 real element IDs, and all 24 are found. Small, and the
-    only corpus of threat descriptions that exists; enough to say the pattern
-    reads prose without inventing citations in it.
-
-    Trailing hyphens are trimmed because prose runs an ID into an em-dash
-    substitute more often than a real slug ends in one; ``normalize_name``
-    strips them, so no legal ID ends in a hyphen anyway.
-    """
-    return [match.group().rstrip("-") for match in _MENTION_RE.finditer(description)]
 
 
 def snap_rulings(
@@ -629,9 +592,10 @@ def review_issues(
     fatally.
 
     Element references are deliberately **not** checked: a ruling carries none.
-    They are the join seam's business (:func:`~analysis_service.fan_in.join_drafts` fails closed on a
-    draft citing an element the model does not contain), and since the critic
-    no longer re-emits them there is no second place they can break. An issue
+    They are the join seam's business (:func:`~analysis_service.fan_in.join_drafts`
+    drops and marks a reference the model does not contain, and fails closed
+    on a ground it cannot derive), and since the critic no longer re-emits
+    them there is no second place they can break. An issue
     listed here has to be one the re-ask can actually fix, and a draft's bad
     reference never was.
     """
@@ -691,9 +655,11 @@ def merge_retry(
     dropped was accepted whole, and the change reached the report as if the
     review had reasoned it out.
 
-    Over the raw payloads, because what is merged is what ``reviewed`` holds
-    and what ``assemble`` reads back. Two rules, and the second list says
-    where the re-ask stepped outside them:
+    Over payloads the caller has already put in the ruling model's own
+    spelling, because what is merged is what ``reviewed`` holds and what
+    ``assemble`` reads back, and a comparison over two providers' spellings of
+    one ruling would read a ``null`` against an absent key as a change. Two
+    rules, and the second list says where the re-ask stepped outside them:
 
     * a drafted ID a problem named takes the re-ask's ruling, every copy of it,
       so a duplicated repair still fails the check that follows;

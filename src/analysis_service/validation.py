@@ -28,7 +28,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, ValidationError
 
-from analysis_service.analysis import CONTROL_ATTRIBUTES, control_state
+from analysis_service.analysis import CONTROL_ATTRIBUTES, control_state, leading_word
 from analysis_service.grounding import normalize, verify_normalized
 from analysis_service.references import canonical
 from analysis_service.system_model import (
@@ -271,13 +271,12 @@ def _ambiguous_control_issues(element: Element) -> list[ValidationIssue]:
     for attribute in CONTROL_ATTRIBUTES:
         if attribute not in type(element).model_fields:
             continue
-        value = str(getattr(element, attribute))
-        lead = (
-            value.strip().split(maxsplit=1)[0].rstrip(",;:.").lower()
-            if value.strip()
-            else ""
-        )
-        if lead in AMBIGUOUS_CONTROL_LEADS:
+        # Through the same reader ``control_state`` uses for its two
+        # sentinels, so "where a word ends" has one answer: ``no-mfa`` and
+        # ``no/unknown`` open with ``no`` here exactly as ``none;`` opens with
+        # ``none`` there.
+        lead = leading_word(str(getattr(element, attribute)), AMBIGUOUS_CONTROL_LEADS)
+        if lead is not None:
             issues.append(
                 ValidationIssue(
                     code="ambiguous-control",
