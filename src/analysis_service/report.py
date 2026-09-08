@@ -1812,7 +1812,7 @@ class UnverifiedGround(BaseModel):
     silently removing a threat is the worst outcome a security tool can have.
 
     Marked per entry, dropped per claim: a claim with one bad quote beside good
-    ones is still justified, and :func:`~analysis_service.critic.join_drafts`
+    ones is still justified, and :func:`~analysis_service.fan_in.join_drafts`
     drops a claim only where *no* ground on it verifies at all, recording it as
     a :class:`DroppedClaim`.
     """
@@ -1918,7 +1918,7 @@ class UnresolvedMention(BaseModel):
 
     A **mention**, never a reference: ``affected_element_ids`` is the threat's
     structural claim about what it acts on, and one that does not resolve fails
-    the job at :func:`~analysis_service.critic.join_drafts`. This is the softer
+    the job at :func:`~analysis_service.fan_in.join_drafts`. This is the softer
     thing beside it — an ID written into the argument, which the analyze prompt
     asks for ("cite element and flow IDs inline") and which nothing checked
     until now. The description is the part a reader actually reads, so an ID in
@@ -2065,7 +2065,7 @@ class DroppedClaim(BaseModel):
       (:func:`~analysis_service.evidence.resolve_proposals`);
     * every element it named is absent from the model, its ID duplicates an
       earlier draft's, or its only grounds are quotes the source it names does
-      not contain (:func:`~analysis_service.critic.join_drafts`).
+      not contain (:func:`~analysis_service.fan_in.join_drafts`).
 
     Each of these costs one entry and never the job. The case against a drop
     is that a finding deleted for a reason recorded in a list is a silent
