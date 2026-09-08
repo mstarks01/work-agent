@@ -222,6 +222,18 @@ def client(tree):
     return browser(session), session, tree
 
 
+def test_the_page_and_its_api_are_served_no_store(client):
+    """The page a dead process built must not come back after a restart.
+
+    The page carries that process's token and its client script inline, so a
+    cached copy is old code holding a token the new process refuses. The reader
+    who upgrades and reloads sees the app they replaced.
+    """
+    app, _, _ = client
+    for path in ("/", "/api/rail", f"/api/part-one?case={CASE}"):
+        assert app.get(path).headers["Cache-Control"] == "no-store"
+
+
 class TestTheOwnListRuleIsEnforced:
     def test_part_two_is_refused_before_the_own_list(self, client):
         """The method's only rule, and the reason it is server-side."""

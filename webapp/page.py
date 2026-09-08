@@ -257,18 +257,27 @@ def refuse_cross_origin(request: Request) -> None:
 
 
 class SecurityHeaders:
-    """``nosniff`` and ``no-referrer`` on every response, whatever served it.
+    """``nosniff``, ``no-referrer`` and ``no-store`` on every response.
 
     Pure ASGI rather than a ``@app.middleware("http")`` function so it cannot
     come between a stream and its client: this only edits the header frame on
     its way out and never touches the body.
 
-    Both headers are per *response* rather than per page, which is why they are
+    All three are per *response* rather than per page, which is why they are
     here and the policy is not. ``nosniff`` matters most for the responses that
     are not HTML — the first-run app serves prose as ``text/plain``, and content
     sniffing is precisely the mechanism that would let a browser decide
     otherwise. ``no-referrer`` keeps a run id out of the ``Referer`` of anything
     a page's own links reach.
+
+    ``no-store`` says that nothing a local app serves belongs in a cache. A
+    page carries the process's own token and its client script inline, so a
+    cached copy is a page from a dead process: a reader who restarts the app
+    after an upgrade reloads and reads the old code, with a token the new
+    process refuses. The responses beside it hold one reader's draft answers,
+    which have no business on disk in a browser cache either.
+
+    ``setdefault`` leaves a response that already chose its own value alone.
     """
 
     def __init__(self, app: ASGIApp) -> None:
@@ -284,6 +293,7 @@ class SecurityHeaders:
                 headers = MutableHeaders(scope=message)
                 headers.setdefault("X-Content-Type-Options", "nosniff")
                 headers.setdefault("Referrer-Policy", "no-referrer")
+                headers.setdefault("Cache-Control", "no-store")
             await send(message)
 
         await self._app(scope, receive, _send)

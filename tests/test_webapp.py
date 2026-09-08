@@ -1200,12 +1200,15 @@ def test_every_response_carries_the_sniffing_and_referrer_headers(client, path):
 
     ``/example`` serves prose as ``text/plain`` and sniffing is what would let a
     browser decide otherwise; a run id in an outbound ``Referer`` is the other
-    half. The 404s and the 405 are included on purpose — an error response is
-    still a response.
+    half. ``no-store`` is the third: a page carries the process's own token and
+    its client script inline, so a cached copy is a page from a dead process.
+    The 404s and the 405 are included on purpose — an error response is still a
+    response.
     """
     response = client.get(path)
     assert response.headers["X-Content-Type-Options"] == "nosniff"
     assert response.headers["Referrer-Policy"] == "no-referrer"
+    assert response.headers["Cache-Control"] == "no-store"
 
 
 def test_the_event_stream_still_streams_under_the_header_middleware(client):
