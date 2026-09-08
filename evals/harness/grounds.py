@@ -18,7 +18,7 @@ the agents follow them:
 It is credential-free, like :mod:`evals.harness.scorer` and
 :mod:`evals.harness.critic_yield`. It takes plain data — the merged drafts and
 the report's marks — and computes. Nothing here re-implements the ladder. The
-marks it counts are the ones :func:`~analysis_service.critic.join_drafts`
+marks it counts are the ones :func:`~analysis_service.fan_in.join_drafts`
 already produced with the shipped checker, so a sweep cannot grade a
 normalization policy the service does not run.
 
@@ -55,7 +55,7 @@ from typing import Any, Literal
 
 from pydantic import ValidationError
 
-from analysis_service.critic import DraftJoinError
+from analysis_service.fan_in import DraftJoinError
 from analysis_service.frameworks import PACKAGES
 from analysis_service.report import (
     Claim,
@@ -139,7 +139,7 @@ class CaseGrounds:
     reasons that agree: the rules being measured are the *category agents'*, so
     a draft the critic later rejected is still evidence about how the agent
     grounded it; and the unverified marks were computed over exactly this set
-    at :func:`~analysis_service.critic.join_drafts`, so numerator and denominator
+    at :func:`~analysis_service.fan_in.join_drafts`, so numerator and denominator
     come from one population rather than two.
     """
 

@@ -11,7 +11,7 @@ from __future__ import annotations
 import pytest
 from pydantic import BaseModel, ValidationError
 
-from analysis_service.critic import DraftJoinError
+from analysis_service.fan_in import DraftJoinError
 from analysis_service.frameworks.stride.record import STRIDE_VERSION, DraftThreat
 from analysis_service.report import (
     DroppedClaim,

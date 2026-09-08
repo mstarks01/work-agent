@@ -22,8 +22,9 @@ import pytest
 from analysis_service.analysis import unknown_controls
 from analysis_service.candidates import generate_candidates
 from analysis_service.coverage import build_coverage
-from analysis_service.critic import duplicate_groups, join_drafts
+from analysis_service.critic import duplicate_groups
 from analysis_service.evidence import evidence_catalog
+from analysis_service.fan_in import join_drafts
 from analysis_service.frameworks import PACKAGES
 from analysis_service.frameworks.stride import STRIDE
 from analysis_service.graph import render, render_fenced, unfence

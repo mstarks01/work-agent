@@ -21,9 +21,10 @@ import pytest
 from google.adk.models.base_llm import BaseLlm
 from pydantic import Field
 
+import analysis_service.fan_in as fan_in_module
 import analysis_service.graph as graph_module
-from analysis_service.critic import DraftJoinError
 from analysis_service.deployment import Deployment
+from analysis_service.fan_in import DraftJoinError
 from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
 from analysis_service.graph import (
     ENTRY_PREPARE,
@@ -148,7 +149,7 @@ def sweep(monkeypatch, case, spoofing_first: dict[str, Any] | None) -> Any:
     first = spoofing_first
     if first is DEAD:
         first = None
-        real_join = graph_module.join_drafts
+        real_join = fan_in_module.join_drafts
         calls: list[int] = []
 
         def join_once_dead(*args: Any, **kwargs: Any) -> Any:
@@ -157,7 +158,7 @@ def sweep(monkeypatch, case, spoofing_first: dict[str, Any] | None) -> Any:
                 raise DraftJoinError("draft 'S-01' cites something no agent can")
             return real_join(*args, **kwargs)
 
-        monkeypatch.setattr(graph_module, "join_drafts", join_once_dead)
+        monkeypatch.setattr(fan_in_module, "join_drafts", join_once_dead)
     if first is not None and "quotes" in first:
         first = first | {
             "quotes": [{**quote, "source_label": label} for quote in first["quotes"]]

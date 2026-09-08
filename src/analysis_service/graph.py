@@ -56,7 +56,7 @@ Six of the per-framework nodes are structural rather than analytical:
 * ``reject`` is where the second failure lands. It is a terminal node that parks
   the validator's issues in state, for the runner to return as a rejection.
 * ``join`` is ADK's ``JoinNode``, a pure barrier with no user code of its own.
-  ``merge`` runs :func:`analysis_service.critic.join_drafts` behind it.
+  ``merge`` runs :func:`analysis_service.fan_in.fan_in` behind it.
 * ``router`` and ``rereview`` are the critic's ``validate`` and ``revalidate``.
   They are one ``route_review`` function run twice, which keeps the mechanical
   check outside ``assemble``, so the graph can re-ask a malformed critic output
@@ -113,7 +113,6 @@ import functools
 import hashlib
 import json
 import logging
-from collections import Counter
 from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
@@ -128,12 +127,11 @@ from google.genai import types
 from pydantic import ValidationError
 
 from analysis_service.candidates import generate_candidates
-from analysis_service.coverage import build_coverage, lane_scope
+from analysis_service.coverage import lane_scope
 from analysis_service.critic import (
     Revision,
     assemble_claims,
     critic_view,
-    join_drafts,
     merge_retry,
     review,
     unsettled_drafts,
@@ -141,12 +139,10 @@ from analysis_service.critic import (
 from analysis_service.domains import select_domain_packs
 from analysis_service.evidence import (
     evidence_catalog,
-    invalid_proposal_marks,
-    known_proposals,
     render_catalog,
     render_element_roster,
-    resolve_proposals,
 )
+from analysis_service.fan_in import fan_in
 from analysis_service.frameworks import (
     DISCLAIMER_DOC,
     FrameworkPackage,
@@ -178,7 +174,6 @@ from analysis_service.report import (
     AnalysisContext,
     AnalysisMarks,
     Claim,
-    DroppedClaim,
     ExecutionEnvelope,
     FrameworkAnalysis,
     FrameworkName,
@@ -203,7 +198,7 @@ from analysis_service.skills import (
     compose_domain_skills,
     compose_lane_skills,
 )
-from analysis_service.sources import CARRIED_EVIDENCE_KINDS, fenced
+from analysis_service.sources import fenced
 from analysis_service.system_model import BoundaryCrossing, SystemModel
 from analysis_service.validation import (
     ValidationIssue,
@@ -1539,51 +1534,20 @@ def merge_drafts(
     nodes: FrameworkNodes,
     source_texts: dict | None = None,
 ) -> Event:
-    """Merge one framework's lane agents' proposals into the list its critic sees.
+    """Park one framework's fan-in and route on what is left for the critic.
 
-    Routes on what is left for the critic: ``review`` when any draft is
-    unsettled, ``settled`` when code ruled every one or there is none, so a
-    critic is never called to read an empty view (:data:`ROUTE_REVIEW`).
+    **One of these per selected framework.** The merge itself is
+    :func:`~analysis_service.fan_in.fan_in`, which takes the lane batches as
+    the agents emitted them and returns the drafts, the marks, the deferred
+    units and the coverage as one value. This node reads the batches out of
+    state, calls it once, parks each part of what it returns under this
+    framework's own key, and routes: ``review`` when any draft is unsettled,
+    ``settled`` when code ruled every one or there is none, so a critic is
+    never called to read an empty view (:data:`ROUTE_REVIEW`).
 
-    **One of these per selected framework.** Each fans in only its own lanes, so
-    two frameworks' drafts never meet: they are ruled by different critics
-    against different questions, and a duplicate across them is not a duplicate.
-
-    Resolution first: an agent emits this package's own
-    :class:`~analysis_service.report.Proposal` subclass, which *names* its
-    evidence, and :func:`~analysis_service.evidence.resolve_proposals` turns each
-    reference back into the ground the catalog holds for it, composes the claim
-    ID from the package's own ``IdRule`` and stamps the lane. The catalog is
-    re-derived here from the same validated model :func:`prepare_analysis`
-    derived it from, rather than parked in state and read back — it is a pure
-    function of that model, so deriving it twice is what guarantees the set an
-    agent chose from and the set its choice is resolved against are the same set.
-
-    **The second derivation stays, and the measurement is why.** Sharing one
-    catalog would have to carry it through the session, where a value a node can
-    reach is a value a node can change, and what it would buy is 0.048 ms on a
-    corpus-sized model and 3.7 ms on one of 600 elements — three derivations in
-    a two-framework job, so 0.14 ms and 11 ms. Deriving it again is cheaper than
-    any structure that would let the two sets differ.
-    ``evals/bench/deterministic.py catalog`` re-derives the two figures.
-
-    Then the mechanical half of the fan-in: :func:`join_drafts` fails closed if
-    a draft cites an element the model does not contain, if two agents reused a
-    claim ID, or if a grounds reference does not resolve — so the critic spends
-    judgement on evidence, lanes and whether a verbatim quote actually supports
-    what it was filed under.
-
-    It also returns what it could *not* verify: quote grounds absent from the
-    source they name are marked rather than dropped, and a claim on which no
-    ground verifies is dropped and marked. Those marks join the ones
-    the evidence resolution produced as a single
-    :class:`~analysis_service.report.AnalysisMarks` under this framework's own
-    key, which is what :func:`assemble_report` carries into this framework's
-    block. The one mark about the *model* is not here (:func:`_model_marks`):
-    one model serves N blocks, so it is derived once at the envelope.
     ``source_texts`` defaults to ``None`` so the in-process engine, which drives
-    a hand-authored model with no job behind it, is not failed on a citation that
-    is not wrong.
+    a hand-authored model with no job behind it, is not failed on a citation
+    that is not wrong.
 
     An agent that emitted **nothing** fails the job here, before any of that. A
     framework's lanes are what make its output that framework's method rather
@@ -1594,15 +1558,17 @@ def merge_drafts(
     would delete a lane of the analysis and finish green.
 
     A lane that ran and found nothing is a different thing and stays legal — it
-    emits ``{"claims": []}``, its key is written, and ``_claims_of`` reads it as
-    the empty list it is. That distinction is the whole check: the absent key,
+    emits ``{"claims": []}``, its key is written, and ``_batch_of`` reads it as
+    the empty batch it is. That distinction is the whole check: the absent key,
     not the empty list.
 
     Two state keys, two shapes, on purpose. ``drafts`` holds the drafts whole,
     because that is what ``assemble_claims`` merges rulings onto to build the
     block. ``draft_view`` is the *prompt* view, built by
     :func:`~analysis_service.critic.critic_view` and narrowed to the fields a
-    verdict is actually reached from.
+    verdict is actually reached from. The re-ask builds its own view through
+    the same function, so the two passes cannot disagree about what a critic
+    reads.
     """
     state = keys.state(ctx)
     lanes = nodes.lanes
@@ -1614,121 +1580,41 @@ def merge_drafts(
             f" nothing ({written}), so those lanes were never analyzed."
             f" {_TRUNCATION_HINT}"
         )
-    package = nodes.package
-    schemas = nodes.schemas
-    proposal_batch = schemas.proposals
+    proposal_batch = nodes.schemas.proposals
     model = SystemModel.model_validate(valid_model)
-    catalog = evidence_catalog(model)
-    batches = {
-        lane.lane: proposal_batch.model_validate(_batch_of(state.get(lane.drafts_key)))
-        for lane in lanes
-    }
-    invalid = {
-        lane: invalid_proposal_marks(batch.invalid, package, lane)
-        for lane, batch in batches.items()
-    }
-    # Identity before the split, so a proposal naming a requirement the
-    # framework does not have is marked whichever side of the split it would
-    # have taken (#659). The two marks per lane are one value from here on.
-    known: dict[str, list[Any]] = {}
-    for lane, batch in batches.items():
-        known[lane], unknown = known_proposals(batch.claims, package, lane)
-        invalid[lane] = invalid[lane].merged_with(unknown)
-    # Split before resolving, because a deferred proposal must not become a
-    # draft: the whole point is that it never reaches the critic. The package
-    # decides which, since the unit and the reason are both its own.
-    partitions = {
-        lane: package.record.partition_proposals(
-            known[lane], lane, CARRIED_EVIDENCE_KINDS
-        )
-        for lane in batches
-    }
-    deferred: dict[str, str] = {}
-    for _, reasons in partitions.values():
-        deferred.update(reasons)
-    state.put(nodes.key("deferred"), deferred)
-    # Logged because the answer a proposal carries to make this decision does
-    # not survive into a draft: without this line a run that defers nothing
-    # leaves no trace of whether the agents ruled or the seam never ran.
-    for lane, (kept, reasons) in partitions.items():
-        logger.info(
-            "%s/%s: %d proposals, %d kept, deferred for %s",
-            package.name,
-            lane,
-            len(kept) + len(reasons),
-            len(kept),
-            sorted(Counter(reasons.values()).items()),
-        )
-    resolutions = {
-        lane: resolve_proposals(kept, catalog, package, lane, model)
-        for lane, (kept, _) in partitions.items()
-    }
-    drafts_by_lane = {
-        lane: resolution.drafts for lane, resolution in resolutions.items()
-    }
-    joined = join_drafts(drafts_by_lane, package, model, source_texts or {})
-    # A draft on a unit the package's own rules ruled out in ``prepare`` is
-    # refused here, whatever the agent read in its scope line: the unit is
-    # settled, and a claim on it would put the same requirement on the report
-    # twice, once as a claim and once as not applicable (#443).
-    ruled_out = state.get(nodes.key("ruled_out")) or {}
-    refused = [
-        DroppedClaim.of(
-            claim_id=draft.id,
-            title=draft.title,
-            reason=ruled_out[unit],
-        )
-        for draft in joined.drafts
-        if (unit := package.record.unit_of(draft)) in ruled_out
-    ]
-    refused_ids = {dropped.claim_id for dropped in refused}
-    merged = [draft for draft in joined.drafts if draft.id not in refused_ids]
-    state.put(nodes.key("drafts"), [draft.model_dump(mode="json") for draft in merged])
-    # Every mark this framework's fan-in produced, from both of its producers:
-    # the join across its lanes, and each lane's own evidence resolution. Merged
-    # rather than parked separately — they share an owner, a standing and a
-    # policy, so one key carries them and ``assemble`` reads one parameter.
-    marks = joined.marks.merged_with(AnalysisMarks(dropped_claims=refused))
-    for lane, resolution in resolutions.items():
-        marks = marks.merged_with(invalid[lane]).merged_with(resolution.marks)
-    # Narrowed to the drafts that survived every pass above, once, after the
-    # last producer. Each pass marks what it sees and cannot know what a later
-    # pass drops, and the block refuses a mark on a claim it does not carry.
-    marks = marks.on_claims({draft.id for draft in merged})
-    state.put(nodes.key("marks"), marks.model_dump(mode="json"))
-    # Logged rather than reported, and the package decides what is worth saying:
-    # a STRIDE lane that numbered its drafts 01, 02, 05 broke nothing a reader
-    # could act on, and the agents are who it is about.
-    for message in package.record.lane_diagnostics(merged):
-        logger.warning(message)
-    # Coverage is computed here, over the drafts, because the question it
-    # answers — did this lane look at the system — is about what the agents did,
-    # not about what survived review. The candidates are regenerated rather than
-    # read back from state: they are a pure function of the same validated model
-    # and the same package rules, so the two derivations cannot disagree, and the
-    # fan-in stays free of a dependency on a key ``prepare`` wrote for the prompt.
-    coverage = build_coverage(
-        drafts_by_lane,
-        generate_candidates(model, package.lanes, package.rules),
+    merged = fan_in(
+        {
+            lane.lane: proposal_batch.model_validate(
+                _batch_of(state.get(lane.drafts_key))
+            )
+            for lane in lanes
+        },
+        nodes.package,
         model,
-        package,
+        source_texts or {},
+        state.get(nodes.key("ruled_out")) or {},
     )
-    state.put(nodes.key("coverage"), [row.model_dump(mode="json") for row in coverage])
-    # The critic reads only the drafts code has not already ruled, with the
-    # pairs it would otherwise hunt for computed onto them. The re-ask builds
-    # its own view through the same function, so the two passes cannot disagree
-    # about what a critic reads.
+    state.put(nodes.key("deferred"), merged.deferred)
+    state.put(
+        nodes.key("drafts"), [draft.model_dump(mode="json") for draft in merged.drafts]
+    )
+    state.put(nodes.key("marks"), merged.marks.model_dump(mode="json"))
+    state.put(
+        nodes.key("coverage"), [row.model_dump(mode="json") for row in merged.coverage]
+    )
     state.prompt(
         nodes.key("draft_view"),
-        render_fenced(critic_view(merged, model, repaired=marks.repaired_quotes)),
+        render_fenced(
+            critic_view(merged.drafts, model, repaired=merged.marks.repaired_quotes)
+        ),
     )
     return _routed(
-        ROUTE_REVIEW if unsettled_drafts(merged) else ROUTE_SETTLED,
+        ROUTE_REVIEW if unsettled_drafts(merged.drafts) else ROUTE_SETTLED,
         {
             "framework": nodes.name,
-            "draft_count": len(merged),
-            "unverified_count": len(marks.unverified_grounds),
-            "unresolved_mention_count": len(marks.unresolved_mentions),
+            "draft_count": len(merged.drafts),
+            "unverified_count": len(merged.marks.unverified_grounds),
+            "unresolved_mention_count": len(merged.marks.unresolved_mentions),
         },
     )
 
