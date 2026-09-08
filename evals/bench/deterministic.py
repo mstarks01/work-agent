@@ -61,13 +61,10 @@ from typing import Any, get_args
 
 from google.adk.workflow import FunctionNode
 
-from analysis_service import evidence, graph
-from analysis_service.critic import (
-    _bound_element_references,
-    _verify_quotes,
-    duplicate_groups,
-)
+from analysis_service import evidence, fan_in, graph
+from analysis_service.critic import duplicate_groups
 from analysis_service.execution import GraphExecutor
+from analysis_service.fan_in import _bound_element_references, _verify_quotes
 from analysis_service.frameworks import (
     PACKAGES,
     FrameworkName,
@@ -213,7 +210,6 @@ def case_spent_deadline() -> None:
     second. What is left is the exact-verification fold, which #627 puts out of
     scope.
     """
-    from analysis_service import critic
 
     sources = {f"src-{n}": synthetic_source(20_000, seed=n) for n in range(10)}
     claims = [
@@ -223,15 +219,15 @@ def case_spent_deadline() -> None:
         )
         for index, label in enumerate(sources)
     ]
-    spent = critic.repair_deadline
-    critic.repair_deadline = lambda: time.thread_time() - 1.0
+    spent = fan_in.repair_deadline
+    fan_in.repair_deadline = lambda: time.thread_time() - 1.0
     try:
         _timed(
             "_verify_quotes: spent deadline, 10 x 20,000-word sources",
             lambda: _verify_quotes(claims, sources),
         )
     finally:
-        critic.repair_deadline = spent
+        fan_in.repair_deadline = spent
 
 
 def case_prepare() -> None:

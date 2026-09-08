@@ -383,7 +383,8 @@ and the selection seam are in place for all of them.
 | `analysis_service.report` | The `Report` envelope, the neutral `Claim` and the severity model. |
 | `analysis_service.frameworks` | The framework-package contract, its registry and its deployment gate. |
 | `analysis_service.validation` | The mechanical validity gate. |
-| `analysis_service.critic` | The mechanical checks around the critic step — the ones no model should be asked to perform. |
+| `analysis_service.fan_in` | One framework's lane batches merged into the drafts its critic reads: evidence resolution, the whole-set checks, and every mark the service records about a draft, behind one call. |
+| `analysis_service.critic` | The mechanical checks around the critic's ruling — the ones no model should be asked to perform — and the view a critic reads. |
 | `analysis_service.skills` / `.prompts` / `.markdown_loader` | Skill/prompt loading and composition. |
 | `analysis_service.model_tiers` / `.sampling` / `.resilience` | Config loaders. |
 | `analysis_service.vendors` | The vendor registry: each vendor's router prefix, credential mode, and model-name rules. |

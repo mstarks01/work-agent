@@ -30,7 +30,7 @@ enumeration can make. An agent proposes one as a
 :class:`~analysis_service.report.QuoteCandidate`, which is the span and the
 source it came from, and :func:`resolve_proposals` assembles the ground. It does
 not check the quote. Presence in the named source stays
-:func:`~analysis_service.critic.join_drafts`'s question, answered by the pinned
+:func:`~analysis_service.fan_in.join_drafts`'s question, answered by the pinned
 ladder in :mod:`analysis_service.grounding` against the job's actual bytes,
 which this module does not hold.
 
@@ -398,7 +398,7 @@ class Resolution(NamedTuple):
 
     Two values because the second is no longer fatal on its own: a dropped
     reference is recorded and the analysis continues, so the caller needs both
-    halves. Shaped like :class:`~analysis_service.critic.JoinedDrafts` — marks
+    halves. Shaped like :class:`~analysis_service.fan_in.JoinedDrafts` — marks
     beside drafts — and carrying the same
     :class:`~analysis_service.report.AnalysisMarks`, so the fan-in merges what
     every lane and the join produced without knowing which mark came from where.
@@ -534,7 +534,7 @@ def resolve_proposals(
     represent — so the claim is dropped and recorded as a
     :class:`~analysis_service.report.DroppedClaim`, with the references it
     cited in the reason. It is the same rule
-    :func:`~analysis_service.critic.join_drafts` applies to unverified quotes:
+    :func:`~analysis_service.fan_in.join_drafts` applies to unverified quotes:
     marked per entry, dropped per claim. Nothing here raises on what an agent
     cited.
 

@@ -361,7 +361,7 @@ def deadline_spent(deadline: float | None) -> bool:
     """Has the body's shared deadline passed?
 
     One reader, because three sites ask it and each asks to avoid a different
-    cost: :func:`repair_quote` and :func:`~analysis_service.critic._verify_quotes`
+    cost: :func:`repair_quote` and :func:`~analysis_service.fan_in._verify_quotes`
     ask before they prepare a source, and :func:`repair_prepared` asks before it
     scans one. ``None`` is a caller that set no body bound, which is every
     caller outside the fan-in.

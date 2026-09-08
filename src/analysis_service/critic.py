@@ -1,37 +1,39 @@
-"""Mechanical checks at the join and assemble seams around a framework's critic.
+"""Mechanical checks around a framework's critic: what it reads, and what it ruled.
 
 This is the deterministic half of the critic step. Mechanical checks belong in
 code, and prompts carry only judgement. Everything here is a check no model
-should be asked to perform: that a framework's lane agents' drafts cite elements
-the System Model contains, that claim IDs are unique, that every grounds entry
-resolves, that every quote ground is really in the source it names, and that the
-critic ruled on exactly the drafts it was given, each ruling carrying a
-well-formed verdict. A package's critic prompt names these as already done, so
-its judgement is spent on evidence, lanes, duplicates and whatever else that
-framework grades. For grounds, it is spent on the one question code cannot
-answer: whether a quote that is verbatim actually supports the finding it was
-filed under.
+should be asked to perform: that the critic ruled on exactly the drafts it was
+given, each ruling carrying a well-formed verdict and each ``needs-info``
+naming an unknown the model contains; that a re-ask changed only what the
+problems named; and, at assembly, that a ruling becomes a claim from the copy
+this service already holds. The view a critic reads is built here too, with
+the pairs it would otherwise hunt for computed onto it, so the first pass and
+the re-ask cannot disagree about what a critic sees.
+
+The checks that run *before* a critic reads anything — element references,
+unique IDs, grounds that resolve, quotes that are in the source they name —
+are the fan-in's, in :mod:`analysis_service.fan_in`. A package's critic prompt
+names those as already done, so its judgement is spent on evidence, lanes,
+duplicates and whatever else that framework grades. For grounds, it is spent on
+the one question code cannot answer: whether a quote that is verbatim actually
+supports the finding it was filed under.
 
 The checks are neutral, and there is one seam per framework rather than one
 across frameworks. Every check here reads
 :class:`~analysis_service.report.Claim`,
 :class:`~analysis_service.report.Ruling` and the package contract, so a second
-framework's output goes through the same code. What it never does is merge two
-frameworks' drafts. The join runs per package, in that package's own declared
-lane order, because two frameworks' claims are not comparable and a duplicate
-across them is not a duplicate.
+framework's output goes through the same code.
 
-The assemble seam is also where a ruling becomes a claim. A critic emits
-judgements keyed by draft ID rather than the drafts themselves, as a
+The assemble seam is where a ruling becomes a claim. A critic emits judgements
+keyed by draft ID rather than the drafts themselves, as a
 :class:`~analysis_service.report.Ruling`. The agent's own fields therefore reach
 the report from the copy this service already holds, rather than round-tripping
 through a model that was never asked to change them.
 
 Model output is untrusted input (OWASP LLM05), and the service validates it here
-before anything reaches the report. Both seams fail closed, and list every issue
-at once. An agent that hallucinates an element ID, or a critic that drops
-claims, is a defect to surface loudly rather than to paper over by discarding
-the offending entries.
+before anything reaches the report. The review check is returned rather than
+raised, so the graph can route a malformed first pass to its bounded re-ask
+(ADR 0005); assembly fails closed, and lists every issue at once.
 """
 
 from __future__ import annotations
@@ -43,35 +45,15 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any, NamedTuple, get_args
 
-from analysis_service.evidence import ground_issues
-from analysis_service.frameworks import FrameworkPackage, FrameworkSchemas
-from analysis_service.grounding import (
-    PreparedSource,
-    deadline_spent,
-    meaning_moved,
-    normalize,
-    prepare_source,
-    repair_deadline,
-    repair_prepared,
-    verify_normalized,
-)
-from analysis_service.references import canonical, snap
+from analysis_service.frameworks import FrameworkSchemas
+from analysis_service.references import snap
 from analysis_service.report import (
-    BEYOND_GROUNDS,
-    ELEMENT_REF_MAX_CHARS,
-    MENTION_MAX_CHARS,
-    AnalysisMarks,
     Claim,
-    DroppedClaim,
-    Ground,
     RepairedQuote,
     RuledClaim,
     Ruling,
     SeverityLevel,
     UnknownRef,
-    UnresolvedMention,
-    UnresolvedReference,
-    UnverifiedGround,
     Verdict,
 )
 from analysis_service.system_model import (
@@ -90,10 +72,6 @@ from analysis_service.system_model import (
 SEVERITY_ORDER: tuple[SeverityLevel, ...] = ("critical", "high", "medium", "low")
 
 
-class DraftJoinError(ValueError):
-    """One framework's merged lane agents' drafts fail a mechanical check."""
-
-
 class CriticOutputError(ValueError):
     """The critic's output does not account for exactly the drafts it saw."""
 
@@ -105,36 +83,6 @@ class AssembledClaims(NamedTuple):
     rejected_claims: list[RuledClaim]
 
 
-class JoinedDrafts(NamedTuple):
-    """What the fan-in produces: the merged drafts, and what did not check out.
-
-    Two returns rather than one because they have different owners. The drafts
-    are the agents'; the :class:`~analysis_service.report.AnalysisMarks` are the
-    *service's* record of what each draft failed to make good on — a quote that
-    is not in the source it named, an element ID a description cited that does
-    not exist, and whatever the package's own record adds
-    (:meth:`~analysis_service.report.Claim.claim_marks`). They ride beside the
-    drafts rather than on them, because a field an agent could set about its own
-    accuracy is not evidence of it.
-
-    None of the marks is fatal, and that is the whole policy of this seam:
-    checks that decide whether a finding *means* anything fail closed, and
-    checks that describe how complete it is are recorded for a reader. The
-    fan-in has no re-ask path, so the second kind must never cost a report.
-    """
-
-    drafts: list[Claim]
-    marks: AnalysisMarks
-
-
-# An element ID as it appears inside prose. Flows carry a second segment and
-# nothing else does, so the two shapes are spelled separately rather than as one
-# optional group that would read ``store:orders-db:anything`` as a store.
-#
-# Built from the element classes' own ``id_prefix``, so a sixth element type
-# joins this pattern by existing rather than by someone remembering. Matched
-# case-insensitively and snapped afterwards, for the reason every other
-# reference in this module is: the spelling is not the claim.
 _FLOW_PREFIX = DataFlow.id_prefix
 _OTHER_PREFIXES = sorted(
     element.id_prefix for element in get_args(Element) if element is not DataFlow
@@ -167,81 +115,6 @@ def mentioned_ids(description: str) -> list[str]:
     strips them, so no legal ID ends in a hyphen anyway.
     """
     return [match.group().rstrip("-") for match in _MENTION_RE.finditer(description)]
-
-
-def _unresolved_mentions(
-    claims: Iterable[Claim], element_ids: Collection[str]
-) -> list[UnresolvedMention]:
-    """Marks for every ID a description cites that the model does not contain."""
-    return [
-        UnresolvedMention(claim_id=claim.id, mention=mention[:MENTION_MAX_CHARS])
-        for claim in claims
-        for mention in mentioned_ids(claim.description)
-        if not canonical(mention, element_ids)
-    ]
-
-
-# The two branches whose reference is an element and an attribute of it. They
-# differ in what they say about that attribute — never stated against stated
-# absent — and in nothing this module does: both snap the same field and both
-# resolve against the same model, so every check here reads the pair.
-_ATTRIBUTE_KINDS = frozenset({"unknown-attribute", "absent-attribute"})
-
-
-def _snapped_ground(
-    ground: Ground, element_ids: Collection[str], labels: Collection[str]
-) -> Ground:
-    """One grounds entry with its branch's reference in canonical spelling."""
-    if ground.kind == "quote":
-        # Only when the job carries labels at all: the in-process engine drives a
-        # hand-authored model with none, and an empty known set snaps nothing.
-        if not labels:
-            return ground
-        return ground.model_copy(
-            update={"source_label": snap(ground.source_label, labels)}
-        )
-    if ground.kind in _ATTRIBUTE_KINDS:
-        return ground.model_copy(
-            update={"element_id": snap(ground.element_id, element_ids)}
-        )
-    if ground.kind == "derived-fact":
-        return ground.model_copy(update={"flow_id": snap(ground.flow_id, element_ids)})
-    # An absent-element ground carries a term rather than an ID, so there is no
-    # spelling to canonicalise: the model names it nowhere, which is the point.
-    return ground
-
-
-def snap_drafts(
-    drafts: Iterable[Claim],
-    element_ids: Collection[str],
-    source_labels: Collection[str] = (),
-) -> list[Claim]:
-    """Every reference a draft carries, in the spelling the job holds.
-
-    Run at the fan-in before the checks, so what those checks compare — and what
-    the report goes on to carry — is the canonical spelling rather than whatever
-    each of a framework's independently-vendored lane agents happened to type.
-    The drafts reach the report unaltered otherwise: this rewrites references and
-    nothing else.
-
-    ``element_ids`` covers flow references too, because a flow *is* an element
-    and its ID is in the same set. Whether that flow is a derived boundary
-    crossing is a different question, asked afterwards by the check that owns it.
-    """
-    return [
-        draft.model_copy(
-            update={
-                "affected_element_ids": [
-                    snap(ref, element_ids) for ref in draft.affected_element_ids
-                ],
-                "grounds": [
-                    _snapped_ground(ground, element_ids, source_labels)
-                    for ground in draft.grounds
-                ],
-            }
-        )
-        for draft in drafts
-    ]
 
 
 def snap_rulings(
@@ -278,158 +151,6 @@ def snap_rulings(
         )
         for ruling in rulings
     ]
-
-
-class _ReferenceCheck(NamedTuple):
-    drafts: list[Claim]
-    unresolved: list[UnresolvedReference]
-    dropped: list[DroppedClaim]
-
-
-def _resolve_element_references(
-    claims: Iterable[Claim], known_ids: Collection[str]
-) -> _ReferenceCheck:
-    """Drop every element reference the model does not contain, and mark it.
-
-    The rule every other citation already has. A reference an agent composed
-    — well-formed, plausible, absent — costs itself, and the claim stands on
-    the elements that resolved. A claim that named elements and lost every one
-    is dropped: a finding about nothing is not a finding. A claim that named
-    none is a package's own business (ASVS leaves the list empty on a claim
-    about the system as a whole) and passes untouched.
-    """
-    drafts: list[Claim] = []
-    unresolved: list[UnresolvedReference] = []
-    dropped: list[DroppedClaim] = []
-    for claim in claims:
-        kept = [ref for ref in claim.affected_element_ids if ref in known_ids]
-        lost = [ref for ref in claim.affected_element_ids if ref not in known_ids]
-        if not lost:
-            drafts.append(claim)
-            continue
-        if not kept:
-            dropped.append(
-                DroppedClaim.of(
-                    claim_id=claim.id,
-                    title=claim.title,
-                    reason=(
-                        "names only elements the system model does not contain"
-                        f" ({', '.join(repr(ref) for ref in lost)})"
-                    ),
-                )
-            )
-            continue
-        # A blank ID is skipped rather than marked, for the reason
-        # :func:`~analysis_service.evidence.resolve_proposals` skips a blank
-        # reference: a mark names an element the model does not contain, and an
-        # empty string names none. The drop reason above still lists it.
-        unresolved += [
-            UnresolvedReference(
-                claim_id=claim.id, element_id=ref[:ELEMENT_REF_MAX_CHARS]
-            )
-            for ref in lost
-            if ref.strip()
-        ]
-        drafts.append(claim.model_copy(update={"affected_element_ids": kept}))
-    return _ReferenceCheck(drafts, unresolved, dropped)
-
-
-def _bound_of(
-    claim: Claim, known_ids: Collection[str], index: ModelIndex
-) -> frozenset[str]:
-    """The element IDs a claim may cite, from its grounds or from its prose.
-
-    A catalogued ground names an element or a flow, and the bound is one hop
-    from those (:meth:`~analysis_service.system_model.ModelIndex.reach`). A
-    claim resting on quotes alone names none, so its bound is exactly what its
-    own prose cites — the same resolution
-    :func:`mentioned_ids` gives coverage — with no hop, since a description
-    that names an element has already put it in reach. A claim citing nothing
-    anywhere has no bound and passes untouched.
-    """
-    places = {ground.place for ground in claim.grounds if ground.place}
-    if places:
-        return index.reach(places)
-    return frozenset(
-        resolved
-        for mention in mentioned_ids(claim.description)
-        if (resolved := canonical(mention, known_ids))
-    )
-
-
-def _bound_element_references(
-    claims: Iterable[Claim], index: ModelIndex
-) -> _ReferenceCheck:
-    """Drop every cited element the claim's own grounds do not reach, and mark it.
-
-    The prompts say reach belongs in the description and
-    ``affected_element_ids`` is what the action lands on. This is that rule in
-    code (#441): an ID more than one hop from every place the grounds name is
-    dropped with :data:`BEYOND_GROUNDS` as its reason, on the same terms as an
-    ID the model does not contain, and a claim left with none is dropped.
-    """
-    known_ids = index.elements.keys()
-    drafts: list[Claim] = []
-    unresolved: list[UnresolvedReference] = []
-    dropped: list[DroppedClaim] = []
-    for claim in claims:
-        reach = _bound_of(claim, known_ids, index)
-        if not reach:
-            drafts.append(claim)
-            continue
-        kept = [ref for ref in claim.affected_element_ids if ref in reach]
-        lost = [ref for ref in claim.affected_element_ids if ref not in reach]
-        if not lost:
-            drafts.append(claim)
-            continue
-        if not kept:
-            dropped.append(
-                DroppedClaim.of(
-                    claim_id=claim.id,
-                    title=claim.title,
-                    reason=(
-                        "names only elements its grounds do not reach"
-                        f" ({', '.join(repr(ref) for ref in lost)})"
-                    ),
-                )
-            )
-            continue
-        unresolved += [
-            UnresolvedReference(
-                claim_id=claim.id, element_id=ref, reason=BEYOND_GROUNDS
-            )
-            for ref in lost
-        ]
-        drafts.append(claim.model_copy(update={"affected_element_ids": kept}))
-    return _ReferenceCheck(drafts, unresolved, dropped)
-
-
-def _drop_duplicate_ids(
-    claims: Iterable[Claim],
-) -> tuple[list[Claim], list[DroppedClaim]]:
-    """Keep the first draft under each ID; drop and mark every later one.
-
-    An agent that numbered two drafts alike, or filed one requirement twice,
-    made a fault in one entry. The first is kept because the lane order is the
-    package's own declared order, so the choice is deterministic and the same
-    on every run.
-    """
-    seen: set[str] = set()
-    kept: list[Claim] = []
-    dropped: list[DroppedClaim] = []
-    for claim in claims:
-        if claim.id in seen:
-            dropped.append(
-                DroppedClaim.of(
-                    claim_id=claim.id,
-                    title=claim.title,
-                    reason="repeats the ID of an earlier draft in this framework",
-                )
-            )
-            continue
-        seen.add(claim.id)
-        kept.append(claim)
-    return kept, dropped
 
 
 class CriticIssue(NamedTuple):
@@ -642,298 +363,6 @@ def _duplicate_id_issues(entries: Iterable[Claim | Ruling]) -> list[str]:
     ]
 
 
-class _QuoteCheck(NamedTuple):
-    """What the quote check produced: the drafts as they now read, and marks."""
-
-    drafts: list[Claim]
-    unverified: list[UnverifiedGround]
-    repaired: list[RepairedQuote]
-    groundless: list[DroppedClaim]
-
-
-def _verify_quotes(claims: Sequence[Claim], sources: Mapping[str, str]) -> _QuoteCheck:
-    """Check every quote ground against the source it names.
-
-    Three outcomes, at two different scopes, and the split is the whole policy.
-    **Per entry**, a quote the ladder refused is offered to
-    :func:`~analysis_service.grounding.repair_prepared` first: where the source holds
-    a span near enough, the ground is rewritten to that span — the submitter's
-    words, never the model's — and a :class:`~analysis_service.report.RepairedQuote`
-    keeps what the agent wrote. Otherwise the quote is *marked* and still renders: 0
-    failures in 206 measured excerpts is not evidence of zero, and the Rule of
-    Three puts the 95% bound at 1.46% per quote — which at the corpus mean of
-    18.7 claims per job is a 24% chance that some job dies on a single
-    cosmetic mismatch. That is not enough evidence to license killing a job.
-
-    **Per claim**, if *no* ground verifies at all, the claim is dropped and
-    recorded as a :class:`~analysis_service.report.DroppedClaim` whose reason
-    carries the quotes that were not found. A claim with one bad quote beside
-    good ones is still justified; a claim where nothing holds is a finding with
-    no machine-checkable justification. Every catalogued ground verifies by set
-    membership, so a claim can only lose every ground if every one of them is a
-    quote and every quote is bad — which is the common shape of a claim in a
-    framework whose catalog rarely holds the fact a requirement turns on, and
-    the reason the drop costs the claim rather than the job.
-
-    Returns the drafts as they now read — a repaired ground is a new ground —
-    with the groundless ones already removed.
-    """
-    # Each source folded once rather than once per quote. The ladder normalizes
-    # every character of the haystack, and a job runs ~19 claims per framework
-    # against the same few submissions, so the per-quote form would re-fold whole
-    # documents to reach the same answer.
-    folded = {label: normalize(text) for label, text in sources.items()}
-    # And each source split and folded per word once, for the repair rung, which
-    # needs the source in a second shape. Filled as a source is first repaired
-    # against rather than up front: a body whose quotes all verify repairs
-    # nothing, and preparing every submission for it would be the whole cost of
-    # the rung with none of its work.
-    #
-    # What it holds for the length of the body is two tuples of words per source
-    # a refused quote named, and that is the retention reuse costs: a fold
-    # nobody keeps is a fold the next quote pays for again.
-    #
-    # Measured at 18x the source bytes, flat from 1,000 words to 50,000 -- one
-    # Python ``str`` per word, twice, is almost all of it, and
-    # ``evals/bench/deterministic.py retention`` re-derives it. The shipped
-    # ``resilience.max_source_bytes`` is 102,400 bytes for a whole job, so a
-    # body holds at most about 1.8 MiB and the eight-slot node pool about 14
-    # MiB. It is bounded by that cap rather than by anything here, which is why
-    # the cap is the thing to read before raising it.
-    prepared: dict[str, PreparedSource] = {}
-    # One deadline for every repair this body runs. Each scan is bounded on its
-    # own, and a body runs one scan per refused quote: bounded per scan, a body
-    # of four hundred adversarial quotes ran for hours after the job settled.
-    deadline = repair_deadline()
-    drafts: list[Claim] = []
-    marks: list[UnverifiedGround] = []
-    repaired: list[RepairedQuote] = []
-    groundless: list[DroppedClaim] = []
-    for claim in claims:
-        grounds = list(claim.grounds)
-        unverified: list[int] = []
-        repairs: list[RepairedQuote] = []
-        for index, ground in enumerate(grounds):
-            if ground.kind != "quote":
-                continue
-            if verify_normalized(ground.text, folded.get(ground.source_label, "")):
-                continue
-            if ground.source_label not in sources:
-                unverified.append(index)
-                continue
-            label = ground.source_label
-            if label not in prepared:
-                # The body's deadline, asked before the fold rather than inside
-                # the scan after it. A body that has spent its thirty seconds
-                # answers ``None`` for every quote that is left, and folding a
-                # whole submission to reach that answer is what this ordering
-                # removes: 400 refused quotes against a 20,000-word source is
-                # 6.4 s of folding for 400 answers of nothing.
-                if deadline_spent(deadline):
-                    unverified.append(index)
-                    continue
-                prepared[label] = prepare_source(sources[label])
-            repair = repair_prepared(ground.text, prepared[label], deadline)
-            if repair is None:
-                unverified.append(index)
-                continue
-            grounds[index] = ground.model_copy(update={"text": repair.span})
-            repairs.append(
-                RepairedQuote(
-                    claim_id=claim.id,
-                    index=index,
-                    written=ground.text,
-                    similarity=round(repair.similarity, 3),
-                    moved=list(meaning_moved(ground.text, repair.span)),
-                    scan_complete=repair.complete,
-                )
-            )
-        if len(unverified) == len(grounds):
-            lost = "; ".join(
-                f"{grounds[index].text!r} not found in {grounds[index].source_label!r}"
-                for index in unverified
-            )
-            groundless.append(
-                DroppedClaim.of(
-                    claim_id=claim.id,
-                    title=claim.title,
-                    reason=f"no ground verifies: {lost}",
-                )
-            )
-            continue
-        drafts.append(
-            claim.model_copy(update={"grounds": grounds}) if repairs else claim
-        )
-        repaired += repairs
-        marks += [
-            UnverifiedGround(
-                claim_id=claim.id,
-                index=index,
-                reason=(
-                    f"not found in {grounds[index].source_label!r}"
-                    if grounds[index].source_label in sources
-                    else f"names source {grounds[index].source_label!r}, which is"
-                    " not one of this job's sources"
-                ),
-            )
-            for index in unverified
-        ]
-    return _QuoteCheck(drafts, marks, repaired, groundless)
-
-
-def join_drafts(
-    drafts_by_lane: Mapping[str, Sequence[Claim]],
-    package: FrameworkPackage,
-    system_model: SystemModel,
-    sources: Mapping[str, str] = MappingProxyType({}),
-) -> JoinedDrafts:
-    """Merge one framework's lane agents' drafts into the list its critic sees.
-
-    **One package per call.** Two frameworks' drafts never meet here: they are
-    ruled by different critics against different questions, and merging them
-    would put a duplicate check across claims that cannot duplicate each other.
-    The graph runs this once per selected framework.
-
-    The package's own declared lane order, so a critic reads the lanes in the
-    same order every run. ID prefixes and each ``Ground``'s own shape are
-    enforced by construction — :func:`~analysis_service.evidence.resolve_proposals`
-    composes both — and what this seam adds is the checks that need the whole
-    set: element references resolving against the System Model, IDs unique
-    across it, and every grounds entry resolving and, for a quote, actually
-    appearing in the source it names.
-
-    **Whether a draft sits in the right lane is not among them, and cannot be.**
-    A draft's lane is stamped from the node by
-    :func:`~analysis_service.evidence.resolve_proposals` rather than written by
-    the agent, so comparing the two would compare a value against the value it
-    was copied from. The question that survives is whether the claim *belongs*
-    in the lane it was found in, which is about the finding's content rather
-    than its serialization, and is a critic's judgement step.
-
-    Two things it *marks* rather than fails on, because the fan-in has no
-    re-ask path and a whole report is too much to trade for either: a quote
-    absent from the source it names, and an element ID a description cites in
-    prose that the model does not contain
-    (:class:`~analysis_service.report.UnresolvedMention`). A claim whose every
-    ground is such a quote is *dropped* and marked
-    (:class:`~analysis_service.report.DroppedClaim`), on the same trade. A
-    package's record adds whatever else its own judgement fields earn
-    (:meth:`~analysis_service.report.Claim.claim_marks`).
-
-    References are snapped to their canonical spelling first
-    (:func:`snap_drafts`), so the checks below — and the report, which carries
-    these drafts' own fields through unaltered — see the spelling the job holds
-    rather than each agent's. That is recognition and never resolution: a
-    reference naming nothing is left exactly as written, for the check to report
-    in the agent's own words.
-
-    The fan-in is where this belongs because it is the first point at which all
-    of this framework's lanes' drafts, the System Model and the job's sources
-    exist together.
-
-    ``sources`` maps each source's label to its text. It defaults to empty for
-    the same reason the validity gate's citation rule takes its label set as a
-    parameter: a hand-authored model driven through the in-process engine has
-    no sources to check against, and inventing a set would fail it on a
-    citation that is not wrong. Empty means the text check does not run — no
-    quote is marked and no claim is dropped on one.
-    """
-    # One index for the whole fan-in. Each check below asks the model who
-    # carries an ID and what a flow runs between, once per claim and once per
-    # grounds entry within it, and each used to walk the model to answer.
-    index = ModelIndex.of(system_model)
-    known_ids = index.elements.keys()
-    snapped = snap_drafts(
-        [draft for lane in package.lanes for draft in drafts_by_lane.get(lane, ())],
-        known_ids,
-        sources.keys(),
-    )
-    unique, duplicates = _drop_duplicate_ids(snapped)
-    referenced = _resolve_element_references(unique, known_ids)
-    issues = ground_issues(referenced.drafts, system_model)
-    if issues:
-        raise DraftJoinError("; ".join(issues))
-    bounded = _bound_element_references(referenced.drafts, index)
-    checked = (
-        _verify_quotes(bounded.drafts, sources)
-        if sources
-        else _QuoteCheck(list(bounded.drafts), [], [], [])
-    )
-    kept, settled_duplicates = _drop_settled_duplicates(checked.drafts, index)
-    return JoinedDrafts(
-        drafts=kept,
-        marks=AnalysisMarks(
-            unverified_grounds=checked.unverified,
-            repaired_quotes=checked.repaired,
-            unresolved_references=[*referenced.unresolved, *bounded.unresolved],
-            unresolved_mentions=_unresolved_mentions(kept, known_ids),
-            dropped_claims=[
-                *duplicates,
-                *referenced.dropped,
-                *bounded.dropped,
-                *checked.groundless,
-                *settled_duplicates,
-            ],
-        ).merged_with(package.record.claim_marks(kept)),
-    )
-
-
-def _drop_settled_duplicates(
-    claims: Sequence[Claim], index: ModelIndex
-) -> tuple[list[Claim], list[DroppedClaim]]:
-    """Keep one of each set of drafts whose grounds settle them alike.
-
-    **The one duplicate check no reader would otherwise make.** A draft its own
-    grounds settle is ruled in code and never shown to a critic (#439), and
-    :func:`critic_view` computes :func:`duplicate_groups` over the shown set —
-    so two conditional drafts naming one action at one place both reach the
-    report, and nothing anywhere compares them. The critic cannot: it is not
-    given them.
-
-    Runs last in the fan-in, on the drafts that survived every other check, so
-    the targets it compares are the ones the report will carry rather than the
-    ones an agent wrote. The key is :func:`duplicate_groups`'s own — the verb
-    and the endpoint-resolved targets — because these are the same duplicates,
-    found at a different seam.
-
-    **First wins, and the choice is deterministic rather than good.** Lane order
-    is the package's own, so two runs of one input drop the same copy. Picking
-    the better-written of the two would be a judgement, and judgement is the
-    critic's; what code can do here is stop one finding being reported twice.
-
-    A draft carrying no verb belongs to a package whose identity is a catalog
-    identifier, and its duplicates are ID collisions :func:`_drop_duplicate_ids`
-    already refused. Those pass through untouched.
-    """
-    flows = index.flow_endpoints
-    seen: dict[tuple[str, frozenset[str]], str] = {}
-    kept: list[Claim] = []
-    dropped: list[DroppedClaim] = []
-    for claim in claims:
-        settled = type(claim).settled_by_grounds(claim) is not None
-        if not settled or claim.verb is None:
-            kept.append(claim)
-            continue
-        key = (claim.verb, endpoint_targets(claim.affected_element_ids, flows))
-        first = seen.get(key)
-        if first is None:
-            seen[key] = claim.id
-            kept.append(claim)
-            continue
-        dropped.append(
-            DroppedClaim.of(
-                claim_id=claim.id,
-                title=claim.title,
-                reason=(
-                    f"names the same action at the same place as {first!r}, and"
-                    " both rest on an unstated control, so no critic sees either"
-                    " to rule on the pair"
-                ),
-            )
-        )
-    return kept, dropped
-
-
 def complete_rulings(
     drafts: Sequence[Claim], rulings: Sequence[Ruling]
 ) -> list[Ruling]:
@@ -1023,7 +452,7 @@ def _duplicate_on_unit_issues(
     """Every ``duplicate`` rejection of a draft that rules on a unit of its own.
 
     A package whose drafts name a unit — a catalog requirement — decides
-    duplication by that unit's identifier, and :func:`_drop_duplicate_ids` has
+    duplication by that unit's identifier, and :func:`~analysis_service.fan_in._drop_duplicate_ids` has
     already dropped the second copy before any critic reads the set. So a
     ``duplicate`` rejection here can only mean the critic judged two rulings on
     two *different* requirements to be one concern, which is a ruling the
@@ -1200,7 +629,7 @@ def review_issues(
     fatally.
 
     Element references are deliberately **not** checked: a ruling carries none.
-    They are the join seam's business (:func:`join_drafts` fails closed on a
+    They are the join seam's business (:func:`~analysis_service.fan_in.join_drafts` fails closed on a
     draft citing an element the model does not contain), and since the critic
     no longer re-emits them there is no second place they can break. An issue
     listed here has to be one the re-ask can actually fix, and a draft's bad
@@ -1350,7 +779,7 @@ def assemble_claims(
     rest are ordered by :func:`_claim_order`.
 
     Claims are built in ``drafts`` order — the package's own lane order, as
-    :func:`join_drafts` left them — so the audit array does not inherit
+    :func:`~analysis_service.fan_in.join_drafts` left them — so the audit array does not inherit
     whatever order the critic happened to emit its rulings in.
     """
     problems = review_issues(drafts, rulings, system_model)
