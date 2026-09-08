@@ -6,6 +6,7 @@ from typing import get_args
 import pytest
 from pydantic import ValidationError
 
+from analysis_service.frameworks import PACKAGES, schemas_for
 from analysis_service.frameworks.stride.record import (
     ThreatRulings,
     build_stride_summary,
@@ -34,6 +35,7 @@ from analysis_service.report import (
     derive_severity_level,
 )
 from analysis_service.sampling import TierSampling
+from analysis_service.system_model import all_attribute_names, attribute_names
 from tests.factories import (
     sample_fingerprint,
     sample_report,
@@ -566,6 +568,33 @@ class TestEveryClaimMarkPointsAtAThreat:
 
         assert [m.claim_id for m in narrowed.unresolved_references] == ["S-01"]
         assert narrowed.dropped_claims == marks.dropped_claims
+
+
+class TestUnknownRefAttributeEnum:
+    """The provider-facing schema lists the legal attribute names.
+
+    The live critic hung a needs-info on ``description`` 132 times in six
+    runs, and every one fired the bounded re-ask: the prompt warned it off
+    ``notes`` by name and the validator refused ``description`` by design. A
+    constrained critic cannot spell what the schema does not list, so the
+    list is a schema fact, derived from the element classes, and the review
+    seam still decides whether the attribute belongs to the named element.
+    """
+
+    @pytest.mark.parametrize("framework", sorted(PACKAGES))
+    def test_every_packages_rulings_schema_carries_the_enum(self, framework):
+        schema = schemas_for(framework).rulings.model_json_schema()
+        attribute = schema["$defs"]["UnknownRef"]["properties"]["attribute"]
+
+        assert attribute["enum"] == ["", *all_attribute_names()]
+
+    def test_the_enum_is_the_union_of_every_element_types_attributes(self):
+        """Held to the registry: one instance of each element type."""
+        model = valid_model()
+        expected = {name for el in model.elements() for name in attribute_names(el)}
+
+        assert set(all_attribute_names()) == expected
+        assert {"name", "description", "notes"}.isdisjoint(all_attribute_names())
 
 
 class TestAnalysisMarks:

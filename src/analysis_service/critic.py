@@ -41,7 +41,7 @@ from collections import Counter
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import NamedTuple, get_args
+from typing import Any, NamedTuple, get_args
 
 from analysis_service.evidence import ground_issues
 from analysis_service.frameworks import FrameworkPackage, FrameworkSchemas
@@ -465,6 +465,11 @@ class ReviewProblems(NamedTuple):
     #: The rulings as :func:`complete_rulings` left them, so assembly reads
     #: the set the check ran over rather than completing it a second time.
     rulings: tuple[Ruling, ...] = ()
+    #: Every *drafted* ID some problem names: ``implicated`` plus the IDs the
+    #: critic ruled twice. It is the whole of what a re-ask may change; a
+    #: ruling on any other drafted ID is already correct and is kept from the
+    #: first pass by :func:`merge_retry`, whatever the re-ask returns for it.
+    repairable: frozenset[str] = frozenset()
 
     def __bool__(self) -> bool:
         return bool(self.messages)
@@ -1229,9 +1234,68 @@ def review_issues(
     implicated = set(dropped) | {
         issue.claim_id for issue in per_ruling if issue.claim_id in drafted_ids
     }
+    duplicated = {
+        claim_id
+        for claim_id, count in Counter(ruling.id for ruling in rulings).items()
+        if count > 1 and claim_id in drafted_ids
+    }
     return ReviewProblems(
-        messages=messages, implicated=frozenset(implicated), rulings=tuple(rulings)
+        messages=messages,
+        implicated=frozenset(implicated),
+        rulings=tuple(rulings),
+        repairable=frozenset(implicated | duplicated),
     )
+
+
+def merge_retry(
+    first: Sequence[Mapping[str, Any]],
+    retry: Sequence[Mapping[str, Any]],
+    repairable: Collection[str],
+    drafted: Collection[str],
+) -> tuple[list[Mapping[str, Any]], list[str]]:
+    """The re-ask's rulings for what the problems named, the first pass's for the rest.
+
+    The re-ask prompt asks for exactly this and nothing enforced it: the first
+    review and the re-ask wrote one state key, and the check that ran on the
+    re-ask compared it with the drafts and never with the first pass. So a
+    re-ask that changed a confirmed ruling to rejected while adding the one it
+    dropped was accepted whole, and the change reached the report as if the
+    review had reasoned it out.
+
+    Over the raw payloads, because what is merged is what ``reviewed`` holds
+    and what ``assemble`` reads back. Two rules, and the second list says
+    where the re-ask stepped outside them:
+
+    * a drafted ID a problem named takes the re-ask's ruling, every copy of it,
+      so a duplicated repair still fails the check that follows;
+    * a drafted ID no problem named keeps the first pass's ruling, and a
+      re-ask ruling that differs from it is recorded and discarded.
+
+    An ID no lane agent drafted is not resolved here. The first pass's copy
+    is left out, because removing it was the re-ask's whole instruction; a
+    copy the re-ask returned anyway is passed through, so the check that
+    follows names it and the job fails as it always did. A re-ask that
+    invents is the service's defect, and a mark is not the place for one.
+    """
+    named = set(repairable)
+    known = set(drafted)
+    kept_first = {
+        ruling["id"]: ruling
+        for ruling in first
+        if ruling["id"] in known and ruling["id"] not in named
+    }
+    merged: list[Mapping[str, Any]] = list(kept_first.values())
+    drift: list[str] = []
+    for ruling in retry:
+        claim_id = ruling["id"]
+        if claim_id in named or claim_id not in known:
+            merged.append(ruling)
+        elif ruling != kept_first.get(claim_id):
+            drift.append(
+                f"re-ask changed ruling {claim_id!r}, which no problem named;"
+                " the first ruling was kept"
+            )
+    return merged, drift
 
 
 def _ruled(draft: Claim, ruling: Ruling, ruled_record: type[RuledClaim]) -> RuledClaim:
@@ -1461,6 +1525,9 @@ class Revision:
     roster: list[str]
     #: The few drafts a structural fix cannot be made without reading.
     unreconciled: list[dict]
+    #: Every drafted ID a problem names, sorted: the whole of what the re-ask
+    #: may change. :func:`merge_retry` holds it to that.
+    repairable: list[str]
 
 
 def review(
@@ -1486,4 +1553,5 @@ def review(
         messages=list(problems.messages),
         roster=[draft.id for draft in shown],
         unreconciled=critic_view(drafts, system_model, only=problems.implicated),
+        repairable=sorted(problems.repairable),
     )
