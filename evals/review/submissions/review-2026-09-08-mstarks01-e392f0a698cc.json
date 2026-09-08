@@ -1,0 +1,67 @@
+{
+  "envelope": 1,
+  "submitted_by": "mstarks01",
+  "submitted_for": "anonymous",
+  "generated": "2026-09-08",
+  "cases": {
+    "01-payments-checkout": {
+      "own_list": [
+        "- The app is vulnerable to an entire class of cookie-related attacks.",
+        "- Password reuse and lack of MFA can lead to impersonation when one unrelated service is compromised.",
+        "- The Python service is listed as being in the core network and not a DMZ.",
+        "- The order service is vulnerable to spoofing and impersonation due to a weak trust relationship.",
+        "- The single application account leads to lack of accountability if the user info is not logged.",
+        "- The password stored in an environment variable is susceptible to being read in plain text.",
+        "- There may be an unauthenticated POST to a webhook which might accept other untrusted POSTS."
+      ],
+      "marks": {
+        "v5:d7731bcf75fc2c82": "agree",
+        "v5:70c5b3a170508da6": "agree",
+        "v5:fc4bfd0960ef198d": "agree",
+        "v5:866be3634c93ef90": "agree",
+        "v5:f7e8244bdd7f6c74": "agree",
+        "v5:93c07130842358fa": "agree",
+        "v5:b144a4c9d899ee0a": "agree",
+        "v5:652da28b442a26b3": "agree",
+        "v5:e8fe546c8e9c26fc": "agree",
+        "v5:92f4060d3b17d290": "agree",
+        "v5:6e370f89ee84d142": "agree",
+        "v5:20e842cab0beed53": "agree",
+        "v5:23df383ce237ff0e": "agree",
+        "v5:e8defbe46332e752": "agree",
+        "v5:c11d20aaca27918d": "agree",
+        "v5:26417fabecbcdf95": "agree",
+        "v5:24d318438f2b84c8": "agree",
+        "v5:aff9a2d34eaf1b79": "agree",
+        "v4:6500a06262a31a1f": "agree",
+        "v4:f9359ba8e162f344": "agree",
+        "v4:2f47011053e07b48": "agree",
+        "v4:4f140b4fdc4756f3": "agree",
+        "v4:1bb536caff886f09": "agree",
+        "v4:d6e8452ca410f55f": "agree",
+        "v4:8e1df5b65b166564": "agree",
+        "v4:d7b7b8eb3b4c68d2": "agree",
+        "v4:d8860a071c14255a": "agree",
+        "v4:db16495d7bc4f394": "agree",
+        "v4:b2b1372076d75638": "agree",
+        "v4:a960649290ed6a8b": "agree",
+        "v4:a30cabb85dbcb62c": "agree",
+        "v4:0510f11efb1c5b74": "agree",
+        "v4:df21ea8a3fef953a": "agree",
+        "v4:630e61e2b73c9bd6": "agree",
+        "v4:5d28d9bb65c150d1": "agree",
+        "v4:3982f85004e1a8db": "agree",
+        "v4:8dabf9b6b076e1a3": "agree",
+        "v4:4518271ab9139bf4": "agree"
+      },
+      "missing": [],
+      "notes": "",
+      "opened_digests": {
+        "source.md": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08",
+        "model.json": "2fa9366ef8b21225b9ac1919c0072acac8fc06b20efc91b55dd3fee50de16c06",
+        "claims/asvs.json": "7177bbb81fb27dd8df326913ca15a5afb40fdc0ced016b01e0c2dfb4a402a4dc",
+        "claims/stride.json": "82ab5d7ae542d7f9bf76f5023802247b1e0137a2ac9a6ad0b5acc2362993d815"
+      }
+    }
+  }
+}
