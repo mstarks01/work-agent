@@ -17,6 +17,7 @@ from analysis_service.api import (
 )
 from analysis_service.auth import AuthenticationError
 from analysis_service.budgets import BudgetPolicy
+from analysis_service.deployment import Deployment
 from analysis_service.errors import ConfigError
 from analysis_service.jobs import (
     InMemoryJobStore,
@@ -28,6 +29,7 @@ from analysis_service.jobs import (
     StubPipelineRunner,
 )
 from analysis_service.parsing import ascii_int
+from analysis_service.pipeline import AdkPipelineRunner
 from analysis_service.report import FrameworkName, Report
 from analysis_service.sources import Source, SourceLimits
 from analysis_service.validation import ValidationIssue
@@ -37,6 +39,7 @@ from tests.factories import (
     admit,
     sample_selection,
 )
+from tests.test_deployment import VERTEX_ENV
 from tests.test_parsing import ISDIGIT_TRAPS
 
 TOKENS = {"alice-token": "alice", "bob-token": "bob"}
@@ -185,6 +188,31 @@ class TestInjectedBoundsMustBeStated:
                 job_deadline_seconds=TEST_DEADLINE_SECONDS,
                 frameworks=DEFAULT_FRAMEWORKS,
             )
+
+
+class TestEveryCarriedPackageReachesARunner:
+    """The job route looks a runner up by the record's framework names alone.
+
+    #690 made that lookup validate each package's options over bare names, so
+    a job naming a package whose options require a field — an ASVS level —
+    could not build its graph at the route, and no test reached the seam.
+    This one does, through the app the route reads, against an offline
+    deployment: building the runner runs the build gates and no model.
+    """
+
+    def test_the_route_can_build_a_runner_for_every_carried_package(self):
+        deployment = Deployment.from_env(env=VERTEX_ENV)
+        app = create_app(
+            deployment=deployment, store=InMemoryJobStore(), verifier=FakeVerifier()
+        )
+        carried = tuple(deployment.frameworks)
+
+        runner = app.state.runner_for(carried)
+
+        assert isinstance(runner, AdkPipelineRunner)
+        # Memoized per selection: the second job naming the same frameworks
+        # shares the graph the first one built.
+        assert app.state.runner_for(carried) is runner
 
 
 class TestHealthAndAuth:
