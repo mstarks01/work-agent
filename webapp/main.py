@@ -86,10 +86,12 @@ The security posture is deliberate throughout:
   together as a :class:`~webapp.page.RenderedPage` and served through
   :func:`~webapp.page.response`, so serving HTML without its header is
   unspellable rather than merely discouraged.
-* ``nosniff`` and ``no-referrer`` on every response, HTML or not, applied by
-  :class:`~webapp.page.SecurityHeaders`. Content sniffing is what would let a
-  browser treat ``/example``'s ``text/plain`` prose as something else, and the
-  referrer policy keeps a run id out of outbound ``Referer`` headers.
+* ``nosniff``, ``no-referrer`` and ``no-store`` on every response, HTML or not,
+  applied by :class:`~webapp.page.SecurityHeaders`. Content sniffing is what
+  would let a browser treat ``/example``'s ``text/plain`` prose as something
+  else, the referrer policy keeps a run id out of outbound ``Referer`` headers,
+  and ``no-store`` keeps a page built by one process out of the cache a later
+  process serves into.
 """
 
 from __future__ import annotations
