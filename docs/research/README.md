@@ -24,6 +24,7 @@ same reason, so a lint cannot rewrite an artifact an ADR points at.
 | `transcript-exports.md` | #51 | 2026-07-31 | — |
 | `asvs-representation.md` + `asvs-l1-subjects.csv` | #160 | 2026-08-12 | — |
 | `system-model-evolution.md` + `probe_model_vocabulary.py` | #483 | 2026-09-04 | repo `8729415`, CycloneDX 1.7 |
+| `repository-evidence.md` | #484 | 2026-09-08 | repo `8085c43`, SARIF 2.1.0 errata 01, GitHub REST 2022-11-28 |
 
 ## The one staleness you must know about
 
