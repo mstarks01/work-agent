@@ -163,6 +163,13 @@ DECLARED: dict[str, str] = {
         "This code is ASVS's. It reads the ASVS catalog, and `FRAMEWORK` is"
         " declared once at the closed type rather than spelled per call."
     ),
+    "evals/harness/attribution.py": (
+        "This code is ASVS's, and explains the two rows `applicability.py`"
+        " produces. A framework whose claims name a catalog requirement lists"
+        " a scope entry per unit and a rejection per draft, which is what"
+        " makes the stage that lost a requirement readable. A framework whose"
+        " claim set is open has no unit to list, so no stage to charge."
+    ),
     "evals/harness/modes.py": (
         "EVAL_FRAMEWORKS is the fallback for a case declaring none; the sweep"
         " reads `case_frameworks()`. `merged_drafts` is a named accessor for"

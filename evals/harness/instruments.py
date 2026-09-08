@@ -51,6 +51,7 @@ from analysis_service.report import (
 )
 from evals.harness import (
     applicability,
+    attribution,
     coverage,
     critic_yield,
     filler,
@@ -380,6 +381,16 @@ INSTRUMENTS: dict[str, Instrument] = {
         ),
         frameworks=("asvs",),
         keys=("applicability_yield", "applicability_yield_aggregate"),
+    ),
+    "attribution": Instrument(
+        # ASVS's fourth per-case instrument: which stage lost each requirement
+        # the matrix or the routing scorer reports as wrong (#659). A closed
+        # claim set has a scope entry per unit and a rejection per draft, which
+        # is what makes the stage readable; an open set has neither.
+        render=lambda sweep: attribution.render(sweep.rows("attribution")),
+        artifact=lambda sweep: attribution.artifact(sweep.rows("attribution")),
+        frameworks=("asvs",),
+        keys=("attribution", "attribution_aggregate"),
     ),
     "scores": Instrument(
         render=lambda sweep: scorer.render(sweep.scores),

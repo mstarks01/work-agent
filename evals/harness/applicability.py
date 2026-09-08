@@ -47,6 +47,7 @@ from analysis_service.report import (
     ScopeEntry,
 )
 from analysis_service.sources import CARRIED_EVIDENCE_KINDS
+from evals.harness import attribution
 from evals.harness.reference import (
     DISPOSITION_FOR_EVIDENCE,
     CaseFramework,
@@ -1192,14 +1193,19 @@ def score_case(
     block it would still produce reports zero recall for a framework that
     correctly did nothing. The block's presence is that declaration.
     """
+    matrix = score_applicability(case, block)
+    # What the run told the submitter to do next, which the matrix above
+    # cannot see: a matched requirement is matched whether the report routed
+    # it to the right kind of evidence or to the wrong one (#471).
+    routing = score_dispositions(case, block)
     return {
-        "applicability": score_applicability(case, block),
-        # What the run told the submitter to do next, which the matrix above
-        # cannot see: a matched requirement is matched whether the report routed
-        # it to the right kind of evidence or to the wrong one (#471).
-        "disposition": score_dispositions(case, block),
+        "applicability": matrix,
+        "disposition": routing,
         # Both sides of this framework's critic, from the block the run already
         # produced: no second scoring pass, because both sides are
         # requirement identifiers.
         "applicability_yield": score_yield(case, block, drafts),
+        # Where each loss the two rows above report happened, read off the
+        # same block: a scope state, a rejection cause or a verdict (#659).
+        "attribution": attribution.attribute_case(case, block, matrix, routing),
     }
