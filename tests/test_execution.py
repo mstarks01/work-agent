@@ -11,14 +11,21 @@ exercised without a live call.
 from __future__ import annotations
 
 import asyncio
+from datetime import UTC, datetime
 
 import pytest
 from google.adk.sessions import InMemorySessionService
 
 from analysis_service import graph
-from analysis_service.execution import GraphExecutor, _NodeFinish
-from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
-from analysis_service.report import latency_by_node, usage_by_node
+from analysis_service.execution import GraphExecutor, GraphRun, _NodeFinish
+from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES, DraftThreat
+from analysis_service.report import (
+    InputRef,
+    Job,
+    Report,
+    latency_by_node,
+    usage_by_node,
+)
 from analysis_service.sampling import (
     TierSampling,
     load_sampling,
@@ -40,6 +47,7 @@ from tests.factories import (
     sample_fingerprint,
     sample_proposal,
     sample_ruling,
+    sample_selection,
     scripted_pipeline,
     served_route,
     valid_model,
@@ -530,3 +538,80 @@ class TestSessionCleanup:
         with pytest.raises(ValueError, match="Invalid JSON"):
             asyncio.run(scenario())
         assert self._sessions(service) == []
+
+
+class TestTheRunCompletesItself:
+    """One reader turns a Graph Run into a Report, for the service and the harness.
+
+    Each driver used to read the final state, stamp the re-ask count and call
+    ``into_report`` itself, so a fix to one reached the other by hand (#709).
+    The harness also read the graph's state keys raw. Both now ask the run.
+    """
+
+    @staticmethod
+    def job():
+        now = datetime.now(UTC)
+        return Job(
+            id="job-1", created_at=now, completed_at=now, frameworks=sample_selection()
+        )
+
+    @staticmethod
+    def input_ref():
+        return InputRef.of(
+            system_name="Test", sources=[Source.description(DESCRIPTION)]
+        )
+
+    def test_a_finished_run_reports_every_block_the_job_selected(self, graph_run):
+        pipeline, _ = scripted_pipeline(happy_replies())
+
+        report = graph_run.report(
+            job=self.job(), input_ref=self.input_ref(), pipeline=pipeline
+        )
+
+        assert isinstance(report, Report)
+        assert [block.framework for block in report.analyses] == ["stride"]
+        assert report.job.revise_rounds == 0
+
+    def test_the_re_ask_count_is_stamped_from_the_runs_own_nodes(self, graph_run):
+        """A driver that built the Job forgot the count; the run cannot."""
+        pipeline, _ = scripted_pipeline(happy_replies())
+        re_ask = graph_run.node_runs[-1].model_copy(
+            update={"node": graph.FrameworkNodes("stride").node(graph.RECRITIC_ROLE)}
+        )
+        run = GraphRun(
+            final_state=graph_run.final_state, node_runs=[*graph_run.node_runs, re_ask]
+        )
+
+        report = run.report(
+            job=self.job(), input_ref=self.input_ref(), pipeline=pipeline
+        )
+
+        assert isinstance(report, Report)
+        assert report.job.revise_rounds == 1
+
+    def test_a_run_that_reached_no_terminal_shape_is_the_drivers_to_name(self):
+        pipeline, _ = scripted_pipeline(happy_replies())
+        run = GraphRun(final_state={}, node_runs=[])
+
+        with pytest.raises(graph.GraphProducedNothing):
+            run.report(job=self.job(), input_ref=self.input_ref(), pipeline=pipeline)
+
+    def test_the_drafts_read_back_as_the_packages_own_record(self, graph_run):
+        (draft,) = graph_run.drafts_of("stride")
+
+        assert isinstance(draft, DraftThreat)
+        assert draft.id == "S-01"
+        assert not hasattr(draft, "verdict")
+
+    def test_a_framework_the_graph_never_fanned_in_has_no_drafts(self):
+        run = GraphRun(final_state={}, node_runs=[])
+
+        with pytest.raises(graph.GraphProducedNothing, match="no drafts"):
+            run.drafts_of("stride")
+
+    def test_the_proposals_are_each_lane_as_its_node_dumped_them(self, graph_run):
+        proposals = graph_run.proposals_of("stride")
+
+        assert set(proposals) == set(STRIDE_CATEGORIES)
+        assert [claim["sequence"] for claim in proposals["spoofing"]["claims"]] == [1]
+        assert proposals["tampering"]["claims"] == []

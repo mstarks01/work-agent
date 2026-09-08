@@ -373,7 +373,7 @@ and the selection seam are in place for all of them.
 | `analysis_service.sources` | `Source`: the untrusted text a job is built from, the per-deployment bounds both entry points enforce, and the fenced render that is the only way caller bytes reach a model (OWASP LLM01). |
 | `analysis_service.deployment` | One installation's config, resolved once: the files, the graph they configure, its runner and its certification gate. |
 | `analysis_service.pipeline` | `AdkPipelineRunner`: one job's identity, input digest and certification around a Graph Run. |
-| `analysis_service.execution` | Drives a built graph and stamps each node execution. Shared by the service and the eval harness. |
+| `analysis_service.execution` | Drives a built graph, stamps each node execution, and turns the finished run into its report or its rejection. Shared by the service and the eval harness. |
 | `analysis_service.graph` | Topology and node functions. |
 | `analysis_service.system_model` | Canonical model + validity helpers. |
 | `analysis_service.analysis` | Deterministic traversal of a validated model: flows, reachability, paths, unknown controls. No security claims. |

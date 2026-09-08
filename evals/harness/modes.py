@@ -35,7 +35,6 @@ from typing import Any
 from analysis_service.analysis import control_state, states_a_protocol
 from analysis_service.deployment import Deployment
 from analysis_service.execution import GraphExecutor, GraphRun
-from analysis_service.frameworks import PACKAGES
 from analysis_service.frameworks.stride.record import DraftThreat
 from analysis_service.graph import (
     ENTRY_EXTRACT,
@@ -45,12 +44,10 @@ from analysis_service.graph import (
     STATE_FRAMEWORK_OPTIONS,
     STATE_VALID_MODEL,
     Entry,
-    FrameworkNodes,
     GraphProducedNothing,
     ModelResolver,
     Pipeline,
     Rejected,
-    result_of,
 )
 from analysis_service.report import (
     Claim,
@@ -114,14 +111,11 @@ class ExtractionResult:
 class AnalysisRun:
     """A graph run's report, plus the draft union each critic was handed.
 
-    The drafts are read straight off each framework's ``merged_drafts`` in the
-    final session state, which is where
-    :func:`~analysis_service.graph.merge_drafts` parks them on the way into that
-    framework's critic — so this costs one extra state key per framework here and
-    no change to the production seam. Reading them back through **the package's
-    own record** rather than passing the raw dicts on keeps every scorer typed
-    against the shipped model, and revalidates on the way out of state exactly as
-    :func:`~analysis_service.graph.assemble_report` does.
+    The drafts are what each framework's fan-in parked on the way into that
+    framework's critic, read back through
+    :meth:`~analysis_service.execution.GraphRun.drafts_of` as **the package's
+    own record**, so every scorer stays typed against the shipped model and no
+    harness code spells a state key.
 
     ``drafts`` is keyed by framework because the drafts are: two frameworks'
     subgraphs never touch, each has its own fan-in and its own critic, and a
@@ -814,50 +808,36 @@ def _report_of(
     sweep's reports would carry no fingerprints and its certification verdict
     would be computed over nothing.
     """
-    state = graph_run.final_state
+    now = datetime.now(UTC)
     try:
-        result = result_of(state)
+        # Grading is per framework (#167), so a scorer reads its own package's
+        # drafts against its own reference set and two packages' records never
+        # meet. Read before the report, so a framework the graph never reached
+        # is named as such rather than as a report defect.
+        drafts = {
+            name: tuple(graph_run.drafts_of(name)) for name in pipeline.frameworks
+        }
+        proposals = {name: graph_run.proposals_of(name) for name in pipeline.frameworks}
+        result = graph_run.report(
+            job=Job(
+                id=f"eval-{case.id}",
+                created_at=now,
+                completed_at=now,
+                # Read off the built graph rather than restated, so the blocks
+                # answer the job's own selection exactly as the envelope
+                # requires; the case supplies only the options the graph does
+                # not carry.
+                frameworks=case_selections(case, pipeline),
+            ),
+            input_ref=InputRef.of(system_name=case.meta.title, sources=case.sources),
+            pipeline=pipeline,
+        )
     except GraphProducedNothing as exc:
         raise EvalRunError(f"{case.id}: {exc}") from exc
     if isinstance(result, Rejected):
         detail = "; ".join(f"{issue.code}: {issue.message}" for issue in result.issues)
         raise EvalRunError(f"{case.id}: the graph rejected the model: {detail}")
-    # Every framework the graph ran, each through its own state key. Grading is
-    # per framework (#167), so a scorer reads its own package's drafts against
-    # its own reference set and two packages' records never meet.
-    drafts: dict[FrameworkName, tuple[Claim, ...]] = {}
-    proposals: dict[FrameworkName, dict[str, Any]] = {}
-    for name in pipeline.frameworks:
-        nodes = FrameworkNodes(name)
-        key = nodes.key("drafts")
-        if key not in state:
-            raise EvalRunError(
-                f"{case.id}: graph produced a {name} analysis with no drafts"
-            )
-        record = PACKAGES[name].record
-        drafts[name] = tuple(record.model_validate(draft) for draft in state[key])
-        proposals[name] = {
-            lane.lane: state[lane.drafts_key]
-            for lane in nodes.lanes
-            if lane.drafts_key in state
-        }
-
-    now = datetime.now(UTC)
-    report = result.into_report(
-        job=Job(
-            id=f"eval-{case.id}",
-            created_at=now,
-            completed_at=now,
-            # Read off the built graph rather than restated, so the blocks
-            # answer the job's own selection exactly as the envelope requires;
-            # the case supplies only the options the graph does not carry.
-            frameworks=case_selections(case, pipeline),
-        ),
-        input_ref=InputRef.of(system_name=case.meta.title, sources=case.sources),
-        nodes=graph_run.node_runs,
-        pipeline=pipeline,
-    )
-    return AnalysisRun(report=report, drafts=drafts, proposals=proposals)
+    return AnalysisRun(report=result, drafts=drafts, proposals=proposals)
 
 
 MODE_ENTRIES: dict[str, Entry] = {
