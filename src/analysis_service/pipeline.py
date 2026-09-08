@@ -38,8 +38,6 @@ from analysis_service.graph import (
     GraphProducedNothing,
     Pipeline,
     Rejected,
-    result_of,
-    revise_rounds,
 )
 from analysis_service.jobs import (
     JobRecord,
@@ -140,7 +138,20 @@ class AdkPipelineRunner:
             on_node=on_node,
         )
         try:
-            result = result_of(graph_run.final_state)
+            result = graph_run.report(
+                job=Job(
+                    id=job.id,
+                    created_at=job.created_at,
+                    completed_at=datetime.now(UTC),
+                    # The selection as *submitted*, options and all, rather
+                    # than the graph's name list: the envelope checks the
+                    # blocks against this field, so recording what the job
+                    # asked for is what makes that check mean anything.
+                    frameworks=list(job.frameworks),
+                ),
+                input_ref=input_ref,
+                pipeline=self._pipeline,
+            )
         except GraphProducedNothing as exc:
             raise PipelineError(f"job {job.id}: {exc}") from exc
         if isinstance(result, Rejected):
@@ -148,27 +159,8 @@ class AdkPipelineRunner:
             # ran and were paid for, and this is the only path where that
             # measurement exists but no report will carry it.
             return PipelineRejected(issues=result.issues, nodes=graph_run.node_runs)
-
-        report = result.into_report(
-            job=Job(
-                id=job.id,
-                created_at=job.created_at,
-                completed_at=datetime.now(UTC),
-                # The selection as *submitted*, options and all, rather than the
-                # graph's name list: the envelope checks the blocks against this
-                # field, so recording what the job asked for is what makes that
-                # check mean anything.
-                frameworks=list(job.frameworks),
-                revise_rounds=revise_rounds(
-                    graph_run.node_runs, [entry.name for entry in job.frameworks]
-                ),
-            ),
-            input_ref=input_ref,
-            nodes=graph_run.node_runs,
-            pipeline=self._pipeline,
-        )
         return PipelineCompleted(
-            report=report, certification=self._certify(job, report)
+            report=result, certification=self._certify(job, result)
         )
 
     def _certify(self, job: JobRecord, report: Report) -> CertifyResult | None:

@@ -32,13 +32,27 @@ from google.adk.apps import App
 from google.adk.sessions import BaseSessionService, InMemorySessionService
 from google.genai import types
 
+from analysis_service.frameworks import package_for
 from analysis_service.graph import (
     STATE_INPUT_TEXT,
     STATE_SOURCE_TEXTS,
+    FrameworkNodes,
+    GraphProducedNothing,
     Pipeline,
+    Rejected,
+    result_of,
+    revise_rounds,
 )
 from analysis_service.identity import build_identity, execution_fingerprint
-from analysis_service.report import NodeRun, TokenUsage
+from analysis_service.report import (
+    Claim,
+    FrameworkName,
+    InputRef,
+    Job,
+    NodeRun,
+    Report,
+    TokenUsage,
+)
 from analysis_service.retry import ATTEMPTS_METADATA_KEY
 from analysis_service.sources import Source, render_sources
 from analysis_service.vendors import join_served
@@ -95,6 +109,72 @@ class GraphRun:
 
     final_state: dict[str, Any]
     node_runs: list[NodeRun]
+
+    def report(
+        self, *, job: Job, input_ref: InputRef, pipeline: Pipeline
+    ) -> Report | Rejected:
+        """This run as the report a driver returns, or the rejection it parked.
+
+        **One reader for both drivers.** The service over a job and the eval
+        harness over a corpus case each used to read the final state, decide
+        which terminal shape it held, stamp the re-ask count and call
+        :meth:`~analysis_service.graph.Analysis.into_report` themselves, and a
+        fix to one reader reached the other only by hand. What differs between
+        the two is what they *do* with a rejection, so that is what each keeps.
+
+        ``job`` carries the identity only a driver knows. Its ``revise_rounds``
+        is stamped here from this run's own node runs, because the count is a
+        fact about the drive rather than about the job, and a driver that
+        forgot it reported a clean run.
+
+        Raises :class:`~analysis_service.graph.GraphProducedNothing` when the
+        state holds neither terminal shape; each driver names the run it was
+        driving.
+        """
+        result = result_of(self.final_state)
+        if isinstance(result, Rejected):
+            return result
+        stamped = job.model_copy(
+            update={
+                "revise_rounds": revise_rounds(
+                    self.node_runs, [entry.name for entry in job.frameworks]
+                )
+            }
+        )
+        return result.into_report(
+            job=stamped, input_ref=input_ref, nodes=self.node_runs, pipeline=pipeline
+        )
+
+    def drafts_of(self, framework: FrameworkName) -> list[Claim]:
+        """The drafts this framework's fan-in parked for its critic.
+
+        Revalidated as the package's own record, the way the assemble node
+        reads them, so a scorer stays typed against the shipped model. A
+        framework whose subgraph ran wrote the key; one with no drafts key is a
+        graph that never reached this framework's fan-in, which is the
+        driver's defect rather than an empty analysis.
+        """
+        key = FrameworkNodes(framework).key("drafts")
+        if key not in self.final_state:
+            raise GraphProducedNothing(
+                f"graph produced a {framework} analysis with no drafts"
+            )
+        record = package_for(framework).record
+        return [record.model_validate(draft) for draft in self.final_state[key]]
+
+    def proposals_of(self, framework: FrameworkName) -> dict[str, Any]:
+        """Each lane's emission as its node dumped it, before the fan-in.
+
+        A draft no longer carries the lane's own answer to *what would settle
+        this*; the fan-in strips it once it has routed the proposal. A lane
+        that wrote no key contributes nothing here rather than failing, because
+        that absence is the fan-in's to refuse.
+        """
+        return {
+            lane.lane: self.final_state[lane.drafts_key]
+            for lane in FrameworkNodes(framework).lanes
+            if lane.drafts_key in self.final_state
+        }
 
 
 class GraphExecutor:
