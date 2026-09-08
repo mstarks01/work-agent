@@ -113,6 +113,7 @@ def test_security_headers_and_a_policy_ride_on_every_page(client):
         response = app.get(path)
         assert response.headers["X-Content-Type-Options"] == "nosniff"
         assert response.headers["Referrer-Policy"] == "no-referrer"
+        assert response.headers["Cache-Control"] == "no-store"
         policy = response.headers["Content-Security-Policy"]
         assert "default-src 'none'" in policy
         assert "'unsafe-inline'" not in policy
