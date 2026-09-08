@@ -25,8 +25,6 @@ Roughly an hour.
 
 ### System description (description)
 
-Exactly what the service would receive.
-
 > Nightly partner data pipeline.
 >
 > Three insurance partners drop a daily extract for us. They push files into a
@@ -134,25 +132,25 @@ on either of them. That is the finding this sitting exists for.
 
 **1.** An attacker who obtains a partner's never-rotated static SFTP key uploads extracts as that partner.
 
-- cites: `flow:insurance-partner-to-landing-bucket:push-daily-extract`, `entity:insurance-partner`
-- tier: must-find · severity: medium/high · verb: `impersonate`
-- recorded note: Long-lived shared secret held by a third party; the primary identity weakness on the ingest path.
+- `flow:insurance-partner-to-landing-bucket:push-daily-extract`, `entity:insurance-partner`
+- severity: medium/high · verb: `impersonate`
+- Long-lived shared secret held by a third party; the primary identity weakness on the ingest path.
 
 > mark:
 
 **2.** An attacker deposits a file into another partner's folder and the scheduler processes it as that partner's extract, because it never checks the depositor.
 
-- cites: `process:ingest-scheduler`, `store:landing-bucket`
-- tier: must-find · severity: medium/high · verb: `plant`
-- recorded note: Stated absence, not an unknown: the source says the check does not happen. Attribution of data to a source is the whole point of the folder layout.
+- `process:ingest-scheduler`, `store:landing-bucket`
+- severity: medium/high · verb: `plant`
+- Stated absence, not an unknown: the source says the check does not happen. Attribution of data to a source is the whole point of the folder layout.
 
 > mark:
 
 **3.** An attacker submits a transform run impersonating the scheduler, since authentication on the trigger path is unverified.
 
-- cites: `flow:ingest-scheduler-to-transform-job:trigger-transform`
-- tier: expected · severity: low/medium · verb: `impersonate`
-- recorded note: Crosses landing into warehouse with unknown authentication.
+- `flow:ingest-scheduler-to-transform-job:trigger-transform`
+- severity: low/medium · verb: `impersonate`
+- Crosses landing into warehouse with unknown authentication.
 
 > mark:
 
@@ -161,25 +159,25 @@ on either of them. That is the finding this sitting exists for.
 
 **4.** An attacker who can write to the landing bucket alters claim records before the nightly run, and only the schema is checked before they reach the warehouse.
 
-- cites: `store:landing-bucket`, `process:transform-job`
-- tier: must-find · severity: medium/high · verb: `alter`
-- recorded note: Content validation is stated as absent; the case's headline integrity finding.
+- `store:landing-bucket`, `process:transform-job`
+- severity: medium/high · verb: `alter`
+- Content validation is stated as absent; the case's headline integrity finding.
 
 > mark:
 
 **5.** An attacker who can write to the Airflow metadata database rewrites a connection string to redirect the pipeline to infrastructure they control.
 
-- cites: `store:airflow-metadata-db`, `flow:ingest-scheduler-to-airflow-metadata-db:read-connections`
-- tier: expected · severity: low/high · verb: `alter`
-- recorded note: The metadata database is a control plane, not just a data store — worth its own finding.
+- `store:airflow-metadata-db`, `flow:ingest-scheduler-to-airflow-metadata-db:read-connections`
+- severity: low/high · verb: `alter`
+- The metadata database is a control plane, not just a data store — worth its own finding.
 
 > mark:
 
 **6.** An attacker who compromises the transform job writes fabricated claim rows into the warehouse alongside genuine ones.
 
-- cites: `store:claims-warehouse`, `flow:transform-job-to-claims-warehouse:load-records`
-- tier: expected · severity: low/high · verb: `forge`
-- recorded note: The load path has unverified authentication and no downstream reconciliation.
+- `store:claims-warehouse`, `flow:transform-job-to-claims-warehouse:load-records`
+- severity: low/high · verb: `forge`
+- The load path has unverified authentication and no downstream reconciliation.
 
 > mark:
 
@@ -188,17 +186,17 @@ on either of them. That is the finding this sitting exists for.
 
 **7.** A partner denies having sent an extract and nothing binds a landed file to the key that uploaded it.
 
-- cites: `store:landing-bucket`, `entity:insurance-partner`
-- tier: must-find · severity: medium/medium · verb: `unattributable`
-- recorded note: Direct consequence of the unchecked depositor: provenance exists only as folder convention.
+- `store:landing-bucket`, `entity:insurance-partner`
+- severity: medium/medium · verb: `unattributable`
+- Direct consequence of the unchecked depositor: provenance exists only as folder convention.
 
 > mark:
 
 **8.** A dispute over a warehouse row cannot be traced back to the extract it came from, because no lineage from file to loaded record is described.
 
-- cites: `store:claims-warehouse`, `process:transform-job`
-- tier: expected · severity: medium/medium · verb: `unattributable`
-- recorded note: Batch pipelines lose attribution at the normalization step unless it is deliberately carried.
+- `store:claims-warehouse`, `process:transform-job`
+- severity: medium/medium · verb: `unattributable`
+- Batch pipelines lose attribution at the normalization step unless it is deliberately carried.
 
 > mark:
 
@@ -207,33 +205,33 @@ on either of them. That is the finding this sitting exists for.
 
 **9.** An analyst who needs only aggregate figures reads member names and dates of birth, because the grant covers the whole dataset.
 
-- cites: `store:claims-warehouse`, `flow:data-analyst-to-claims-warehouse:run-queries`
-- tier: must-find · severity: high/high · verb: `abuse-grant`
-- recorded note: Stated absence of column-level restriction over health data; the highest-likelihood disclosure in the model.
+- `store:claims-warehouse`, `flow:data-analyst-to-claims-warehouse:run-queries`
+- severity: high/high · verb: `abuse-grant`
+- Stated absence of column-level restriction over health data; the highest-likelihood disclosure in the model.
 
 > mark:
 
 **10.** An attacker who reaches the Airflow metadata database recovers every partner key and connection string it holds, since its protection at rest is unverified.
 
-- cites: `store:airflow-metadata-db`
-- tier: must-find · severity: medium/high · verb: `recover-credential`
-- recorded note: Single store concentrating credentials for the entire ingest path.
+- `store:airflow-metadata-db`
+- severity: medium/high · verb: `recover-credential`
+- Single store concentrating credentials for the entire ingest path.
 
 > mark:
 
 **11.** An attacker who reaches the landing bucket's storage reads raw partner extracts, whose protection at rest is unverified.
 
-- cites: `store:landing-bucket`
-- tier: expected · severity: medium/high · verb: `read`
-- recorded note: The source explicitly flags this as unknown and on defaults; needs-info is an acceptable verdict.
+- `store:landing-bucket`
+- severity: medium/high · verb: `read`
+- The source explicitly flags this as unknown and on defaults; needs-info is an acceptable verdict.
 
 > mark:
 
 **12.** An attacker observing the load path reads claim records in transit, because transport encryption on it is unverified.
 
-- cites: `flow:transform-job-to-claims-warehouse:load-records`
-- tier: expected · severity: low/high · verb: `intercept`
-- recorded note: Intra-zone, so lower likelihood than the crossing flows.
+- `flow:transform-job-to-claims-warehouse:load-records`
+- severity: low/high · verb: `intercept`
+- Intra-zone, so lower likelihood than the crossing flows.
 
 > mark:
 
@@ -242,17 +240,17 @@ on either of them. That is the finding this sitting exists for.
 
 **13.** An attacker deposits an enormous or malformed file that consumes the nightly window and prevents genuine extracts from being processed.
 
-- cites: `store:landing-bucket`, `process:ingest-scheduler`
-- tier: must-find · severity: medium/medium · verb: `flood`
-- recorded note: The batch shape is the vulnerability: a missed window is a lost day, not a slow request.
+- `store:landing-bucket`, `process:ingest-scheduler`
+- severity: medium/medium · verb: `flood`
+- The batch shape is the vulnerability: a missed window is a lost day, not a slow request.
 
 > mark:
 
 **14.** An attacker crafts input that makes the transform job fail repeatedly, leaving the warehouse stale without any request-level error surfacing.
 
-- cites: `process:transform-job`, `store:claims-warehouse`
-- tier: expected · severity: medium/medium · verb: `disable`
-- recorded note: Silent staleness rather than visible downtime — the failure mode analysts under-report on pipelines.
+- `process:transform-job`, `store:claims-warehouse`
+- severity: medium/medium · verb: `disable`
+- Silent staleness rather than visible downtime — the failure mode analysts under-report on pipelines.
 
 > mark:
 
@@ -261,25 +259,25 @@ on either of them. That is the finding this sitting exists for.
 
 **15.** An attacker with a foothold in the landing network reads the metadata database and escalates to every credential the pipeline holds.
 
-- cites: `store:airflow-metadata-db`, `process:ingest-scheduler`
-- tier: must-find · severity: medium/high · verb: `escalate`
-- recorded note: Escalation framing of the credential concentration: one foothold to all downstream systems.
+- `store:airflow-metadata-db`, `process:ingest-scheduler`
+- severity: medium/high · verb: `escalate`
+- Escalation framing of the credential concentration: one foothold to all downstream systems.
 
 > mark:
 
 **16.** An attacker who can plant a file in the landing bucket gains execution in the warehouse network through the job it triggers.
 
-- cites: `process:transform-job`, `flow:ingest-scheduler-to-transform-job:trigger-transform`
-- tier: must-find · severity: medium/high · verb: `escalate`
-- recorded note: Data crossing into a compute zone that acts on it is the boundary crossing that matters here.
+- `process:transform-job`, `flow:ingest-scheduler-to-transform-job:trigger-transform`
+- severity: medium/high · verb: `escalate`
+- Data crossing into a compute zone that acts on it is the boundary crossing that matters here.
 
 > mark:
 
 **17.** An analyst uses their dataset-wide grant to reach claim data belonging to partners outside their remit.
 
-- cites: `entity:data-analyst`, `store:claims-warehouse`
-- tier: expected · severity: medium/medium · verb: `abuse-grant`
-- recorded note: Authorization scope, distinct from the disclosure entry about which columns are readable.
+- `entity:data-analyst`, `store:claims-warehouse`
+- severity: medium/medium · verb: `abuse-grant`
+- Authorization scope, distinct from the disclosure entry about which columns are readable.
 
 > mark:
 

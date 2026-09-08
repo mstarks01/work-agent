@@ -118,7 +118,8 @@ function records(into, c) {
           rec.label + ". " + (rec.identifier ? rec.identifier + " — " : "") + rec.title));
         for (const row of rec.fields)
           card.appendChild(el("div", "meta",
-            row.map(f => f.label + ": " + f.values.join(", ")).join(" · ")));
+            row.map(f => (f.label ? f.label + ": " : "") + f.values.join(", "))
+               .join(" · ")));
         if (target) {
           const marks = el("div", "marks");
           for (const mark of DATA.marks) {

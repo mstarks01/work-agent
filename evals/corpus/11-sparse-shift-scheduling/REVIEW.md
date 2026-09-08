@@ -25,8 +25,6 @@ Roughly an hour.
 
 ### System description (description)
 
-Exactly what the service would receive.
-
 > Colleague shift scheduling tool.
 >
 > Store managers use a scheduling web app to build the weekly rota for their
@@ -122,9 +120,8 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A1.** `V1.2.4` — The scheduling service reads and writes the rota database and nothing says how its queries are built.
 
-- cites: `process:scheduling-service`, `store:rota-database`, `flow:scheduling-service-to-rota-database:read-write-rotas`
-- tier: must-find
-- recorded note: A process reaching a store; query construction unstated.
+- `process:scheduling-service`, `store:rota-database`, `flow:scheduling-service-to-rota-database:read-write-rotas`
+- A process reaching a store; query construction unstated.
 
 > mark:
 
@@ -133,9 +130,8 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A2.** `V3.3.1` — Colleagues reach the scheduling web app from their own phones and no cookie attribute is stated.
 
-- cites: `entity:colleague`, `process:scheduling-web-app`, `flow:colleague-to-scheduling-web-app:view-shifts`
-- tier: expected
-- recorded note: The source says nobody documented how colleagues or managers sign in, which is the silence this requirement lands in. The attribute is set by whatever emits Set-Cookie, which is the application or the layer in front of it, so either route settles it.
+- `entity:colleague`, `process:scheduling-web-app`, `flow:colleague-to-scheduling-web-app:view-shifts`
+- The source says nobody documented how colleagues or managers sign in, which is the silence this requirement lands in. The attribute is set by whatever emits Set-Cookie, which is the application or the layer in front of it, so either route settles it.
 
 > mark:
 
@@ -144,9 +140,8 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A3.** `V6.1.1` — The input carries no documentation of rate limiting or anti-automation for a sign-in reachable from colleagues' own phones.
 
-- cites: `process:scheduling-web-app`
-- tier: must-find
-- recorded note: The source states the gap outright: nobody has written down how colleagues or managers sign in.
+- `process:scheduling-web-app`
+- The source states the gap outright: nobody has written down how colleagues or managers sign in.
 
 > mark:
 
@@ -155,9 +150,8 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A4.** `V7.2.1` — Nothing says where a colleague's session token is verified, or that a trusted backend does it.
 
-- cites: `process:scheduling-web-app`, `process:scheduling-service`
-- tier: expected
-- recorded note: The web app holds no rota data of its own, so the verification point is a real question the input does not answer.
+- `process:scheduling-web-app`, `process:scheduling-service`
+- The web app holds no rota data of its own, so the verification point is a real question the input does not answer.
 
 > mark:
 
@@ -166,17 +160,15 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A5.** `V8.1.1` — The input carries no authorization documentation separating what a store manager may do from what a colleague may do.
 
-- cites: `process:scheduling-web-app`, `process:scheduling-service`
-- tier: expected
-- recorded note: Documentation requirement; both roles reach the same app.
+- `process:scheduling-web-app`, `process:scheduling-service`
+- Documentation requirement; both roles reach the same app.
 
 > mark:
 
 **A6.** `V8.2.2` — Colleagues view their own shifts and managers build their own store's rota, and nothing restricts either to their own data.
 
-- cites: `entity:colleague`, `entity:store-manager`, `process:scheduling-service`, `store:rota-database`
-- tier: must-find
-- recorded note: Two roles over one store of colleague names, contact details and availability. Data-specific access is the requirement and nothing settles it.
+- `entity:colleague`, `entity:store-manager`, `process:scheduling-service`, `store:rota-database`
+- Two roles over one store of colleague names, contact details and availability. Data-specific access is the requirement and nothing settles it.
 
 > mark:
 
@@ -185,9 +177,8 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A7.** `V12.2.1` — Colleagues reach the web app from their own phones and the source says nobody documented whether any of it is encrypted.
 
-- cites: `entity:colleague`, `process:scheduling-web-app`, `flow:colleague-to-scheduling-web-app:view-shifts`
-- tier: must-find
-- recorded note: The case that made #219 concrete: the app is stated to be a web app and its transport is stated to be unrecorded. The requirement applies for the first fact and is unsettled by the second.
+- `entity:colleague`, `process:scheduling-web-app`, `flow:colleague-to-scheduling-web-app:view-shifts`
+- The case that made #219 concrete: the app is stated to be a web app and its transport is stated to be unrecorded. The requirement applies for the first fact and is unsettled by the second.
 
 > mark:
 
@@ -196,9 +187,8 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A8.** `V14.2.1` — Colleague contact details and availability move through the app and nothing says they stay out of URLs and query strings.
 
-- cites: `process:scheduling-web-app`, `store:rota-database`
-- tier: expected
-- recorded note: The store is named as holding the data; the transport detail is unstated.
+- `process:scheduling-web-app`, `store:rota-database`
+- The store is named as holding the data; the transport detail is unstated.
 
 > mark:
 
@@ -222,33 +212,33 @@ on either of them. That is the finding this sitting exists for.
 
 **1.** An attacker signs in to the scheduling web app as a colleague and reads that colleague's shifts and details, because how colleagues are authenticated is unverified.
 
-- cites: `flow:colleague-to-scheduling-web-app:view-shifts`, `entity:colleague`
-- tier: must-find · severity: medium/medium · verb: `impersonate`
-- recorded note: The source explicitly says nobody has documented how colleagues sign in. needs-info is the right verdict here; silence is not.
+- `flow:colleague-to-scheduling-web-app:view-shifts`, `entity:colleague`
+- severity: medium/medium · verb: `impersonate`
+- The source explicitly says nobody has documented how colleagues sign in. needs-info is the right verdict here; silence is not.
 
 > mark:
 
 **2.** An attacker signs in as a store manager and builds that store's rota, because how managers are authenticated is unverified.
 
-- cites: `flow:store-manager-to-scheduling-web-app:build-rota`, `entity:store-manager`
-- tier: must-find · severity: medium/high · verb: `impersonate`
-- recorded note: Same unknown as the colleague lane but a materially higher impact, which is why the two are kept as separate references rather than one.
+- `flow:store-manager-to-scheduling-web-app:build-rota`, `entity:store-manager`
+- severity: medium/high · verb: `impersonate`
+- Same unknown as the colleague lane but a materially higher impact, which is why the two are kept as separate references rather than one.
 
 > mark:
 
 **3.** An attacker presents itself to the file share as the payroll system and collects the weekly payroll export, since how the share identifies a collector is unverified.
 
-- cites: `flow:payroll-system-to-file-share:collect-payroll-export`, `store:file-share`
-- tier: must-find · severity: medium/high · verb: `impersonate`
-- recorded note: This is the boundary crossing the source draws most clearly and says least about. The payroll team environment is a zone we are told nothing else about.
+- `flow:payroll-system-to-file-share:collect-payroll-export`, `store:file-share`
+- severity: medium/high · verb: `impersonate`
+- This is the boundary crossing the source draws most clearly and says least about. The payroll team environment is a zone we are told nothing else about.
 
 > mark:
 
 **4.** An attacker on the internal network calls the scheduling service while claiming to be the web app, because how the two identify each other is unverified.
 
-- cites: `flow:scheduling-web-app-to-scheduling-service:rota-requests`
-- tier: expected · severity: medium/high · verb: `impersonate`
-- recorded note: Stated as undocumented in the closing paragraph, which is the sentence most likely to be dropped in extraction.
+- `flow:scheduling-web-app-to-scheduling-service:rota-requests`
+- severity: medium/high · verb: `impersonate`
+- Stated as undocumented in the closing paragraph, which is the sentence most likely to be dropped in extraction.
 
 > mark:
 
@@ -257,25 +247,25 @@ on either of them. That is the finding this sitting exists for.
 
 **5.** An attacker alters the payroll export while it sits on the file share, so the payroll system collects hours nobody worked.
 
-- cites: `store:file-share`, `flow:payroll-system-to-file-share:collect-payroll-export`
-- tier: must-find · severity: medium/high · verb: `alter`
-- recorded note: The export rests unattended between two independent trust zones, and nothing states any integrity control over it. This is the case's strongest finding.
+- `store:file-share`, `flow:payroll-system-to-file-share:collect-payroll-export`
+- severity: medium/high · verb: `alter`
+- The export rests unattended between two independent trust zones, and nothing states any integrity control over it. This is the case's strongest finding.
 
 > mark:
 
 **6.** An attacker who reaches the rota database changes rota entries directly, bypassing whatever the scheduling service enforces.
 
-- cites: `store:rota-database`, `flow:scheduling-service-to-rota-database:read-write-rotas`
-- tier: expected · severity: low/high · verb: `alter`
-- recorded note: Reaching the store and modifying it is a distinct claim from reading it; the pair is deliberately split across lanes.
+- `store:rota-database`, `flow:scheduling-service-to-rota-database:read-write-rotas`
+- severity: low/high · verb: `alter`
+- Reaching the store and modifying it is a distinct claim from reading it; the pair is deliberately split across lanes.
 
 > mark:
 
 **7.** An attacker positioned between a manager's device and the web app modifies rota changes in flight, because whether the traffic is encrypted is unverified.
 
-- cites: `flow:store-manager-to-scheduling-web-app:build-rota`
-- tier: expected · severity: low/medium · verb: `alter-in-transit`
-- recorded note: Encryption in transit is stated as undocumented, not as absent; an analyst asserting there is no TLS here is unsupported.
+- `flow:store-manager-to-scheduling-web-app:build-rota`
+- severity: low/medium · verb: `alter-in-transit`
+- Encryption in transit is stated as undocumented, not as absent; an analyst asserting there is no TLS here is unsupported.
 
 > mark:
 
@@ -284,17 +274,17 @@ on either of them. That is the finding this sitting exists for.
 
 **8.** A store manager denies having made a rota change that disadvantaged a colleague, and nothing in the model records who changed what.
 
-- cites: `process:scheduling-service`, `flow:store-manager-to-scheduling-web-app:build-rota`
-- tier: must-find · severity: medium/medium · verb: `unattributable`
-- recorded note: No log or audit store appears anywhere in the source. Absence of a logging element is a legitimate repudiation finding; absence of a stated control is not.
+- `process:scheduling-service`, `flow:store-manager-to-scheduling-web-app:build-rota`
+- severity: medium/medium · verb: `unattributable`
+- No log or audit store appears anywhere in the source. Absence of a logging element is a legitimate repudiation finding; absence of a stated control is not.
 
 > mark:
 
 **9.** Nobody can establish who collected a given payroll export from the file share, because no record of collections exists in the model.
 
-- cites: `flow:payroll-system-to-file-share:collect-payroll-export`, `store:file-share`
-- tier: expected · severity: medium/medium · verb: `unattributable`
-- recorded note: Pairs with the spoofing claim on the same flow: one is getting in as payroll, this one is that nothing afterwards distinguishes them.
+- `flow:payroll-system-to-file-share:collect-payroll-export`, `store:file-share`
+- severity: medium/medium · verb: `unattributable`
+- Pairs with the spoofing claim on the same flow: one is getting in as payroll, this one is that nothing afterwards distinguishes them.
 
 > mark:
 
@@ -303,25 +293,25 @@ on either of them. That is the finding this sitting exists for.
 
 **10.** An attacker reads colleague names, contact details and availability from the rota database, because whether it is encrypted at rest is unverified.
 
-- cites: `store:rota-database`
-- tier: must-find · severity: medium/high · verb: `read`
-- recorded note: The source states what the data is but never classifies it. The pii tag comes from the content, and data_classification stays unknown; a case that conflates the two is exactly what this case is here to catch.
+- `store:rota-database`
+- severity: medium/high · verb: `read`
+- The source states what the data is but never classifies it. The pii tag comes from the content, and data_classification stays unknown; a case that conflates the two is exactly what this case is here to catch.
 
 > mark:
 
 **11.** An attacker with access to the file share reads a whole store's payroll export in one file.
 
-- cites: `store:file-share`, `flow:scheduling-service-to-file-share:write-payroll-export`
-- tier: must-find · severity: medium/high · verb: `read`
-- recorded note: Aggregation is the point: the export concentrates in one artifact what the database holds per colleague.
+- `store:file-share`, `flow:scheduling-service-to-file-share:write-payroll-export`
+- severity: medium/high · verb: `read`
+- Aggregation is the point: the export concentrates in one artifact what the database holds per colleague.
 
 > mark:
 
 **12.** An attacker on the network path between a colleague's phone and the web app reads that colleague's shifts and details in transit.
 
-- cites: `flow:colleague-to-scheduling-web-app:view-shifts`
-- tier: expected · severity: low/medium · verb: `intercept`
-- recorded note: The one flow that leaves the internal network on the colleague side, with encryption explicitly undocumented.
+- `flow:colleague-to-scheduling-web-app:view-shifts`
+- severity: low/medium · verb: `intercept`
+- The one flow that leaves the internal network on the colleague side, with encryption explicitly undocumented.
 
 > mark:
 
@@ -330,17 +320,17 @@ on either of them. That is the finding this sitting exists for.
 
 **13.** An attacker floods the scheduling web app so managers cannot build rotas and colleagues cannot see their shifts.
 
-- cites: `process:scheduling-web-app`
-- tier: expected · severity: medium/medium · verb: `flood`
-- recorded note: The web app is the one process the model infers to be reachable from outside, and that inference is recorded as an assumption rather than asserted.
+- `process:scheduling-web-app`
+- severity: medium/medium · verb: `flood`
+- The web app is the one process the model infers to be reachable from outside, and that inference is recorded as an assumption rather than asserted.
 
 > mark:
 
 **14.** An attacker prevents the weekly export from reaching the file share, so a pay run happens with no hours for a store.
 
-- cites: `store:file-share`, `process:scheduling-service`
-- tier: must-find · severity: low/high · verb: `disable`
-- recorded note: A weekly batch with a deadline behind it fails differently from a request path: the damage is a missed pay run, not slow pages.
+- `store:file-share`, `process:scheduling-service`
+- severity: low/high · verb: `disable`
+- A weekly batch with a deadline behind it fails differently from a request path: the damage is a missed pay run, not slow pages.
 
 > mark:
 
@@ -349,17 +339,17 @@ on either of them. That is the finding this sitting exists for.
 
 **15.** A colleague uses the shared app to build or change a rota as though they were a store manager, because the separation between the two roles is unverified.
 
-- cites: `process:scheduling-web-app`, `flow:colleague-to-scheduling-web-app:view-shifts`
-- tier: must-find · severity: medium/high · verb: `abuse-grant`
-- recorded note: Both roles are stated to use the same app, and no authorization rule between them is stated anywhere. This is the finding that follows from the shared-app fact rather than from any missing control.
+- `process:scheduling-web-app`, `flow:colleague-to-scheduling-web-app:view-shifts`
+- severity: medium/high · verb: `abuse-grant`
+- Both roles are stated to use the same app, and no authorization rule between them is stated anywhere. This is the finding that follows from the shared-app fact rather than from any missing control.
 
 > mark:
 
 **16.** An attacker on the internal network calls the scheduling service directly and performs rota writes the web app would not have allowed.
 
-- cites: `process:scheduling-service`, `flow:scheduling-web-app-to-scheduling-service:rota-requests`
-- tier: expected · severity: low/high · verb: `escalate`
-- recorded note: The service is where writes actually happen, which the source says outright; whether it re-checks anything the app checked is undocumented.
+- `process:scheduling-service`, `flow:scheduling-web-app-to-scheduling-service:rota-requests`
+- severity: low/high · verb: `escalate`
+- The service is where writes actually happen, which the source says outright; whether it re-checks anything the app checked is undocumented.
 
 > mark:
 
