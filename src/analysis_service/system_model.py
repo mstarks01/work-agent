@@ -248,6 +248,28 @@ def attribute_names(element: Element) -> tuple[str, ...]:
     )
 
 
+def all_attribute_names() -> tuple[str, ...]:
+    """Every security-relevant attribute any element type declares, sorted.
+
+    The union of :func:`attribute_names` over the five element classes, read
+    off the classes so it moves with them. It is what a provider-facing schema
+    may list where a field names an attribute: a critic constrained to this
+    list cannot spell ``description`` or ``notes``, which are identity fields
+    and never a place a fact lives, and the per-type check at the review seam
+    still decides whether the named attribute belongs to the named element.
+    """
+    return tuple(
+        sorted(
+            {
+                name
+                for element_type in get_args(Element)
+                for name in element_type.model_fields
+                if name not in _Element.model_fields
+            }
+        )
+    )
+
+
 def assumable_attributes(element: Element) -> tuple[str, ...]:
     """Every field an **Assumption** may name, derived from the schema.
 

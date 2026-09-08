@@ -1346,6 +1346,116 @@ def test_a_clean_first_pass_records_nothing():
     assert marks.unreconciled_rulings == []
 
 
+def _second_look(ctx, drafts, retry_rulings):
+    """The re-ask returned; run the router again over the same parked state."""
+    ctx.state[NODES.key("reviewed")] = {
+        "claims": [ruling.model_dump(mode="json") for ruling in retry_rulings]
+    }
+    return graph.route_review(valid_model().model_dump(mode="json"), ctx, KEYS, NODES)
+
+
+def _reviewed_verdicts(ctx) -> dict[str, str]:
+    return {
+        ruling["id"]: ruling["verdict"]["status"]
+        for ruling in ctx.state[NODES.key("reviewed")]["claims"]
+    }
+
+
+def test_a_re_ask_may_change_only_the_rulings_the_problems_named():
+    """The retry prompt says to carry every other ruling across byte-identical,
+    and nothing enforced it: the two passes wrote one key and the check read
+    the drafts, never the first pass. A re-ask that repaired the dropped draft
+    and also flipped a confirmed ruling to rejected was accepted whole (#659)."""
+    drafts = [sample_draft("S-01"), sample_draft("T-01", category="tampering")]
+    ctx = FakeContext()
+    first = route(
+        valid_model().model_dump(mode="json"),
+        [draft.model_dump(mode="json") for draft in drafts],
+        ctx,
+        reviewed_threats={"claims": [sample_ruling("S-01").model_dump(mode="json")]},
+    )
+    assert first.actions.route == graph.ROUTE_REVISE
+    assert ctx.state[NODES.key("repairable")] == ["T-01"]
+
+    flipped = sample_ruling(
+        "S-01",
+        verdict=Verdict(
+            status="rejected", reason="re-decided", rejected_because="reasoning"
+        ),
+    )
+    second = _second_look(ctx, drafts, [flipped, sample_ruling("T-01")])
+
+    assert second.actions.route == graph.ROUTE_ACCEPT
+    assert _reviewed_verdicts(ctx) == {"S-01": "confirmed", "T-01": "confirmed"}
+    marks = AnalysisMarks.model_validate(ctx.state[NODES.key("marks")])
+    assert any(
+        "changed ruling 'S-01'" in message for message in marks.unreconciled_rulings
+    )
+    # The first pass's own problem stays on record beside the drift.
+    assert any("T-01" in message for message in marks.unreconciled_rulings)
+
+
+def test_a_re_ask_that_repairs_only_what_was_named_leaves_no_drift_mark():
+    drafts = [sample_draft("S-01"), sample_draft("T-01", category="tampering")]
+    ctx = FakeContext()
+    route(
+        valid_model().model_dump(mode="json"),
+        [draft.model_dump(mode="json") for draft in drafts],
+        ctx,
+        reviewed_threats={"claims": [sample_ruling("S-01").model_dump(mode="json")]},
+    )
+
+    second = _second_look(ctx, drafts, [sample_ruling("S-01"), sample_ruling("T-01")])
+
+    assert second.actions.route == graph.ROUTE_ACCEPT
+    marks = AnalysisMarks.model_validate(ctx.state[NODES.key("marks")])
+    assert [m for m in marks.unreconciled_rulings if "re-ask" in m] == []
+
+
+def test_an_invented_ruling_in_the_re_ask_still_fails_the_second_look():
+    """The merge resolves what the first pass got right; it does not excuse a
+    re-ask that invents. That stays the loud failure it always was."""
+    drafts = [sample_draft("S-01"), sample_draft("T-01", category="tampering")]
+    ctx = FakeContext()
+    route(
+        valid_model().model_dump(mode="json"),
+        [draft.model_dump(mode="json") for draft in drafts],
+        ctx,
+        reviewed_threats={"claims": [sample_ruling("S-01").model_dump(mode="json")]},
+    )
+
+    second = _second_look(
+        ctx,
+        drafts,
+        [sample_ruling("S-01"), sample_ruling("T-01"), sample_ruling("X-99")],
+    )
+
+    assert second.actions.route == graph.ROUTE_REVISE
+    assert "X-99" in ctx.state[NODES.key("critic_issues")]
+
+
+def test_a_duplicated_id_is_the_re_asks_to_repair():
+    """A duplicate ID names no draft to read, but it is the re-ask's to fix, so
+    the merge takes the re-ask's ruling for it rather than the first pass's pair."""
+    drafts = [sample_draft("S-01")]
+    ctx = FakeContext()
+    first = route(
+        valid_model().model_dump(mode="json"),
+        [draft.model_dump(mode="json") for draft in drafts],
+        ctx,
+        reviewed_threats={
+            "claims": [sample_ruling("S-01").model_dump(mode="json")] * 2
+        },
+    )
+    assert first.actions.route == graph.ROUTE_REVISE
+    assert ctx.state[NODES.key("repairable")] == ["S-01"]
+
+    second = _second_look(ctx, drafts, [sample_ruling("S-01")])
+
+    assert second.actions.route == graph.ROUTE_ACCEPT
+    assert list(_reviewed_verdicts(ctx)) == ["S-01"]
+
+
 def _revise(drafts, rulings):
     """Drive the router to its ``revise`` edge and hand back the parked state."""
     ctx = FakeContext()
@@ -2230,7 +2340,15 @@ FRAMEWORK_KEY_WRITERS: tuple[tuple[str, dict[str, Any]], ...] = (
         "critic",
         {"reviewed": {"claims": [sample_ruling("S-01").model_dump(mode="json")]}},
     ),
-    ("router", {"accepted": True}),
+    (
+        "router",
+        {
+            "accepted": True,
+            # Written on the ``revise`` edge, for the second look to merge onto.
+            "first_review": [sample_ruling("S-01").model_dump(mode="json")],
+            "repairable": [],
+        },
+    ),
 )
 
 
