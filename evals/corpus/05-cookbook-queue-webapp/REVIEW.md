@@ -25,8 +25,6 @@ Roughly an hour.
 
 ### System description (description)
 
-Exactly what the service would receive.
-
 > Web application with a queue-decoupled background process.
 >
 > A user's browser talks to the web application over HTTP/S across the public
@@ -123,17 +121,15 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A1.** `V3.4.1` — No security response header is described for the one encrypted browser-facing link.
 
-- cites: `entity:browser`, `process:web-application`, `flow:browser-to-web-application:page-request`
-- tier: must-find
-- recorded note: tech:browser-frontend fires; the chapter applies and every header is unstated. The header is emitted by the application or by the layer in front of it, so either route settles it.
+- `entity:browser`, `process:web-application`, `flow:browser-to-web-application:page-request`
+- tech:browser-frontend fires; the chapter applies and every header is unstated. The header is emitted by the application or by the layer in front of it, so either route settles it.
 
 > mark:
 
 **A2.** `V3.3.1` — Nothing states whether the web application sets any cookie or with which attributes.
 
-- cites: `process:web-application`, `flow:browser-to-web-application:page-request`
-- tier: expected
-- recorded note: A browser client is stated; the cookie question is open rather than answered. The attribute is set by whatever emits Set-Cookie, which is the application or the layer in front of it, so either route settles it.
+- `process:web-application`, `flow:browser-to-web-application:page-request`
+- A browser client is stated; the cookie question is open rather than answered. The attribute is set by whatever emits Set-Cookie, which is the application or the layer in front of it, so either route settles it.
 
 > mark:
 
@@ -142,9 +138,8 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A3.** `V13.3.1` — Both configuration stores hold the credentials their process needs, and nothing says whether a secrets management solution holds or injects them.
 
-- cites: `store:web-application-config`, `store:worker-config`
-- tier: must-find
-- recorded note: The source says the stores hold credentials. Where those credentials come from is a deployment fact the description does not carry.
+- `store:web-application-config`, `store:worker-config`
+- The source says the stores hold credentials. Where those credentials come from is a deployment fact the description does not carry.
 
 > mark:
 
@@ -153,9 +148,8 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A4.** `V15.2.2` — Nothing states what bounds the work a queued job can consume.
 
-- cites: `process:background-worker`, `store:message-queue`, `flow:background-worker-to-message-queue:consume-job`
-- tier: must-find
-- recorded note: A queue with an internal worker raises the availability requirement; the input never reaches it.
+- `process:background-worker`, `store:message-queue`, `flow:background-worker-to-message-queue:consume-job`
+- A queue with an internal worker raises the availability requirement; the input never reaches it.
 
 > mark:
 
@@ -164,9 +158,8 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A5.** `V17.2.1` — No WebRTC media path exists in this system, so this chapter does not apply.
 
-- cites: 
-- tier: must-find
-- recorded note: The exclusion the standard invites by name. The flows state HTTP/S and unknown, and no element is a media server.
+- 
+- The exclusion the standard invites by name. The flows state HTTP/S and unknown, and no element is a media server.
 
 > mark:
 
@@ -175,9 +168,8 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A6.** `V12.3.3` — Every link except the browser one states no transport protection at all.
 
-- cites: `process:web-application`, `store:message-queue`, `flow:web-application-to-message-queue:enqueue-job`
-- tier: expected
-- recorded note: The submitter marks one link as the only encrypted one, which settles the others.
+- `process:web-application`, `store:message-queue`, `flow:web-application-to-message-queue:enqueue-job`
+- The submitter marks one link as the only encrypted one, which settles the others.
 
 > mark:
 
@@ -186,9 +178,8 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A7.** `V6.1.1` — Nothing states how the web application authenticates anybody.
 
-- cites: `process:web-application`
-- tier: expected
-- recorded note: authentication is unknown on the browser flow; the chapter applies and stays open.
+- `process:web-application`
+- authentication is unknown on the browser flow; the chapter applies and stays open.
 
 > mark:
 
@@ -212,25 +203,25 @@ on either of them. That is the finding this sitting exists for.
 
 **1.** An attacker interacts with the web application as a legitimate user, because how the application authenticates the browser is unverified.
 
-- cites: `flow:browser-to-web-application:page-request`, `entity:browser`
-- tier: must-find · severity: medium/medium · verb: `impersonate`
-- recorded note: Authentication on the one internet-crossing flow is unknown; needs-info is an acceptable verdict, silence is not.
+- `flow:browser-to-web-application:page-request`, `entity:browser`
+- severity: medium/medium · verb: `impersonate`
+- Authentication on the one internet-crossing flow is unknown; needs-info is an acceptable verdict, silence is not.
 
 > mark:
 
 **2.** An attacker who reaches the queue enqueues jobs as if they came from the web application, since queue authentication is unverified.
 
-- cites: `flow:web-application-to-message-queue:enqueue-job`, `store:message-queue`
-- tier: must-find · severity: medium/high · verb: `impersonate`
-- recorded note: The queue is the trust hand-off in this design; nothing states how a producer is identified.
+- `flow:web-application-to-message-queue:enqueue-job`, `store:message-queue`
+- severity: medium/high · verb: `impersonate`
+- The queue is the trust hand-off in this design; nothing states how a producer is identified.
 
 > mark:
 
 **3.** An attacker holding the worker's database credentials connects to the database as the worker.
 
-- cites: `flow:background-worker-to-database:read-write-records`
-- tier: expected · severity: medium/high · verb: `use-credential`
-- recorded note: Credentials are stated to exist in the worker config; their protection is not.
+- `flow:background-worker-to-database:read-write-records`
+- severity: medium/high · verb: `use-credential`
+- Credentials are stated to exist in the worker config; their protection is not.
 
 > mark:
 
@@ -239,25 +230,25 @@ on either of them. That is the finding this sitting exists for.
 
 **4.** An attacker places a poisoned message on the queue and the worker processes it as legitimate work.
 
-- cites: `store:message-queue`, `process:background-worker`
-- tier: must-find · severity: medium/high · verb: `plant`
-- recorded note: The canonical queue-decoupling threat: the worker's input is only as trustworthy as write access to the queue.
+- `store:message-queue`, `process:background-worker`
+- severity: medium/high · verb: `plant`
+- The canonical queue-decoupling threat: the worker's input is only as trustworthy as write access to the queue.
 
 > mark:
 
 **5.** An attacker who can write to the web application config changes the queue endpoint or credentials and redirects the application's work.
 
-- cites: `store:web-application-config`, `process:web-application`
-- tier: must-find · severity: low/high · verb: `alter`
-- recorded note: Config stores are control planes; protection on this one is entirely unstated.
+- `store:web-application-config`, `process:web-application`
+- severity: low/high · verb: `alter`
+- Config stores are control planes; protection on this one is entirely unstated.
 
 > mark:
 
 **6.** An attacker with the worker's database access alters application records or the log records stored alongside them.
 
-- cites: `store:database`, `flow:background-worker-to-database:read-write-records`
-- tier: expected · severity: medium/high · verb: `alter`
-- recorded note: Records and their own audit log share one store — tampering with one covers the other.
+- `store:database`, `flow:background-worker-to-database:read-write-records`
+- severity: medium/high · verb: `alter`
+- Records and their own audit log share one store — tampering with one covers the other.
 
 > mark:
 
@@ -266,17 +257,17 @@ on either of them. That is the finding this sitting exists for.
 
 **7.** An attacker who compromises the worker erases or edits the log records that would show what it did, because the logs live in the same database the worker writes.
 
-- cites: `store:database`, `process:background-worker`
-- tier: must-find · severity: medium/high · verb: `delete`
-- recorded note: The strongest finding available from the diagram: no separation between the audit record and the audited actor.
+- `store:database`, `process:background-worker`
+- severity: medium/high · verb: `delete`
+- The strongest finding available from the diagram: no separation between the audit record and the audited actor.
 
 > mark:
 
 **8.** The origin of a processed job cannot be established, because nothing records which producer enqueued it.
 
-- cites: `store:message-queue`, `flow:web-application-to-message-queue:enqueue-job`
-- tier: expected · severity: medium/medium · verb: `unattributable`
-- recorded note: Decoupling removes the request context that would otherwise attribute the work.
+- `store:message-queue`, `flow:web-application-to-message-queue:enqueue-job`
+- severity: medium/medium · verb: `unattributable`
+- Decoupling removes the request context that would otherwise attribute the work.
 
 > mark:
 
@@ -285,33 +276,33 @@ on either of them. That is the finding this sitting exists for.
 
 **9.** An attacker who compromises the background worker reads the database credentials from its config store.
 
-- cites: `store:worker-config`
-- tier: must-find · severity: medium/high · verb: `recover-credential`
-- recorded note: This is the threat the original cookbook model records against this element; protection at rest is unstated.
+- `store:worker-config`
+- severity: medium/high · verb: `recover-credential`
+- This is the threat the original cookbook model records against this element; protection at rest is unstated.
 
 > mark:
 
 **10.** An attacker who compromises the internet-facing web application reads the queue credentials from its config store.
 
-- cites: `store:web-application-config`
-- tier: must-find · severity: medium/high · verb: `recover-credential`
-- recorded note: Same shape as the worker finding, but reachable from the internet-facing tier, so likelier.
+- `store:web-application-config`
+- severity: medium/high · verb: `recover-credential`
+- Same shape as the worker finding, but reachable from the internet-facing tier, so likelier.
 
 > mark:
 
 **11.** An attacker who reaches the database storage reads application and log records, whose protection at rest is unverified.
 
-- cites: `store:database`
-- tier: expected · severity: medium/medium · verb: `read`
-- recorded note: Data classification is unknown here, so impact cannot be rated higher than medium on the facts given.
+- `store:database`
+- severity: medium/medium · verb: `read`
+- Data classification is unknown here, so impact cannot be rated higher than medium on the facts given.
 
 > mark:
 
 **12.** An attacker on the internal network reads job contents in transit, because transport encryption between the tiers is unverified.
 
-- cites: `flow:web-application-to-message-queue:enqueue-job`, `flow:background-worker-to-message-queue:consume-job`
-- tier: expected · severity: medium/medium · verb: `intercept`
-- recorded note: Only the browser link is marked encrypted; the rest is explicitly silent.
+- `flow:web-application-to-message-queue:enqueue-job`, `flow:background-worker-to-message-queue:consume-job`
+- severity: medium/medium · verb: `intercept`
+- Only the browser link is marked encrypted; the rest is explicitly silent.
 
 > mark:
 
@@ -320,25 +311,25 @@ on either of them. That is the finding this sitting exists for.
 
 **13.** An attacker floods the queue with jobs until the worker cannot keep up and queued work stops completing.
 
-- cites: `store:message-queue`, `process:background-worker`
-- tier: must-find · severity: medium/medium · verb: `flood`
-- recorded note: A single worker behind an unbounded queue; the backlog is invisible to the user who submitted the work.
+- `store:message-queue`, `process:background-worker`
+- severity: medium/medium · verb: `flood`
+- A single worker behind an unbounded queue; the backlog is invisible to the user who submitted the work.
 
 > mark:
 
 **14.** An attacker floods the internet-facing web application until it stops serving browsers.
 
-- cites: `process:web-application`, `flow:browser-to-web-application:page-request`
-- tier: expected · severity: medium/medium · verb: `flood`
-- recorded note: Generic but grounded: it is the only internet-facing element.
+- `process:web-application`, `flow:browser-to-web-application:page-request`
+- severity: medium/medium · verb: `flood`
+- Generic but grounded: it is the only internet-facing element.
 
 > mark:
 
 **15.** An attacker submits work that makes the worker exhaust database capacity, stalling both job processing and logging.
 
-- cites: `store:database`, `process:background-worker`
-- tier: expected · severity: low/medium · verb: `flood`
-- recorded note: Shared store means one saturation affects the audit trail too.
+- `store:database`, `process:background-worker`
+- severity: low/medium · verb: `flood`
+- Shared store means one saturation affects the audit trail too.
 
 > mark:
 
@@ -347,17 +338,17 @@ on either of them. That is the finding this sitting exists for.
 
 **16.** An attacker who compromises the internet-facing web application uses its queue credentials to reach the backend tier.
 
-- cites: `process:web-application`, `store:message-queue`
-- tier: must-find · severity: medium/high · verb: `escalate`
-- recorded note: The queue is the only path across the tier boundary, so it is the escalation route by construction.
+- `process:web-application`, `store:message-queue`
+- severity: medium/high · verb: `escalate`
+- The queue is the only path across the tier boundary, so it is the escalation route by construction.
 
 > mark:
 
 **17.** An attacker who gets code execution in the worker inherits whatever database privilege its credentials carry, which is unverified and may be unrestricted.
 
-- cites: `process:background-worker`, `store:database`
-- tier: must-find · severity: medium/high · verb: `abuse-grant`
-- recorded note: Job content is attacker-influenceable via the queue, so worker execution is a realistic starting point.
+- `process:background-worker`, `store:database`
+- severity: medium/high · verb: `abuse-grant`
+- Job content is attacker-influenceable via the queue, so worker execution is a realistic starting point.
 
 > mark:
 

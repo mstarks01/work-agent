@@ -25,8 +25,6 @@ Roughly an hour.
 
 ### System description (description)
 
-Exactly what the service would receive.
-
 > Hosted model inference for our product teams.
 >
 > Other teams' backends call our inference gateway, a FastAPI service on GKE
@@ -128,9 +126,8 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A1.** `V4.1.1` — The inference gateway's response content types and method policy are never described.
 
-- cites: `process:inference-gateway`
-- tier: must-find
-- recorded note: An internet-facing HTTPS surface exists and its contract is unstated.
+- `process:inference-gateway`
+- An internet-facing HTTPS surface exists and its contract is unstated.
 
 > mark:
 
@@ -139,17 +136,15 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A2.** `V5.2.1` — Nothing limits the size or type of a model artifact published into the registry.
 
-- cites: `entity:ml-engineer`, `store:model-registry`, `flow:ml-engineer-to-model-registry:publish-artifact`
-- tier: must-find
-- recorded note: An artifact upload path exists; feature:file-upload has a subject here.
+- `entity:ml-engineer`, `store:model-registry`, `flow:ml-engineer-to-model-registry:publish-artifact`
+- An artifact upload path exists; feature:file-upload has a subject here.
 
 > mark:
 
 **A3.** `V5.2.2` — Nothing states what validates a published artifact before the model server loads it.
 
-- cites: `store:model-registry`, `flow:ml-engineer-to-model-registry:publish-artifact`
-- tier: expected
-- recorded note: The registry is read by an internal server, so an unvalidated artifact is executed content.
+- `store:model-registry`, `flow:ml-engineer-to-model-registry:publish-artifact`
+- The registry is read by an internal server, so an unvalidated artifact is executed content.
 
 > mark:
 
@@ -158,9 +153,8 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A4.** `V9.1.1` — The per-team API key carries no claims, so this chapter does not apply to the gateway.
 
-- cites: `entity:calling-service`, `process:inference-gateway`, `flow:calling-service-to-inference-gateway:submit-inference-request`
-- tier: must-find
-- recorded note: The stated credential is an opaque key rather than a self-contained token; the exclusion is the answer.
+- `entity:calling-service`, `process:inference-gateway`, `flow:calling-service-to-inference-gateway:submit-inference-request`
+- The stated credential is an opaque key rather than a self-contained token; the exclusion is the answer.
 
 > mark:
 
@@ -169,9 +163,8 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A5.** `V13.2.1` — The calling service authenticates to the inference gateway with a per-team API key that is never expired or rotated, an unchanging credential on a backend link.
 
-- cites: `entity:calling-service`, `flow:calling-service-to-inference-gateway:submit-inference-request`
-- tier: must-find
-- recorded note: Stated outright, so the ruling is plain. V6.2.10 is about user passwords and forbids forced rotation, so it was the wrong home for this fact.
+- `entity:calling-service`, `flow:calling-service-to-inference-gateway:submit-inference-request`
+- Stated outright, so the ruling is plain. V6.2.10 is about user passwords and forbids forced rotation, so it was the wrong home for this fact.
 
 > mark:
 
@@ -180,9 +173,8 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A6.** `V8.2.1` — The model server accepts forwarded requests on network position with no stated permission check.
 
-- cites: `process:inference-gateway`, `process:model-server`, `flow:inference-gateway-to-model-server:forward-request`
-- tier: expected
-- recorded note: authentication is stated as none, so the ruling is plain.
+- `process:inference-gateway`, `process:model-server`, `flow:inference-gateway-to-model-server:forward-request`
+- authentication is stated as none, so the ruling is plain.
 
 > mark:
 
@@ -191,9 +183,8 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A7.** `V11.3.2` — No cipher is stated for the feature store or the inference log at rest.
 
-- cites: `store:feature-store`, `store:inference-log`
-- tier: expected
-- recorded note: Both are confidential with encryption_at_rest unknown.
+- `store:feature-store`, `store:inference-log`
+- Both are confidential with encryption_at_rest unknown.
 
 > mark:
 
@@ -202,9 +193,8 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A8.** `V12.3.3` — The gateway to model server link states neither a protocol nor transport protection.
 
-- cites: `process:inference-gateway`, `process:model-server`, `flow:inference-gateway-to-model-server:forward-request`
-- tier: must-find
-- recorded note: protocol and encryption_in_transit are both unknown on an internal crossing.
+- `process:inference-gateway`, `process:model-server`, `flow:inference-gateway-to-model-server:forward-request`
+- protocol and encryption_in_transit are both unknown on an internal crossing.
 
 > mark:
 
@@ -213,9 +203,8 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A9.** `V16.2.5` — Nothing states what of an inference request is written to the confidential request log.
 
-- cites: `process:inference-gateway`, `store:inference-log`, `flow:inference-gateway-to-inference-log:write-request-log`
-- tier: must-find
-- recorded note: The log is confidential and its content is never described. What reaches the log comes from the call site or from the logging configuration, so either route settles it.
+- `process:inference-gateway`, `store:inference-log`, `flow:inference-gateway-to-inference-log:write-request-log`
+- The log is confidential and its content is never described. What reaches the log comes from the call site or from the logging configuration, so either route settles it.
 
 > mark:
 
@@ -224,9 +213,8 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A10.** `V13.3.2` — Nothing states what limits the model server's registry service account.
 
-- cites: `process:model-server`, `store:model-registry`
-- tier: expected
-- recorded note: A service account is named and its scope is not.
+- `process:model-server`, `store:model-registry`
+- A service account is named and its scope is not.
 
 > mark:
 
@@ -250,25 +238,25 @@ on either of them. That is the finding this sitting exists for.
 
 **1.** An attacker who obtains a never-expiring API key calls the inference gateway as that team indefinitely.
 
-- cites: `flow:calling-service-to-inference-gateway:submit-inference-request`, `entity:calling-service`
-- tier: must-find · severity: high/high · verb: `use-credential`
-- recorded note: Bearer credential with no expiry on an internet-facing endpoint; compromise is permanent until noticed.
+- `flow:calling-service-to-inference-gateway:submit-inference-request`, `entity:calling-service`
+- severity: high/high · verb: `use-credential`
+- Bearer credential with no expiry on an internet-facing endpoint; compromise is permanent until noticed.
 
 > mark:
 
 **2.** Any workload inside the model network submits inference requests posing as the gateway, which the model server accepts on network position alone.
 
-- cites: `flow:inference-gateway-to-model-server:forward-request`, `process:model-server`
-- tier: must-find · severity: medium/high · verb: `impersonate`
-- recorded note: Stated absence of authentication behind a boundary that is only 'meant to be' closed.
+- `flow:inference-gateway-to-model-server:forward-request`, `process:model-server`
+- severity: medium/high · verb: `impersonate`
+- Stated absence of authentication behind a boundary that is only 'meant to be' closed.
 
 > mark:
 
 **3.** An attacker publishes a model artifact under a shared group account with no individual identity behind it.
 
-- cites: `flow:ml-engineer-to-model-registry:publish-artifact`, `entity:ml-engineer`
-- tier: expected · severity: medium/high · verb: `use-credential`
-- recorded note: Publish authentication is unknown and possibly shared; report as unverified.
+- `flow:ml-engineer-to-model-registry:publish-artifact`, `entity:ml-engineer`
+- severity: medium/high · verb: `use-credential`
+- Publish authentication is unknown and possibly shared; report as unverified.
 
 > mark:
 
@@ -277,25 +265,25 @@ on either of them. That is the finding this sitting exists for.
 
 **4.** An attacker who can write to the registry swaps the model artifact and the model server loads it without any integrity verification.
 
-- cites: `store:model-registry`, `flow:model-server-to-model-registry:load-artifact`
-- tier: must-find · severity: high/high · verb: `plant`
-- recorded note: The defining supply-chain finding of this case; the source states verification is absent.
+- `store:model-registry`, `flow:model-server-to-model-registry:load-artifact`
+- severity: high/high · verb: `plant`
+- The defining supply-chain finding of this case; the source states verification is absent.
 
 > mark:
 
 **5.** An attacker with model-network access writes to the unauthenticated Redis feature store and changes the features a decision is made on.
 
-- cites: `store:feature-store`, `flow:model-server-to-feature-store:read-features`
-- tier: must-find · severity: medium/high · verb: `alter`
-- recorded note: No password is a stated fact, not an unknown; poisoning features silently changes inference output.
+- `store:feature-store`, `flow:model-server-to-feature-store:read-features`
+- severity: medium/high · verb: `alter`
+- No password is a stated fact, not an unknown; poisoning features silently changes inference output.
 
 > mark:
 
 **6.** An attacker inside the model network alters request payloads in flight on the unauthenticated, unencrypted forward path.
 
-- cites: `flow:inference-gateway-to-model-server:forward-request`
-- tier: expected · severity: medium/medium · verb: `alter-in-transit`
-- recorded note: Same flow as the spoofing entry; the lane difference is modifying content versus assuming identity.
+- `flow:inference-gateway-to-model-server:forward-request`
+- severity: medium/medium · verb: `alter-in-transit`
+- Same flow as the spoofing entry; the lane difference is modifying content versus assuming identity.
 
 > mark:
 
@@ -304,17 +292,17 @@ on either of them. That is the finding this sitting exists for.
 
 **7.** Nobody can establish which engineer published a given model artifact, because publication runs through a shared account.
 
-- cites: `store:model-registry`, `entity:ml-engineer`
-- tier: must-find · severity: medium/medium · verb: `unattributable`
-- recorded note: Model provenance is the audit trail that matters here; a shared account destroys it.
+- `store:model-registry`, `entity:ml-engineer`
+- severity: medium/medium · verb: `unattributable`
+- Model provenance is the audit trail that matters here; a shared account destroys it.
 
 > mark:
 
 **8.** A calling team disputes a request the log attributes to them, and a shared long-lived API key cannot establish who actually sent it.
 
-- cites: `store:inference-log`, `entity:calling-service`
-- tier: expected · severity: medium/medium · verb: `unattributable`
-- recorded note: The log records the key's team, not an actor; distinct from disclosure findings about the same store.
+- `store:inference-log`, `entity:calling-service`
+- severity: medium/medium · verb: `unattributable`
+- The log records the key's team, not an actor; distinct from disclosure findings about the same store.
 
 > mark:
 
@@ -323,33 +311,33 @@ on either of them. That is the finding this sitting exists for.
 
 **9.** An attacker who reaches the inference log reads raw end-user prompts, whose protection at rest is unverified.
 
-- cites: `store:inference-log`
-- tier: must-find · severity: medium/high · verb: `read`
-- recorded note: A debugging store that silently became the most sensitive data collection in the system.
+- `store:inference-log`
+- severity: medium/high · verb: `read`
+- A debugging store that silently became the most sensitive data collection in the system.
 
 > mark:
 
 **10.** An attacker with model-network access reads per-customer account age and spend bands from the unauthenticated feature store.
 
-- cites: `store:feature-store`
-- tier: must-find · severity: medium/high · verb: `read`
-- recorded note: Stated absence of authentication over data tagged pii and financial.
+- `store:feature-store`
+- severity: medium/high · verb: `read`
+- Stated absence of authentication over data tagged pii and financial.
 
 > mark:
 
 **11.** A caller crafts a request that makes the model emit customer features belonging to a different tenant.
 
-- cites: `process:model-server`, `flow:calling-service-to-inference-gateway:submit-inference-request`
-- tier: expected · severity: medium/high · verb: `elicit`
-- recorded note: Model-mediated disclosure: the gateway authenticates the team but nothing scopes which customers' features a request may pull. Review sitting 01 struck 'or training data' from this claim: no training pipeline exists in this model, and the label set already rules training-time attacks out of scope for this case, so the claim graded the tool against a fact the model does not hold.
+- `process:model-server`, `flow:calling-service-to-inference-gateway:submit-inference-request`
+- severity: medium/high · verb: `elicit`
+- Model-mediated disclosure: the gateway authenticates the team but nothing scopes which customers' features a request may pull. Review sitting 01 struck 'or training data' from this claim: no training pipeline exists in this model, and the label set already rules training-time attacks out of scope for this case, so the claim graded the tool against a fact the model does not hold.
 
 > mark:
 
 **12.** An attacker on the internal path reads end-user text out of forwarded requests, because transport encryption there is unverified.
 
-- cites: `flow:inference-gateway-to-model-server:forward-request`
-- tier: expected · severity: medium/medium · verb: `intercept`
-- recorded note: Boundary crossing from serving edge into model network with no stated protection.
+- `flow:inference-gateway-to-model-server:forward-request`
+- severity: medium/medium · verb: `intercept`
+- Boundary crossing from serving edge into model network with no stated protection.
 
 > mark:
 
@@ -358,25 +346,25 @@ on either of them. That is the finding this sitting exists for.
 
 **13.** A caller holding a valid key floods the gateway with inference requests and exhausts the shared GPU capacity behind it.
 
-- cites: `process:inference-gateway`, `flow:calling-service-to-inference-gateway:submit-inference-request`
-- tier: must-find · severity: high/high · verb: `flood`
-- recorded note: GPU capacity is the scarce, expensive resource; no quota or rate limit per key is described.
+- `process:inference-gateway`, `flow:calling-service-to-inference-gateway:submit-inference-request`
+- severity: high/high · verb: `flood`
+- GPU capacity is the scarce, expensive resource; no quota or rate limit per key is described.
 
 > mark:
 
 **14.** An attacker with model-network access flushes or fills the unauthenticated Redis store, stalling every request that needs features.
 
-- cites: `store:feature-store`, `process:model-server`
-- tier: expected · severity: medium/high · verb: `disable`
-- recorded note: An unauthenticated cache is as easy to destroy as to read.
+- `store:feature-store`, `process:model-server`
+- severity: medium/high · verb: `disable`
+- An unauthenticated cache is as easy to destroy as to read.
 
 > mark:
 
 **15.** An attacker deletes or corrupts the registry artifact so the model server cannot start after a restart.
 
-- cites: `store:model-registry`, `process:model-server`
-- tier: expected · severity: low/high · verb: `delete`
-- recorded note: Startup dependency with no fallback described.
+- `store:model-registry`, `process:model-server`
+- severity: low/high · verb: `delete`
+- Startup dependency with no fallback described.
 
 > mark:
 
@@ -385,25 +373,25 @@ on either of them. That is the finding this sitting exists for.
 
 **16.** An attacker who can write to the registry turns an unverified artifact load into code execution on the GPU nodes.
 
-- cites: `store:model-registry`, `process:model-server`
-- tier: must-find · severity: medium/high · verb: `escalate`
-- recorded note: Model artifacts are loaded as code; the escalation framing of the swap finding.
+- `store:model-registry`, `process:model-server`
+- severity: medium/high · verb: `escalate`
+- Model artifacts are loaded as code; the escalation framing of the swap finding.
 
 > mark:
 
 **17.** An attacker who compromises the internet-facing gateway inherits unauthenticated access to everything in the model network.
 
-- cites: `process:inference-gateway`, `process:model-server`
-- tier: must-find · severity: medium/high · verb: `escalate`
-- recorded note: The whole model network's security rests on the gateway being the only reachable path.
+- `process:inference-gateway`, `process:model-server`
+- severity: medium/high · verb: `escalate`
+- The whole model network's security rests on the gateway being the only reachable path.
 
 > mark:
 
 **18.** A caller uses its key to reach models or capabilities its team was never entitled to, because the key authenticates without scoping what it may invoke.
 
-- cites: `entity:calling-service`, `process:inference-gateway`
-- tier: expected · severity: medium/medium · verb: `abuse-grant`
-- recorded note: Authorization scope on a multi-tenant gateway is unspecified; report as unverified.
+- `entity:calling-service`, `process:inference-gateway`
+- severity: medium/medium · verb: `abuse-grant`
+- Authorization scope on a multi-tenant gateway is unspecified; report as unverified.
 
 > mark:
 

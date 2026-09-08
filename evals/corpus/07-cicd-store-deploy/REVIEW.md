@@ -25,8 +25,6 @@ Roughly an hour.
 
 ### System description (description)
 
-Exactly what the service would receive.
-
 > Build and deploy pipeline for the in-store estate.
 >
 > We run about 1,200 stores. Each store has a small server in the back office
@@ -161,41 +159,41 @@ on either of them. That is the finding this sitting exists for.
 
 **1.** An attacker holding the shared build token calls the deploy controller as if it were the build runner and names an image sha of their own choosing as the current release.
 
-- cites: `flow:build-runner-to-deploy-controller:set-current-release`, `process:deploy-controller`
-- tier: must-find · severity: medium/high · verb: `use-credential`
-- recorded note: The one credential the source describes in full, and it describes it as shared across every pipeline and never rotated. Holding it is indistinguishable from being the runner.
+- `flow:build-runner-to-deploy-controller:set-current-release`, `process:deploy-controller`
+- severity: medium/high · verb: `use-credential`
+- The one credential the source describes in full, and it describes it as shared across every pipeline and never rotated. Holding it is indistinguishable from being the runner.
 
 > mark:
 
 **2.** An attacker on the retail WAN presents itself to the image registry as a store server and pulls the estate's container images.
 
-- cites: `flow:store-server-to-image-registry:pull-image`, `store:image-registry`
-- tier: must-find · severity: medium/medium · verb: `impersonate`
-- recorded note: The source says the registry allows the pull and that nobody has written down what a store server presents to it; needs-info is the right verdict, not silence.
+- `flow:store-server-to-image-registry:pull-image`, `store:image-registry`
+- severity: medium/medium · verb: `impersonate`
+- The source says the registry allows the pull and that nobody has written down what a store server presents to it; needs-info is the right verdict, not silence.
 
 > mark:
 
 **3.** An attacker polls the deploy controller while claiming to be a store server, since what a store server presents to the controller is unverified.
 
-- cites: `flow:store-server-to-deploy-controller:poll-current-release`, `process:deploy-controller`
-- tier: expected · severity: medium/low · verb: `impersonate`
-- recorded note: Lower impact than the registry pull because the poll returns one sha, but it is the same undocumented identity and belongs on the record.
+- `flow:store-server-to-deploy-controller:poll-current-release`, `process:deploy-controller`
+- severity: medium/low · verb: `impersonate`
+- Lower impact than the registry pull because the poll returns one sha, but it is the same undocumented identity and belongs on the record.
 
 > mark:
 
 **4.** An attacker pushes branches to the git server as a developer, because how developers authenticate to it is unverified.
 
-- cites: `flow:developer-to-git-server:push-branches`, `entity:developer`
-- tier: expected · severity: medium/medium · verb: `impersonate`
-- recorded note: Pushing a branch alone does not reach the estate — a merge to main is what starts a build — which is why this sits below the release-setting claims.
+- `flow:developer-to-git-server:push-branches`, `entity:developer`
+- severity: medium/medium · verb: `impersonate`
+- Pushing a branch alone does not reach the estate — a merge to main is what starts a build — which is why this sits below the release-setting claims.
 
 > mark:
 
 **5.** An attacker logs in to the build runner as a developer and triggers a rebuild of main, since how that login is authenticated is unverified.
 
-- cites: `flow:developer-to-build-runner:manual-rebuild`, `process:build-runner`
-- tier: expected · severity: medium/high · verb: `impersonate`
-- recorded note: Distinct from the elevation claim on the same flow: this is an outsider becoming a developer, not a developer using the authority they legitimately have.
+- `flow:developer-to-build-runner:manual-rebuild`, `process:build-runner`
+- severity: medium/high · verb: `impersonate`
+- Distinct from the elevation claim on the same flow: this is an outsider becoming a developer, not a developer using the authority they legitimately have.
 
 > mark:
 
@@ -204,49 +202,49 @@ on either of them. That is the finding this sitting exists for.
 
 **6.** An attacker alters the deploy controller's current-release record so that every store server pulls and runs an image of the attacker's choosing within a minute.
 
-- cites: `process:deploy-controller`, `process:store-server`
-- tier: must-find · severity: medium/high · verb: `alter`
-- recorded note: The single record is the whole control plane of the estate, and the poll loop turns one write into 1,200 restarts with no further attacker action.
+- `process:deploy-controller`, `process:store-server`
+- severity: medium/high · verb: `alter`
+- The single record is the whole control plane of the estate, and the poll loop turns one write into 1,200 restarts with no further attacker action.
 
 > mark:
 
 **7.** An attacker publishes a package that the lockfile resolves to and the runner bakes it into the image unchecked, because signatures on downloads are not verified.
 
-- cites: `flow:build-runner-to-public-package-registry:resolve-dependencies`, `process:build-runner`
-- tier: must-find · severity: medium/high · verb: `plant`
-- recorded note: A stated absence, not an unknown — the source says outright that the runner does not verify signatures, so this is grounded rather than needs-info.
+- `flow:build-runner-to-public-package-registry:resolve-dependencies`, `process:build-runner`
+- severity: medium/high · verb: `plant`
+- A stated absence, not an unknown — the source says outright that the runner does not verify signatures, so this is grounded rather than needs-info.
 
 > mark:
 
 **8.** An attacker replaces the image stored under a commit-sha tag in the registry, so store servers pull attacker content while the recorded release is unchanged.
 
-- cites: `store:image-registry`, `process:store-server`
-- tier: must-find · severity: medium/high · verb: `plant`
-- recorded note: Worth keeping separate from the controller-record claim: this one leaves the release record honest, so nothing in the described system would show a change.
+- `store:image-registry`, `process:store-server`
+- severity: medium/high · verb: `plant`
+- Worth keeping separate from the controller-record claim: this one leaves the release record honest, so nothing in the described system would show a change.
 
 > mark:
 
 **9.** An attacker modifies source held on the git server so the change is carried into the next image the runner builds.
 
-- cites: `store:git-server`
-- tier: expected · severity: low/high · verb: `alter`
-- recorded note: The slowest path to the estate of the three tampering entry points, since it waits for a build, but the source states no protection on the content at rest.
+- `store:git-server`
+- severity: low/high · verb: `alter`
+- The slowest path to the estate of the three tampering entry points, since it waits for a build, but the source states no protection on the content at rest.
 
 > mark:
 
 **10.** An attacker on the retail WAN alters the container image as a store server pulls it, since protection of that traffic is unverified.
 
-- cites: `flow:store-server-to-image-registry:pull-image`
-- tier: expected · severity: low/high · verb: `alter-in-transit`
-- recorded note: The image crosses from the build environment to the store estate over a WAN the source describes without saying anything about how it is protected.
+- `flow:store-server-to-image-registry:pull-image`
+- severity: low/high · verb: `alter-in-transit`
+- The image crosses from the build environment to the store estate over a WAN the source describes without saying anything about how it is protected.
 
 > mark:
 
 **11.** An attacker on the retail WAN alters the answer to a store server's poll so that store installs a different image sha from the rest of the estate.
 
-- cites: `flow:store-server-to-deploy-controller:poll-current-release`
-- tier: expected · severity: low/medium · verb: `alter-in-transit`
-- recorded note: Per-store rather than estate-wide, which is what separates it from writing the controller's record.
+- `flow:store-server-to-deploy-controller:poll-current-release`
+- severity: low/medium · verb: `alter-in-transit`
+- Per-store rather than estate-wide, which is what separates it from writing the controller's record.
 
 > mark:
 
@@ -255,17 +253,17 @@ on either of them. That is the finding this sitting exists for.
 
 **12.** A build that reached the estate cannot be attributed to the developer who started it, because any developer can trigger a manual rebuild on an unreviewed path whose authentication is unverified.
 
-- cites: `flow:developer-to-build-runner:manual-rebuild`, `process:build-runner`
-- tier: must-find · severity: medium/medium · verb: `unattributable`
-- recorded note: The source states the path is not reviewed and does not require a merge, so the git history that would otherwise carry attribution is bypassed by construction.
+- `flow:developer-to-build-runner:manual-rebuild`, `process:build-runner`
+- severity: medium/medium · verb: `unattributable`
+- The source states the path is not reviewed and does not require a merge, so the git history that would otherwise carry attribution is bypassed by construction.
 
 > mark:
 
 **13.** The deploy controller cannot tell which pipeline set a release, because every pipeline presents the same shared build token.
 
-- cites: `flow:build-runner-to-deploy-controller:set-current-release`, `process:deploy-controller`
-- tier: must-find · severity: high/medium · verb: `unattributable`
-- recorded note: High likelihood because it is not an attack condition but the described steady state — the token is stated to be the same for every pipeline.
+- `flow:build-runner-to-deploy-controller:set-current-release`, `process:deploy-controller`
+- severity: high/medium · verb: `unattributable`
+- High likelihood because it is not an attack condition but the described steady state — the token is stated to be the same for every pipeline.
 
 > mark:
 
@@ -274,33 +272,33 @@ on either of them. That is the finding this sitting exists for.
 
 **14.** An attacker who reads the build runner's configuration recovers the shared build token and can thereafter set the estate's release.
 
-- cites: `process:build-runner`, `flow:build-runner-to-deploy-controller:set-current-release`
-- tier: must-find · severity: medium/high · verb: `recover-credential`
-- recorded note: Recovering the credential is a separate action from using it, and the corpus files the use under spoofing; the never-rotated qualifier is what makes recovery durable.
+- `process:build-runner`, `flow:build-runner-to-deploy-controller:set-current-release`
+- severity: medium/high · verb: `recover-credential`
+- Recovering the credential is a separate action from using it, and the corpus files the use under spoofing; the never-rotated qualifier is what makes recovery durable.
 
 > mark:
 
 **15.** An attacker who reaches the git server's storage reads the estate's source code, since protection of what it stores is unverified.
 
-- cites: `store:git-server`
-- tier: expected · severity: low/medium · verb: `read`
-- recorded note: The source names this gap explicitly in its closing line, which is the sentence most likely to be dropped in extraction.
+- `store:git-server`
+- severity: low/medium · verb: `read`
+- The source names this gap explicitly in its closing line, which is the sentence most likely to be dropped in extraction.
 
 > mark:
 
 **16.** An attacker who reaches the image registry's storage reads the built images and whatever is baked into them, since protection at rest is unverified.
 
-- cites: `store:image-registry`
-- tier: expected · severity: low/medium · verb: `read`
-- recorded note: Paired with the git-server claim in the same closing sentence; kept separate because they are different stores with different reachability.
+- `store:image-registry`
+- severity: low/medium · verb: `read`
+- Paired with the git-server claim in the same closing sentence; kept separate because they are different stores with different reachability.
 
 > mark:
 
 **17.** An attacker on the retail WAN reads the container image as a store server pulls it, since protection of that traffic is unverified.
 
-- cites: `flow:store-server-to-image-registry:pull-image`
-- tier: expected · severity: low/medium · verb: `intercept`
-- recorded note: Reading the image in transit and altering it in transit are two claims on one flow. The elements are identical, so the action verb is the only thing that separates them: `intercept` against `alter-in-transit`.
+- `flow:store-server-to-image-registry:pull-image`
+- severity: low/medium · verb: `intercept`
+- Reading the image in transit and altering it in transit are two claims on one flow. The elements are identical, so the action verb is the only thing that separates them: `intercept` against `alter-in-transit`.
 
 > mark:
 
@@ -309,25 +307,25 @@ on either of them. That is the finding this sitting exists for.
 
 **18.** An attacker sets the current release to an image that does not start, and every store server restarts into it and stops serving tills.
 
-- cites: `process:deploy-controller`, `process:store-server`
-- tier: must-find · severity: medium/high · verb: `alter`
-- recorded note: The estate-wide blast radius is the poll loop working as designed; this is the availability face of the same write the tampering lane files as integrity.
+- `process:deploy-controller`, `process:store-server`
+- severity: medium/high · verb: `alter`
+- The estate-wide blast radius is the poll loop working as designed; this is the availability face of the same write the tampering lane files as integrity.
 
 > mark:
 
 **19.** An attacker floods the deploy controller until the estate's polls fail and no new release can reach any store.
 
-- cites: `process:deploy-controller`
-- tier: expected · severity: medium/low · verb: `flood`
-- recorded note: Impact is low because a store server that cannot poll keeps running the image it has; what stops is deployment, not selling.
+- `process:deploy-controller`
+- severity: medium/low · verb: `flood`
+- Impact is low because a store server that cannot poll keeps running the image it has; what stops is deployment, not selling.
 
 > mark:
 
 **20.** An attacker makes the image registry unreachable over the WAN so store servers cannot complete a pull and the estate is left split across two releases.
 
-- cites: `flow:store-server-to-image-registry:pull-image`, `store:image-registry`
-- tier: expected · severity: low/medium · verb: `disable`
-- recorded note: The interesting consequence is not downtime but divergence: the source describes no ordering or rollback across 1,200 independent pullers.
+- `flow:store-server-to-image-registry:pull-image`, `store:image-registry`
+- severity: low/medium · verb: `disable`
+- The interesting consequence is not downtime but divergence: the source describes no ordering or rollback across 1,200 independent pullers.
 
 > mark:
 
@@ -336,33 +334,33 @@ on either of them. That is the finding this sitting exists for.
 
 **21.** Any developer turns code of their own choosing into the software running in 1,200 stores by triggering the manual rebuild, a path the source states requires no merge and receives no review.
 
-- cites: `flow:developer-to-build-runner:manual-rebuild`, `process:store-server`
-- tier: must-find · severity: medium/high · verb: `abuse-grant`
-- recorded note: The case's signature shape: authority flows upward through the build, so the weakest gate on the input side is the real authority over the estate.
+- `flow:developer-to-build-runner:manual-rebuild`, `process:store-server`
+- severity: medium/high · verb: `abuse-grant`
+- The case's signature shape: authority flows upward through the build, so the weakest gate on the input side is the real authority over the estate.
 
 > mark:
 
 **22.** An attacker who compromises the build runner controls what every store server runs, because the runner both writes the image and holds the token that names the release.
 
-- cites: `process:build-runner`, `process:store-server`
-- tier: must-find · severity: medium/high · verb: `escalate`
-- recorded note: The runner concentrates both halves of the deploy path, so the build environment is effectively a higher-privilege zone than the estate it feeds.
+- `process:build-runner`, `process:store-server`
+- severity: medium/high · verb: `escalate`
+- The runner concentrates both halves of the deploy path, so the build environment is effectively a higher-privilege zone than the estate it feeds.
 
 > mark:
 
 **23.** An attacker who takes one store server uses whatever it presents to reach the deploy controller on the corporate network and the registry in the build environment.
 
-- cites: `process:store-server`, `process:deploy-controller`
-- tier: expected · severity: low/high · verb: `escalate`
-- recorded note: A back-office box in one of 1,200 stores is the least defensible element in the model and it is stated to reach across two boundaries.
+- `process:store-server`, `process:deploy-controller`
+- severity: low/high · verb: `escalate`
+- A back-office box in one of 1,200 stores is the least defensible element in the model and it is stated to reach across two boundaries.
 
 > mark:
 
 **24.** A malicious dependency executes with the build runner's authority during the build, carrying an attacker from the public internet into the build environment.
 
-- cites: `flow:build-runner-to-public-package-registry:resolve-dependencies`, `process:build-runner`
-- tier: expected · severity: medium/high · verb: `escalate`
-- recorded note: Distinct from the tampering claim on the same flow: that one is about what ends up in the image, this one is about code running on the runner at build time.
+- `flow:build-runner-to-public-package-registry:resolve-dependencies`, `process:build-runner`
+- severity: medium/high · verb: `escalate`
+- Distinct from the tampering claim on the same flow: that one is about what ends up in the image, this one is about code running on the runner at build time.
 
 > mark:
 

@@ -271,7 +271,14 @@ pre { background:#8881; padding:1rem; overflow-x:auto; white-space:pre-wrap; bor
 .verbatim { background:none; border-left:2px solid var(--line); border-radius:0; padding:0 0 0 1rem; font:inherit; }
 .scroll { overflow-x:auto; } table { border-collapse:collapse; width:100%; font-size:.84rem; }
 th,td { text-align:left; padding:.35rem .6rem; border-bottom:1px solid var(--line); } th { color:var(--dim); }
-ul.terms { list-style:none; padding:0; }.rec { border-left:3px solid #8886; }.fields { list-style:none; padding:0; }
+ul.terms { list-style:none; padding:0; }.rec { border-left:3px solid #8886; }
+.fields { list-style:none; padding:0; font-size:.85rem; }.fields li { margin:.35rem 0; }
+/* A field label and an element id both read as the report's rounded boxes. */
+.fields .lbl { display:inline-block; border:1px solid var(--line); border-radius:999px;
+  padding:1px .55rem; margin-right:.35rem; background:#8881; color:var(--dim);
+  text-transform:uppercase; letter-spacing:.05em; font-size:.68rem; font-weight:600; }
+.fields code.id { background:#8881; border:1px solid var(--line); border-radius:6px;
+  padding:1px .4rem; }
 .mark { display:flex; gap:.6rem; align-items:baseline; margin-top:.8rem; padding-top:.7rem; border-top:1px solid var(--line); }
 .aside { color:var(--dim); font-size:.85rem; }.framework-picker { border:0; padding:0; margin:1rem 0; }
 .framework-picker label { margin-right:1rem; } details.framework { border:1px solid var(--line); border-radius:8px; padding:.75rem 1rem; margin:.8rem 0; }
@@ -299,6 +306,7 @@ ul.terms { list-style:none; padding:0; }.rec { border-left:3px solid #8886; }.fi
     <li><b>Agree</b> when the underlying finding is real, supported by the case, and worth reporting.</li>
     <li><b>Reject</b> when the finding is unsupported, materially overstated, or simply incorrect.</li>
     <li><b>Duplicate</b> when another recorded entry already describes the same underlying issue.</li>
+    <li><b>Unsure</b> when you read the finding and cannot decide. It is a real answer: record it rather than pick one of the other three to get past the entry.</li>
   </ul>
   <p><b>Judge the issue, not the wording.</b> Two differently worded findings can be duplicates, while similar-looking findings can still be distinct when they affect different assets, trust boundaries, or failure paths.</p>
   <section><h3>Why this can stay local</h3>
@@ -332,7 +340,7 @@ ul.terms { list-style:none; padding:0; }.rec { border-left:3px solid #8886; }.fi
 
 <article id="case" class="hidden">
 <header><h2 id="caseTitle"></h2><p class="walk"><button id="previous">← Previous</button><span id="progressTop" class="progress"></span><button id="next">Next →</button></p></header>
-<p class="sub"><code id="caseId"></code></p><p id="moved" class="note hidden"></p><p id="waiting" class="note hidden"></p>
+<p id="moved" class="note hidden"></p><p id="waiting" class="note hidden"></p>
 <section><h2>System description</h2><div id="partOne" class="doc"></div></section>
 <section id="one"><h2>Part 1 — your independent review</h2>
 <p class="note">Before seeing any model findings, write the security concerns or unanswered questions you notice in the system description, one per line. <b>After you save and reveal the model findings, this list is locked.</b> Resetting clears Part 2 answers but does not allow this independent first pass to be changed.</p>
@@ -354,7 +362,7 @@ ul.terms { list-style:none; padding:0; }.rec { border-left:3px solid #8886; }.fi
 </article>
 
 <article id="readOnly" class="hidden">
-<header><h2 id="readOnlyTitle"></h2></header><p class="sub"><code id="readOnlyCase"></code> · <span class="readonly-badge">Read only</span></p>
+<header><h2 id="readOnlyTitle"></h2></header><p class="sub"><span class="readonly-badge">Read only</span></p>
 <p id="readOnlyMeta" class="note"></p><section><h2>System description</h2><div id="readOnlyPartOne"></div></section>
 <section><h2>Recorded review</h2><pre id="readOnlyDocument"></pre></section>
 </article>

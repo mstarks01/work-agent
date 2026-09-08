@@ -25,8 +25,6 @@ Roughly an hour.
 
 ### System description (description)
 
-Exactly what the service would receive.
-
 > Sokify order and dispatch — rough notes for the threat model.
 >
 > Sokify sells socks online. Customers browse and order through our mobile app;
@@ -139,9 +137,8 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A1.** `V12.2.1` — The mobile app reaches the web API over HTTP rather than HTTPS.
 
-- cites: `process:mobile-app`, `process:web-api`, `flow:mobile-app-to-web-api:api-traffic`
-- tier: must-find
-- recorded note: encryption_in_transit is stated absent, so the ruling is plain rather than conditional.
+- `process:mobile-app`, `process:web-api`, `flow:mobile-app-to-web-api:api-traffic`
+- encryption_in_transit is stated absent, so the ruling is plain rather than conditional.
 
 > mark:
 
@@ -150,9 +147,8 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A2.** `V14.2.1` — Customer names, addresses and card details are held with no stated protection.
 
-- cites: `store:user-database`, `process:web-api`, `flow:web-api-to-user-database:customer-records`
-- tier: must-find
-- recorded note: The classification is stated and nothing that follows from it is.
+- `store:user-database`, `process:web-api`, `flow:web-api-to-user-database:customer-records`
+- The classification is stated and nothing that follows from it is.
 
 > mark:
 
@@ -161,9 +157,8 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A3.** `V1.2.4` — A macro-bearing spreadsheet sends SQL statements to the web API over an unstated transport.
 
-- cites: `process:catalogue-spreadsheet`, `process:web-api`, `flow:catalogue-spreadsheet-to-web-api:sql-statements`
-- tier: must-find
-- recorded note: The strongest injection trigger in the corpus: raw SQL from a client the model names.
+- `process:catalogue-spreadsheet`, `process:web-api`, `flow:catalogue-spreadsheet-to-web-api:sql-statements`
+- The strongest injection trigger in the corpus: raw SQL from a client the model names.
 
 > mark:
 
@@ -172,9 +167,8 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A4.** `V15.3.1` — The web API serves customer records to the mobile app and nothing states which fields a response carries.
 
-- cites: `process:mobile-app`, `process:web-api`, `flow:mobile-app-to-web-api:api-traffic`
-- tier: must-find
-- recorded note: The delivery file receives addresses only, and the source says so. The open subset question is what the API returns to the app.
+- `process:mobile-app`, `process:web-api`, `flow:mobile-app-to-web-api:api-traffic`
+- The delivery file receives addresses only, and the source says so. The open subset question is what the API returns to the app.
 
 > mark:
 
@@ -183,9 +177,8 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A5.** `V6.1.1` — Nothing states how a customer is authenticated to the mobile app.
 
-- cites: `entity:customer`, `process:mobile-app`, `flow:customer-to-mobile-app:browse-and-order`
-- tier: must-find
-- recorded note: authentication is unknown on the one human-facing flow.
+- `entity:customer`, `process:mobile-app`, `flow:customer-to-mobile-app:browse-and-order`
+- authentication is unknown on the one human-facing flow.
 
 > mark:
 
@@ -194,9 +187,8 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A6.** `V8.2.2` — Nothing restricts what the web API may read from the customer record store.
 
-- cites: `process:web-api`, `store:user-database`
-- tier: expected
-- recorded note: The store holds payment card data and the flow's authentication is unknown.
+- `process:web-api`, `store:user-database`
+- The store holds payment card data and the flow's authentication is unknown.
 
 > mark:
 
@@ -205,9 +197,8 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A7.** `V3.5.3` — Nothing states which HTTP methods the web API accepts for order submission.
 
-- cites: `process:web-api`, `flow:mobile-app-to-web-api:api-traffic`
-- tier: expected
-- recorded note: An HTTP surface is stated; the method policy is not.
+- `process:web-api`, `flow:mobile-app-to-web-api:api-traffic`
+- An HTTP surface is stated; the method policy is not.
 
 > mark:
 
@@ -231,25 +222,25 @@ on either of them. That is the finding this sitting exists for.
 
 **1.** An attacker submits orders to the web API as if they came from the mobile app, since how the API authenticates callers is unverified.
 
-- cites: `flow:mobile-app-to-web-api:api-traffic`, `process:web-api`
-- tier: must-find · severity: medium/high · verb: `impersonate`
-- recorded note: The source states outright that nobody can say what the API does about authentication, and the app is the only stated client; needs-info is an acceptable verdict here, silence is not.
+- `flow:mobile-app-to-web-api:api-traffic`, `process:web-api`
+- severity: medium/high · verb: `impersonate`
+- The source states outright that nobody can say what the API does about authentication, and the app is the only stated client; needs-info is an acceptable verdict here, silence is not.
 
 > mark:
 
 **2.** An attacker who obtains a copy of the catalogue spreadsheet sends SQL to the web API as the catalogue tool.
 
-- cites: `flow:catalogue-spreadsheet-to-web-api:sql-statements`, `process:catalogue-spreadsheet`
-- tier: must-find · severity: medium/high · verb: `impersonate`
-- recorded note: The macro path's authority is carried by a file on a laptop; nothing in the source identifies who is driving it.
+- `flow:catalogue-spreadsheet-to-web-api:sql-statements`, `process:catalogue-spreadsheet`
+- severity: medium/high · verb: `impersonate`
+- The macro path's authority is carried by a file on a laptop; nothing in the source identifies who is driving it.
 
 > mark:
 
 **3.** An attacker faxes a customer what appears to be a Sokify order confirmation, since nothing on the fax leg identifies the sender.
 
-- cites: `flow:fax-gateway-to-customer:confirmation-fax`, `entity:customer`
-- tier: expected · severity: low/medium · verb: `forge`
-- recorded note: The reverse direction of the case's signature weakness: the model records that the destination is never verified, and the leg carries no sender identity either.
+- `flow:fax-gateway-to-customer:confirmation-fax`, `entity:customer`
+- severity: low/medium · verb: `forge`
+- The reverse direction of the case's signature weakness: the model records that the destination is never verified, and the leg carries no sender identity either.
 
 > mark:
 
@@ -258,41 +249,41 @@ on either of them. That is the finding this sitting exists for.
 
 **4.** An attacker on the network path alters order details in flight between the app and the web API, because that traffic runs over plain HTTP.
 
-- cites: `flow:mobile-app-to-web-api:api-traffic`
-- tier: must-find · severity: high/medium · verb: `alter-in-transit`
-- recorded note: The missing TLS is stated by the source rather than inferred, so this is the one claim in the case that rests on no unknown at all.
+- `flow:mobile-app-to-web-api:api-traffic`
+- severity: high/medium · verb: `alter-in-transit`
+- The missing TLS is stated by the source rather than inferred, so this is the one claim in the case that rests on no unknown at all.
 
 > mark:
 
 **5.** An attacker drives the spreadsheet's macros to change catalogue prices through the web API.
 
-- cites: `flow:catalogue-spreadsheet-to-web-api:sql-statements`, `process:web-api`
-- tier: must-find · severity: medium/high · verb: `alter`
-- recorded note: The stated purpose of the path, exercised by the wrong party; distinct from injecting statements the path was never meant to carry.
+- `flow:catalogue-spreadsheet-to-web-api:sql-statements`, `process:web-api`
+- severity: medium/high · verb: `alter`
+- The stated purpose of the path, exercised by the wrong party; distinct from injecting statements the path was never meant to carry.
 
 > mark:
 
 **6.** An attacker appends further SQL to the statements the macros send so the web API executes changes beyond prices and product copy.
 
-- cites: `flow:catalogue-spreadsheet-to-web-api:sql-statements`, `process:web-api`
-- tier: must-find · severity: medium/high · verb: `inject`
-- recorded note: Injection through a path that carries statements rather than parameters; kept distinct from the price-change claim because the target differs. `inject` against a claim about altering a price is a verb difference as well as an element one.
+- `flow:catalogue-spreadsheet-to-web-api:sql-statements`, `process:web-api`
+- severity: medium/high · verb: `inject`
+- Injection through a path that carries statements rather than parameters; kept distinct from the price-change claim because the target differs. `inject` against a claim about altering a price is a verb difference as well as an element one.
 
 > mark:
 
 **7.** An attacker who can write to the flat file rewrites a delivery address so goods are dispatched somewhere else.
 
-- cites: `store:delivery-address-flat-file`, `process:sims`
-- tier: expected · severity: low/high · verb: `alter`
-- recorded note: The file sits alongside SIMS with no stated protection; the impact is physical goods, not records.
+- `store:delivery-address-flat-file`, `process:sims`
+- severity: low/high · verb: `alter`
+- The file sits alongside SIMS with no stated protection; the impact is physical goods, not records.
 
 > mark:
 
 **8.** An attacker changes the number stored against an order so the confirmation is faxed to a machine they control.
 
-- cites: `flow:web-api-to-sims:order-handover`, `process:sims`
-- tier: expected · severity: low/medium · verb: `alter`
-- recorded note: Reaches the disclosure below by a tampering route; the two are separate findings because the actions differ.
+- `flow:web-api-to-sims:order-handover`, `process:sims`
+- severity: low/medium · verb: `alter`
+- Reaches the disclosure below by a tampering route; the two are separate findings because the actions differ.
 
 > mark:
 
@@ -301,25 +292,25 @@ on either of them. That is the finding this sitting exists for.
 
 **9.** A customer denies placing an order and Sokify cannot show who submitted it, because how the API authenticates callers is unverified.
 
-- cites: `process:web-api`, `flow:mobile-app-to-web-api:api-traffic`
-- tier: must-find · severity: medium/medium · verb: `unattributable`
-- recorded note: The same unknown as the spoofing claim, filed for what it costs after the fact rather than for the access it grants.
+- `process:web-api`, `flow:mobile-app-to-web-api:api-traffic`
+- severity: medium/medium · verb: `unattributable`
+- The same unknown as the spoofing claim, filed for what it costs after the fact rather than for the access it grants.
 
 > mark:
 
 **10.** Nobody can show who made a price change, because the changes arrive at the web API as SQL from a spreadsheet rather than from an identified user.
 
-- cites: `flow:catalogue-spreadsheet-to-web-api:sql-statements`
-- tier: expected · severity: medium/medium · verb: `unattributable`
-- recorded note: Grounded in the model's shape rather than in a missing control: the source describes no person at the sending end of this flow.
+- `flow:catalogue-spreadsheet-to-web-api:sql-statements`
+- severity: medium/medium · verb: `unattributable`
+- Grounded in the model's shape rather than in a missing control: the source describes no person at the sending end of this flow.
 
 > mark:
 
 **11.** Sokify cannot show a confirmation ever reached the customer, because nobody checks the fax arrived at the right place.
 
-- cites: `flow:fax-gateway-to-customer:confirmation-fax`
-- tier: expected · severity: medium/low · verb: `unattributable`
-- recorded note: The stated absence read for its evidentiary cost; an analyst that only files the disclosure has read half of it.
+- `flow:fax-gateway-to-customer:confirmation-fax`
+- severity: medium/low · verb: `unattributable`
+- The stated absence read for its evidentiary cost; an analyst that only files the disclosure has read half of it.
 
 > mark:
 
@@ -328,33 +319,33 @@ on either of them. That is the finding this sitting exists for.
 
 **12.** An attacker on the network path reads customer details out of the app's plain-HTTP traffic to the web API.
 
-- cites: `flow:mobile-app-to-web-api:api-traffic`
-- tier: must-find · severity: high/high · verb: `intercept`
-- recorded note: The clearest finding in the case and the one that needs no unknown; a run that misses it has not read the source at all.
+- `flow:mobile-app-to-web-api:api-traffic`
+- severity: high/high · verb: `intercept`
+- The clearest finding in the case and the one that needs no unknown; a run that misses it has not read the source at all.
 
 > mark:
 
 **13.** An attacker who reaches the user database reads customers' names, addresses and the cards they paid with, since at-rest protection is unverified.
 
-- cites: `store:user-database`
-- tier: must-find · severity: medium/high · verb: `read`
-- recorded note: The source names the contents and then says outright that nobody knows whether the store is encrypted.
+- `store:user-database`
+- severity: medium/high · verb: `read`
+- The source names the contents and then says outright that nobody knows whether the store is encrypted.
 
 > mark:
 
 **14.** An attacker who reaches the flat file reads every delivery address written into it.
 
-- cites: `store:delivery-address-flat-file`
-- tier: expected · severity: medium/medium · verb: `read`
-- recorded note: Lower impact than the database because the source is explicit that only addresses go in the file, which is a stated scope limit rather than an assumed one.
+- `store:delivery-address-flat-file`
+- severity: medium/medium · verb: `read`
+- Lower impact than the database because the source is explicit that only addresses go in the file, which is a stated scope limit rather than an assumed one.
 
 > mark:
 
 **15.** The confirmation fax discloses a customer's name and address to whoever holds the dialled number, because nobody checks it arrived at the right place.
 
-- cites: `flow:fax-gateway-to-customer:confirmation-fax`, `process:fax-gateway`
-- tier: must-find · severity: medium/medium · verb: `read`
-- recorded note: The case's signature threat and the reason the fax leg is in the corpus at all: a channel where the control is not unverified but unavailable, which is a different thing from unknown.
+- `flow:fax-gateway-to-customer:confirmation-fax`, `process:fax-gateway`
+- severity: medium/medium · verb: `read`
+- The case's signature threat and the reason the fax leg is in the corpus at all: a channel where the control is not unverified but unavailable, which is a different thing from unknown.
 
 > mark:
 
@@ -363,25 +354,25 @@ on either of them. That is the finding this sitting exists for.
 
 **16.** An attacker floods the internet-facing web API until customers cannot place orders.
 
-- cites: `process:web-api`
-- tier: expected · severity: medium/medium · verb: `flood`
-- recorded note: The app is the only channel the source describes, so losing the API loses all ordering.
+- `process:web-api`
+- severity: medium/medium · verb: `flood`
+- The app is the only channel the source describes, so losing the API loses all ordering.
 
 > mark:
 
 **17.** An attacker sends SQL through the macro path that locks catalogue rows so the app cannot serve the catalogue.
 
-- cites: `flow:catalogue-spreadsheet-to-web-api:sql-statements`, `process:web-api`
-- tier: expected · severity: low/high · verb: `inject`
-- recorded note: The same path as the tampering claims, used to deny rather than to alter.
+- `flow:catalogue-spreadsheet-to-web-api:sql-statements`, `process:web-api`
+- severity: low/high · verb: `inject`
+- The same path as the tampering claims, used to deny rather than to alter.
 
 > mark:
 
 **18.** An attacker who stops SIMS accepting order handovers halts dispatch for every order placed.
 
-- cites: `process:sims`, `flow:web-api-to-sims:order-handover`
-- tier: expected · severity: low/high · verb: `disable`
-- recorded note: SIMS is a single legacy path with no stated alternative; orders are taken but nothing ships.
+- `process:sims`, `flow:web-api-to-sims:order-handover`
+- severity: low/high · verb: `disable`
+- SIMS is a single legacy path with no stated alternative; orders are taken but nothing ships.
 
 > mark:
 
@@ -390,17 +381,17 @@ on either of them. That is the finding this sitting exists for.
 
 **19.** An attacker who reaches the marketing laptop gains a write path into the web API from the office zone, because the spreadsheet's macros speak SQL to it.
 
-- cites: `process:catalogue-spreadsheet`, `flow:catalogue-spreadsheet-to-web-api:sql-statements`, `process:web-api`
-- tier: must-find · severity: medium/high · verb: `escalate`
-- recorded note: The crossing an analyst should see first: an unmanaged endpoint in a different zone holds a standing write path into the server-side estate.
+- `process:catalogue-spreadsheet`, `flow:catalogue-spreadsheet-to-web-api:sql-statements`, `process:web-api`
+- severity: medium/high · verb: `escalate`
+- The crossing an analyst should see first: an unmanaged endpoint in a different zone holds a standing write path into the server-side estate.
 
 > mark:
 
 **20.** An attacker whose SQL reaches the web API through the catalogue path acts against customer records the catalogue tool has no business touching.
 
-- cites: `flow:catalogue-spreadsheet-to-web-api:sql-statements`, `store:user-database`
-- tier: expected · severity: medium/high · verb: `abuse-grant`
-- recorded note: The classic escalation shape: a path scoped by intent rather than by a control, reaching whatever authority the API holds over the database.
+- `flow:catalogue-spreadsheet-to-web-api:sql-statements`, `store:user-database`
+- severity: medium/high · verb: `abuse-grant`
+- The classic escalation shape: a path scoped by intent rather than by a control, reaching whatever authority the API holds over the database.
 
 > mark:
 
