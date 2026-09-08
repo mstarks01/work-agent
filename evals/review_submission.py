@@ -46,6 +46,22 @@ class MergedReview:
     def signature(self) -> str:
         return sittings.naming(self.envelope.submitted_by, self.envelope.submitted_for)
 
+    @property
+    def generated(self) -> str:
+        return self.envelope.generated
+
+    @property
+    def order(self) -> tuple[str, str]:
+        """What "later" means for a merged sitting, spelled once.
+
+        The ``generated`` date is the only date a file carries, so it decides.
+        The name breaks a tie between two signatures on one date, and both of
+        those stay live; a tie inside one signature is refused by
+        :func:`_live`, because nothing in the files says which the reader
+        wrote last.
+        """
+        return (self.generated, self.path.name)
+
 
 def covers(root: Path, case_id: str, answers: envelopes.CaseAnswers) -> list[str]:
     """Which **Framework**s this sitting read. See
@@ -98,7 +114,25 @@ def validate(
     for case_id, answers in envelope.cases.items():
         if case_id in offered:
             problems.extend(_case_problems(root, case_id, answers))
-    return problems
+    return [*problems, *_ties_with(root, envelope)]
+
+
+def _ties_with(root: Path, envelope: envelopes.Envelope) -> list[str]:
+    """The ties this envelope would make against what is already merged.
+
+    Read before the file is in the tree, so the app and CI refuse the same
+    thing. A merged file with this envelope's own name is this envelope, and
+    is not a tie with itself.
+    """
+    name = submission_name(envelope)
+    try:
+        merged = [
+            (path, held) for path, held in iter_submissions(root) if path.name != name
+        ]
+    except ReviewSubmissionError:
+        return []
+    _, ties = _live(_reviews([*merged, (root / relative_path(envelope), envelope)]))
+    return ties
 
 
 def _read(path: Path) -> envelopes.Envelope:
@@ -131,7 +165,44 @@ def repository_problems(root: Path) -> list[str]:
             )
         if not envelope.cases:
             problems.append(f"{path.relative_to(root)}: contains no completed cases")
-    return problems
+    _, ties = _live(_reviews(submissions))
+    return [*problems, *ties]
+
+
+def _live(reviews: list[MergedReview]) -> tuple[list[MergedReview], list[str]]:
+    """The live sitting per case and signature, and every tie nothing breaks.
+
+    A reader who sits one case twice replaces their earlier sitting, and
+    "later" is the ``generated`` date. Two sittings by one signature of one
+    case on one date carry nothing that says which the reader wrote last, so
+    neither is live and both are named. A merged file is never removed, so
+    the reader's remedy is a sitting dated later, and a maintainer's is to
+    drop one of the two.
+    """
+    grouped: dict[tuple[str, str], list[MergedReview]] = {}
+    for review in reviews:
+        grouped.setdefault((review.case_id, review.signature), []).append(review)
+    live: list[MergedReview] = []
+    ties: list[str] = []
+    for (case_id, signature), held in grouped.items():
+        newest = max(review.generated for review in held)
+        tied = sorted(review.path.name for review in held if review.generated == newest)
+        if len(tied) == 1:
+            live.append(max(held, key=lambda review: review.order))
+            continue
+        ties.append(
+            f"{case_id}: {' and '.join(tied)} are both {signature}'s sitting dated"
+            f" {newest}, and nothing says which is later; keep one"
+        )
+    return live, ties
+
+
+def _reviews(submissions) -> list[MergedReview]:
+    return [
+        MergedReview(path, envelope, case_id, answers)
+        for path, envelope in submissions
+        for case_id, answers in envelope.cases.items()
+    ]
 
 
 def current_reviews(root: Path) -> dict[str, dict[str, MergedReview]]:
@@ -147,19 +218,19 @@ def current_reviews(root: Path) -> dict[str, dict[str, MergedReview]]:
     whose evidence moved and leaves the rest standing.
 
     Later submissions win, which is how a second reader replaces a first.
+    :func:`_live` says what later is, and drops the pair it cannot order.
     """
     covered: dict[str, dict[str, MergedReview]] = {}
     try:
         submissions = list(iter_submissions(root))
     except ReviewSubmissionError:
         return covered
-    for path, envelope in submissions:
-        for case_id, answers in envelope.cases.items():
-            if _case_problems(root, case_id, answers):
-                continue
-            review = MergedReview(path, envelope, case_id, answers)
-            for framework in covers(root, case_id, answers):
-                covered.setdefault(case_id, {})[framework] = review
+    live, _ = _live(_reviews(submissions))
+    for review in sorted(live, key=lambda review: review.order):
+        if _case_problems(root, review.case_id, review.answers):
+            continue
+        for framework in covers(root, review.case_id, review.answers):
+            covered.setdefault(review.case_id, {})[framework] = review
     return covered
 
 
@@ -197,7 +268,7 @@ def current_for_case(root: Path, case_id: str) -> MergedReview | None:
     recent state of the case.
     """
     covered = current_reviews(root).get(case_id, {})
-    return max(covered.values(), key=lambda review: review.path.name, default=None)
+    return max(covered.values(), key=lambda review: review.order, default=None)
 
 
 def rail_signatures(root: Path) -> tuple[dict[str, str], dict[str, str]]:
@@ -223,7 +294,7 @@ def rail_signatures(root: Path) -> tuple[dict[str, str], dict[str, str]]:
             read = ", ".join(sorted(reviews))
             partial[case_id] = f"{', '.join(left)} waiting; {read} read"
         else:
-            newest = max(reviews.values(), key=lambda review: review.path.name)
+            newest = max(reviews.values(), key=lambda review: review.order)
             signed[case_id] = newest.signature
     return signed, partial
 

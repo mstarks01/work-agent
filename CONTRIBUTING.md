@@ -21,7 +21,7 @@ is any good. Two kinds:
   request included. It records as one JSON file and needs no write access;
   [`evals/BLESSING.md`](evals/BLESSING.md) step 6 explains the method, and
   `webapp/offline_sitting.py` writes the same sitting as one standalone page
-  for a reader who cannot clone at all. 13 of the 13 cases are still waiting
+  for a reader who cannot clone at all. 12 of the 13 cases are still waiting
   for one.
 
 Both are **free and offline**, and neither needs a provider key. A golden case

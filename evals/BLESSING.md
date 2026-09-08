@@ -588,9 +588,15 @@ reference set, not the roster, not a test. A pull request that touches anything
 else fails the scope check by name. So a correction you would make to a recorded
 set travels as prose in your notes, and a maintainer makes the change.
 
+**A second sitting of one case replaces your first by its date.** The
+`generated` date is the only date a submission carries. Two sittings of one
+case by one reader on one date say nothing about which came last, so CI refuses
+the second one on that day. Sit it again on a later date, or ask a maintainer to
+drop one of the two.
+
 `tests/test_case_review.py` fails on a new case that arrives with no submission
 clearing it, and its `UNREVIEWED` table says what each unread case leaves
-unchecked. Thirteen of the 13 cases that shipped before this was enforced are
+unchecked. Twelve of the 13 cases that shipped before this was enforced are
 still unread. The table is not the count — `evals.review_submission`
 derives that from the corpus and the merged submissions, so no list can disagree
 with it — and an entry for a case somebody has since read is spent and can be

@@ -124,3 +124,56 @@ def test_the_json_contains_the_human_evidence(tmp_path: Path):
         "model.json",
         "claims/stride.json",
     }
+
+
+def dated(
+    envelope: envelopes.Envelope, generated: str, notes: str
+) -> envelopes.Envelope:
+    """The same sitting on another date, with a note that says which it is."""
+    answers = envelope.cases[CASE].model_copy(update={"notes": notes})
+    return envelope.model_copy(
+        update={"generated": generated, "cases": {CASE: answers}}
+    )
+
+
+def test_a_later_dated_sitting_by_one_reader_replaces_the_first(tmp_path: Path):
+    tree = tree_for(tmp_path)
+    write_review(tree, dated(envelope_for(tree), "2026-09-05", "first"))
+    write_review(tree, dated(envelope_for(tree), "2026-09-06", "second"))
+    assert reviews.repository_problems(tree) == []
+    current = reviews.current_for_case(tree, CASE)
+    assert current is not None and current.answers.notes == "second"
+    assert reviews.unreviewed_cases(tree) == []
+
+
+def test_two_sittings_by_one_reader_on_one_date_are_refused(tmp_path: Path):
+    """Nothing in the files says which one the reader wrote last.
+
+    The name is a digest, so on one date two files sort by a random hex
+    string. The pull request that would make the pair is refused, and a pair
+    that reaches the tree covers nothing rather than whichever sorts last.
+    """
+    tree = tree_for(tmp_path)
+    first = dated(envelope_for(tree), "2026-09-05", "first")
+    second = dated(envelope_for(tree), "2026-09-05", "second")
+    first_path = write_review(tree, first)
+    refused = reviews.validate(second, tree, author="ada")
+    assert any("nothing says which is later" in problem for problem in refused)
+    # The merged file is this envelope, and a file is not a tie with itself.
+    assert reviews.validate(first, tree, author="ada") == []
+
+    second_path = write_review(tree, second)
+    problems = reviews.repository_problems(tree)
+    assert len(problems) == 1
+    assert first_path.name in problems[0] and second_path.name in problems[0]
+    assert reviews.current_reviews(tree) == {}
+    assert reviews.unreviewed_cases(tree) == [CASE]
+
+
+def test_two_readers_on_one_date_both_cover(tmp_path: Path):
+    tree = tree_for(tmp_path)
+    write_review(tree, envelope_for(tree, "ada"))
+    write_review(tree, envelope_for(tree, "bob"))
+    assert reviews.repository_problems(tree) == []
+    assert set(reviews.current_reviews(tree)[CASE]) == set(reviews.declared(tree, CASE))
+    assert reviews.unreviewed_cases(tree) == []
