@@ -77,6 +77,23 @@ class EvalRunError(RuntimeError):
     """A graph run produced neither the artifact the mode wanted nor a rejection."""
 
 
+class CaseFailure(Exception):
+    """A case whose graph ran to the end and whose result did not become a report.
+
+    Carries what ran, because the provider billed it whatever came next. The
+    sweep used to read a case's node runs off its finished report, so a case
+    that failed at report validation contributed nothing to the usage the
+    artifact prices, and a run that cost a dollar read as free (#707).
+    ``cause`` is the exception the caller classifies, exactly the one it would
+    have caught before this wrapper existed.
+    """
+
+    def __init__(self, cause: Exception, node_runs: Sequence[NodeRun]) -> None:
+        super().__init__(str(cause))
+        self.cause = cause
+        self.node_runs = tuple(node_runs)
+
+
 @dataclass(frozen=True)
 class ExtractionResult:
     """One extraction run: what came out, whether it was valid, and what ran.
@@ -766,6 +783,21 @@ async def run_end_to_end(case: GoldenCase, pipeline: Pipeline) -> AnalysisRun:
 
 
 def _run_from_graph(
+    case: GoldenCase, graph_run: GraphRun, pipeline: Pipeline
+) -> AnalysisRun:
+    """:func:`_report_of`, with what ran attached to whatever it raises.
+
+    The graph is finished by the time this is called, so every node it ran
+    was billed; a failure past this point is a fact about the result and not
+    about the spend, and the sweep needs both.
+    """
+    try:
+        return _report_of(case, graph_run, pipeline)
+    except Exception as exc:
+        raise CaseFailure(exc, graph_run.node_runs) from exc
+
+
+def _report_of(
     case: GoldenCase, graph_run: GraphRun, pipeline: Pipeline
 ) -> AnalysisRun:
     """Complete the graph's :class:`~analysis_service.graph.Analysis` into a report, as production does.

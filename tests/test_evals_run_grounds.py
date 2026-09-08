@@ -318,6 +318,30 @@ def test_a_dead_case_is_counted_and_the_sweep_continues(monkeypatch, case):
     assert [entry.case_id for entry in run.grounds] == ["case-second"]
 
 
+def test_a_case_that_fails_at_report_validation_is_still_metered(monkeypatch, case):
+    """The provider billed every node before the report was built. The sweep
+    read a case's node runs off its finished report, so a case that failed
+    there priced at zero: the second ASVS pre-flight of 2026-09-08 ran for
+    3.5 minutes and its artifact said nothing was metered (#707)."""
+    real_into_report = graph_module.Analysis.into_report
+    dead_once = {"pending": True}
+
+    def into_report_once_dead(self, *args, **kwargs):
+        if dead_once.pop("pending", False):
+            raise DraftJoinError("the report did not validate")
+        return real_into_report(self, *args, **kwargs)
+
+    monkeypatch.setattr(graph_module.Analysis, "into_report", into_report_once_dead)
+
+    run = sweep(monkeypatch, case, None)
+
+    assert [f.kind for f in run.grounds_failures] == ["other"]
+    assert [entry.case_id for entry in run.grounds] == ["case-second"]
+    # Both cases ran the critic; the dead one's execution is counted too, and
+    # the usage fold that prices the sweep reads the same executions list.
+    assert run.latency["critic_stride"].executions == 2
+
+
 def test_a_failed_case_contributes_no_coverage(monkeypatch, case):
     """No report, no accounting — a lane cannot be credited for a dead case."""
     run = sweep(monkeypatch, case, DEAD)

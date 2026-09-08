@@ -323,6 +323,29 @@ async def _run_mode(
     skipped: list[str] = []
     stopped_before: tuple[str, ...] = ()
 
+    def record_failure(case: GoldenCase, error: Exception) -> None:
+        """One reader of what a failed case leaves behind, for both ways it fails."""
+        if isinstance(error, modes.EvalRunError):
+            # The graph refused this case's model. In `end-to-end` that is
+            # extraction and its one `repair` pass both failing, which is a
+            # measurement — and the mode where a refused model is most
+            # expected is also the most expensive per case, so losing the
+            # sweep over one costs every case that already ran.
+            #
+            # Not routed through `classify_failure`: that reads draft-level
+            # faults off the fan-in, and a refused model never produced
+            # drafts. The message already carries the case id.
+            failures.append(str(error))
+            payloads.append({"case": case.id, "run_failure": str(error)})
+            return
+        if isinstance(error, CAUGHT):
+            failure = classify_failure(case.id, error)
+            grounds_failures.append(failure)
+            failures.append(f"{case.id}: {failure.kind}: {failure.detail}")
+            payloads.append({"case": case.id, "grounds_failure": failure.to_json()})
+            return
+        raise error
+
     for position, case in enumerate(cases):
         if position and accepted is not None:
             remaining = [later.id for later in cases[position:]]
@@ -374,24 +397,17 @@ async def _run_mode(
                 if mode == "analysis"
                 else await modes.run_end_to_end(case, pipeline)
             )
-        except modes.EvalRunError as error:
-            # The graph refused this case's model. In `end-to-end` that is
-            # extraction and its one `repair` pass both failing, which is a
-            # measurement — and the mode where a refused model is most expected
-            # is also the most expensive per case, so losing the sweep over one
-            # costs every case that already ran.
-            #
-            # Not routed through `classify_failure`: that reads draft-level
-            # faults off the fan-in, and a refused model never produced drafts.
-            # The message already carries the case id.
-            failures.append(str(error))
-            payloads.append({"case": case.id, "run_failure": str(error)})
+        except modes.CaseFailure as failed:
+            # The graph ran to the end and the provider billed every node, so
+            # what ran joins the sweep's executions before the failure is
+            # classified: a failed case is priced like a finished one (#707).
+            executions += failed.node_runs
+            record_failure(case, failed.cause)
             continue
         except CAUGHT as error:
-            failure = classify_failure(case.id, error)
-            grounds_failures.append(failure)
-            failures.append(f"{case.id}: {failure.kind}: {failure.detail}")
-            payloads.append({"case": case.id, "grounds_failure": failure.to_json()})
+            # A node raised inside the graph. Nothing carries its node runs
+            # out, so this case's spend stays unmetered.
+            record_failure(case, error)
             continue
 
         runs[case.id] = run
