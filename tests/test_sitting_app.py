@@ -1896,6 +1896,64 @@ class TestTheTerminalReadsNoDraft:
         assert capsys.readouterr().out.splitlines() == list(CASES)
 
 
+class TestARowThatWillNotPressSaysWhy:
+    """The one row nobody can open is the one row that has to explain itself.
+
+    An unreadable draft draws a ``!`` and a dead row. The reason lived in the
+    ``title`` tooltip alone, which a keyboard, a touch screen and a screen
+    reader all miss — so the reader met a mark with no sentence behind it, on
+    the only row the app will not let them recover from.
+    """
+
+    def script(self) -> str:
+        return client_script("sitting.js")
+
+    def test_the_error_row_renders_the_reason_as_text(self):
+        """Visible text, through ``el``, so a path arrives as characters."""
+        assert 'el("span", "reason", row.status)' in self.script()
+
+    def test_the_reason_has_a_style_to_render_in(self):
+        """A class the stylesheet does not carry renders as the row's own text."""
+        assert ".reason {" in _PAGE
+
+    def test_the_tooltip_and_the_accessible_name_read_one_sentence(self):
+        """Both call ``railStatus``, so neither can drift from the other."""
+        source = self.script()
+        assert "item.title = status;" in source
+        assert 'name + " — " + status' in source
+        assert "function railStatus(row)" in source
+
+    def test_the_accessible_name_does_not_repeat_the_reason(self):
+        """The name is built from the title, not from the label element.
+
+        ``label.textContent`` carries the reason once the row appends it, so
+        an accessible name taken from the element would say it twice.
+        """
+        assert "label.textContent" not in self.script()
+
+    def test_the_mark_and_the_reason_key_on_one_state(self):
+        """``railSymbol`` draws the ``!`` and ``railRow`` explains it."""
+        source = self.script()
+        assert 'const ERROR = "error";' in source
+        assert "if (state === ERROR)" in source
+        assert "if (row.review.state === ERROR && row.status)" in source
+
+    def test_the_rail_hands_the_page_a_reason_to_show(self, tree):
+        """The prose the row renders is the prose the harness writes."""
+        path = drafts_root(tree) / "sam" / f"{CASE}.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("{ not json", encoding="utf-8")
+        app = browser(session_for(tree, "sam"))
+
+        row = next(r for r in app.get("/api/rail").json()["cases"] if r["case"] == CASE)
+        state = app.get("/api/review-states").json()["states"][CASE]
+
+        assert state["state"] == "error"
+        assert row["pressable"] is False
+        assert row["status"].startswith("draft unreadable: ")
+        assert str(path) in row["status"]
+
+
 class TestACorpusThatDoesNotLoad:
     """A ``case.json`` the loader refuses stops the session with one line.
 
