@@ -1037,7 +1037,11 @@ class TestASweepSurvivesARefusedModel:
         source = (
             Path(__file__).resolve().parents[1] / "evals" / "harness" / "run.py"
         ).read_text(encoding="utf-8")
-        body = source.split("else await modes.run_end_to_end(case, pipeline)", 1)[1]
+        # One reader classifies a failed case however it failed, so the order
+        # lives in that reader's body rather than in two except clauses.
+        body = source.split("def record_failure(", 1)[1]
+        refused = body.index("isinstance(error, modes.EvalRunError)")
+        fan_in = body.index("isinstance(error, CAUGHT)")
 
-        assert body.index("except modes.EvalRunError") < body.index("except CAUGHT")
-        assert "continue" in body[: body.index("except CAUGHT")]
+        assert refused < fan_in
+        assert "return" in body[refused:fan_in]
