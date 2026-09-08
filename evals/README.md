@@ -186,6 +186,7 @@ somewhere else.
 | `harness/structural.py` | The structural gates — the only checks that fail a run. |
 | `harness/scorer.py` | The scoring pipeline: prefilter → rule → match → standing → severity. |
 | `harness/pairing.py` | The reading view behind one applicability disagreement: every requirement the run applied that the case did not expect, and every one the case expected that the run did not deliver, each with the standard's text and the argument made for it. Scores nothing and rules on nothing. |
+| `harness/attribution.py` | Which stage lost each requirement the ASVS matrix or the disposition scorer reports as wrong: precondition, generation, critic, verdict or deferral, read off the scope state, the rejection step or the verdict. Explains the two numbers beside it and moves neither. |
 | `harness/applicability.py` | ASVS's scorer: a confusion matrix over a finite catalog, matched by requirement ID. A closed claim set needs no composed identity, so no rule runs here. Carries the `disposition` instrument beside it, which reads what the run concluded rather than whether the requirement applies. |
 | `harness/critic_yield.py` | What the critic added and removed, scored on both sides. |
 | `harness/grounds.py` | What the category agents did with `grounds` — the branch mix, the padding number and the unverified-quote rate — plus the two failures the grounding path kills a case with. |
@@ -408,9 +409,24 @@ always deferred.
   beside the accuracy figure: a small denominator and a good score are different
   facts.
 
-An `applicable` scope entry — *considered, and nothing raised* — reads as
+A `not-raised` scope entry — *handed to the lanes, and nothing filed* — reads as
 silence rather than as a seventh disposition, so a case cannot expect one. For a
 requirement the case listed, that is the miss recall already counts.
+
+- `attribution` — **which stage lost each requirement the two blocks above
+  report as wrong?** One row per loss, charged to one of five stages in
+  pipeline order: `precondition` (the framework never ran, so the scope entry
+  reads `undecidable` or `not-applicable`), `generation` (no lane filed, so it
+  reads `not-raised`), `critic` (a lane filed and the critic rejected the draft,
+  with the rejection step as the cause), `verdict` (the claim passed review and
+  routed the submitter wrongly), or `deferral` (the run deferred a requirement
+  the case expected settled, or deferred it for the wrong kind of evidence). A
+  requirement the critic rejected is charged once, under `critic`, and never
+  again as a routing error. Every stage is read from a closed token the report
+  carries; the `reason` on each row is the report's own sentence, carried for
+  reading and never counted. Extraction is not a stage here: a scored sweep
+  injects the blessed model, and the `extraction` mode measures that step on
+  its own.
 
 **The complement is only a negative on an exhaustive set.** Each framework
 declares `reference_set` in `case.json`, and it defaults to `sampled`, which is

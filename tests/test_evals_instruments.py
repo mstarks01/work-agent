@@ -129,7 +129,7 @@ class TestTheTableCoversTheArtifact:
                 owners[key] = name
 
     def test_the_instrument_keys_are_the_ones_the_artifact_carried(self):
-        """The 24 keys a sweep writes, pinned one by one.
+        """The 26 keys a sweep writes, pinned one by one.
 
         Pinned as a literal because this is the one place a silent loss would
         not show up as a failing fold: an instrument dropped from the table
@@ -154,6 +154,8 @@ class TestTheTableCoversTheArtifact:
             "applicability_yield_aggregate",
             "disposition",
             "disposition_aggregate",
+            "attribution",
+            "attribution_aggregate",
             "scores",
             "exemplar_delta",
             "unlisted_for_promotion",
@@ -345,10 +347,15 @@ class TestOneCaseMeasuredAlone:
         assert [entry.framework for entry in measured.grounds] == ["asvs"]
 
     def test_a_package_with_a_per_case_scorer_contributes_its_rows(self):
-        """ASVS declares one, so all three of its rows arrive keyed by instrument."""
+        """ASVS declares one, so all four of its rows arrive keyed by instrument."""
         measured = self.measured([asvs_block(1)])
 
-        expected = {"applicability", "disposition", "applicability_yield"}
+        expected = {
+            "applicability",
+            "disposition",
+            "applicability_yield",
+            "attribution",
+        }
         assert set(measured.rows) == expected
         assert set(measured.payload) >= expected
 
