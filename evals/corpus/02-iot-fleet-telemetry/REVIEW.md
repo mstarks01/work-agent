@@ -25,8 +25,6 @@ Roughly an hour.
 
 ### System description (description)
 
-Exactly what the service would receive.
-
 > Telemetry platform for our deployed sensor fleet.
 >
 > We have a few thousand sensor nodes installed on customer sites. They are
@@ -130,17 +128,15 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A1.** `V8.2.1` — Nothing states what restricts the device gateway's access to the device registry.
 
-- cites: `process:device-gateway`, `store:device-registry`, `flow:device-gateway-to-device-registry:look-up-device`
-- tier: must-find
-- recorded note: authentication on the flow is unknown; the requirement applies and stays open.
+- `process:device-gateway`, `store:device-registry`, `flow:device-gateway-to-device-registry:look-up-device`
+- authentication on the flow is unknown; the requirement applies and stays open.
 
 > mark:
 
 **A2.** `V8.3.1` — Nothing states which layer enforces a tenant boundary on telemetry writes.
 
-- cites: `process:telemetry-normalizer`, `store:telemetry-lake`
-- tier: expected
-- recorded note: The normalizer writes every fleet's readings and no enforcing layer is named.
+- `process:telemetry-normalizer`, `store:telemetry-lake`
+- The normalizer writes every fleet's readings and no enforcing layer is named.
 
 > mark:
 
@@ -149,9 +145,8 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A3.** `V10.4.4` — Company SSO is named for operator dashboards and nothing says which grant it uses.
 
-- cites: `entity:fleet-operator`, `store:telemetry-lake`, `flow:fleet-operator-to-telemetry-lake:query-dashboards`
-- tier: must-find
-- recorded note: tech:oauth fires on the SSO mention. The chapter may apply and the input never settles it.
+- `entity:fleet-operator`, `store:telemetry-lake`, `flow:fleet-operator-to-telemetry-lake:query-dashboards`
+- tech:oauth fires on the SSO mention. The chapter may apply and the input never settles it.
 
 > mark:
 
@@ -160,9 +155,8 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A4.** `V11.3.2` — No cipher is stated for either the device registry or the telemetry lake at rest.
 
-- cites: `store:device-registry`, `store:telemetry-lake`
-- tier: must-find
-- recorded note: Both carry encryption_at_rest unknown against confidential and customer data.
+- `store:device-registry`, `store:telemetry-lake`
+- Both carry encryption_at_rest unknown against confidential and customer data.
 
 > mark:
 
@@ -171,9 +165,8 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A5.** `V1.2.4` — Nothing says how the normalizer builds the queries that load readings into BigQuery.
 
-- cites: `process:telemetry-normalizer`, `store:telemetry-lake`
-- tier: expected
-- recorded note: tech:database fires on the BigQuery store.
+- `process:telemetry-normalizer`, `store:telemetry-lake`
+- tech:database fires on the BigQuery store.
 
 > mark:
 
@@ -197,25 +190,25 @@ on either of them. That is the finding this sitting exists for.
 
 **1.** An attacker who extracts the fleet-wide pre-shared key from any one node publishes readings to the gateway as any other device in the fleet.
 
-- cites: `flow:sensor-node-to-device-gateway:publish-readings`, `entity:sensor-node`
-- tier: must-find · severity: high/high · verb: `impersonate`
-- recorded note: The defining finding of this case: one shared, never-rotated key across physically exposed devices.
+- `flow:sensor-node-to-device-gateway:publish-readings`, `entity:sensor-node`
+- severity: high/high · verb: `impersonate`
+- The defining finding of this case: one shared, never-rotated key across physically exposed devices.
 
 > mark:
 
 **2.** An attacker with physical access presents themselves as a field technician on the node's serial console, whose authentication is unverified.
 
-- cites: `flow:field-technician-to-sensor-node:local-service-session`, `entity:sensor-node`
-- tier: must-find · severity: medium/high · verb: `impersonate`
-- recorded note: Physical exposure is stated in the source; console authentication is unknown, so it must be reported unverified.
+- `flow:field-technician-to-sensor-node:local-service-session`, `entity:sensor-node`
+- severity: medium/high · verb: `impersonate`
+- Physical exposure is stated in the source; console authentication is unknown, so it must be reported unverified.
 
 > mark:
 
 **3.** An attacker serves a node a firmware image that impersonates an official release, because the node authenticates neither the bucket nor the image's origin.
 
-- cites: `store:firmware-bucket`, `flow:sensor-node-to-firmware-bucket:poll-firmware`
-- tier: expected · severity: medium/high · verb: `forge`
-- recorded note: Origin authentication, as distinct from the tampering entry about modifying an image in place.
+- `store:firmware-bucket`, `flow:sensor-node-to-firmware-bucket:poll-firmware`
+- severity: medium/high · verb: `forge`
+- Origin authentication, as distinct from the tampering entry about modifying an image in place.
 
 > mark:
 
@@ -224,25 +217,25 @@ on either of them. That is the finding this sitting exists for.
 
 **4.** An attacker who can write to the firmware bucket plants a malicious image that every polling node installs, since image signature verification is unverified.
 
-- cites: `store:firmware-bucket`, `entity:sensor-node`
-- tier: must-find · severity: high/high · verb: `plant`
-- recorded note: Fleet-wide code execution; the source explicitly flags signature checking as unknown.
+- `store:firmware-bucket`, `entity:sensor-node`
+- severity: high/high · verb: `plant`
+- Fleet-wide code execution; the source explicitly flags signature checking as unknown.
 
 > mark:
 
 **5.** An attacker holding the fleet key injects fabricated readings that the normalizer loads into the lake as genuine customer data.
 
-- cites: `flow:sensor-node-to-device-gateway:publish-readings`, `store:telemetry-lake`
-- tier: must-find · severity: high/medium · verb: `forge`
-- recorded note: Data integrity downstream of a spoofable device identity; distinct from the spoofing lane's identity claim.
+- `flow:sensor-node-to-device-gateway:publish-readings`, `store:telemetry-lake`
+- severity: high/medium · verb: `forge`
+- Data integrity downstream of a spoofable device identity; distinct from the spoofing lane's identity claim.
 
 > mark:
 
 **6.** An attacker who can write to the device registry reassigns a node to a different customer, redirecting or corrupting that customer's data.
 
-- cites: `store:device-registry`, `flow:device-gateway-to-device-registry:look-up-device`
-- tier: expected · severity: low/high · verb: `alter`
-- recorded note: The registry is the authority for tenancy; its own access control is unverified.
+- `store:device-registry`, `flow:device-gateway-to-device-registry:look-up-device`
+- severity: low/high · verb: `alter`
+- The registry is the authority for tenancy; its own access control is unverified.
 
 > mark:
 
@@ -251,17 +244,17 @@ on either of them. That is the finding this sitting exists for.
 
 **7.** A customer disputes a reading attributed to their site and no per-device identity exists to establish which node actually sent it.
 
-- cites: `entity:sensor-node`, `store:telemetry-lake`
-- tier: must-find · severity: medium/medium · verb: `unattributable`
-- recorded note: Follows directly from a fleet-wide rather than per-device credential.
+- `entity:sensor-node`, `store:telemetry-lake`
+- severity: medium/medium · verb: `unattributable`
+- Follows directly from a fleet-wide rather than per-device credential.
 
 > mark:
 
 **8.** A technician denies having made a configuration change on a node, and the unauthenticated local console records no actor to contradict them.
 
-- cites: `flow:field-technician-to-sensor-node:local-service-session`
-- tier: expected · severity: medium/medium · verb: `unattributable`
-- recorded note: No logging is described anywhere on the service path.
+- `flow:field-technician-to-sensor-node:local-service-session`
+- severity: medium/medium · verb: `unattributable`
+- No logging is described anywhere on the service path.
 
 > mark:
 
@@ -270,33 +263,33 @@ on either of them. That is the finding this sitting exists for.
 
 **9.** An attacker who reaches the telemetry lake reads customer site addresses and occupancy patterns, whose protection at rest is unverified.
 
-- cites: `store:telemetry-lake`
-- tier: must-find · severity: medium/high · verb: `read`
-- recorded note: Occupancy data is unusually sensitive: it reveals when a physical site is empty.
+- `store:telemetry-lake`
+- severity: medium/high · verb: `read`
+- Occupancy data is unusually sensitive: it reveals when a physical site is empty.
 
 > mark:
 
 **10.** An attacker on the path between a node and the gateway reads readings and the presented key, because transport encryption on the MQTT session is unverified.
 
-- cites: `flow:sensor-node-to-device-gateway:publish-readings`
-- tier: must-find · severity: medium/high · verb: `intercept`
-- recorded note: The same wire carries the credential and the data; a needs-info verdict on encryption is acceptable.
+- `flow:sensor-node-to-device-gateway:publish-readings`
+- severity: medium/high · verb: `intercept`
+- The same wire carries the credential and the data; a needs-info verdict on encryption is acceptable.
 
 > mark:
 
 **11.** An attacker downloads firmware images from the public bucket and reverse-engineers them to recover embedded fleet credentials or logic.
 
-- cites: `store:firmware-bucket`
-- tier: expected · severity: high/medium · verb: `read`
-- recorded note: Public read is stated, not inferred; pairs with the fleet-key finding.
+- `store:firmware-bucket`
+- severity: high/medium · verb: `read`
+- Public read is stated, not inferred; pairs with the fleet-key finding.
 
 > mark:
 
 **12.** An attacker who reaches the device registry reads the key material and customer assignments it holds, whose protection at rest is unverified.
 
-- cites: `store:device-registry`
-- tier: expected · severity: medium/high · verb: `read`
-- recorded note: The registry is tagged credentials; disclosure here is equivalent to fleet compromise.
+- `store:device-registry`
+- severity: medium/high · verb: `read`
+- The registry is tagged credentials; disclosure here is equivalent to fleet compromise.
 
 > mark:
 
@@ -305,25 +298,25 @@ on either of them. That is the finding this sitting exists for.
 
 **13.** An attacker floods the internet-exposed MQTT broker with connections until genuine nodes can no longer publish readings.
 
-- cites: `process:device-gateway`, `flow:sensor-node-to-device-gateway:publish-readings`
-- tier: must-find · severity: high/high · verb: `flood`
-- recorded note: The gateway is the single ingest point for the whole fleet and is tagged availability-critical.
+- `process:device-gateway`, `flow:sensor-node-to-device-gateway:publish-readings`
+- severity: high/high · verb: `flood`
+- The gateway is the single ingest point for the whole fleet and is tagged availability-critical.
 
 > mark:
 
 **14.** An attacker publishes a firmware image that bricks every node that installs it, taking the fleet offline with no remote recovery path.
 
-- cites: `entity:sensor-node`, `store:firmware-bucket`
-- tier: expected · severity: medium/high · verb: `plant`
-- recorded note: Availability consequence of the same unverified update path; the devices are physically remote.
+- `entity:sensor-node`, `store:firmware-bucket`
+- severity: medium/high · verb: `plant`
+- Availability consequence of the same unverified update path; the devices are physically remote.
 
 > mark:
 
 **15.** An attacker holding the fleet key floods the ingest path with readings until the normalizer falls behind and dashboards stop reflecting the fleet.
 
-- cites: `process:telemetry-normalizer`, `store:telemetry-lake`
-- tier: expected · severity: medium/medium · verb: `flood`
-- recorded note: Cost-amplification against a metered analytics store as well as an availability effect.
+- `process:telemetry-normalizer`, `store:telemetry-lake`
+- severity: medium/medium · verb: `flood`
+- Cost-amplification against a metered analytics store as well as an availability effect.
 
 > mark:
 
@@ -332,25 +325,25 @@ on either of them. That is the finding this sitting exists for.
 
 **16.** An attacker turns an unsigned firmware update into code execution on every node, escalating from bucket write access to control of the physical fleet.
 
-- cites: `entity:sensor-node`, `flow:sensor-node-to-firmware-bucket:poll-firmware`
-- tier: must-find · severity: high/high · verb: `escalate`
-- recorded note: The escalation framing of the firmware finding: privilege gained, not just data changed.
+- `entity:sensor-node`, `flow:sensor-node-to-firmware-bucket:poll-firmware`
+- severity: high/high · verb: `escalate`
+- The escalation framing of the firmware finding: privilege gained, not just data changed.
 
 > mark:
 
 **17.** An attacker who compromises one physically accessible node uses its fleet-wide credential to act as the whole fleet against the ingest edge.
 
-- cites: `entity:sensor-node`, `process:device-gateway`
-- tier: must-find · severity: high/high · verb: `escalate`
-- recorded note: One-device compromise to fleet-scope privilege; the shared key is the escalation mechanism.
+- `entity:sensor-node`, `process:device-gateway`
+- severity: high/high · verb: `escalate`
+- One-device compromise to fleet-scope privilege; the shared key is the escalation mechanism.
 
 > mark:
 
 **18.** An operator signed in for dashboards queries raw customer records beyond what their role needs, because no narrower grant on the lake is described.
 
-- cites: `entity:fleet-operator`, `store:telemetry-lake`
-- tier: expected · severity: medium/medium · verb: `abuse-grant`
-- recorded note: SSO is stated but authorization scope is not; report as unverified rather than absent.
+- `entity:fleet-operator`, `store:telemetry-lake`
+- severity: medium/medium · verb: `abuse-grant`
+- SSO is stated but authorization scope is not; report as unverified rather than absent.
 
 > mark:
 

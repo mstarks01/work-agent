@@ -220,7 +220,6 @@ async function openCase(id) {
   if (current !== id) return;
   if (!res.ok) { $("partOne").textContent = d.detail; return; }
   $("caseTitle").textContent = d.title;
-  $("caseId").textContent = d.case;
   layout($("partOne"), d.blocks);
   warn(d.moved);
   waiting(d);
@@ -250,7 +249,6 @@ async function openReadOnly(id) {
   const d = await res.json();
   if (!res.ok) { $("readOnlyDocument").textContent = d.detail; return; }
   $("readOnlyTitle").textContent = d.title;
-  $("readOnlyCase").textContent = d.case;
   $("readOnlyMeta").textContent = "Reviewed by " + d.reviewed_by + " · " + d.date;
   layout($("readOnlyPartOne"), d.blocks);
   $("readOnlyDocument").textContent = d.document;
@@ -281,12 +279,16 @@ function el(tag, cls, text) {
   return n;
 }
 
-function sourceBlock(block) {
+function sourceBlock(block, named) {
   const card = el("div", "card");
-  const head = el("div", "head");
-  head.append(el("h4", null, block.label));
-  card.append(head, el("p", "hint", "Exactly what the service would receive."),
-              el("pre", "verbatim", block.text));
+  // The section above already names a lone source. A second source is a
+  // different document, so there its label is the only thing telling them apart.
+  if (named) {
+    const head = el("div", "head");
+    head.append(el("h4", null, block.label));
+    card.append(head);
+  }
+  card.append(el("pre", "verbatim", block.text));
   return card;
 }
 
@@ -329,9 +331,10 @@ const BLOCKS = {source: sourceBlock, table: tableBlock, terms: termsBlock};
 
 function layout(box, blocks) {
   box.replaceChildren();
+  const named = blocks.filter(b => b.kind === "source").length > 1;
   for (const block of blocks) {
     const build = BLOCKS[block.kind];
-    if (build) box.append(build(block));
+    if (build) box.append(build(block, named));
     else box.append(el("p", "note", "This page cannot display part of this case."));
   }
 }
@@ -340,7 +343,7 @@ function fieldRow(row) {
   const li = el("li");
   row.forEach((field, n) => {
     if (n) li.append(" · ");
-    li.append(el("span", "lbl", field.label + " "));
+    if (field.label) li.append(el("span", "lbl", field.label));
     field.values.forEach((v, i) => {
       if (i) li.append(", ");
       li.append(field.code ? el("code", "id", v) : document.createTextNode(v));

@@ -263,22 +263,26 @@ def _fields(*rows: list[dict] | None) -> list[list[dict]]:
     """The named fields of one record, one printed line per row.
 
     A row is a list of fields, because the reading document puts a record's
-    tier, severity and verb on one line and its citations on another. A field
-    names itself, carries its values as values, and says whether they are
+    severity and verb on one line and its citations on another. A field names
+    itself, carries its values as values, and says whether they are
     identifiers — so the document can print backticks and a page can print
     code spans, from one description of the same record.
+
+    A field whose label is ``None`` prints its values alone. The citations and
+    the recorded note read as themselves, and a word in front of them says
+    nothing a reader does not already see.
     """
     return [row for row in rows if row]
 
 
-def _field(label: str, *values: str, code: bool = False) -> dict:
+def _field(label: str | None, *values: str, code: bool = False) -> dict:
     return {"label": label, "values": list(values), "code": code}
 
 
 def _note_row(record: dict) -> list[dict] | None:
     if not record.get("notes"):
         return None
-    return [_field("recorded note", record["notes"])]
+    return [_field(None, record["notes"])]
 
 
 def stride_part(claims: list[dict]) -> dict:
@@ -294,9 +298,8 @@ def stride_part(claims: list[dict]) -> dict:
                 "identifier": None,
                 "title": claim["claim"],
                 "fields": _fields(
-                    [_field("cites", *claim["affected_element_ids"], code=True)],
+                    [_field(None, *claim["affected_element_ids"], code=True)],
                     [
-                        _field("tier", claim["tier"]),
                         _field(
                             "severity",
                             f"{severity['likelihood']}/{severity['impact']}",
@@ -328,8 +331,7 @@ def asvs_part(records: list[dict]) -> dict:
                 "identifier": record["requirement"],
                 "title": record["claim"],
                 "fields": _fields(
-                    [_field("cites", *record["affected_element_ids"], code=True)],
-                    [_field("tier", record["tier"])],
+                    [_field(None, *record["affected_element_ids"], code=True)],
                     _note_row(record),
                 ),
             }
@@ -375,7 +377,8 @@ def _printed(field: dict) -> str:
     values = field["values"]
     if field["code"]:
         values = [f"`{value}`" for value in values]
-    return f"{field['label']}: {', '.join(values)}"
+    printed = ", ".join(values)
+    return f"{field['label']}: {printed}" if field["label"] else printed
 
 
 def part_markdown(rendered: dict, part: int) -> str:
@@ -496,7 +499,6 @@ def part_one_markdown(blocks: list[dict]) -> str:
         if block["kind"] != "source":
             continue
         lines.append(f"### {block['label']} ({block['source_kind']})\n")
-        lines.append("Exactly what the service would receive.\n")
         lines.append(quoted(block["text"]))
         lines.append("")
     lines.append("### What the model says is in it\n")

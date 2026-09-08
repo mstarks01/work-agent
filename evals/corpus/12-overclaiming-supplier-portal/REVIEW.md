@@ -25,8 +25,6 @@ Roughly an hour.
 
 ### System description (description)
 
-Exactly what the service would receive.
-
 > Supplier document portal.
 >
 > Suppliers upload their compliance paperwork through a portal — insurance
@@ -131,9 +129,8 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A1.** `V1.2.4` — The supplier master service writes records from a vendor CSV into the supplier database and nothing says how those writes are built.
 
-- cites: `process:supplier-master-service`, `store:supplier-database`, `flow:supplier-master-service-to-supplier-database:write-supplier-records`
-- tier: must-find
-- recorded note: The runbook states the file arrives as plain CSV and is picked up as-is, which is the fact that makes an untrusted-input path concrete.
+- `process:supplier-master-service`, `store:supplier-database`, `flow:supplier-master-service-to-supplier-database:write-supplier-records`
+- The runbook states the file arrives as plain CSV and is picked up as-is, which is the fact that makes an untrusted-input path concrete.
 
 > mark:
 
@@ -142,17 +139,15 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A2.** `V5.2.1` — Suppliers upload compliance documents and nothing states a size the portal will accept.
 
-- cites: `process:supplier-portal`, `store:document-store`
-- tier: expected
-- recorded note: Upload is stated; the limit is not.
+- `process:supplier-portal`, `store:document-store`
+- Upload is stated; the limit is not.
 
 > mark:
 
 **A3.** `V5.2.2` — Suppliers upload insurance certificates and audit documents and nothing says the portal checks the file against an expected type.
 
-- cites: `entity:supplier`, `process:supplier-portal`, `flow:supplier-to-supplier-portal:upload-documents`
-- tier: must-find
-- recorded note: An upload from outside the organization is the trigger. The vendor datasheet asserts the platform is secure by design, which is a claim rather than a stated control.
+- `entity:supplier`, `process:supplier-portal`, `flow:supplier-to-supplier-portal:upload-documents`
+- An upload from outside the organization is the trigger. The vendor datasheet asserts the platform is secure by design, which is a claim rather than a stated control.
 
 > mark:
 
@@ -161,25 +156,22 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A4.** `V6.1.1` — The input carries no documentation of rate limiting or anti-automation on the supplier sign-in.
 
-- cites: `process:supplier-portal`
-- tier: expected
-- recorded note: Documentation requirement. The datasheet's 'fully authenticated' is not a control the input states.
+- `process:supplier-portal`
+- Documentation requirement. The datasheet's 'fully authenticated' is not a control the input states.
 
 > mark:
 
 **A5.** `V6.2.1` — Suppliers sign in with a password and no minimum length is stated.
 
-- cites: `entity:supplier`, `process:supplier-portal`
-- tier: expected
-- recorded note: Password authentication is stated outright, so the chapter applies; the parameter is what nothing settles.
+- `entity:supplier`, `process:supplier-portal`
+- Password authentication is stated outright, so the chapter applies; the parameter is what nothing settles.
 
 > mark:
 
 **A6.** `V6.4.1` — The vendor issues each supplier a username and password, and nothing says the initial credential is randomly generated or expires.
 
-- cites: `entity:supplier`, `entity:portal-vendor`, `process:supplier-portal`
-- tier: must-find
-- recorded note: A stated issued credential is exactly this requirement's subject, and the party issuing it is outside the organization.
+- `entity:supplier`, `entity:portal-vendor`, `process:supplier-portal`
+- A stated issued credential is exactly this requirement's subject, and the party issuing it is outside the organization.
 
 > mark:
 
@@ -188,9 +180,8 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A7.** `V8.2.2` — Every supplier uploads into one platform and nothing restricts a supplier to its own documents.
 
-- cites: `entity:supplier`, `process:supplier-portal`, `store:document-store`
-- tier: must-find
-- recorded note: The documents carry contact details for the suppliers' own staff, so data-specific access is the requirement. The datasheet asserts access is fully authenticated, which says nothing about which data a signed-in supplier reaches.
+- `entity:supplier`, `process:supplier-portal`, `store:document-store`
+- The documents carry contact details for the suppliers' own staff, so data-specific access is the requirement. The datasheet asserts access is fully authenticated, which says nothing about which data a signed-in supplier reaches.
 
 > mark:
 
@@ -199,9 +190,8 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A8.** `V12.2.1` — Suppliers upload to an externally hosted portal and no flow states its transport.
 
-- cites: `entity:supplier`, `process:supplier-portal`, `flow:supplier-to-supplier-portal:upload-documents`
-- tier: must-find
-- recorded note: 'Enterprise-grade encryption throughout' is the vendor's claim about its own product, not a stated fact about this connection. The requirement applies and is unsettled.
+- `entity:supplier`, `process:supplier-portal`, `flow:supplier-to-supplier-portal:upload-documents`
+- 'Enterprise-grade encryption throughout' is the vendor's claim about its own product, not a stated fact about this connection. The requirement applies and is unsettled.
 
 > mark:
 
@@ -210,17 +200,15 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A9.** `V15.1.1` — The whole portal is a third-party product and the input carries no documented remediation time frames for it.
 
-- cites: `process:supplier-portal`, `entity:portal-vendor`
-- tier: must-find
-- recorded note: The source states the organization runs no part of the portal, which makes the third-party rule the central one for this case.
+- `process:supplier-portal`, `entity:portal-vendor`
+- The source states the organization runs no part of the portal, which makes the third-party rule the central one for this case.
 
 > mark:
 
 **A10.** `V15.2.1` — Nothing says the portal's components sit inside any documented update window.
 
-- cites: `process:supplier-portal`
-- tier: expected
-- recorded note: Follows V15.1.1: with no documented time frame there is nothing to hold the components to.
+- `process:supplier-portal`
+- Follows V15.1.1: with no documented time frame there is nothing to hold the components to.
 
 > mark:
 
@@ -244,25 +232,25 @@ on either of them. That is the finding this sitting exists for.
 
 **1.** An attacker who obtains a supplier's vendor-issued password signs in as that supplier and uploads paperwork in their name.
 
-- cites: `flow:supplier-to-supplier-portal:upload-documents`, `entity:supplier`
-- tier: must-find · severity: medium/medium · verb: `impersonate`
-- recorded note: Sign-in is the one control the source actually states, so this claim rests on a stated fact rather than on an unknown. Whether a second factor exists is never stated, and asserting its absence would be unsupported.
+- `flow:supplier-to-supplier-portal:upload-documents`, `entity:supplier`
+- severity: medium/medium · verb: `impersonate`
+- Sign-in is the one control the source actually states, so this claim rests on a stated fact rather than on an unknown. Whether a second factor exists is never stated, and asserting its absence would be unsupported.
 
 > mark:
 
 **2.** An attacker signs in to the portal as a category manager and approves supplier paperwork, because how category managers are authenticated is unverified.
 
-- cites: `flow:category-manager-to-supplier-portal:review-documents`, `entity:category-manager`
-- tier: must-find · severity: medium/high · verb: `impersonate`
-- recorded note: The datasheet's fully authenticated and audited covers this flow rhetorically and states nothing about it. An analyst that treats the manager path as authenticated because the vendor says so has swallowed the claim.
+- `flow:category-manager-to-supplier-portal:review-documents`, `entity:category-manager`
+- severity: medium/high · verb: `impersonate`
+- The datasheet's fully authenticated and audited covers this flow rhetorically and states nothing about it. An analyst that treats the manager path as authenticated because the vendor says so has swallowed the claim.
 
 > mark:
 
 **3.** An attacker writes a file into the landing bucket while posing as the vendor's nightly push, since how the bucket identifies the writer is unverified.
 
-- cites: `flow:portal-vendor-to-landing-bucket:push-nightly-extract`, `store:landing-bucket`
-- tier: must-find · severity: medium/high · verb: `plant`
-- recorded note: The one flow crossing from the vendor platform into our cloud account, and the source states no authentication on it at all.
+- `flow:portal-vendor-to-landing-bucket:push-nightly-extract`, `store:landing-bucket`
+- severity: medium/high · verb: `plant`
+- The one flow crossing from the vendor platform into our cloud account, and the source states no authentication on it at all.
 
 > mark:
 
@@ -271,25 +259,25 @@ on either of them. That is the finding this sitting exists for.
 
 **4.** An attacker modifies the extract file in the landing bucket before the supplier master service loads it, and the altered supplier records reach the database.
 
-- cites: `store:landing-bucket`, `flow:supplier-master-service-to-landing-bucket:load-extract`
-- tier: must-find · severity: medium/high · verb: `alter`
-- recorded note: The runbook states the file is picked up as-is, which is a stated absence of validation rather than an inferred one — the strongest grounded finding in the case.
+- `store:landing-bucket`, `flow:supplier-master-service-to-landing-bucket:load-extract`
+- severity: medium/high · verb: `alter`
+- The runbook states the file is picked up as-is, which is a stated absence of validation rather than an inferred one — the strongest grounded finding in the case.
 
 > mark:
 
 **5.** An attacker on the path of the nightly push alters the extract in transit, because the source contradicts itself over whether that transfer is encrypted.
 
-- cites: `flow:portal-vendor-to-landing-bucket:push-nightly-extract`
-- tier: must-find · severity: medium/high · verb: `alter-in-transit`
-- recorded note: This is the case's central reference. The correct handling of we were told it is encrypted end to end against the runbook's plain CSV is needs-info on an unresolved question; the first names no layer and the second describes the file at rest, so neither settles the channel. Both a confident encrypted and a confident unencrypted are wrong, and the latter is worse.
+- `flow:portal-vendor-to-landing-bucket:push-nightly-extract`
+- severity: medium/high · verb: `alter-in-transit`
+- This is the case's central reference. The correct handling of we were told it is encrypted end to end against the runbook's plain CSV is needs-info on an unresolved question; the first names no layer and the second describes the file at rest, so neither settles the channel. Both a confident encrypted and a confident unencrypted are wrong, and the latter is worse.
 
 > mark:
 
 **6.** An attacker with access inside the vendor platform alters a stored compliance document so a supplier appears certified when they are not.
 
-- cites: `store:document-store`, `flow:supplier-portal-to-document-store:store-documents`
-- tier: expected · severity: low/high · verb: `alter`
-- recorded note: We run no part of the vendor platform, so every control inside it is unverifiable by us rather than absent. Secure by design is not a control.
+- `store:document-store`, `flow:supplier-portal-to-document-store:store-documents`
+- severity: low/high · verb: `alter`
+- We run no part of the vendor platform, so every control inside it is unverifiable by us rather than absent. Secure by design is not a control.
 
 > mark:
 
@@ -298,17 +286,17 @@ on either of them. That is the finding this sitting exists for.
 
 **7.** A category manager denies having approved a supplier's paperwork, and the model holds no audit record we control or can produce.
 
-- cites: `flow:category-manager-to-supplier-portal:review-documents`, `process:supplier-portal`
-- tier: must-find · severity: medium/medium · verb: `unattributable`
-- recorded note: The datasheet says audited and the model has no audit store, because a marketing adjective is not an element. An analyst that cites an audit log here is citing something that does not exist in the model.
+- `flow:category-manager-to-supplier-portal:review-documents`, `process:supplier-portal`
+- severity: medium/medium · verb: `unattributable`
+- The datasheet says audited and the model has no audit store, because a marketing adjective is not an element. An analyst that cites an audit log here is citing something that does not exist in the model.
 
 > mark:
 
 **8.** The vendor disputes what a given nightly extract contained when it left their platform, and nothing on our side records what arrived.
 
-- cites: `entity:portal-vendor`, `flow:portal-vendor-to-landing-bucket:push-nightly-extract`
-- tier: expected · severity: low/medium · verb: `unattributable`
-- recorded note: A dispute across an organizational boundary is the repudiation shape that matters here, and it is the boundary we have least visibility across.
+- `entity:portal-vendor`, `flow:portal-vendor-to-landing-bucket:push-nightly-extract`
+- severity: low/medium · verb: `unattributable`
+- A dispute across an organizational boundary is the repudiation shape that matters here, and it is the boundary we have least visibility across.
 
 > mark:
 
@@ -317,25 +305,25 @@ on either of them. That is the finding this sitting exists for.
 
 **9.** An attacker with access to the landing bucket reads the whole supplier extract, because whether the bucket is encrypted at rest is unverified.
 
-- cites: `store:landing-bucket`
-- tier: must-find · severity: medium/high · verb: `read`
-- recorded note: Enterprise-grade encryption throughout is a claim about the vendor's platform; the bucket is in our cloud account and the source says nothing about it either way.
+- `store:landing-bucket`
+- severity: medium/high · verb: `read`
+- Enterprise-grade encryption throughout is a claim about the vendor's platform; the bucket is in our cloud account and the source says nothing about it either way.
 
 > mark:
 
 **10.** An attacker inside the vendor platform reads supplier staff contact details out of the stored compliance documents.
 
-- cites: `store:document-store`, `entity:portal-vendor`
-- tier: expected · severity: low/high · verb: `read`
-- recorded note: The documents are stated to hold contact details for supplier staff, which is what drives the pii tag; fully compliant states nothing about who inside the vendor can read them.
+- `store:document-store`, `entity:portal-vendor`
+- severity: low/high · verb: `read`
+- The documents are stated to hold contact details for supplier staff, which is what drives the pii tag; fully compliant states nothing about who inside the vendor can read them.
 
 > mark:
 
 **11.** An attacker on the network path between a supplier and the portal reads uploaded paperwork in transit, because whether that traffic is encrypted is unverified.
 
-- cites: `flow:supplier-to-supplier-portal:upload-documents`
-- tier: expected · severity: low/medium · verb: `intercept`
-- recorded note: The upload flow crosses from the public internet into the vendor platform and the datasheet's encryption claim never becomes a stated property of it.
+- `flow:supplier-to-supplier-portal:upload-documents`
+- severity: low/medium · verb: `intercept`
+- The upload flow crosses from the public internet into the vendor platform and the datasheet's encryption claim never becomes a stated property of it.
 
 > mark:
 
@@ -344,17 +332,17 @@ on either of them. That is the finding this sitting exists for.
 
 **12.** The vendor platform becomes unavailable and suppliers cannot file compliance paperwork while it is down.
 
-- cites: `entity:portal-vendor`, `process:supplier-portal`
-- tier: expected · severity: medium/medium · verb: `disable`
-- recorded note: Availability of a system we do not run is a real exposure and not a control gap; it belongs in the report even though there is nothing on our side to fix.
+- `entity:portal-vendor`, `process:supplier-portal`
+- severity: medium/medium · verb: `disable`
+- Availability of a system we do not run is a real exposure and not a control gap; it belongs in the report even though there is nothing on our side to fix.
 
 > mark:
 
 **13.** An attacker stops the nightly extract from being loaded and the supplier database silently keeps serving stale supplier records.
 
-- cites: `store:landing-bucket`, `process:supplier-master-service`
-- tier: must-find · severity: low/high · verb: `disable`
-- recorded note: The failure here is staleness rather than an outage: nothing in the source detects a missing nightly file.
+- `store:landing-bucket`, `process:supplier-master-service`
+- severity: low/high · verb: `disable`
+- The failure here is staleness rather than an outage: nothing in the source detects a missing nightly file.
 
 > mark:
 
@@ -363,17 +351,17 @@ on either of them. That is the finding this sitting exists for.
 
 **14.** A signed-in supplier reaches another supplier's compliance documents through the portal, because no separation between supplier tenants is stated.
 
-- cites: `flow:supplier-to-supplier-portal:upload-documents`, `process:supplier-portal`
-- tier: must-find · severity: medium/high · verb: `abuse-grant`
-- recorded note: Many suppliers share one vendor-hosted product and the source states nothing about isolation between them. Fully compliant is the phrase most likely to be mistaken for an answer to this.
+- `flow:supplier-to-supplier-portal:upload-documents`, `process:supplier-portal`
+- severity: medium/high · verb: `abuse-grant`
+- Many suppliers share one vendor-hosted product and the source states nothing about isolation between them. Fully compliant is the phrase most likely to be mistaken for an answer to this.
 
 > mark:
 
 **15.** An attacker uses the contents of the extract file to make the supplier master service act beyond what a data load should do, since the file is consumed as-is.
 
-- cites: `flow:supplier-master-service-to-landing-bucket:load-extract`, `process:supplier-master-service`
-- tier: expected · severity: low/high · verb: `inject`
-- recorded note: Picked up as-is is stated, so treating attacker-influenced file content as trusted input is grounded rather than speculative.
+- `flow:supplier-master-service-to-landing-bucket:load-extract`, `process:supplier-master-service`
+- severity: low/high · verb: `inject`
+- Picked up as-is is stated, so treating attacker-influenced file content as trusted input is grounded rather than speculative.
 
 > mark:
 
