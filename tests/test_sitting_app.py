@@ -2091,6 +2091,55 @@ class TestTheLayoutCoversTheCase:
         assert len(titles) == len(set(titles)), "one sentence names two records"
 
 
+class TestTheStandardsOwnWordsRideOnTheRecord:
+    """A record naming a catalog requirement carries the standard's sentence.
+
+    The page prints it under the claim, closed until the reader opens it, so
+    a reader rules on the requirement rather than on the claim's paraphrase.
+    A record naming no requirement carries ``None`` rather than nothing, so a
+    page reads one shape from every renderer.
+    """
+
+    @pytest.mark.parametrize(
+        "case_dir", verify_corpus.case_dirs(), ids=lambda path: path.name
+    )
+    def test_every_record_names_what_it_quotes(self, case_dir):
+        from analysis_service.frameworks.asvs.catalog import requirement_text
+
+        prepared = sittings.prepare(case_dir)
+        for framework, part in prepared.part_two_blocks.items():
+            for group in part["groups"]:
+                for record in group["records"]:
+                    standard = record["standard"]
+                    if record["identifier"] is None:
+                        assert standard is None, f"{framework} quotes no standard"
+                        continue
+                    assert standard["text"] == requirement_text(record["identifier"])
+                    assert standard["text"], f"{record['identifier']} has no text"
+                    assert "CC BY-SA" in standard["source"]
+                    assert "requirement text" in standard["label"]
+
+    @pytest.mark.parametrize(
+        "case_dir", verify_corpus.case_dirs(), ids=lambda path: path.name
+    )
+    def test_the_reading_document_cites_and_does_not_quote(self, case_dir):
+        """``REVIEW.md`` is an Apache-2.0 file, so the sentence stays off it."""
+        prepared = sittings.prepare(case_dir)
+        for framework, part in prepared.part_two_blocks.items():
+            printed = prepared.part_two[framework]
+            for group in part["groups"]:
+                for record in group["records"]:
+                    if record["standard"] is None:
+                        continue
+                    assert record["identifier"] in printed
+                    assert record["standard"]["text"] not in printed
+
+    @pytest.mark.parametrize("script", ["sitting.js", "offline_sitting.js"])
+    def test_both_surfaces_read_the_block(self, script):
+        """A page that never reads the block prints a fact with no reader."""
+        assert ".standard" in client_script(script)
+
+
 class TestTheRailAndTheGateAgree:
     """One reader for "is this case read", asked from both ends.
 

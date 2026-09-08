@@ -103,6 +103,17 @@ function ownList(into, c) {
   into.appendChild(p);
 }
 
+// The standard's own sentence for a record that names one, closed until the
+// reader opens it. The summary says what opens, so the reader knows the
+// words are there.
+function standardText(standard) {
+  const details = el("details", "standard");
+  details.appendChild(el("summary", null, "Show the " + standard.label));
+  details.appendChild(el("p", "quote", standard.text));
+  details.appendChild(el("p", "meta", standard.source));
+  return details;
+}
+
 function records(into, c) {
   const held = answers[c.case];
   let part = 2;
@@ -116,6 +127,7 @@ function records(into, c) {
         const card = el("div", "rec");
         card.appendChild(el("div", null,
           rec.label + ". " + (rec.identifier ? rec.identifier + " — " : "") + rec.title));
+        if (rec.standard) card.appendChild(standardText(rec.standard));
         for (const row of rec.fields)
           card.appendChild(el("div", "meta",
             row.map(f => (f.label ? f.label + ": " : "") + f.values.join(", "))
