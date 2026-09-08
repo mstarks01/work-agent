@@ -6,7 +6,6 @@ from analysis_service import critic
 from analysis_service.critic import (
     CriticOutputError,
     assemble_claims,
-    mentioned_ids,
     review_issues,
     snap_rulings,
 )
@@ -23,6 +22,7 @@ from analysis_service.report import (
     Verdict,
 )
 from analysis_service.sources import DEFAULT_DESCRIPTION_LABEL
+from analysis_service.system_model import mentioned_ids
 from tests.factories import sample_draft, sample_ruling, valid_model
 
 #: The five model-facing shapes STRIDE's own nodes speak in. ``assemble_claims``

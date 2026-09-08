@@ -384,7 +384,8 @@ class TestCandidatesAreNotFindings:
         """Candidates reach the agents and stop there.
 
         The importers of this module are the seam that renders the prompt
-        (``graph``) and the accounting that counts what was offered
+        (``graph``), the fan-in that regenerates the same candidates for the
+        coverage account (``fan_in``), and the accounting itself
         (``coverage``). Neither the critic nor the report can see one, so no
         code path exists that turns a fired rule into a threat.
         """
@@ -396,4 +397,4 @@ class TestCandidatesAreNotFindings:
             for path in package.glob("*.py")
             if "from analysis_service.candidates import" in path.read_text()
         }
-        assert importers == {"coverage.py", "graph.py"}
+        assert importers == {"coverage.py", "fan_in.py", "graph.py"}

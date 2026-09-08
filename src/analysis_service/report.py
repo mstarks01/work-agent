@@ -1917,8 +1917,8 @@ class UnresolvedMention(BaseModel):
     """An element ID a description names in prose that the model does not contain.
 
     A **mention**, never a reference: ``affected_element_ids`` is the threat's
-    structural claim about what it acts on, and one that does not resolve fails
-    the job at :func:`~analysis_service.fan_in.join_drafts`. This is the softer
+    structural claim about what it acts on, and one that does not resolve is
+    dropped and marked at :func:`~analysis_service.fan_in.join_drafts`. This is the softer
     thing beside it — an ID written into the argument, which the analyze prompt
     asks for ("cite element and flow IDs inline") and which nothing checked
     until now. The description is the part a reader actually reads, so an ID in

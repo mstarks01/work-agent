@@ -57,11 +57,10 @@ from types import MappingProxyType
 
 from analysis_service.analysis import unknown_controls
 from analysis_service.candidates import CandidateSet
-from analysis_service.critic import mentioned_ids
 from analysis_service.frameworks import FrameworkPackage
 from analysis_service.references import canonical
 from analysis_service.report import Claim, LaneCoverage
-from analysis_service.system_model import SystemModel
+from analysis_service.system_model import SystemModel, mentioned_ids
 
 __all__ = ["build_coverage", "cited_element_ids", "lane_scope"]
 

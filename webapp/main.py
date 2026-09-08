@@ -302,9 +302,13 @@ def _unit_order(unit: str) -> tuple[int | str, ...]:
     shape of a unit belongs to the framework rather than to this page: ASVS's
     ``V<chapter>.<section>.<requirement>`` sorts into the standard's own order,
     and a package numbering its units another way still sorts stably.
+
+    ``isdecimal`` rather than ``isdigit``: ``int`` accepts exactly the decimal
+    digits, and ``isdigit`` also says yes to a superscript, which ``int``
+    refuses. A unit read from a file is the shape nobody listed.
     """
     return tuple(
-        int(part) if part.isdigit() else part for part in unit.lstrip("Vv").split(".")
+        int(part) if part.isdecimal() else part for part in unit.lstrip("Vv").split(".")
     )
 
 

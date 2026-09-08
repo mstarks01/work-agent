@@ -1382,3 +1382,13 @@ class TestTheReportPageGetsARowPerUnit:
         )
         assert payload is not None
         assert "</script>" not in payload.group(1)
+
+
+def test_a_unit_part_that_is_a_digit_but_not_a_decimal_sorts_as_text():
+    """``"²".isdigit()`` is true and ``int("²")`` raises. A unit read off a
+    loaded report is the shape nobody listed, so the sort key reads decimals
+    and leaves every other part as text rather than failing the page."""
+    from webapp.main import _unit_order
+
+    assert _unit_order("V1.\u00b2") == (1, "\u00b2")
+    assert _unit_order("V6.2.10") > _unit_order("V6.2.9")

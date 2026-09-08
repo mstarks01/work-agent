@@ -68,10 +68,12 @@ input cannot carry that answer.
 > not hold while the requirement still applies. The second now answers
 > `reasoning`, rules on nothing, and leaves the requirement on the scope list
 > as `not-raised`, beside `lane` and `duplicate`. A rejection for an unsupported
-> gap no longer reads as an exclusion.
+> gap no longer reads as an exclusion. The same audit corrected the word
+> *fork*: the standard invites a level-filtered run, so it is a partial
+> verification and not a fork, and the decision below now says so.
 
 **No output of this service is a compliance result, and a level-filtered run is a
-fork of ASVS rather than ASVS.** The word compliance appears in no verdict
+partial verification rather than a compliance claim.** The word compliance appears in no verdict
 rationale, in no lane skill and in no claim description; the package's own
 `disclaimer.md` states both limits, and every **Framework Analysis** carries it.
 
