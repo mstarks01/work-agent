@@ -533,8 +533,12 @@ and no second copy: the envelope is the save file.
 
 **Open the pull request on GitHub** is the way out, and it needs nothing from
 you. It carries the reader straight to GitHub's editor with their submission
-and its name already filled in; **Propose changes** opens the pull request, and
-contribution CI validates it exactly as it validates one the app opened. The
+and its name already filled in. GitHub shows one of two buttons. An account
+without write access presses **Propose changes**, and GitHub opens the pull
+request from a fork. An account with write access presses **Commit changes** and
+then chooses **Create a new branch for this commit and start a pull request**,
+because the default there commits straight to main. Contribution CI validates
+the pull request exactly as it validates one the app opened. The
 page names the file by the digest of its own canonical bytes, the same rule
 `evals.harness.envelope` uses, so a name CI accepts is one the page computed
 from the words the reader actually wrote.
