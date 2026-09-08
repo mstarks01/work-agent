@@ -2131,6 +2131,22 @@ ClaimMark = (
     UnresolvedReference | UnresolvedMention | UnresolvedEvidence | MissingMitigation
 )
 
+#: Every :class:`AnalysisMarks` field whose entries annotate a claim the block
+#: must carry: the four :data:`ClaimMark` kinds and the two indexed marks. The
+#: block's own checks refuse an entry here that names a claim it does not hold.
+#: ``dropped_claims`` and ``unknown_claim_identities`` name a claim that is
+#: absent on purpose, so they are not here. ``tests/test_report.py`` holds this
+#: tuple to the mark models, so a mark kind added with a ``claim_id`` joins it
+#: or fails a test.
+CLAIM_BOUND_MARKS: tuple[str, ...] = (
+    "unverified_grounds",
+    "repaired_quotes",
+    "unresolved_references",
+    "unresolved_mentions",
+    "unresolved_evidence",
+    "missing_mitigations",
+)
+
 
 class SharedElementName(BaseModel):
     """Elements of different types whose names normalize to one slug.
@@ -2241,6 +2257,26 @@ class AnalysisMarks(BaseModel):
             **{
                 name: [*getattr(self, name), *getattr(other, name)]
                 for name in AnalysisMarks.model_fields
+            }
+        )
+
+    def on_claims(self, claim_ids: Collection[str]) -> AnalysisMarks:
+        """These marks, with every claim-bound entry narrowed to ``claim_ids``.
+
+        The fan-in drops a draft in several passes, and a pass that marked a
+        claim cannot know that a later one will drop it: a draft naming one
+        element the model lacks and one its grounds do not reach is marked by
+        the reference check and dropped by the bound check. A mark on a claim
+        the block does not carry annotates nothing, and the block's own check
+        refuses it — so without this the whole job fails on a mark about a
+        claim the service itself removed. The drop stays recorded:
+        ``dropped_claims`` names the claim and the reason, and is not narrowed.
+        """
+        kept = set(claim_ids)
+        return self.model_copy(
+            update={
+                name: [mark for mark in getattr(self, name) if mark.claim_id in kept]
+                for name in CLAIM_BOUND_MARKS
             }
         )
 

@@ -11,6 +11,7 @@ from analysis_service.frameworks.stride.record import (
     build_stride_summary,
 )
 from analysis_service.report import (
+    CLAIM_BOUND_MARKS,
     CLAIM_ID_MAX_CHARS,
     DROPPED_REASON_MAX_CHARS,
     DROPPED_TITLE_MAX_CHARS,
@@ -537,6 +538,34 @@ class TestEveryClaimMarkPointsAtAThreat:
             MissingMitigation,
         }
         assert set(get_args(ClaimMark)) == covered
+
+    def test_the_claim_bound_table_is_every_mark_field_that_names_a_claim(self):
+        """The table the fan-in narrows by, held to the mark models: every
+        ``AnalysisMarks`` field whose entry carries a ``claim_id`` is in it,
+        except the two that name a claim absent on purpose."""
+        absent_on_purpose = {"dropped_claims", "unknown_claim_identities"}
+        naming = {
+            name
+            for name, field in AnalysisMarks.model_fields.items()
+            if "claim_id" in getattr(get_args(field.annotation)[0], "model_fields", {})
+        }
+        assert set(CLAIM_BOUND_MARKS) == naming - absent_on_purpose
+
+    def test_narrowing_keeps_marks_on_the_named_claims_and_every_drop(self):
+        marks = AnalysisMarks(
+            unresolved_references=[
+                UnresolvedReference(claim_id="S-01", element_id="process:ghost"),
+                UnresolvedReference(claim_id="S-02", element_id="process:ghost"),
+            ],
+            dropped_claims=[
+                DroppedClaim.of(claim_id="S-02", title="dropped", reason="no reach")
+            ],
+        )
+
+        narrowed = marks.on_claims({"S-01"})
+
+        assert [m.claim_id for m in narrowed.unresolved_references] == ["S-01"]
+        assert narrowed.dropped_claims == marks.dropped_claims
 
 
 class TestAnalysisMarks:
