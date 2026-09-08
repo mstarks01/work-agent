@@ -256,6 +256,7 @@ button:disabled { opacity:.5; cursor:default; }
 button.row:hover,li.current .row { background:#8883; }.label { flex:1; min-width:0; overflow-wrap:anywhere; }
 .state-icon { flex:0 0 1rem; width:1rem; text-align:center; font-weight:700; }
 .state-icon.complete { color:#2f9e5e; }.state-icon.error { color:#c34a3c; }
+.reason { display:block; color:var(--dim); font-size:.85rem; margin-top:.15rem; overflow-wrap:anywhere; }
 .hidden { display:none !important; }.note { background:#8881; padding:.8rem 1rem; border-radius:6px; }
 .guide-panel { border:1px solid var(--line); border-radius:8px; padding:.8rem 1rem; margin-bottom:1.5rem; background:#8881; }
 .example { margin:.65rem 0; padding-left:.8rem; border-left:2px solid var(--line); }.why { color:var(--dim); font-size:.9rem; }
