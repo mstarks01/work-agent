@@ -1685,6 +1685,10 @@ def merge_drafts(
     marks = joined.marks.merged_with(AnalysisMarks(dropped_claims=refused))
     for lane, resolution in resolutions.items():
         marks = marks.merged_with(invalid[lane]).merged_with(resolution.marks)
+    # Narrowed to the drafts that survived every pass above, once, after the
+    # last producer. Each pass marks what it sees and cannot know what a later
+    # pass drops, and the block refuses a mark on a claim it does not carry.
+    marks = marks.on_claims({draft.id for draft in merged})
     state.put(nodes.key("marks"), marks.model_dump(mode="json"))
     # Logged rather than reported, and the package decides what is worth saying:
     # a STRIDE lane that numbered its drafts 01, 02, 05 broke nothing a reader

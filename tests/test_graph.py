@@ -37,6 +37,7 @@ from analysis_service.frameworks.stride.record import (
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.model_tiers import LLM_NODES
 from analysis_service.report import (
+    CLAIM_BOUND_MARKS,
     AnalysisMarks,
     FrameworkName,
     InputRef,
@@ -1099,6 +1100,32 @@ def test_merge_parks_every_mark_kind_under_one_key():
     assert marks.unresolved_mentions == []
     assert marks.unresolved_evidence == []
     assert marks.missing_mitigations == []
+
+
+def test_a_mark_never_outlives_the_draft_it_annotates():
+    """A draft naming one element the model lacks and one its grounds do not
+    reach is marked by the reference pass and dropped by the bound pass. The
+    block refuses a mark on a claim it does not carry, so left as it was the
+    whole job failed on a claim the service itself removed — which is how the
+    2026-09-08 ASVS pre-flight on case 01 ended. The drop stays on record."""
+    ctx = FakeContext(
+        **analyze_state(
+            spoofing=[
+                sample_proposal(
+                    "S-01", affected_element_ids=["process:ghost", "store:orders-db"]
+                )
+            ]
+        )
+    )
+
+    graph.merge_drafts(valid_model().model_dump(mode="json"), ctx, KEYS, NODES)
+
+    surviving = {draft["id"] for draft in ctx.state[NODES.key("drafts")]}
+    marks = AnalysisMarks.model_validate(ctx.state[NODES.key("marks")])
+    assert "S-01" not in surviving
+    assert [d.claim_id for d in marks.dropped_claims] == ["S-01"]
+    for name in CLAIM_BOUND_MARKS:
+        assert {mark.claim_id for mark in getattr(marks, name)} <= surviving, name
 
 
 def test_the_marks_reach_the_report_through_assemble():
