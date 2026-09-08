@@ -51,7 +51,11 @@ from pydantic.json_schema import SkipJsonSchema
 from analysis_service.actions import ActionVerb
 from analysis_service.grounding import MovedKind, meaning_moved
 from analysis_service.sources import Source
-from analysis_service.system_model import BoundaryCrossing, SystemModel
+from analysis_service.system_model import (
+    BoundaryCrossing,
+    SystemModel,
+    all_attribute_names,
+)
 from analysis_service.vendors import ServedTrust, vendor_for_route
 
 # The payload schema readers key on. Consumers that ignore unknown fields
@@ -473,7 +477,17 @@ class UnknownRef(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     element_id: str = Field(default="", max_length=300)
-    attribute: AttributeName = Field(default="", max_length=100)
+    # The provider-facing schema lists the legal names, so a constrained
+    # critic cannot spell ``description`` or ``notes`` here: the live critic
+    # did so 132 times in six runs and every one fired the bounded re-ask.
+    # The enum is a schema fact and not a validator, so a report written
+    # before it still loads; whether the attribute belongs to the named
+    # element stays with the review seam, which reads the same classes.
+    attribute: AttributeName = Field(
+        default="",
+        max_length=100,
+        json_schema_extra={"enum": ["", *all_attribute_names()]},
+    )
     subject: str = Field(default="", max_length=300)
 
     @property
@@ -2234,6 +2248,10 @@ class AnalysisMarks(BaseModel):
     #:
     #: A mark, not a failure: the re-ask exists for these, and a run that
     #: repaired itself is a successful run. What it is not is a *clean* one.
+    #:
+    #: The second look appends what the re-ask changed beyond its brief — a
+    #: ruling no problem named, or an ID no lane agent drafted — each one
+    #: discarded in favour of the first pass and recorded here.
     unreconciled_rulings: list[str] = Field(default_factory=list)
     repaired_quotes: list[RepairedQuote] = Field(default_factory=list)
     unresolved_references: list[UnresolvedReference] = Field(default_factory=list)

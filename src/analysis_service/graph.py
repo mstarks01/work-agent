@@ -134,6 +134,7 @@ from analysis_service.critic import (
     assemble_claims,
     critic_view,
     join_drafts,
+    merge_retry,
     review,
     unsettled_drafts,
 )
@@ -632,6 +633,11 @@ FRAMEWORK_STRUCTURED_ARTIFACTS: tuple[str, ...] = (
     "retrieved",
     "reviewed",
     "accepted",
+    # The first critic pass's rulings, as returned, and the drafted IDs its
+    # problems named. Written by the first ``route_review`` on its ``revise``
+    # edge, read by the second, which merges the re-ask onto them.
+    "first_review",
+    "repairable",
 )
 
 #: Keys holding bytes a model reads and Python does not. Written once by the
@@ -1783,6 +1789,26 @@ def route_review(
     state = keys.state(ctx)
     package_drafts = _drafts_of(state.get(nodes.key("drafts")), nodes.package)
     ruled = _claims_of(state.get(nodes.key("reviewed")))
+    parked = AnalysisMarks.model_validate(state.get(nodes.key("marks")) or {})
+    first = state.get(nodes.key("first_review"))
+    if first is not None:
+        # The second look. The re-ask was asked to change only what the
+        # problems named and to carry every other ruling across unchanged;
+        # this is where that is held rather than hoped for. What it changed
+        # beyond its brief is recorded beside the first pass's problems and
+        # discarded, and ``reviewed`` is rewritten so ``assemble`` reads the
+        # merged set and never the re-ask's own.
+        ruled, drift = merge_retry(
+            first,
+            ruled,
+            state.get(nodes.key("repairable")) or [],
+            [draft.id for draft in package_drafts],
+        )
+        state.put(nodes.key("reviewed"), {"claims": list(ruled)})
+        parked = parked.model_copy(
+            update={"unreconciled_rulings": [*parked.unreconciled_rulings, *drift]}
+        )
+        state.put(nodes.key("marks"), parked.model_dump(mode="json"))
     rulings = _rulings_of(ruled, nodes.schemas)
     outcome = review(package_drafts, rulings, model)
     if isinstance(outcome, Revision):
@@ -1795,15 +1821,24 @@ def route_review(
         state.prompt(
             nodes.key("unreconciled_drafts"), render_fenced(outcome.unreconciled)
         )
+        # The same bytes, kept where code reads them back: the second look
+        # merges the re-ask onto these, and ``repairable`` is the whole of
+        # what it may replace.
+        state.put(nodes.key("first_review"), list(ruled))
+        state.put(nodes.key("repairable"), list(outcome.repairable))
         # Recorded onto this framework's marks before the re-ask runs, so the
         # report says how the first pass failed even when the re-ask repairs it
         # completely. Merged rather than assigned: ``marks`` already holds what
         # fan-in produced, and a second look must not drop it.
-        parked = AnalysisMarks.model_validate(state.get(nodes.key("marks")) or {})
         state.put(
             nodes.key("marks"),
             parked.model_copy(
-                update={"unreconciled_rulings": list(outcome.messages)}
+                update={
+                    "unreconciled_rulings": [
+                        *parked.unreconciled_rulings,
+                        *outcome.messages,
+                    ]
+                }
             ).model_dump(mode="json"),
         )
         return _routed(ROUTE_REVISE, {"issue_count": len(outcome.messages)})
