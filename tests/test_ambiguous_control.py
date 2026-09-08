@@ -2,7 +2,7 @@
 
 import pytest
 
-from analysis_service.analysis import control_state
+from analysis_service.analysis import control_state, leading_word
 from analysis_service.validation import AMBIGUOUS_CONTROL_LEADS, validate
 from tests.factories import valid_model
 
@@ -39,3 +39,24 @@ def test_the_three_legal_shapes_pass(value):
 def test_the_leads_are_negations_and_not_the_absence_sentinel():
     assert "none" not in AMBIGUOUS_CONTROL_LEADS
     assert {"no", "not", "without"} <= AMBIGUOUS_CONTROL_LEADS
+
+
+@pytest.mark.parametrize(
+    "value", ["no-mfa on the login", "no/unknown", "No, only an ACL"]
+)
+def test_a_negation_joined_by_punctuation_still_opens_the_value(value):
+    """The gate reads the leading word through ``leading_word``, the reader
+    ``control_state`` uses for its two sentinels, so a word ends at a word
+    boundary and not at whitespace. Read by whitespace, ``no-mfa`` passed."""
+    model = valid_model()
+    model.data_flows[0].authentication = value
+    assert control_state(value) == "stated"
+    assert "ambiguous-control" in codes(model)
+
+
+def test_the_gate_and_control_state_share_one_reader_of_the_leading_word():
+    assert leading_word("none; by network position", ("none", "unknown")) == "none"
+    assert leading_word("nonexistent control", ("none", "unknown")) is None
+    assert leading_word("  Not stated", AMBIGUOUS_CONTROL_LEADS) == "not"
+    assert leading_word("nobody said", AMBIGUOUS_CONTROL_LEADS) is None
+    assert leading_word("N/A", AMBIGUOUS_CONTROL_LEADS) == "n/a"

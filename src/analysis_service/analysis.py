@@ -37,7 +37,8 @@ this is analysis over it.
 from __future__ import annotations
 
 import re
-from collections.abc import Iterator
+from collections.abc import Collection, Iterator
+from functools import cache
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -62,6 +63,7 @@ __all__ = [
     "inbound_flows",
     "internet_exposed_elements",
     "is_unverified",
+    "leading_word",
     "matches_term",
     "names_term",
     "outbound_flows",
@@ -94,6 +96,7 @@ SENSITIVE_ASSET_TAGS = frozenset(
     {"credentials", "pii", "financial", "health", "secrets", "business-critical-data"}
 )
 
+
 # A control attribute states its own absence or its own unverifiability in its
 # first token, which is the only position this module reads. Everything after
 # it is prose for the agent: ``"none; accepted by network position"`` is
@@ -101,7 +104,25 @@ SENSITIVE_ASSET_TAGS = frozenset(
 # ``"no MFA on the password login"`` is *stated* — it describes a mechanism
 # that exists, and reading "no" as absence would delete a control the text
 # actually named.
-_LEADING_CONTROL_TOKEN_RE = re.compile(r"^\s*(unknown|none)\b", re.IGNORECASE)
+@cache
+def _leading_word_re(words: tuple[str, ...]) -> re.Pattern[str]:
+    alternatives = "|".join(
+        re.escape(word) for word in sorted(words, key=len, reverse=True)
+    )
+    return re.compile(rf"^\s*({alternatives})\b", re.IGNORECASE)
+
+
+def leading_word(value: str, words: Collection[str]) -> str | None:
+    """The word ``value`` opens with, lower-cased, if it is one of ``words``.
+
+    **The one reader of "what does this attribute open with".** A word ends at
+    a word boundary, so ``no-mfa`` and ``no/unknown`` open with ``no`` and
+    ``nobody`` opens with nothing on this list. :func:`control_state` reads the
+    two sentinels through it, and the validity gate reads the ambiguous
+    negations through it, so the two cannot disagree about where a word ends.
+    """
+    match = _leading_word_re(tuple(sorted(words))).match(value)
+    return match.group(1).lower() if match else None
 
 
 class UnknownControl(BaseModel):
@@ -147,10 +168,10 @@ def control_state(value: str) -> ControlState:
     """
     if not value.strip():
         return "unverified"
-    match = _LEADING_CONTROL_TOKEN_RE.match(value)
-    if match is None:
+    lead = leading_word(value, (UNKNOWN, "none"))
+    if lead is None:
         return "stated"
-    return "unverified" if match.group(1).lower() == UNKNOWN else "absent"
+    return "unverified" if lead == UNKNOWN else "absent"
 
 
 def states_a_protocol(protocol: str) -> bool:

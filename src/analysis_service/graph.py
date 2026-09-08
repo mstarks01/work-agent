@@ -1686,7 +1686,7 @@ def route_review(
         # merged set and never the re-ask's own.
         ruled, drift = merge_retry(
             first,
-            ruled,
+            _canonical_rulings(ruled, nodes.schemas),
             state.get(nodes.key("repairable")) or [],
             [draft.id for draft in package_drafts],
         )
@@ -1710,7 +1710,7 @@ def route_review(
         # The same bytes, kept where code reads them back: the second look
         # merges the re-ask onto these, and ``repairable`` is the whole of
         # what it may replace.
-        state.put(nodes.key("first_review"), list(ruled))
+        state.put(nodes.key("first_review"), _canonical_rulings(ruled, nodes.schemas))
         state.put(nodes.key("repairable"), list(outcome.repairable))
         # Recorded onto this framework's marks before the re-ask runs, so the
         # report says how the first pass failed even when the re-ask repairs it
@@ -1743,6 +1743,18 @@ def _drafts_of(drafts: list | None, package: FrameworkPackage) -> list[Claim]:
 def _rulings_of(ruled: Sequence[Any], schemas: FrameworkSchemas) -> list[Ruling]:
     """One critic's emission, revalidated as this framework's own ruling type."""
     return list(schemas.rulings.model_validate({"claims": list(ruled)}).claims)
+
+
+def _canonical_rulings(ruled: Sequence[Any], schemas: FrameworkSchemas) -> list[dict]:
+    """The same emission, as the ruling model spells it.
+
+    What :func:`~analysis_service.critic.merge_retry` compares. A provider may
+    spell one ruling two ways across two calls -- an optional key present as
+    ``null`` in one and absent in the other -- and a comparison over the raw
+    payloads would read that as a re-ask changing a ruling it was told to carry
+    across. The model's own dump is one spelling per ruling.
+    """
+    return [ruling.model_dump(mode="json") for ruling in _rulings_of(ruled, schemas)]
 
 
 def fail_review(valid_model: dict, ctx, keys: GraphKeys, nodes: FrameworkNodes) -> dict:

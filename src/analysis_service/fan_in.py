@@ -45,7 +45,7 @@ from typing import NamedTuple
 
 from analysis_service.candidates import generate_candidates
 from analysis_service.coverage import build_coverage
-from analysis_service.critic import endpoint_targets, mentioned_ids
+from analysis_service.critic import endpoint_targets
 from analysis_service.evidence import (
     evidence_catalog,
     ground_issues,
@@ -81,7 +81,7 @@ from analysis_service.report import (
     UnverifiedGround,
 )
 from analysis_service.sources import CARRIED_EVIDENCE_KINDS
-from analysis_service.system_model import ModelIndex, SystemModel
+from analysis_service.system_model import ModelIndex, SystemModel, mentioned_ids
 
 logger = logging.getLogger(__name__)
 
@@ -246,14 +246,6 @@ class JoinedDrafts(NamedTuple):
     marks: AnalysisMarks
 
 
-# An element ID as it appears inside prose. Flows carry a second segment and
-# nothing else does, so the two shapes are spelled separately rather than as one
-# optional group that would read ``store:orders-db:anything`` as a store.
-#
-# Built from the element classes' own ``id_prefix``, so a sixth element type
-# joins this pattern by existing rather than by someone remembering. Matched
-# case-insensitively and snapped afterwards, for the reason every other
-# reference in this module is: the spelling is not the claim.
 def _unresolved_mentions(
     claims: Iterable[Claim], element_ids: Collection[str]
 ) -> list[UnresolvedMention]:

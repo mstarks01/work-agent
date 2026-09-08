@@ -1412,6 +1412,32 @@ def test_a_re_ask_that_repairs_only_what_was_named_leaves_no_drift_mark():
     assert [m for m in marks.unreconciled_rulings if "re-ask" in m] == []
 
 
+def test_a_re_ask_that_respells_a_ruling_is_not_drift():
+    """A provider may spell one ruling two ways across two calls: an optional
+    key present as ``null`` in one pass and absent in the next. The merge
+    compares the ruling model's own spelling, so a respelling is not a change
+    and earns no mark."""
+    drafts = [sample_draft("S-01"), sample_draft("T-01", category="tampering")]
+    ctx = FakeContext()
+    route(
+        valid_model().model_dump(mode="json"),
+        [draft.model_dump(mode="json") for draft in drafts],
+        ctx,
+        reviewed_threats={"claims": [sample_ruling("S-01").model_dump(mode="json")]},
+    )
+    sparse = sample_ruling("S-01").model_dump(mode="json", exclude_defaults=True)
+    assert sparse != sample_ruling("S-01").model_dump(mode="json")
+    ctx.state[NODES.key("reviewed")] = {
+        "claims": [sparse, sample_ruling("T-01").model_dump(mode="json")]
+    }
+
+    second = graph.route_review(valid_model().model_dump(mode="json"), ctx, KEYS, NODES)
+
+    assert second.actions.route == graph.ROUTE_ACCEPT
+    marks = AnalysisMarks.model_validate(ctx.state[NODES.key("marks")])
+    assert [m for m in marks.unreconciled_rulings if "re-ask" in m] == []
+
+
 def test_an_invented_ruling_in_the_re_ask_still_fails_the_second_look():
     """The merge resolves what the first pass got right; it does not excuse a
     re-ask that invents. That stays the loud failure it always was."""
