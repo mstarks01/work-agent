@@ -257,8 +257,11 @@ def contribution_url(envelope: envelopes.Envelope, slug: str) -> str:
 
     **The way in for a reader with no clone.** They open the standalone sitting
     page, read a case, press this, and land on GitHub's new-file form holding
-    the file and its name. **Propose changes** opens the pull request, and
-    contribution CI validates it exactly as it validates one the app opened.
+    the file and its name. An account without write access presses **Propose
+    changes**, and GitHub opens the pull request from a fork. An account with
+    write access presses **Commit changes** and chooses a new branch there,
+    because that dialog's default commits straight to main. Contribution CI
+    validates the pull request exactly as it validates one the app opened.
     Nothing is installed and no credential is held anywhere but GitHub.
 
     The name is the digest of the canonical bytes, so a reader who edits the
