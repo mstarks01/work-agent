@@ -308,5 +308,20 @@
     },
     "notes": "The pivot itself, stated against the two processes rather than the flow between them.",
     "verb": "escalate"
+  },
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "flow:shopper-to-storefront-api:place-order",
+      "entity:shopper"
+    ],
+    "claim": "An attacker takes a shopper's email and password from a breach elsewhere, signs in to the storefront API with them, and places orders as that shopper.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "high",
+      "impact": "high"
+    },
+    "notes": "Credential stuffing on a password-only sign-in with no MFA. A second finding beside the cookie replay, because the actions differ: a reused password obtains a session, a stolen cookie reuses one already issued. MFA is the countermeasure here and not there.",
+    "verb": "guess-credential"
   }
 ]

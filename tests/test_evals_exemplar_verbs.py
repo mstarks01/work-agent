@@ -83,7 +83,7 @@ def test_a_sibling_is_a_demonstrated_verb_of_the_same_family(corpus):
 
 
 def test_the_undemonstrated_count_is_what_the_sweep_measured(swept):
-    """47 of 243, 23 of them must-find. See this module's docstring when it
+    """47 of 244, 23 of them must-find. See this module's docstring when it
     moves."""
     assert len(swept) == 47
     assert sum(1 for entry in swept if entry.must_find) == 23

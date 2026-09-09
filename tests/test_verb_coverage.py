@@ -1,6 +1,6 @@
 """Every reference claim carries an action verb, and a new one must too.
 
-This started as a list of what was missing. Nothing is missing now: all 243
+This started as a list of what was missing. Nothing is missing now: all 244
 claims across all 13 cases carry a verb, so what is left is the guard that stops it coming back. A
 case that arrives without verbs fails here rather than quietly weakening
 :class:`~evals.harness.identity.SubsetVerbIdentity` on the case nobody checked.
@@ -24,7 +24,7 @@ from evals.harness.verbs import ACTION_VERBS, unknown_verbs
 #: verb. Spelled per case rather than as one total so that a case losing claims
 #: and another gaining them cannot cancel out.
 CLAIMS_PER_CASE: dict[str, int] = {
-    "01-payments-checkout": 21,
+    "01-payments-checkout": 22,
     "02-iot-fleet-telemetry": 18,
     "03-batch-data-pipeline": 17,
     "04-ml-inference-service": 18,
@@ -94,23 +94,14 @@ def test_every_assigned_verb_is_in_the_vocabulary():
 #: Verbs no reference claim uses, each with why it stays. An exemption with a
 #: reason, in the shape ``test_rule_coverage.py`` already uses here — unlike a
 #: list of work nobody has done, an entry here says the omission is understood.
-UNUSED_BUT_KEPT: dict[str, str] = {
-    "guess-credential": (
-        "No reference claim describes guessing a credential, and five"
-        " no-match candidates in build_pairs.py do — 'brute-forces the fleet"
-        " pre-shared key', 'guesses the build token because it is short'. Those"
-        " are hard negatives against claims about *holding* or *recovering* a"
-        " credential, which is exactly where a matcher must not merge. The verb"
-        " earns its place on the half of the fixtures that is not assigned yet."
-    ),
-}
+UNUSED_BUT_KEPT: dict[str, str] = {}
 
 
 def test_every_verb_is_used_or_exempted_with_a_reason():
     """A verb no claim uses is a distinction the corpus cannot show is real.
 
     Not a failure of the corpus — a question for the vocabulary. A verb that
-    earns no place in 243 claims is one to justify or to remove, and this is
+    earns no place in 244 claims is one to justify or to remove, and this is
     where that gets noticed rather than in a review two years from now.
     """
     corpus = load_corpus(verify_corpus.CORPUS_DIR)

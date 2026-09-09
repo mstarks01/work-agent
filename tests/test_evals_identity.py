@@ -2,7 +2,7 @@
 
 The measurement [#201](https://github.com/mstarks01/work-agent/issues/201) asks
 for. `tests/test_claim_identity.py` answered the false-merge direction over the
-blessed reference sets — the lane and the element set separate 242 of 243 claims
+blessed reference sets — the lane and the element set separate 243 of 244 claims
 — and could not answer the direction the issue's title names, because the
 calibration set's candidate side was a bare string. It now carries element IDs,
 so this runs :class:`~evals.harness.identity.MechanicalIdentity` through
@@ -84,7 +84,7 @@ MEASURED = {
 #: on the candidates a run actually produces, it merges **81 of 111** — it is
 #: barely a rule at all. The verb takes that to 3 while also avoiding one split.
 FRONTIER = {
-    "equality": {"splits": 88, "candidate_merges": 22, "reference_merges": 1},
+    "equality": {"splits": 88, "candidate_merges": 22, "reference_merges": 2},
     #: The rule #201 argues for, and the only row here that is usable.
     #: It is not an element rule, so it is measured by :func:`_rules`'s
     #: verb-aware entry rather than by a shape function.
@@ -93,14 +93,14 @@ FRONTIER = {
         "candidate_merges": 3,
         "reference_merges": 3,
     },
-    "endpoint equality": {"splits": 59, "candidate_merges": 36, "reference_merges": 6},
-    "subset": {"splits": 41, "candidate_merges": 64, "reference_merges": 7},
-    "endpoint subset": {"splits": 14, "candidate_merges": 81, "reference_merges": 23},
-    "overlap": {"splits": 4, "candidate_merges": 83, "reference_merges": 34},
+    "endpoint equality": {"splits": 59, "candidate_merges": 36, "reference_merges": 7},
+    "subset": {"splits": 41, "candidate_merges": 64, "reference_merges": 8},
+    "endpoint subset": {"splits": 14, "candidate_merges": 81, "reference_merges": 24},
+    "overlap": {"splits": 4, "candidate_merges": 83, "reference_merges": 35},
     "endpoint overlap": {
         "splits": 1,
         "candidate_merges": 99,
-        "reference_merges": 126,
+        "reference_merges": 129,
     },
 }
 
@@ -363,8 +363,8 @@ class TestAClaimThatNamesNoPlaceMatchesNothing:
 #: is what survives the verb. The gap between them is what the verb buys.
 VERB_MEASURED = {
     "cases": 13,
-    "within_lane_pairs": 287,
-    "subset": 23,
+    "within_lane_pairs": 291,
+    "subset": 24,
     "subset_verb": 3,
 }
 
