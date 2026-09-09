@@ -423,6 +423,7 @@ def test_a_claim_naming_an_unpublished_requirement_is_dropped_and_marked():
             title="A real requirement",
             description="d",
             needs_evidence="",
+            direction="gap",
             evidence_refs=[reference],
         ),
         RequirementProposal(
@@ -430,6 +431,7 @@ def test_a_claim_naming_an_unpublished_requirement_is_dropped_and_marked():
             title="An invented requirement",
             description="d",
             needs_evidence="",
+            direction="gap",
             evidence_refs=[reference],
         ),
     ]
@@ -864,6 +866,7 @@ class TestAJobDefersWhatItsInputCannotSettle:
             description="d",
             requirement=key,
             needs_evidence=needs,
+            direction="question" if needs else "gap",
             quotes=[QuoteCandidate(text="Shoppers sign in", source_label="note")],
         )
 
@@ -1020,6 +1023,7 @@ class TestThisPackageCarriesNoActionVerb:
                 description="d",
                 requirement="2.1",
                 needs_evidence="",
+                direction="gap",
                 verb="replay",
                 quotes=[QuoteCandidate(text="x", source_label="n")],
             )
@@ -1325,6 +1329,7 @@ def test_an_invented_key_is_marked_even_when_its_evidence_kind_would_defer_it():
             title="An invented requirement, deferred to code",
             description="d",
             needs_evidence="code",
+            direction="question",
             evidence_refs=["crossing:flow:customer-to-web-app:login"],
         ),
     ]
@@ -1358,3 +1363,104 @@ class TestTheCriticGetsTheRequirementsOwnWords:
         from analysis_service.frameworks.asvs.catalog import requirement_text
 
         assert all(requirement_text(req.id) for req in requirements_for(3))
+
+
+class TestADraftStatesItsDirection:
+    """ADR 0028: the lane directs, the critic rules, and silence never confirms."""
+
+    @staticmethod
+    def _proposal(direction, needs="", **grounds):
+        return RequirementProposal(
+            title="t",
+            description="d",
+            requirement="2.1",
+            direction=direction,
+            needs_evidence=needs,
+            **grounds,
+        )
+
+    def test_a_question_names_its_kind_and_nothing_else_does(self):
+        quote = [QuoteCandidate(text="Shoppers sign in", source_label="note")]
+        with pytest.raises(ValidationError):
+            self._proposal("question", "", quotes=quote)
+        with pytest.raises(ValidationError):
+            self._proposal("gap", "code", quotes=quote)
+        with pytest.raises(ValidationError):
+            self._proposal("excluded", "prose", absent_elements=["ldap"])
+
+    def test_a_gap_on_absence_alone_is_unsupported(self):
+        record = PACKAGES["asvs"].record
+        reason = record.unsupported(self._proposal("gap", absent_elements=["ldap"]))
+
+        assert "absent elements alone" in reason
+
+    def test_a_gap_on_a_stated_fact_and_an_exclusion_on_absence_stand(self):
+        record = PACKAGES["asvs"].record
+
+        assert (
+            record.unsupported(
+                self._proposal(
+                    "gap", quotes=[QuoteCandidate(text="x", source_label="n")]
+                )
+            )
+            == ""
+        )
+        assert (
+            record.unsupported(self._proposal("gap", evidence_refs=["crossing:flow:a"]))
+            == ""
+        )
+        assert (
+            record.unsupported(self._proposal("excluded", absent_elements=["ldap"]))
+            == ""
+        )
+        assert (
+            record.unsupported(
+                self._proposal("question", "prose", absent_elements=["ldap"])
+            )
+            == ""
+        )
+
+    def test_the_fan_in_reaches_this_packages_own_refusal(self):
+        record = PACKAGES["asvs"].record
+
+        assert record.unsupported.__func__.__qualname__ != "Claim.unsupported", (
+            "ASVS resolves the neutral default, so it refuses nothing"
+        )
+
+    def test_the_agent_is_handed_the_field_and_must_answer_it(self):
+        schema = RequirementProposal.model_json_schema()
+
+        assert "direction" in schema["properties"]
+        assert "direction" in schema["required"]
+
+    def test_the_draft_carries_the_direction_to_the_critic(self):
+        from analysis_service.critic import critic_view
+        from analysis_service.evidence import evidence_catalog, resolve_proposals
+        from tests.factories import valid_model
+
+        model = valid_model()
+        proposal = self._proposal("excluded", absent_elements=["ldap"])
+        resolution = resolve_proposals(
+            [proposal],
+            evidence_catalog(model),
+            PACKAGES["asvs"],
+            "authentication",
+            model,
+        )
+        (draft,) = resolution.drafts
+        assert draft.direction == "excluded"
+        (view,) = critic_view([draft], model)
+        assert view["direction"] == "excluded"
+
+    def test_a_claim_read_back_from_an_older_report_carries_no_direction(self):
+        draft = DraftRequirementRuling(
+            id="v5.0.0-6.2.1",
+            framework="asvs",
+            framework_version=ASVS_VERSION,
+            chapter="authentication",
+            title="t",
+            description="d",
+            grounds=[Ground(kind="absent-element", term="ldap")],
+        )
+
+        assert draft.direction == ""

@@ -33,9 +33,9 @@ from __future__ import annotations
 
 from collections.abc import Collection, Mapping, Sequence
 from types import MappingProxyType
-from typing import Any, Literal, get_args
+from typing import Any, Literal, Self, get_args
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic.json_schema import SkipJsonSchema
 
 from analysis_service.frameworks.asvs.catalog import (
@@ -176,6 +176,15 @@ class DraftRequirementRuling(Claim):
     model_config = ConfigDict(extra="forbid")
 
     chapter: AsvsChapter
+    # The lane's own statement of what the draft is (ADR 0028), carried from
+    # the proposal so the critic reads it beside the grounds: an ``excluded``
+    # on a verified absent element is the framework's exclusion, and a critic
+    # that cannot see the direction rejected 96 of 99 of them as inferences.
+    # Empty only on a claim read back from a report written before the field,
+    # the precedent ``rejected_because`` set: the service fills it from the
+    # proposal, whose schema requires it, and recording nothing is truthful
+    # where inventing a direction the lane never stated is not.
+    direction: Literal["", "gap", "question", "excluded"] = ""
     # The claim side of the pair narrowed on the proposal above, and it has to
     # move with it: a proposal that validates must resolve into a claim that
     # validates, which is the rule `Proposal.verb`'s own comment states.
@@ -191,6 +200,30 @@ class DraftRequirementRuling(Claim):
     def unit_of(cls, draft: Claim) -> str:
         """The requirement a draft rules on, which is this framework's unit."""
         return requirement_of(draft.id)
+
+    @classmethod
+    def unsupported(cls, proposal: Any) -> str:
+        """Why a proposal cannot become a draft, or ``""`` when it can.
+
+        **Silence never confirms** (ADR 0028). A ``gap`` is the one direction
+        the critic may confirm, and a confirmation needs a stated fact: a quote,
+        or a catalogued attribute the model carries. A gap that rests on
+        ``absent_elements`` alone argues from what the description does not
+        say, which is the draft the critic rejected 93 times of 94 per case 01
+        run. Dropped here, with the reason, so the report says what happened
+        and the critic never reads it. A ``question`` on absence is a question,
+        and an ``excluded`` on absence is what ADR 0027 allows.
+        """
+        if (
+            proposal.direction == "gap"
+            and not proposal.evidence_refs
+            and not proposal.quotes
+        ):
+            return (
+                "asserts a gap and rests on absent elements alone; a gap needs a"
+                " stated fact, and what the description does not say is a question"
+            )
+        return ""
 
     @classmethod
     def text_of_unit(cls, unit: str) -> str:
@@ -245,20 +278,21 @@ class RequirementProposal(Proposal):
     position in the graph, so a requirement naming no element is the ordinary
     case here rather than a defect.
 
-    ``needs_evidence`` splits one of the three cases the output contract already
-    asks a lane agent to decide between. Two of them the agent can answer from
-    the input — the requirement does not apply, or it applies and the input
-    shows a gap. The third, *it applies and the input does not settle it*, hides
-    two different answers: **send more description**, and **no description will
-    ever answer this**. Only the agent that read the Source can tell them apart,
-    so it is asked, and it answers by naming the kind of evidence that would
-    settle the requirement.
+    ``direction`` is the agent's statement of which of the three things this
+    draft is (ADR 0028): a ``gap`` the input states, a ``question`` the input
+    does not settle, or a requirement ``excluded`` because the system has no
+    such subject. The lane directs and the **Critic** rules; the field is the
+    one place code can read a draft's direction before a critic does, and the
+    fan-in drops a ``gap`` that rests on absence alone, because silence never
+    confirms.
 
-    Empty means the agent ruled: the claim stands and the **Critic** judges it.
-    ``prose`` means more of the same input would settle it, so the claim also
-    stands and reads as a request the submitter can act on. Any other kind means
-    this job cannot reach it at all, and the requirement becomes a **Scope
-    Entry** rather than a claim.
+    ``needs_evidence`` is the second half of a ``question``: the kind of
+    evidence that would settle it. ``prose`` means more of the same input would,
+    so the claim stands and reads as a request the submitter can act on. Any
+    other kind means this job cannot reach it at all, and the requirement
+    becomes a **Scope Entry** rather than a claim. A ``gap`` and an ``excluded``
+    carry the empty kind, and the validator holds the two fields together: a
+    question names a kind, and nothing else does.
 
     **Judgement, deliberately, rather than a table.** Whether a description
     settles a requirement depends on what that description says: four
@@ -296,6 +330,23 @@ class RequirementProposal(Proposal):
     # ruled — but it must be *chosen* rather than fallen into. The enum is
     # what keeps a required field from becoming an invented one.
     needs_evidence: Literal["", "prose", "code", "config", "people"]
+    # REQUIRED, WITH NO DEFAULT, for the reason ``needs_evidence`` is: the
+    # schema obliges an answer where a prompt alone does not. Closed, so a
+    # spelling outside the three is an invalid proposal rather than a fourth
+    # direction nobody declared.
+    direction: Literal["gap", "question", "excluded"]
+
+    @model_validator(mode="after")
+    def _direction_and_kind_agree(self) -> Self:
+        asks = self.direction == "question"
+        if asks != bool(self.needs_evidence):
+            raise ValueError(
+                f"the draft titled {self.title!r} says {self.direction!r} and"
+                f" needs_evidence={self.needs_evidence!r}: a question names the"
+                " kind of evidence that would settle it, and a gap or an"
+                " exclusion names none"
+            )
+        return self
 
 
 class RequirementProposals(ProposalBatch):

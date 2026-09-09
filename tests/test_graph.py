@@ -2983,6 +2983,7 @@ def test_merge_marks_an_invented_key_before_the_deferral_split():
                 title="An invented requirement, deferred to code",
                 description="d",
                 needs_evidence="code",
+                direction="question",
                 evidence_refs=["crossing:flow:customer-to-web-app:login"],
             ).model_dump(mode="json")
         ]
@@ -2999,3 +3000,49 @@ def test_merge_marks_an_invented_key_before_the_deferral_split():
     assert ctx.state[asvs_nodes.key("deferred")] == {}
     (mark,) = ctx.state[asvs_nodes.key("marks")]["unknown_claim_identities"]
     assert mark["claim_id"] == "v5.0.0-6.99.99"
+
+
+def test_merge_drops_a_gap_that_rests_on_absence_alone():
+    """ADR 0028: silence never confirms. A ``gap`` grounded in ``absent_elements``
+    and nothing else is a Dropped Claim at the fan-in, with the reason, and no
+    critic reads it. The same grounds under ``excluded`` are what ADR 0027
+    allows, and that draft goes on to the critic."""
+    from analysis_service.frameworks import PACKAGES
+    from analysis_service.frameworks.asvs.record import RequirementProposal
+
+    asvs_nodes = graph.FrameworkNodes("asvs")
+    asvs_keys = graph.GraphKeys.of(("asvs",))
+    state = {
+        graph.Lane("asvs", lane).drafts_key: {"claims": []}
+        for lane in PACKAGES["asvs"].lanes
+    }
+    state[graph.Lane("asvs", "authentication").drafts_key] = {
+        "claims": [
+            RequirementProposal(
+                requirement="2.1",
+                title="A gap argued from what the description never mentions",
+                description="d",
+                needs_evidence="",
+                direction="gap",
+                absent_elements=["ldap"],
+            ).model_dump(mode="json"),
+            RequirementProposal(
+                requirement="2.2",
+                title="A requirement with no subject here",
+                description="d",
+                needs_evidence="",
+                direction="excluded",
+                absent_elements=["ldap"],
+            ).model_dump(mode="json"),
+        ]
+    }
+    ctx = FakeContext(**state)
+
+    event = graph.merge_drafts(
+        valid_model().model_dump(mode="json"), ctx, asvs_keys, asvs_nodes
+    )
+
+    assert event.output["draft_count"] == 1
+    (dropped,) = ctx.state[asvs_nodes.key("marks")]["dropped_claims"]
+    assert dropped["claim_id"] == "v5.0.0-6.2.1"
+    assert "absent elements alone" in dropped["reason"]
