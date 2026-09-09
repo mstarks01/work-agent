@@ -43,22 +43,22 @@ differently and one finding becomes two.
 Elements alone cannot separate a read from a write against one store. The
 frontier in `tests/test_evals_identity.py` prices every rule on all three ways
 of being wrong — false splits over the 200 labelled match pairs, false merges
-over the 111 scored candidate negatives, and 3 false merges over the 287
+over the 111 scored candidate negatives, and 3 false merges over the 291
 within-lane reference pairs:
 
-| Rule | False splits (of 200) | Candidate merges (of 111) | Reference merges (of 287) |
+| Rule | False splits (of 200) | Candidate merges (of 111) | Reference merges (of 291) |
 |---|---|---|---|
-| equality | 88 | 22 | 1 |
-| endpoint subset | 14 | 81 | 23 |
+| equality | 88 | 22 | 2 |
+| endpoint subset | 14 | 81 | 24 |
 | **endpoint subset + verb** | **14** | **3** | **3** |
-| overlap | 4 | 83 | 34 |
-| endpoint overlap | 1 | 99 | 126 |
+| overlap | 4 | 83 | 35 |
+| endpoint overlap | 1 | 99 | 129 |
 
 No element-only row is usable: the tightest loses 89 paraphrases and the loosest
-destroys 126 findings. **The verb row is the first one that is.**
+destroys 129 findings. **The verb row is the first one that is.**
 
 **Read the candidate column, not the reference one.** On reference pairs alone
-`endpoint subset` merges 23 of 287 and looks survivable. On the candidate
+`endpoint subset` merges 24 of 291 and looks survivable. On the candidate
 paraphrases a live run actually emits it merges **81 of 111** — it is barely a
 rule. The verb takes that to 3 without adding a split. That column did not exist
 until [#511](https://github.com/mstarks01/work-agent/issues/511) assigned the
@@ -254,8 +254,8 @@ no reviewer sees it go. So every package carries a collision rule, and
 
 | Package | Comparable reference pairs | Collisions |
 |---|---|---|
-| `stride` | 287 | 3 |
-| `asvs` | 20 | 0 |
+| `stride` | 291 | 3 |
+| `asvs` | 22 | 0 |
 
 ASVS's denominator is small because the chapter separates almost everything
 first: 448 within-case pairs, of which 20 share a chapter, of which none shares
@@ -279,7 +279,7 @@ The rule is the only matcher a scored sweep has. A `match` is a recall hit; a
 `no-match` leaves the finding unmatched, and its fingerprint is looked up in
 the vote ledger — `rejected`, `pooled`, `open` or `unvoted`. Nothing asks a
 model. The rule's known error costs are the record above: 14 of 200 labelled
-matches split, 3 of 111 candidate negatives merged, 3 of 287 reference pairs
+matches split, 3 of 111 candidate negatives merged, 3 of 291 reference pairs
 merged. A split surfaces as an unvoted finding in the queue rather than
 vanishing. A merge does not surface at all, which is why the candidate merge
 column is the one to watch.
