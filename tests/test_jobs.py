@@ -4,6 +4,7 @@ import asyncio
 
 import pytest
 
+from analysis_service.execution import GraphFailed
 from analysis_service.jobs import (
     DEADLINE_FAILURE_MESSAGE,
     GENERIC_FAILURE_MESSAGE,
@@ -20,7 +21,7 @@ from analysis_service.jobs import (
     build_store,
     execute_job,
 )
-from analysis_service.report import InputRef
+from analysis_service.report import InputRef, NodeRun, TokenUsage
 from analysis_service.sources import Source
 from analysis_service.validation import ValidationIssue
 from tests.factories import (
@@ -55,6 +56,21 @@ class RejectingRunner:
 class FailingRunner:
     async def run(self, job: JobRecord, on_node: NodeCallback) -> PipelineOutcome:
         raise RuntimeError("db password hunter2 leaked in traceback")
+
+
+class MidGraphFailingRunner:
+    """A lane raised after extraction ran and was metered."""
+
+    async def run(self, job: JobRecord, on_node: NodeCallback) -> PipelineOutcome:
+        await on_node("extract")
+        raise GraphFailed(
+            RuntimeError("provider refused"),
+            [
+                NodeRun(
+                    node="extract", duration_ms=10, usage=TokenUsage(prompt_tokens=100)
+                )
+            ],
+        )
 
 
 class TestLifecycle:
@@ -497,6 +513,18 @@ class TestExecuteJob:
         assert record.error == GENERIC_FAILURE_MESSAGE
         assert "hunter2" not in record.error
         assert record.report is None
+
+    def test_a_graph_that_raised_mid_run_keeps_its_reservation(self):
+        """The finishes come out of the executor now (#711), and the route
+        still does not settle from them: the raising node's own call is not
+        among them, so the figure is a floor, and a bound that must hold before
+        anything is spent errs upward. `transition` states the rule."""
+        record = self.run_with(MidGraphFailingRunner())
+        assert record.status == "failed"
+        assert record.error == GENERIC_FAILURE_MESSAGE
+        assert "provider refused" not in record.error
+        assert record.unreported_nodes == []
+        assert record.measured_tokens is None, "unmeasured rather than free"
 
 
 class TestJobDeadline:

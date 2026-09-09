@@ -63,6 +63,26 @@ from analysis_service.vendors import join_served
 OnNode = Callable[[str], Awaitable[None]]
 
 
+class GraphFailed(Exception):
+    """A node raised mid-graph, and this is what had finished before it.
+
+    The provider billed every node that finished, and the one that raised may
+    have been billed too, for a call whose usage never reached this driver:
+    ADK tags its error event with the node's path, so that node may appear
+    here with no usage, or not at all. Either way ``node_runs`` is a floor on
+    the spend, never the spend, and it is what the caller has: a sweep prices
+    a failed case from it, and the job route keeps its reservation rather than
+    settling to a figure it knows is short.
+    ``cause`` is the exception the caller classifies, exactly the one it would
+    have caught before this wrapper existed.
+    """
+
+    def __init__(self, cause: Exception, node_runs: Sequence[NodeRun]) -> None:
+        super().__init__(str(cause))
+        self.cause = cause
+        self.node_runs = tuple(node_runs)
+
+
 @dataclass(frozen=True)
 class _NodeFinish:
     """When one graph node produced its output, and what build answered it.
@@ -227,8 +247,10 @@ class GraphExecutor:
         eval mode injecting an already-blessed model at a later entry point. It
         may not carry the input text: that key is this method's to write.
 
-        A node that raises propagates: the caller decides what a partial run
-        means, and nothing here converts a failure into a run that looks short.
+        A node that raises propagates as :class:`GraphFailed`, carrying the
+        node runs that finished before it: the caller decides what a partial
+        run means, and nothing here converts a failure into a run that looks
+        short or into one that looks free.
         """
         rendered = render_sources(sources)
         seed: dict[str, Any] = dict(extra_state or {})
@@ -283,6 +305,8 @@ class GraphExecutor:
             final = await self._session_service.get_session(
                 app_name=self._app_name, user_id=user_id, session_id=session.id
             )
+        except Exception as exc:
+            raise GraphFailed(exc, self._node_runs(finishes, started_at)) from exc
         finally:
             await self._session_service.delete_session(
                 app_name=self._app_name, user_id=user_id, session_id=session.id

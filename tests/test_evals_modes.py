@@ -1045,3 +1045,35 @@ class TestASweepSurvivesARefusedModel:
 
         assert refused < fan_in
         assert "return" in body[refused:fan_in]
+
+
+def test_a_node_that_raises_mid_graph_still_hands_the_sweep_what_ran(case, monkeypatch):
+    """A raised lane used to leave the case priced at zero (#711).
+
+    The executor now carries the finishes before the fault out as
+    ``GraphFailed``, and ``run_graph`` turns that into the one failure type the
+    sweep prices from, so a case that fails inside a lane joins the usage block
+    the same way a case that fails at report validation does (#707). The fault
+    is a provider error on one lane, the shape a live sweep meets; a malformed
+    reply is the fan-in's to survive and never reaches the executor.
+    """
+    models: dict[str, ScriptedLlm] = {}
+    pipeline = build(case, ENTRY_PREPARE, models)
+
+    async def refused(self, llm_request, stream: bool = False):
+        raise RuntimeError("provider refused")
+        yield  # an async generator, as the adapter's method is
+
+    monkeypatch.setattr(LaneAwareLlm, "generate_content_async", refused)
+
+    with pytest.raises(modes.CaseFailure, match="provider refused") as raised:
+        asyncio.run(modes.run_analysis(case, pipeline))
+
+    ran = {run.node: run for run in raised.value.node_runs}
+    lanes = {analyze_node_name("stride", category) for category in STRIDE_CATEGORIES}
+    assert "prepare" in ran, "the nodes before the fault are what the provider billed"
+    # ADK tags its error event with the failed node's path, so a lane that
+    # raised rides out too, with nothing metered on it: the floor the type
+    # promises, never a figure that looks like a spend.
+    assert all(ran[node].usage is None for node in lanes & set(ran))
+    assert isinstance(raised.value.cause, RuntimeError)

@@ -17,7 +17,7 @@ import pytest
 from google.adk.sessions import InMemorySessionService
 
 from analysis_service import graph
-from analysis_service.execution import GraphExecutor, GraphRun, _NodeFinish
+from analysis_service.execution import GraphExecutor, GraphFailed, GraphRun, _NodeFinish
 from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES, DraftThreat
 from analysis_service.report import (
     InputRef,
@@ -535,9 +535,52 @@ class TestSessionCleanup:
         async def scenario():
             await executor.run([Source.description(DESCRIPTION)], user_id="test-user")
 
-        with pytest.raises(ValueError, match="Invalid JSON"):
+        with pytest.raises(GraphFailed, match="Invalid JSON") as raised:
             asyncio.run(scenario())
+        assert isinstance(raised.value.cause, ValueError)
         assert self._sessions(service) == []
+
+
+class TestAGraphThatRaisesCarriesWhatRan:
+    """A node that raises propagates with the node runs that finished before it.
+
+    The provider billed every one of those, and the sweep priced the case at
+    zero because nothing carried them out (#711). The raising node's own call
+    is the one figure that never reaches the driver, so what comes out is a
+    floor on the spend and is named as one.
+    """
+
+    def failing(self, replies):
+        pipeline, _ = scripted_pipeline(replies)
+        executor = GraphExecutor(pipeline, app_name="stride-test")
+
+        async def scenario():
+            await executor.run([Source.description(DESCRIPTION)], user_id="test-user")
+
+        with pytest.raises(GraphFailed) as raised:
+            asyncio.run(scenario())
+        return raised.value
+
+    def test_the_nodes_before_the_fault_ride_out(self):
+        spoofing = graph.analyze_node_name("stride", "spoofing")
+        failed = self.failing(happy_replies() | {spoofing: "not json"})
+
+        ran = [run.node for run in failed.node_runs]
+
+        assert "extract" in ran
+        assert spoofing not in ran, "the raising node's own call is not metered"
+        assert isinstance(failed.cause, ValueError)
+
+    def test_a_fault_on_the_first_node_carries_nothing(self):
+        failed = self.failing(happy_replies() | {"extract": "not json"})
+
+        assert failed.node_runs == ()
+
+    def test_the_cause_is_the_exception_the_caller_would_have_caught(self):
+        failed = self.failing(happy_replies() | {"extract": "not json"})
+
+        assert failed.__cause__ is failed.cause
+        assert "Invalid JSON" in str(failed)
 
 
 class TestTheRunCompletesItself:
