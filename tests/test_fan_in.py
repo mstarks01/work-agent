@@ -16,6 +16,7 @@ from analysis_service.report import (
     Severity,
 )
 from analysis_service.sources import DEFAULT_DESCRIPTION_LABEL
+from analysis_service.system_model import ModelIndex
 from tests.factories import (
     sample_draft,
     sample_proposal,
@@ -1014,3 +1015,71 @@ class TestFanIn:
         by_lane = {row.lane: row.drafts for row in merged.coverage}
         assert set(by_lane) == set(STRIDE.lanes)
         assert (by_lane["spoofing"], by_lane["tampering"]) == (1, 1)
+
+
+class TestSettledDuplicates:
+    """Two conditional drafts are one finding only when they ask one question.
+
+    A draft its own grounds settle never reaches a critic, so the fan-in is the
+    only place two of them are compared. The key is the lane, the verb, the
+    place and the unstated controls the drafts rest on. The first Baseline
+    dropped a WebSocket draft for a REST draft between the same two processes:
+    one place under the endpoint fold, two flows, two unstated controls, and
+    the dropped draft's question about the socket's session went with it.
+    """
+
+    @pytest.fixture
+    def index(self):
+        return ModelIndex.of(valid_model())
+
+    @staticmethod
+    def resting_on(threat_id, attribute, category="spoofing", verb="impersonate"):
+        return sample_draft(
+            threat_id,
+            category,
+            verb=verb,
+            affected_element_ids=["flow:customer-to-web-app:login"],
+            grounds=[
+                Ground(
+                    kind="unknown-attribute",
+                    element_id="flow:customer-to-web-app:login",
+                    attribute=attribute,
+                )
+            ],
+        )
+
+    def test_one_question_asked_twice_keeps_the_first(self, index):
+        drafts = [
+            self.resting_on("S-01", "authentication"),
+            self.resting_on("S-02", "authentication"),
+        ]
+
+        kept, dropped = fan_in._drop_settled_duplicates(drafts, index)
+
+        assert [claim.id for claim in kept] == ["S-01"]
+        assert [(mark.claim_id, mark.title) for mark in dropped] == [
+            ("S-02", drafts[1].title)
+        ]
+        assert "'S-01'" in dropped[0].reason
+
+    def test_two_unstated_controls_are_two_questions(self, index):
+        drafts = [
+            self.resting_on("S-01", "authentication"),
+            self.resting_on("S-02", "encryption_in_transit"),
+        ]
+
+        kept, dropped = fan_in._drop_settled_duplicates(drafts, index)
+
+        assert [claim.id for claim in kept] == ["S-01", "S-02"]
+        assert dropped == []
+
+    def test_two_lanes_are_two_findings(self, index):
+        drafts = [
+            self.resting_on("S-01", "authentication"),
+            self.resting_on("T-01", "authentication", category="tampering"),
+        ]
+
+        kept, dropped = fan_in._drop_settled_duplicates(drafts, index)
+
+        assert [claim.id for claim in kept] == ["S-01", "T-01"]
+        assert dropped == []
