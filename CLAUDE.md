@@ -92,6 +92,17 @@ is a claim about OpenAI's catalogue. Drive the real dependency where CI can
 (`test_identity.py` drives the installed translator), and where it cannot,
 record the measurement beside the code rather than asserting it in prose.
 
+### Price a fix before a run
+
+A sweep costs money and sees nothing under the run-to-run spread. Before any
+paid run, read the archived misses and state the fix's ceiling in must-finds:
+`losses` charges each STRIDE miss to the verb, a merge, the critic, the place or
+no lead, and `attribution` charges each ASVS miss to a stage. A fix whose
+ceiling sits inside the spread gets no run; batch it. A scorer change is priced
+offline on the frontier with `run.py price-verbs`, and the run confirms rather
+than discovers. Spend on the narrowest instrument that can see the change: one
+case, then five runs of it, then the corpus. See `evals/TUNING.md` step 3.
+
 ### One rule, one reader
 
 When two pieces of code answer the same question, they will eventually answer it

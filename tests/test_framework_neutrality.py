@@ -235,6 +235,12 @@ DECLARED: dict[str, str] = {
         " claim set has. `INSTRUMENTS` already declares the instrument"
         ' `frameworks=("stride",)`; this is the module behind it.'
     ),
+    "evals/harness/verb_pricing.py": (
+        "This code is STRIDE's, through `SubsetVerbIdentity` and the STRIDE"
+        " reference sets it prices a candidate over. Only a package whose claims"
+        " compose an identity from an action has a verb equivalence to price; a"
+        " package whose claims carry a catalog identifier has no verb and no row."
+    ),
     "evals/harness/losses.py": (
         "This code is STRIDE's, through `DraftThreat`, a category and a verb."
         " A miss lost to the verb is a cause only a package whose claims compose"
