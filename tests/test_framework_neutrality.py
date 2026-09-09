@@ -235,6 +235,14 @@ DECLARED: dict[str, str] = {
         " claim set has. `INSTRUMENTS` already declares the instrument"
         ' `frameworks=("stride",)`; this is the module behind it.'
     ),
+    "evals/harness/losses.py": (
+        "This code is STRIDE's, through `DraftThreat`, a category and a verb."
+        " A miss lost to the verb is a cause only a package whose claims compose"
+        " an identity from an action and a place can have; a package whose"
+        " claims carry a catalog identifier has `attribution.py`, the stage"
+        " reading, instead. `INSTRUMENTS` already declares the instrument"
+        ' `frameworks=("stride",)`; this is the module behind it.'
+    ),
     "evals/verify_corpus.py": (
         "Five tables keyed by framework (record fields, record checks, lane"
         " accessor, ASVS-only chapter check, calibration-fixture input). All"

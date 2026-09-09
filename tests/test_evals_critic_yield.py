@@ -257,8 +257,13 @@ def test_the_cli_reports_both_sides_per_case_and_pooled(case, capsys):
         report=_report_with(case, [promote(kept)]),
         drafts={"stride": (kept, junk)},
     )
-    scores, yields = run._score_runs(
-        [case], {case.id: analysis}, _identity_matcher([kept]), _rejecting(case, junk)
+    flows = {flow.id: (flow.source, flow.destination) for flow in case.model.data_flows}
+    scores, yields, _ = run._score_runs(
+        [case],
+        {case.id: analysis},
+        _identity_matcher([kept]),
+        _rejecting(case, junk),
+        {case.id: flows},
     )
     critic_yield.render(yields)
 

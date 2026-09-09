@@ -67,6 +67,7 @@ from evals.harness import (
     instruction,
     instruction_delta,
     ledger,
+    losses,
     modes,
     pairing,
     queue,
@@ -99,7 +100,7 @@ from evals.harness.grounds import (
     GroundsFailure,
     classify_failure,
 )
-from evals.harness.identity import SubsetVerbIdentity
+from evals.harness.identity import FlowMap, SubsetVerbIdentity
 from evals.harness.instruments import (
     INSTRUMENTS,
     ModeRun,
@@ -107,6 +108,7 @@ from evals.harness.instruments import (
     measure_case,
     render_all,
 )
+from evals.harness.losses import CaseLosses
 from evals.harness.provenance import (
     UNSET,
     ProvenanceError,
@@ -495,7 +497,8 @@ def _score_runs(
     runs: dict[str, modes.AnalysisRun],
     matcher: SubsetVerbIdentity,
     votes: ledger.Ledger,
-) -> tuple[tuple[CaseScore, ...], tuple[CriticYield, ...]]:
+    flows_by_case: Mapping[str, FlowMap],
+) -> tuple[tuple[CaseScore, ...], tuple[CriticYield, ...], tuple[CaseLosses, ...]]:
     """Score every case that carries a STRIDE block, on both sides of the critic.
 
     Yield comes out of the same pass rather than a second sweep: the pre-critic
@@ -510,20 +513,26 @@ def _score_runs(
     that ran a different package. Asking for the block regardless is what made a
     sweep of one framework die inside another framework's scorer.
     """
-    scored = [
-        score_case_with_yield(
-            case,
-            runs[case.id].merged_drafts,
-            stride_threats(runs[case.id].report),
-            matcher,
-            votes,
+    scored = []
+    charged = []
+    for case in cases:
+        if case.id not in runs or not optional_block(runs[case.id].report, "stride"):
+            continue
+        drafts = runs[case.id].merged_drafts
+        produced = stride_threats(runs[case.id].report)
+        entry = score_case_with_yield(case, drafts, produced, matcher, votes)
+        scored.append(entry)
+        # The third reading off the same pass: what lost each miss, from the
+        # score's own misses and the two sides the yield already compares.
+        charged.append(
+            losses.attribute_case(
+                case, entry.score, drafts, produced, flows_by_case[case.id]
+            )
         )
-        for case in cases
-        if case.id in runs and optional_block(runs[case.id].report, "stride")
-    ]
     return (
         tuple(entry.score for entry in scored),
         tuple(entry.critic_yield for entry in scored),
+        tuple(charged),
     )
 
 
@@ -570,17 +579,19 @@ def _scored_sweep(
             f"{len(unrostered)} voter(s) have no roster line and no series"
             f" reads them: {', '.join(unrostered)}"
         )
-    matcher = SubsetVerbIdentity(_flows_by_case(cases))
+    flows_by_case = _flows_by_case(cases)
+    matcher = SubsetVerbIdentity(flows_by_case)
     reports = {case: run.report for case, run in runs.items()}
 
     by_series = {}
     for name, included in standings.SERIES.items():
         read = standings.narrow(votes, table, included)
-        scores, yields = _score_runs(cases, runs, matcher, read)
+        scores, yields, charged = _score_runs(cases, runs, matcher, read, flows_by_case)
         by_series[name] = replace(
             sweep,
             scores=scores,
             yields=yields,
+            losses=charged,
             writing=writing.measure(cases, reports, read),
         )
     return by_series, votes
