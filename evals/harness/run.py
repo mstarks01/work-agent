@@ -398,15 +398,18 @@ async def _run_mode(
                 else await modes.run_end_to_end(case, pipeline)
             )
         except modes.CaseFailure as failed:
-            # The graph ran to the end and the provider billed every node, so
-            # what ran joins the sweep's executions before the failure is
-            # classified: a failed case is priced like a finished one (#707).
+            # The provider billed every node that finished, whether the graph
+            # then failed to build its report (#707) or a later node raised
+            # (#711), so what ran joins the sweep's executions before the
+            # failure is classified: a failed case is priced like a finished
+            # one. The raising node's own call is the one figure no path
+            # meters, so the price is a floor.
             executions += failed.node_runs
             record_failure(case, failed.cause)
             continue
         except CAUGHT as error:
-            # A node raised inside the graph. Nothing carries its node runs
-            # out, so this case's spend stays unmetered.
+            # A fault before the executor started: nothing ran, so nothing is
+            # owed to the usage block.
             record_failure(case, error)
             continue
 

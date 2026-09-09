@@ -34,7 +34,7 @@ from typing import Any
 
 from analysis_service.analysis import control_state, states_a_protocol
 from analysis_service.deployment import Deployment
-from analysis_service.execution import GraphExecutor, GraphRun
+from analysis_service.execution import GraphExecutor, GraphFailed, GraphRun
 from analysis_service.frameworks.stride.record import DraftThreat
 from analysis_service.graph import (
     ENTRY_EXTRACT,
@@ -75,14 +75,18 @@ class EvalRunError(RuntimeError):
 
 
 class CaseFailure(Exception):
-    """A case whose graph ran to the end and whose result did not become a report.
+    """A case that did not become a report, and what its graph ran first.
 
-    Carries what ran, because the provider billed it whatever came next. The
-    sweep used to read a case's node runs off its finished report, so a case
-    that failed at report validation contributed nothing to the usage the
-    artifact prices, and a run that cost a dollar read as free (#707).
-    ``cause`` is the exception the caller classifies, exactly the one it would
-    have caught before this wrapper existed.
+    Two ways in. The graph ran to the end and the result failed to build, in
+    which case every node was billed (#707). Or a node raised inside the graph,
+    in which case every node that finished before it was billed and the
+    executor hands those out as :class:`~analysis_service.execution.GraphFailed`
+    (#711). Either way the provider billed what ran whatever came next, and the
+    sweep used to read a case's node runs off its finished report, so a failed
+    case contributed nothing to the usage the artifact prices and a run that
+    cost a dollar read as free. ``cause`` is the exception the caller
+    classifies, exactly the one it would have caught before this wrapper
+    existed.
     """
 
     def __init__(self, cause: Exception, node_runs: Sequence[NodeRun]) -> None:
@@ -595,7 +599,13 @@ async def run_graph(
     than one certifying an empty observation set.
     """
     executor = GraphExecutor(pipeline, app_name=EVAL_APP_NAME)
-    return await executor.run(sources, user_id=EVAL_USER, extra_state=extra_state)
+    try:
+        return await executor.run(sources, user_id=EVAL_USER, extra_state=extra_state)
+    except GraphFailed as failed:
+        # One failure type for the sweep, whichever side of the graph's end the
+        # fault sat on: what ran joins the artifact's usage before the cause is
+        # classified.
+        raise CaseFailure(failed.cause, failed.node_runs) from failed.cause
 
 
 async def run_extraction(case: GoldenCase, pipeline: Pipeline) -> ExtractionResult:
