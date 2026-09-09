@@ -28,5 +28,7 @@ Ten fields — the five shared ones plus `sequence`, `affected_element_ids`, `ve
 - *authorization*: `escalate`, `abuse-grant`
 - *attribution*: `unattributable`
 
+Three rules hold in every lane, because the first Baseline's misses broke them most. A credential the attacker holds and presents is `use-credential`, never `impersonate`: `impersonate` is posing as a party without its credential. Reading a store that holds credentials is `recover-credential`, not `read`. A grant legitimately held and misused is `abuse-grant`; a position reaching authority it does not carry is `escalate`.
+
 - **`severity`** — `likelihood` and `impact` (`low | medium | high`) plus a `justification` that cites model facts for both axes. Omit any band; it is derived.
 - **`mitigations`** — a summary line each, with optional detail. Give at least one for every threat you can act on. Leave it empty only when the threat is conditional on an `unknown` and no countermeasure can be named before that fact is learned — say so in the description when you do.
