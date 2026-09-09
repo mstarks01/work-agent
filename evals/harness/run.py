@@ -86,6 +86,7 @@ from evals.harness.artifact import (
     repo_commit,
 )
 from evals.harness.artifact import build as build_artifact
+from evals.harness.baseline import BASELINES_DIR
 from evals.harness.calibration import (
     AGREEMENT_BAR,
     DEFAULT_PAIRS_PATH,
@@ -1054,8 +1055,21 @@ def command_score(args: argparse.Namespace) -> int:
     instruments marked ``scored`` are recomputed and their keys replaced; every
     run-level block stays exactly as the sweep wrote it, because grounds,
     coverage and provenance are facts about a run that no later vote changes.
+
+    **It writes nothing inside a merged Baseline.** A Baseline's files are
+    digest-sealed in its ``baseline.json``, so a rewrite in place fails the
+    repo-wide verify and stales the comparison table (#745). The recorded
+    number stays recorded; a re-scored copy goes wherever ``--out`` says.
     """
     path = Path(args.artifact)
+    out = Path(args.out) if args.out else path
+    if _sealed(out):
+        print(
+            f"{out}: sits inside {BASELINES_DIR}, where a merged Baseline's files"
+            " are digest-sealed; write the scored copy elsewhere with --out",
+            file=sys.stderr,
+        )
+        return 1
     loaded = load_artifact(path)
     cases = [case for case in load_corpus(args.corpus) if case.id in loaded.cases]
     if not cases:
@@ -1083,11 +1097,15 @@ def command_score(args: argparse.Namespace) -> int:
     raw |= _scored_keys(sweep)
     raw["series"] = _series_record(by_series)
 
-    out = Path(args.out) if args.out else path
     out.write_text(json.dumps(raw, indent=2) + "\n", "utf-8")
     print(f"\n{len(votes)} vote(s) read from {args.ledger}")
     print(f"{out} rewritten" if out == path else f"scored artifact written to {out}")
     return 0
+
+
+def _sealed(path: Path) -> bool:
+    """Whether ``path`` sits inside the directory of merged, digest-sealed Baselines."""
+    return path.resolve().is_relative_to(BASELINES_DIR.resolve())
 
 
 def command_price_verbs(args: argparse.Namespace) -> int:
