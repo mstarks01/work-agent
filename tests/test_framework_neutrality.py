@@ -896,6 +896,7 @@ NEUTRAL_HOOKS: dict[str, str] = {
     "units_for": "record",
     "settled_by_grounds": "record",
     "unit_of": "record",
+    "unsupported": "record",
     "unit_text": "record",
     "text_of_unit": "record",
     "rating_of": "record",
@@ -1213,4 +1214,25 @@ def test_every_output_contract_counts_the_fields_its_schema_emits():
         assert _count_words(listed) == {len(emitted), len(shared)}, (
             f"{name}/output.md counts {listed!r}; the schema emits"
             f" {len(emitted)} fields, {len(shared)} of them shared"
+        )
+
+
+def test_a_package_that_rules_on_a_unit_declares_a_direction():
+    """ADR 0028: ``direction`` belongs to a package whose claims name a catalog
+    unit and can rule it out, and to no other. Held as a pairing over the
+    registry rather than as a name, so a package nobody has written yet answers
+    for itself: one that overrides ``unit_of`` emits the field, one that keeps
+    the neutral default does not."""
+    from analysis_service.report import Claim
+
+    for name, schemas in SCHEMAS.items():
+        draft = schemas.proposals.model_fields["claims"].annotation.__args__[0]
+        emitted = "direction" in draft.model_json_schema()["properties"]
+        names_a_unit = (
+            PACKAGES[name].record.unit_of.__func__ is not Claim.unit_of.__func__
+        )
+        assert emitted == names_a_unit, (
+            f"{name}: names a unit={names_a_unit}, emits direction={emitted}."
+            " A package that rules on a unit states a direction; one that"
+            " composes an identity from an action states none."
         )
