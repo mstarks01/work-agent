@@ -5,9 +5,9 @@ and write one. It has no entry point and no page of its own.
 ``webapp/sitting.py`` is the surface a reader runs; it passes its page to
 :func:`create_app` and adds the routes only that surface needs.
 
-The interface a surface uses is five names: :func:`create_app`,
+The interface a surface uses is seven names: :func:`create_app`,
 :func:`build_session`, :func:`open_case`, :func:`held_draft`,
-:func:`save_draft` and :func:`require_token`. Everything else here is private,
+:func:`save_draft`, :func:`moved_under` and :func:`require_token`. Everything else here is private,
 so a surface that needs a sixth thing asks for it rather than reaching in.
 
 The session offers the whole corpus. A rail lists every case with a status, the
@@ -484,6 +484,19 @@ def _moved(
             if name in prepared.files
         },
     )
+
+
+def moved_under(session: Session, case_id: str) -> list[str]:
+    """The files of a recorded draft that moved since the surface served them.
+
+    For a surface's contribution step. A draft the reader recorded and then
+    left while a corpus edit landed carries digests CI would refuse, and the
+    only remedy is to open the case again, which is where the files are
+    re-pinned. Named so the surface can send the reader there rather than
+    hand them the digest problem.
+    """
+    prepared = session.prepare(case_id)
+    return _moved(session, prepared, session.draft(case_id))
 
 
 def _served(

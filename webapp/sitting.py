@@ -127,6 +127,14 @@ def _review_envelope(
                 status_code=409,
                 detail=f"{row.case_id}: only recorded cases can be contributed",
             )
+        # Before the digest check can say it in its own words: a record whose
+        # set moved since it was served is one the reader has to see again.
+        if moved := base.moved_under(session, row.case_id):
+            raise HTTPException(
+                status_code=409,
+                detail=f"{row.case_id}: {', '.join(moved)} changed since you"
+                " recorded it; open the case, read what moved, and record again",
+            )
         cases[row.case_id] = envelopes.CaseAnswers(
             own_list=held.own_list,
             marks=held.marks,

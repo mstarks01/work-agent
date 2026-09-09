@@ -486,7 +486,8 @@ one thing unmarked, a claim whose identity changed is the one thing unmarked,
 and the record refuses to finish until you answer it. The draft pins each file
 to the bytes the app served you, so the record you contribute covers the edited
 set. If a file moves while your tab is open, the record refuses and names the
-file: reload the case, read what moved, and record again.
+file: reload the case, read what moved, and record again. **Contribute** says the
+same of a case you recorded before the edit and did not open since.
 
 **A case that gains a framework waits for that one set.** Your sitting judged
 what existed, and it still stands. The rail says `<framework> waiting;
