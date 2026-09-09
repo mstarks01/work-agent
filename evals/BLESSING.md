@@ -483,8 +483,10 @@ covering those sets, fail-closed, and they go back on the list.
 sitting: the list you wrote, and every mark whose finding the case still
 carries. A mark is keyed by the finding's fingerprint, so an added claim is the
 one thing unmarked, a claim whose identity changed is the one thing unmarked,
-and the record refuses to finish until you answer it. The draft pins the files
-as they are now, so the record you contribute covers the edited set.
+and the record refuses to finish until you answer it. The draft pins each file
+to the bytes the app served you, so the record you contribute covers the edited
+set. If a file moves while your tab is open, the record refuses and names the
+file: reload the case, read what moved, and record again.
 
 **A case that gains a framework waits for that one set.** Your sitting judged
 what existed, and it still stands. The rail says `<framework> waiting;

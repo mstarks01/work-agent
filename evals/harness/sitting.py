@@ -171,9 +171,10 @@ class Draft(BaseModel):
     is a defect that waits.
 
     ``opened_digests`` pins each required file to the bytes it held when the
-    draft opened. That is a different question from the digests a merged
-    submission carries, which pin what a recorded sitting signed, and it is
-    what lets a surface tell the reader the text moved under a read in progress.
+    surface last served it to the reader. That is a different question from the
+    digests a merged submission carries, which pin what a recorded sitting
+    signed, and it is what lets a surface tell the reader the text moved under
+    a read in progress and refuse to record until it is served again.
 
     **A hand-edited draft costs nothing this project can price, and nothing
     notices it.** A reader who types their own list into this file by hand
