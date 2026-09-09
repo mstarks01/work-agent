@@ -1432,3 +1432,35 @@ class TestADraftStatesItsDirection:
 
         assert "direction" in schema["properties"]
         assert "direction" in schema["required"]
+
+    def test_the_draft_carries_the_direction_to_the_critic(self):
+        from analysis_service.critic import critic_view
+        from analysis_service.evidence import evidence_catalog, resolve_proposals
+        from tests.factories import valid_model
+
+        model = valid_model()
+        proposal = self._proposal("excluded", absent_elements=["ldap"])
+        resolution = resolve_proposals(
+            [proposal],
+            evidence_catalog(model),
+            PACKAGES["asvs"],
+            "authentication",
+            model,
+        )
+        (draft,) = resolution.drafts
+        assert draft.direction == "excluded"
+        (view,) = critic_view([draft], model)
+        assert view["direction"] == "excluded"
+
+    def test_a_claim_read_back_from_an_older_report_carries_no_direction(self):
+        draft = DraftRequirementRuling(
+            id="v5.0.0-6.2.1",
+            framework="asvs",
+            framework_version=ASVS_VERSION,
+            chapter="authentication",
+            title="t",
+            description="d",
+            grounds=[Ground(kind="absent-element", term="ldap")],
+        )
+
+        assert draft.direction == ""

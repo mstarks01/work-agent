@@ -75,7 +75,11 @@ ruled.
 description names no such thing. It stays, and the rejected claim the report
 keeps carries the absent-element ground with the term that matched nothing, so
 a reader sees that the ruling reads the description's silence and not the
-deployed system's. `prompts/critic.md`'s
+deployed system's. The draft carries its direction to the critic, and the
+critic's text says an `excluded` on a verified absent element is judged on
+whether the term is the requirement's subject and rejected for `evidence`
+where it is. The one measured run without that sentence rejected 96 of 99
+exclusions for `reasoning`. `prompts/critic.md`'s
 rule that a graph's shape confirms no *threat* is unchanged, because it is a
 rule about `gap` and not about `excluded`.
 

@@ -176,6 +176,15 @@ class DraftRequirementRuling(Claim):
     model_config = ConfigDict(extra="forbid")
 
     chapter: AsvsChapter
+    # The lane's own statement of what the draft is (ADR 0028), carried from
+    # the proposal so the critic reads it beside the grounds: an ``excluded``
+    # on a verified absent element is the framework's exclusion, and a critic
+    # that cannot see the direction rejected 96 of 99 of them as inferences.
+    # Empty only on a claim read back from a report written before the field,
+    # the precedent ``rejected_because`` set: the service fills it from the
+    # proposal, whose schema requires it, and recording nothing is truthful
+    # where inventing a direction the lane never stated is not.
+    direction: Literal["", "gap", "question", "excluded"] = ""
     # The claim side of the pair narrowed on the proposal above, and it has to
     # move with it: a proposal that validates must resolve into a claim that
     # validates, which is the rule `Proposal.verb`'s own comment states.
