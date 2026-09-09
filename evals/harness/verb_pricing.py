@@ -32,7 +32,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from evals.harness.calibration import LabelledPair
-from evals.harness.identity import FlowMap, SubsetVerbIdentity, endpoint_form
+from evals.harness.identity import FlowMap, SubsetVerbIdentity, endpoint_subset
 from evals.harness.ledger import Ledger
 from evals.harness.reference import GoldenCase, ReferenceThreat
 from evals.harness.scorer import score_case
@@ -116,12 +116,14 @@ def _rules_one(
     flows: FlowMap,
     groups: Groups | None,
 ) -> bool:
-    """The shipped rule's shape, with the equivalence table given rather than read."""
-    left = endpoint_form(left_ids, flows)
-    right = endpoint_form(right_ids, flows)
-    if not left or not right:
-        return False
-    return (left <= right or right <= left) and same_action(
+    """The shipped rule's two halves, with the equivalence table given rather than read.
+
+    Both halves are the rule's own readers: :func:`endpoint_subset` is the
+    element half :class:`SubsetVerbIdentity` calls, and :func:`same_action` the
+    action half. Nothing here restates either, so a change to the rule prices
+    itself.
+    """
+    return endpoint_subset(left_ids, right_ids, flows) and same_action(
         left_verb, right_verb, groups
     )
 

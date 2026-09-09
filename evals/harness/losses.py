@@ -18,19 +18,24 @@ Five causes, decided in this order for one missed reference:
   wrote a different verb. The pair of verbs rides on the row, because which
   side is wrong is a decision this module does not make.
 * ``merged``: a surviving claim cites the place with the reference's own
-  verb, and the scorer assigned it to a sibling reference. Two references at
+  action, read through the equivalence table the identity rule reads, and the
+  scorer assigned it to a sibling reference. Two references at
   one place under one action are the merges ``verbs.UNSEPARATED`` records,
   and the loss is the corpus's to rule on rather than the lane's.
 * ``critic``: no surviving claim cites the place, but a draft the critic
-  rejected did, with the reference's verb. The finding was written and killed.
+  rejected did, with the reference's action. The finding was written and killed.
 * ``place``: a candidate rule led the lane to the reference's elements and no
   draft cites them. The lead did not take.
 * ``unled``: no rule fired on the reference's elements and no draft cites
   them. Nothing sent the lane there.
 
 Every fact read here is one the harness already holds in a closed form: the
-scorer's element relation, the record's verb, the trigger instrument's rule
-IDs. No prose is read into any number; the rationale strings the scorer prints
+scorer's element relation, the identity rule's own answer to whether two verbs
+name one action, the trigger instrument's rule IDs. Whether two verbs are one
+action is read through :func:`~evals.harness.verbs.same_action` and never
+compared as strings: the table is empty today, and a reader that compared
+strings would agree with the rule until the day an entry lands, then charge a
+``merged`` miss to the verb. No prose is read into any number; the rationale strings the scorer prints
 are for a person, and this module does not parse them.
 
 Per reference rather than per draft, and only over misses: a matched reference
@@ -49,6 +54,7 @@ from evals.harness.identity import FlowMap, endpoint_subset
 from evals.harness.reference import GoldenCase
 from evals.harness.scorer import CaseScore
 from evals.harness.triggers import case_trigger_recall
+from evals.harness.verbs import same_action
 
 #: The causes a miss is charged to, in the order they are decided.
 Cause = Literal["verb", "merged", "critic", "place", "unled"]
@@ -150,7 +156,7 @@ def attribute_case(
                     index,
                     lane,
                     index in must_find,
-                    "merged" if claim.verb == verb else "verb",
+                    "merged" if same_action(claim.verb, verb) else "verb",
                     verb,
                     draft_id=claim.id,
                     draft_verb=claim.verb,
@@ -162,7 +168,7 @@ def attribute_case(
             for draft in drafts
             if draft.category == lane
             and draft.id not in surviving
-            and draft.verb == verb
+            and same_action(draft.verb, verb)
         ]
         killed_here = _at_place(reference.affected_element_ids, killed, flows)
         if killed_here:
