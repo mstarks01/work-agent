@@ -406,6 +406,46 @@ class TestWhatARescoreTouches:
         assert "scores" not in scored(swept), "the input is left as the sweep wrote it"
 
 
+class TestItWritesNothingInsideAMergedBaseline:
+    """A Baseline's files are digest-sealed, so a score in place breaks the
+    seal and the repo-wide verify with it (#745). The guide used to name that
+    command. The command now refuses any target under the Baselines root and
+    names ``--out``."""
+
+    def test_in_place_is_refused_and_the_artifact_is_untouched(
+        self, swept, tmp_path, monkeypatch, capsys
+    ):
+        from evals.harness import run as run_module
+
+        monkeypatch.setattr(run_module, "BASELINES_DIR", tmp_path)
+
+        code = main(["score", str(swept), "--ledger", str(tmp_path / "n.jsonl")])
+
+        assert code == 1
+        assert "--out" in capsys.readouterr().err
+        assert "scores" not in scored(swept)
+
+    def test_a_copy_outside_the_root_is_written(self, swept, tmp_path, monkeypatch):
+        from evals.harness import run as run_module
+
+        monkeypatch.setattr(run_module, "BASELINES_DIR", tmp_path)
+        out = tmp_path.parent / f"{tmp_path.name}-rescored.json"
+
+        code = main(
+            [
+                "score",
+                str(swept),
+                "--ledger",
+                str(tmp_path / "n.jsonl"),
+                "--out",
+                str(out),
+            ]
+        )
+
+        assert code == 0
+        assert out.exists()
+
+
 class TestItRefusesRatherThanScoringHalf:
     def test_a_sweep_with_no_drafts_is_refused(
         self, swept, tmp_path, case, roster_path

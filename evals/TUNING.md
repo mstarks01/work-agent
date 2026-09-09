@@ -297,10 +297,13 @@ each miss to what lost it. `losses` is STRIDE's: the verb (the lane cited the
 place and wrote another action), `merged`, the critic, the place (a rule led
 there and nothing was drafted), or `unled`. `attribution` is ASVS's, by stage.
 `run.py score` writes both over any archived sweep, and the merged Baselines
-under `evals/baselines/` are the sweeps to read first.
+under `evals/baselines/` are the sweeps to read first. A Baseline's files are
+digest-sealed, so score it to a copy: the command refuses to write inside
+`evals/baselines/`.
 
 ```bash
-python -m evals.harness.run score evals/baselines/<baseline>/<sweep>.json
+python -m evals.harness.run score evals/baselines/<baseline>/<sweep>.json \
+  --out /tmp/<sweep>-rescored.json
 ```
 
 The class a fix addresses is its ceiling, and the ceiling is a price rather
