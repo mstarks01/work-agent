@@ -58,7 +58,7 @@ def priced(monkeypatch):
 TIER_NODES = {"extract": "base", "critic": "strong"}
 
 
-def artifact_document(usage, seed=1):
+def artifact_document(usage, seed=1, cases=("01-a-case",)):
     """One admissible artifact whose nodes carry the tiers ``ROUTES`` names.
 
     ``usage`` is ``{node: (prompt, cached, completion)}``. The borrowed
@@ -93,7 +93,7 @@ def artifact_document(usage, seed=1):
     return {
         "artifact_version": ARTIFACT_VERSION,
         "mode": "end-to-end",
-        "cases": ["01-a-case"],
+        "cases": list(cases),
         "trusted": False,
         "structural_failures": [],
         "repo_commit": {"commit": "c" * 40, "clean": True},
@@ -116,7 +116,16 @@ def artifact_document(usage, seed=1):
 EVEN_USAGE = {"extract": (1000, 200, 300), "critic": (1000, 200, 300)}
 
 
-def merged(root, name, identity, actual, sweeps=1, usage=None, recorded_prices=()):
+def merged(
+    root,
+    name,
+    identity,
+    actual,
+    sweeps=1,
+    usage=None,
+    recorded_prices=(),
+    cases=("01-a-case",),
+):
     """A merged Baseline on disk: the manifest, and one artifact per sweep.
 
     The artifacts are what a borrowed estimate reads; the manifest's recorded
@@ -131,7 +140,7 @@ def merged(root, name, identity, actual, sweeps=1, usage=None, recorded_prices=(
     for index in range(sweeps):
         filename = f"ada-{index:04d}.json"
         (directory / filename).write_text(
-            json.dumps(artifact_document(usage or EVEN_USAGE, seed=index)),
+            json.dumps(artifact_document(usage or EVEN_USAGE, seed=index, cases=cases)),
             encoding="utf-8",
         )
         entries.append(
@@ -202,6 +211,28 @@ class TestTheEstimate:
 
         assert amounts[0] is not None
         assert all(amount == pytest.approx(amounts[0]) for amount in amounts)
+
+    def test_a_run_naming_fewer_cases_is_priced_per_case(self, tmp_path, priced):
+        """#751: a one-case run was quoted the lender's thirteen-case figure and
+        refused a consent four times its spend. The lender's counts are a whole
+        sweep's, so the named count takes the lender's mean per case."""
+        thirteen = tuple(f"{index:02d}-case" for index in range(1, 14))
+        merged(
+            tmp_path,
+            "other",
+            {**IDENTITY, "repo_commit": "e" * 40},
+            actual=0.60,
+            cases=thirteen,
+        )
+        whole = consent.estimate(IDENTITY, ROUTES, tmp_path)
+        one = consent.estimate(IDENTITY, ROUTES, tmp_path, cases=1)
+        all_named = consent.estimate(IDENTITY, ROUTES, tmp_path, cases=13)
+
+        assert whole.amount_usd is not None and one.amount_usd is not None
+        assert one.amount_usd == pytest.approx(whole.amount_usd / 13)
+        assert all_named.amount_usd == pytest.approx(whole.amount_usd)
+        assert "1 of the lender's 13 cases" in " ".join(one.lines)
+        assert "scaled" not in " ".join(all_named.lines)
 
     def test_a_dearer_route_for_this_run_makes_the_guess_dearer(
         self, tmp_path, priced, monkeypatch

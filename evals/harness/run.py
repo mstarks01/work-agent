@@ -761,6 +761,7 @@ def command_run(args: argparse.Namespace) -> int:
         _would_be_identity(cases, deployment, commit, corpus, args),
         _tier_routes(deployment),
         REPO_ROOT,
+        cases=len(cases),
     )
     estimate = replace(estimate, lines=(*estimate.lines, *_contribution_note(commit)))
     try:

@@ -214,6 +214,9 @@ class Borrowed:
     amount_usd: float
     source: str
     differs: tuple[str, ...] = ()
+    #: ``(named, lender)`` when this run names fewer cases than the lender ran
+    #: and the amount is the lender's mean per case over the named count.
+    scaled: tuple[int, int] | None = None
 
 
 def _recorded_prices(manifest: dict[str, Any]) -> dict[str, UnitPrices]:
@@ -294,6 +297,7 @@ def estimate(
     identity: dict[str, Any],
     routes: dict[str, str],
     root: Path,
+    cases: int | None = None,
 ) -> Estimate:
     """Price this sweep before it runs, from the merged Baselines.
 
@@ -301,6 +305,12 @@ def estimate(
     and ``routes`` is the requested route per tier. An exact identity match
     is a ``recorded`` number; any other Baseline lends its per-tier token
     counts, repriced with this run's models, for an ``estimated`` one.
+
+    ``cases`` is how many cases this run names. A lender's counts are a whole
+    sweep's, so a run that names fewer cases is priced at the lender's mean
+    per case over the named count, and the line says so (#751). A whole-corpus
+    figure quoted for one case asked for consent to four times the spend.
+    ``None`` prices the whole sweep.
     """
     baselines = _merged_baselines(root)
     lines: list[str] = []
@@ -332,7 +342,7 @@ def estimate(
     if missing:
         return Estimate(label="unpriced", amount_usd=None, lines=tuple(lines))
 
-    borrowed = _borrow(baselines, routes, identity)
+    borrowed = _borrow(baselines, routes, identity, cases)
     if borrowed is None:
         lines.append(
             "no merged Baseline to calibrate token counts from, so no amount"
@@ -347,6 +357,13 @@ def estimate(
         f"the closest Baseline is not this configuration: {borrowed.source} {reason}"
         for reason in borrowed.differs
     ]
+    if borrowed.scaled is not None:
+        named, lender = borrowed.scaled
+        lines.append(
+            f"scaled to {named} of the lender's {lender} cases at its mean per"
+            " case; cases differ in size, so this is a mean and not the named"
+            " cases' own counts"
+        )
     lines += _price_drift(_manifest_named(baselines, borrowed.source))
     return Estimate(
         label="estimated", amount_usd=borrowed.amount_usd, lines=tuple(lines)
@@ -366,6 +383,7 @@ def _borrow(
     baselines: Sequence[tuple[Path, dict[str, Any]]],
     routes: dict[str, str],
     identity: dict[str, Any],
+    cases: int | None = None,
 ) -> Borrowed | None:
     """The most comparable Baseline's recorded token counts, at this run's prices.
 
@@ -399,23 +417,31 @@ def _borrow(
     )
     for directory, manifest in ranked:
         priced = []
+        lender_cases = 0
         for entry in manifest.get("sweeps", []):
-            amount = _reprice(directory, str(entry.get("artifact", "")), routes)
-            if amount is not None:
+            repriced = _reprice(directory, str(entry.get("artifact", "")), routes)
+            if repriced is not None:
+                amount, lender_cases = repriced
                 priced.append(amount)
         if priced:
+            mean = sum(priced) / len(priced)
+            scaled = None
+            if cases is not None and 0 < cases < lender_cases:
+                mean = mean * cases / lender_cases
+                scaled = (cases, lender_cases)
             return Borrowed(
-                amount_usd=sum(priced) / len(priced),
+                amount_usd=mean,
                 source=str(manifest.get("name")),
                 differs=_differences(identity, manifest.get("identity", {})),
+                scaled=scaled,
             )
     return None
 
 
 def _reprice(
     directory: Path, artifact_name: str, routes: dict[str, str]
-) -> float | None:
-    """One recorded sweep's usage, as if this run's models had served it.
+) -> tuple[float, int] | None:
+    """One recorded sweep's usage, as if this run's models had served it, and its case count.
 
     ``None`` rather than a number whenever the answer would rest on a guess:
     an artifact that will not load, a node provenance never recorded, a tier
@@ -454,7 +480,9 @@ def _reprice(
         # The route stands where the served model would: in the hypothetical
         # this prices, the route is what serves the call.
         calls.append((route, route, usage))
-    return price_calls(calls, rates=rates).total_usd if calls else None
+    if not calls:
+        return None
+    return price_calls(calls, rates=rates).total_usd, len(artifact.cases)
 
 
 def _render(estimate: Estimate) -> str:
