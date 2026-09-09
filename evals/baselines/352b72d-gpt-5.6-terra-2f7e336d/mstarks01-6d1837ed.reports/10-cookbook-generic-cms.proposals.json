@@ -1,0 +1,630 @@
+{
+  "stride": {
+    "spoofing": {
+      "claims": [
+        {
+          "title": "HTTP asset delivery allows impersonation of the CDN to readers",
+          "description": "An on-path attacker or attacker able to redirect public DNS/traffic can impersonate `entity:cdn` to `entity:reader` on `flow:reader-to-cdn:asset-fetch`, because the boundary-crossing asset fetch uses HTTP with transport encryption stated absent. Readers have no authenticated server channel on this flow and can be served a look-alike CDN response. Second-order: the impersonation can cause readers to receive fraudulent images, stylesheets, or downloads instead of the business-critical assets held by `store:cdn-bucket`, affecting the public site's integrity and `process:web-server`'s reputation.",
+          "affected_element_ids": [
+            "entity:reader",
+            "entity:cdn",
+            "flow:reader-to-cdn:asset-fetch"
+          ],
+          "verb": "impersonate",
+          "evidence_refs": [
+            "crossing:flow:reader-to-cdn:asset-fetch",
+            "absent:flow:reader-to-cdn:asset-fetch:encryption_in_transit"
+          ],
+          "quotes": [],
+          "absent_elements": [],
+          "sequence": 1,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium because `flow:reader-to-cdn:asset-fetch` is a crossing from `boundary:public-internet`, though the attacker needs a network-position or traffic-redirection capability. Impact is medium because the impersonated endpoint supplies public-site assets from `store:cdn-bucket`, tagged `business-critical-data`, and can damage the reputation asset on `process:web-server`."
+          },
+          "mitigations": [
+            {
+              "summary": "Serve all CDN assets over TLS with validated CDN certificates",
+              "detail": "Change `flow:reader-to-cdn:asset-fetch` to HTTPS with TLS 1.2+ and full certificate-chain validation, and redirect or reject HTTP asset requests."
+            }
+          ]
+        },
+        {
+          "title": "An attacker can impersonate the web server to the CDN if publish authentication is absent",
+          "description": "`flow:web-server-to-cdn-bucket:asset-publish` crosses from `boundary:hosted-network` to `boundary:cdn` with `authentication: unknown`. If this unknown resolves to no verified workload identity, an attacker able to reach the CDN publishing interface can impersonate `process:web-server` and publish assets to `store:cdn-bucket` as the CMS. Second-order: those assets are served to readers by `entity:cdn`; therefore, the forged publisher identity reaches public content distribution and the business-critical content associated with `process:web-server`. This is conditional on the undocumented authentication attribute, not an assertion that the publish flow is unauthenticated.",
+          "affected_element_ids": [
+            "process:web-server",
+            "entity:cdn",
+            "store:cdn-bucket",
+            "flow:web-server-to-cdn-bucket:asset-publish"
+          ],
+          "verb": "impersonate",
+          "evidence_refs": [
+            "crossing:flow:web-server-to-cdn-bucket:asset-publish",
+            "unknown:flow:web-server-to-cdn-bucket:asset-publish:authentication"
+          ],
+          "quotes": [],
+          "absent_elements": [],
+          "sequence": 2,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium and conditional on the unknown authentication value: the publish flow crosses into `boundary:cdn`, but exploiting it requires access to that interface and authentication may be present. Impact is medium because the accepted publisher can place assets in `store:cdn-bucket`, tagged `business-critical-data`, for distribution through the public site."
+          },
+          "mitigations": [
+            {
+              "summary": "Require a verifiable per-workload identity for CDN publishing",
+              "detail": "Document and enforce authentication on `flow:web-server-to-cdn-bucket:asset-publish`, using a dedicated short-lived audience-bound workload token or mTLS identity for `process:web-server`; scope it to only the required bucket and write operations."
+            },
+            {
+              "summary": "Authenticate the CDN endpoint as well as the publisher",
+              "detail": "Establish TLS with certificate validation for the publishing flow and record the resulting `protocol` and `encryption_in_transit` attributes explicitly."
+            }
+          ]
+        },
+        {
+          "title": "An attacker can administer MySQL as the admin if direct-flow authentication is absent",
+          "description": "`flow:admin-to-mysql-database:direct-administration` crosses from `boundary:public-internet` to `boundary:hosted-network` with `authentication: unknown`. If that unknown resolves to no effective caller authentication, an internet attacker can connect directly and impersonate `entity:admin` to `store:mysql-database`, performing direct maintenance outside `process:web-server` and the CMS. Second-order: the direct flow has read-write access to pages, accounts, and comments in `store:mysql-database`, so the accepted impostor identity reaches PII and business-critical CMS data. This draft is conditional on the undocumented authentication attribute.",
+          "affected_element_ids": [
+            "entity:admin",
+            "store:mysql-database",
+            "flow:admin-to-mysql-database:direct-administration"
+          ],
+          "verb": "impersonate",
+          "evidence_refs": [
+            "crossing:flow:admin-to-mysql-database:direct-administration",
+            "unknown:flow:admin-to-mysql-database:direct-administration:authentication"
+          ],
+          "quotes": [],
+          "absent_elements": [],
+          "sequence": 3,
+          "severity": {
+            "likelihood": "high",
+            "impact": "medium",
+            "level": "high",
+            "justification": "Likelihood is high conditional on the unknown authentication value because the direct-administration flow originates in `boundary:public-internet` and reaches the hosted network. Impact is medium because `store:mysql-database` is tagged `pii` and `business-critical-data`, and the flow performs read-write operations against it."
+          },
+          "mitigations": [
+            {
+              "summary": "Require strong, explicit authentication for direct database administration",
+              "detail": "Establish and record the authentication on `flow:admin-to-mysql-database:direct-administration`; require a unique admin identity with phishing-resistant MFA and least-privilege database roles rather than relying on source location."
+            },
+            {
+              "summary": "Move administration behind an authenticated access boundary",
+              "detail": "Restrict direct MySQL administration to a controlled, authenticated management path rather than permitting connections from the public internet."
+            }
+          ]
+        },
+        {
+          "title": "Unencrypted direct MySQL access permits a fake database endpoint to capture admin activity",
+          "description": "An attacker positioned on the network path can impersonate the MySQL endpoint to `entity:admin` on `flow:admin-to-mysql-database:direct-administration`, because the public-to-hosted-network administration connection has no TLS. The admin cannot authenticate the server over that flow, allowing a look-alike database service or transparent interception to solicit any database authentication material and receive direct maintenance commands. Second-order: successful interception of the admin's database access can be used to reach `store:mysql-database`, which holds pages, accounts, and comments tagged `pii` and `business-critical-data`.",
+          "affected_element_ids": [
+            "entity:admin",
+            "store:mysql-database",
+            "flow:admin-to-mysql-database:direct-administration"
+          ],
+          "verb": "impersonate",
+          "evidence_refs": [
+            "crossing:flow:admin-to-mysql-database:direct-administration",
+            "absent:flow:admin-to-mysql-database:direct-administration:encryption_in_transit"
+          ],
+          "quotes": [],
+          "absent_elements": [],
+          "sequence": 4,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium because the flow crosses from `boundary:public-internet` and has transport encryption stated absent, but the attacker must obtain a position to intercept or redirect the admin's traffic. Impact is medium because the direct connection handles maintenance against `store:mysql-database`, tagged `pii` and `business-critical-data`."
+          },
+          "mitigations": [
+            {
+              "summary": "Encrypt and authenticate the MySQL server endpoint",
+              "detail": "Require TLS 1.2+ for `flow:admin-to-mysql-database:direct-administration` with full certificate-chain validation so `entity:admin` verifies the intended database endpoint before sending credentials or commands."
+            },
+            {
+              "summary": "Use a private management connection path",
+              "detail": "Route database administration through an authenticated management access path and disallow plaintext MySQL connections from arbitrary public networks."
+            }
+          ]
+        }
+      ],
+      "invalid": []
+    },
+    "tampering": {
+      "claims": [
+        {
+          "title": "On-path attackers can modify CDN assets delivered over HTTP",
+          "description": "An attacker positioned between `entity:reader` and `entity:cdn` can alter responses on `flow:reader-to-cdn:asset-fetch`, because this public-internet-to-CDN boundary-crossing flow has no transport encryption or integrity protection. The attacker can replace stylesheets, images, or downloads with malicious or misleading versions before the reader receives them. Second-order, the altered assets are presented as site content to readers, compromising the integrity and reputation of the public site and its published business-critical assets.",
+          "affected_element_ids": [
+            "flow:reader-to-cdn:asset-fetch",
+            "entity:reader",
+            "entity:cdn"
+          ],
+          "verb": "alter-in-transit",
+          "evidence_refs": [
+            "crossing:flow:reader-to-cdn:asset-fetch",
+            "absent:flow:reader-to-cdn:asset-fetch:encryption_in_transit"
+          ],
+          "quotes": [],
+          "absent_elements": [],
+          "sequence": 1,
+          "severity": {
+            "likelihood": "high",
+            "impact": "medium",
+            "level": "high",
+            "justification": "Likelihood is high because `flow:reader-to-cdn:asset-fetch` crosses from the public internet and explicitly lacks transport encryption, allowing attackers able to occupy common public-network paths to modify responses without credentials. Impact is medium because the altered content reaches readers as site assets and affects the public content site's integrity and reputation, while `store:cdn-bucket` holds `business-critical-data`."
+          },
+          "mitigations": [
+            {
+              "summary": "Serve all CDN assets over authenticated HTTPS",
+              "detail": "Require TLS 1.2+ with valid certificate validation for `flow:reader-to-cdn:asset-fetch`, redirect HTTP requests to HTTPS, and enable HSTS for the public site."
+            },
+            {
+              "summary": "Add asset integrity verification",
+              "detail": "Use versioned immutable asset URLs and Subresource Integrity for applicable browser-loaded assets so a modified CDN response is rejected by clients."
+            }
+          ]
+        },
+        {
+          "title": "On-path attackers can rewrite direct MySQL administration commands",
+          "description": "`flow:admin-to-mysql-database:direct-administration` crosses from `boundary:public-internet` to `boundary:hosted-network` over an unsecured MySQL connection with no TLS. An attacker able to occupy that network path can alter an administrator's SQL maintenance request or its result before it reaches `store:mysql-database`, changing pages, accounts, or comments outside the CMS. Second-order, `process:web-server` reads the altered records through `flow:web-server-to-mysql-database:cms-data` and serves the corrupted content or account state to site users.",
+          "affected_element_ids": [
+            "flow:admin-to-mysql-database:direct-administration",
+            "entity:admin",
+            "store:mysql-database"
+          ],
+          "verb": "alter-in-transit",
+          "evidence_refs": [
+            "crossing:flow:admin-to-mysql-database:direct-administration",
+            "absent:flow:admin-to-mysql-database:direct-administration:encryption_in_transit"
+          ],
+          "quotes": [],
+          "absent_elements": [],
+          "sequence": 2,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium because the direct administration flow crosses the public-internet boundary without TLS, but exploitation requires an attacker to obtain an on-path position for an administrator's connection. Impact is high because `store:mysql-database` holds pages, accounts, and comments and is tagged `pii` and `business-critical-data`; its corrupted records are consumed by `process:web-server`."
+          },
+          "mitigations": [
+            {
+              "summary": "Require TLS for direct MySQL administration",
+              "detail": "Configure `flow:admin-to-mysql-database:direct-administration` to require authenticated TLS with certificate validation so SQL commands and results have transport integrity protection."
+            },
+            {
+              "summary": "Remove public direct database administration",
+              "detail": "Restrict the database management path to a controlled administrative network or jump host and permit only explicitly authorized administrative identities."
+            }
+          ]
+        },
+        {
+          "title": "CDN publication traffic may be modifiable in transit if its transport is unprotected",
+          "description": "`flow:web-server-to-cdn-bucket:asset-publish` crosses from `boundary:hosted-network` to `boundary:cdn`, but its `protocol` and `encryption_in_transit` attributes are unknown. If the unresolved transport protection does not provide authenticated encryption or message signing, an attacker with a position on this cross-zone path can alter newly published images, stylesheets, or downloads before they are stored in `store:cdn-bucket`. Second-order, the modified assets are subsequently delivered to readers through `flow:reader-to-cdn:asset-fetch` as apparently legitimate published site content. This threat is conditional on the unknown transport attributes, not an assertion that the publication path is plaintext.",
+          "affected_element_ids": [
+            "flow:web-server-to-cdn-bucket:asset-publish",
+            "process:web-server",
+            "store:cdn-bucket"
+          ],
+          "verb": "alter-in-transit",
+          "evidence_refs": [
+            "crossing:flow:web-server-to-cdn-bucket:asset-publish",
+            "unknown:flow:web-server-to-cdn-bucket:asset-publish:protocol",
+            "unknown:flow:web-server-to-cdn-bucket:asset-publish:encryption_in_transit"
+          ],
+          "quotes": [],
+          "absent_elements": [],
+          "sequence": 3,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium and conditional on the unknown protocol and transport-protection attributes: the path crosses from the hosted network to the separate CDN zone, but an attacker still needs an on-path position. Impact is medium because altered `business-critical-data` in `store:cdn-bucket` is distributed to readers through the CDN."
+          },
+          "mitigations": [
+            {
+              "summary": "Verify and enforce authenticated encryption for asset publishing",
+              "detail": "Document the protocol for `flow:web-server-to-cdn-bucket:asset-publish` and require TLS with endpoint certificate validation or signed upload requests and payload integrity verification."
+            },
+            {
+              "summary": "Verify published asset integrity before serving",
+              "detail": "Have the CDN bucket or publication workflow validate signed manifests or checksums before accepting and releasing assets uploaded by `process:web-server`."
+            }
+          ]
+        },
+        {
+          "title": "Unauthorized parties may be able to plant CDN assets if publish authentication is not enforced",
+          "description": "`flow:web-server-to-cdn-bucket:asset-publish` performs writes to `store:cdn-bucket`, but its `authentication` attribute is unknown. If this unknown resolves to absent, weak, or overly broad write authorization, a party able to reach the CDN publication interface can plant or overwrite images, stylesheets, and downloads while bypassing `process:web-server`'s CMS publication path. Second-order, `entity:cdn` distributes those attacker-controlled assets to readers over `flow:reader-to-cdn:asset-fetch`. This is conditional on the unresolved authentication state rather than a claim that CDN write authorization is absent.",
+          "affected_element_ids": [
+            "flow:web-server-to-cdn-bucket:asset-publish",
+            "store:cdn-bucket",
+            "process:web-server"
+          ],
+          "verb": "plant",
+          "evidence_refs": [
+            "crossing:flow:web-server-to-cdn-bucket:asset-publish",
+            "unknown:flow:web-server-to-cdn-bucket:asset-publish:authentication"
+          ],
+          "quotes": [],
+          "absent_elements": [],
+          "sequence": 4,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium and conditional on the unknown authentication attribute: the publication flow crosses into the CDN zone and an attacker must reach its write interface, but no verified caller identity is recorded. Impact is medium because `store:cdn-bucket` contains business-critical published assets that are delivered to public readers."
+          },
+          "mitigations": [
+            {
+              "summary": "Use a dedicated least-privilege CDN publisher identity",
+              "detail": "Require `process:web-server` to authenticate to `store:cdn-bucket` with a dedicated workload identity restricted to the required bucket, paths, and write operations."
+            },
+            {
+              "summary": "Prevent unreviewed asset replacement",
+              "detail": "Enable object versioning, immutable release prefixes, and reviewed promotion of uploaded assets so unexpected overwrites can be detected and rolled back."
+            }
+          ]
+        },
+        {
+          "title": "Direct database access may permit unauthorized rewrites if authentication is weak or absent",
+          "description": "`flow:admin-to-mysql-database:direct-administration` is a public-internet-to-hosted-network, read-write path into `store:mysql-database`, yet its authentication is unknown. If the database does not strongly authenticate and authorize the administrator's identity for only required maintenance operations, an external attacker who reaches this direct database interface can alter pages, accounts, and comments directly rather than through `process:web-server` and its CMS. Second-order, `process:web-server` retrieves those records through `flow:web-server-to-mysql-database:cms-data` and presents the tampered content or account state as authoritative. This threat is conditional on the unverified authentication attribute.",
+          "affected_element_ids": [
+            "flow:admin-to-mysql-database:direct-administration",
+            "entity:admin",
+            "store:mysql-database"
+          ],
+          "verb": "alter",
+          "evidence_refs": [
+            "crossing:flow:admin-to-mysql-database:direct-administration",
+            "unknown:flow:admin-to-mysql-database:direct-administration:authentication"
+          ],
+          "quotes": [],
+          "absent_elements": [],
+          "sequence": 5,
+          "severity": {
+            "likelihood": "high",
+            "impact": "high",
+            "level": "critical",
+            "justification": "Likelihood is high conditional on the unknown authentication state because `flow:admin-to-mysql-database:direct-administration` exposes a direct read-write database path from `boundary:public-internet`; if authentication is absent or weak, no prior foothold is needed. Impact is high because `store:mysql-database` is tagged `pii` and `business-critical-data`, and its pages, accounts, and comments are trusted and served by `process:web-server`."
+          },
+          "mitigations": [
+            {
+              "summary": "Require strong authenticated and authorized database administration",
+              "detail": "Use individual, strongly authenticated administrative identities for `flow:admin-to-mysql-database:direct-administration`, with least-privilege roles limited to required maintenance statements and objects."
+            },
+            {
+              "summary": "Constrain the administration network path",
+              "detail": "Remove arbitrary-location database access by requiring a managed jump host or private administrative network and deny all other direct database connections."
+            }
+          ]
+        }
+      ],
+      "invalid": []
+    },
+    "repudiation": {
+      "claims": [
+        {
+          "title": "Direct database changes by the admin may be impossible to attribute",
+          "description": "`entity:admin` can perform direct read-write maintenance against `store:mysql-database` through `flow:admin-to-mysql-database:direct-administration`, crossing from `boundary:public-internet` into `boundary:hosted-network`. Authentication on that administrative flow is `unknown`; if it resolves to a shared account, an unaudited database identity, or an identity not retained with each change, an admin can alter pages, accounts, or comments and later deny making the change. The model identifies no audit log or database change-history that could independently bind a before/after change, timestamp, and acting principal to this direct path. Second-order, disputed changes affect content served by `process:web-server`, while changes to account records undermine accountability for the PII and business-critical data held in `store:mysql-database`.",
+          "affected_element_ids": [
+            "entity:admin",
+            "flow:admin-to-mysql-database:direct-administration",
+            "store:mysql-database"
+          ],
+          "verb": "unattributable",
+          "evidence_refs": [
+            "crossing:flow:admin-to-mysql-database:direct-administration",
+            "unknown:flow:admin-to-mysql-database:direct-administration:authentication"
+          ],
+          "quotes": [
+            {
+              "text": "There is an admin who maintains the database directly rather than through the CMS.",
+              "source_label": "System description"
+            },
+            {
+              "text": "The web server runs the CMS and keeps pages, accounts and comments in a MySQL database",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [
+            "audit log",
+            "change history"
+          ],
+          "sequence": 1,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium and conditional on the unknown authentication on `flow:admin-to-mysql-database:direct-administration`: the administrative write path crosses from `boundary:public-internet`, but exploiting deniability requires administrative access or control of its credential. Impact is medium because `store:mysql-database` holds pages, accounts, and comments and is tagged `pii` and `business-critical-data`, so a disputed direct change can affect both account records and public CMS content."
+          },
+          "mitigations": [
+            {
+              "summary": "Use individually attributable administrative identities",
+              "detail": "Require a distinct, non-shared administrative credential for each user on `flow:admin-to-mysql-database:direct-administration`, and record the verified database principal rather than a self-reported username."
+            },
+            {
+              "summary": "Create independent, immutable database-change evidence",
+              "detail": "Send direct administrative writes and CMS-originated sensitive changes to a dedicated append-only audit target with acting principal, target row/object, before-and-after values, timestamp, and outcome; make corrections new entries rather than overwrites."
+            }
+          ]
+        }
+      ],
+      "invalid": []
+    },
+    "information-disclosure": {
+      "claims": [
+        {
+          "title": "Unencrypted direct database administration exposes CMS records on public network paths",
+          "description": "An on-path attacker between `entity:admin` in `boundary:public-internet` and `store:mysql-database` can intercept `flow:admin-to-mysql-database:direct-administration`, which is explicitly an unsecured MySQL connection without TLS. The attacker can read direct maintenance traffic containing pages, accounts, and comments, including the PII and business-critical data held by `store:mysql-database`. Second-order, the captured database records reveal account and site-content information that can be used to target particular readers or CMS content outside the protected web-server path.",
+          "affected_element_ids": [
+            "flow:admin-to-mysql-database:direct-administration",
+            "entity:admin",
+            "store:mysql-database"
+          ],
+          "verb": "intercept",
+          "evidence_refs": [
+            "absent:flow:admin-to-mysql-database:direct-administration:encryption_in_transit",
+            "crossing:flow:admin-to-mysql-database:direct-administration"
+          ],
+          "quotes": [],
+          "absent_elements": [],
+          "sequence": 1,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium because `flow:admin-to-mysql-database:direct-administration` crosses from `boundary:public-internet` and has stated-absent transport encryption, but interception still requires an on-path position. Impact is high because the flow carries direct maintenance of `store:mysql-database`, which holds PII and business-critical pages, accounts, and comments."
+          },
+          "mitigations": [
+            {
+              "summary": "Require encrypted, authenticated administration connectivity",
+              "detail": "Configure TLS for `flow:admin-to-mysql-database:direct-administration`, validate the database server identity, and use client-certificate or equivalent mutually authenticated administration access."
+            },
+            {
+              "summary": "Constrain the administration network path",
+              "detail": "Route direct database administration through a controlled access path and restrict database listener access to approved administrative sources rather than arbitrary public-network locations."
+            }
+          ]
+        },
+        {
+          "title": "CMS database traffic may expose accounts and comments if internal MySQL transport is unencrypted",
+          "description": "`flow:web-server-to-mysql-database:cms-data` carries pages, accounts, and comments between `process:web-server` and `store:mysql-database`, but its `encryption_in_transit` attribute is unknown. If that unknown resolves to plaintext MySQL transport, an attacker with a foothold in `boundary:hosted-network` or visibility into that internal path can intercept CMS reads and writes and read the database's PII and business-critical content. Second-order, observed account and content data can be correlated with public requests to `process:web-server` to profile readers and identify valuable CMS records for later attacks. This is conditional on verification of the transport-encryption setting; it does not assert that the internal flow is plaintext.",
+          "affected_element_ids": [
+            "flow:web-server-to-mysql-database:cms-data",
+            "process:web-server",
+            "store:mysql-database"
+          ],
+          "verb": "intercept",
+          "evidence_refs": [
+            "unknown:flow:web-server-to-mysql-database:cms-data:encryption_in_transit"
+          ],
+          "quotes": [],
+          "absent_elements": [],
+          "sequence": 2,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional on the unknown transport-encryption state: an attacker needs a foothold or observation position in `boundary:hosted-network`, but the model provides no verified encryption for `flow:web-server-to-mysql-database:cms-data`. Impact is high because the flow carries the pages, accounts, and comments of `store:mysql-database`, which is tagged PII and business-critical data."
+          },
+          "mitigations": [
+            {
+              "summary": "Verify and enforce TLS for the CMS-to-MySQL connection",
+              "detail": "Establish the actual `encryption_in_transit` setting for `flow:web-server-to-mysql-database:cms-data` and require TLS with server-certificate validation; use mTLS if both workload identities can be managed."
+            },
+            {
+              "summary": "Limit exposure of the database network path",
+              "detail": "Restrict MySQL network access to the web-server workload and segment the hosted network so unrelated or compromised workloads cannot observe the connection."
+            }
+          ]
+        },
+        {
+          "title": "A copied MySQL volume could disclose all CMS accounts if encryption at rest is absent",
+          "description": "`store:mysql-database` holds pages, accounts, and comments and is tagged with PII and business-critical data, while its `encryption_at_rest` attribute is unknown. If this unknown resolves to unencrypted storage, a party obtaining its underlying storage media or an operational copy of the MySQL store can read the CMS dataset without authenticating through `process:web-server` or the normal database read path. Second-order, one copied database artifact exposes the account and site-content corpus at once, enabling targeted disclosure using information that would otherwise be reached only through the CMS. This threat is conditional on the unverified at-rest encryption state, not an assertion that the database is unencrypted.",
+          "affected_element_ids": [
+            "store:mysql-database"
+          ],
+          "verb": "read",
+          "evidence_refs": [
+            "unknown:store:mysql-database:encryption_at_rest"
+          ],
+          "quotes": [],
+          "absent_elements": [],
+          "sequence": 3,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional because `store:mysql-database` has unverified `encryption_at_rest`, and access to underlying media or an operational copy is required. Impact is high because a raw copy would disclose the full PII and business-critical CMS dataset in `store:mysql-database`, and such disclosure cannot be revoked once copied."
+          },
+          "mitigations": [
+            {
+              "summary": "Verify and enforce encryption at rest for MySQL and its operational copies",
+              "detail": "Determine the actual `encryption_at_rest` posture of `store:mysql-database`, then use managed-key encryption for database volumes and explicitly apply equivalent protection to backups, snapshots, replicas, and exported copies."
+            },
+            {
+              "summary": "Restrict storage and key access",
+              "detail": "Separate storage-copy access from CMS and database runtime identities, use least-privilege permissions for export and restore operations, and limit key-use permissions to approved database operations."
+            }
+          ]
+        }
+      ],
+      "invalid": []
+    },
+    "denial-of-service": {
+      "claims": [
+        {
+          "title": "Public request flooding can exhaust the CMS web server and its database path",
+          "description": "An internet attacker can flood `process:web-server` through the boundary-crossing `flow:reader-to-web-server:page-requests`. Even ordinary HTTPS page requests consume finite network, TLS, connection, worker, and CMS-rendering capacity; the model does not state rate limits, request-size limits, timeouts, or load shedding. The attacker can generate requests far more cheaply than `process:web-server` can serve them, denying pages to legitimate `entity:reader` users. Second-order, `process:web-server` reads and writes CMS content through `flow:web-server-to-mysql-database:cms-data`, so saturation can also consume MySQL connections or throughput at `store:mysql-database` and make the site's content, account, and comment functions unavailable.",
+          "affected_element_ids": [
+            "process:web-server",
+            "flow:reader-to-web-server:page-requests"
+          ],
+          "verb": "flood",
+          "evidence_refs": [
+            "crossing:flow:reader-to-web-server:page-requests"
+          ],
+          "quotes": [
+            {
+              "text": "Public site: readers hit the web server over HTTPS",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 1,
+          "severity": {
+            "likelihood": "high",
+            "impact": "medium",
+            "level": "high",
+            "justification": "Likelihood is high because `flow:reader-to-web-server:page-requests` crosses from `boundary:public-internet` to the internet-facing `process:web-server`, allowing any internet attacker to send high-volume HTTPS requests with commodity tooling. Impact is medium because the flood denies the public site and can propagate to `store:mysql-database`, which supports pages, accounts, and comments and carries `business-critical-data` and `reputation` assets, but the modeled interruption is recoverable."
+          },
+          "mitigations": [
+            {
+              "summary": "Bound and shed public request load",
+              "detail": "Apply per-source and, where identity is established, per-account rate limits; enforce request-body and header-size caps; use short read and idle timeouts; and shed excess work before it occupies CMS workers."
+            },
+            {
+              "summary": "Protect the database from web-tier saturation",
+              "detail": "Set bounded web-server-to-MySQL connection pools, database statement timeouts, and circuit-breaking or fail-fast behavior on `flow:web-server-to-mysql-database:cms-data` so a public flood cannot indefinitely queue work at `store:mysql-database`."
+            }
+          ]
+        },
+        {
+          "title": "Internet-reachable direct MySQL connections can starve database capacity",
+          "description": "An attacker on the public internet can flood connection attempts at `store:mysql-database` through `flow:admin-to-mysql-database:direct-administration`, which crosses from `boundary:public-internet` directly into the hosted network. MySQL connection slots, handshake CPU, and query/lock throughput are finite shared resources; authentication on this direct path is `unknown`, and the model states no source restrictions, connection caps, or idle timeouts. Sustained connection or slow-query pressure can starve the database for the legitimate admin and for `process:web-server`. Second-order, when `store:mysql-database` is unavailable, the CMS cannot retrieve or update pages, accounts, and comments through `flow:web-server-to-mysql-database:cms-data`, producing a site-wide availability failure.",
+          "affected_element_ids": [
+            "store:mysql-database",
+            "flow:admin-to-mysql-database:direct-administration",
+            "entity:admin"
+          ],
+          "verb": "flood",
+          "evidence_refs": [
+            "crossing:flow:admin-to-mysql-database:direct-administration",
+            "unknown:flow:admin-to-mysql-database:direct-administration:authentication"
+          ],
+          "quotes": [
+            {
+              "text": "That is an unsecured MySQL connection straight to the box, no TLS on it, and they do it from wherever they happen to be \u2014 there is no jump host.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 2,
+          "severity": {
+            "likelihood": "high",
+            "impact": "medium",
+            "level": "high",
+            "justification": "Likelihood is high because `flow:admin-to-mysql-database:direct-administration` is a crossing from `boundary:public-internet` to `store:mysql-database`, and connection flooding requires no privileged application access; authentication on the flow is unverified. Impact is medium because exhaustion blocks both direct administration and the web server's CMS dependency, affecting `business-critical-data` and public-site availability, while the modeled outage remains recoverable."
+          },
+          "mitigations": [
+            {
+              "summary": "Restrict direct database reachability",
+              "detail": "Constrain `flow:admin-to-mysql-database:direct-administration` to a managed administrative access path and approved source networks rather than allowing arbitrary internet locations."
+            },
+            {
+              "summary": "Limit and isolate MySQL connection consumption",
+              "detail": "Enforce per-source connection limits, aggressive handshake and idle-session timeouts, bounded query execution time, and separate reserved capacity for `process:web-server` so administrative-path traffic cannot consume all MySQL capacity."
+            }
+          ]
+        }
+      ],
+      "invalid": []
+    },
+    "elevation-of-privilege": {
+      "claims": [
+        {
+          "title": "Compromise of the public CMS inherits read/write authority over site accounts and content",
+          "description": "An anonymous or signed-in reader can reach `process:web-server` from the public site. If an attacker obtains code execution or equivalent control of this internet-facing process through a separate flaw, they can abuse the process's existing read/write path `flow:web-server-to-mysql-database:cms-data` to act with the CMS database authority against `store:mysql-database`, rather than with reader-level permissions. The authentication arrangement for that database flow is unknown, so the scope and isolation of the inherited database identity are unverified. Second-order, this grants access to and the ability to modify the site's pages, accounts, and comments, including the `pii` and `business-critical-data` held by `store:mysql-database`.",
+          "affected_element_ids": [
+            "process:web-server",
+            "flow:reader-to-web-server:page-requests",
+            "flow:web-server-to-mysql-database:cms-data",
+            "store:mysql-database"
+          ],
+          "verb": "abuse-grant",
+          "evidence_refs": [
+            "unknown:flow:web-server-to-mysql-database:cms-data:authentication",
+            "crossing:flow:reader-to-web-server:page-requests"
+          ],
+          "quotes": [
+            {
+              "text": "Public site: readers hit the web server over HTTPS, some of them signed in.",
+              "source_label": "System description"
+            },
+            {
+              "text": "The web server runs the CMS and keeps pages, accounts and comments in a MySQL\ndatabase on the same hosted network.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 1,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium because `crossing:flow:reader-to-web-server:page-requests` exposes `process:web-server` to public readers, but exploitation still requires a separate compromise of that process; the database-flow authentication is unverified in `unknown:flow:web-server-to-mysql-database:cms-data:authentication`. Impact is medium because `store:mysql-database` holds `pii` and `business-critical-data`, although the model does not establish a broader credential or secret-store ladder."
+          },
+          "mitigations": [
+            {
+              "summary": "Constrain the CMS database identity",
+              "detail": "Use a distinct, narrowly scoped database identity for `process:web-server` on `flow:web-server-to-mysql-database:cms-data`, granting only required tables and operations and avoiding administrative or blanket database privileges."
+            },
+            {
+              "summary": "Use short-lived workload authentication for database access",
+              "detail": "Replace any long-lived or shared database credential with workload-bound, short-lived authentication and establish the currently unknown authentication configuration for `flow:web-server-to-mysql-database:cms-data`."
+            }
+          ]
+        },
+        {
+          "title": "A compromised public CMS can inherit cross-boundary publishing authority to the CDN bucket",
+          "description": "A reader who compromises `process:web-server` through a separate flaw can invoke its ordinary publishing capability over `flow:web-server-to-cdn-bucket:asset-publish` and thereby act with whatever authority permits writes to `store:cdn-bucket` across the hosted-network-to-CDN boundary. Authentication for that publishing flow is unknown, so it is unverified whether the authority is narrowly limited to a publish prefix and operation or is a broader CDN-bucket grant. Second-order, the attacker can publish content delivered as images, stylesheets, or downloads to readers, gaining control over business-critical public assets and potentially using the trusted site distribution path to affect visitors.",
+          "affected_element_ids": [
+            "process:web-server",
+            "flow:reader-to-web-server:page-requests",
+            "flow:web-server-to-cdn-bucket:asset-publish",
+            "store:cdn-bucket"
+          ],
+          "verb": "abuse-grant",
+          "evidence_refs": [
+            "crossing:flow:reader-to-web-server:page-requests",
+            "crossing:flow:web-server-to-cdn-bucket:asset-publish",
+            "unknown:flow:web-server-to-cdn-bucket:asset-publish:authentication"
+          ],
+          "quotes": [
+            {
+              "text": "When new assets are published the web server\npushes them up to the CDN's bucket.",
+              "source_label": "System description"
+            },
+            {
+              "text": "Nothing here tells you how the push to the CDN is authenticated",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 2,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium because public readers cross into `process:web-server` on `crossing:flow:reader-to-web-server:page-requests`, but the attacker first needs to compromise that process; `unknown:flow:web-server-to-cdn-bucket:asset-publish:authentication` leaves the inherited publishing scope unverified. Impact is medium because the cross-boundary write reaches `store:cdn-bucket`, which holds `business-critical-data`, and can affect assets distributed to readers."
+          },
+          "mitigations": [
+            {
+              "summary": "Scope CDN publishing authority to the minimum asset path and operation",
+              "detail": "Configure the identity used on `flow:web-server-to-cdn-bucket:asset-publish` to permit only required write operations to a dedicated publishing prefix, with no bucket-policy, deletion, or unrelated-object authority."
+            },
+            {
+              "summary": "Isolate public request handling from publishing credentials",
+              "detail": "Move publication to a separately authenticated, constrained deployment process so `process:web-server` does not retain ambient authority to write `store:cdn-bucket`; establish and document the currently unknown authentication mechanism on the publishing flow."
+            }
+          ]
+        }
+      ],
+      "invalid": []
+    }
+  }
+}

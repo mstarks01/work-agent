@@ -1,0 +1,561 @@
+{
+  "stride": {
+    "spoofing": {
+      "claims": [
+        {
+          "title": "On-path attacker can impersonate the Web API to mobile clients",
+          "description": "Because `flow:mobile-app-to-web-api:api-traffic` uses HTTP with transport encryption stated absent, an attacker able to control or observe the network path between `process:mobile-app` and `process:web-api` can substitute a look-alike Web API. The mobile app has no authenticated server endpoint to verify on this flow, allowing the attacker to impersonate `process:web-api` and collect customer order-placement traffic. The second-order reach includes customer details sent toward the real API and the ability to induce the app to submit orders to the impostor rather than the legitimate service.",
+          "affected_element_ids": [
+            "process:mobile-app",
+            "process:web-api",
+            "flow:mobile-app-to-web-api:api-traffic"
+          ],
+          "verb": "impersonate",
+          "evidence_refs": [
+            "absent:flow:mobile-app-to-web-api:api-traffic:encryption_in_transit",
+            "crossing:flow:mobile-app-to-web-api:api-traffic"
+          ],
+          "quotes": [],
+          "absent_elements": [],
+          "sequence": 1,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium because exploitation requires an attacker position on the boundary-crossing path in `flow:mobile-app-to-web-api:api-traffic`, although its transport encryption is stated absent. Impact is medium because the flow carries customer order-placement traffic and `process:mobile-app` is tagged `pii`."
+          },
+          "mitigations": [
+            {
+              "summary": "Use authenticated TLS for the mobile API connection",
+              "detail": "Change `flow:mobile-app-to-web-api:api-traffic` to HTTPS with TLS 1.2+ and full certificate-chain validation so `process:mobile-app` verifies the identity of `process:web-api` before sending order traffic."
+            }
+          ]
+        },
+        {
+          "title": "Unauthenticated API requests could let attackers pose as legitimate mobile-app callers",
+          "description": "`flow:mobile-app-to-web-api:api-traffic` crosses from the customer-device zone to `process:web-api`, but its `authentication` attribute is unknown. If that unknown resolves to no verified caller identity, any attacker able to reach the internet-facing `process:web-api` can originate requests that the API treats as coming from a legitimate `process:mobile-app` caller. The attacker can thereby place or manipulate customer-facing requests that the API processes; second-order, the API keeps customer records in `store:user-database` and hands placed orders to `process:sims`, reaching PII, financial data, and order processing. This is conditional on the unverified authentication state, not an assertion that authentication is absent.",
+          "affected_element_ids": [
+            "process:mobile-app",
+            "process:web-api",
+            "flow:mobile-app-to-web-api:api-traffic"
+          ],
+          "verb": "impersonate",
+          "evidence_refs": [
+            "crossing:flow:mobile-app-to-web-api:api-traffic",
+            "unknown:flow:mobile-app-to-web-api:api-traffic:authentication"
+          ],
+          "quotes": [],
+          "absent_elements": [],
+          "sequence": 2,
+          "severity": {
+            "likelihood": "high",
+            "impact": "high",
+            "level": "critical",
+            "justification": "Likelihood is high conditional on the unknown authentication value: `flow:mobile-app-to-web-api:api-traffic` crosses from the customer-device zone and `process:web-api` is internet-facing, so attackers can attempt requests broadly if caller verification is absent. Impact is high because `process:web-api` is tagged `pii` and `financial` and reaches `store:user-database`, which holds customer names, addresses, and payment-card information."
+          },
+          "mitigations": [
+            {
+              "summary": "Establish and enforce verified caller identity for the mobile API",
+              "detail": "Resolve and make explicit the `authentication` on `flow:mobile-app-to-web-api:api-traffic`; require short-lived, audience-bound user or app tokens validated by `process:web-api` rather than trusting a client-originated request as a mobile-app call."
+            },
+            {
+              "summary": "Bind order operations to the verified customer identity",
+              "detail": "Have `process:web-api` derive the customer identity and permitted order actions from the verified credential rather than from caller-supplied identifiers."
+            }
+          ]
+        },
+        {
+          "title": "Marketing-office foothold could impersonate the catalogue spreadsheet to the Web API",
+          "description": "`flow:catalogue-spreadsheet-to-web-api:sql-statements` crosses from `boundary:marketing-office` into `boundary:sokify-internal-systems` with `authentication` unknown. If the Web API does not verify a distinct identity for `process:catalogue-spreadsheet`, an attacker who gains a foothold in the marketing-office zone can impersonate that spreadsheet and send SQL-statement requests to `process:web-api` as catalogue updates. The stated function of this flow is changing prices and product copy; second-order, a trusted forged update reaches the API's business-critical catalogue operations and may affect orders subsequently handed to `process:sims`. This is conditional on the unknown authentication attribute.",
+          "affected_element_ids": [
+            "process:catalogue-spreadsheet",
+            "process:web-api",
+            "flow:catalogue-spreadsheet-to-web-api:sql-statements"
+          ],
+          "verb": "impersonate",
+          "evidence_refs": [
+            "crossing:flow:catalogue-spreadsheet-to-web-api:sql-statements",
+            "unknown:flow:catalogue-spreadsheet-to-web-api:sql-statements:authentication"
+          ],
+          "quotes": [],
+          "absent_elements": [],
+          "sequence": 3,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium and conditional on the unknown authentication value: exploiting the flow requires a foothold in `boundary:marketing-office`, but an unverified boundary-crossing caller could then be imitated. Impact is medium because the flow's stated operation changes prices and product copy, and both `process:catalogue-spreadsheet` and `process:web-api` handle business-critical data."
+          },
+          "mitigations": [
+            {
+              "summary": "Give the catalogue automation a verifiable workload identity",
+              "detail": "Require `process:web-api` to authenticate `flow:catalogue-spreadsheet-to-web-api:sql-statements` with a unique service identity, such as mTLS or short-lived audience-bound workload tokens, rather than relying on office-network reachability."
+            },
+            {
+              "summary": "Replace unrestricted SQL-style update submission with scoped catalogue operations",
+              "detail": "Restrict the authenticated spreadsheet identity to narrowly defined price and product-copy update operations and validate its requests at `process:web-api`."
+            }
+          ]
+        },
+        {
+          "title": "Internal foothold could impersonate the Web API when submitting orders to SIMS",
+          "description": "`process:sims` accepts `flow:web-api-to-sims:order-handover` from another process in `boundary:sokify-internal-systems`, but the flow's authentication is unknown. If SIMS infers the caller's identity from internal reachability rather than verifying it, an attacker with a foothold in that zone can impersonate `process:web-api` and submit fabricated orders to `process:sims`. Second-order, SIMS writes delivery addresses to `store:delivery-address-flat-file` and sends dispatch notes through `process:fax-gateway`, so the forged API identity can drive fulfillment activity and handling of customer PII. This is conditional on the unknown authentication state.",
+          "affected_element_ids": [
+            "process:web-api",
+            "process:sims",
+            "flow:web-api-to-sims:order-handover"
+          ],
+          "verb": "impersonate",
+          "evidence_refs": [
+            "unknown:flow:web-api-to-sims:order-handover:authentication"
+          ],
+          "quotes": [],
+          "absent_elements": [],
+          "sequence": 4,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium conditional on the unknown authentication value because the attacker needs a prior foothold in `boundary:sokify-internal-systems`, where both endpoints reside. Impact is medium because `process:sims` is tagged `pii` and `business-critical-data`, and accepted orders propagate to the delivery-address file and fax dispatch process."
+          },
+          "mitigations": [
+            {
+              "summary": "Authenticate API-to-SIMS order handover independently of network location",
+              "detail": "Make `flow:web-api-to-sims:order-handover` use mTLS or short-lived workload tokens and have `process:sims` validate the `process:web-api` identity and token audience on every order."
+            },
+            {
+              "summary": "Constrain the Web API identity at SIMS",
+              "detail": "Authorize the verified Web API workload only for the minimum required order-handover operation and reject requests that do not carry a valid order context."
+            }
+          ]
+        }
+      ],
+      "invalid": []
+    },
+    "tampering": {
+      "claims": [
+        {
+          "title": "On-path attacker can alter customer orders sent over HTTP",
+          "description": "`flow:mobile-app-to-web-api:api-traffic` crosses from `boundary:customer-device` to `boundary:sokify-internal-systems` over HTTP with transport encryption stated absent. An attacker able to occupy the customer-to-API network path can alter order placement traffic or customer details before `process:web-api` receives it, causing the API to treat substituted delivery or order values as legitimate. Second-order, `process:web-api` can persist altered customer records through `flow:web-api-to-user-database:customer-records` and forward an altered placed order through `flow:web-api-to-sims:order-handover`; SIMS then writes the supplied delivery address and produces a dispatch workflow based on it.",
+          "affected_element_ids": [
+            "flow:mobile-app-to-web-api:api-traffic",
+            "process:mobile-app",
+            "process:web-api"
+          ],
+          "verb": "alter-in-transit",
+          "evidence_refs": [
+            "crossing:flow:mobile-app-to-web-api:api-traffic",
+            "absent:flow:mobile-app-to-web-api:api-traffic:encryption_in_transit"
+          ],
+          "quotes": [],
+          "absent_elements": [],
+          "sequence": 1,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium because the absent transport protection on boundary-crossing `flow:mobile-app-to-web-api:api-traffic` makes modification technically straightforward, but the attacker must obtain an on-path position. Impact is high because `process:web-api` handles `pii`, `financial`, and `business-critical-data`, and altered input can be stored in `store:user-database` and acted on by `process:sims`."
+          },
+          "mitigations": [
+            {
+              "summary": "Protect mobile API traffic with authenticated TLS",
+              "detail": "Change `flow:mobile-app-to-web-api:api-traffic` to HTTPS using TLS 1.2+ with certificate validation in `process:mobile-app`, so an on-path party cannot silently modify requests."
+            },
+            {
+              "summary": "Validate order data at the API",
+              "detail": "Have `process:web-api` canonicalize and allowlist order fields, including server-side delivery-address and price validation, before persisting or forwarding an order."
+            }
+          ]
+        },
+        {
+          "title": "Catalogue SQL can be modified in transit if the office-to-API transport is not integrity-protected",
+          "description": "`flow:catalogue-spreadsheet-to-web-api:sql-statements` crosses from `boundary:marketing-office` into `boundary:sokify-internal-systems`, carries SQL statements that change prices and product copy, and has `encryption_in_transit: unknown`. If that unknown resolves to no authenticated transport or message integrity check, an attacker positioned on this path can alter a legitimate spreadsheet macro request before `process:web-api` acts on it. The direct-SQL design means modified price or catalogue-copy instructions arrive in the same form as authorized updates; second-order, the altered catalogue becomes the business data customers browse and order through `process:mobile-app` and `process:web-api`.",
+          "affected_element_ids": [
+            "flow:catalogue-spreadsheet-to-web-api:sql-statements",
+            "process:catalogue-spreadsheet",
+            "process:web-api"
+          ],
+          "verb": "alter-in-transit",
+          "evidence_refs": [
+            "crossing:flow:catalogue-spreadsheet-to-web-api:sql-statements",
+            "unknown:flow:catalogue-spreadsheet-to-web-api:sql-statements:encryption_in_transit"
+          ],
+          "quotes": [],
+          "absent_elements": [],
+          "sequence": 2,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium and conditional on the unknown transport-protection attribute: the flow crosses the marketing-office boundary, but an attacker still needs a position on that path. Impact is medium because the flow explicitly changes prices and product copy and is tagged `business-critical-data`, potentially corrupting the customer-facing catalogue."
+          },
+          "mitigations": [
+            {
+              "summary": "Authenticate and encrypt catalogue-update traffic",
+              "detail": "Use mutually authenticated TLS for `flow:catalogue-spreadsheet-to-web-api:sql-statements` or sign each update payload so `process:web-api` rejects modified requests."
+            },
+            {
+              "summary": "Replace direct SQL submission with a constrained catalogue API",
+              "detail": "Make `process:catalogue-spreadsheet` submit structured price and copy changes to a dedicated API operation, and have `process:web-api` validate allowed fields, products, and value ranges rather than accepting SQL statements."
+            }
+          ]
+        },
+        {
+          "title": "User records may be directly rewritten if database write authentication is not enforced",
+          "description": "`flow:web-api-to-user-database:customer-records` has `authentication: unknown` while performing read-write operations against `store:user-database`. If that unknown resolves to absent or insufficient database-side caller verification, an attacker who obtains network reach to the database write interface can alter customer names, addresses, or card-related records rather than going through `process:web-api` validation. This is a conditional integrity threat, not an assertion that the database lacks authentication; the unresolved question is which principal is accepted for writes and whether it is restricted to the web API's required operations.",
+          "affected_element_ids": [
+            "store:user-database",
+            "flow:web-api-to-user-database:customer-records",
+            "process:web-api"
+          ],
+          "verb": "alter",
+          "evidence_refs": [
+            "unknown:flow:web-api-to-user-database:customer-records:authentication"
+          ],
+          "quotes": [],
+          "absent_elements": [],
+          "sequence": 3,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional on the unknown authentication state: exploitation requires network reach to the internal database interface, but an unverified write identity may permit direct modification. Impact is high because `store:user-database` holds customer names, addresses, and payment-card-related data and is tagged `pii` and `financial`."
+          },
+          "mitigations": [
+            {
+              "summary": "Establish and enforce a least-privilege database identity",
+              "detail": "Require `process:web-api` to authenticate to `store:user-database` with a distinct workload identity, and deny all unauthenticated or unrecognized database connections."
+            },
+            {
+              "summary": "Restrict write scope and validate record ownership",
+              "detail": "Grant the web API only the required record operations and enforce server-side ownership and field validation before customer records can be modified."
+            }
+          ]
+        }
+      ],
+      "invalid": []
+    },
+    "repudiation": {
+      "claims": [
+        {
+          "title": "Customer orders may be unattributable at the Web API",
+          "description": "A customer using `entity:customer` can later deny placing an order submitted through `flow:mobile-app-to-web-api:api-traffic` to `process:web-api`. That flow crosses from the customer-device zone and has `authentication: unknown`; if the unresolved authentication does not establish an individual customer identity, the Web API cannot bind the order to a specific person. The model also contains no audit log or audit flow recording an actor, action, target, timestamp, and outcome, so the evidence needed to rebut the dispute is not represented. This is conditional on the unknown authentication state and on whether an unmodelled audit trail exists. Second-order, disputed orders are handed to `process:sims` and customer/card records are maintained in `store:user-database`, leaving fulfilment and payment-related disputes without conclusive initiating-actor evidence.",
+          "affected_element_ids": [
+            "entity:customer",
+            "process:web-api",
+            "flow:mobile-app-to-web-api:api-traffic"
+          ],
+          "verb": "unattributable",
+          "evidence_refs": [
+            "crossing:flow:mobile-app-to-web-api:api-traffic",
+            "unknown:flow:mobile-app-to-web-api:api-traffic:authentication"
+          ],
+          "quotes": [
+            {
+              "text": "Customers browse and order through our mobile app",
+              "source_label": "System description"
+            },
+            {
+              "text": "Nobody here can tell me what the API does about authentication",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [
+            "audit log"
+          ],
+          "sequence": 1,
+          "severity": {
+            "likelihood": "high",
+            "impact": "medium",
+            "level": "high",
+            "justification": "Likelihood is high, conditionally on `unknown:flow:mobile-app-to-web-api:api-traffic:authentication`: the customer order path crosses into `process:web-api` over `crossing:flow:mobile-app-to-web-api:api-traffic`, and an ordinary customer dispute needs no prior system compromise. Impact is medium because `process:web-api` handles `financial` and `business-critical-data` and writes customer/card data to `store:user-database`, but the model does not establish an unbounded transaction value or system-wide irreversible loss."
+          },
+          "mitigations": [
+            {
+              "summary": "Authenticate and record the individual ordering customer",
+              "detail": "Resolve authentication on `flow:mobile-app-to-web-api:api-traffic` using an individual customer identity, and have `process:web-api` emit structured order events containing the verified subject, action, order identifier, timestamp, and outcome."
+            },
+            {
+              "summary": "Create retained, independent order evidence",
+              "detail": "Send security and order-audit events from `process:web-api` to a dedicated append-only audit store with retention protection; propagate the verified originating identity with the order handed to `process:sims`."
+            }
+          ]
+        },
+        {
+          "title": "Catalogue changes may be unattributable to an individual marketing operator",
+          "description": "A person with access to `process:catalogue-spreadsheet` can issue price or product-copy changes through `flow:catalogue-spreadsheet-to-web-api:sql-statements` and later deny making the change. The flow crosses from `boundary:marketing-office` into `process:web-api` with `authentication: unknown`; if this is not an individual, verified identity, neither the API nor any record represented in the model can distinguish one marketing user from another or prove who requested a specific catalogue update. No audit log or audit flow is modelled for these business-critical changes. This is conditional on the unresolved authentication attribute and on whether an unmodelled audit record exists. Second-order, price and product-copy changes processed by `process:web-api` affect the catalogue presented to customers and can create financial and operational disputes.",
+          "affected_element_ids": [
+            "process:catalogue-spreadsheet",
+            "process:web-api",
+            "flow:catalogue-spreadsheet-to-web-api:sql-statements"
+          ],
+          "verb": "unattributable",
+          "evidence_refs": [
+            "crossing:flow:catalogue-spreadsheet-to-web-api:sql-statements",
+            "unknown:flow:catalogue-spreadsheet-to-web-api:sql-statements:authentication"
+          ],
+          "quotes": [
+            {
+              "text": "The macros in it send SQL statements straight to the web API to change prices and product copy",
+              "source_label": "System description"
+            },
+            {
+              "text": "Nobody here can tell me what the API does about authentication",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [
+            "audit log"
+          ],
+          "sequence": 2,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium, conditionally on `unknown:flow:catalogue-spreadsheet-to-web-api:sql-statements:authentication`: exploitation requires access to the marketing-office-side spreadsheet or an authorised marketing operator, although the flow is a trust-boundary crossing (`crossing:flow:catalogue-spreadsheet-to-web-api:sql-statements`). Impact is medium because the target `process:web-api` handles `business-critical-data` and `financial` assets, while the model does not quantify the scope or duration of a disputed catalogue change."
+          },
+          "mitigations": [
+            {
+              "summary": "Use individual identities for catalogue administration",
+              "detail": "Replace unverified spreadsheet-to-API access with per-user authentication on `flow:catalogue-spreadsheet-to-web-api:sql-statements`, and ensure `process:web-api` verifies rather than trusts a self-reported operator identity."
+            },
+            {
+              "summary": "Audit each catalogue change immutably",
+              "detail": "Have `process:web-api` record the verified acting principal, before/after values, request or change identifier, timestamp, and result for every price or product-copy update in an append-only retained audit store; corrections should create new entries rather than overwrite prior evidence."
+            }
+          ]
+        }
+      ],
+      "invalid": []
+    },
+    "information-disclosure": {
+      "claims": [
+        {
+          "title": "Customer order details are readable over plaintext HTTP to the Web API",
+          "description": "An attacker able to observe the boundary-crossing path from the customer device to Sokify can intercept `flow:mobile-app-to-web-api:api-traffic`, which carries customer details in order-placement traffic to the internet-facing `process:web-api` over HTTP with transport encryption stated absent. The attacker can read customers' order activity and personal details without authenticating to the API. The captured data also identifies orders subsequently handled by `process:web-api` and passed to `process:sims`, enabling targeted follow-on abuse against affected customers.",
+          "affected_element_ids": [
+            "flow:mobile-app-to-web-api:api-traffic",
+            "process:mobile-app",
+            "process:web-api"
+          ],
+          "verb": "intercept",
+          "evidence_refs": [
+            "absent:flow:mobile-app-to-web-api:api-traffic:encryption_in_transit",
+            "crossing:flow:mobile-app-to-web-api:api-traffic"
+          ],
+          "quotes": [],
+          "absent_elements": [],
+          "sequence": 1,
+          "severity": {
+            "likelihood": "high",
+            "impact": "high",
+            "level": "critical",
+            "justification": "Likelihood is high because `flow:mobile-app-to-web-api:api-traffic` crosses from `boundary:customer-device` into Sokify systems and its `encryption_in_transit` is stated absent, so any capable on-path observer can passively capture it. Impact is high because the flow carries `pii` in customer order traffic to the internet-facing `process:web-api`, allowing repeated collection of customer information across normal ordering activity."
+          },
+          "mitigations": [
+            {
+              "summary": "Require HTTPS for all mobile-app API traffic",
+              "detail": "Replace HTTP on `flow:mobile-app-to-web-api:api-traffic` with TLS 1.2+; validate the Web API certificate in `process:mobile-app` and redirect or fail closed for plaintext requests."
+            },
+            {
+              "summary": "Minimize sensitive order fields in transit",
+              "detail": "Use opaque order and customer references where possible rather than transmitting unnecessary customer details on the customer-to-API hop."
+            }
+          ]
+        },
+        {
+          "title": "Unverified fax destination can disclose order confirmations to an unintended recipient",
+          "description": "A person who controls or receives the number stored against an order can read the confirmation sent through `flow:fax-gateway-to-customer:confirmation-fax`, because `process:fax-gateway` dials that number but does not verify that the fax reached the intended customer. The fax reveals the customer's name and address to an unauthorized recipient. This recipient can correlate the confirmation with a real order originating from `process:web-api` and processed by `process:sims`, creating a credible basis for targeted fraud or social engineering against that customer.",
+          "affected_element_ids": [
+            "process:fax-gateway",
+            "flow:fax-gateway-to-customer:confirmation-fax",
+            "entity:customer"
+          ],
+          "verb": "read",
+          "evidence_refs": [
+            "crossing:flow:fax-gateway-to-customer:confirmation-fax"
+          ],
+          "quotes": [
+            {
+              "text": "nobody checks it arrived at the right place",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 2,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium because exploiting the issue requires an incorrect or attacker-controlled fax destination, but the stated lack of delivery verification on the boundary-crossing `flow:fax-gateway-to-customer:confirmation-fax` means a misdirected fax is not detected. Impact is medium because `process:fax-gateway` and the fax flow handle `pii`, specifically the customer's name and address, for an individual order."
+          },
+          "mitigations": [
+            {
+              "summary": "Replace fax confirmations with an authenticated delivery channel",
+              "detail": "Deliver confirmations through the authenticated mobile-app/API channel rather than `process:fax-gateway`, avoiding transmission of customer PII to a dialled number."
+            },
+            {
+              "summary": "Verify the confirmation recipient before sending",
+              "detail": "If fax must remain, require a customer-confirmed destination and minimize the confirmation to an opaque order reference rather than including name and address."
+            }
+          ]
+        },
+        {
+          "title": "Customer records may be readable from unencrypted User Database storage",
+          "description": "`store:user-database` holds customer names, addresses, and the card used for payment, but its `encryption_at_rest` attribute is unknown. If this resolves to unencrypted storage, an attacker or over-privileged operator who obtains the database volume or an operational copy such as a snapshot or backup can read the full customer corpus directly without authenticating through `process:web-api`. The disclosure includes financial and personal data and can be used to target customers and their records handled through `flow:web-api-to-user-database:customer-records`. This threat is conditional on confirming the at-rest encryption posture; it does not assert that encryption is absent.",
+          "affected_element_ids": [
+            "store:user-database"
+          ],
+          "verb": "read",
+          "evidence_refs": [
+            "unknown:store:user-database:encryption_at_rest"
+          ],
+          "quotes": [],
+          "absent_elements": [],
+          "sequence": 3,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional because `store:user-database` has unverified `encryption_at_rest`, so a storage-layer copy may be readable if protection is absent, though an attacker must obtain that copy. Impact is high because the store contains both `pii` and `financial` data, including names, addresses, and payment-card information, at full-corpus scale."
+          },
+          "mitigations": [
+            {
+              "summary": "Establish and enforce encryption at rest for the User Database",
+              "detail": "Verify `store:user-database` encryption status and enforce encryption at rest with KMS-managed keys, covering database volumes, backups, snapshots, and replicas."
+            },
+            {
+              "summary": "Restrict access to storage copies and decryption keys",
+              "detail": "Use separate least-privilege principals for database administration, backup/export operations, and key use; log and alert on snapshot or backup export operations."
+            }
+          ]
+        },
+        {
+          "title": "Delivery-address flat-file contents may be exposed through unencrypted storage",
+          "description": "`store:delivery-address-flat-file` contains delivery addresses and has `encryption_at_rest: unknown`. If the flat file is not protected at rest, a person obtaining its host storage, copied file, or operational backup can read delivery addresses without going through `process:sims`. The resulting address list can be correlated with orders delivered through `flow:web-api-to-sims:order-handover` and used to target customers. This is a conditional threat based on the unresolved encryption attribute, not an assertion that the file is currently unencrypted.",
+          "affected_element_ids": [
+            "store:delivery-address-flat-file"
+          ],
+          "verb": "read",
+          "evidence_refs": [
+            "unknown:store:delivery-address-flat-file:encryption_at_rest"
+          ],
+          "quotes": [],
+          "absent_elements": [],
+          "sequence": 4,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium and conditional because `store:delivery-address-flat-file` has unverified `encryption_at_rest` and exploitation requires access to a storage-layer copy. Impact is medium because the file is limited to delivery-address `pii`, but a copied flat file may expose addresses for many orders at once."
+          },
+          "mitigations": [
+            {
+              "summary": "Encrypt the delivery-address file and its operational copies",
+              "detail": "Verify and enforce encryption at rest for `store:delivery-address-flat-file`, including its host volume, backups, and any copied operational artifacts."
+            },
+            {
+              "summary": "Limit and minimize retained address data",
+              "detail": "Restrict filesystem and backup access to the SIMS service identity, retain delivery addresses only for the dispatch period, and securely delete expired records."
+            }
+          ]
+        }
+      ],
+      "invalid": []
+    },
+    "denial-of-service": {
+      "claims": [
+        {
+          "title": "Flooding order requests can exhaust the Web API and stall fulfilment",
+          "description": "An internet attacker can repeatedly submit browse/order traffic through `flow:customer-to-mobile-app:browse-and-order` and the boundary-crossing `flow:mobile-app-to-web-api:api-traffic` to flood `process:web-api`. Authentication on the API flow is unknown, and the model does not establish request-rate, request-size, concurrency, or load-shedding limits. Each accepted order causes `process:web-api` to maintain customer records in `store:user-database` and hand work to `process:sims`, making the attacker\u2019s request cost more than simply delivering the request. Second-order, saturation prevents the sole customer-facing channel from placing legitimate orders, prevents catalogue updates arriving on `flow:catalogue-spreadsheet-to-web-api:sql-statements`, and delays the downstream SIMS address-file and dispatch workflow. This threat is conditional on the unverified authentication and capacity-control posture.",
+          "affected_element_ids": [
+            "process:web-api",
+            "flow:mobile-app-to-web-api:api-traffic"
+          ],
+          "verb": "flood",
+          "evidence_refs": [
+            "crossing:flow:mobile-app-to-web-api:api-traffic",
+            "unknown:flow:mobile-app-to-web-api:api-traffic:authentication"
+          ],
+          "quotes": [
+            {
+              "text": "The web API keeps customers in the user database: name, address, and the card they paid with. When an order is placed the API hands the order over to SIMS",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 1,
+          "severity": {
+            "likelihood": "high",
+            "impact": "medium",
+            "level": "high",
+            "justification": "Likelihood is high, conditionally: `flow:mobile-app-to-web-api:api-traffic` crosses from `boundary:customer-device` into the internet-facing `process:web-api`, while its authentication is explicitly unknown, so an attacker can attempt request flooding without a stated hard prerequisite. Impact is medium: `process:web-api` is the only stated customer ordering channel and carries `pii`, `financial`, and `business-critical-data`; an overload interrupts customer orders and downstream fulfilment, but the model does not tag the affected components `availability-critical` or establish irrecoverable loss."
+          },
+          "mitigations": [
+            {
+              "summary": "Bound public request work before it reaches order processing",
+              "detail": "Apply per-verified-identity and per-source rate limits, bounded request bodies, concurrency ceilings, and fail-fast load shedding on `process:web-api` for `flow:mobile-app-to-web-api:api-traffic`."
+            },
+            {
+              "summary": "Isolate downstream fulfilment capacity from API bursts",
+              "detail": "Use bounded queues and backpressure between `process:web-api` and `process:sims`, and cap database work per request so a public burst cannot consume all order-processing capacity."
+            },
+            {
+              "summary": "Establish and enforce the API authentication posture",
+              "detail": "Resolve the unknown authentication state on `flow:mobile-app-to-web-api:api-traffic` and authenticate callers before allowing order paths that allocate database and fulfilment work."
+            }
+          ]
+        }
+      ],
+      "invalid": []
+    },
+    "elevation-of-privilege": {
+      "claims": [
+        {
+          "title": "Marketing-originated SQL can borrow the Web API's customer-data authority",
+          "description": "`process:catalogue-spreadsheet` in `boundary:marketing-office` sends SQL statements directly over `flow:catalogue-spreadsheet-to-web-api:sql-statements` to the internet-facing `process:web-api`, crossing into `boundary:sokify-internal-systems`; authentication on that crossing is unknown. If `process:web-api` executes these statements without authenticating the originating spreadsheet/workload and restricting the SQL operation and target to the catalogue function, a marketing-office attacker who can alter the spreadsheet or its macro input can cause the API to exercise its standing authority beyond price and copy changes. This is an authorization escalation from catalogue-editing capability to the API's authority. Second-order, `process:web-api` has read-write access to `store:user-database` via `flow:web-api-to-user-database:customer-records`, so arbitrary accepted SQL or equivalent database operations could reach customer names, addresses, and payment-card data. The unresolved question is whether the API authenticates this flow and enforces a server-side allowlist or separate least-privilege identity for catalogue updates.",
+          "affected_element_ids": [
+            "process:catalogue-spreadsheet",
+            "flow:catalogue-spreadsheet-to-web-api:sql-statements",
+            "process:web-api",
+            "store:user-database"
+          ],
+          "verb": "abuse-grant",
+          "evidence_refs": [
+            "crossing:flow:catalogue-spreadsheet-to-web-api:sql-statements",
+            "unknown:flow:catalogue-spreadsheet-to-web-api:sql-statements:authentication"
+          ],
+          "quotes": [
+            {
+              "text": "The macros in it send SQL statements straight to the web API to change prices and product copy",
+              "source_label": "System description"
+            },
+            {
+              "text": "The web API keeps customers in the user database: name, address, and the card they paid with.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 1,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional: exploitation requires an attacker to gain control of the marketing spreadsheet or its inputs, while authentication on the boundary-crossing `flow:catalogue-spreadsheet-to-web-api:sql-statements` is unverified. Impact is high because the borrowed authority reaches `store:user-database` through `flow:web-api-to-user-database:customer-records`, containing customer names, addresses, and payment-card data."
+          },
+          "mitigations": [
+            {
+              "summary": "Authenticate and authorize catalogue updates at the Web API",
+              "detail": "Require a distinct authenticated workload identity for `flow:catalogue-spreadsheet-to-web-api:sql-statements` and authorize it only for explicit catalogue-update operations."
+            },
+            {
+              "summary": "Eliminate arbitrary SQL from the marketing integration",
+              "detail": "Replace SQL statement submission with a constrained catalogue API or parameterized, server-side update procedures, and give that path a database identity unable to read or modify customer records in `store:user-database`."
+            }
+          ]
+        }
+      ],
+      "invalid": []
+    }
+  }
+}
