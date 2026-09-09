@@ -315,7 +315,7 @@ class ThreatProposal(Proposal):
     """What a category agent emits: a finding that *names* its evidence.
 
     The neutral :class:`~analysis_service.report.Proposal` carries the title, the
-    description, the element refs and the two evidence lists. STRIDE adds its
+    description, the element refs and the three evidence lists. STRIDE adds its
     own ID key and its own judgement fields.
     """
 
