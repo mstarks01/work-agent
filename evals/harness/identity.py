@@ -33,7 +33,7 @@ See ``evals/harness/ledger.py``.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -187,8 +187,15 @@ class SubsetVerbIdentity:
     another's graph.
     """
 
-    def __init__(self, flows_by_case: Mapping[str, FlowMap]) -> None:
+    def __init__(
+        self,
+        flows_by_case: Mapping[str, FlowMap],
+        equivalent: Sequence[frozenset[str]] | None = None,
+    ) -> None:
         self._flows = flows_by_case
+        #: A candidate equivalence table, for pricing a merge before it ships.
+        #: ``None`` is the shipped :data:`~evals.harness.verbs.EQUIVALENT`.
+        self._equivalent = equivalent
 
     def equivalent(self, pair: ClaimPair) -> ClaimRuling:
         if pair.candidate_element_ids is None:
@@ -206,7 +213,7 @@ class SubsetVerbIdentity:
         elements = endpoint_subset(
             pair.reference_element_ids, pair.candidate_element_ids, flows
         )
-        action = same_action(pair.reference_verb, pair.candidate_verb)
+        action = same_action(pair.reference_verb, pair.candidate_verb, self._equivalent)
         placeless = [
             side
             for side, ids in (

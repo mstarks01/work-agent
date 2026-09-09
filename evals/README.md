@@ -189,6 +189,7 @@ somewhere else.
 | `harness/attribution.py` | Which stage lost each requirement the ASVS matrix or the disposition scorer reports as wrong: precondition, generation, critic, verdict or deferral, read off the scope state, the rejection step or the verdict. Explains the two numbers beside it and moves neither. |
 | `harness/applicability.py` | ASVS's scorer: a confusion matrix over a finite catalog, matched by requirement ID. A closed claim set needs no composed identity, so no rule runs here. Carries the `disposition` instrument beside it, which reads what the run concluded rather than whether the requirement applies. |
 | `harness/critic_yield.py` | What the critic added and removed, scored on both sides. |
+| `harness/verb_pricing.py` | A verb equivalence priced before it ships: false splits and false merges over the labelled pairs, merges over the corpus's own reference pairs, and a sweep re-scored under it. `run.py price-verbs`. |
 | `harness/losses.py` | What lost each STRIDE reference a run missed: the verb, the critic, the place, or no lead. A fix carries its ceiling before a run is paid for. |
 | `harness/grounds.py` | What the category agents did with `grounds` — the branch mix, the padding number and the unverified-quote rate — plus the two failures the grounding path kills a case with. |
 | `harness/coverage.py` | What each category agent was offered and how much of it its drafts cite, pooled over the sweep. |

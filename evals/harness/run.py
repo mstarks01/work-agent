@@ -44,6 +44,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
+from analysis_service.actions import VerbError
 from analysis_service.certification import CertificationError, CertifyResult, certify
 from analysis_service.deployment import Deployment
 from analysis_service.frameworks import PACKAGES
@@ -74,6 +75,7 @@ from evals.harness import (
     roster,
     standings,
     submit,
+    verb_pricing,
     writing,
 )
 from evals.harness.artifact import (
@@ -86,6 +88,7 @@ from evals.harness.artifact import (
 from evals.harness.artifact import build as build_artifact
 from evals.harness.calibration import (
     AGREEMENT_BAR,
+    DEFAULT_PAIRS_PATH,
     IDENTITY_VALIDATION,
     load_pairs,
     measure_agreement,
@@ -1087,6 +1090,58 @@ def command_score(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_price_verbs(args: argparse.Namespace) -> int:
+    """Price one or more verb equivalences before adopting any (no credentials).
+
+    The frontier the identity tests pin, opened to a candidate: false splits and
+    false merges over the labelled pairs, merges over the corpus's own reference
+    pairs, and, with ``--artifact``, the sweep's reports re-scored under the
+    candidate so the gain is a number beside the price. Nothing is adopted; the
+    table is what a decision on ``EQUIVALENT`` reads (#730).
+    """
+    corpus = load_corpus(args.corpus)
+    flows_by_case = _flows_by_case(corpus)
+    pairs = load_pairs(args.pairs)
+    produced = None
+    if args.artifact is not None:
+        path = Path(args.artifact)
+        cases = [case for case in corpus if case.id in load_artifact(path).cases]
+        runs = _runs_from_reports(path, cases)
+        produced = {
+            case_id: stride_threats(run.report)
+            for case_id, run in runs.items()
+            if optional_block(run.report, "stride")
+        }
+    try:
+        candidates = [
+            verb_pricing.parse_groups([spelling]) for spelling in args.equivalent
+        ]
+        if args.together and len(args.equivalent) > 1:
+            candidates.append(verb_pricing.parse_groups(args.equivalent))
+    except (ValueError, VerbError) as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    shipped = verb_pricing.price(None, corpus, flows_by_case, pairs, produced)
+    priced = [
+        verb_pricing.price(groups, corpus, flows_by_case, pairs, produced)
+        for groups in candidates
+    ]
+    verb_pricing.render(shipped, priced)
+    if args.out is not None:
+        Path(args.out).write_text(
+            json.dumps(
+                {
+                    "shipped": shipped.to_json(),
+                    "candidates": [p.to_json() for p in priced],
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+    return 0
+
+
 def command_pairing(args: argparse.Namespace) -> int:
     """Build the reading view behind one case's applicability disagreement.
 
@@ -1472,6 +1527,29 @@ def _score_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def _price_verbs_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--equivalent",
+        action="append",
+        default=[],
+        metavar="VERB=VERB[=VERB]",
+        help="a candidate group, priced on its own; repeat for several",
+    )
+    parser.add_argument(
+        "--together",
+        action="store_true",
+        help="also price every --equivalent group applied at once",
+    )
+    parser.add_argument(
+        "--artifact",
+        default=None,
+        help="a finished sweep whose reports are re-scored for the gain column",
+    )
+    parser.add_argument("--corpus", default=DEFAULT_CORPUS_DIR)
+    parser.add_argument("--pairs", default=DEFAULT_PAIRS_PATH)
+    parser.add_argument("--out", default=None, help="write the table as JSON here too")
+
+
 def _pairing_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("artifact", help="a sweep artifact with a .reports/ dir")
     parser.add_argument("--case", required=True, help="which corpus case to pair")
@@ -1605,6 +1683,12 @@ COMMANDS: dict[str, Command] = {
         help="re-score a finished sweep against the ledger (no credentials)",
         run=command_score,
         arguments=_score_arguments,
+    ),
+    "price-verbs": Command(
+        help="price a verb equivalence on the frontier before adopting it"
+        " (no credentials)",
+        run=command_price_verbs,
+        arguments=_price_verbs_arguments,
     ),
     "pairing": Command(
         help="the two sides of one case's applicability disagreement (no credentials)",
