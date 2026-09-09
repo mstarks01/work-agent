@@ -44,7 +44,7 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any, NamedTuple
 
-from analysis_service.frameworks import FrameworkSchemas
+from analysis_service.frameworks import FrameworkSchemas, lane_of
 from analysis_service.references import snap
 from analysis_service.report import (
     Claim,
@@ -496,23 +496,29 @@ def endpoint_targets(
 def duplicate_groups(
     drafts: Sequence[Claim], system_model: SystemModel
 ) -> dict[str, list[str]]:
-    """Each draft's ID against the other drafts naming one action at one place.
+    """Each draft's ID against the other drafts naming one action at one place in its lane.
 
-    The critic's duplicate step is a comparison of two fields — the verb and
-    the endpoint-resolved targets — made here so the critic reads the pairs
-    rather than hunting for them across every lane (#440). Lanes are not compared: a read and a write of one
-    flow carry two verbs, and two lanes filing one verb at one place is the
-    duplicate the step exists to catch.
+    The critic's duplicate step is a comparison of three fields — the lane, the
+    verb and the endpoint-resolved targets — made here so the critic reads the
+    pairs rather than hunting for them (#440). The lane is part of the key
+    because it is part of a claim's identity: the corpus records one verb at
+    one place in two lanes as two findings, and the critic prompt says two
+    lanes are never duplicates. A read and a write of one flow carry two verbs,
+    so they are never paired either.
 
     A draft with no verb belongs to a package whose identity is a catalog
     identifier, and its duplicates are ID collisions the join already refuses.
     """
     flows = ModelIndex.of(system_model).flow_endpoints
-    by_key: dict[tuple[str, frozenset[str]], list[str]] = {}
+    by_key: dict[tuple[str | None, str, frozenset[str]], list[str]] = {}
     for draft in drafts:
         if draft.verb is None:
             continue
-        key = (draft.verb, endpoint_targets(draft.affected_element_ids, flows))
+        key = (
+            lane_of(draft),
+            draft.verb,
+            endpoint_targets(draft.affected_element_ids, flows),
+        )
         by_key.setdefault(key, []).append(draft.id)
     return {
         draft_id: [other for other in ids if other != draft_id]

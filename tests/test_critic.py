@@ -651,7 +651,29 @@ class TestDuplicateGroups:
     def model(self):
         return valid_model()
 
-    def test_one_verb_at_one_place_is_marked_across_lanes(self, model):
+    def test_one_verb_at_one_place_is_marked_within_a_lane(self, model):
+        from analysis_service.critic import duplicate_groups
+
+        drafts = [
+            sample_draft("S-01", verb="forge", affected_element_ids=[CROSSING]),
+            sample_draft(
+                "S-02",
+                verb="forge",
+                affected_element_ids=["entity:customer", "process:web-app"],
+            ),
+            sample_draft("S-03", verb="replay", affected_element_ids=[CROSSING]),
+        ]
+
+        assert duplicate_groups(drafts, model) == {"S-01": ["S-02"], "S-02": ["S-01"]}
+
+    def test_one_verb_at_one_place_in_two_lanes_is_two_findings(self, model):
+        """The lane is part of a claim's identity, so the pair is never marked.
+
+        The corpus records one verb at one place in two lanes as two references,
+        the scorer keys by lane, and the critic prompt says two lanes are never
+        duplicates. #440 asked for the identity rule's comparison, which reads
+        the lane; the first cut left it out.
+        """
         from analysis_service.critic import duplicate_groups
 
         drafts = [
@@ -662,10 +684,9 @@ class TestDuplicateGroups:
                 verb="forge",
                 affected_element_ids=["entity:customer", "process:web-app"],
             ),
-            sample_draft("S-02", verb="replay", affected_element_ids=[CROSSING]),
         ]
 
-        assert duplicate_groups(drafts, model) == {"S-01": ["T-01"], "T-01": ["S-01"]}
+        assert duplicate_groups(drafts, model) == {}
 
     def test_a_draft_with_no_verb_is_never_compared(self, model):
         from analysis_service.critic import duplicate_groups
@@ -897,13 +918,13 @@ class TestTheCriticView:
         before pairing would leave a draft paired with nothing and read as
         unique — which is exactly the judgement the critic is being spared.
         """
-        drafts = [sample_draft("S-01"), sample_draft("T-01", category="tampering")]
+        drafts = [sample_draft("S-01"), sample_draft("S-02")]
         model = valid_model()
 
         (narrowed,) = critic.critic_view(drafts, model, only={"S-01"})
         whole = critic.critic_view(drafts, model)
 
-        assert narrowed["same_action_as"] == ["T-01"]
+        assert narrowed["same_action_as"] == ["S-02"]
         assert narrowed == next(view for view in whole if view["id"] == "S-01")
 
     def test_narrowing_to_nothing_renders_nothing(self):
