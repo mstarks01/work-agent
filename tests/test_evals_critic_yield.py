@@ -83,20 +83,18 @@ def _expected(case):
 
 def test_scorer_takes_drafts_without_promoting_them(case):
     # The shape decision: drafts score as drafts. A draft carries no verdict,
-    # so the needs-info bypass is simply inactive and the threat is keyed
-    # like any other unmatched claim.
+    # and is keyed like any other unmatched claim.
     drafts = [draft_threat(1, "spoofing", "An attacker forges a webhook.")]
 
     score = score_case(case, drafts, ScriptedMatcher(), Ledger())
 
     assert score.produced_ids == ("S-01",)
-    assert score.needs_info_unmatched == ()
     assert [entry.threat_id for entry in score.unlisted] == ["S-01"]
 
 
-def test_needs_info_bypass_still_applies_to_ruled_threats(case):
-    # And the post-critic side keeps the rule: a needs-info threat is never
-    # keyed as a false positive.
+def test_a_ruled_needs_info_threat_is_keyed_too(case):
+    # A verdict exempts nothing from a vote: a conditional finding that asks
+    # the wrong question is a person's to reject.
     draft = draft_threat(1, "spoofing", "An attacker forges a webhook.")
     ruled = promote(
         draft,
@@ -114,8 +112,7 @@ def test_needs_info_bypass_still_applies_to_ruled_threats(case):
 
     score = score_case(case, [ruled], ScriptedMatcher(), Ledger())
 
-    assert score.needs_info_unmatched == ("S-01",)
-    assert score.unlisted == ()
+    assert [entry.threat_id for entry in score.unlisted] == ["S-01"]
 
 
 def test_killing_a_rejected_draft_is_the_critic_earning_its_cost(case):
