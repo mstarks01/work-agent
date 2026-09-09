@@ -388,11 +388,19 @@ def open_case(session: Session, case_id: str) -> sittings.Prepared:
 def held_draft(session: Session, case_id: str) -> sittings.Draft | None:
     """This reader's draft of one case, or the refusal an unreadable one gets.
 
-    **A case a merged sitting covers in part re-opens on that sitting.** The
-    reader comes back when the case gains a **Framework**, and by then they
-    have read the recorded sets, so a list written now would be evidence of an
-    order that did not happen. The list written blind rides forward locked,
-    with the marks already made, and only the new set is theirs to answer.
+    **A case a merged sitting once covered re-opens on that sitting.** The
+    reader comes back when the case gains a **Framework**, or when a file they
+    read moves under a corpus edit, and by then they have read the recorded
+    sets, so a list written now would be evidence of an order that did not
+    happen. The list written blind rides forward locked, with the marks already
+    made, and only what is new is theirs to answer.
+
+    The sitting is read whether or not it still stands. A mark is keyed by the
+    finding's fingerprint, so an added claim arrives unmarked, a changed one
+    arrives unmarked, and every other mark is still the reader's answer; a key
+    that names no finding any more is dropped here, because the record refuses
+    it. The digests are pinned to the files as they are now, because a record
+    carrying the old ones would be refused the day it merged.
 
     The resumed draft is written to the store the first time it is asked for,
     because every later request — the sets, a save, the record — asks the
@@ -405,7 +413,7 @@ def held_draft(session: Session, case_id: str) -> sittings.Draft | None:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     if held is not None:
         return held
-    merged = review_submissions.current_for_case(session.root, case_id)
+    merged = review_submissions.latest_for_case(session.root, case_id)
     if merged is None:
         return None
     try:
@@ -418,7 +426,10 @@ def held_draft(session: Session, case_id: str) -> sittings.Draft | None:
         own_list=list(merged.answers.own_list),
         opened_digests=opened,
     )
-    resumed.marks = dict(merged.answers.marks)
+    known = {target.fingerprint for target in prepared.mark_targets}
+    resumed.marks = {
+        key: mark for key, mark in merged.answers.marks.items() if key in known
+    }
     resumed.missing = list(merged.answers.missing)
     save_draft(session, resumed)
     return resumed

@@ -2345,3 +2345,119 @@ class TestAFrameworkArrivingOnAReadCase:
         )
 
         assert "changed since" not in said
+
+
+class TestACorpusEditUnderAMergedSitting:
+    """A file a merged sitting read moves, and the reader keeps their marks.
+
+    The gate is right to drop the sitting: a digest that no longer matches says
+    the record signed bytes the tree no longer holds. The launcher used to ask
+    the gate's reader when it seeded a draft, so the same edit opened the case
+    empty and the reader marked every finding again. A mark is keyed by the
+    finding's fingerprint, so an added claim is the only one without an answer,
+    and a claim whose identity changed is the only one whose old mark is gone.
+    """
+
+    def claims_file(self, tree, case=CASE):
+        return tree / "evals" / "corpus" / case / "claims" / "stride.json"
+
+    def add_claim(self, tree, case=CASE):
+        """One more STRIDE claim, on elements the case already carries."""
+        path = self.claims_file(tree, case)
+        claims = json.loads(path.read_text("utf-8"))
+        added = {
+            **claims[0],
+            "verb": "replay",
+            "claim": "A captured reading is replayed to the gateway.",
+        }
+        path.write_text(json.dumps([*claims, added], indent=2) + "\n", encoding="utf-8")
+
+    def rekey_claim(self, tree, case=CASE):
+        """The first claim keeps its place and changes its identity."""
+        path = self.claims_file(tree, case)
+        claims = json.loads(path.read_text("utf-8"))
+        claims[0]["verb"] = "replay"
+        path.write_text(json.dumps(claims, indent=2) + "\n", encoding="utf-8")
+
+    def opened(self, tree, reviewer="ada"):
+        app = browser(session_for(tree, reviewer))
+        return app, app.get(f"/api/part-one?case={CASE}").json()
+
+    def test_the_gate_drops_the_sitting_and_the_launcher_still_reads_it(self, tree):
+        """Two readers, two questions, and the edit separates them."""
+        sign(tree, CASE, "ada")
+        self.add_claim(tree)
+
+        assert review_submissions.current_for_case(tree, CASE) is None
+        assert review_submissions.latest_for_case(tree, CASE) is not None
+        assert CASE in review_submissions.unreviewed_cases(tree), "the gate"
+
+    def test_the_marks_and_the_list_come_back_after_the_edit(self, tree):
+        signed = sign(tree, CASE, "ada").cases[CASE]
+        self.add_claim(tree)
+
+        _, opened = self.opened(tree)
+
+        assert opened["own_list"] == list(signed.own_list)
+        assert opened["marks"] == dict(signed.marks)
+
+    def test_only_the_added_claim_is_unmarked(self, tree):
+        sign(tree, CASE, "ada")
+        self.add_claim(tree)
+
+        app, opened = self.opened(tree)
+        unmarked = set(every_mark(app)) - set(opened["marks"])
+
+        assert len(unmarked) == 1
+
+    def test_a_mark_naming_no_finding_any_more_is_dropped(self, tree):
+        """The record refuses a key the case does not carry, so the seed does
+        too, and the re-keyed claim arrives as the one thing to answer."""
+        signed = sign(tree, CASE, "ada").cases[CASE]
+        self.rekey_claim(tree)
+
+        app, opened = self.opened(tree)
+        targets = set(every_mark(app))
+
+        assert set(opened["marks"]) < set(signed.marks)
+        assert set(opened["marks"]) <= targets
+        assert len(targets - set(opened["marks"])) == 1
+
+    def test_the_record_after_the_edit_is_one_the_gate_accepts(self, tree):
+        """Fresh digests, so the record carries what the tree holds now."""
+        sign(tree, CASE, "ada")
+        self.add_claim(tree)
+        app, opened = self.opened(tree)
+
+        finish = app.post(
+            "/api/finish",
+            json={
+                "case": CASE,
+                "marks": {**every_mark(app), **opened["marks"]},
+                "missing": [],
+                "notes": "",
+            },
+        )
+        held = json.loads(draft_file(tree, CASE).read_text("utf-8"))
+
+        assert finish.status_code == 200, finish.text
+        assert finish.json()["moved"] == []
+        assert (
+            sittings.sitting_problems(
+                tree / "evals" / "corpus" / CASE,
+                own_list=held["own_list"],
+                opened_digests=held["opened_digests"],
+                marks=held["marks"],
+            )
+            == []
+        )
+
+    def test_the_list_written_before_the_edit_rides_forward_locked(self, tree):
+        """The reader read the sets already; a second blind list is not evidence."""
+        sign(tree, CASE, "ada")
+        self.add_claim(tree)
+        app, _ = self.opened(tree)
+
+        second = app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
+
+        assert second.status_code == 409
