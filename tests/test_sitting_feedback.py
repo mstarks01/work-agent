@@ -400,3 +400,21 @@ def test_a_record_whose_set_moved_is_sent_back_to_the_case(tmp_path: Path, monke
     assert "carries no digest" not in detail
     held = session.draft(CASE)
     assert held is not None and held.state == "finished", "nothing is lost"
+
+
+def test_the_way_out_sits_above_the_file_preview():
+    """The link that opens the pull request is what the reader came for.
+
+    Show files renders the whole JSON, and a reader who then pressed
+    Contribute found the link below it, off the screen. The steps and the
+    result now sit above the preview, the preview scrolls inside its own
+    box, and the page hides it on Contribute and scrolls the steps into view.
+    """
+    page = sitting._PAGE
+    assert page.index('id="submit"') < page.index('id="browserSteps"')
+    assert page.index('id="browserSteps"') < page.index('id="filePreview"')
+    assert page.index('id="result"') < page.index('id="filePreview"')
+    assert ".file-preview pre { max-height:40vh; overflow:auto; }" in page
+    script = client_script("sitting.js")
+    assert 'hide("filePreview");' in script.split('$("submit").addEventListener', 1)[1]
+    assert '$("browserSteps").scrollIntoView' in script

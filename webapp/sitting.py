@@ -295,7 +295,7 @@ details.standard { margin:.3rem 0 .1rem; font-size:.88rem; } details.standard su
 .save-status { margin-left:.7rem; color:var(--dim); }.line { display:flex; justify-content:space-between; gap:1rem; padding:.5rem 0; }
 .attribution { border:1px solid var(--line); border-radius:8px; padding:.8rem 1rem; margin:1rem 0; }.attribution label { display:block; margin:.4rem 0; }
 .text-input { width:min(24rem,100%); padding:.5rem .6rem; border:1px solid var(--line); border-radius:6px; }
-.file-preview { border:1px solid var(--line); border-radius:8px; padding:1rem; margin:1rem 0; }.file-preview h3 { margin-top:0; }
+.file-preview { border:1px solid var(--line); border-radius:8px; padding:1rem; margin:1rem 0; }.file-preview h3 { margin-top:0; }.file-preview pre { max-height:40vh; overflow:auto; }
 #thanks { font-weight:600; }.readonly-badge { font-weight:600; }
 </style></head><body>
 <nav>
@@ -387,9 +387,9 @@ details.standard { margin:.3rem 0 .1rem; font-size:.88rem; } details.standard su
 <fieldset class="attribution"><legend>Reviewer attribution</legend><label><input type="radio" name="reviewerAttribution" value="anonymous" checked> Anonymous / on behalf of someone else</label><label><input type="radio" name="reviewerAttribution" value="self"> Myself</label><p class="hint">Anonymous hides reviewer attribution, not the GitHub account that opens the pull request.</p></fieldset>
 <div id="browserIdentity" class="hidden"><label for="githubAuthor"><b>GitHub username for the pull request</b></label><br><input id="githubAuthor" class="text-input" autocomplete="username" spellcheck="false"><p class="hint">CI requires this name to match the GitHub account that opens the pull request.</p></div>
 <p><button id="showFiles">Show files</button> <button id="submit">Contribute</button><span id="contributeStatus" class="save-status" role="status"></span></p>
-<div id="filePreview" class="file-preview hidden"><h3>Files to submit</h3><p id="previewPath"></p><pre id="previewContent"></pre></div>
 <pre id="result" class="hidden"></pre><p id="thanks" class="hidden">Thank you for contributing this review.</p>
 <div id="browserSteps" class="note hidden"><p><b>Your review is ready to publish.</b></p><p>The link below opens GitHub with the file and its name already filled in. Sign in if you need to. GitHub shows one of two buttons. An account without write access presses <b>Propose changes</b>, and GitHub opens the pull request. An account with write access presses <b>Commit changes</b> and then chooses <b>Create a new branch for this commit and start a pull request</b>, because the default there commits straight to main. CI validates the review before it can merge.</p><p><a id="contributeLink" href="#" target="_blank" rel="noopener">Open the pull request on GitHub</a></p><p class="sub">A copy has also been downloaded, in case you would rather upload it by hand.</p></div>
+<div id="filePreview" class="file-preview hidden"><h3>Files to submit</h3><p id="previewPath"></p><pre id="previewContent"></pre></div>
 </section></article>
 </main>
 <script nonce="__CSP_NONCE__">
