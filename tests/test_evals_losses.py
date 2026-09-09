@@ -112,6 +112,27 @@ def test_a_killed_draft_at_the_place_with_the_reference_verb_is_the_critics(
     assert loss.draft_id == draft.id
 
 
+def test_an_equivalent_verb_is_the_reference_action(case, flows, monkeypatch):
+    """The identity rule reads verbs through the equivalence table, so this
+    instrument does too. The table is empty today; with a string comparison
+    the two agreed until the first entry landed, and then a killed draft under
+    an equivalent verb fell through to the lead, and a surviving one at the
+    place read as a verb loss the scorer had already forgiven."""
+    from evals.harness import verbs
+
+    reference = case.stride_claims()[0]
+    other = "guess-credential" if reference.verb != "guess-credential" else "replay"
+    monkeypatch.setattr(verbs, "EQUIVALENT", (frozenset({reference.verb, other}),))
+    draft = at(reference, 1, other)
+
+    killed = by_index(charge(case, flows, [draft], []))[0]
+    assert killed.cause == "critic"
+    assert killed.draft_verb == other
+
+    survived = by_index(charge(case, flows, [draft], [promote(draft)]))
+    assert 0 not in survived, "the rule matched it, so the reference is not a miss"
+
+
 def test_a_killed_draft_with_another_verb_is_still_a_verb_loss_only_if_it_survived(
     case, flows
 ):
