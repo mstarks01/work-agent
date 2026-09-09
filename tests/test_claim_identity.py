@@ -75,6 +75,13 @@ UNSEPARATED: dict[str, str] = {
         " question rather than one this test can settle -- and until it is"
         " settled, a vote on either answers for both."
     ),
+    "01-payments-checkout | spoofing | entity:shopper, process:storefront-api": (
+        "Replaying a stolen session cookie and signing in with a password taken"
+        " from a breach elsewhere are `replay` and `guess-credential` against"
+        " the shopper's one flow. One reuses a session already issued, the other"
+        " obtains a new one; binding the session answers the first and MFA the"
+        " second. The verb separates them, and the lanes have written both."
+    ),
     "01-payments-checkout | information-disclosure |"
     " process:order-service, store:orders-db": (
         "Reading PII off the unprotected connection and recovering the database"
