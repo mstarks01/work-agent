@@ -27,15 +27,15 @@ Two callers reach the web API on different flows with different payloads, so the
 ```
 ## V8.1.1 — Documented authorization rules cannot be settled from this input
 
-A documentation requirement again. It applies — there are rules to document, because the system distinguishes callers — and the input is a system description rather than a policy.
+A documentation requirement again. It applies — there are rules to document, because the system distinguishes callers — and the input is a system description rather than a policy. The submitter can supply the rules, or say none are written, so ask for more description.
 
 ```json
 {
   "requirement": "1.1",
   "direction": "question",
-  "needs_evidence": "people",
+  "needs_evidence": "prose",
   "title": "Documented authorization rules cannot be settled from this input",
-  "description": "V8.1.1 verifies that the application's authorization rules are documented. It applies to this system: `entity:customer` and `entity:payments-provider` reach `process:web-api` from `boundary:public-internet` on different flows carrying different payloads, so there are rules distinguishing what each may do. This job carries a description of the system rather than that documentation, so the requirement applies and this input cannot settle it.",
+  "description": "V8.1.1 verifies that the application's authorization rules are documented. It applies to this system: `entity:customer` and `entity:payments-provider` reach `process:web-api` from `boundary:public-internet` on different flows carrying different payloads, so there are rules distinguishing what each may do. This description says nothing about that documentation, so the requirement applies and this input does not settle it. A fuller description would: supply the rules, or state that none are written.",
   "affected_element_ids": [
     "process:web-api"
   ],

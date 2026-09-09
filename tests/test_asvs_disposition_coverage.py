@@ -156,3 +156,52 @@ def test_the_corpus_exercises_the_alternate_route():
         <= {"needs-more-prose", "needs-code", "needs-config", "needs-people"}
         for routes in widened.values()
     )
+
+
+def test_an_exemplar_question_names_the_kind_the_corpus_expects():
+    """An exemplar teaches a lane which kind of evidence settles a requirement,
+    and the corpus scores the lane on the same answer. Two exemplars taught
+    `people` where the read reference said prose (#738), and a third did the
+    same for V8.1.1. Direction is the system's own and is not compared: an
+    exemplar system may lack what a corpus case has. Code against config is the
+    system's own too: a token signature's primitive sits in a broker's
+    configuration and a password check's hash in a web API's code, and V11.4.1
+    is labelled both ways. Prose against people is the contract's question,
+    whether a submitter's own words can settle a requirement or only a person
+    the job cannot reach, and that answer does not move with the system. So
+    only that axis is compared.
+    """
+    from analysis_service.frameworks import PACKAGES
+    from analysis_service.frameworks.asvs.catalog import CHAPTER_NUMBERS
+    from tests.test_prompt_lints import exemplar_proposals
+
+    expected = {
+        requirement_id: {
+            (case_id, record.disposition)
+            for case_id, records in _corpus().items()
+            for record in records
+            if record.requirement == requirement_id
+            and record.disposition in DISPOSITION_FOR_EVIDENCE.values()
+        }
+        for requirement_id in {
+            record.requirement for records in _corpus().values() for record in records
+        }
+    }
+    contract_axis = {"needs-more-prose", "needs-people"}
+    disagreements = []
+    for lane in PACKAGES["asvs"].lanes:
+        for proposal in exemplar_proposals("asvs", lane):
+            if proposal.direction != "question":
+                continue
+            requirement_id = f"V{CHAPTER_NUMBERS[lane]}.{proposal.requirement}"
+            taught = DISPOSITION_FOR_EVIDENCE[proposal.needs_evidence]
+            disagreements += [
+                f"{requirement_id}: exemplar teaches {taught}, case {case_id} expects {labelled}"
+                for case_id, labelled in sorted(expected.get(requirement_id, ()))
+                if labelled != taught and {labelled, taught} <= contract_axis
+            ]
+    assert not disagreements, (
+        "an exemplar routes a question to a kind the corpus does not expect:\n  "
+        + "\n  ".join(disagreements)
+        + "\nDecide which side is right; a human-read case's label wins."
+    )
