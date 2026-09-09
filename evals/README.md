@@ -62,7 +62,7 @@ which questions a cheap model may answer and which it may not.
 **There is no model judge.** Claim matching is `SubsetVerbIdentity`, a rule in
 `harness/identity.py`, and it is measured on the two directions it can fail in
 (`python -m evals.harness.run calibrate`), with no provider call: **14 false
-splits of 200, 3 false merges of 111 and 3 false merges of 287.** The first two
+splits of 200, 3 false merges of 111 and 3 false merges of 291.** The first two
 denominators are equivalent candidates and candidate negatives; the third is
 distinct reference pairs. Read them
 apart. A false split hands a reviewer one unmatched finding; a false merge
@@ -71,7 +71,7 @@ denominators are different populations and none is a rate over what a live run
 emits.
 
 Equivalently by population: 14 false splits over 200 equivalent candidate pairs,
-3 false merges over 111 candidate negatives, and 3 false merges over 287
+3 false merges over 111 candidate negatives, and 3 false merges over 291
 distinct reference pairs.
 
 The 339 calibration fixtures retain their original order and reference claims.
@@ -197,7 +197,7 @@ somewhere else.
 | `harness/calibration.py` | Rule-vs-label agreement over the labelled fixtures — the scoreboard any rule change must clear. |
 | `harness/verbs.py` | The closed vocabulary of attacker actions, and what counts as one action. |
 | `harness/exemplar_verbs.py` | Which actions a package's shipped exemplars demonstrate against which its reference sets grade, and the exemplar pairs that name one place and two actions. Reads text and blessed models only, so it costs no provider call. |
-| `harness/identity.py` | Claim identity from the fields a claim carries. `SubsetVerbIdentity` has 14 false splits of 200, 3 false merges of 111 and 3 false merges of 287, with no model call. |
+| `harness/identity.py` | Claim identity from the fields a claim carries. `SubsetVerbIdentity` has 14 false splits of 200, 3 false merges of 111 and 3 false merges of 291, with no model call. |
 | `harness/fingerprint.py` | A **Claim**'s identity as a versioned value code computes. No model call. |
 | `harness/ledger.py` | The append-only record of what a **person** decided about a finding. One file per voter, named by the GitHub login. |
 | `harness/envelope.py` | The offline sitting envelope: one reader's answers read back from the standalone page and applied through the same `finish` the app runs. Treats the file as untrusted input and recomputes every digest against this tree. |
