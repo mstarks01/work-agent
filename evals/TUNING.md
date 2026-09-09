@@ -78,26 +78,29 @@ flowchart TD
 
     subgraph tune["Repeat per idea"]
         direction TB
-        s3["3. Change one lever<br/>edit/env — sampling,<br/>a prompt, or the corpus"]
-        s4["4. Re-run and compare<br/>run ×5"]
-        s5["5. Promote the winner<br/>commit — sampling also<br/>updates the blessed list"]
-        s3 --> s4
-        s4 -- "beats the baseline<br/>spread, per case" --> s5
-        s4 -. "it doesn't" .-> s3
+        s3["3. Price the fix<br/>read the archived misses —<br/>a ceiling, in must-finds"]
+        s4["4. Change one lever<br/>edit/env — sampling,<br/>a prompt, or the corpus"]
+        s5["5. Re-run and compare<br/>run ×5"]
+        s6["6. Promote the winner<br/>commit — sampling also<br/>updates the blessed list"]
+        s3 -- "ceiling clears<br/>the spread" --> s4
+        s3 -. "it doesn't:<br/>batch it, or drop it" .-> s3
+        s4 --> s5
+        s5 -- "beats the baseline<br/>spread, per case" --> s6
+        s5 -. "it doesn't" .-> s3
     end
 
     s2 --> s3
-    s5 -. "next idea" .-> s3
+    s6 -. "next idea" .-> s3
 
     classDef step fill:#e0f2fe,stroke:#0284c7,stroke-width:1.5px,color:#082f49
     classDef win fill:#dcfce7,stroke:#16a34a,stroke-width:1.5px,color:#052e16
-    class s1,s2,s3,s4 step
-    class s5 win
+    class s1,s2,s3,s4,s5 step
+    class s6 win
     style setup fill:#f8fafc,stroke:#94a3b8,stroke-dasharray:4 4,color:#0f172a
     style tune fill:#f8fafc,stroke:#94a3b8,stroke-dasharray:4 4,color:#0f172a
 ```
 
-Do them in order. Steps 1–2 are setup you do once per tuning session; 3–5 are the
+Do them in order. Steps 1–2 are setup you do once per tuning session; 3–6 are the
 loop you repeat per idea.
 
 ## Step 1 — Trust the rule
@@ -283,7 +286,55 @@ requirement in one of those chapters is not a prompt problem — the agent was
 never handed the lead. **This costs no provider call**, so read it before
 spending a sweep.
 
-## Step 3 — Change exactly one lever
+## Step 3 — Price the fix before you spend
+
+A sweep costs about $6 and sees nothing under the spread. So before a lever
+moves, read what the fix can recover from the sweeps already on disk, and say
+it as a number: must-finds of 129.
+
+**Read the archived misses.** Every scored sweep carries two blocks that charge
+each miss to what lost it. `losses` is STRIDE's: the verb (the lane cited the
+place and wrote another action), `merged`, the critic, the place (a rule led
+there and nothing was drafted), or `unled`. `attribution` is ASVS's, by stage.
+`run.py score` writes both over any archived sweep, and the merged Baselines
+under `evals/baselines/` are the sweeps to read first.
+
+```bash
+python -m evals.harness.run score evals/baselines/<baseline>/<sweep>.json
+```
+
+The class a fix addresses is its ceiling. An exemplar edit recovers verb
+losses in its lane and nothing else; a candidate rule recovers `unled` losses
+and nothing else. On 2026-09-09 one exemplar edit went to a paid sweep before
+this was read; its ceiling was five must-finds, inside the band.
+
+**Price a scorer change on the frontier, with no run at all.** A verb
+equivalence in `evals/harness/verbs.py` is a decision with a price on three
+axes and a gain on one, and every number is offline:
+
+```bash
+python -m evals.harness.run price-verbs \
+  --equivalent forge=inject=plant --equivalent read=recover-credential \
+  --together --artifact evals/baselines/<baseline>/<sweep>.json
+```
+
+It prints the shipped rule's row and one row per candidate: labelled matches
+the rule would split, labelled non-matches it would merge, reference pairs the
+corpus records as two findings that it would call one, and the sweep re-scored
+under it. Every new merge is named, because a count of wrong merges is a number
+nobody can act on. A candidate that prices well is still a decision: a reference
+merge is a pair the corpus says are two findings, and the corpus is the standard.
+
+**Then apply the rule.** A fix whose ceiling sits inside the spread from step 2
+gets no run of its own. Batch it with the next fixes until the batch clears the
+band, because a Baseline is per commit and every merge makes the next run an
+estimate rather than a recorded number. Spend on the narrowest instrument that
+can see the change: one case first, five runs of that case next, and the corpus
+only for a batch. What is decidable offline — a verb pair against the frontier,
+a corpus label, a scorer rule — is decided offline first, and the run confirms
+rather than discovers.
+
+## Step 4 — Change exactly one lever
 
 Change one thing at a time — two at once and you can't tell which moved the
 numbers. Your levers, roughly in order of leverage:
@@ -410,7 +461,7 @@ Recurring ones are worth adding to a case's reference set (see
 [`BLESSING.md`](BLESSING.md)). This makes the corpus a better yardstick over
 time — but it also shifts every baseline, so re-run Step 2 after changing it.
 
-## Step 4 — Re-run and compare
+## Step 5 — Re-run and compare
 
 Re-run the suite five times with your change and compare to the baseline band:
 
@@ -428,7 +479,7 @@ A change that lifts or holds per-case recall, without widening the delta or
 raising `killed-real`, is a keeper. Anything else is noise, or a trade you should
 justify in the pull request.
 
-## Step 5 — Promote the winner
+## Step 6 — Promote the winner
 
 **Prompt or corpus changes** ship like any code change: commit the edited files
 with the run artifacts (or a summary) in the PR so a reviewer can see the gain.

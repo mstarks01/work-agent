@@ -23,6 +23,8 @@ survivable. Priced on the paraphrases a live run emits, it merges 81 of 111.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from analysis_service.actions import (
     ACTION_VERBS,
     FAMILIES,
@@ -100,19 +102,25 @@ UNSEPARATED: tuple[tuple[str, str, str], ...] = (
 )
 
 
-def canonical(verb: str) -> str:
+def canonical(verb: str, equivalent: Sequence[frozenset[str]] | None = None) -> str:
     """The representative of ``verb``'s equivalence group, or ``verb`` itself.
 
     The representative is the alphabetically first member of the group, so the
     answer does not depend on the order :data:`EQUIVALENT` happens to list.
+
+    ``equivalent`` is the shipped table unless a caller passes one. A candidate
+    table is how :mod:`evals.harness.verb_pricing` prices a merge before it is
+    adopted, through the same reader the shipped rule uses.
     """
     check_verb(verb)
-    for group in EQUIVALENT:
+    for group in EQUIVALENT if equivalent is None else equivalent:
         if verb in group:
             return min(group)
     return verb
 
 
-def same_action(left: str, right: str) -> bool:
-    """Do these two verbs name one action, through :data:`EQUIVALENT`?"""
-    return canonical(left) == canonical(right)
+def same_action(
+    left: str, right: str, equivalent: Sequence[frozenset[str]] | None = None
+) -> bool:
+    """Do these two verbs name one action, through :data:`EQUIVALENT` or ``equivalent``?"""
+    return canonical(left, equivalent) == canonical(right, equivalent)
