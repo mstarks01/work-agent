@@ -53,12 +53,6 @@ from evals.review_submission import REPO_ROOT, unreviewed_cases
 #: acceptable. They are the cases that shipped before step 6 was enforced, and
 #: the list is meant to shrink to nothing.
 UNREVIEWED: dict[str, str] = {
-    "01-payments-checkout": (
-        "22 STRIDE claims and 18 ASVS records. Read twice, last on 2026-09-08; "
-        "the credential-stuffing claim added on 2026-09-09 (#426) moved the "
-        "STRIDE file under that sitting, so the case waits for a sitting that "
-        "answers the one new claim."
-    ),
     "02-iot-fleet-telemetry": (
         "18 STRIDE claims and 8 ASVS records, unread. The ASVS records feed the "
         "applicability matrix, which scores whether a requirement applies and "
