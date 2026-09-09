@@ -28,7 +28,7 @@ manifest records it.
 
 ### `352b72d-gpt-5.6-terra-2f7e336d`
 
-`strong`: `openai/gpt-5.6-terra` · frameworks stride · 1 sweep(s) · $5.68 recorded · submitted by mstarks01 · merged unknown
+`strong`: `openai/gpt-5.6-terra` · frameworks stride · 1 sweep(s) · $5.68 recorded · submitted by mstarks01 · merged 2026-09-09
 
 Vote coverage: 0 of 16 unmatched finding(s) judged by a person.
 

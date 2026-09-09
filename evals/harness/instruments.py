@@ -57,6 +57,7 @@ from evals.harness import (
     filler,
     grounds,
     instruction,
+    losses,
     modes,
     scorer,
     writing,
@@ -65,6 +66,7 @@ from evals.harness.coverage import LaneCoverage, TaggedRow
 from evals.harness.critic_yield import CriticYield
 from evals.harness.grounds import CaseGrounds, GroundsFailure
 from evals.harness.instruction import NodeInstruction
+from evals.harness.losses import CaseLosses
 from evals.harness.provenance import RunProvenance
 from evals.harness.reference import GoldenCase
 from evals.harness.scorer import CaseScore
@@ -206,6 +208,8 @@ class Sweep:
     run: ModeRun
     scores: tuple[CaseScore, ...] = ()
     yields: tuple[CriticYield, ...] = ()
+    #: What lost each STRIDE reference the run missed, per case (#426).
+    losses: tuple[CaseLosses, ...] = ()
     #: What reviewers said about the prose, read out of the vote ledger. Its
     #: own field rather than a row on ``run`` because it reads the ledger, and
     #: the ledger is only loaded on the scored pass.
@@ -417,6 +421,16 @@ INSTRUMENTS: dict[str, Instrument] = {
         frameworks=("stride",),
         scored=True,
         keys=("critic_yield", "critic_yield_aggregate"),
+    ),
+    # The per-miss half of what ``attribution`` does for ASVS. Keyed to the
+    # package whose claims compose an identity from an action and a place,
+    # because "the verb lost it" is a cause only such a package can have.
+    "losses": Instrument(
+        render=lambda sweep: losses.render(sweep.losses),
+        artifact=lambda sweep: losses.artifact(sweep.losses),
+        frameworks=("stride",),
+        scored=True,
+        keys=("losses", "losses_aggregate"),
     ),
     "writing": Instrument(
         render=lambda sweep: writing.render(sweep.writing),
