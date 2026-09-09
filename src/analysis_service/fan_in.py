@@ -53,7 +53,7 @@ from analysis_service.evidence import (
     known_proposals,
     resolve_proposals,
 )
-from analysis_service.frameworks import FrameworkPackage
+from analysis_service.frameworks import FrameworkPackage, lane_of
 from analysis_service.grounding import (
     PreparedSource,
     deadline_spent,
@@ -723,9 +723,15 @@ def _drop_settled_duplicates(
 
     Runs last in the fan-in, on the drafts that survived every other check, so
     the targets it compares are the ones the report will carry rather than the
-    ones an agent wrote. The key is :func:`~analysis_service.critic.duplicate_groups`'s own — the verb
-    and the endpoint-resolved targets — because these are the same duplicates,
-    found at a different seam.
+    ones an agent wrote. The key is :func:`~analysis_service.critic.duplicate_groups`'s own — the lane, the
+    verb and the endpoint-resolved targets — plus the unstated controls the
+    drafts rest on. The critic reads a pair and judges it; code deletes, so its
+    key is the stricter one. Two conditional drafts resting on different
+    unknowns ask different questions: a REST flow and a WebSocket flow between
+    one pair of processes fold to one place, and a draft on each rests on its
+    own flow's unstated authentication. The first Baseline deleted exactly that
+    pair, and the dropped draft's question about the socket's session went with
+    it.
 
     **First wins, and the choice is deterministic rather than good.** Lane order
     is the package's own, so two runs of one input drop the same copy. Picking
@@ -737,7 +743,7 @@ def _drop_settled_duplicates(
     already refused. Those pass through untouched.
     """
     flows = index.flow_endpoints
-    seen: dict[tuple[str, frozenset[str]], str] = {}
+    seen: dict[tuple[object, ...], str] = {}
     kept: list[Claim] = []
     dropped: list[DroppedClaim] = []
     for claim in claims:
@@ -745,7 +751,14 @@ def _drop_settled_duplicates(
         if not settled or claim.verb is None:
             kept.append(claim)
             continue
-        key = (claim.verb, endpoint_targets(claim.affected_element_ids, flows))
+        key = (
+            lane_of(claim),
+            claim.verb,
+            endpoint_targets(claim.affected_element_ids, flows),
+            frozenset(
+                (ref.element_id, ref.attribute) for ref in claim.unknown_grounds()
+            ),
+        )
         first = seen.get(key)
         if first is None:
             seen[key] = claim.id
@@ -756,9 +769,9 @@ def _drop_settled_duplicates(
                 claim_id=claim.id,
                 title=claim.title,
                 reason=(
-                    f"names the same action at the same place as {first!r}, and"
-                    " both rest on an unstated control, so no critic sees either"
-                    " to rule on the pair"
+                    f"names the same action at the same place as {first!r} in"
+                    " its lane, and both rest on the same unstated controls, so"
+                    " no critic sees either to rule on the pair"
                 ),
             )
         )
