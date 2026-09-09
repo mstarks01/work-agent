@@ -8,6 +8,8 @@ Three drafts against the exemplar system, showing the shape and the reasoning. F
 
 Lane contrast: being accepted *as* the web API is spoofing. Directing an honest, over-privileged service to use authority the caller does not have is yours.
 
+Two verbs, two places. `abuse-grant` is a deputy's standing authority misused, and it is cited where that authority is exercised: the deputy, the flow it exercises it over, and the store at the end. `escalate` is a position reaching a zone or an authority it does not carry, and it is cited at the crossing it reaches through: the caller, the flow that crosses, and the process it reaches. One draft cites one place. A draft that cites both the crossing and the store is two findings with one verb, and the scorer counts it as neither.
+
 ```json
 {
   "sequence": 1,
@@ -15,7 +17,6 @@ Lane contrast: being accepted *as* the web API is spoofing. Directing an honest,
   "description": "`process:ledger-service` performs transfers using the standing full read/write credential on `flow:ledger-service-to-accounts-db:read-write-balances`, and takes its instructions from `flow:web-api-to-ledger-service:post-transfer`, which carries `authentication: none`. Nothing binds an instruction to an authorized customer at the point authority is exercised: the caller supplies the account identifiers and the ledger acts on them with its own privilege, the classic confused deputy. An attacker who can reach the ledger moves funds between arbitrary accounts — horizontal escalation across the entire customer base — without ever holding a customer credential. Second-order: the same standing authority covers all rows of `store:accounts-db`, so any code-execution flaw in this process inherits it wholesale.",
   "affected_element_ids": [
     "process:ledger-service",
-    "flow:web-api-to-ledger-service:post-transfer",
     "flow:ledger-service-to-accounts-db:read-write-balances",
     "store:accounts-db"
   ],
@@ -95,17 +96,17 @@ Written against exemplar system B. Escalation does not need a privilege bug when
 
 ## Unknown-conditional: unverified reachability of the ledger service
 
-`process:ledger-service` carries `exposure: unknown`. Condition the escalation on that attribute and let the critic mark it needs-info; the model does not say the process is reachable from outside `boundary:core`.
+`process:ledger-service` carries `exposure: unknown`. Condition the escalation on that attribute and let the critic mark it needs-info; the model does not say the process is reachable from outside `boundary:core`. This is an `escalate`, so it is cited at the crossing a position would reach through, not at the store the deputy in E-01 acts on: the two are two findings with two verbs, and the second is already drafted.
 
 ```json
 {
   "sequence": 3,
   "title": "Direct transfer authority if the ledger service is reachable beyond the core zone",
-  "description": "`process:ledger-service` has `exposure: unknown`, and it accepts transfer instructions over `flow:web-api-to-ledger-service:post-transfer` with `authentication: none` while holding full authority over `store:accounts-db`. If that unknown resolves to reachability beyond `boundary:core` — a load balancer, a peered network, a management interface — the attacker population for that unauthenticated surface is no longer limited to holders of a dmz foothold, and the escalation in E-01 becomes directly available without any prior compromise. This draft is conditional on the `exposure` attribute of `process:ledger-service`; it is not a claim that the process is externally reachable.",
+  "description": "`process:ledger-service` has `exposure: unknown`, and it accepts transfer instructions over `flow:web-api-to-ledger-service:post-transfer` from `process:web-api` with `authentication: none`. If that unknown resolves to reachability beyond `boundary:core` — a load balancer, a peered network, a management interface — then a position outside the core zone reaches the transfer surface directly, without a dmz foothold and without any prior compromise: the attacker's position does not carry transfer authority, and the crossing hands it over on reachability alone. What the ledger then does with its own database authority is E-01's finding, not this one. This draft is conditional on the `exposure` attribute of `process:ledger-service`; it is not a claim that the process is externally reachable.",
   "affected_element_ids": [
-    "process:ledger-service",
+    "process:web-api",
     "flow:web-api-to-ledger-service:post-transfer",
-    "store:accounts-db"
+    "process:ledger-service"
   ],
   "verb": "escalate",
   "evidence_refs": [
@@ -115,7 +116,7 @@ Written against exemplar system B. Escalation does not need a privilege bug when
   "severity": {
     "likelihood": "medium",
     "impact": "high",
-    "justification": "Likelihood is medium and conditional on the unknown `exposure` value: if reachable, exploitation needs no credential and no foothold, but the process may in fact be core-only. Impact is high: unmediated transfer authority over `store:accounts-db`, tagged `financial` and `pii`."
+    "justification": "Likelihood is medium and conditional on the unknown `exposure` value: if reachable, exploitation needs no credential and no foothold, but the process may in fact be core-only. Impact is high: the crossing hands over the transfer surface of `process:ledger-service`, and every transfer it accepts moves `financial` data."
   },
   "mitigations": [
     {
