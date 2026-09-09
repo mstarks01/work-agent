@@ -465,9 +465,10 @@ the next sitting, and only the rate over it is a score.
   waits on a review sitting — a plausible, grounded extra never gates.
 
   **It is not a false-positive rate, and the denominator is why.** It divides
-  by every threat produced, while only an unmatched, non-`needs-info`, in-lane
-  threat citing a modelled element can ever raise it. Producing more conditional
-  findings therefore lowers the number with nobody having read one. Read it
+  by every threat produced, while only an unmatched, in-lane threat citing a
+  modelled element can ever raise it. A `needs-info` threat is one of those:
+  a conditional finding can ask an irrelevant question, and a person's vote on
+  it counts the same way. Read it
   beside the **eligible** and **reviewed** counts the artifact carries, and
   `rejected_rate_of_reviewed` beside those — which is still not precision,
   because a sitting reaches whatever it reaches rather than a drawn sample.

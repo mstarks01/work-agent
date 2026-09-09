@@ -50,7 +50,7 @@ from evals.harness.scorer import CaseScore, candidate_claim, ratio, score_case
 
 # What one produced threat turned out to be, in the pass that scored it. The
 # first two are hits against the reference set, the last four are the ways of
-# missing it; ``needs-info`` is post-critic only, since it is a verdict.
+# missing it.
 Disposition = Literal[
     "matched-must-find",
     "matched-expected",
@@ -59,7 +59,6 @@ Disposition = Literal[
     "pooled",
     "open",
     "unvoted",
-    "needs-info",
     "unscored",
 ]
 
@@ -256,8 +255,8 @@ def _dispositions(score: CaseScore) -> dict[str, tuple[Disposition, int | None]]
     Threat IDs are unique within a run — :func:`~analysis_service.critic.
     join_drafts` fails closed if two category agents reuse one — so a dict is a safe
     index. The scorer's outcomes are mutually exclusive by construction: a
-    threat is matched, or a lane error, or ``needs-info``, or unlisted with
-    exactly one standing. ``unscored`` should be unreachable, and is here so that
+    threat is matched, or a lane error, or unlisted with exactly one
+    standing. ``unscored`` should be unreachable, and is here so that
     a future scorer path which stops covering the produced set surfaces as a
     visible label in the artifact rather than a ``KeyError`` mid-sweep.
     """
@@ -271,8 +270,6 @@ def _dispositions(score: CaseScore) -> dict[str, tuple[Disposition, int | None]]
         records[error.threat_id] = ("lane-error", error.reference_index)
     for entry in score.unlisted:
         records[entry.threat_id] = (entry.standing, None)
-    for threat_id in score.needs_info_unmatched:
-        records[threat_id] = ("needs-info", None)
     for threat_id in score.produced_ids:
         records.setdefault(threat_id, ("unscored", None))
     return records

@@ -313,7 +313,13 @@ def test_an_unsure_vote_leaves_the_finding_open(case):
     assert unlisted_for_promotion([score]) == []
 
 
-def test_needs_info_threats_bypass_adjudication(case, no_votes):
+def test_needs_info_threats_are_keyed_like_any_other(case, no_votes):
+    """A conditional finding can be wrong too, so a person gets to say so.
+
+    The verdict used to exempt it from the vote lookup, which left most of a
+    report's unmatched output outside every number: 100 of 116 in the first
+    Baseline.
+    """
     produced = [
         produced_threat(
             1,
@@ -327,8 +333,8 @@ def test_needs_info_threats_bypass_adjudication(case, no_votes):
 
     score = score_case(case, produced, matcher, no_votes)
 
-    assert score.needs_info_unmatched == ("S-01",)
-    assert score.unlisted == ()
+    assert [entry.threat_id for entry in score.unlisted] == ["S-01"]
+    assert score.standing_counts["unvoted"] == 1
 
 
 def test_element_disagreement_is_scored_not_filtered(case, no_votes):
