@@ -664,6 +664,8 @@ $("submit").addEventListener("click", async () => {
   const choice = contributionChoice();
   if (!requireBrowserAuthor(choice)) return;
   $("submit").disabled = true;
+  // The preview is the reader's to reopen; the way out must not sit below it.
+  hide("filePreview");
   $("contributeStatus").textContent = "Preparing contribution…";
   const res = await post("/api/contribute", choice);
   const d = await res.json();
@@ -695,6 +697,7 @@ $("submit").addEventListener("click", async () => {
   URL.revokeObjectURL(url);
   $("contributeStatus").textContent = "Ready to publish";
   show("browserSteps");
+  $("browserSteps").scrollIntoView({block: "nearest"});
 });
 
 // --- Wiring ------------------------------------------------------------------
