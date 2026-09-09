@@ -214,8 +214,11 @@ class Borrowed:
     amount_usd: float
     source: str
     differs: tuple[str, ...] = ()
-    #: ``(named, lender)`` when this run names fewer cases than the lender ran
-    #: and the amount is the lender's mean per case over the named count.
+    #: ``(named, lender)`` when this run names a different number of cases
+    #: than the lender ran, and the amount is the lender's mean per case over
+    #: the named count. A lender that ran one case lends a whole sweep its
+    #: mean thirteen times over, and a lender that ran thirteen lends one case
+    #: a thirteenth.
     scaled: tuple[int, int] | None = None
 
 
@@ -307,10 +310,12 @@ def estimate(
     counts, repriced with this run's models, for an ``estimated`` one.
 
     ``cases`` is how many cases this run names. A lender's counts are a whole
-    sweep's, so a run that names fewer cases is priced at the lender's mean
-    per case over the named count, and the line says so (#751). A whole-corpus
-    figure quoted for one case asked for consent to four times the spend.
-    ``None`` prices the whole sweep.
+    sweep's over however many cases it ran, so a run that names a different
+    number is priced at the lender's mean per case over the named count, in
+    either direction, and the line says so (#751). A whole-corpus figure quoted
+    for one case asked for consent to four times the spend; a one-case lender
+    quoting a whole sweep would ask for a thirteenth. ``None`` prices the whole
+    sweep at the lender's own count.
     """
     baselines = _merged_baselines(root)
     lines: list[str] = []
@@ -426,7 +431,12 @@ def _borrow(
         if priced:
             mean = sum(priced) / len(priced)
             scaled = None
-            if cases is not None and 0 < cases < lender_cases:
+            if (
+                cases is not None
+                and cases > 0
+                and lender_cases > 0
+                and cases != lender_cases
+            ):
                 mean = mean * cases / lender_cases
                 scaled = (cases, lender_cases)
             return Borrowed(

@@ -234,6 +234,19 @@ class TestTheEstimate:
         assert "1 of the lender's 13 cases" in " ".join(one.lines)
         assert "scaled" not in " ".join(all_named.lines)
 
+    def test_a_run_naming_more_cases_than_the_lender_ran_scales_up(
+        self, tmp_path, priced
+    ):
+        """The other direction of the same shape: a one-case pre-flight lending
+        a whole sweep its own figure would quote a thirteenth of the spend."""
+        merged(tmp_path, "other", {**IDENTITY, "repo_commit": "e" * 40}, actual=0.60)
+        one = consent.estimate(IDENTITY, ROUTES, tmp_path, cases=1)
+        thirteen = consent.estimate(IDENTITY, ROUTES, tmp_path, cases=13)
+
+        assert one.amount_usd is not None and thirteen.amount_usd is not None
+        assert thirteen.amount_usd == pytest.approx(one.amount_usd * 13)
+        assert "13 of the lender's 1 cases" in " ".join(thirteen.lines)
+
     def test_a_dearer_route_for_this_run_makes_the_guess_dearer(
         self, tmp_path, priced, monkeypatch
     ):
