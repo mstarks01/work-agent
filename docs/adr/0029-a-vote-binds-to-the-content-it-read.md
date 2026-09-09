@@ -1,6 +1,6 @@
 # 29. A vote binds to the content it read
 
-- **Status**: proposed
+- **Status**: proposed, revised after the measurement below
 - **Date**: 2026-09-09
 - **Effort**: [#743 — bind substantive and writing review to a content version](https://github.com/mstarks01/work-agent/issues/743),
   finding 11 of the audit on [#732](https://github.com/mstarks01/work-agent/issues/732)
@@ -35,13 +35,24 @@ vote only to content with that digest.** Two keys on every vote row:
 | `fingerprint` | the topic: one finding at one place in one lane | the scorer's match and standing, the queue, the sitting, `rekey` |
 | `content` | the version: what the reader was shown when they answered | the standing's *validity*, and the writing instrument |
 
-`content` is a sha256 over the claim's assessed fields as the report carries
-them: `description`, `grounds`, `verdict`, and the package's own judgement
-fields, `severity` and `mitigations` where the record grades harm. The title
-is left out, because the identity already reads the title's meaning and a
-retitle is not a change of argument. The set is read off the record's fields,
-so a package that grades nothing digests less, and a package nobody has
-written yet digests what it declares.
+`content` is a sha256 over the claim's **structural** content: the verdict's
+status, the catalogued grounds as (kind, place or term, attribute) with quotes
+left out, and the package's own ratings where the record grades harm. Prose is
+left out on purpose, and the measurement below is why: a digest that read the
+description and the mitigations carried across two runs of one configuration
+0 times in 234 pairs, because a model writes new prose every run, so a vote on
+prose would go stale on every sweep and the ledger would never carry a
+standing forward. The structural digest carried 155 of 234, and it is what a
+substance vote judges: which fact the claim rests on, and what the critic made
+of it. The set is read off the record's fields, so a package that grades
+nothing digests less, and a package nobody has written yet digests what it
+declares.
+
+**A writing vote binds to the prose it read, and expires with it.** A style
+objection is about the words on the page. It carries a second digest over
+`description` and `mitigations`, and reads live only against those words,
+which in practice means within the sitting that cast it. That is the honest
+scope of a style vote, and the writing instrument counts stale ones apart.
 
 **A standing is live only while the content is the one voted on.** When the
 produced claim's digest differs from the vote's, the vote stands in the ledger
@@ -90,10 +101,21 @@ beside the new content, and a retired vote hides what a person once said.
 sweeps of one configuration produce one content twice, and a vote should
 carry across them.
 
-## Measurement before acceptance
+## Measurement
 
-Offline and free: recompute the digest over every claim in the merged
-Baseline and the archived ASVS runs, count how many findings share a
-fingerprint across two sweeps of one configuration, and how many of those
-share a digest. That number says how often a live vote would carry between
-runs, and it decides whether the digest is worth its cost.
+Run offline on 2026-09-09 over the six case 01 STRIDE runs of one
+configuration (the pre-flight and the five spread runs of that day): 27
+distinct fingerprints, 21 seen in two or more runs, 234 pairs of runs on one
+fingerprint.
+
+| digest | pairs that share it |
+|---|---:|
+| description, grounds, verdict, severity, mitigations | 0 of 234 |
+| verdict status, catalogued grounds, ratings | 155 of 234 |
+| verdict status alone | 222 of 234 |
+
+The first row is the record as first proposed, and it fails: no vote would
+carry between runs. The second row is the decision above. The third row
+carries most but binds to nothing a substance vote reads. What remains to
+measure is the same table over the thirteen-case Baseline once a second
+sweep of its configuration exists, which waits on spend.
