@@ -1,6 +1,6 @@
 # 28. A draft states its direction
 
-- **Status**: proposed
+- **Status**: accepted
 - **Date**: 2026-09-09
 - **Effort**: [#713 — a typed applicability state on the proposal](https://github.com/mstarks01/work-agent/issues/713),
   with the three contract contradictions recorded on it from the audit on
@@ -72,9 +72,14 @@ ruled.
 
 **Silence may exclude, and the record says so.** An `excluded` draft grounded in
 `absent_elements` is what ADR 0027 already allows: a judgement that the
-description names no such thing. It stays, and the **Scope Entry** it becomes
-carries the term that matched nothing, so a reader sees that the ruling reads
-the description's silence and not the deployed system's. `prompts/critic.md`'s
+description names no such thing. It stays, and the rejected claim the report
+keeps carries the absent-element ground with the term that matched nothing, so
+a reader sees that the ruling reads the description's silence and not the
+deployed system's. The draft carries its direction to the critic, and the
+critic's text says an `excluded` on a verified absent element is judged on
+whether the term is the requirement's subject and rejected for `evidence`
+where it is. The one measured run without that sentence rejected 96 of 99
+exclusions for `reasoning`. `prompts/critic.md`'s
 rule that a graph's shape confirms no *threat* is unchanged, because it is a
 rule about `gap` and not about `excluded`.
 
@@ -100,8 +105,9 @@ it. Its `reasoning` rejections fall to the drafts that misread a stated fact,
 which is the judgement the prompt asks of it.
 
 **Every ASVS exemplar changes.** The 17 lane exemplar files gain the field, in
-our own words under the package's content licence, and the lint that parses
-them against the proposal schema holds them to it. The corpus reference
+our own words under the package's content licence, and
+`tests/test_prompt_lints.py` parses every block as the proposal, so a block
+without it fails. The corpus reference
 dispositions map onto the three values without an edit: `gap-from-prose` is a
 `gap`, every `needs-*` is a `question`, and `not-applicable` is `excluded`.
 

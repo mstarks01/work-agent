@@ -948,6 +948,7 @@ SCRIPTED_FRAMEWORKS: Mapping[FrameworkName, ScriptedFramework] = MappingProxyTyp
                     # that keeps this scripted claim a claim rather than a
                     # scope entry.
                     needs_evidence="",
+                    direction="gap",
                     evidence_refs=["crossing:flow:customer-to-web-app:login"],
                 )
             ),

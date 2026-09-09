@@ -9,6 +9,7 @@ The honest ruling for a component-currency requirement. The model names the fram
 ```json
 {
   "requirement": "2.1",
+  "direction": "question",
   "needs_evidence": "people",
   "title": "Whether the components sit inside their documented remediation windows cannot be settled from this input",
   "description": "V15.2.1 asks that no component in the application has outlived the update and remediation time frames the organization documented for it. It applies to this system: `process:web-api` is described as FastAPI on Cloud Run and `process:ledger-service` as a Python worker, so both carry third-party components with a version and an age. The requirement's subject is those versions against a written time frame, and this job carries a description of the system rather than a dependency list or that document. So the requirement applies and this input cannot settle it.",
@@ -32,6 +33,7 @@ The notes describe what a customer sends and never what comes back. Whether a re
 ```json
 {
   "requirement": "3.1",
+  "direction": "question",
   "needs_evidence": "code",
   "title": "What the web API returns of an account record is never stated",
   "description": "V15.3.1 asks that the application returns only the fields of a data object a caller needs, rather than the whole object. It applies here because `process:web-api` serves `entity:customer` over `flow:customer-to-web-api:submit-payment` and the data behind it lives in `store:accounts-db`, a store classified confidential and tagged `pii` and `financial`. The notes describe what a customer sends and never describe what the API sends back, so whether a response carries a whole account record or the fields the customer needs is open. The requirement applies and the input does not settle it; the response serialisers in `process:web-api` would.",

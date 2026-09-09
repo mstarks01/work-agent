@@ -971,6 +971,20 @@ class Claim(BaseModel):
         return Ruling(id=draft.id, verdict=verdict)
 
     @classmethod
+    def unsupported(cls, proposal: Any) -> str:
+        """Why one proposal may not become a draft, in the package's words, or ``""``.
+
+        Read at the fan-in after the deferral split and before evidence
+        resolution, so a proposal the package refuses is a **Dropped Claim**
+        with this reason and never a draft. The neutral answer refuses nothing:
+        a package whose claims compose an identity from an action and a place
+        states no direction, and its drafts are the critic's to judge. A package
+        whose drafts carry a direction overrides this (ADR 0028).
+        """
+        del proposal
+        return ""
+
+    @classmethod
     def unit_of(cls, draft: Claim) -> str:
         """The unit of this framework's scope list a draft rules on, or ``""``.
 

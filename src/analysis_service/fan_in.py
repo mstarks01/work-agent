@@ -53,7 +53,7 @@ from analysis_service.evidence import (
     known_proposals,
     resolve_proposals,
 )
-from analysis_service.frameworks import FrameworkPackage, lane_of
+from analysis_service.frameworks import FrameworkPackage, lane_of, schemas_for
 from analysis_service.grounding import (
     PreparedSource,
     deadline_spent,
@@ -174,9 +174,30 @@ def fan_in(
             len(kept),
             sorted(Counter(reasons.values()).items()),
         )
+    # A proposal the package refuses on its own terms is dropped here, with the
+    # reason, before it can become a draft (ADR 0028): the neutral answer
+    # refuses nothing, and the ASVS answer refuses a gap resting on absence
+    # alone. Read after the split, because a deferred proposal is already gone.
+    key_field = schemas_for(package.name).key_field
+    unsupported: list[DroppedClaim] = []
+    supported: dict[str, list] = {}
+    for lane, (kept, _) in partitions.items():
+        supported[lane] = []
+        for proposal in kept:
+            reason = package.record.unsupported(proposal)
+            if reason:
+                unsupported.append(
+                    DroppedClaim.of(
+                        claim_id=package.compose_id(lane, getattr(proposal, key_field)),
+                        title=proposal.title,
+                        reason=reason,
+                    )
+                )
+            else:
+                supported[lane].append(proposal)
     resolutions = {
-        lane: resolve_proposals(kept, catalog, package, lane, model)
-        for lane, (kept, _) in partitions.items()
+        lane: resolve_proposals(supported[lane], catalog, package, lane, model)
+        for lane in partitions
     }
     drafts_by_lane = {
         lane: resolution.drafts for lane, resolution in resolutions.items()
@@ -197,7 +218,9 @@ def fan_in(
     # the join across its lanes, each lane's own evidence resolution, and the
     # refusals above. One value, because they share an owner, a standing and a
     # policy.
-    marks = joined.marks.merged_with(AnalysisMarks(dropped_claims=refused))
+    marks = joined.marks.merged_with(
+        AnalysisMarks(dropped_claims=[*unsupported, *refused])
+    )
     for lane, resolution in resolutions.items():
         marks = marks.merged_with(invalid[lane]).merged_with(resolution.marks)
     # Narrowed to the drafts that survived every pass above, once, after the

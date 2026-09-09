@@ -480,12 +480,15 @@ _RESOLVED_AWAY = frozenset({"evidence_refs", "quotes", "absent_elements"})
 #: here has already done its work by the time a draft is built, so carrying it
 #: on would put a routing signal in the report.
 #:
-#: ``needs_evidence`` is the one: the fan-in reads it to decide whether the
+#: ``needs_evidence`` is one: the fan-in reads it to decide whether the
 #: proposal becomes a draft at all, and a proposal that survives that split is
 #: one this job can settle. What remains of the distinction — *the description
 #: is thin* against *no description would do* — is already carried by whether
 #: the requirement is a **Claim** or a **Scope Entry**, so repeating it as a
-#: field would be a second spelling of the same fact.
+#: field would be a second spelling of the same fact. ``direction`` (ADR 0028)
+#: is *not* here: the fan-in reads it to refuse a gap that rests on absence
+#: alone, and then the draft carries it on, because the critic rules an
+#: ``excluded`` draft by it.
 _ROUTED_AWAY = frozenset({"needs_evidence"})
 
 

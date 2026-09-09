@@ -9,6 +9,7 @@ The exclusion, resting on the terms no element in the model names.
 ```json
 {
   "requirement": "2.1",
+  "direction": "excluded",
   "needs_evidence": "",
   "title": "This system carries no DTLS certificate to manage a key for",
   "description": "V17.2.1 asks that the private key behind a DTLS certificate is managed under the documented key-management policy. It does not apply here. The five flows in this model state HTTPS, HTTPS POST, gRPC, the PostgreSQL wire protocol and an HTTPS append; none is a WebRTC session, and no element's technology names SRTP, STUN, TURN or a data channel. The requirement has no subject in this system.",
@@ -29,6 +30,7 @@ A second requirement excluded on the same fact, stated once rather than argued a
 ```json
 {
   "requirement": "3.1",
+  "direction": "excluded",
   "needs_evidence": "",
   "title": "No WebRTC signalling server exists to rate-limit",
   "description": "V17.3.1 asks that a signalling server keeps serving legitimate signalling messages under a flood, by rate limiting at the signalling layer. It does not apply here, on the same stated fact that rules out V17.2.1: no flow in this model is a WebRTC session and no element is a peer, a relay or a signalling server. The requirement has no subject in this system.",

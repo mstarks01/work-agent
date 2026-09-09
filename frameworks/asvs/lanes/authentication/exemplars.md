@@ -9,6 +9,7 @@ The notes settle that MFA was never added. That answers a different requirement;
 ```json
 {
   "requirement": "3.1",
+  "direction": "question",
   "needs_evidence": "config",
   "title": "No control against credential stuffing or brute force is stated for the customer login",
   "description": "V6.3.1 asks that the defences the application's security documentation prescribes against credential stuffing and password brute force are actually in place. It applies here because `entity:customer` authenticates to `process:web-api` with an email and password over `flow:customer-to-web-api:submit-payment`, so a password login exists to attack. The notes describe the mechanism and say nothing about rate limiting, lockout or any other defence, and they carry no security documentation to measure against. The absence of MFA is a different fact and settles nothing here. The requirement applies and the input does not settle it; the login configuration `process:web-api` enforces would.",
@@ -35,6 +36,7 @@ A password exists, so the password requirements apply. Their subject is a parame
 ```json
 {
   "requirement": "2.1",
+  "direction": "question",
   "needs_evidence": "config",
   "title": "No password length policy is stated for customer accounts",
   "description": "V6.2.1 sets a floor on password length. It applies here because `flow:customer-to-web-api:submit-payment` authenticates `entity:customer` with an email and a password, so this system runs password authentication. The notes describe the mechanism and carry no parameter of it: no minimum length, no maximum, and no statement about what the registration form accepts. The requirement applies and the input does not settle it. The password policy `process:web-api` enforces at registration would settle it.",
