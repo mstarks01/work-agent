@@ -1410,9 +1410,10 @@ class TestTheTextMovedUnderTheRead:
     to know before they spend an hour, and again at finish, because a file
     can move while the tab sits open.
 
-    The app names the files and judges nothing. The reader keeps their own
-    list either way, and decides for themselves whether it still answers the
-    text.
+    The app names the files and judges nothing about the text. The reader keeps
+    their own list either way, and decides for themselves whether it still
+    answers. What it does refuse is a record over bytes it never served: a
+    digest re-pins when the file is served again, and the finish waits for that.
     """
 
     def move(self, tree, case=CASE, name="source.md"):
@@ -1468,13 +1469,19 @@ class TestTheTextMovedUnderTheRead:
         assert came_back["own_list"] == OWN_LIST
         assert app.get(f"/api/part-two?case={CASE}").status_code == 200
 
-    def test_a_file_that_moves_while_the_tab_sits_open_reaches_the_finish(self, tree):
-        """The open said nothing, because at open nothing had moved."""
+    def test_a_file_that_moves_while_the_tab_sits_open_refuses_the_finish(self, tree):
+        """The open said nothing, because at open nothing had moved. The record
+        signs the bytes the reader was served, and these were not, so it is
+        refused with the file's name and the remedy, rather than written with a
+        digest CI would refuse the day it merged."""
         app = browser(session_for(tree, "ada"))
         app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         assert app.get(f"/api/part-one?case={CASE}").json()["moved"] == []
         self.move(tree)
-        assert self.finish(app).json()["moved"] == ["source.md"]
+        refused = self.finish(app)
+        assert refused.status_code == 409
+        assert "source.md" in refused.json()["detail"]
+        assert "reload" in refused.json()["detail"]
 
     def test_the_finish_names_nothing_where_nothing_moved(self, tree):
         app = browser(session_for(tree, "ada"))
@@ -1482,10 +1489,12 @@ class TestTheTextMovedUnderTheRead:
         assert self.finish(app).json()["moved"] == []
 
     def test_the_own_list_survives_the_warning_at_finish(self, tree):
-        """The record is written, and the reader's list rides into it whole."""
+        """The record is written once the moved file is served again, and the
+        reader's list rides into it whole."""
         app = browser(session_for(tree, "ada"))
         app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         self.move(tree)
+        assert app.get(f"/api/part-one?case={CASE}").json()["moved"] == ["source.md"]
         assert self.finish(app).status_code == 200
         held = json.loads(draft_file(tree, CASE).read_text("utf-8"))
         assert held["own_list"] == OWN_LIST
@@ -2461,3 +2470,112 @@ class TestACorpusEditUnderAMergedSitting:
         second = app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
 
         assert second.status_code == 409
+
+
+class TestARecordSignsWhatWasServed:
+    """The draft's digests follow what the surface hands the reader.
+
+    Part one pins the shared files and part two the reference sets, each when
+    served. Before this, a draft pinned every file once at the own list and
+    never again, so a reader whose draft outlived a corpus edit recorded a
+    digest CI refused, with no way to a record it would take short of dropping
+    the case. That is the shape the case 01 re-sit of 2026-09-09 hit.
+    """
+
+    def move_claims(self, tree, case=CASE):
+        path = tree / "evals" / "corpus" / case / "claims" / "stride.json"
+        claims = json.loads(path.read_text("utf-8"))
+        claims[0]["verb"] = "replay"
+        path.write_text(json.dumps(claims, indent=2) + "\n", encoding="utf-8")
+
+    def digest_now(self, tree, name, case=CASE):
+        case_dir = tree / "evals" / "corpus" / case
+        return sittings.digests(case_dir, [name])[name]
+
+    def problems(self, tree, case=CASE):
+        held = json.loads(draft_file(tree, case).read_text("utf-8"))
+        return sittings.sitting_problems(
+            tree / "evals" / "corpus" / case,
+            own_list=held["own_list"],
+            opened_digests=held["opened_digests"],
+            marks=held["marks"],
+        )
+
+    def test_serving_the_sets_re_pins_the_set_that_moved(self, tree):
+        app = browser(session_for(tree, "ada"))
+        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
+        self.move_claims(tree)
+
+        app.get(f"/api/part-two?case={CASE}")
+        held = json.loads(draft_file(tree, CASE).read_text("utf-8"))
+
+        assert held["opened_digests"]["claims/stride.json"] == self.digest_now(
+            tree, "claims/stride.json"
+        )
+
+    def test_serving_part_one_pins_the_shared_files_and_not_the_sets(self, tree):
+        """Each part pins what it shows. A moved set stays named until the
+        reader is shown it, which is what the finish waits for."""
+        app = browser(session_for(tree, "ada"))
+        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
+        self.move_claims(tree)
+
+        assert app.get(f"/api/part-one?case={CASE}").json()["moved"] == [
+            "claims/stride.json"
+        ]
+        assert app.get(f"/api/part-one?case={CASE}").json()["moved"] == [
+            "claims/stride.json"
+        ]
+
+    def test_a_draft_that_outlived_a_corpus_edit_records_once_served_again(self, tree):
+        """The case 01 shape: the draft pinned the set before the edit merged."""
+        app = browser(session_for(tree, "ada"))
+        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
+        marked = every_mark(app)
+        self.move_claims(tree)
+
+        # The marks were made over the set as served before the edit, and the
+        # press arrives without the set being served again.
+        refused = app.post(
+            "/api/finish",
+            json={"case": CASE, "marks": marked, "missing": [], "notes": ""},
+        )
+        assert refused.status_code == 409
+        assert "claims/stride.json" in refused.json()["detail"]
+
+        app.get(f"/api/part-two?case={CASE}")
+        recorded = app.post(
+            "/api/finish",
+            json={"case": CASE, "marks": every_mark(app), "missing": [], "notes": ""},
+        )
+
+        assert recorded.status_code == 200, recorded.text
+        assert self.problems(tree) == []
+
+    def test_a_draft_nothing_moved_under_is_not_rewritten(self, tree):
+        app = browser(session_for(tree, "ada"))
+        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
+        before = draft_file(tree, CASE).read_bytes()
+
+        app.get(f"/api/part-one?case={CASE}")
+        app.get(f"/api/part-two?case={CASE}")
+
+        assert draft_file(tree, CASE).read_bytes() == before
+
+    def test_a_session_left_running_across_the_edit_serves_the_edited_set(self, tree):
+        """The session keeps a prepared case; it re-reads one whose files moved."""
+        app = browser(session_for(tree, "ada"))
+        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
+        before = {
+            target["fingerprint"]
+            for target in app.get(f"/api/part-two?case={CASE}").json()["marks"]
+        }
+        self.move_claims(tree)
+
+        after = {
+            target["fingerprint"]
+            for target in app.get(f"/api/part-two?case={CASE}").json()["marks"]
+        }
+
+        assert after != before
+        assert len(after) == len(before)
