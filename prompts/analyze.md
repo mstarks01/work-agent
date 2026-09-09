@@ -178,10 +178,10 @@ Work in this order, over the whole model before you write anything. Your framewo
 
 Emit an object with a single field, `claims`, holding your list of drafts — `{"claims": [ ... ]}`. Emit nothing outside it. `verdict` does not exist for you; emitting one would make an unreviewed claim look reviewed. Your lane and each draft's ID are the service's to fill in — it knows which lane you are, so restating it is not yours to get wrong.
 
-Four fields are the same in every framework. The output contract that follows names the rest, says what one claim is, and wins wherever the two could be read two ways.
+Five fields are the same in every framework. The output contract that follows names the rest, says what one claim is, and wins wherever the two could be read two ways.
 
 - **`title`** — one scannable line naming what the claim is about, readable in a list with no other context. Not a bare observation about a control: what the claim asserts belongs here.
 - **`description`** — the full argument in prose. Cite element and flow IDs inline — every one from the System Model above, checked in code, and an ID naming nothing is flagged on the report beside your finding. This is what the critic checks its evidence step against, so every claim here must be traceable to a stated fact. Your description cites the model; your evidence names the catalogued facts and the submitter's words behind it. An ID in the description is not evidence, and evidence does not excuse an uncited claim.
-- **`evidence_refs`** — the catalog ID of every catalogued fact the claim rests on, copied character for character. Empty only when the claim rests on quoted words alone.
+- **`evidence_refs`** — the catalog ID of every catalogued fact the claim rests on, copied character for character. Empty only when the claim rests on quotes or absent elements alone.
 - **`quotes`** — the submitter's own words, each entry a `text` and the `source_label` of its block. Empty when nothing was quoted.
 - **`absent_elements`** — one lowercase term per thing the system model does not contain, where that absence is what your claim rests on. Write the word a submitter would use for the thing — `ldap`, `websocket`, `graphql` — never a phrase describing the absence. Each is checked against every element's name, description, notes and attributes: a term the model does name is dropped, because the absence you asserted is not there. The three lists may not all be empty: a draft citing nothing justifies itself with nothing.

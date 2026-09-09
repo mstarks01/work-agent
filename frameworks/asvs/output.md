@@ -20,7 +20,7 @@ These follow step 7 of the procedure above and belong to this framework alone.
 
 ## Your fields
 
-Each draft carries exactly seven fields — `requirement`, `title`, `description`, `affected_element_ids`, `evidence_refs`, `quotes`, `needs_evidence` — and nothing else.
+Each draft carries exactly eight fields — the five shared ones plus `requirement`, `affected_element_ids` and `needs_evidence` — and nothing else.
 
 - **`requirement`** — the `<section>.<requirement>` pair inside your chapter, as your `## Applicability` spells it: `2.5` for `V1.2.5` in the encoding and sanitization lane. Digits and one dot, nothing else. The service composes the published version-safe reference from it and your chapter, so `2.5` becomes `v5.0.0-1.2.5` — never spell your chapter and never spell the version.
 - **`title`** — name the requirement's subject and what this system's input says about it. "V1.2.4 parameterized queries" restates the catalog; "database queries are built by hand in the order service" is a ruling.

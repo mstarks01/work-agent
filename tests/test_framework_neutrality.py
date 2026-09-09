@@ -1142,3 +1142,75 @@ def test_every_package_caps_the_drafts_one_lane_may_emit():
             " length. Narrowing the field drops the base's cap silently, so the"
             " package has to spell MAX_CLAIMS_PER_BATCH itself."
         )
+
+
+#: The heading under which a package's ``output.md`` counts the fields a draft
+#: carries, and the heading under which the shared ``analyze.md`` describes the
+#: fields every framework shares.
+FIELDS_HEADING = "## Your fields"
+SHARED_FIELDS_HEADING = "## Output"
+
+
+def _section(path: Path, heading: str) -> list[str]:
+    """The lines under ``heading`` up to the next heading, blank lines dropped."""
+    lines = path.read_text(encoding="utf-8").splitlines()
+    start = lines.index(heading) + 1
+    body = []
+    for line in lines[start:]:
+        if line.startswith("#"):
+            break
+        if line.strip():
+            body.append(line)
+    return body
+
+
+def _count_words(sentence: str) -> set[int]:
+    """Every field count the sentence spells, as a number."""
+    by_word = {word: count for count, word in COUNT_WORDS.items()}
+    return {
+        by_word[word]
+        for word in re.findall(r"\b([a-z]+)\b(?= fields| shared)", sentence.lower())
+        if word in by_word
+    }
+
+
+def test_every_output_contract_counts_the_fields_its_schema_emits():
+    """The field sentence a lane agent reads names what its schema emits.
+
+    ``analyze.md`` describes the fields every framework shares, and each
+    package's ``output.md`` opens ``## Your fields`` with a count and the rest.
+    Both are prose beside a schema, and the prose drifted: the shared prompt
+    said four and listed five, and one package counted seven where its schema
+    emitted eight. The schema is the reader; this holds the sentences to it.
+    """
+    shared_section = _section(
+        REPO_ROOT / "prompts" / "analyze.md", SHARED_FIELDS_HEADING
+    )
+    shared = {
+        name
+        for line in shared_section
+        for name in re.findall(r"^- \*\*`(\w+)`\*\*", line)
+    }
+    shared_sentence = next(line for line in shared_section if "fields" in line)
+    assert _count_words(shared_sentence) == {len(shared)}, (
+        f"analyze.md counts the shared fields as {shared_sentence!r} and lists"
+        f" {sorted(shared)}"
+    )
+
+    for name, schemas in SCHEMAS.items():
+        draft = schemas.proposals.model_fields["claims"].annotation.__args__[0]
+        emitted = set(draft.model_json_schema()["properties"])
+        assert shared <= emitted, f"{name} emits no {sorted(shared - emitted)}"
+        sentence = _section(
+            REPO_ROOT / "frameworks" / name / "output.md", FIELDS_HEADING
+        )[0]
+        listed = sentence.partition("nothing else")[0]
+        named = shared | set(re.findall(r"`(\w+)`", listed))
+        assert named == emitted, (
+            f"{name}/output.md names {sorted(named)} under {FIELDS_HEADING!r};"
+            f" {draft.__name__} emits {sorted(emitted)}"
+        )
+        assert _count_words(listed) == {len(emitted), len(shared)}, (
+            f"{name}/output.md counts {listed!r}; the schema emits"
+            f" {len(emitted)} fields, {len(shared)} of them shared"
+        )
