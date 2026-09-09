@@ -2,8 +2,11 @@
 
 The scorer says *which* references a run missed. This says *why*, from the
 same rulings, so a fix carries its ceiling before anybody pays for a run: an
-exemplar edit can recover only the misses the verb lost, a candidate rule only
-the misses no rule led to. On 2026-09-09 an exemplar edit went to a $6 sweep
+exemplar edit is priced on the misses the verb lost, a candidate rule on the
+misses no rule led to. The class is the expected recovery and not a causal
+bound; a gain outside it is a signal to read, never noise, and the cause order
+below records one observation per miss rather than every contributor. On
+2026-09-09 an exemplar edit went to a $6 sweep
 with no such number; read off the Baseline afterwards, its ceiling was five
 must-finds of 129, inside the run-to-run band.
 

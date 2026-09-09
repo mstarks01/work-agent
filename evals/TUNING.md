@@ -303,9 +303,17 @@ under `evals/baselines/` are the sweeps to read first.
 python -m evals.harness.run score evals/baselines/<baseline>/<sweep>.json
 ```
 
-The class a fix addresses is its ceiling. An exemplar edit recovers verb
-losses in its lane and nothing else; a candidate rule recovers `unled` losses
-and nothing else. On 2026-09-09 one exemplar edit went to a paid sweep before
+The class a fix addresses is its ceiling, and the ceiling is a price rather
+than a bound: the number of must-finds the fix is expected to recover, read off
+the rows in its class. An exemplar edit is priced on the verb losses in its
+lane; a candidate rule on the `unled` losses. Neither class is causal. A better
+example can lead a lane to a place it never cited, a rule can recover a
+different action at a place already led, and either can regress outside its
+class. So price on the class, and read a gain or a loss outside it as a signal
+about the mechanism, never as noise. The loss instrument charges each miss to
+the first surviving claim at the reference's place, so a `verb` or `merged`
+row records one observation and hides no other cause; a run can move rows
+between classes. On 2026-09-09 one exemplar edit went to a paid sweep before
 this was read; its ceiling was five must-finds, inside the band.
 
 **Price a scorer change on the frontier, with no run at all.** A verb
