@@ -56,6 +56,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from evals import review_submission as review_submissions
 from evals.harness import envelope as envelopes
 from evals.harness import sitting as sittings
 from evals.harness import submit as submit_spine
@@ -108,6 +109,8 @@ def payload(corpus_dir: Path, submitted_by: str, submitted_for: str) -> dict:
         "repo": submit_spine.repo_slug(REPO_ROOT),
         "branch": submit_spine.BASE_BRANCH,
         "submissions_dir": envelopes.SUBMISSIONS_DIR.as_posix(),
+        # The one limit both pages read; the page picks the door from it.
+        "editor_url_limit": review_submissions.EDITOR_URL_LIMIT,
         "min_own_list": sittings.MIN_OWN_LIST,
         "marks": list(sittings.MARKS),
         "cases": cases,

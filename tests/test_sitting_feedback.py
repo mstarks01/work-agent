@@ -217,6 +217,58 @@ def test_browser_contribution_returns_the_same_json_without_mutating_local_files
     assert parsed["submitted_for"] == "web-reviewer"
     assert (tree / "evals" / "corpus" / CASE / "case.json").read_bytes() == case_before
     assert (tree / "tests" / "test_case_review.py").read_bytes() == list_before
+    assert body["route"] == "editor"
+    assert "/new/" in body["url"] and "value=" in body["url"]
+
+
+def test_a_review_too_long_for_the_editor_link_takes_the_upload_door(
+    tmp_path: Path, monkeypatch
+):
+    """GitHub refuses a request URL past its limit ("Whoa there!"), which a
+    case 02 sitting hit on 2026-09-09. Past the limit the page opens GitHub's
+    upload page at the submissions folder, with nothing in the URL, and the
+    downloaded file is what the reader drops in."""
+    tree = tree_for(tmp_path)
+    client, _ = client_for(tree)
+    record_one(client)
+    monkeypatch.setattr(sitting.submit_spine, "gh_login", lambda root: "")
+    monkeypatch.setattr(review_submissions, "EDITOR_URL_LIMIT", 100)
+
+    body = client.post(
+        "/api/contribute", json={"reviewer": "self", "author": "web-reviewer"}
+    ).json()
+
+    assert body["route"] == "upload"
+    assert body["url"].endswith("/upload/main/evals/review/submissions")
+    assert "?" not in body["url"]
+    assert body["filename"].endswith(".json"), "the file still downloads"
+
+
+def test_the_route_is_one_reader_for_both_doors():
+    long_lines = [f"line {i:03d} " + "x" * 80 for i in range(120)]
+    envelope = envelopes.Envelope.model_validate(
+        {
+            "envelope": envelopes.VERSION,
+            "submitted_by": "ada",
+            "submitted_for": "ada",
+            "generated": "2026-09-09",
+            "cases": {
+                CASE: {
+                    "own_list": long_lines,
+                    "marks": {},
+                    "missing": [],
+                    "notes": "",
+                    "opened_digests": {},
+                }
+            },
+        }
+    )
+    route = review_submissions.contribution_route(envelope, "o/r")
+    assert route.kind == "upload"
+    assert route.url == review_submissions.upload_url("o/r")
+    assert len(review_submissions.contribution_url(envelope, "o/r")) > (
+        review_submissions.EDITOR_URL_LIMIT
+    )
 
 
 def test_direct_contribution_opens_one_json_pr_and_cleans_local_record(
@@ -417,4 +469,5 @@ def test_the_way_out_sits_above_the_file_preview():
     assert ".file-preview pre { max-height:40vh; overflow:auto; }" in page
     script = client_script("sitting.js")
     assert 'hide("filePreview");' in script.split('$("submit").addEventListener', 1)[1]
-    assert '$("browserSteps").scrollIntoView' in script
+    assert "$(steps).scrollIntoView" in script
+    assert page.index('id="uploadSteps"') < page.index('id="filePreview"')

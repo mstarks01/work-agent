@@ -24,8 +24,10 @@ from pathlib import Path
 
 import pytest
 
+from evals import review_submission as review_submissions
 from evals.harness import envelope as envelopes
 from evals.harness import sitting as sittings
+from evals.harness import submit as submit_spine
 from evals.harness.envelope import VERSION
 from evals.harness.reference import ANONYMOUS, CorpusError
 from tests.test_sitting_app import CASE, build_tree
@@ -268,7 +270,10 @@ class TestThePageNamesASubmissionTheWayPythonDoes:
         )
         block = source.split(NAMING_BLOCK)[1].split("async function publish")[0]
         harness = (
-            "const DATA = {repo: 'o/r', branch: 'main', submissions_dir: 'd'};\n"
+            "const DATA = {repo: 'o/r', branch: "
+            f"{submit_spine.BASE_BRANCH!r}, submissions_dir: "
+            f"{envelopes.SUBMISSIONS_DIR.as_posix()!r}, editor_url_limit: "
+            f"{review_submissions.EDITOR_URL_LIMIT}}};\n"
             "const window = {crypto: require('node:crypto').webcrypto};\n"
             f"function canonical{block.split('function canonical', 1)[1]}\n"
             f"{script}\n"
@@ -306,6 +311,47 @@ class TestThePageNamesASubmissionTheWayPythonDoes:
 
         assert printed == envelopes.submission_name(envelope)
 
+    def test_a_short_review_opens_the_same_editor_link(self, corpus):
+        envelope = self.envelope(corpus)
+
+        printed = self.under_node(
+            f"contributionRoute({envelope.model_dump_json()})"
+            ".then(route => process.stdout.write(JSON.stringify(route)));"
+        )
+
+        route = json.loads(printed)
+        expected = review_submissions.contribution_route(envelope, "o/r")
+        assert route["kind"] == expected.kind == "editor"
+        assert route["url"] == expected.url
+
+    def test_a_long_review_opens_the_same_upload_page(self, corpus):
+        """One limit, read by both pages, opens one door for one file."""
+        envelope = self.envelope(corpus).model_copy(
+            update={
+                "cases": {
+                    case_id: answers.model_copy(
+                        update={
+                            "own_list": [
+                                f"a long line {i:03d} " + "x" * 80 for i in range(120)
+                            ]
+                        }
+                    )
+                    for case_id, answers in self.envelope(corpus).cases.items()
+                }
+            }
+        )
+
+        printed = self.under_node(
+            f"contributionRoute({envelope.model_dump_json()})"
+            ".then(route => process.stdout.write(JSON.stringify(route)));"
+        )
+
+        route = json.loads(printed)
+        expected = review_submissions.contribution_route(envelope, "o/r")
+        assert route["kind"] == expected.kind == "upload"
+        assert route["url"] == expected.url
+        assert "?" not in route["url"], "nothing rides in the upload URL"
+
 
 class TestThePressLeavesThePageInPlace:
     """The pull request opens in a new tab, and the reader's tab stays.
@@ -318,7 +364,7 @@ class TestThePressLeavesThePageInPlace:
     window, in both states a browser can leave it.
     """
 
-    def press(self, opened: str) -> dict:
+    def press(self, opened: str, route: str = "editor") -> dict:
         node = shutil.which("node")
         if node is None:
             pytest.skip("no node on PATH to run the page's own block")
@@ -333,11 +379,14 @@ class TestThePressLeavesThePageInPlace:
             "const alert = text => { said = text; };\n"
             "const finished = () => ['02-iot-fleet-telemetry'];\n"
             "const envelope = () => ({});\n"
-            "const contributionUrl = async () => 'https://github.com/o/r/new/main';\n"
+            "let downloaded = 0;\n"
+            "const downloadSubmission = async () => { downloaded += 1; };\n"
+            f"const contributionRoute = async () => ({{kind: {route!r}, url:"
+            f" 'https://github.com/o/r/{'upload' if route == 'upload' else 'new'}/main'}});\n"
             f"{block}\n"
             "publishToGitHub().then(() => process.stdout.write(JSON.stringify({\n"
             "  page: window.location, opened: opened && opened.location,\n"
-            "  said: said, opener: opened && opened.opener,\n"
+            "  said: said, opener: opened && opened.opener, downloaded: downloaded,\n"
             "})));\n"
         )
         with tempfile.TemporaryDirectory() as scratch:
@@ -359,6 +408,19 @@ class TestThePressLeavesThePageInPlace:
         assert result["opened"] == "https://github.com/o/r/new/main"
         assert result["opener"] is None, "the new tab cannot reach back"
         assert result["page"] == "the page"
+
+    def test_a_long_review_downloads_the_file_and_opens_the_upload_page(self):
+        result = self.press("{opener: 'the page'}", route="upload")
+
+        assert result["opened"] == "https://github.com/o/r/upload/main"
+        assert result["downloaded"] == 1
+        assert "upload" in result["said"]
+        assert result["page"] == "the page"
+
+    def test_a_short_review_downloads_nothing_extra(self):
+        result = self.press("{opener: 'the page'}")
+
+        assert result["downloaded"] == 0
 
     def test_a_blocked_tab_is_said_and_the_page_still_stays(self):
         result = self.press("null")
