@@ -432,7 +432,9 @@ press carries before you press. **Contribute** opens the pull request through
 the `gh` you are already signed in to; it binds to loopback and holds no
 credential of its own. With no `gh` login it downloads the same one file and
 hands you a link to GitHub's editor with it already filled in, so the way out
-never depends on a credential. `--list` prints the cases nobody has read.
+never depends on a credential. A review too long for that link opens GitHub's
+upload page at the submissions folder instead; drop the downloaded file in and
+keep its name. `--list` prints the cases nobody has read.
 
 **Stop whenever you like.** The moment you post your own list, the app opens a
 **Draft Sitting** for that case and keeps your list, your marks, your missing

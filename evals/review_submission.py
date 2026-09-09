@@ -18,6 +18,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import Literal
 from urllib.parse import quote, urlencode
 
 from evals.harness import envelope as envelopes
@@ -341,6 +342,50 @@ def unreviewed_cases(root: Path) -> list[str]:
             for framework in declared(root, case.meta.id)
         )
     ]
+
+
+#: The longest editor link this repository hands a reader. GitHub refuses a
+#: request URL past its own limit with "Whoa there! Your request URL is too
+#: long", and does not publish the number; a case 01 sitting at 5,073
+#: characters opened, and a case 02 sitting was refused on 2026-09-09. The
+#: widely reported bound is 8,192, and this sits under it. A sitting that will
+#: not fit takes the upload route instead, which carries nothing in the URL.
+EDITOR_URL_LIMIT = 8000
+
+
+@dataclass(frozen=True)
+class ContributionRoute:
+    """How a reader with no clone lands their one file on GitHub.
+
+    ``editor`` opens GitHub's new-file form with the file already typed.
+    ``upload`` opens GitHub's upload page at the submissions directory, for a
+    file the page has already downloaded; the reader drops it in. Both end in
+    the same two buttons and the same contribution CI.
+    """
+
+    kind: Literal["editor", "upload"]
+    url: str
+
+
+def upload_url(slug: str) -> str:
+    """GitHub's upload page at the submissions directory. Nothing rides in the URL."""
+    return (
+        f"https://github.com/{slug}/upload/{submit_spine.BASE_BRANCH}/"
+        f"{envelopes.SUBMISSIONS_DIR.as_posix()}"
+    )
+
+
+def contribution_route(envelope: envelopes.Envelope, slug: str) -> ContributionRoute:
+    """The editor link when it fits GitHub's limit, and the upload page when it does not.
+
+    One reader for the choice. The offline page makes the same choice in its
+    own script from the same limit, and ``tests/test_offline_sitting.py``
+    drives that script against this function.
+    """
+    editor = contribution_url(envelope, slug)
+    if len(editor) <= EDITOR_URL_LIMIT:
+        return ContributionRoute("editor", editor)
+    return ContributionRoute("upload", upload_url(slug))
 
 
 def contribution_url(envelope: envelopes.Envelope, slug: str) -> str:
