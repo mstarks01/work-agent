@@ -159,10 +159,6 @@ DELIBERATE: dict[tuple[str, str], str] = {
         "docs/example-report.html",
     ): "same block, same marking.",
     (
-        "evals/harness/baseline.py",
-        "baseline.json",
-    ): "each merged Baseline's manifest; none is merged yet.",
-    (
         "tests/test_doc_reference_lints.py",
         "CONTEXT-MAP.md",
     ): "this module's own docstring, quoting the exception above it.",

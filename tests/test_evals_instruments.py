@@ -161,6 +161,8 @@ class TestTheTableCoversTheArtifact:
             "unlisted_for_promotion",
             "critic_yield",
             "critic_yield_aggregate",
+            "losses",
+            "losses_aggregate",
             "writing",
             "writing_aggregate",
         }
@@ -177,15 +179,16 @@ class TestTheScoredSplit:
         assert "coverage:" in printed
 
     def test_the_scored_instruments_are_the_ones_that_read_scores(self):
-        """The two per-package scorers, and the one that reads the ledger.
+        """The STRIDE scorers, and the one that reads the ledger.
 
-        ``writing`` is scored for a different reason from the other two: it
+        ``losses`` reads the score's misses, so it rides the same pass as
+        ``critic_yield``. ``writing`` is scored for a different reason: it
         needs no score, but the vote ledger is only loaded on the scored pass,
         and a reading over votes nobody loaded would report every sweep as
         unobjected-to.
         """
         scored = {name for name, i in INSTRUMENTS.items() if i.scored}
-        assert scored == {"scores", "critic_yield", "writing"}
+        assert scored == {"scores", "critic_yield", "losses", "writing"}
 
 
 class TestScoringSkipsAPackageItDoesNotRead:
@@ -203,11 +206,12 @@ class TestScoringSkipsAPackageItDoesNotRead:
         assert optional_block(report, "stride") is None
 
         run = _AnalysisRunStub(report)
-        scores, yields = _score_runs(
-            [_CaseStub()], {"case": run}, _NeverAskedMatcher(), Ledger()
+        scores, yields, charged = _score_runs(
+            [_CaseStub()], {"case": run}, _NeverAskedMatcher(), Ledger(), {}
         )
         assert scores == ()
         assert yields == ()
+        assert charged == ()
 
 
 class _CaseStub:
