@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import secrets
 import sys
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Annotated
@@ -100,6 +101,8 @@ class Session:
     preselect: str | None = None
     rows: tuple[sittings.Row, ...] = ()
     prepared: dict[str, sittings.Prepared] = field(default_factory=dict)
+    #: The digests each prepared case was read at, so a moved file re-reads it.
+    pinned: dict[str, dict[str, str]] = field(default_factory=dict)
     token: str = field(default_factory=lambda: secrets.token_urlsafe(24))
     dropped: set[str] = field(default_factory=set)
 
@@ -137,9 +140,24 @@ class Session:
         return sittings.load_draft(self.drafts, self.submitted_by, case_id)
 
     def prepare(self, case_id: str) -> sittings.Prepared:
-        if case_id not in self.prepared:
-            self.prepared[case_id] = sittings.prepare(self.corpus_dir / case_id)
-        return self.prepared[case_id]
+        """The case, prepared once and re-read when a file of it moves.
+
+        Preparing fingerprints every reference set, so the result is kept for
+        the session. It is kept beside the digests it was read at, because a
+        corpus edit under a running session must reach the reader: a target
+        list from before the edit would refuse the mark the new claim needs.
+        """
+        case_dir = self.corpus_dir / case_id
+        kept = self.prepared.get(case_id)
+        if (
+            kept is not None
+            and sittings.digests(case_dir, kept.files) == self.pinned[case_id]
+        ):
+            return kept
+        prepared = sittings.prepare(case_dir)
+        self.prepared[case_id] = prepared
+        self.pinned[case_id] = sittings.digests(case_dir, prepared.files)
+        return prepared
 
 
 def create_app(session: Session, page: str, script: str) -> FastAPI:
@@ -199,6 +217,8 @@ def create_app(session: Session, page: str, script: str) -> FastAPI:
         held = held_draft(session, case)
         work = held or sittings.Draft(case=prepared.case_id)
         covered = review_submissions.current_reviews(session.root)
+        moved = _moved(session, prepared, held)
+        _served(session, prepared, held, sittings.SHARED_FILES)
         return JSONResponse(
             {
                 "case": prepared.case_id,
@@ -216,7 +236,7 @@ def create_app(session: Session, page: str, script: str) -> FastAPI:
                 "marks": work.marks,
                 "missing": work.missing,
                 "notes": work.notes,
-                "moved": _moved(session, prepared, held),
+                "moved": moved,
             }
         )
 
@@ -276,13 +296,15 @@ def create_app(session: Session, page: str, script: str) -> FastAPI:
     @app.get("/api/part-two")
     def part_two(case: CaseId) -> JSONResponse:
         prepared = open_case(session, case)
-        if held_draft(session, case) is None:
+        held = held_draft(session, case)
+        if held is None:
             raise HTTPException(
                 status_code=409,
                 detail="write your own list first; the recorded sets are not"
                 " served until it is in, because the document prints your list"
                 " above them and a later reader takes that order on trust",
             )
+        _served(session, prepared, held, sittings.claim_files(prepared.part_two_blocks))
         return JSONResponse(
             {
                 "case": prepared.case_id,
@@ -307,12 +329,21 @@ def create_app(session: Session, page: str, script: str) -> FastAPI:
         held = held_draft(session, body.case)
         if held is None:
             raise HTTPException(status_code=409, detail="no own list was written")
-        moved = _moved(session, prepared, held)
+        # A record signs the bytes the reader was served. A file that moved
+        # since is one nobody has read in this form, and a record carrying its
+        # old digest is refused the day it merges — so refuse it here, where
+        # the remedy is one reload rather than a lost sitting.
+        if moved := _moved(session, prepared, held):
+            raise HTTPException(
+                status_code=409,
+                detail=f"{', '.join(moved)} changed since this case was served;"
+                " reload the case, read what moved, and record again",
+            )
         _record(session, prepared, held, body.marks, body.missing, body.notes)
         return JSONResponse(
             {
                 "case": prepared.case_id,
-                "moved": moved,
+                "moved": [],
                 "ready": len(session.carried()),
             }
         )
@@ -453,6 +484,32 @@ def _moved(
             if name in prepared.files
         },
     )
+
+
+def _served(
+    session: Session,
+    prepared: sittings.Prepared,
+    draft: sittings.Draft | None,
+    names: Iterable[str],
+) -> None:
+    """Pin the files this response serves to the bytes it serves them at.
+
+    The draft's digests say what the reader was shown, and a record signs
+    exactly that. Part one pins the shared files and part two the reference
+    sets, each at the moment the surface hands them over, so a file that moved
+    under an earlier read is re-pinned the next time the reader is shown it.
+    Nothing to pin before the draft exists: the own list writes the first set.
+    """
+    if draft is None:
+        return
+    case_dir = session.corpus_dir / prepared.case_id
+    fresh = sittings.digests(
+        case_dir, [name for name in names if name in prepared.files]
+    )
+    if all(draft.opened_digests.get(name) == digest for name, digest in fresh.items()):
+        return
+    draft.opened_digests = {**draft.opened_digests, **fresh}
+    save_draft(session, draft)
 
 
 def save_draft(session: Session, draft: sittings.Draft) -> None:
