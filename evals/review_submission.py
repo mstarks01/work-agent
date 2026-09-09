@@ -271,6 +271,26 @@ def current_for_case(root: Path, case_id: str) -> MergedReview | None:
     return max(covered.values(), key=lambda review: review.order, default=None)
 
 
+def latest_for_case(root: Path, case_id: str) -> MergedReview | None:
+    """The newest live sitting that names this case, whether or not it still stands.
+
+    A different question from :func:`current_for_case`. That one answers what
+    covers the case now, and drops a sitting the moment a file it read moves,
+    which is the fail-closed answer a gate needs. A reader who comes back after
+    that edit needs the other answer: what did the last sitting say? Its marks
+    are keyed by fingerprint, so every one that still names a finding is still
+    an answer, and the draft the surface seeds from it pins the files as they
+    are now. Without this reader, one added claim cost a whole case's read.
+    """
+    try:
+        submissions = list(iter_submissions(root))
+    except ReviewSubmissionError:
+        return None
+    live, _ = _live(_reviews(submissions))
+    named = [review for review in live if review.case_id == case_id]
+    return max(named, key=lambda review: review.order, default=None)
+
+
 def rail_signatures(root: Path) -> tuple[dict[str, str], dict[str, str]]:
     """What a rail says about every case a merged sitting touches.
 
