@@ -370,3 +370,33 @@ def test_contribution_status_needs_the_page_token(tmp_path: Path, monkeypatch):
     assert told.status_code == 200
     assert told.json() == {"mode": "direct", "author": "ada"}
     assert 'getJson("/api/contribution-status", true)' in client_script("sitting.js")
+
+
+def test_a_record_whose_set_moved_is_sent_back_to_the_case(tmp_path: Path, monkeypatch):
+    """The stage names the case and the remedy, not the digest.
+
+    A reader records a case, a corpus edit lands, and they press Contribute
+    from the stage without opening the case again. The digests are the ones
+    the record was served at, so CI would refuse the file; the surface says
+    which case to open instead, because opening it is what re-pins them.
+    """
+    tree = tree_for(tmp_path)
+    client, session = client_for(tree)
+    record_one(client)
+    monkeypatch.setattr(sitting.submit_spine, "gh_login", lambda root: "ada")
+    path = tree / "evals" / "corpus" / CASE / "claims" / "stride.json"
+    claims = json.loads(path.read_text("utf-8"))
+    claims[0]["verb"] = "replay"
+    path.write_text(json.dumps(claims, indent=2) + "\n", encoding="utf-8")
+
+    response = client.post("/api/contribute", json={"reviewer": "anonymous"})
+
+    assert response.status_code == 409
+    detail = response.json()["detail"]
+    assert detail.startswith(
+        f"{CASE}: claims/stride.json changed since you recorded it"
+    )
+    assert "open the case" in detail
+    assert "carries no digest" not in detail
+    held = session.draft(CASE)
+    assert held is not None and held.state == "finished", "nothing is lost"
