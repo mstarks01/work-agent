@@ -190,7 +190,9 @@ function bar(into) {
     " ready to publish. Download to stop and load the same file to carry on — " +
     "nothing is sent from this page. On GitHub, an account without write access " +
     "presses Propose changes; an account with write access presses Commit changes " +
-    "and then chooses Create a new branch, because the default commits straight to main."));
+    "and then chooses Create a new branch, because the default commits straight to main. " +
+    "A review too long for GitHub's editor link opens the upload page instead, with the " +
+    "file downloaded for you to drop in."));
   into.appendChild(b);
 }
 
@@ -258,12 +260,46 @@ async function submissionName(env) {
   return "review-" + env.generated + "-" + env.submitted_by + "-" + digest + ".json";
 }
 
+// Escaped as Python's `urlencode(..., quote_via=quote)` escapes, byte for
+// byte: a space is `%20` and not `+`, and `!'()*` are escaped too. The two
+// pages measure one link against one limit, so one file opens one door on
+// both; `tests/test_offline_sitting.py` compares the strings.
+function quoteLikePython(text) {
+  return encodeURIComponent(text)
+    .replace(/[!'()*]/g, c => "%" + c.charCodeAt(0).toString(16).toUpperCase());
+}
+
 async function contributionUrl(env) {
-  const query = new URLSearchParams({
-    filename: DATA.submissions_dir + "/" + await submissionName(env),
-    value: canonical(env),
-  });
+  const query = "filename=" + quoteLikePython(DATA.submissions_dir + "/" + await submissionName(env))
+    + "&value=" + quoteLikePython(canonical(env));
   return "https://github.com/" + DATA.repo + "/new/" + DATA.branch + "?" + query;
+}
+
+function uploadUrl() {
+  return "https://github.com/" + DATA.repo + "/upload/" + DATA.branch + "/" + DATA.submissions_dir;
+}
+
+// The editor link when it fits GitHub's limit, and the upload page when it
+// does not. The limit is the Python's, carried in DATA, so the two pages open
+// the same door for the same file; `evals.review_submission.contribution_route`
+// is the reader this agrees with.
+async function contributionRoute(env) {
+  const editor = await contributionUrl(env);
+  if (editor.length <= DATA.editor_url_limit) return {kind: "editor", url: editor};
+  return {kind: "upload", url: uploadUrl()};
+}
+
+// The submission itself, under the name CI expects, for the upload door.
+async function downloadSubmission(env) {
+  const blob = new Blob([canonical(env)], {type: "application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = await submissionName(env);
+  document.body.append(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 // The window is opened from the click and before the await, because a popup
@@ -282,7 +318,13 @@ async function publishToGitHub() {
     return;
   }
   opened.opener = null;
-  opened.location = await contributionUrl(envelope(ready));
+  const env = envelope(ready);
+  const route = await contributionRoute(env);
+  if (route.kind === "upload") {
+    await downloadSubmission(env);
+    alert("Your review is too long for GitHub's editor link, so the file was downloaded. Drop it onto the upload page that opens, keep its name as downloaded, and press the button GitHub shows.");
+  }
+  opened.location = route.url;
 }
 
 function restore(text) {

@@ -623,6 +623,7 @@ async function loadStage() {
   hide("result");
   hide("thanks");
   hide("browserSteps");
+  hide("uploadSteps");
   $("contributeStatus").textContent = "";
 }
 
@@ -685,7 +686,11 @@ $("submit").addEventListener("click", async () => {
     show("result");
     return;
   }
-  $("contributeLink").href = d.url;
+  // Which door GitHub opens is the server's call, from one limit both pages
+  // read: the editor with the file typed in, or the upload page for a file
+  // the reader drops in. The download below serves both.
+  const steps = d.route === "upload" ? "uploadSteps" : "browserSteps";
+  $(steps === "uploadSteps" ? "uploadLink" : "contributeLink").href = d.url;
   const blob = new Blob([d.content], {type: "application/json"});
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -696,8 +701,8 @@ $("submit").addEventListener("click", async () => {
   a.remove();
   URL.revokeObjectURL(url);
   $("contributeStatus").textContent = "Ready to publish";
-  show("browserSteps");
-  $("browserSteps").scrollIntoView({block: "nearest"});
+  show(steps);
+  $(steps).scrollIntoView({block: "nearest"});
 });
 
 // --- Wiring ------------------------------------------------------------------

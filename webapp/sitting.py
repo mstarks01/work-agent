@@ -162,16 +162,20 @@ def _preview(session: Session, envelope: envelopes.Envelope) -> dict[str, str]:
 
     ``url`` opens GitHub's editor with the file already typed, so the way out
     is one press rather than a download, a search for the right directory and a
-    drag. The content rides beside it because a reader is entitled to read what
-    they are about to publish before they publish it.
+    drag. A file too long for that link opens GitHub's upload page instead, and
+    ``route`` says which, so the page shows the steps for the door it opened.
+    The content rides beside it because a reader is entitled to read what they
+    are about to publish before they publish it.
     """
+    route = review_submissions.contribution_route(
+        envelope, submit_spine.repo_slug(session.root)
+    )
     return {
         "filename": review_submissions.submission_name(envelope),
         "path": review_submissions.relative_path(envelope),
         "content": review_submissions.serialize(envelope).decode("utf-8"),
-        "url": review_submissions.contribution_url(
-            envelope, submit_spine.repo_slug(session.root)
-        ),
+        "url": route.url,
+        "route": route.kind,
     }
 
 
@@ -389,6 +393,7 @@ details.standard { margin:.3rem 0 .1rem; font-size:.88rem; } details.standard su
 <p><button id="showFiles">Show files</button> <button id="submit">Contribute</button><span id="contributeStatus" class="save-status" role="status"></span></p>
 <pre id="result" class="hidden"></pre><p id="thanks" class="hidden">Thank you for contributing this review.</p>
 <div id="browserSteps" class="note hidden"><p><b>Your review is ready to publish.</b></p><p>The link below opens GitHub with the file and its name already filled in. Sign in if you need to. GitHub shows one of two buttons. An account without write access presses <b>Propose changes</b>, and GitHub opens the pull request. An account with write access presses <b>Commit changes</b> and then chooses <b>Create a new branch for this commit and start a pull request</b>, because the default there commits straight to main. CI validates the review before it can merge.</p><p><a id="contributeLink" href="#" target="_blank" rel="noopener">Open the pull request on GitHub</a></p><p class="sub">A copy has also been downloaded, in case you would rather upload it by hand.</p></div>
+<div id="uploadSteps" class="note hidden"><p><b>Your review is ready to publish, and it is too long for GitHub's editor link.</b></p><p>The file has been downloaded. The link below opens GitHub's upload page at the folder it belongs in. Sign in if you need to, drop the downloaded file onto the page, and keep its name exactly as downloaded. GitHub then shows one of two buttons. An account without write access presses <b>Propose changes</b>, and GitHub opens the pull request. An account with write access presses <b>Commit changes</b> and then chooses <b>Create a new branch for this commit and start a pull request</b>, because the default there commits straight to main. CI validates the review before it can merge.</p><p><a id="uploadLink" href="#" target="_blank" rel="noopener">Open the upload page on GitHub</a></p></div>
 <div id="filePreview" class="file-preview hidden"><h3>Files to submit</h3><p id="previewPath"></p><pre id="previewContent"></pre></div>
 </section></article>
 </main>
