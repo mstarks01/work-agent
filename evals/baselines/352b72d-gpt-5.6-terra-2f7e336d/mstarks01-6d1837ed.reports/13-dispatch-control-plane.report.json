@@ -1,0 +1,2204 @@
+{
+  "schema_version": "3.0",
+  "disclaimer": "AI-generated security analysis. Not reviewed by a human security analyst.",
+  "job": {
+    "id": "eval-13-dispatch-control-plane",
+    "status": "completed",
+    "created_at": "2026-09-09T16:32:11.484605Z",
+    "completed_at": "2026-09-09T16:32:11.484605Z",
+    "revise_rounds": 0,
+    "frameworks": [
+      {
+        "name": "stride",
+        "options": {}
+      }
+    ]
+  },
+  "input": {
+    "system_name": "Browser dispatch console reaching a production control plane, fed by a partner's SOAP schedule",
+    "sources": [
+      {
+        "kind": "description",
+        "label": "System description",
+        "sha256": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7"
+      }
+    ],
+    "source_sha256": "dbe860e5ea0f36087c47975d1b907632bc82dff402690c9540b8f65cbbe3ff1d"
+  },
+  "nodes": [
+    {
+      "node": "prepare",
+      "model": null,
+      "requested_model": null,
+      "instruction_sha256": null,
+      "execution_fingerprint": null,
+      "duration_ms": 4,
+      "usage": null,
+      "attempts": 1,
+      "served_trust": null
+    },
+    {
+      "node": "analyze_stride_repudiation",
+      "model": "openai/gpt-5.6-terra",
+      "requested_model": "openai/gpt-5.6-terra",
+      "instruction_sha256": "8fe334168e615b7a432527f1e6ae98de06af039dd6f8c7d3c45d5808fd0ae063",
+      "execution_fingerprint": "f4d1569117bfce459cb26ce4a5d158a0aba059553475779f50cb149823de09aa",
+      "duration_ms": 34936,
+      "usage": {
+        "prompt_tokens": 18047,
+        "cached_prompt_tokens": 0,
+        "completion_tokens": 2251,
+        "reasoning_tokens": 1023,
+        "total_tokens": 20298
+      },
+      "attempts": 1,
+      "served_trust": "provider_reported"
+    },
+    {
+      "node": "analyze_stride_elevation_of_privilege",
+      "model": "openai/gpt-5.6-terra",
+      "requested_model": "openai/gpt-5.6-terra",
+      "instruction_sha256": "8fe334168e615b7a432527f1e6ae98de06af039dd6f8c7d3c45d5808fd0ae063",
+      "execution_fingerprint": "f4d1569117bfce459cb26ce4a5d158a0aba059553475779f50cb149823de09aa",
+      "duration_ms": 41804,
+      "usage": {
+        "prompt_tokens": 17918,
+        "cached_prompt_tokens": 0,
+        "completion_tokens": 2907,
+        "reasoning_tokens": 1712,
+        "total_tokens": 20825
+      },
+      "attempts": 1,
+      "served_trust": "provider_reported"
+    },
+    {
+      "node": "analyze_stride_denial_of_service",
+      "model": "openai/gpt-5.6-terra",
+      "requested_model": "openai/gpt-5.6-terra",
+      "instruction_sha256": "8fe334168e615b7a432527f1e6ae98de06af039dd6f8c7d3c45d5808fd0ae063",
+      "execution_fingerprint": "f4d1569117bfce459cb26ce4a5d158a0aba059553475779f50cb149823de09aa",
+      "duration_ms": 47346,
+      "usage": {
+        "prompt_tokens": 17247,
+        "cached_prompt_tokens": 0,
+        "completion_tokens": 3109,
+        "reasoning_tokens": 1388,
+        "total_tokens": 20356
+      },
+      "attempts": 1,
+      "served_trust": "provider_reported"
+    },
+    {
+      "node": "analyze_stride_tampering",
+      "model": "openai/gpt-5.6-terra",
+      "requested_model": "openai/gpt-5.6-terra",
+      "instruction_sha256": "8fe334168e615b7a432527f1e6ae98de06af039dd6f8c7d3c45d5808fd0ae063",
+      "execution_fingerprint": "f4d1569117bfce459cb26ce4a5d158a0aba059553475779f50cb149823de09aa",
+      "duration_ms": 49030,
+      "usage": {
+        "prompt_tokens": 18058,
+        "cached_prompt_tokens": 0,
+        "completion_tokens": 3356,
+        "reasoning_tokens": 1241,
+        "total_tokens": 21414
+      },
+      "attempts": 1,
+      "served_trust": "provider_reported"
+    },
+    {
+      "node": "analyze_stride_information_disclosure",
+      "model": "openai/gpt-5.6-terra",
+      "requested_model": "openai/gpt-5.6-terra",
+      "instruction_sha256": "8fe334168e615b7a432527f1e6ae98de06af039dd6f8c7d3c45d5808fd0ae063",
+      "execution_fingerprint": "f4d1569117bfce459cb26ce4a5d158a0aba059553475779f50cb149823de09aa",
+      "duration_ms": 51512,
+      "usage": {
+        "prompt_tokens": 18223,
+        "cached_prompt_tokens": 0,
+        "completion_tokens": 3424,
+        "reasoning_tokens": 1387,
+        "total_tokens": 21647
+      },
+      "attempts": 1,
+      "served_trust": "provider_reported"
+    },
+    {
+      "node": "analyze_stride_spoofing",
+      "model": "openai/gpt-5.6-terra",
+      "requested_model": "openai/gpt-5.6-terra",
+      "instruction_sha256": "8fe334168e615b7a432527f1e6ae98de06af039dd6f8c7d3c45d5808fd0ae063",
+      "execution_fingerprint": "f4d1569117bfce459cb26ce4a5d158a0aba059553475779f50cb149823de09aa",
+      "duration_ms": 60706,
+      "usage": {
+        "prompt_tokens": 17528,
+        "cached_prompt_tokens": 0,
+        "completion_tokens": 4051,
+        "reasoning_tokens": 1707,
+        "total_tokens": 21579
+      },
+      "attempts": 1,
+      "served_trust": "provider_reported"
+    },
+    {
+      "node": "join_stride",
+      "model": null,
+      "requested_model": null,
+      "instruction_sha256": null,
+      "execution_fingerprint": null,
+      "duration_ms": 1,
+      "usage": null,
+      "attempts": 1,
+      "served_trust": null
+    },
+    {
+      "node": "merge_stride",
+      "model": null,
+      "requested_model": null,
+      "instruction_sha256": null,
+      "execution_fingerprint": null,
+      "duration_ms": 7,
+      "usage": null,
+      "attempts": 1,
+      "served_trust": null
+    },
+    {
+      "node": "critic_stride",
+      "model": "openai/gpt-5.6-terra",
+      "requested_model": "openai/gpt-5.6-terra",
+      "instruction_sha256": "8fe334168e615b7a432527f1e6ae98de06af039dd6f8c7d3c45d5808fd0ae063",
+      "execution_fingerprint": "f4d1569117bfce459cb26ce4a5d158a0aba059553475779f50cb149823de09aa",
+      "duration_ms": 22140,
+      "usage": {
+        "prompt_tokens": 10171,
+        "cached_prompt_tokens": 0,
+        "completion_tokens": 1042,
+        "reasoning_tokens": 867,
+        "total_tokens": 11213
+      },
+      "attempts": 1,
+      "served_trust": "provider_reported"
+    },
+    {
+      "node": "router_stride",
+      "model": null,
+      "requested_model": null,
+      "instruction_sha256": null,
+      "execution_fingerprint": null,
+      "duration_ms": 2,
+      "usage": null,
+      "attempts": 1,
+      "served_trust": null
+    },
+    {
+      "node": "assemble",
+      "model": null,
+      "requested_model": null,
+      "instruction_sha256": null,
+      "execution_fingerprint": null,
+      "duration_ms": 3,
+      "usage": null,
+      "attempts": 1,
+      "served_trust": null
+    }
+  ],
+  "sampling": {
+    "base": {
+      "temperature": null,
+      "top_p": null,
+      "seed": null,
+      "max_output_tokens": 16384,
+      "candidate_count": 1,
+      "presence_penalty": null,
+      "frequency_penalty": null,
+      "thinking": null,
+      "constrain_output": true
+    },
+    "strong": {
+      "temperature": null,
+      "top_p": null,
+      "seed": null,
+      "max_output_tokens": 64000,
+      "candidate_count": 1,
+      "presence_penalty": null,
+      "frequency_penalty": null,
+      "thinking": null,
+      "constrain_output": true
+    },
+    "review": {
+      "temperature": null,
+      "top_p": null,
+      "seed": null,
+      "max_output_tokens": 64000,
+      "candidate_count": 1,
+      "presence_penalty": null,
+      "frequency_penalty": null,
+      "thinking": null,
+      "constrain_output": true
+    }
+  },
+  "system_model": {
+    "external_entities": [
+      {
+        "id": "entity:duty-engineer",
+        "name": "duty engineer",
+        "description": "Sits on the corporate network and dispatches field crews from the console.",
+        "assets": [],
+        "source_excerpt": "Duty engineers sit on the corporate network. They open the dispatch console in their browser.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:corporate-network"
+      },
+      {
+        "id": "entity:scheduling-partner",
+        "name": "scheduling partner",
+        "description": "Another company that publishes tomorrow's planned work as a SOAP feed.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "A scheduling partner, which is another company, publishes tomorrow's planned work.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:scheduling-partner-platform"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:dispatch-console",
+        "name": "dispatch console",
+        "description": "Single-page JavaScript app the engineer opens in a browser; the corporate web host serves it, and it calls the dispatch API from a different origin.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "The console is a single-page JavaScript app and our corporate web host serves it.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "single-page JavaScript app in the browser",
+        "trust_zone": "boundary:corporate-network",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:dispatch-api",
+        "name": "dispatch API",
+        "description": "Runs in the production control plane; moves crews, changes a depot's work for the day, and reads and writes the dispatch database.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "The console calls the dispatch API. The dispatch API runs in the production control plane.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:production-control-plane",
+        "exposure": "internal",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:schedule-importer",
+        "name": "schedule importer",
+        "description": "Runs on the corporate network; every hour it pulls the partner's feed, parses it, archives the document, and posts the parsed work orders to the dispatch API.",
+        "assets": [
+          "business-critical-data",
+          "credentials"
+        ],
+        "source_excerpt": "Every hour it pulls the partner's SOAP feed over HTTPS and parses the XML document it gets back.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "parses the partner's SOAP feed as an XML document; no product named",
+        "trust_zone": "boundary:corporate-network",
+        "exposure": "unknown",
+        "interface_kind": "non-web"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:dispatch-database",
+        "name": "dispatch database",
+        "description": "Holds the job orders, the crew names and the crew mobile numbers. Each job order carries the token or session that created it and nothing about the person behind it.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "That database holds the job orders, the crew names and the crew mobile numbers.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The source states the at-rest protection is not written down anywhere, so this is a gap somebody registered rather than a topic nobody raised.",
+        "technology": "unknown",
+        "trust_zone": "boundary:production-control-plane",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:schedule-archive",
+        "name": "schedule archive",
+        "description": "Folder on the corporate file store holding every XML document the importer downloads.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "It writes each document it downloads into the schedule archive, a folder on the corporate file store.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "folder on the corporate file store",
+        "trust_zone": "boundary:corporate-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:duty-engineer-to-dispatch-console:open-console",
+        "name": "open console",
+        "description": "The engineer opens the console in their browser and signs in to it.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "They open the dispatch console in their browser.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The source states nobody wrote down how an engineer signs in.",
+        "source": "entity:duty-engineer",
+        "destination": "process:dispatch-console",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "the engineer's sign-in",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:dispatch-console-to-dispatch-api:dispatch-requests",
+        "name": "dispatch requests",
+        "description": "The console calls the dispatch API cross-origin, because the two are served from different origins; which origins the API allows, and whether it allows credentials, is not recorded.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "The console and the API are served from different origins, so the API answers the console cross-origin.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:dispatch-console",
+        "destination": "process:dispatch-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "dispatch actions: moving a crew and changing a depot's work for the day",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:dispatch-console-to-dispatch-api:live-job-status",
+        "name": "live job status",
+        "description": "The console opens a WebSocket to the dispatch API and holds it open for live job status.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "The console also opens a WebSocket to the dispatch API and holds it open for live job status.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The source states nobody wrote down whether the socket runs over TLS, whether its handshake is authenticated, or whether it checks the session again once open.",
+        "source": "process:dispatch-console",
+        "destination": "process:dispatch-api",
+        "protocol": "WebSocket",
+        "authentication": "unknown",
+        "data_description": "live job status for the crews on screen",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
+        "name": "pull schedule feed",
+        "description": "The importer pulls the partner's SOAP feed every hour and parses the XML document it gets back.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "Every hour it pulls the partner's SOAP feed over HTTPS and parses the XML document it gets back.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The source states nothing was written down about how the partner identifies our importer, or how our importer identifies the partner.",
+        "source": "process:schedule-importer",
+        "destination": "entity:scheduling-partner",
+        "protocol": "SOAP over HTTPS",
+        "authentication": "unknown",
+        "data_description": "tomorrow's planned work, as an XML document",
+        "encryption_in_transit": "encrypted (HTTPS)",
+        "operations": "read"
+      },
+      {
+        "id": "flow:schedule-importer-to-schedule-archive:store-schedule-documents",
+        "name": "store schedule documents",
+        "description": "The importer writes each downloaded XML document into the archive folder.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "It writes each document it downloads into the schedule archive, a folder on the corporate file store.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:schedule-importer",
+        "destination": "store:schedule-archive",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "the partner's XML schedule documents",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:schedule-importer-to-dispatch-api:post-work-orders",
+        "name": "post work orders",
+        "description": "The importer posts the parsed work orders to the same dispatch API the console calls.",
+        "assets": [
+          "business-critical-data",
+          "credentials"
+        ],
+        "source_excerpt": "The importer then posts the parsed work orders to the same dispatch API the console calls. It presents an API token.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:schedule-importer",
+        "destination": "process:dispatch-api",
+        "protocol": "unknown",
+        "authentication": "an API token issued when the importer was built and never rotated since",
+        "data_description": "the work orders parsed out of the partner's feed",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:dispatch-api-to-dispatch-database:read-write-job-orders",
+        "name": "read write job orders",
+        "description": "The API reads and writes the job orders and the crew details behind them.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "The dispatch API reads and writes the dispatch database.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:dispatch-api",
+        "destination": "store:dispatch-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "job orders, crew names and crew mobile numbers",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:corporate-network",
+        "name": "corporate network",
+        "description": "Where the duty engineers, their browsers and the schedule importer sit. Same company as the control plane, and a laptop here holds none of the control plane's rights.",
+        "assets": [],
+        "source_excerpt": "Duty engineers sit on the corporate network.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:production-control-plane",
+        "name": "production control plane",
+        "description": "Same company and same staff as the corporate network, and it holds the live estate: an account here can move a crew and change a depot's work for the day. Not reachable from the internet.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "The control plane is the same company and the same staff, but it is the zone that holds the live estate: an account there can move a crew, and it can change the work a depot does that day. A corporate laptop holds none of those rights.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "privilege"
+      },
+      {
+        "id": "boundary:scheduling-partner-platform",
+        "name": "scheduling partner platform",
+        "description": "Run by another company; the source says nothing else about it.",
+        "assets": [],
+        "source_excerpt": "A scheduling partner, which is another company, publishes tomorrow's planned work.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The dispatch API is not reachable from the internet.",
+        "element_id": "process:dispatch-api",
+        "attribute": "exposure",
+        "basis": "The source states the control plane is not reachable from the internet, and places the dispatch API in it; the source states nothing about the API's own exposure."
+      }
+    ]
+  },
+  "boundary_crossings": [
+    {
+      "flow_id": "flow:dispatch-console-to-dispatch-api:dispatch-requests",
+      "source_zone": "boundary:corporate-network",
+      "destination_zone": "boundary:production-control-plane"
+    },
+    {
+      "flow_id": "flow:dispatch-console-to-dispatch-api:live-job-status",
+      "source_zone": "boundary:corporate-network",
+      "destination_zone": "boundary:production-control-plane"
+    },
+    {
+      "flow_id": "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
+      "source_zone": "boundary:corporate-network",
+      "destination_zone": "boundary:scheduling-partner-platform"
+    },
+    {
+      "flow_id": "flow:schedule-importer-to-dispatch-api:post-work-orders",
+      "source_zone": "boundary:corporate-network",
+      "destination_zone": "boundary:production-control-plane"
+    }
+  ],
+  "shared_element_names": [],
+  "elements_analyzed": 17,
+  "model_repair": null,
+  "analysis_context": {
+    "instruction_sha256": "8fe334168e615b7a432527f1e6ae98de06af039dd6f8c7d3c45d5808fd0ae063",
+    "domain_packs": [
+      "http-api",
+      "multi-tenant-saas"
+    ]
+  },
+  "execution": {
+    "identity_version": 2,
+    "build": {
+      "analysis-service": "0.1.0",
+      "google-adk": "2.5.0",
+      "google-genai": "2.11.0",
+      "litellm": "1.97.0"
+    },
+    "review_independence": "shared"
+  },
+  "analyses": [
+    {
+      "framework": "stride",
+      "framework_version": "1.0",
+      "disclaimer": "AI-generated STRIDE threat model. Each claim asserts that an attacker action against the named elements is credible against what the submitted text stated — never that a control is absent, and never that anything not listed here is safe. Not reviewed by a human security analyst.",
+      "claims": [
+        {
+          "id": "D-01",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Long-lived WebSocket connections can exhaust dispatch API capacity",
+          "description": "An attacker with a foothold on the corporate network can open and retain many connections on `flow:dispatch-console-to-dispatch-api:live-job-status` to consume finite socket, worker, memory, or connection-pool capacity at `process:dispatch-api`. This is conditional on the unverified handshake authentication and on whether per-client connection limits and idle timeouts exist: `flow:dispatch-console-to-dispatch-api:live-job-status` crosses from the corporate network into the production control plane and is explicitly designed to remain open. The attacker pays only to maintain sockets while the API bears their state and scheduling cost. Second-order, exhaustion of the shared `process:dispatch-api` prevents legitimate live-status sessions and delays or rejects dispatch changes on `flow:dispatch-console-to-dispatch-api:dispatch-requests` and parsed work-order posts on `flow:schedule-importer-to-dispatch-api:post-work-orders`; the API's database operations on `flow:dispatch-api-to-dispatch-database:read-write-job-orders` are also stalled.",
+          "affected_element_ids": [
+            "process:dispatch-api",
+            "flow:dispatch-console-to-dispatch-api:live-job-status"
+          ],
+          "verb": "flood",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "The console also opens a WebSocket to the dispatch API and holds it open for live job status.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:dispatch-console-to-dispatch-api:live-job-status",
+              "term": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:dispatch-console-to-dispatch-api:live-job-status",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "The claim rests on `authentication` on `flow:dispatch-console-to-dispatch-api:live-job-status`, which the input never stated.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:dispatch-console-to-dispatch-api:live-job-status",
+                "attribute": "authentication",
+                "subject": ""
+              }
+            ],
+            "rejected_because": null
+          },
+          "category": "denial-of-service",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium: the attack originates from `boundary:corporate-network` across `crossing:flow:dispatch-console-to-dispatch-api:live-job-status`, requiring a corporate-network foothold, but the WebSocket handshake authentication is unverified (`unknown:flow:dispatch-console-to-dispatch-api:live-job-status:authentication`). Impact is high: `process:dispatch-api` performs the live production dispatch operations and is shared by both console dispatch requests and the schedule importer, so exhaustion disrupts the ability to move crews and change depot work."
+          },
+          "mitigations": [
+            {
+              "summary": "Bound WebSocket lifetime and per-client concurrency",
+              "detail": "Require authentication at the WebSocket handshake and revalidate sessions as appropriate; impose per-identity and per-source connection caps, aggressive idle and read timeouts, message-size limits, and heartbeat-based disconnection on `flow:dispatch-console-to-dispatch-api:live-job-status`."
+            },
+            {
+              "summary": "Bulkhead live status from dispatch writes",
+              "detail": "Reserve bounded concurrency and connection capacity at `process:dispatch-api` for dispatch actions and importer posts, and shed excess live-status connections rather than allowing them to queue behind or consume write-path resources."
+            }
+          ],
+          "confidence": "low"
+        },
+        {
+          "id": "E-01",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Unverified corporate-to-control-plane API transition could grant live dispatch authority",
+          "description": "An attacker with a foothold on `boundary:corporate-network` can invoke `process:dispatch-api` through `flow:dispatch-console-to-dispatch-api:dispatch-requests` and `flow:dispatch-console-to-dispatch-api:live-job-status`, both of which cross into the privilege boundary `boundary:production-control-plane`. Authentication on both crossings is unknown. If `process:dispatch-api` does not authenticate the original engineer and enforce their authorization server-side on every request and WebSocket session, the attacker escalates from corporate-network access, which holds no control-plane rights, to production authority to move crews and change a depot's work. Second-order, the API's read/write path `flow:dispatch-api-to-dispatch-database:read-write-job-orders` reaches `store:dispatch-database`, allowing changes to dispatch records and access to crew names and mobile numbers.",
+          "affected_element_ids": [
+            "process:dispatch-api",
+            "flow:dispatch-console-to-dispatch-api:dispatch-requests",
+            "flow:dispatch-console-to-dispatch-api:live-job-status"
+          ],
+          "verb": "escalate",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "A corporate laptop holds none of those rights.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:dispatch-console-to-dispatch-api:dispatch-requests",
+              "term": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:dispatch-console-to-dispatch-api:live-job-status",
+              "term": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:dispatch-console-to-dispatch-api:dispatch-requests",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:dispatch-console-to-dispatch-api:live-job-status",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "The claim rests on `authentication` on `flow:dispatch-console-to-dispatch-api:dispatch-requests`, `authentication` on `flow:dispatch-console-to-dispatch-api:live-job-status`, which the input never stated.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:dispatch-console-to-dispatch-api:dispatch-requests",
+                "attribute": "authentication",
+                "subject": ""
+              },
+              {
+                "element_id": "flow:dispatch-console-to-dispatch-api:live-job-status",
+                "attribute": "authentication",
+                "subject": ""
+              }
+            ],
+            "rejected_because": null
+          },
+          "category": "elevation-of-privilege",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional on the unknown authentication of both boundary-crossing flows: the attacker requires a corporate-network foothold, but the model states no receiving authentication control. Impact is high because `process:dispatch-api` is in `boundary:production-control-plane`, whose account can move crews and change depot work, and it has read/write access to `store:dispatch-database`, which holds PII and business-critical dispatch data."
+          },
+          "mitigations": [
+            {
+              "summary": "Enforce authentication and authorization at the dispatch API boundary",
+              "detail": "Have `process:dispatch-api` verify the engineer identity on `flow:dispatch-console-to-dispatch-api:dispatch-requests` and authorize each requested crew or depot action server-side; deny requests without an explicit permitted action."
+            },
+            {
+              "summary": "Bind WebSocket access to an authorized session",
+              "detail": "Require an authenticated WebSocket handshake on `flow:dispatch-console-to-dispatch-api:live-job-status`, revalidate authorization during the session, and limit subscribed job status to the engineer's permitted scope."
+            }
+          ],
+          "confidence": "low"
+        },
+        {
+          "id": "I-02",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "The importer's long-lived API token may be exposed while work orders cross into the control plane",
+          "description": "`flow:schedule-importer-to-dispatch-api:post-work-orders` crosses from `boundary:corporate-network` into `boundary:production-control-plane`, carries an API token and work orders, and has `encryption_in_transit: unknown`. If transport protection is absent or incomplete on this hop, an on-path attacker in the corporate network can intercept the unrotated importer token as well as planned-work data. Holding that token enables subsequent access to `process:dispatch-api`, which accepts posts that affect the live dispatch estate; that second-order use is an authorization or integrity consequence, while this claim is the credential disclosure itself. This is conditional on verifying the hop's transport protection.",
+          "affected_element_ids": [
+            "flow:schedule-importer-to-dispatch-api:post-work-orders",
+            "process:schedule-importer",
+            "process:dispatch-api"
+          ],
+          "verb": "intercept",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "It presents an API token. That token was issued when the importer was built and nobody has rotated it since.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:schedule-importer-to-dispatch-api:post-work-orders",
+              "attribute": "encryption_in_transit",
+              "flow_id": "",
+              "term": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:schedule-importer-to-dispatch-api:post-work-orders",
+              "term": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "The claim rests on `encryption_in_transit` on `flow:schedule-importer-to-dispatch-api:post-work-orders`, which the input never stated.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:schedule-importer-to-dispatch-api:post-work-orders",
+                "attribute": "encryption_in_transit",
+                "subject": ""
+              }
+            ],
+            "rejected_because": null
+          },
+          "category": "information-disclosure",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional: the flow crosses from the corporate network to the production control plane and its transport encryption is unverified, but interception requires an on-path corporate-network position. Impact is high because the disclosed long-lived API token reaches `process:dispatch-api`, whose modelled role includes changing live crew and depot work."
+          },
+          "mitigations": [
+            {
+              "summary": "Enforce mTLS or TLS on the importer-to-API hop",
+              "detail": "Set verified TLS protection for `flow:schedule-importer-to-dispatch-api:post-work-orders`; use mTLS where feasible so the importer also verifies the API peer."
+            },
+            {
+              "summary": "Replace and rotate the standing API token",
+              "detail": "Move the importer credential to a dedicated secret store, issue short-lived scoped credentials, and immediately rotate the token that has never been rotated."
+            }
+          ],
+          "confidence": "low"
+        },
+        {
+          "id": "I-04",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "A storage-layer copy could disclose all dispatch records if database encryption at rest is absent",
+          "description": "`store:dispatch-database` holds job orders, crew names, and crew mobile numbers and is tagged `pii`, but `encryption_at_rest` is `unknown`. If this unknown resolves to no effective encryption at rest, an attacker or over-privileged operator who obtains a database volume, snapshot, backup, or other operational copy can read the corpus directly without authenticating through `process:dispatch-api`. The resulting crew contact and dispatch-history dataset can be combined with intercepted or otherwise obtained operational information to target specific crews and work. This claim is conditional on the unverified at-rest protection; it does not assert that the database is currently unencrypted.",
+          "affected_element_ids": [
+            "store:dispatch-database"
+          ],
+          "verb": "read",
+          "grounds": [
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "store:dispatch-database",
+              "attribute": "encryption_at_rest",
+              "flow_id": "",
+              "term": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "The claim rests on `encryption_at_rest` on `store:dispatch-database`, which the input never stated.",
+            "related_unknowns": [
+              {
+                "element_id": "store:dispatch-database",
+                "attribute": "encryption_at_rest",
+                "subject": ""
+              }
+            ],
+            "rejected_because": null
+          },
+          "category": "information-disclosure",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional on `unknown:store:dispatch-database:encryption_at_rest`: a copied volume or backup bypasses the application path, although the protection may be present once verified. Impact is high because `store:dispatch-database` contains the dispatch corpus and is tagged `pii`, including crew names and mobile numbers."
+          },
+          "mitigations": [
+            {
+              "summary": "Verify and enforce encryption at rest for the dispatch database",
+              "detail": "Establish the at-rest posture of `store:dispatch-database` and require managed-key or customer-managed-key encryption for its primary storage, backups, snapshots, and replicas."
+            },
+            {
+              "summary": "Constrain access to operational copies and keys",
+              "detail": "Use separate least-privilege principals for backup, restore, and key use; restrict snapshot export and monitor unusual backup or volume-access activity."
+            }
+          ],
+          "confidence": "low"
+        },
+        {
+          "id": "S-01",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Unauthenticated console access could let a corporate attacker act as a duty engineer",
+          "description": "`flow:duty-engineer-to-dispatch-console:open-console` has `authentication: unknown`. If this unknown resolves to absent or ineffective engineer authentication, an attacker who has obtained access to `boundary:corporate-network` can impersonate `entity:duty-engineer` to `process:dispatch-console`. Second-order: the browser console initiates `flow:dispatch-console-to-dispatch-api:dispatch-requests`, so the impostor can attempt dispatch actions against the production control plane, including moving crews and changing a depot's work for the day. This is conditional on the undocumented authentication state, not an assertion that the console currently permits anonymous access.",
+          "affected_element_ids": [
+            "entity:duty-engineer",
+            "process:dispatch-console",
+            "flow:duty-engineer-to-dispatch-console:open-console"
+          ],
+          "verb": "impersonate",
+          "grounds": [
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:duty-engineer-to-dispatch-console:open-console",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "The claim rests on `authentication` on `flow:duty-engineer-to-dispatch-console:open-console`, which the input never stated.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:duty-engineer-to-dispatch-console:open-console",
+                "attribute": "authentication",
+                "subject": ""
+              }
+            ],
+            "rejected_because": null
+          },
+          "category": "spoofing",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional because authentication on `flow:duty-engineer-to-dispatch-console:open-console` is unknown, while exploitation requires a foothold in `boundary:corporate-network`. Impact is high because `process:dispatch-console` can send dispatch-changing requests to `process:dispatch-api` in `boundary:production-control-plane`, which is tagged `business-critical-data` and controls live crew and depot work."
+          },
+          "mitigations": [
+            {
+              "summary": "Establish and enforce individual engineer authentication for the console",
+              "detail": "Document the authentication state of `flow:duty-engineer-to-dispatch-console:open-console` and require a verified, individual identity before serving an authenticated console session."
+            },
+            {
+              "summary": "Use phishing-resistant MFA for dispatch engineers",
+              "detail": "Require WebAuthn/passkeys for `entity:duty-engineer` and bind the resulting session to the browser's subsequent dispatch requests."
+            }
+          ],
+          "confidence": "low"
+        },
+        {
+          "id": "S-02",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "A corporate foothold could forge dispatch actions if API caller authentication is absent",
+          "description": "`flow:dispatch-console-to-dispatch-api:dispatch-requests` crosses from `boundary:corporate-network` to `boundary:production-control-plane` with `authentication: unknown`. If `process:dispatch-api` does not verify a caller identity on this flow, an attacker with a corporate-network foothold can send requests impersonating the trusted `process:dispatch-console` or an authorized engineer. The attacker can thereby move crews or change a depot's work through `process:dispatch-api`. Second-order: the API reads and writes job orders and crew details in `store:dispatch-database`, extending the forged caller's reach to operational data and crew PII. This claim is conditional on the unknown authentication attribute.",
+          "affected_element_ids": [
+            "process:dispatch-console",
+            "process:dispatch-api",
+            "flow:dispatch-console-to-dispatch-api:dispatch-requests"
+          ],
+          "verb": "impersonate",
+          "grounds": [
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:dispatch-console-to-dispatch-api:dispatch-requests",
+              "term": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:dispatch-console-to-dispatch-api:dispatch-requests",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "The claim rests on `authentication` on `flow:dispatch-console-to-dispatch-api:dispatch-requests`, which the input never stated.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:dispatch-console-to-dispatch-api:dispatch-requests",
+                "attribute": "authentication",
+                "subject": ""
+              }
+            ],
+            "rejected_because": null
+          },
+          "category": "spoofing",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional on the unknown authentication control: the crossing starts in `boundary:corporate-network`, so an attacker needs a corporate-network foothold, but no verified caller identity is recorded. Impact is high because `process:dispatch-api` performs write operations that move crews and change depot work, and reaches `store:dispatch-database`, tagged `pii` and `business-critical-data`."
+          },
+          "mitigations": [
+            {
+              "summary": "Authenticate every console-to-API request across the boundary",
+              "detail": "Make authentication on `flow:dispatch-console-to-dispatch-api:dispatch-requests` explicit and require the API to validate a short-lived, audience-bound user or workload token rather than trust network reachability."
+            },
+            {
+              "summary": "Bind dispatch authorization to the verified engineer identity",
+              "detail": "Have `process:dispatch-api` authorize each requested dispatch action using the verified identity and reject caller-supplied identity claims that are not protected by the credential."
+            }
+          ],
+          "confidence": "low"
+        },
+        {
+          "id": "S-05",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "A stolen long-lived importer token lets an attacker post work orders as the importer",
+          "description": "`flow:schedule-importer-to-dispatch-api:post-work-orders` crosses from `boundary:corporate-network` into `boundary:production-control-plane` and authenticates with an API token that was issued when `process:schedule-importer` was built and has never been rotated. An attacker who obtains that token can replay it to `process:dispatch-api` and impersonate the importer to submit fabricated work orders. Second-order: the API writes job orders and crew details to `store:dispatch-database`, so the impersonation can alter operational dispatch data and affect the crew information associated with those orders. The model establishes the token's long unrotated lifetime; its channel binding and storage protections need confirmation.",
+          "affected_element_ids": [
+            "process:schedule-importer",
+            "process:dispatch-api",
+            "flow:schedule-importer-to-dispatch-api:post-work-orders"
+          ],
+          "verb": "use-credential",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "It presents an API token. That token was issued when the importer was built and nobody has rotated it since.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:schedule-importer-to-dispatch-api:post-work-orders",
+              "term": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:schedule-importer-to-dispatch-api:post-work-orders",
+              "attribute": "encryption_in_transit",
+              "flow_id": "",
+              "term": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "The claim rests on `encryption_in_transit` on `flow:schedule-importer-to-dispatch-api:post-work-orders`, which the input never stated.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:schedule-importer-to-dispatch-api:post-work-orders",
+                "attribute": "encryption_in_transit",
+                "subject": ""
+              }
+            ],
+            "rejected_because": null
+          },
+          "category": "spoofing",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium because a stolen API token is replayable as the importer and its unrotated lifetime increases the opportunity for use, though the attacker must first obtain it and the production API is internal. Impact is high because the token authorizes writes to `process:dispatch-api`, which changes live dispatch work and writes data reaching `store:dispatch-database`, tagged `pii` and `business-critical-data`."
+          },
+          "mitigations": [
+            {
+              "summary": "Replace the long-lived API token with a short-lived workload credential",
+              "detail": "Use mTLS workload identity or short-lived, audience-bound tokens for `flow:schedule-importer-to-dispatch-api:post-work-orders`, so credential possession has a limited replay window and is bound to `process:dispatch-api`."
+            },
+            {
+              "summary": "Rotate and scope the existing importer credential immediately",
+              "detail": "Until replacement is complete, rotate the API token, store it in a managed secret mechanism, and restrict it to only the required work-order posting operation."
+            },
+            {
+              "summary": "Establish protected transport for the importer API call",
+              "detail": "Resolve the unknown `encryption_in_transit` state and require TLS with certificate validation on `flow:schedule-importer-to-dispatch-api:post-work-orders` to prevent interception or endpoint substitution."
+            }
+          ],
+          "confidence": "low"
+        },
+        {
+          "id": "T-01",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Dispatch actions can be modified in transit if cross-zone transport protection is absent",
+          "description": "`flow:dispatch-console-to-dispatch-api:dispatch-requests` crosses from the corporate network into the production control plane, but its `protocol` and `encryption_in_transit` are unknown. If the unverified transport protection resolves to no authenticated encryption on this segment, an attacker with an on-path position can alter crew-movement or depot-work requests before `process:dispatch-api` processes them. The modification reaches the live estate controlled by `process:dispatch-api`, which reads and writes job orders in `store:dispatch-database`; altered actions can therefore become authoritative dispatch changes.",
+          "affected_element_ids": [
+            "flow:dispatch-console-to-dispatch-api:dispatch-requests",
+            "process:dispatch-console",
+            "process:dispatch-api"
+          ],
+          "verb": "alter-in-transit",
+          "grounds": [
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:dispatch-console-to-dispatch-api:dispatch-requests",
+              "term": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:dispatch-console-to-dispatch-api:dispatch-requests",
+              "attribute": "protocol",
+              "flow_id": "",
+              "term": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:dispatch-console-to-dispatch-api:dispatch-requests",
+              "attribute": "encryption_in_transit",
+              "flow_id": "",
+              "term": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "The claim rests on `protocol` on `flow:dispatch-console-to-dispatch-api:dispatch-requests`, `encryption_in_transit` on `flow:dispatch-console-to-dispatch-api:dispatch-requests`, which the input never stated.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:dispatch-console-to-dispatch-api:dispatch-requests",
+                "attribute": "protocol",
+                "subject": ""
+              },
+              {
+                "element_id": "flow:dispatch-console-to-dispatch-api:dispatch-requests",
+                "attribute": "encryption_in_transit",
+                "subject": ""
+              }
+            ],
+            "rejected_because": null
+          },
+          "category": "tampering",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional on the unknown transport attributes: exploiting the path requires an on-path position between `boundary:corporate-network` and `boundary:production-control-plane`, but no verified transport integrity control is recorded. Impact is high because `process:dispatch-api` controls business-critical live dispatch actions and persists job-order changes in `store:dispatch-database`."
+          },
+          "mitigations": [
+            {
+              "summary": "Require authenticated TLS for console dispatch requests",
+              "detail": "Use TLS 1.2+ with certificate validation for `flow:dispatch-console-to-dispatch-api:dispatch-requests`, and record the protocol and transport-integrity configuration."
+            },
+            {
+              "summary": "Validate authorization and action constraints at the API",
+              "detail": "Have `process:dispatch-api` authenticate the caller and enforce server-side authorization and validation for crew and depot changes, limiting the effect of malformed or altered requests."
+            }
+          ],
+          "confidence": "low"
+        },
+        {
+          "id": "T-02",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Tampered importer work orders can be accepted by the dispatch API if their transport is unprotected",
+          "description": "`flow:schedule-importer-to-dispatch-api:post-work-orders` crosses from `boundary:corporate-network` into `boundary:production-control-plane` and has `protocol` and `encryption_in_transit` recorded as unknown. If this flow lacks authenticated encryption, an attacker positioned on the corporate-to-control-plane path can alter parsed work orders while they are sent by `process:schedule-importer`. `process:dispatch-api` then treats the changed work orders as importer submissions and writes the resulting dispatch state to `store:dispatch-database`, affecting live crew and depot planning.",
+          "affected_element_ids": [
+            "flow:schedule-importer-to-dispatch-api:post-work-orders",
+            "process:schedule-importer",
+            "process:dispatch-api"
+          ],
+          "verb": "alter-in-transit",
+          "grounds": [
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:schedule-importer-to-dispatch-api:post-work-orders",
+              "term": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:schedule-importer-to-dispatch-api:post-work-orders",
+              "attribute": "protocol",
+              "flow_id": "",
+              "term": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:schedule-importer-to-dispatch-api:post-work-orders",
+              "attribute": "encryption_in_transit",
+              "flow_id": "",
+              "term": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "The claim rests on `protocol` on `flow:schedule-importer-to-dispatch-api:post-work-orders`, `encryption_in_transit` on `flow:schedule-importer-to-dispatch-api:post-work-orders`, which the input never stated.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:schedule-importer-to-dispatch-api:post-work-orders",
+                "attribute": "protocol",
+                "subject": ""
+              },
+              {
+                "element_id": "flow:schedule-importer-to-dispatch-api:post-work-orders",
+                "attribute": "encryption_in_transit",
+                "subject": ""
+              }
+            ],
+            "rejected_because": null
+          },
+          "category": "tampering",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional on the unknown transport configuration: the attacker needs an on-path position across the corporate-to-production boundary, but no verified transport protection is modeled. Impact is high because tampered work orders reach `process:dispatch-api` and can alter business-critical live dispatch data in `store:dispatch-database`."
+          },
+          "mitigations": [
+            {
+              "summary": "Protect the importer-to-API write flow with mTLS",
+              "detail": "Require mutually authenticated TLS and certificate validation on `flow:schedule-importer-to-dispatch-api:post-work-orders`; document the protocol and encryption settings."
+            },
+            {
+              "summary": "Bind work-order integrity to the importer",
+              "detail": "Sign work-order payloads at `process:schedule-importer` and verify signatures and schemas at `process:dispatch-api` before writing dispatch records."
+            }
+          ],
+          "confidence": "low"
+        },
+        {
+          "id": "T-03",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "A stolen non-rotated importer token can modify dispatch work orders",
+          "description": "`process:schedule-importer` posts work orders through `flow:schedule-importer-to-dispatch-api:post-work-orders` using an API token that has never been rotated. An attacker who obtains that long-lived token can submit altered or fabricated work orders to `process:dispatch-api` through the same write path, bypassing the distinction between legitimate importer data and attacker changes. The API reads and writes `store:dispatch-database`, so the forged work orders can become persistent changes to crew assignments and depot work.",
+          "affected_element_ids": [
+            "flow:schedule-importer-to-dispatch-api:post-work-orders",
+            "process:schedule-importer",
+            "process:dispatch-api"
+          ],
+          "verb": "alter",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "It presents an API token. That token was issued when the importer was built and nobody has rotated it since.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": ""
+            }
+          ],
+          "verdict": {
+            "status": "confirmed",
+            "reason": "",
+            "related_unknowns": [],
+            "rejected_because": null
+          },
+          "category": "tampering",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium because the static, never-rotated credential remains usable once obtained, although an attacker must first acquire it. Impact is high because the token authorizes a write flow to `process:dispatch-api`, which controls business-critical dispatch work and writes `store:dispatch-database`."
+          },
+          "mitigations": [
+            {
+              "summary": "Replace the permanent importer token with short-lived workload credentials",
+              "detail": "Use a workload identity or short-lived, automatically rotated token for `process:schedule-importer`, with revocation and rotation procedures."
+            },
+            {
+              "summary": "Limit the importer credential's write authority",
+              "detail": "Authorize the importer only for constrained work-order operations and validate allowable partner, depot, crew, and schedule fields at `process:dispatch-api`."
+            }
+          ],
+          "confidence": "high"
+        },
+        {
+          "id": "T-04",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "A substituted partner XML feed can inject altered work orders into production",
+          "description": "`flow:schedule-importer-to-scheduling-partner:pull-schedule-feed` crosses to the external scheduling-partner zone and has `authentication: unknown`. If the importer does not authenticate the partner response, an attacker able to impersonate or intercept that external feed can inject an XML schedule containing altered work orders for `process:schedule-importer` to parse. The importer archives the document through `flow:schedule-importer-to-schedule-archive:store-schedule-documents` and forwards parsed work orders over `flow:schedule-importer-to-dispatch-api:post-work-orders`; the untrusted XML is thereby laundered into `process:dispatch-api` and can change persistent dispatch records in `store:dispatch-database`.",
+          "affected_element_ids": [
+            "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
+            "process:schedule-importer"
+          ],
+          "verb": "inject",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "Nothing was written down about how the partner identifies our importer, or how our importer identifies the partner.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
+              "term": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "The claim rests on `authentication` on `flow:schedule-importer-to-scheduling-partner:pull-schedule-feed`, which the input never stated.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
+                "attribute": "authentication",
+                "subject": ""
+              }
+            ],
+            "rejected_because": null
+          },
+          "category": "tampering",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional on the unknown partner-authentication control: the external partner boundary provides an attacker-reachable integration point, though impersonating or intercepting the feed is still required. Impact is high because attacker-supplied work orders propagate through `process:schedule-importer` into `process:dispatch-api` and can change business-critical live dispatch records."
+          },
+          "mitigations": [
+            {
+              "summary": "Mutually authenticate the scheduling-feed exchange",
+              "detail": "Require the importer to validate the scheduling partner's identity using mTLS or verified message signatures, and authenticate the importer to the partner."
+            },
+            {
+              "summary": "Validate and constrain imported schedules before forwarding",
+              "detail": "Apply schema validation, canonicalization, field allowlists, and business-rule checks in `process:schedule-importer`, then re-validate work orders in `process:dispatch-api` before persistence."
+            }
+          ],
+          "confidence": "low"
+        },
+        {
+          "id": "T-05",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Direct database changes are possible if the API-to-database write identity is not enforced",
+          "description": "`flow:dispatch-api-to-dispatch-database:read-write-job-orders` has `authentication: unknown` while carrying read-write job orders and crew details into `store:dispatch-database`. If this unknown resolves to absent or ineffective database caller authentication and authorization, an attacker with a foothold in the production control plane can alter job orders, crew names, or mobile-number records directly rather than through `process:dispatch-api` validation. `process:dispatch-api` subsequently reads the same database, so it can act on attacker-modified dispatch state as though it were legitimate.",
+          "affected_element_ids": [
+            "flow:dispatch-api-to-dispatch-database:read-write-job-orders",
+            "store:dispatch-database",
+            "process:dispatch-api"
+          ],
+          "verb": "alter",
+          "grounds": [
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:dispatch-api-to-dispatch-database:read-write-job-orders",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "The claim rests on `authentication` on `flow:dispatch-api-to-dispatch-database:read-write-job-orders`, which the input never stated.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:dispatch-api-to-dispatch-database:read-write-job-orders",
+                "attribute": "authentication",
+                "subject": ""
+              }
+            ],
+            "rejected_because": null
+          },
+          "category": "tampering",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional on the unknown database authentication setting: a production-control-plane foothold is required, but the model does not verify a database identity or authorization control. Impact is high because `store:dispatch-database` holds PII and business-critical job and crew records consumed by `process:dispatch-api` for live dispatch operations."
+          },
+          "mitigations": [
+            {
+              "summary": "Enforce authenticated least-privilege database access",
+              "detail": "Give `process:dispatch-api` a dedicated, short-lived database identity with only the required statements and tables; deny direct write access to other production principals."
+            },
+            {
+              "summary": "Add integrity controls for dispatch records",
+              "detail": "Use server-side ownership and workflow validation, versioned updates, and reconciliation of job-order changes so direct or unexpected record modifications are detected and recoverable."
+            }
+          ],
+          "confidence": "low"
+        },
+        {
+          "id": "D-02",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Hostile partner XML can exhaust or crash the schedule importer",
+          "description": "A malicious or compromised scheduling partner, or an attacker able to exploit the unverified peer authentication on `flow:schedule-importer-to-scheduling-partner:pull-schedule-feed`, can return an oversized, deeply nested, or entity-expanding XML document. `process:schedule-importer` parses the partner response as XML, so one inexpensive response can impose disproportionate CPU and memory allocation and crash or wedge the hourly importer. This is conditional on unrecorded XML parser limits. Second-order, the importer stops archiving documents through `flow:schedule-importer-to-schedule-archive:store-schedule-documents` and stops delivering tomorrow's parsed work orders through `flow:schedule-importer-to-dispatch-api:post-work-orders`, leaving dispatch without scheduled work even if `process:dispatch-api` remains available.",
+          "affected_element_ids": [
+            "process:schedule-importer",
+            "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed"
+          ],
+          "verb": "flood",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "Every hour it pulls the partner's SOAP feed over HTTPS and parses the XML document it gets back.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
+              "term": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "The claim rests on `authentication` on `flow:schedule-importer-to-scheduling-partner:pull-schedule-feed`, which the input never stated.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
+                "attribute": "authentication",
+                "subject": ""
+              }
+            ],
+            "rejected_because": null
+          },
+          "category": "denial-of-service",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium: the XML enters across `crossing:flow:schedule-importer-to-scheduling-partner:pull-schedule-feed` from another company's platform, and peer authentication is unverified (`unknown:flow:schedule-importer-to-scheduling-partner:pull-schedule-feed:authentication`), although exploitation requires control of or successful impersonation of that partner. Impact is medium: `process:schedule-importer` and its schedule documents are associated with business-critical dispatch work, but the model does not establish that an importer outage disables the dispatch API itself."
+          },
+          "mitigations": [
+            {
+              "summary": "Constrain XML parsing before resource allocation",
+              "detail": "Apply a strict response-size cap, streaming parsing, document-depth and entity-expansion limits, and parser CPU/time budgets in `process:schedule-importer`; reject malformed or over-budget documents before posting any work orders."
+            },
+            {
+              "summary": "Authenticate the scheduling-feed peer and isolate failures",
+              "detail": "Establish and record mutual partner authentication for `flow:schedule-importer-to-scheduling-partner:pull-schedule-feed`, and isolate failed imports so a single bad hourly document cannot crash-loop the importer."
+            }
+          ],
+          "confidence": "low"
+        },
+        {
+          "id": "D-03",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Unbounded schedule-document retention can fill the archive storage",
+          "description": "A compromised scheduling partner can repeatedly supply unusually large XML schedules over `flow:schedule-importer-to-scheduling-partner:pull-schedule-feed`; `process:schedule-importer` writes every downloaded document through `flow:schedule-importer-to-schedule-archive:store-schedule-documents` into `store:schedule-archive`. If size and retention quotas are not present, the attacker converts a recurring partner response into archive disk or file-store quota consumption, eventually preventing legitimate schedule documents from being retained and potentially blocking importer writes. This is conditional on the unverified partner authentication and on unrecorded archive quotas and retention controls. Second-order, failure to retain or process incoming schedules disrupts the importer's subsequent work-order delivery to `process:dispatch-api` via `flow:schedule-importer-to-dispatch-api:post-work-orders`.",
+          "affected_element_ids": [
+            "store:schedule-archive",
+            "process:schedule-importer",
+            "flow:schedule-importer-to-schedule-archive:store-schedule-documents"
+          ],
+          "verb": "flood",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "It writes each document it downloads into the schedule archive, a folder on the corporate file store.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
+              "term": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "store:schedule-archive",
+              "attribute": "data_classification",
+              "flow_id": "",
+              "term": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "The claim rests on `authentication` on `flow:schedule-importer-to-scheduling-partner:pull-schedule-feed`, `data_classification` on `store:schedule-archive`, which the input never stated.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
+                "attribute": "authentication",
+                "subject": ""
+              },
+              {
+                "element_id": "store:schedule-archive",
+                "attribute": "data_classification",
+                "subject": ""
+              }
+            ],
+            "rejected_because": null
+          },
+          "category": "denial-of-service",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium: the content arrives from the external scheduling-partner boundary (`crossing:flow:schedule-importer-to-scheduling-partner:pull-schedule-feed`) and its authentication is unverified (`unknown:flow:schedule-importer-to-scheduling-partner:pull-schedule-feed:authentication`), though the attacker must control or impersonate that source. Impact is medium: `store:schedule-archive` holds business-critical schedule documents and archive exhaustion prevents future schedule retention and can interrupt the work-order import path, but the model does not show other corporate file-store dependants."
+          },
+          "mitigations": [
+            {
+              "summary": "Enforce archive quotas and retention",
+              "detail": "Set a maximum accepted document size at `process:schedule-importer`, per-feed storage quotas for `store:schedule-archive`, and bounded retention or archival rotation so historical documents cannot consume the entire file-store allocation."
+            },
+            {
+              "summary": "Monitor storage consumption and fail safely",
+              "detail": "Alert on schedule-archive fill rate and capacity, reject documents before writing once a quota is reached, and preserve the importer process so archive failure does not cause uncontrolled retries or prevent controlled delivery of valid work orders."
+            }
+          ],
+          "confidence": "low"
+        },
+        {
+          "id": "E-02",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "The schedule importer may lend its production API token to the scheduling partner",
+          "description": "`process:schedule-importer` parses XML supplied by the external `entity:scheduling-partner` over `flow:schedule-importer-to-scheduling-partner:pull-schedule-feed`, which crosses into `boundary:scheduling-partner-platform`, then posts the parsed work orders to `process:dispatch-api` through `flow:schedule-importer-to-dispatch-api:post-work-orders` using a long-lived API token. If the importer does not independently constrain and authorize the partner-originated work orders before posting them, a compromised or malicious scheduling partner can abuse the importer's standing token to command the production dispatch API beyond the partner's intended authority. Second-order, `process:dispatch-api` writes those orders through `flow:dispatch-api-to-dispatch-database:read-write-job-orders` into `store:dispatch-database`, affecting live dispatch operations and associated crew data.",
+          "affected_element_ids": [
+            "entity:scheduling-partner",
+            "process:schedule-importer",
+            "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed"
+          ],
+          "verb": "abuse-grant",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "A scheduling partner, which is another company, publishes tomorrow's planned work.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": ""
+            },
+            {
+              "kind": "quote",
+              "text": "Every hour it pulls the partner's SOAP feed over HTTPS and parses the XML document it gets back.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": ""
+            },
+            {
+              "kind": "quote",
+              "text": "It presents an API token. That token was issued when the importer was built and nobody has rotated it since.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
+              "term": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "The model states that the importer parses partner XML and posts work orders using its production API token, but does not state whether it independently validates, constrains, and authorizes partner-originated work orders before posting them.",
+            "related_unknowns": [
+              {
+                "element_id": "",
+                "attribute": "",
+                "subject": "Does the schedule importer independently validate, constrain, and authorize partner-originated work orders before posting them to the dispatch API?"
+              }
+            ],
+            "rejected_because": null
+          },
+          "category": "elevation-of-privilege",
+          "severity": {
+            "likelihood": "low",
+            "impact": "high",
+            "level": "medium",
+            "justification": "Likelihood is low because abuse requires control of the external scheduling partner's feed or a compromise of that partner, although that feed is routinely parsed by `process:schedule-importer`. Impact is high because the importer's token posts to `process:dispatch-api` in the production privilege zone, whose authority affects live crews and depot work, and the API subsequently writes business-critical and PII-bearing records to `store:dispatch-database`."
+          },
+          "mitigations": [
+            {
+              "summary": "Authorize partner-originated work orders before using the importer token",
+              "detail": "Make `process:schedule-importer` validate that each parsed order is within the scheduling partner's explicitly allowed depot, crew, and operation scope; reject unsupported or privileged actions before `flow:schedule-importer-to-dispatch-api:post-work-orders`."
+            },
+            {
+              "summary": "Replace the permanent broad integration token",
+              "detail": "Use a short-lived, narrowly scoped credential for `flow:schedule-importer-to-dispatch-api:post-work-orders` that can create only approved imported work-order types, rather than a token issued once and never rotated."
+            }
+          ],
+          "confidence": "low"
+        },
+        {
+          "id": "I-01",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Live dispatch status may be readable across the corporate-to-control-plane WebSocket",
+          "description": "`flow:dispatch-console-to-dispatch-api:live-job-status` crosses from the corporate network into the production control plane, but its `encryption_in_transit` is `unknown`. If the WebSocket is not protected with TLS, an attacker with an on-path position on the corporate-to-control-plane route, including a compromised corporate-network host, can intercept live job status for crews on screen. The disclosed operational status can be correlated with the dispatch API's broader crew and job-order data, enabling targeted operational reconnaissance against the live estate. This is conditional on resolving the unverified transport-protection attribute.",
+          "affected_element_ids": [
+            "flow:dispatch-console-to-dispatch-api:live-job-status",
+            "process:dispatch-console",
+            "process:dispatch-api"
+          ],
+          "verb": "intercept",
+          "grounds": [
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:dispatch-console-to-dispatch-api:live-job-status",
+              "attribute": "encryption_in_transit",
+              "flow_id": "",
+              "term": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:dispatch-console-to-dispatch-api:live-job-status",
+              "term": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "The claim rests on `encryption_in_transit` on `flow:dispatch-console-to-dispatch-api:live-job-status`, which the input never stated.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:dispatch-console-to-dispatch-api:live-job-status",
+                "attribute": "encryption_in_transit",
+                "subject": ""
+              }
+            ],
+            "rejected_because": null
+          },
+          "category": "information-disclosure",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium and conditional because `flow:dispatch-console-to-dispatch-api:live-job-status` crosses a trust boundary and has unverified transport encryption, while an attacker still needs a position on the corporate-to-production path. Impact is medium because the flow exposes business-critical live crew and job-status information used by `process:dispatch-api` to operate the live dispatch estate."
+          },
+          "mitigations": [
+            {
+              "summary": "Require authenticated TLS for the live-status socket",
+              "detail": "Use WSS/TLS for `flow:dispatch-console-to-dispatch-api:live-job-status`, authenticate the WebSocket handshake, and bind the open socket to the engineer session."
+            },
+            {
+              "summary": "Minimize live-status payloads",
+              "detail": "Return only the status fields needed by the current console view and avoid including identifiers or crew details that the browser does not require."
+            }
+          ],
+          "confidence": "low"
+        },
+        {
+          "id": "I-03",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Crew names and mobile numbers may be readable on the API-to-database connection",
+          "description": "`flow:dispatch-api-to-dispatch-database:read-write-job-orders` carries job orders, crew names, and crew mobile numbers, while its `encryption_in_transit` is `unknown`. If this internal production-control-plane database hop is plaintext, an attacker who has obtained a foothold or on-path observation capability in that zone can intercept crew PII and job-order data without using the dispatch application's normal read path. The captured job and crew mapping can then support targeted contact or operational attacks against people and work recorded in `store:dispatch-database`. This is conditional on the currently unverified transport-encryption setting.",
+          "affected_element_ids": [
+            "flow:dispatch-api-to-dispatch-database:read-write-job-orders",
+            "process:dispatch-api",
+            "store:dispatch-database"
+          ],
+          "verb": "intercept",
+          "grounds": [
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:dispatch-api-to-dispatch-database:read-write-job-orders",
+              "attribute": "encryption_in_transit",
+              "flow_id": "",
+              "term": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "The claim rests on `encryption_in_transit` on `flow:dispatch-api-to-dispatch-database:read-write-job-orders`, which the input never stated.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:dispatch-api-to-dispatch-database:read-write-job-orders",
+                "attribute": "encryption_in_transit",
+                "subject": ""
+              }
+            ],
+            "rejected_because": null
+          },
+          "category": "information-disclosure",
+          "severity": {
+            "likelihood": "low",
+            "impact": "high",
+            "level": "medium",
+            "justification": "Likelihood is low and conditional because the encryption state is unverified but an attacker must first obtain an on-path position inside `boundary:production-control-plane`. Impact is high because `flow:dispatch-api-to-dispatch-database:read-write-job-orders` carries the database's crew names and mobile numbers alongside the job-order corpus."
+          },
+          "mitigations": [
+            {
+              "summary": "Encrypt the API-to-database connection",
+              "detail": "Require TLS for `flow:dispatch-api-to-dispatch-database:read-write-job-orders`, validate the database certificate, and use mutually authenticated service identities where supported."
+            },
+            {
+              "summary": "Restrict database-network observation paths",
+              "detail": "Segment the database connection path and restrict the API and database identities so only the required service connection can reach the database listener."
+            }
+          ],
+          "confidence": "low"
+        },
+        {
+          "id": "I-05",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Archived partner schedules could be read from file-storage copies if encryption at rest is absent",
+          "description": "`store:schedule-archive` retains every XML document downloaded from the external scheduling partner, and its `encryption_at_rest` attribute is `unknown`. If the corporate file store does not encrypt the archive at rest, an insider or attacker who obtains a copied archive, backup, or decommissioned storage media can read the complete set of planned-work schedules without using `process:schedule-importer`. The accumulated schedule history reveals operational plans that can be used to anticipate depot and crew activity. This is conditional on the unresolved at-rest encryption attribute.",
+          "affected_element_ids": [
+            "store:schedule-archive",
+            "flow:schedule-importer-to-schedule-archive:store-schedule-documents"
+          ],
+          "verb": "read",
+          "grounds": [
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "store:schedule-archive",
+              "attribute": "encryption_at_rest",
+              "flow_id": "",
+              "term": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "The claim rests on `encryption_at_rest` on `store:schedule-archive`, which the input never stated.",
+            "related_unknowns": [
+              {
+                "element_id": "store:schedule-archive",
+                "attribute": "encryption_at_rest",
+                "subject": ""
+              }
+            ],
+            "rejected_because": null
+          },
+          "category": "information-disclosure",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium and conditional because `store:schedule-archive` has unverified encryption at rest and storage-layer copies can be accessed outside the application's normal path. Impact is medium because the archive contains every partner XML schedule document and is tagged `business-critical-data`, but no PII or credential asset is recorded for that store."
+          },
+          "mitigations": [
+            {
+              "summary": "Encrypt the schedule archive and its copies",
+              "detail": "Verify the file store's protection and require encryption at rest for `store:schedule-archive`, including backups, snapshots, and exported archive copies."
+            },
+            {
+              "summary": "Limit archive readership and retention",
+              "detail": "Grant the importer and narrowly defined archival operators only the required read access, audit bulk reads, and retain downloaded schedule documents only for the documented business period."
+            }
+          ],
+          "confidence": "low"
+        },
+        {
+          "id": "R-01",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Duty engineers can deny dispatch changes because job orders retain only a session or token",
+          "description": "A duty engineer using `entity:duty-engineer` can dispute having moved a crew or changed a depot through `flow:dispatch-console-to-dispatch-api:dispatch-requests`. That boundary-crossing write flow has `authentication: unknown`, and `process:dispatch-api` writes the resulting orders to `store:dispatch-database`. The database states that each job order retains only the token or session that created it, not the person behind it. If the unknown authentication does not provide an individual identity that is preserved in an independent audit record, the stored record cannot rebut an engineer who denies a specific operational change. The model also contains no audit-log element or audit flow from `process:dispatch-api`; this is a conditional evidence-gap finding rather than an assertion that no deployment logging exists. Second-order, disputed changes to crew assignments and a depot's daily work cannot be reliably assigned to an individual, impairing investigation and correction of the business-critical dispatch state in `store:dispatch-database`.",
+          "affected_element_ids": [
+            "process:dispatch-api",
+            "flow:dispatch-console-to-dispatch-api:dispatch-requests"
+          ],
+          "verb": "unattributable",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "The dispatch API reads and writes the dispatch database.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": ""
+            },
+            {
+              "kind": "quote",
+              "text": "Every job order in it carries the token or the session that created it, and nothing about the person behind that token.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:dispatch-console-to-dispatch-api:dispatch-requests",
+              "term": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:dispatch-console-to-dispatch-api:dispatch-requests",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": ""
+            },
+            {
+              "kind": "absent-element",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": "audit log"
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "The claim rests on `authentication` on `flow:dispatch-console-to-dispatch-api:dispatch-requests`, which the input never stated.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:dispatch-console-to-dispatch-api:dispatch-requests",
+                "attribute": "authentication",
+                "subject": ""
+              }
+            ],
+            "rejected_because": null
+          },
+          "category": "repudiation",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium and conditional on the unknown authentication on `flow:dispatch-console-to-dispatch-api:dispatch-requests`: an actor needs access from `boundary:corporate-network` across the derived crossing into `boundary:production-control-plane`, but an ordinary duty-engineer dispute can exploit the attribution gap. Impact is medium because `store:dispatch-database` and `process:dispatch-api` handle `business-critical-data`, including crew and daily-depot changes, while the stated loss is accountability rather than direct disclosure or destruction."
+          },
+          "mitigations": [
+            {
+              "summary": "Record the verified individual principal for every dispatch change",
+              "detail": "Require individually attributable authentication on `flow:dispatch-console-to-dispatch-api:dispatch-requests`, and have `process:dispatch-api` emit structured audit events containing the verified subject, action, affected job order, timestamp, and outcome."
+            },
+            {
+              "summary": "Make dispatch changes durable audit events rather than token-only state",
+              "detail": "Add versioned change history for `store:dispatch-database` with before/after values and the acting principal; corrections should create new entries rather than overwrite the disputed record."
+            },
+            {
+              "summary": "Preserve audit evidence independently",
+              "detail": "Send API audit events to append-only, retention-protected storage under a separate write principal, so the component performing dispatch changes cannot amend evidence about them."
+            }
+          ],
+          "confidence": "low"
+        },
+        {
+          "id": "R-02",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Scheduling partner feed deliveries may be deniable without retained signed exchanges",
+          "description": "`entity:scheduling-partner` can deny publishing a particular schedule that `process:schedule-importer` obtained over `flow:schedule-importer-to-scheduling-partner:pull-schedule-feed`. The flow crosses from `boundary:corporate-network` to the other company's `boundary:scheduling-partner-platform`, but its `authentication` is unknown. If that unknown does not resolve to retained signed requests and responses, HTTPS transport alone does not provide durable evidence that the partner sent a specific XML schedule; the partner and operator would have only competing accounts of which plan was delivered. The importer archives documents in `store:schedule-archive` and posts parsed work orders onward to `process:dispatch-api`, so a disputed feed can propagate into business-critical dispatch decisions without conclusive source attribution. This is conditional on the unverified authentication attribute, not a claim that the partner integration is unsigned.",
+          "affected_element_ids": [
+            "entity:scheduling-partner",
+            "process:schedule-importer",
+            "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed"
+          ],
+          "verb": "unattributable",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "Nothing was written down about how the partner identifies our importer, or how our importer identifies the partner.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
+              "term": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "The claim rests on `authentication` on `flow:schedule-importer-to-scheduling-partner:pull-schedule-feed`, which the input never stated.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
+                "attribute": "authentication",
+                "subject": ""
+              }
+            ],
+            "rejected_because": null
+          },
+          "category": "repudiation",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium and conditional on the unknown authentication of `flow:schedule-importer-to-scheduling-partner:pull-schedule-feed`: a dispute requires the external partner relationship and the cross-boundary exchange, but no attacker compromise is needed for either party to contest a delivery. Impact is medium because the flow carries business-critical planned work and its parsed output reaches `process:dispatch-api`, which changes live dispatch operations."
+          },
+          "mitigations": [
+            {
+              "summary": "Use and retain signed schedule exchanges",
+              "detail": "Establish the authentication used by `flow:schedule-importer-to-scheduling-partner:pull-schedule-feed`; where it lacks non-repudiable evidence, require signed responses with timestamps and nonces, and retain the raw signed documents for the dispute window."
+            },
+            {
+              "summary": "Record the received document and downstream processing linkage",
+              "detail": "Have `process:schedule-importer` log the verified partner identity, signature-verification outcome, document hash, receipt time, and the work orders posted to `process:dispatch-api`, allowing a disputed operational change to be traced back to a specific retained exchange."
+            }
+          ],
+          "confidence": "low"
+        },
+        {
+          "id": "S-04",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "A forged partner schedule response could be accepted if partner identity is not verified",
+          "description": "`flow:schedule-importer-to-scheduling-partner:pull-schedule-feed` crosses from `boundary:corporate-network` to `boundary:scheduling-partner-platform` with `authentication: unknown`. If `process:schedule-importer` does not validate that the response is from `entity:scheduling-partner`, an attacker able to redirect or answer the importer's request can impersonate the scheduling partner and supply a fabricated XML schedule. Second-order: the importer archives the document and posts its parsed work orders via `flow:schedule-importer-to-dispatch-api:post-work-orders`, allowing the forged partner identity to influence live dispatch work. This is conditional on the undocumented mutual-identification arrangement.",
+          "affected_element_ids": [
+            "process:schedule-importer",
+            "entity:scheduling-partner",
+            "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed"
+          ],
+          "verb": "impersonate",
+          "grounds": [
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
+              "term": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "The claim rests on `authentication` on `flow:schedule-importer-to-scheduling-partner:pull-schedule-feed`, which the input never stated.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
+                "attribute": "authentication",
+                "subject": ""
+              }
+            ],
+            "rejected_because": null
+          },
+          "category": "spoofing",
+          "severity": {
+            "likelihood": "low",
+            "impact": "high",
+            "level": "medium",
+            "justification": "Likelihood is low and conditional because authentication is unknown and an attacker must additionally gain a position to redirect or respond to the importer's partner request; the stated HTTPS transport may also provide server authentication that is not recorded. Impact is high because forged schedules are transformed into work orders sent to `process:dispatch-api`, which controls business-critical live dispatch operations."
+          },
+          "mitigations": [
+            {
+              "summary": "Verify the scheduling partner's service identity",
+              "detail": "Document the authentication on `flow:schedule-importer-to-scheduling-partner:pull-schedule-feed` and require validated TLS server certificates, ideally with partner certificate pinning or a constrained private CA identity."
+            },
+            {
+              "summary": "Authenticate the importer to the partner with a distinct workload identity",
+              "detail": "Use a separately issued client certificate or short-lived workload credential for `process:schedule-importer` so both sides can verify the peer rather than rely on network destination alone."
+            }
+          ],
+          "confidence": "low"
+        }
+      ],
+      "rejected_claims": [],
+      "scope": [],
+      "coverage": [
+        {
+          "lane": "spoofing",
+          "drafts": 5,
+          "rules": 2,
+          "rules_fired": 1,
+          "candidates": 3,
+          "candidates_cited": 3,
+          "elements": 17,
+          "elements_cited": 14,
+          "boundary_crossings": 4,
+          "boundary_crossings_cited": 4,
+          "unknown_controls": 18,
+          "unknown_controls_cited": 6
+        },
+        {
+          "lane": "tampering",
+          "drafts": 5,
+          "rules": 2,
+          "rules_fired": 2,
+          "candidates": 5,
+          "candidates_cited": 3,
+          "elements": 17,
+          "elements_cited": 11,
+          "boundary_crossings": 4,
+          "boundary_crossings_cited": 3,
+          "unknown_controls": 18,
+          "unknown_controls_cited": 4
+        },
+        {
+          "lane": "repudiation",
+          "drafts": 2,
+          "rules": 1,
+          "rules_fired": 1,
+          "candidates": 6,
+          "candidates_cited": 2,
+          "elements": 17,
+          "elements_cited": 10,
+          "boundary_crossings": 4,
+          "boundary_crossings_cited": 2,
+          "unknown_controls": 18,
+          "unknown_controls_cited": 2
+        },
+        {
+          "lane": "information-disclosure",
+          "drafts": 5,
+          "rules": 2,
+          "rules_fired": 2,
+          "candidates": 8,
+          "candidates_cited": 6,
+          "elements": 17,
+          "elements_cited": 11,
+          "boundary_crossings": 4,
+          "boundary_crossings_cited": 2,
+          "unknown_controls": 18,
+          "unknown_controls_cited": 5
+        },
+        {
+          "lane": "denial-of-service",
+          "drafts": 3,
+          "rules": 2,
+          "rules_fired": 1,
+          "candidates": 1,
+          "candidates_cited": 0,
+          "elements": 17,
+          "elements_cited": 9,
+          "boundary_crossings": 4,
+          "boundary_crossings_cited": 4,
+          "unknown_controls": 18,
+          "unknown_controls_cited": 3
+        },
+        {
+          "lane": "elevation-of-privilege",
+          "drafts": 2,
+          "rules": 2,
+          "rules_fired": 1,
+          "candidates": 4,
+          "candidates_cited": 3,
+          "elements": 17,
+          "elements_cited": 12,
+          "boundary_crossings": 4,
+          "boundary_crossings_cited": 4,
+          "unknown_controls": 18,
+          "unknown_controls_cited": 2
+        }
+      ],
+      "unverified_grounds": [],
+      "unreconciled_rulings": [],
+      "repaired_quotes": [],
+      "unresolved_references": [
+        {
+          "claim_id": "T-04",
+          "element_id": "process:dispatch-api",
+          "reason": "more than one hop from every place the claim's grounds name"
+        },
+        {
+          "claim_id": "R-01",
+          "element_id": "entity:duty-engineer",
+          "reason": "more than one hop from every place the claim's grounds name"
+        },
+        {
+          "claim_id": "R-01",
+          "element_id": "store:dispatch-database",
+          "reason": "more than one hop from every place the claim's grounds name"
+        },
+        {
+          "claim_id": "E-02",
+          "element_id": "flow:schedule-importer-to-dispatch-api:post-work-orders",
+          "reason": "more than one hop from every place the claim's grounds name"
+        }
+      ],
+      "unresolved_mentions": [],
+      "unresolved_evidence": [],
+      "unknown_claim_identities": [],
+      "dropped_claims": [
+        {
+          "claim_id": "S-03",
+          "title": "An unauthenticated WebSocket could let a corporate attacker pose as the dispatch console",
+          "reason": "names the same action at the same place as 'S-02', and both rest on an unstated control, so no critic sees either to rule on the pair"
+        }
+      ],
+      "fired_rules": [
+        "denial-of-service-shared-dependency",
+        "elevation-of-privilege-privilege-zone-crossing",
+        "information-disclosure-store-at-rest-unverified",
+        "information-disclosure-unprotected-sensitive-transit",
+        "repudiation-unattributable-action",
+        "spoofing-unverified-boundary-auth",
+        "tampering-unprotected-transit-crossing",
+        "tampering-unverified-write-to-store"
+      ],
+      "knowledge_docs": [
+        "cases/chained-benign-facts",
+        "cases/shared-credential-attribution",
+        "cases/spoofing-or-elevation",
+        "cases/stated-control-outside-the-model",
+        "cases/two-threats-one-flow",
+        "cases/unknown-is-not-absent",
+        "notes/attribution-and-audit",
+        "notes/failure-coupling",
+        "notes/identity-at-a-boundary",
+        "notes/privilege-transitions",
+        "notes/protection-at-rest",
+        "notes/transport-protection",
+        "notes/write-path-integrity"
+      ],
+      "summary": {
+        "claim_count": 21,
+        "needs_info_count": 20,
+        "rejected_count": 0,
+        "by_category": {
+          "denial-of-service": 3,
+          "elevation-of-privilege": 2,
+          "information-disclosure": 5,
+          "spoofing": 4,
+          "tampering": 5,
+          "repudiation": 2
+        },
+        "by_severity": {
+          "high": 12,
+          "medium": 9
+        },
+        "by_severity_confirmed": {
+          "high": 1
+        }
+      },
+      "missing_mitigations": []
+    }
+  ]
+}
