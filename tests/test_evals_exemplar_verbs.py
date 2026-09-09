@@ -115,23 +115,27 @@ def test_a_swept_package_disagrees_with_its_own_corpus_and_no_other(corpus):
         assert {entry.framework for entry in entries} == {framework}
 
 
-def test_the_exemplars_hold_exactly_one_collision():
-    """One place and two actions, inside one lane's shipped drafts.
+def test_the_exemplars_hold_no_collision():
+    """No place carries two actions inside one lane's shipped drafts.
 
-    Pinned at one because a second would mean a prompt edit introduced a pair
-    the identity rule splits, which is the failure this whole module measures
-    arriving from the side nobody grades.
+    The elevation lane used to: its canonical `abuse-grant` and its conditional
+    `escalate` keyed one element set, which is the identity rule's own split
+    condition sitting in the prompt, and the lane followed the canonical verb
+    four times in five on case 01 (#426). Each now cites its own place. Pinned
+    at zero because a new pair would mean a prompt edit re-introduced one, the
+    failure this whole module measures arriving from the side nobody grades.
     """
     found = [
         collision
         for framework in verb_keyed_frameworks()
         for collision in collisions(framework)
     ]
-    assert len(found) == 1
-    collision = found[0]
-    assert collision.lane == "elevation-of-privilege"
-    assert set(collision.verbs) == {"abuse-grant", "escalate"}
-    assert collision.shared_element_ids
+    # Named by lane, verbs and the shared place, so a new pair is read off the
+    # failure rather than hunted for in the lane text.
+    assert not found, [
+        (collision.lane, collision.verbs, collision.shared_element_ids)
+        for collision in found
+    ]
 
 
 def test_a_collision_names_two_actions_of_one_family():
