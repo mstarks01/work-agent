@@ -1,0 +1,1916 @@
+{
+  "schema_version": "3.0",
+  "disclaimer": "AI-generated security analysis. Not reviewed by a human security analyst.",
+  "job": {
+    "id": "eval-01-payments-checkout",
+    "status": "completed",
+    "created_at": "2026-09-09T16:15:42.943188Z",
+    "completed_at": "2026-09-09T16:15:42.943188Z",
+    "revise_rounds": 0,
+    "frameworks": [
+      {
+        "name": "stride",
+        "options": {}
+      }
+    ]
+  },
+  "input": {
+    "system_name": "Storefront checkout and order capture",
+    "sources": [
+      {
+        "kind": "description",
+        "label": "System description",
+        "sha256": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08"
+      }
+    ],
+    "source_sha256": "f90b4a8504474d0285ef1f001ad98fa1e2e5e7cdfc44d795996c9e7235a74883"
+  },
+  "nodes": [
+    {
+      "node": "prepare",
+      "model": null,
+      "requested_model": null,
+      "instruction_sha256": null,
+      "execution_fingerprint": null,
+      "duration_ms": 8,
+      "usage": null,
+      "attempts": 1,
+      "served_trust": null
+    },
+    {
+      "node": "analyze_stride_elevation_of_privilege",
+      "model": "openai/gpt-5.6-terra",
+      "requested_model": "openai/gpt-5.6-terra",
+      "instruction_sha256": "8fe334168e615b7a432527f1e6ae98de06af039dd6f8c7d3c45d5808fd0ae063",
+      "execution_fingerprint": "f4d1569117bfce459cb26ce4a5d158a0aba059553475779f50cb149823de09aa",
+      "duration_ms": 20731,
+      "usage": {
+        "prompt_tokens": 15827,
+        "cached_prompt_tokens": 0,
+        "completion_tokens": 1132,
+        "reasoning_tokens": 512,
+        "total_tokens": 16959
+      },
+      "attempts": 1,
+      "served_trust": "provider_reported"
+    },
+    {
+      "node": "analyze_stride_information_disclosure",
+      "model": "openai/gpt-5.6-terra",
+      "requested_model": "openai/gpt-5.6-terra",
+      "instruction_sha256": "8fe334168e615b7a432527f1e6ae98de06af039dd6f8c7d3c45d5808fd0ae063",
+      "execution_fingerprint": "f4d1569117bfce459cb26ce4a5d158a0aba059553475779f50cb149823de09aa",
+      "duration_ms": 41111,
+      "usage": {
+        "prompt_tokens": 16395,
+        "cached_prompt_tokens": 0,
+        "completion_tokens": 2980,
+        "reasoning_tokens": 540,
+        "total_tokens": 19375
+      },
+      "attempts": 1,
+      "served_trust": "provider_reported"
+    },
+    {
+      "node": "analyze_stride_spoofing",
+      "model": "openai/gpt-5.6-terra",
+      "requested_model": "openai/gpt-5.6-terra",
+      "instruction_sha256": "8fe334168e615b7a432527f1e6ae98de06af039dd6f8c7d3c45d5808fd0ae063",
+      "execution_fingerprint": "f4d1569117bfce459cb26ce4a5d158a0aba059553475779f50cb149823de09aa",
+      "duration_ms": 43565,
+      "usage": {
+        "prompt_tokens": 16487,
+        "cached_prompt_tokens": 0,
+        "completion_tokens": 3021,
+        "reasoning_tokens": 896,
+        "total_tokens": 19508
+      },
+      "attempts": 1,
+      "served_trust": "provider_reported"
+    },
+    {
+      "node": "analyze_stride_denial_of_service",
+      "model": "openai/gpt-5.6-terra",
+      "requested_model": "openai/gpt-5.6-terra",
+      "instruction_sha256": "8fe334168e615b7a432527f1e6ae98de06af039dd6f8c7d3c45d5808fd0ae063",
+      "execution_fingerprint": "f4d1569117bfce459cb26ce4a5d158a0aba059553475779f50cb149823de09aa",
+      "duration_ms": 45215,
+      "usage": {
+        "prompt_tokens": 16248,
+        "cached_prompt_tokens": 0,
+        "completion_tokens": 2146,
+        "reasoning_tokens": 1434,
+        "total_tokens": 18394
+      },
+      "attempts": 1,
+      "served_trust": "provider_reported"
+    },
+    {
+      "node": "analyze_stride_tampering",
+      "model": "openai/gpt-5.6-terra",
+      "requested_model": "openai/gpt-5.6-terra",
+      "instruction_sha256": "8fe334168e615b7a432527f1e6ae98de06af039dd6f8c7d3c45d5808fd0ae063",
+      "execution_fingerprint": "f4d1569117bfce459cb26ce4a5d158a0aba059553475779f50cb149823de09aa",
+      "duration_ms": 46579,
+      "usage": {
+        "prompt_tokens": 15960,
+        "cached_prompt_tokens": 0,
+        "completion_tokens": 3252,
+        "reasoning_tokens": 1150,
+        "total_tokens": 19212
+      },
+      "attempts": 1,
+      "served_trust": "provider_reported"
+    },
+    {
+      "node": "analyze_stride_repudiation",
+      "model": "openai/gpt-5.6-terra",
+      "requested_model": "openai/gpt-5.6-terra",
+      "instruction_sha256": "8fe334168e615b7a432527f1e6ae98de06af039dd6f8c7d3c45d5808fd0ae063",
+      "execution_fingerprint": "f4d1569117bfce459cb26ce4a5d158a0aba059553475779f50cb149823de09aa",
+      "duration_ms": 48640,
+      "usage": {
+        "prompt_tokens": 16072,
+        "cached_prompt_tokens": 0,
+        "completion_tokens": 2862,
+        "reasoning_tokens": 1788,
+        "total_tokens": 18934
+      },
+      "attempts": 1,
+      "served_trust": "provider_reported"
+    },
+    {
+      "node": "join_stride",
+      "model": null,
+      "requested_model": null,
+      "instruction_sha256": null,
+      "execution_fingerprint": null,
+      "duration_ms": 1,
+      "usage": null,
+      "attempts": 1,
+      "served_trust": null
+    },
+    {
+      "node": "merge_stride",
+      "model": null,
+      "requested_model": null,
+      "instruction_sha256": null,
+      "execution_fingerprint": null,
+      "duration_ms": 5,
+      "usage": null,
+      "attempts": 1,
+      "served_trust": null
+    },
+    {
+      "node": "critic_stride",
+      "model": "openai/gpt-5.6-terra",
+      "requested_model": "openai/gpt-5.6-terra",
+      "instruction_sha256": "8fe334168e615b7a432527f1e6ae98de06af039dd6f8c7d3c45d5808fd0ae063",
+      "execution_fingerprint": "f4d1569117bfce459cb26ce4a5d158a0aba059553475779f50cb149823de09aa",
+      "duration_ms": 34473,
+      "usage": {
+        "prompt_tokens": 12179,
+        "cached_prompt_tokens": 0,
+        "completion_tokens": 1935,
+        "reasoning_tokens": 1517,
+        "total_tokens": 14114
+      },
+      "attempts": 1,
+      "served_trust": "provider_reported"
+    },
+    {
+      "node": "router_stride",
+      "model": null,
+      "requested_model": null,
+      "instruction_sha256": null,
+      "execution_fingerprint": null,
+      "duration_ms": 2,
+      "usage": null,
+      "attempts": 1,
+      "served_trust": null
+    },
+    {
+      "node": "assemble",
+      "model": null,
+      "requested_model": null,
+      "instruction_sha256": null,
+      "execution_fingerprint": null,
+      "duration_ms": 3,
+      "usage": null,
+      "attempts": 1,
+      "served_trust": null
+    }
+  ],
+  "sampling": {
+    "base": {
+      "temperature": null,
+      "top_p": null,
+      "seed": null,
+      "max_output_tokens": 16384,
+      "candidate_count": 1,
+      "presence_penalty": null,
+      "frequency_penalty": null,
+      "thinking": null,
+      "constrain_output": true
+    },
+    "strong": {
+      "temperature": null,
+      "top_p": null,
+      "seed": null,
+      "max_output_tokens": 64000,
+      "candidate_count": 1,
+      "presence_penalty": null,
+      "frequency_penalty": null,
+      "thinking": null,
+      "constrain_output": true
+    },
+    "review": {
+      "temperature": null,
+      "top_p": null,
+      "seed": null,
+      "max_output_tokens": 64000,
+      "candidate_count": 1,
+      "presence_penalty": null,
+      "frequency_penalty": null,
+      "thinking": null,
+      "constrain_output": true
+    }
+  },
+  "system_model": {
+    "external_entities": [
+      {
+        "id": "entity:shopper",
+        "name": "shopper",
+        "description": "A customer who browses the storefront and places orders.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "Shoppers browse the storefront and place orders through the storefront API",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:public-internet"
+      },
+      {
+        "id": "entity:card-processor",
+        "name": "card processor",
+        "description": "Third-party payment processor that settles payments and calls back on settlement.",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "Our card processor is a third party.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:public-internet"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:storefront-api",
+        "name": "storefront API",
+        "description": "Node service on Cloud Run; the only internet-exposed component. Terminates shopper sessions and receives the processor's settlement webhook.",
+        "assets": [
+          "reputation"
+        ],
+        "source_excerpt": "the storefront API, a Node service running on Cloud Run. It is the only thing we expose to the internet.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "Node on Cloud Run",
+        "trust_zone": "boundary:storefront-dmz",
+        "exposure": "internet-facing",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:order-service",
+        "name": "order service",
+        "description": "Python worker that captures orders, persists them, and writes receipts.",
+        "assets": [
+          "financial",
+          "availability-critical"
+        ],
+        "source_excerpt": "The order service is a Python worker in our core network; it is not exposed outside.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "Python worker",
+        "trust_zone": "boundary:core-services",
+        "exposure": "internal",
+        "interface_kind": "web"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:orders-db",
+        "name": "orders db",
+        "description": "PostgreSQL database holding orders, shopper addresses and card last-four.",
+        "assets": [
+          "pii",
+          "financial"
+        ],
+        "source_excerpt": "Orders, shopper addresses and card-last-four live in a PostgreSQL database (orders-db)",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "PostgreSQL",
+        "trust_zone": "boundary:core-services",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:receipt-archive",
+        "name": "receipt archive",
+        "description": "Cloud Storage bucket holding one receipt per completed order.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "a receipt written to a Cloud Storage bucket we call the receipt archive",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "Cloud Storage bucket",
+        "trust_zone": "boundary:core-services",
+        "data_classification": "internal",
+        "encryption_at_rest": "customer-managed key (CMEK)"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:shopper-to-storefront-api:place-order",
+        "name": "place order",
+        "description": "Shopper submits an order over an authenticated session.",
+        "assets": [
+          "pii",
+          "financial"
+        ],
+        "source_excerpt": "Shoppers sign in with email and password and get a session cookie; we have not rolled out MFA for shopper accounts yet.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:shopper",
+        "destination": "process:storefront-api",
+        "protocol": "HTTPS",
+        "authentication": "session cookie issued after email and password login; no MFA",
+        "data_description": "order contents, shipping address, card last-four",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:card-processor-to-storefront-api:settlement-webhook",
+        "name": "settlement webhook",
+        "description": "Processor POSTs a settlement callback marking an order paid.",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "they POST a webhook back to the storefront API to tell us the order is paid. I would have to check how that callback is authenticated.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:card-processor",
+        "destination": "process:storefront-api",
+        "protocol": "HTTPS POST",
+        "authentication": "unknown",
+        "data_description": "settlement confirmation for an order",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:storefront-api-to-order-service:submit-order",
+        "name": "submit order",
+        "description": "Storefront API forwards a submitted order into the core zone for capture.",
+        "assets": [
+          "pii",
+          "financial"
+        ],
+        "source_excerpt": "There is no auth on that gRPC call — the order service accepts anything that can reach it",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:storefront-api",
+        "destination": "process:order-service",
+        "protocol": "gRPC",
+        "authentication": "none; accepted by network position",
+        "data_description": "order contents, shopper identifiers, shipping address",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:order-service-to-orders-db:read-write-orders",
+        "name": "read write orders",
+        "description": "Order service reads and writes order rows.",
+        "assets": [
+          "pii",
+          "financial"
+        ],
+        "source_excerpt": "a single application account that has full read/write. The password comes from an environment variable on the worker.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:order-service",
+        "destination": "store:orders-db",
+        "protocol": "PostgreSQL wire protocol",
+        "authentication": "single shared application account with full read/write; password from an environment variable",
+        "data_description": "order rows, shipping addresses, card last-four",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:order-service-to-receipt-archive:append-receipt",
+        "name": "append receipt",
+        "description": "Order service writes one receipt object per completed order.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "That is on TLS with the order service's own service account",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:order-service",
+        "destination": "store:receipt-archive",
+        "protocol": "HTTPS",
+        "authentication": "order service's own service account",
+        "data_description": "receipt recording the order written and that the order service wrote it",
+        "encryption_in_transit": "TLS",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:public-internet",
+        "name": "public internet",
+        "description": "Everything outside the storefront's control: shoppers and the card processor.",
+        "assets": [],
+        "source_excerpt": "It is the only thing we expose to the internet.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:storefront-dmz",
+        "name": "storefront dmz",
+        "description": "The internet-exposed tier holding the storefront API.",
+        "assets": [],
+        "source_excerpt": "the storefront API, a Node service running on Cloud Run. It is the only thing we expose to the internet.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:core-services",
+        "name": "core services",
+        "description": "Internal network holding the order service and its data.",
+        "assets": [],
+        "source_excerpt": "The order service is a Python worker in our core network; it is not exposed outside.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The order service is reachable only from inside the core network, not from the internet.",
+        "element_id": "process:order-service",
+        "attribute": "exposure",
+        "basis": "Described as \"in our core network; it is not exposed outside\"."
+      }
+    ]
+  },
+  "boundary_crossings": [
+    {
+      "flow_id": "flow:shopper-to-storefront-api:place-order",
+      "source_zone": "boundary:public-internet",
+      "destination_zone": "boundary:storefront-dmz"
+    },
+    {
+      "flow_id": "flow:card-processor-to-storefront-api:settlement-webhook",
+      "source_zone": "boundary:public-internet",
+      "destination_zone": "boundary:storefront-dmz"
+    },
+    {
+      "flow_id": "flow:storefront-api-to-order-service:submit-order",
+      "source_zone": "boundary:storefront-dmz",
+      "destination_zone": "boundary:core-services"
+    }
+  ],
+  "shared_element_names": [],
+  "elements_analyzed": 14,
+  "model_repair": null,
+  "analysis_context": {
+    "instruction_sha256": "8fe334168e615b7a432527f1e6ae98de06af039dd6f8c7d3c45d5808fd0ae063",
+    "domain_packs": [
+      "http-api",
+      "databases"
+    ]
+  },
+  "execution": {
+    "identity_version": 2,
+    "build": {
+      "analysis-service": "0.1.0",
+      "google-adk": "2.5.0",
+      "google-genai": "2.11.0",
+      "litellm": "1.97.0"
+    },
+    "review_independence": "shared"
+  },
+  "analyses": [
+    {
+      "framework": "stride",
+      "framework_version": "1.0",
+      "disclaimer": "AI-generated STRIDE threat model. Each claim asserts that an attacker action against the named elements is credible against what the submitted text stated — never that a control is absent, and never that anything not listed here is safe. Not reviewed by a human security analyst.",
+      "claims": [
+        {
+          "id": "D-01",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Order-request flooding exhausts the public checkout path and propagates into order capture",
+          "description": "An attacker operating shopper accounts can flood `process:storefront-api` through `flow:shopper-to-storefront-api:place-order`. The flow crosses from `boundary:public-internet` into the only internet-facing component, and each accepted order request causes `process:storefront-api` to call `process:order-service` over `flow:storefront-api-to-order-service:submit-order`; the order service then persists order data to `store:orders-db` and writes a receipt. Sustained low-cost request generation can consume the storefront's request/worker capacity and propagate concurrent gRPC, database-write, and receipt-write work faster than legitimate checkout traffic can be served. Second-order, saturating this public entry point prevents legitimate shoppers from placing orders and can stall `process:order-service`, which is tagged `availability-critical`, along with its order persistence and receipt generation. The model does not state rate limits, request-cost budgets, concurrency caps, load shedding, or downstream timeout/backpressure behavior, so their effectiveness is unverified.",
+          "affected_element_ids": [
+            "process:storefront-api",
+            "flow:shopper-to-storefront-api:place-order",
+            "process:order-service",
+            "flow:storefront-api-to-order-service:submit-order"
+          ],
+          "verb": "flood",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "It is the only thing we expose to the\ninternet.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": ""
+            },
+            {
+              "kind": "quote",
+              "text": "When a shopper submits an order the storefront API calls the order service\nover gRPC.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:shopper-to-storefront-api:place-order",
+              "term": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:storefront-api-to-order-service:submit-order",
+              "term": ""
+            }
+          ],
+          "verdict": {
+            "status": "confirmed",
+            "reason": "",
+            "related_unknowns": [],
+            "rejected_because": null
+          },
+          "category": "denial-of-service",
+          "severity": {
+            "likelihood": "high",
+            "impact": "high",
+            "level": "critical",
+            "justification": "Likelihood is high because `flow:shopper-to-storefront-api:place-order` crosses from `boundary:public-internet` to the internet-exposed `process:storefront-api`, allowing ordinary internet clients with shopper sessions to generate requests at scale; no admission-control or rate-limit behavior is stated. Impact is high because the flood propagates across `crossing:flow:storefront-api-to-order-service:submit-order` into `process:order-service`, which is tagged `availability-critical`, disrupting checkout, order persistence in `store:orders-db`, and receipt creation."
+          },
+          "mitigations": [
+            {
+              "summary": "Apply bounded admission control to checkout requests",
+              "detail": "Enforce per-account and per-source request-rate and concurrent-order limits at `process:storefront-api`, with a bounded request-body size and early rejection before initiating gRPC work."
+            },
+            {
+              "summary": "Prevent public bursts from consuming all order-service capacity",
+              "detail": "Set strict request deadlines, bounded concurrency, and load shedding on `flow:storefront-api-to-order-service:submit-order` so overloaded `process:storefront-api` fails fast rather than indefinitely queuing or propagating work to `process:order-service` and `store:orders-db`."
+            },
+            {
+              "summary": "Protect persistence dependencies from checkout spikes",
+              "detail": "Use bounded database connection and statement-time limits for `flow:order-service-to-orders-db:read-write-orders`, and reserve capacity for legitimate order processing so a single request population cannot monopolize order writes."
+            }
+          ],
+          "confidence": "medium"
+        },
+        {
+          "id": "S-01",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Credential stuffing can let an attacker place orders as a shopper",
+          "description": "An internet attacker can use breached email/password pairs or a real-time phishing proxy against the login backing `flow:shopper-to-storefront-api:place-order` and thereby impersonate `entity:shopper` to `process:storefront-api`; the resulting session cookie is indistinguishable from the shopper's because the flow uses email/password login with no MFA. The attacker can place orders containing the shopper's shipping address and card last-four. Second-order, `process:storefront-api` forwards accepted orders over `flow:storefront-api-to-order-service:submit-order`, and `process:order-service` persists them to `store:orders-db`, reaching financial order state and shopper PII.",
+          "affected_element_ids": [
+            "entity:shopper",
+            "process:storefront-api",
+            "flow:shopper-to-storefront-api:place-order"
+          ],
+          "verb": "guess-credential",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "Shoppers sign in with email and password and get a session cookie; we have not rolled out MFA for shopper accounts yet.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:shopper-to-storefront-api:place-order",
+              "term": ""
+            }
+          ],
+          "verdict": {
+            "status": "confirmed",
+            "reason": "",
+            "related_unknowns": [],
+            "rejected_because": null
+          },
+          "category": "spoofing",
+          "severity": {
+            "likelihood": "high",
+            "impact": "high",
+            "level": "critical",
+            "justification": "Likelihood is high because `flow:shopper-to-storefront-api:place-order` crosses from the public internet and uses password-only authentication with no MFA, enabling widely available credential-stuffing and phishing techniques. Impact is high because a successful session can submit financial orders and reaches `store:orders-db`, which holds PII and financial data and is classified confidential."
+          },
+          "mitigations": [
+            {
+              "summary": "Require phishing-resistant shopper MFA",
+              "detail": "Use WebAuthn/passkeys for the authentication backing `flow:shopper-to-storefront-api:place-order`, so a password alone cannot establish a shopper session."
+            },
+            {
+              "summary": "Reduce password-replay success",
+              "detail": "Screen for breached passwords and rate-limit and monitor login attempts at `process:storefront-api` by account and source."
+            }
+          ],
+          "confidence": "high"
+        },
+        {
+          "id": "E-01",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Compromising the storefront API grants unauthenticated access to core order authority",
+          "description": "An attacker who first gains control of the internet-facing `process:storefront-api` can use its network position to send arbitrary requests over `flow:storefront-api-to-order-service:submit-order`. That flow crosses from the storefront DMZ into the core-services zone and has no authentication, so `process:order-service` accepts requests based on reachability rather than a verified calling workload or propagated shopper identity. The attacker can therefore cause the order service to exercise its standing authority for orders they are not authorized to create or modify. Second-order, `process:order-service` uses the full read/write application account on `flow:order-service-to-orders-db:read-write-orders`, allowing the pivot to affect the confidential PII and financial order records in `store:orders-db`.",
+          "affected_element_ids": [
+            "process:storefront-api",
+            "flow:storefront-api-to-order-service:submit-order",
+            "process:order-service"
+          ],
+          "verb": "abuse-grant",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "There is no auth on that gRPC call — the order service accepts anything that can reach it, which is meant to be only the storefront API.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": ""
+            },
+            {
+              "kind": "quote",
+              "text": "the order service reads and writes with a single application account that has full read/write.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:storefront-api-to-order-service:submit-order",
+              "term": ""
+            },
+            {
+              "kind": "absent-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:storefront-api-to-order-service:submit-order",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": ""
+            }
+          ],
+          "verdict": {
+            "status": "confirmed",
+            "reason": "",
+            "related_unknowns": [],
+            "rejected_because": null
+          },
+          "category": "elevation-of-privilege",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium because `process:storefront-api` is internet-facing, but exploitation requires first obtaining control of that process or another position able to reach the DMZ-to-core crossing. Impact is high because the unauthenticated crossing reaches `process:order-service`, whose full read/write application account accesses confidential `store:orders-db` containing PII and financial order data."
+          },
+          "mitigations": [
+            {
+              "summary": "Authenticate and authorize the DMZ-to-core order call",
+              "detail": "Require `process:order-service` to authenticate `flow:storefront-api-to-order-service:submit-order` with a narrowly scoped workload identity, and reject requests that do not carry a verified caller identity."
+            },
+            {
+              "summary": "Propagate and verify shopper authorization at the order service",
+              "detail": "Pass a verifiable, audience-bound shopper identity or order authorization from `process:storefront-api` and have `process:order-service` enforce server-side ownership and permitted operations rather than trusting caller-supplied shopper identifiers."
+            },
+            {
+              "summary": "Constrain the order service database grant",
+              "detail": "Replace the shared full read/write database account on `flow:order-service-to-orders-db:read-write-orders` with least-privilege, short-lived access limited to required order operations."
+            }
+          ],
+          "confidence": "high"
+        },
+        {
+          "id": "I-01",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Shopper order data may be interceptable if HTTPS transport protection is not verified",
+          "description": "`flow:shopper-to-storefront-api:place-order` crosses from `boundary:public-internet` to the internet-facing `process:storefront-api` and carries order contents, shipping addresses, and card last-four data. Its `encryption_in_transit` is unknown; if HTTPS is not actually protected end-to-end on this flow, an attacker able to observe the shopper-to-DMZ path can intercept the shopper's PII and financial order details. Second-order, the captured shopper identifiers and order information can be used to target accounts and specific orders handled by `process:order-service`. This is conditional on verifying the flow's transport-encryption posture.",
+          "affected_element_ids": [
+            "flow:shopper-to-storefront-api:place-order",
+            "entity:shopper",
+            "process:storefront-api"
+          ],
+          "verb": "intercept",
+          "grounds": [
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:shopper-to-storefront-api:place-order",
+              "attribute": "encryption_in_transit",
+              "flow_id": "",
+              "term": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:shopper-to-storefront-api:place-order",
+              "term": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "The claim rests on `encryption_in_transit` on `flow:shopper-to-storefront-api:place-order`, which the input never stated.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:shopper-to-storefront-api:place-order",
+                "attribute": "encryption_in_transit",
+                "subject": ""
+              }
+            ],
+            "rejected_because": null
+          },
+          "category": "information-disclosure",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional because `flow:shopper-to-storefront-api:place-order` crosses the public-internet boundary, making on-path observation plausible, but the unknown transport protection may be present. Impact is high because the flow carries `pii` and `financial` data, including shipping addresses and card last-four, for shopper orders."
+          },
+          "mitigations": [
+            {
+              "summary": "Verify and enforce TLS for shopper order submission",
+              "detail": "Set and continuously verify `encryption_in_transit` for `flow:shopper-to-storefront-api:place-order` as TLS 1.2+ from the shopper to `process:storefront-api`, with valid certificate management and redirects from HTTP disabled or rejected."
+            },
+            {
+              "summary": "Minimize payment-related data in the order payload",
+              "detail": "Keep card-related details out of the storefront order submission where possible and use processor-issued opaque references instead."
+            }
+          ],
+          "confidence": "low"
+        },
+        {
+          "id": "I-03",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Order details may be readable across the DMZ-to-core gRPC path if transport encryption is absent",
+          "description": "`flow:storefront-api-to-order-service:submit-order` crosses from `boundary:storefront-dmz` into `boundary:core-services` and carries order contents, shopper identifiers, and shipping addresses. Its `encryption_in_transit` is unknown; if the gRPC hop lacks verified TLS, an attacker with an observation position in either network zone, such as a compromised workload on the path, can intercept PII and financial order data. Second-order, these identifiers map directly to the records persisted in `store:orders-db`, enabling later targeting of particular shoppers and orders. This claim is conditional on resolving the unknown encryption state; the absence of authentication on this flow is not the basis of this disclosure claim.",
+          "affected_element_ids": [
+            "flow:storefront-api-to-order-service:submit-order",
+            "process:storefront-api",
+            "process:order-service"
+          ],
+          "verb": "intercept",
+          "grounds": [
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:storefront-api-to-order-service:submit-order",
+              "attribute": "encryption_in_transit",
+              "flow_id": "",
+              "term": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:storefront-api-to-order-service:submit-order",
+              "term": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "The claim rests on `encryption_in_transit` on `flow:storefront-api-to-order-service:submit-order`, which the input never stated.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:storefront-api-to-order-service:submit-order",
+                "attribute": "encryption_in_transit",
+                "subject": ""
+              }
+            ],
+            "rejected_because": null
+          },
+          "category": "information-disclosure",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional: the flow crosses the DMZ-to-core boundary and an attacker needs a position on that internal path, while the encryption control is unverified. Impact is high because the flow carries both `pii` and `financial` order data, including shopper identifiers and addresses."
+          },
+          "mitigations": [
+            {
+              "summary": "Use mTLS for the gRPC order-submission hop",
+              "detail": "Set `encryption_in_transit` on `flow:storefront-api-to-order-service:submit-order` to mutually authenticated TLS so `process:storefront-api` and `process:order-service` protect payload confidentiality and verify peers."
+            },
+            {
+              "summary": "Send opaque order references where feasible",
+              "detail": "Reduce the identifiers and address details sent over the cross-zone flow when `process:order-service` can retrieve only the fields required for capture."
+            }
+          ],
+          "confidence": "low"
+        },
+        {
+          "id": "I-05",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "A disclosed environment database password enables bulk reading of order records",
+          "description": "`process:order-service` uses a single application-account password from its environment for `flow:order-service-to-orders-db:read-write-orders`, and that account has full read/write access to `store:orders-db`. An attacker or over-privileged operator who recovers this static credential from the worker environment can use it to read the confidential database's order rows, addresses, and card last-four values in bulk. Second-order, the credential grants corpus-scale access to `store:orders-db`, rather than access limited to a single shopper session or order, and can be used from a position able to reach the core database path.",
+          "affected_element_ids": [
+            "process:order-service",
+            "flow:order-service-to-orders-db:read-write-orders",
+            "store:orders-db"
+          ],
+          "verb": "recover-credential",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "The password comes from an environment variable on the worker.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": ""
+            },
+            {
+              "kind": "quote",
+              "text": "a single application account that has full read/write",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": ""
+            }
+          ],
+          "verdict": {
+            "status": "confirmed",
+            "reason": "",
+            "related_unknowns": [],
+            "rejected_because": null
+          },
+          "category": "information-disclosure",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium because the database secret is a static password stored in the `process:order-service` environment, creating a recoverable standing credential, though the attacker must first obtain access to that value. Impact is high because the same account has full read access to confidential `store:orders-db`, which holds `pii` and `financial` data."
+          },
+          "mitigations": [
+            {
+              "summary": "Replace the environment password with short-lived workload credentials",
+              "detail": "Use workload identity or short-lived database credentials issued through a dedicated secret-management system instead of a long-lived password in the `process:order-service` environment."
+            },
+            {
+              "summary": "Restrict the application account's read scope",
+              "detail": "Split database principals and grant only the rows, tables, and columns required by `process:order-service`; avoid a single full-read account for all order data."
+            },
+            {
+              "summary": "Rotate and scan for exposure",
+              "detail": "Rotate the existing password, prevent it from appearing in diagnostics and logs, and scan deployment configuration, images, and operational artifacts for copies."
+            }
+          ],
+          "confidence": "medium"
+        },
+        {
+          "id": "I-06",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "A storage-layer copy could expose all order records if orders-db encryption at rest is absent",
+          "description": "`store:orders-db` is classified confidential, holds shopper addresses and card last-four data, and has `encryption_at_rest` set to unknown. If that unknown resolves to unencrypted storage, an attacker or over-privileged operator who obtains access to the PostgreSQL storage layer or an operational copy of that store can read its PII and financial order records without authenticating through `process:order-service`. Second-order, a raw storage copy bypasses the normal application access path and exposes the accumulated order corpus rather than one request's records. This is conditional on verification of the at-rest encryption setting; it does not assert that encryption is absent.",
+          "affected_element_ids": [
+            "store:orders-db"
+          ],
+          "verb": "read",
+          "grounds": [
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "store:orders-db",
+              "attribute": "encryption_at_rest",
+              "flow_id": "",
+              "term": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "The claim rests on `encryption_at_rest` on `store:orders-db`, which the input never stated.",
+            "related_unknowns": [
+              {
+                "element_id": "store:orders-db",
+                "attribute": "encryption_at_rest",
+                "subject": ""
+              }
+            ],
+            "rejected_because": null
+          },
+          "category": "information-disclosure",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional because `store:orders-db` has unverified `encryption_at_rest`, and storage-layer access or an operational copy avoids the application path if encryption is absent. Impact is high because the store is classified confidential and tagged `pii` and `financial`, so one copy can disclose its full accumulated order corpus."
+          },
+          "mitigations": [
+            {
+              "summary": "Verify and enforce encryption at rest for orders-db and its operational copies",
+              "detail": "Establish the actual `encryption_at_rest` posture of `store:orders-db`; require managed encryption with controlled keys for the database and any backups, snapshots, replicas, or exports associated with that store."
+            },
+            {
+              "summary": "Restrict key and storage-layer access",
+              "detail": "Separate database access from key-use and operational-copy export permissions, using least-privilege roles and audit coverage for storage and key operations."
+            }
+          ],
+          "confidence": "low"
+        },
+        {
+          "id": "S-02",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Forged settlement callbacks are possible if webhook authentication is absent",
+          "description": "`flow:card-processor-to-storefront-api:settlement-webhook` crosses from `boundary:public-internet` to `process:storefront-api`, but its `authentication` attribute is unknown. If that unknown resolves to no verified signature, mutual TLS, or equivalent sender verification, an internet attacker who learns the endpoint can forge a callback as `entity:card-processor` and mark an order paid. Second-order, the forged settlement changes financial order-processing decisions made by `process:storefront-api` and its downstream order-capture path. This is conditional on the unresolved authentication state; it does not assert that webhook authentication is absent.",
+          "affected_element_ids": [
+            "entity:card-processor",
+            "process:storefront-api",
+            "flow:card-processor-to-storefront-api:settlement-webhook"
+          ],
+          "verb": "forge",
+          "grounds": [
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:card-processor-to-storefront-api:settlement-webhook",
+              "term": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:card-processor-to-storefront-api:settlement-webhook",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "The claim rests on `authentication` on `flow:card-processor-to-storefront-api:settlement-webhook`, which the input never stated.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:card-processor-to-storefront-api:settlement-webhook",
+                "attribute": "authentication",
+                "subject": ""
+              }
+            ],
+            "rejected_because": null
+          },
+          "category": "spoofing",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional because the callback arrives across a public-internet boundary, but `unknown:flow:card-processor-to-storefront-api:settlement-webhook:authentication` means an effective sender-verification control may exist but is undocumented. Impact is high because the callback marks an order paid and affects financial order state processed downstream by `process:order-service` and stored in confidential `store:orders-db`."
+          },
+          "mitigations": [
+            {
+              "summary": "Verify and document card-processor webhook identity",
+              "detail": "Make authentication explicit on `flow:card-processor-to-storefront-api:settlement-webhook`; require a per-integration HMAC or asymmetric signature over the payload, or mTLS, before `process:storefront-api` accepts a settlement."
+            },
+            {
+              "summary": "Prevent callback replay",
+              "detail": "Require a signed timestamp and unique event identifier, reject stale deliveries, and enforce idempotent settlement processing."
+            }
+          ],
+          "confidence": "low"
+        },
+        {
+          "id": "S-03",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "A foothold in the storefront zone can impersonate the storefront API to order service",
+          "description": "An attacker who gains reachability in `boundary:storefront-dmz` can send arbitrary requests over `flow:storefront-api-to-order-service:submit-order` and impersonate `process:storefront-api` to `process:order-service`, because the flow explicitly has no authentication and is accepted solely by network position. The attacker can submit fraudulent orders with chosen shopper identifiers and shipping details. Second-order, `process:order-service` writes those orders to `store:orders-db` and emits receipts to `store:receipt-archive`, so the impersonation reaches financial order processing, PII, and business-critical receipt records.",
+          "affected_element_ids": [
+            "process:storefront-api",
+            "process:order-service",
+            "flow:storefront-api-to-order-service:submit-order"
+          ],
+          "verb": "impersonate",
+          "grounds": [
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:storefront-api-to-order-service:submit-order",
+              "term": ""
+            },
+            {
+              "kind": "absent-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:storefront-api-to-order-service:submit-order",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": ""
+            }
+          ],
+          "verdict": {
+            "status": "confirmed",
+            "reason": "",
+            "related_unknowns": [],
+            "rejected_because": null
+          },
+          "category": "spoofing",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium because exploiting the path requires a foothold or request-origin capability in `boundary:storefront-dmz`, but the crossing has stated absent authentication rather than a verified workload identity. Impact is high because `process:order-service` handles financial and availability-critical assets and writes shopper PII and financial orders to confidential `store:orders-db`."
+          },
+          "mitigations": [
+            {
+              "summary": "Replace network-position trust with workload authentication",
+              "detail": "Require mTLS with a distinct authenticated identity for `process:storefront-api` on `flow:storefront-api-to-order-service:submit-order`, and authorize only that workload at `process:order-service`."
+            },
+            {
+              "summary": "Bind submitted orders to verified caller identity",
+              "detail": "Have `process:order-service` reject requests lacking the verified storefront workload identity rather than accepting any source that can reach the core network."
+            }
+          ],
+          "confidence": "high"
+        },
+        {
+          "id": "S-05",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "A stolen shared database password can impersonate the order service to orders DB",
+          "description": "An attacker who obtains the password used on `flow:order-service-to-orders-db:read-write-orders` can use that static shared application account to impersonate `process:order-service` to `store:orders-db`. The account has full read/write access, so possession of the password provides the database the same machine identity and authority as the legitimate order service. Second-order, the impostor can act across the corpus of order rows containing shopper addresses and card last-four values, rather than being constrained to a single order.",
+          "affected_element_ids": [
+            "process:order-service",
+            "store:orders-db",
+            "flow:order-service-to-orders-db:read-write-orders"
+          ],
+          "verb": "use-credential",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "Orders, shopper addresses and card-last-four live in a PostgreSQL database (orders-db) that the order service reads and writes with a single application account that has full read/write. The password comes from an environment variable on the worker.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": ""
+            }
+          ],
+          "verdict": {
+            "status": "confirmed",
+            "reason": "",
+            "related_unknowns": [],
+            "rejected_because": null
+          },
+          "category": "spoofing",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium because the database identity is a password held in an environment variable and possession of that static credential is sufficient to present the shared application identity. Impact is high because `store:orders-db` is confidential and contains PII and financial order data, while the quoted account has full read/write access."
+          },
+          "mitigations": [
+            {
+              "summary": "Replace the shared database password with workload-bound identity",
+              "detail": "Use short-lived workload-federated database credentials or a per-workload client certificate for `process:order-service`, rather than a password stored in its environment."
+            },
+            {
+              "summary": "Constrain and rotate remaining database credentials",
+              "detail": "If a password must remain, rotate it regularly, scope its privileges to the required tables and operations, and ensure no other workload uses the same database account."
+            }
+          ],
+          "confidence": "high"
+        },
+        {
+          "id": "T-03",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Orders can be modified on the DMZ-to-core gRPC path if transport protection is absent",
+          "description": "`flow:storefront-api-to-order-service:submit-order` crosses from `boundary:storefront-dmz` into `boundary:core-services`; it has no authentication and its `encryption_in_transit` protection is unknown. If the gRPC hop lacks authenticated encryption, an attacker able to occupy or redirect this cross-zone path can alter order contents, shopper identifiers, or shipping addresses before `process:order-service` captures them. Second-order, `process:order-service` writes the altered order rows through `flow:order-service-to-orders-db:read-write-orders` into confidential `store:orders-db`, making manipulated financial and PII-bearing records authoritative. The transport aspect is conditional on the unknown encryption attribute; the lack of call authentication is stated.",
+          "affected_element_ids": [
+            "flow:storefront-api-to-order-service:submit-order",
+            "process:storefront-api",
+            "process:order-service"
+          ],
+          "verb": "alter-in-transit",
+          "grounds": [
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:storefront-api-to-order-service:submit-order",
+              "term": ""
+            },
+            {
+              "kind": "absent-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:storefront-api-to-order-service:submit-order",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:storefront-api-to-order-service:submit-order",
+              "attribute": "encryption_in_transit",
+              "flow_id": "",
+              "term": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "The claim rests on `encryption_in_transit` on `flow:storefront-api-to-order-service:submit-order`, which the input never stated.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:storefront-api-to-order-service:submit-order",
+                "attribute": "encryption_in_transit",
+                "subject": ""
+              }
+            ],
+            "rejected_because": null
+          },
+          "category": "tampering",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium: the attacker needs a position on the DMZ-to-core crossing, but `flow:storefront-api-to-order-service:submit-order` has stated absent authentication and unverified transport protection. Impact is high because altered orders are persisted in confidential `store:orders-db`, which holds `financial` and `pii` data, and can affect the order-capture path of `process:order-service`."
+          },
+          "mitigations": [
+            {
+              "summary": "Use mutually authenticated TLS for the gRPC hop",
+              "detail": "Require mTLS with service identities on `flow:storefront-api-to-order-service:submit-order` so the cross-zone call has authenticated encryption and integrity protection."
+            },
+            {
+              "summary": "Sign and validate submitted order payloads",
+              "detail": "Have `process:storefront-api` sign canonical order instructions and require `process:order-service` to verify the signature and allowlist required fields before capture."
+            }
+          ],
+          "confidence": "low"
+        },
+        {
+          "id": "I-02",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Settlement status may be readable in transit if webhook transport protection is not verified",
+          "description": "`flow:card-processor-to-storefront-api:settlement-webhook` crosses from `boundary:public-internet` to `process:storefront-api` and carries financial settlement confirmations. Because `encryption_in_transit` is unknown, if the HTTPS webhook channel is not protected end-to-end, an on-path attacker can intercept which orders have settled and their payment status. Second-order, this exposes order-payment timing and status information processed by `process:storefront-api`, which can aid targeted fraud or social-engineering attempts against shoppers. This is conditional on the unresolved transport-encryption attribute.",
+          "affected_element_ids": [
+            "flow:card-processor-to-storefront-api:settlement-webhook",
+            "entity:card-processor",
+            "process:storefront-api"
+          ],
+          "verb": "intercept",
+          "grounds": [
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:card-processor-to-storefront-api:settlement-webhook",
+              "attribute": "encryption_in_transit",
+              "flow_id": "",
+              "term": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:card-processor-to-storefront-api:settlement-webhook",
+              "term": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "The claim rests on `encryption_in_transit` on `flow:card-processor-to-storefront-api:settlement-webhook`, which the input never stated.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:card-processor-to-storefront-api:settlement-webhook",
+                "attribute": "encryption_in_transit",
+                "subject": ""
+              }
+            ],
+            "rejected_because": null
+          },
+          "category": "information-disclosure",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium and conditional because the webhook crosses the public-internet boundary, although `encryption_in_transit` is unverified rather than stated absent. Impact is medium because the flow is tagged `financial` and reveals settlement status, but the described payload is a confirmation rather than the full order record."
+          },
+          "mitigations": [
+            {
+              "summary": "Verify and require TLS for processor callbacks",
+              "detail": "Establish that `flow:card-processor-to-storefront-api:settlement-webhook` uses TLS 1.2+ for the complete callback path and reject downgrade or plaintext delivery."
+            }
+          ],
+          "confidence": "low"
+        },
+        {
+          "id": "I-04",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Database traffic may disclose confidential order records if its transport encryption is not verified",
+          "description": "`flow:order-service-to-orders-db:read-write-orders` transfers order rows, shipping addresses, and card last-four between `process:order-service` and confidential `store:orders-db`. Its `encryption_in_transit` is unknown; if PostgreSQL wire traffic is unencrypted, an attacker who has obtained a network observation position inside `boundary:core-services` can intercept the records read or written by the service. Second-order, repeated observation can accumulate a large portion of the corpus held by `store:orders-db` without using the database's application read path. This is conditional on the unresolved transport-encryption setting.",
+          "affected_element_ids": [
+            "flow:order-service-to-orders-db:read-write-orders",
+            "process:order-service",
+            "store:orders-db"
+          ],
+          "verb": "intercept",
+          "grounds": [
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:order-service-to-orders-db:read-write-orders",
+              "attribute": "encryption_in_transit",
+              "flow_id": "",
+              "term": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "The claim rests on `encryption_in_transit` on `flow:order-service-to-orders-db:read-write-orders`, which the input never stated.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:order-service-to-orders-db:read-write-orders",
+                "attribute": "encryption_in_transit",
+                "subject": ""
+              }
+            ],
+            "rejected_because": null
+          },
+          "category": "information-disclosure",
+          "severity": {
+            "likelihood": "low",
+            "impact": "high",
+            "level": "medium",
+            "justification": "Likelihood is low and conditional because this is an intra-core-services flow, so an attacker first needs an internal observation position, and its transport encryption is unknown. Impact is high because `store:orders-db` is confidential and the flow carries `pii` and `financial` order records."
+          },
+          "mitigations": [
+            {
+              "summary": "Require encrypted PostgreSQL connections",
+              "detail": "Configure TLS for `flow:order-service-to-orders-db:read-write-orders`, require certificate validation by `process:order-service`, and reject non-TLS database connections."
+            }
+          ],
+          "confidence": "low"
+        },
+        {
+          "id": "R-02",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Settlement confirmations may be unattributable to the card processor",
+          "description": "`flow:card-processor-to-storefront-api:settlement-webhook` crosses from `boundary:public-internet` to `process:storefront-api`, but its `authentication` is unknown. If this resolves to an unsigned or otherwise non-verifiable callback, a settlement confirmation acted on by `process:storefront-api` cannot be bound to `entity:card-processor`; the processor can deny sending a particular paid-status update and the storefront cannot rebut the dispute with authenticated message evidence. The consequence reaches financial order state in `store:orders-db`, where a settlement dispute can affect whether an order is treated as paid. This claim is conditional on the unresolved authentication attribute and does not assert that the webhook is unsigned.",
+          "affected_element_ids": [
+            "entity:card-processor",
+            "process:storefront-api",
+            "flow:card-processor-to-storefront-api:settlement-webhook"
+          ],
+          "verb": "unattributable",
+          "grounds": [
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:card-processor-to-storefront-api:settlement-webhook",
+              "term": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:card-processor-to-storefront-api:settlement-webhook",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "The claim rests on `authentication` on `flow:card-processor-to-storefront-api:settlement-webhook`, which the input never stated.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:card-processor-to-storefront-api:settlement-webhook",
+                "attribute": "authentication",
+                "subject": ""
+              }
+            ],
+            "rejected_because": null
+          },
+          "category": "repudiation",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium and conditional on `unknown:flow:card-processor-to-storefront-api:settlement-webhook:authentication`: the callback crosses from `boundary:public-internet`, but a verification control may exist and has not been recorded. Impact is medium because the callback carries `financial` settlement confirmations and can affect paid-status records in `store:orders-db`, although the model indicates individual order settlements rather than a system-wide financial action."
+          },
+          "mitigations": [
+            {
+              "summary": "Establish and retain verifiable settlement-callback evidence",
+              "detail": "Confirm the authentication mechanism on `flow:card-processor-to-storefront-api:settlement-webhook`; if it lacks message-level proof, require timestamped, nonce-protected signed callbacks using a processor-specific key and retain the raw signed request for the dispute window."
+            },
+            {
+              "summary": "Log settlement decisions with verified sender identity",
+              "detail": "Have `process:storefront-api` record the verified processor identity, signature-validation outcome, message identifier, timestamp, and resulting order-state transition before updating downstream order state."
+            }
+          ],
+          "confidence": "low"
+        },
+        {
+          "id": "S-04",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "A fake order-service endpoint could harvest orders if gRPC server identity is unverified",
+          "description": "`flow:storefront-api-to-order-service:submit-order` has `encryption_in_transit: unknown`. If this means gRPC does not use TLS with certificate validation or another verified server identity, an attacker able to redirect or intercept traffic between the storefront and core zones can impersonate `process:order-service` to `process:storefront-api`. The fake endpoint can receive order contents, shopper identifiers, shipping addresses, and card last-four values sent on that flow. This draft is conditional on the unresolved transport-protection attribute, not a claim that encryption or certificate validation is absent.",
+          "affected_element_ids": [
+            "process:storefront-api",
+            "process:order-service",
+            "flow:storefront-api-to-order-service:submit-order"
+          ],
+          "verb": "impersonate",
+          "grounds": [
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:storefront-api-to-order-service:submit-order",
+              "term": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:storefront-api-to-order-service:submit-order",
+              "attribute": "encryption_in_transit",
+              "flow_id": "",
+              "term": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "The claim rests on `encryption_in_transit` on `flow:storefront-api-to-order-service:submit-order`, which the input never stated.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:storefront-api-to-order-service:submit-order",
+                "attribute": "encryption_in_transit",
+                "subject": ""
+              }
+            ],
+            "rejected_because": null
+          },
+          "category": "spoofing",
+          "severity": {
+            "likelihood": "low",
+            "impact": "high",
+            "level": "medium",
+            "justification": "Likelihood is low and conditional because exploiting this requires network redirection or an on-path position between the DMZ and core zones, while the unknown transport control may be present. Impact is high because the flow carries shopper PII and financial order data, and its downstream destination is `process:order-service`, which handles financial and availability-critical assets."
+          },
+          "mitigations": [
+            {
+              "summary": "Authenticate the order-service endpoint in transit",
+              "detail": "Use TLS 1.2+ with full certificate-chain validation on `flow:storefront-api-to-order-service:submit-order`; use a private CA or workload identity such as SPIFFE to bind the certificate to `process:order-service`."
+            },
+            {
+              "summary": "Use mutual TLS for the service crossing",
+              "detail": "Combine server validation with mTLS so both `process:storefront-api` and `process:order-service` verify the peer workload identity."
+            }
+          ],
+          "confidence": "low"
+        },
+        {
+          "id": "T-01",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Order details can be modified in transit if shopper HTTPS lacks verified transport protection",
+          "description": "`flow:shopper-to-storefront-api:place-order` crosses from `boundary:public-internet` to internet-facing `process:storefront-api`, but its `encryption_in_transit` attribute is unknown. If HTTPS is not providing authenticated transport protection end to end on this path, an on-path attacker can alter order contents, shipping addresses, or card-last-four values before `process:storefront-api` processes them. Second-order, the API forwards submitted orders through `flow:storefront-api-to-order-service:submit-order`, allowing altered order data to be captured by `process:order-service` and persisted in `store:orders-db`. This is conditional on the unverified transport-protection attribute, not an assertion that HTTPS is plaintext.",
+          "affected_element_ids": [
+            "flow:shopper-to-storefront-api:place-order",
+            "process:storefront-api",
+            "entity:shopper"
+          ],
+          "verb": "alter-in-transit",
+          "grounds": [
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:shopper-to-storefront-api:place-order",
+              "term": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:shopper-to-storefront-api:place-order",
+              "attribute": "encryption_in_transit",
+              "flow_id": "",
+              "term": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "The claim rests on `encryption_in_transit` on `flow:shopper-to-storefront-api:place-order`, which the input never stated.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:shopper-to-storefront-api:place-order",
+                "attribute": "encryption_in_transit",
+                "subject": ""
+              }
+            ],
+            "rejected_because": null
+          },
+          "category": "tampering",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium and conditional because `flow:shopper-to-storefront-api:place-order` crosses the public-internet boundary and its transport protection is unverified, although an attacker still needs an on-path position. Impact is medium because the flow carries `pii` and `financial` order data and the altered values can be persisted in confidential `store:orders-db`."
+          },
+          "mitigations": [
+            {
+              "summary": "Verify authenticated TLS for shopper order submission",
+              "detail": "Require TLS 1.2+ with valid certificate validation and authenticated encryption on `flow:shopper-to-storefront-api:place-order`; record the verified transport configuration rather than leaving `encryption_in_transit` unknown."
+            },
+            {
+              "summary": "Validate authoritative order fields at the API",
+              "detail": "Have `process:storefront-api` canonicalize and allowlist expected order and address fields before forwarding them to `process:order-service`."
+            }
+          ],
+          "confidence": "low"
+        },
+        {
+          "id": "T-02",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Settlement callbacks can be altered in transit if webhook HTTPS protection is unverified",
+          "description": "`flow:card-processor-to-storefront-api:settlement-webhook` crosses from `boundary:public-internet` into `process:storefront-api` and has `encryption_in_transit: unknown`. If the HTTPS POST does not provide verified authenticated transport protection on the full path, an on-path attacker can alter a genuine settlement confirmation, such as the referenced order or payment status, before the storefront processes the callback that marks an order paid. This directly corrupts financial settlement state at `process:storefront-api`; the threat is conditional on the unresolved transport-protection attribute.",
+          "affected_element_ids": [
+            "flow:card-processor-to-storefront-api:settlement-webhook",
+            "process:storefront-api",
+            "entity:card-processor"
+          ],
+          "verb": "alter-in-transit",
+          "grounds": [
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:card-processor-to-storefront-api:settlement-webhook",
+              "term": ""
+            },
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:card-processor-to-storefront-api:settlement-webhook",
+              "attribute": "encryption_in_transit",
+              "flow_id": "",
+              "term": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "The claim rests on `encryption_in_transit` on `flow:card-processor-to-storefront-api:settlement-webhook`, which the input never stated.",
+            "related_unknowns": [
+              {
+                "element_id": "flow:card-processor-to-storefront-api:settlement-webhook",
+                "attribute": "encryption_in_transit",
+                "subject": ""
+              }
+            ],
+            "rejected_because": null
+          },
+          "category": "tampering",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium and conditional: the callback crosses from `boundary:public-internet`, but exploitation requires an on-path position and depends on the unknown transport-protection state. Impact is medium because `flow:card-processor-to-storefront-api:settlement-webhook` carries `financial` settlement confirmations that mark orders paid."
+          },
+          "mitigations": [
+            {
+              "summary": "Verify end-to-end TLS on the settlement webhook",
+              "detail": "Require modern TLS with certificate validation for `flow:card-processor-to-storefront-api:settlement-webhook` and document the resulting `encryption_in_transit` control."
+            },
+            {
+              "summary": "Add message-level integrity verification",
+              "detail": "Require `process:storefront-api` to verify a card-processor signature over the canonical callback payload before applying settlement state, so a transport-path rewrite is rejected."
+            }
+          ],
+          "confidence": "low"
+        },
+        {
+          "id": "T-05",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "Offline alteration of the orders database is possible if encryption at rest is absent",
+          "description": "`store:orders-db` contains confidential order, address, and card-last-four data, while its `encryption_at_rest` attribute is unknown. If encryption and integrity protection do not cover the database's offline media, snapshots, or restore material, an attacker with access to that material can alter stored order records and have the modified data reintroduced as authentic. This is conditional on the unresolved at-rest protection state and does not assert that such protection is absent.",
+          "affected_element_ids": [
+            "store:orders-db"
+          ],
+          "verb": "alter",
+          "grounds": [
+            {
+              "kind": "unknown-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "store:orders-db",
+              "attribute": "encryption_at_rest",
+              "flow_id": "",
+              "term": ""
+            }
+          ],
+          "verdict": {
+            "status": "needs-info",
+            "reason": "The claim rests on `encryption_at_rest` on `store:orders-db`, which the input never stated.",
+            "related_unknowns": [
+              {
+                "element_id": "store:orders-db",
+                "attribute": "encryption_at_rest",
+                "subject": ""
+              }
+            ],
+            "rejected_because": null
+          },
+          "category": "tampering",
+          "severity": {
+            "likelihood": "low",
+            "impact": "high",
+            "level": "medium",
+            "justification": "Likelihood is low and conditional because exploitation requires access to offline material in addition to the unknown at-rest protection being absent. Impact is high because `store:orders-db` is confidential and contains the central `pii` and `financial` order corpus, so restored corruption can affect many orders."
+          },
+          "mitigations": [
+            {
+              "summary": "Verify encryption and integrity protection for database media",
+              "detail": "Establish whether `store:orders-db` encryption at rest covers disks, snapshots, backups, and exports; use managed envelope encryption with protected keys where it does not."
+            },
+            {
+              "summary": "Validate restores before production use",
+              "detail": "Use versioned backups and integrity checks during restore so altered database media cannot be accepted as an authoritative `store:orders-db` state."
+            }
+          ],
+          "confidence": "low"
+        }
+      ],
+      "rejected_claims": [
+        {
+          "id": "T-04",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "A leaked shared database password permits direct rewriting of all orders",
+          "description": "`flow:order-service-to-orders-db:read-write-orders` uses a single application account whose password is held in the environment of `process:order-service` and has full read/write access. An attacker who obtains that static credential can directly alter order rows, shipping addresses, and card-last-four records in `store:orders-db`, bypassing the validation and capture logic of `process:order-service`. The corruption affects the full confidential order corpus rather than one caller's request; no downstream consumer of `store:orders-db` is modeled to independently validate those rewritten records.",
+          "affected_element_ids": [
+            "store:orders-db",
+            "flow:order-service-to-orders-db:read-write-orders",
+            "process:order-service"
+          ],
+          "verb": "alter",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "Orders, shopper addresses and card-last-four live in a PostgreSQL database (orders-db) that the order service reads and writes with a single application account that has full read/write. The password comes from an environment variable on the worker.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": ""
+            }
+          ],
+          "verdict": {
+            "status": "rejected",
+            "reason": "The claim asserts that “no downstream consumer of `store:orders-db` is modeled to independently validate those rewritten records,” but the model does not state any downstream validation behavior or establish its absence.",
+            "related_unknowns": [],
+            "rejected_because": "reasoning"
+          },
+          "category": "tampering",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium because the attacker must first obtain the static environment-held database password, but the quoted shared full-read/write account makes that credential directly usable. Impact is high because `store:orders-db` is confidential and holds the system's `pii` and `financial` order records, all of which the credential can rewrite."
+          },
+          "mitigations": [
+            {
+              "summary": "Replace the shared static password with workload identity",
+              "detail": "Authenticate `process:order-service` to `store:orders-db` using short-lived workload-federated database credentials rather than an environment-held shared password."
+            },
+            {
+              "summary": "Restrict database write authority",
+              "detail": "Give the order service only the tables, operations, and row scope it requires; use separate reader and writer principals and deny schema or unrelated-record changes."
+            }
+          ],
+          "confidence": "low"
+        },
+        {
+          "id": "R-01",
+          "framework": "stride",
+          "framework_version": "1.0",
+          "title": "A core-network actor can deny orders injected through the unauthenticated order-service call",
+          "description": "An actor with access to `boundary:core-services` can submit an order to `process:order-service` through `flow:storefront-api-to-order-service:submit-order`, because that flow has no authentication and is accepted solely by network position. The resulting receipt is written via `flow:order-service-to-receipt-archive:append-receipt` to `store:receipt-archive`, but the described record identifies the order and `process:order-service`, not the originating caller. The actor can therefore deny having caused a fraudulent or disputed order: the available receipt proves only that the service wrote it. Second-order, the order is persisted in `store:orders-db`, so financial order records and completed-order receipts may lack evidence tying the write to either an authenticated shopper or a distinct internal principal.",
+          "affected_element_ids": [
+            "process:order-service",
+            "flow:storefront-api-to-order-service:submit-order"
+          ],
+          "verb": "unattributable",
+          "grounds": [
+            {
+              "kind": "quote",
+              "text": "The receipt records which order was written and that the order service wrote it.",
+              "source_label": "System description",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "",
+              "term": ""
+            },
+            {
+              "kind": "absent-attribute",
+              "text": "",
+              "source_label": "",
+              "element_id": "flow:storefront-api-to-order-service:submit-order",
+              "attribute": "authentication",
+              "flow_id": "",
+              "term": ""
+            },
+            {
+              "kind": "derived-fact",
+              "text": "",
+              "source_label": "",
+              "element_id": "",
+              "attribute": "",
+              "flow_id": "flow:storefront-api-to-order-service:submit-order",
+              "term": ""
+            }
+          ],
+          "verdict": {
+            "status": "rejected",
+            "reason": "The model states that `flow:storefront-api-to-order-service:submit-order` originates in `boundary:storefront-dmz`; it does not state that an actor merely having access to `boundary:core-services` can send requests over that flow or otherwise reach `process:order-service`.",
+            "related_unknowns": [],
+            "rejected_because": "reasoning"
+          },
+          "category": "repudiation",
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium because exploitation requires a foothold able to reach `process:order-service` in `boundary:core-services`, but `flow:storefront-api-to-order-service:submit-order` explicitly has absent authentication. Impact is medium because the flow and downstream `store:orders-db` carry `financial` order data, while the receipt evidence in `store:receipt-archive` cannot resolve a disputed completed order."
+          },
+          "mitigations": [
+            {
+              "summary": "Authenticate and identify each caller of the order service",
+              "detail": "Require authenticated internal calls on `flow:storefront-api-to-order-service:submit-order` and validate a distinct workload identity; do not treat network position as the caller identity."
+            },
+            {
+              "summary": "Record the originating principal in completed-order evidence",
+              "detail": "Propagate the authenticated shopper subject, or the validated internal caller identity where applicable, through `process:order-service` and record it in `store:receipt-archive` with the action, target order, timestamp, and outcome."
+            },
+            {
+              "summary": "Make receipts independently durable audit evidence",
+              "detail": "Use append-only retention and integrity-protected records for completed-order events so the recorded actor and action remain available for the dispute-retention period."
+            }
+          ],
+          "confidence": "low"
+        }
+      ],
+      "scope": [],
+      "coverage": [
+        {
+          "lane": "spoofing",
+          "drafts": 5,
+          "rules": 2,
+          "rules_fired": 2,
+          "candidates": 3,
+          "candidates_cited": 3,
+          "elements": 14,
+          "elements_cited": 12,
+          "boundary_crossings": 3,
+          "boundary_crossings_cited": 3,
+          "unknown_controls": 7,
+          "unknown_controls_cited": 3
+        },
+        {
+          "lane": "tampering",
+          "drafts": 5,
+          "rules": 2,
+          "rules_fired": 1,
+          "candidates": 3,
+          "candidates_cited": 3,
+          "elements": 14,
+          "elements_cited": 12,
+          "boundary_crossings": 3,
+          "boundary_crossings_cited": 3,
+          "unknown_controls": 7,
+          "unknown_controls_cited": 5
+        },
+        {
+          "lane": "repudiation",
+          "drafts": 2,
+          "rules": 1,
+          "rules_fired": 1,
+          "candidates": 1,
+          "candidates_cited": 1,
+          "elements": 14,
+          "elements_cited": 10,
+          "boundary_crossings": 3,
+          "boundary_crossings_cited": 2,
+          "unknown_controls": 7,
+          "unknown_controls_cited": 2
+        },
+        {
+          "lane": "information-disclosure",
+          "drafts": 6,
+          "rules": 2,
+          "rules_fired": 2,
+          "candidates": 5,
+          "candidates_cited": 5,
+          "elements": 14,
+          "elements_cited": 12,
+          "boundary_crossings": 3,
+          "boundary_crossings_cited": 3,
+          "unknown_controls": 7,
+          "unknown_controls_cited": 5
+        },
+        {
+          "lane": "denial-of-service",
+          "drafts": 1,
+          "rules": 2,
+          "rules_fired": 2,
+          "candidates": 2,
+          "candidates_cited": 1,
+          "elements": 14,
+          "elements_cited": 6,
+          "boundary_crossings": 3,
+          "boundary_crossings_cited": 2,
+          "unknown_controls": 7,
+          "unknown_controls_cited": 0
+        },
+        {
+          "lane": "elevation-of-privilege",
+          "drafts": 1,
+          "rules": 2,
+          "rules_fired": 1,
+          "candidates": 1,
+          "candidates_cited": 1,
+          "elements": 14,
+          "elements_cited": 5,
+          "boundary_crossings": 3,
+          "boundary_crossings_cited": 1,
+          "unknown_controls": 7,
+          "unknown_controls_cited": 1
+        }
+      ],
+      "unverified_grounds": [],
+      "unreconciled_rulings": [],
+      "repaired_quotes": [],
+      "unresolved_references": [
+        {
+          "claim_id": "R-01",
+          "element_id": "store:receipt-archive",
+          "reason": "more than one hop from every place the claim's grounds name"
+        },
+        {
+          "claim_id": "R-01",
+          "element_id": "flow:order-service-to-receipt-archive:append-receipt",
+          "reason": "more than one hop from every place the claim's grounds name"
+        },
+        {
+          "claim_id": "E-01",
+          "element_id": "flow:order-service-to-orders-db:read-write-orders",
+          "reason": "more than one hop from every place the claim's grounds name"
+        }
+      ],
+      "unresolved_mentions": [],
+      "unresolved_evidence": [],
+      "unknown_claim_identities": [],
+      "dropped_claims": [],
+      "fired_rules": [
+        "denial-of-service-internet-exposed-process",
+        "denial-of-service-shared-dependency",
+        "elevation-of-privilege-inbound-from-exposed-process",
+        "information-disclosure-store-at-rest-unverified",
+        "information-disclosure-unprotected-sensitive-transit",
+        "repudiation-unattributable-action",
+        "spoofing-unverified-boundary-auth",
+        "spoofing-unverified-external-caller",
+        "tampering-unprotected-transit-crossing"
+      ],
+      "knowledge_docs": [
+        "cases/chained-benign-facts",
+        "cases/shared-credential-attribution",
+        "cases/two-threats-one-flow",
+        "cases/unknown-is-not-absent",
+        "notes/attribution-and-audit",
+        "notes/callback-and-webhook-trust",
+        "notes/compromise-inheritance",
+        "notes/cost-of-an-unauthenticated-request",
+        "notes/failure-coupling",
+        "notes/identity-at-a-boundary",
+        "notes/protection-at-rest",
+        "notes/transport-protection"
+      ],
+      "summary": {
+        "claim_count": 18,
+        "needs_info_count": 12,
+        "rejected_count": 2,
+        "by_category": {
+          "denial-of-service": 1,
+          "spoofing": 5,
+          "elevation-of-privilege": 1,
+          "information-disclosure": 6,
+          "tampering": 4,
+          "repudiation": 1
+        },
+        "by_severity": {
+          "critical": 2,
+          "high": 9,
+          "medium": 7
+        },
+        "by_severity_confirmed": {
+          "critical": 2,
+          "high": 4
+        }
+      },
+      "missing_mitigations": []
+    }
+  ]
+}

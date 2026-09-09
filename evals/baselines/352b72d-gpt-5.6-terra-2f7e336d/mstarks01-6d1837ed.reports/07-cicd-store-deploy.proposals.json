@@ -1,0 +1,805 @@
+{
+  "stride": {
+    "spoofing": {
+      "claims": [
+        {
+          "title": "Shared build token lets an attacker impersonate the build runner to release an image",
+          "description": "An attacker who obtains the shared build token can impersonate `process:build-runner` on `flow:build-runner-to-deploy-controller:set-current-release` and instruct `process:deploy-controller` to make an attacker-chosen image SHA the current release. The token is the same for every pipeline and has never been rotated, so its possession is sufficient to present the shared pipeline identity rather than an attributable workload identity. Second-order: `process:store-server` polls the controller and pulls the selected image from `store:image-registry`, so the impersonation can direct rollout across the approximately 1,200-store estate.",
+          "affected_element_ids": [
+            "process:build-runner",
+            "process:deploy-controller",
+            "flow:build-runner-to-deploy-controller:set-current-release"
+          ],
+          "verb": "impersonate",
+          "evidence_refs": [
+            "crossing:flow:build-runner-to-deploy-controller:set-current-release"
+          ],
+          "quotes": [
+            {
+              "text": "The token the runner uses to call the controller is a shared build token that is the same for every pipeline and has not been rotated since the pipeline was set up.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 1,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium: exploitation requires obtaining the shared token, but it is long-lived, shared by every pipeline, and the flow crosses from `boundary:build-environment` to `boundary:corporate-network` (`crossing:flow:build-runner-to-deploy-controller:set-current-release`). Impact is high: `process:deploy-controller` selects the estate release, while `process:store-server` represents about 1,200 servers and is tagged `availability-critical`."
+          },
+          "mitigations": [
+            {
+              "summary": "Replace the shared build token with per-workload identity",
+              "detail": "Use a distinct workload identity or mTLS certificate for each pipeline on `flow:build-runner-to-deploy-controller:set-current-release`, rather than a token shared by all pipelines."
+            },
+            {
+              "summary": "Use short-lived, audience-bound deployment credentials",
+              "detail": "Issue short-lived credentials restricted to `process:deploy-controller`, rotate any remaining static secret, and record the originating pipeline identity for each release update."
+            }
+          ]
+        },
+        {
+          "title": "Unverified package provenance lets an attacker impersonate a trusted dependency source",
+          "description": "On `flow:build-runner-to-public-package-registry:resolve-dependencies`, `process:build-runner` does not verify signatures on downloaded packages. An attacker able to impersonate or interfere with the public dependency source can supply a package that the runner accepts as the lockfile-selected dependency, rather than as attacker-supplied content. The flow also has unknown transport protection, so server authentication is not established by the model. Second-order: the dependency is incorporated into the image pushed to `store:image-registry`; the build runner then sets the release through `process:deploy-controller`, reaching the store-server fleet.",
+          "affected_element_ids": [
+            "process:build-runner",
+            "entity:public-package-registry",
+            "flow:build-runner-to-public-package-registry:resolve-dependencies"
+          ],
+          "verb": "impersonate",
+          "evidence_refs": [
+            "crossing:flow:build-runner-to-public-package-registry:resolve-dependencies",
+            "absent:flow:build-runner-to-public-package-registry:resolve-dependencies:authentication",
+            "unknown:flow:build-runner-to-public-package-registry:resolve-dependencies:encryption_in_transit"
+          ],
+          "quotes": [],
+          "absent_elements": [],
+          "sequence": 2,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium: this is a boundary crossing to `boundary:internet` with package-signature verification stated absent (`absent:flow:build-runner-to-public-package-registry:resolve-dependencies:authentication`), although successful source impersonation may require an on-path, DNS, or dependency-source compromise; transport protection is also unverified. Impact is high: accepted dependencies are built into images that ultimately deploy to `process:store-server`, whose fleet is tagged `availability-critical`."
+          },
+          "mitigations": [
+            {
+              "summary": "Verify signed dependency provenance before building",
+              "detail": "Require signature verification against trusted publisher keys for every package on `flow:build-runner-to-public-package-registry:resolve-dependencies`, and reject unsigned or untrusted artifacts."
+            },
+            {
+              "summary": "Authenticate the registry endpoint",
+              "detail": "Use TLS with full certificate-chain validation for the public registry connection and constrain trusted package sources and publisher identities."
+            }
+          ]
+        },
+        {
+          "title": "Developer impersonation could provide interactive build-runner access if login authentication is unverified",
+          "description": "`flow:developer-to-build-runner:manual-rebuild` crosses from `boundary:corporate-network` into `boundary:build-environment`, but its `authentication` and `encryption_in_transit` attributes are unknown. If the undocumented login does not strongly verify the human and server identities, an attacker with a corporate-network foothold could impersonate `entity:developer` to `process:build-runner` and start the unreviewed manual rebuild. Second-order: the build runner holds the credential used to update `process:deploy-controller`, and its normal build path pushes images to `store:image-registry`, making the build environment a route to releases consumed by the store estate. This is conditional on the unknown authentication and transport-control states, not a claim that they are absent.",
+          "affected_element_ids": [
+            "entity:developer",
+            "process:build-runner",
+            "flow:developer-to-build-runner:manual-rebuild"
+          ],
+          "verb": "impersonate",
+          "evidence_refs": [
+            "crossing:flow:developer-to-build-runner:manual-rebuild",
+            "unknown:flow:developer-to-build-runner:manual-rebuild:authentication",
+            "unknown:flow:developer-to-build-runner:manual-rebuild:encryption_in_transit"
+          ],
+          "quotes": [
+            {
+              "text": "any developer can log in to the build runner and kick off a rebuild of `main` by hand; that path does not require a merge and is not reviewed.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 3,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional: the flow crosses from the corporate network and both authentication and transport protection are unverified (`unknown:flow:developer-to-build-runner:manual-rebuild:authentication` and `unknown:flow:developer-to-build-runner:manual-rebuild:encryption_in_transit`), while an attacker needs a corporate-network foothold. Impact is high: `process:build-runner` is tagged `credentials` and can push images and invoke the deployment path reaching the 1,200-server `process:store-server` fleet."
+          },
+          "mitigations": [
+            {
+              "summary": "Document and enforce strong developer authentication to the build runner",
+              "detail": "Make `flow:developer-to-build-runner:manual-rebuild` use explicit, individually attributable authentication, preferably phishing-resistant MFA for `entity:developer`."
+            },
+            {
+              "summary": "Authenticate the build-runner endpoint and constrain rebuild authority",
+              "detail": "Use TLS with validated server certificates and restrict manual rebuild initiation to narrowly scoped, audited identities."
+            }
+          ]
+        },
+        {
+          "title": "A fake image registry could be accepted by store servers if registry authenticity is not verified",
+          "description": "`flow:store-server-to-image-registry:pull-image` crosses the retail WAN from `boundary:store-estate` to `boundary:build-environment`, while its protocol, caller authentication, and encryption-in-transit attributes are unknown. If this unknown transport state resolves to missing TLS or missing certificate validation, an attacker positioned on the WAN could impersonate `store:image-registry` to `process:store-server` and deliver an image represented as the requested release. Second-order: each server pulls and restarts the received container; because `process:store-server` represents roughly 1,200 identical back-office servers and is `availability-critical`, the counterfeit-registry identity can affect the estate rather than one host. This claim is conditional on the undocumented server-authenticity control.",
+          "affected_element_ids": [
+            "process:store-server",
+            "store:image-registry",
+            "flow:store-server-to-image-registry:pull-image"
+          ],
+          "verb": "impersonate",
+          "evidence_refs": [
+            "crossing:flow:store-server-to-image-registry:pull-image",
+            "unknown:flow:store-server-to-image-registry:protocol",
+            "unknown:flow:store-server-to-image-registry:encryption_in_transit"
+          ],
+          "quotes": [],
+          "absent_elements": [],
+          "sequence": 4,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional on the unknown protocol and transport state: exploiting this WAN crossing requires a network-path position, but the model does not establish validated server authentication (`unknown:flow:store-server-to-image-registry:encryption_in_transit`). Impact is high: the delivered image is restarted by the approximately 1,200-store `process:store-server` fleet, which is tagged `availability-critical`."
+          },
+          "mitigations": [
+            {
+              "summary": "Require validated TLS server identity for registry pulls",
+              "detail": "Configure `flow:store-server-to-image-registry:pull-image` for TLS 1.2+ with full certificate-chain validation, using a private CA or pinned workload identity where appropriate."
+            },
+            {
+              "summary": "Verify container image provenance before restart",
+              "detail": "Require `process:store-server` to verify signed image manifests against trusted build identities and only accept images whose digest is authorized by the deployment record."
+            }
+          ]
+        },
+        {
+          "title": "A fake git server could supply source to the build runner if server authenticity is unverified",
+          "description": "`flow:build-runner-to-git-server:fetch-source` crosses from `boundary:build-environment` to `boundary:corporate-network`, with authentication, protocol, and encryption-in-transit all unknown. If the runner does not validate the git-server identity, an attacker able to intercept or redirect that crossing could impersonate `store:git-server` to `process:build-runner` and provide source as though it were the merged commit. Second-order: the runner builds that source, pushes the resulting image to `store:image-registry`, and updates `process:deploy-controller`, which is then polled by the store fleet. This is conditional on the undocumented authentication and server-certificate-validation state.",
+          "affected_element_ids": [
+            "process:build-runner",
+            "store:git-server",
+            "flow:build-runner-to-git-server:fetch-source"
+          ],
+          "verb": "impersonate",
+          "evidence_refs": [
+            "crossing:flow:build-runner-to-git-server:fetch-source",
+            "unknown:flow:build-runner-to-git-server:authentication",
+            "unknown:flow:build-runner-to-git-server:protocol",
+            "unknown:flow:build-runner-to-git-server:encryption_in_transit"
+          ],
+          "quotes": [],
+          "absent_elements": [],
+          "sequence": 5,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional: impersonating the source requires control of or access to the internal boundary-crossing path, but no authentication, protocol, or transport validation is documented for that path (`unknown:flow:build-runner-to-git-server:authentication` and `unknown:flow:build-runner-to-git-server:encryption_in_transit`). Impact is high: `process:build-runner` converts fetched source into the release image and the deployment path reaches the availability-critical `process:store-server` fleet."
+          },
+          "mitigations": [
+            {
+              "summary": "Use mutually authenticated, validated transport for source retrieval",
+              "detail": "Configure `flow:build-runner-to-git-server:fetch-source` with TLS/SSH server-key validation and a unique build-runner client identity rather than trust based on network reachability."
+            },
+            {
+              "summary": "Bind builds to verified source revisions",
+              "detail": "Have `process:build-runner` verify signed commits or immutable commit identities before building, and record the verified source revision with the resulting image digest."
+            }
+          ]
+        }
+      ],
+      "invalid": []
+    },
+    "tampering": {
+      "claims": [
+        {
+          "title": "Unsigned public dependency packages can be injected into production builds",
+          "description": "An attacker who can publish or alter a dependency artifact at `entity:public-package-registry` can inject a malicious package through `flow:build-runner-to-public-package-registry:resolve-dependencies`. The build runner does not authenticate package signatures, so `process:build-runner` may incorporate attacker-controlled dependency code into the built image. Second-order, the image is written through `flow:build-runner-to-image-registry:push-image`, selected through `flow:build-runner-to-deploy-controller:set-current-release`, and pulled and restarted by `process:store-server` across the estate.",
+          "affected_element_ids": [
+            "flow:build-runner-to-public-package-registry:resolve-dependencies",
+            "entity:public-package-registry",
+            "process:build-runner"
+          ],
+          "verb": "inject",
+          "evidence_refs": [
+            "crossing:flow:build-runner-to-public-package-registry:resolve-dependencies",
+            "absent:flow:build-runner-to-public-package-registry:resolve-dependencies:authentication"
+          ],
+          "quotes": [
+            {
+              "text": "the lockfile is taken as given \u2014 the runner does not verify signatures on what it downloads",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 1,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium: `flow:build-runner-to-public-package-registry:resolve-dependencies` crosses into `boundary:internet` and has stated-absent package authentication, but the attacker must control or substitute a package selected by the lockfile. Impact is high: `process:build-runner` produces the release image, and the resulting code is deployed to the approximately 1,200 `process:store-server` instances."
+          },
+          "mitigations": [
+            {
+              "summary": "Verify signed dependency provenance before building",
+              "detail": "Require `process:build-runner` to verify trusted package signatures and provenance for artifacts received on `flow:build-runner-to-public-package-registry:resolve-dependencies`."
+            },
+            {
+              "summary": "Make dependency resolution immutable",
+              "detail": "Pin package versions and content digests in the lockfile, reject artifacts whose digest differs, and restrict accepted registries to approved sources."
+            }
+          ]
+        },
+        {
+          "title": "Source code can be modified in transit before the build runner compiles it",
+          "description": "If the unverified `encryption_in_transit` setting on cross-boundary `flow:build-runner-to-git-server:fetch-source` resolves to no authenticated transport integrity, an attacker with a position between `boundary:build-environment` and `boundary:corporate-network` can alter the fetched merged source before `process:build-runner` compiles it. The runner would build an image from attacker-modified source while retaining the expected release workflow. Second-order, that image is pushed to `store:image-registry`, selected by `process:deploy-controller`, and executed when `process:store-server` pulls and restarts it. This is conditional on the currently unknown transport protection, not a claim that the fetch is plaintext.",
+          "affected_element_ids": [
+            "flow:build-runner-to-git-server:fetch-source",
+            "store:git-server",
+            "process:build-runner"
+          ],
+          "verb": "alter-in-transit",
+          "evidence_refs": [
+            "crossing:flow:build-runner-to-git-server:fetch-source",
+            "unknown:flow:build-runner-to-git-server:fetch-source:encryption_in_transit",
+            "unknown:flow:build-runner-to-git-server:fetch-source:protocol",
+            "unknown:flow:build-runner-to-git-server:fetch-source:authentication"
+          ],
+          "quotes": [
+            {
+              "text": "The build runner picks the merge up, fetches the source, resolves the dependency lockfile and produces a container image.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 2,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional on the unknown protection values on the boundary-crossing `flow:build-runner-to-git-server:fetch-source`; exploitation requires an on-path position between the build and corporate zones. Impact is high because altered source controls a production image subsequently executed by the estate of about 1,200 `process:store-server` instances."
+          },
+          "mitigations": [
+            {
+              "summary": "Use mutually authenticated, integrity-protected source retrieval",
+              "detail": "Set `flow:build-runner-to-git-server:fetch-source` to authenticated TLS or SSH with host verification and protected build-runner credentials."
+            },
+            {
+              "summary": "Verify the intended source revision before build",
+              "detail": "Have `process:build-runner` verify signed commits or tags and confirm the fetched tree matches the reviewed commit SHA before producing an image."
+            }
+          ]
+        },
+        {
+          "title": "A shared build token can be used to alter the estate's selected release",
+          "description": "An attacker who obtains the shared, long-lived build token can alter the current-release record at `process:deploy-controller` through `flow:build-runner-to-deploy-controller:set-current-release`, selecting an attacker-chosen image SHA rather than the intended release. Because the same token is used by every pipeline and is never rotated, compromise of one token grants a reusable write primitive to the deployment decision. Second-order, every `process:store-server` polls the controller and can pull and restart on the substituted release from `store:image-registry`.",
+          "affected_element_ids": [
+            "flow:build-runner-to-deploy-controller:set-current-release",
+            "process:build-runner",
+            "process:deploy-controller"
+          ],
+          "verb": "alter",
+          "evidence_refs": [
+            "crossing:flow:build-runner-to-deploy-controller:set-current-release",
+            "unknown:flow:build-runner-to-deploy-controller:set-current-release:encryption_in_transit"
+          ],
+          "quotes": [
+            {
+              "text": "The token the runner uses to call the controller is a shared build token that is the same for every pipeline and has not been rotated since the pipeline was set up.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 3,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium: exploitation requires obtaining the token, but it is shared by every pipeline and has not been rotated. Impact is high because `process:deploy-controller` holds the image SHA for the estate, and `process:store-server` instances act on that release selection."
+          },
+          "mitigations": [
+            {
+              "summary": "Replace the shared build token with per-workload short-lived identity",
+              "detail": "Authenticate `process:build-runner` to `process:deploy-controller` using a unique, scoped workload identity with short-lived credentials and rotation."
+            },
+            {
+              "summary": "Constrain release-selection writes",
+              "detail": "Require `process:deploy-controller` to accept only a signed image digest and provenance record generated by the authorized build for the corresponding reviewed commit."
+            }
+          ]
+        },
+        {
+          "title": "Store release polling can be modified in transit to redirect deployments",
+          "description": "If the unknown transport protection on `flow:store-server-to-deploy-controller:poll-current-release` does not provide authenticated integrity for the controller response, an attacker on the retail WAN can alter the returned current-release image SHA before it reaches `process:store-server`. The store server may then treat the substituted SHA as the estate release and retrieve a different image from `store:image-registry`. This is conditional on the unknown `encryption_in_transit`, protocol, and authentication attributes; it does not assert that the retail-WAN connection is unprotected.",
+          "affected_element_ids": [
+            "flow:store-server-to-deploy-controller:poll-current-release",
+            "process:deploy-controller",
+            "process:store-server"
+          ],
+          "verb": "alter-in-transit",
+          "evidence_refs": [
+            "crossing:flow:store-server-to-deploy-controller:poll-current-release",
+            "unknown:flow:store-server-to-deploy-controller:poll-current-release:encryption_in_transit",
+            "unknown:flow:store-server-to-deploy-controller:poll-current-release:authentication",
+            "unknown:flow:store-server-to-deploy-controller:poll-current-release:protocol"
+          ],
+          "quotes": [
+            {
+              "text": "Every store server asks the deploy controller once a minute what the current release is, and if it differs from what it is running it pulls that image from the registry and restarts the container.",
+              "source_label": "System description"
+            },
+            {
+              "text": "Traffic between the stores and the corporate network goes over the retail WAN.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 4,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional on the unknown controls for boundary-crossing `flow:store-server-to-deploy-controller:poll-current-release`; an attacker must obtain a position on the retail WAN. Impact is high because a forged release selection can cause `process:store-server`, representing approximately 1,200 servers, to restart into a substituted deployment."
+          },
+          "mitigations": [
+            {
+              "summary": "Mutually authenticate and integrity-protect release polling",
+              "detail": "Use mTLS on `flow:store-server-to-deploy-controller:poll-current-release` and ensure the controller response is protected end to end."
+            },
+            {
+              "summary": "Sign and verify release manifests",
+              "detail": "Have `process:deploy-controller` sign the release manifest and require each `process:store-server` to verify the signature and authorized image digest before pulling or restarting."
+            }
+          ]
+        },
+        {
+          "title": "Container images can be altered in transit while stores pull them over the WAN",
+          "description": "If `flow:store-server-to-image-registry:pull-image` lacks authenticated transport integrity, an attacker positioned on the WAN path between `boundary:store-estate` and `boundary:build-environment` can alter the container image bytes delivered to `process:store-server`. A store that accepts the altered image restarts and executes attacker-controlled till-software code. The same opportunity can affect each store's pull path, extending the integrity loss across the modeled fleet. This threat is conditional on the currently unknown transport, protocol, and authentication attributes for the image-pull flow.",
+          "affected_element_ids": [
+            "flow:store-server-to-image-registry:pull-image",
+            "store:image-registry",
+            "process:store-server"
+          ],
+          "verb": "alter-in-transit",
+          "evidence_refs": [
+            "crossing:flow:store-server-to-image-registry:pull-image",
+            "unknown:flow:store-server-to-image-registry:pull-image:encryption_in_transit",
+            "unknown:flow:store-server-to-image-registry:pull-image:authentication",
+            "unknown:flow:store-server-to-image-registry:pull-image:protocol"
+          ],
+          "quotes": [
+            {
+              "text": "The image registry is reachable from the store estate over the WAN.",
+              "source_label": "System description"
+            },
+            {
+              "text": "if it differs from what it is running it pulls that image from the registry and restarts the container.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 5,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional on the unknown protections of the boundary-crossing image-pull flow; the attacker needs a WAN on-path position. Impact is high because altered container code is executed by `process:store-server`, which represents about 1,200 availability-critical store servers."
+          },
+          "mitigations": [
+            {
+              "summary": "Protect registry pulls with authenticated TLS",
+              "detail": "Configure `flow:store-server-to-image-registry:pull-image` for TLS with registry identity verification and mutually authenticated store identities."
+            },
+            {
+              "summary": "Require image signature and digest verification at each store",
+              "detail": "Require `process:store-server` to verify a trusted image signature and immutable content digest before starting an image, independently of transport protection."
+            }
+          ]
+        }
+      ],
+      "invalid": []
+    },
+    "repudiation": {
+      "claims": [
+        {
+          "title": "A pipeline operator can deny selecting the estate-wide release because the deploy credential is shared",
+          "description": "An operator of any pipeline holding the credential on `flow:build-runner-to-deploy-controller:set-current-release` can set the current release in `process:deploy-controller` and later deny having done so. The flow crosses from `boundary:build-environment` to `boundary:corporate-network`, but its shared build token identifies only the population of pipelines, not the individual pipeline or operator responsible for the release-selection action. Any controller-side evidence based on that credential can narrow the action only to that population. Second-order: `process:store-server` instances poll the selected release and pull the corresponding image, so a disputed release selection affects the accountability of rollout activity across the store estate.",
+          "affected_element_ids": [
+            "process:build-runner",
+            "process:deploy-controller",
+            "flow:build-runner-to-deploy-controller:set-current-release"
+          ],
+          "verb": "unattributable",
+          "evidence_refs": [
+            "crossing:flow:build-runner-to-deploy-controller:set-current-release"
+          ],
+          "quotes": [
+            {
+              "text": "a shared build token that is the same for every pipeline",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 1,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium: exploiting the evidentiary gap requires control of a pipeline or its shared token, but the shared credential is explicitly used across every pipeline and the release-setting flow crosses into `boundary:corporate-network`. Impact is high: `process:deploy-controller` selects the release consumed by the approximately 1,200-store `process:store-server` estate, whose assets include `business-critical-data` and `availability-critical`."
+          },
+          "mitigations": [
+            {
+              "summary": "Replace the shared build token with per-pipeline identities",
+              "detail": "Give each pipeline a distinct, rotated credential on `flow:build-runner-to-deploy-controller:set-current-release` and record the verified pipeline identity and associated initiating principal with each release-selection request."
+            },
+            {
+              "summary": "Create durable release-selection evidence",
+              "detail": "Have `process:deploy-controller` retain append-only security events containing the authenticated pipeline, originating developer or approval identity, image SHA, timestamp, outcome, and request identifier."
+            }
+          ]
+        },
+        {
+          "title": "An unreviewed manual rebuild may be deniable because developer authentication and audit evidence are undocumented",
+          "description": "A developer uses `flow:developer-to-build-runner:manual-rebuild` to trigger an unreviewed rebuild of main in `process:build-runner`. That cross-boundary flow has `authentication: unknown`, and the model contains no `audit log` element or audit flow showing that the authenticated developer, rebuild request, source revision, and outcome are retained. If the unknown authentication does not provide an individual verified identity and durable audit record, a developer can deny initiating the rebuild after its image is pushed and selected for deployment. Second-order: the rebuild feeds `flow:build-runner-to-image-registry:push-image` and can result in a release selected through `flow:build-runner-to-deploy-controller:set-current-release`, leaving the later store-estate rollout without conclusive evidence of who initiated it. This is conditional on the undocumented authentication and record handling, not an assertion that no logging exists in deployment.",
+          "affected_element_ids": [
+            "entity:developer",
+            "process:build-runner",
+            "flow:developer-to-build-runner:manual-rebuild"
+          ],
+          "verb": "unattributable",
+          "evidence_refs": [
+            "unknown:flow:developer-to-build-runner:manual-rebuild:authentication",
+            "crossing:flow:developer-to-build-runner:manual-rebuild"
+          ],
+          "quotes": [
+            {
+              "text": "any developer can log in to the build runner and kick off a rebuild of `main` by hand; that path does not require a merge and is not reviewed",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [
+            "audit log"
+          ],
+          "sequence": 2,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional on the unknown authentication state: the action requires a developer login, but every developer is permitted to initiate the unreviewed rebuild and the login flow crosses from `boundary:corporate-network` into `boundary:build-environment`. Impact is high: `process:build-runner` holds `credentials` and `business-critical-data`, and its output can be selected for rollout to `process:store-server`, which is `availability-critical` across the store estate."
+          },
+          "mitigations": [
+            {
+              "summary": "Verify and retain individual developer identity for manual rebuilds",
+              "detail": "Require individual non-shared authentication on `flow:developer-to-build-runner:manual-rebuild` and emit structured, tamper-resistant events recording the verified subject, requested revision, rebuild identifier, timestamp, and result."
+            },
+            {
+              "summary": "Make manual rebuilds traceable through deployment",
+              "detail": "Propagate the initiating developer and rebuild identifier into image metadata and release-selection records, while retaining the build-runner identity separately, so later deployment evidence can link a rollout to its human initiator."
+            }
+          ]
+        }
+      ],
+      "invalid": []
+    },
+    "information-disclosure": {
+      "claims": [
+        {
+          "title": "Shared build token may be intercepted between the build environment and deploy controller",
+          "description": "`flow:build-runner-to-deploy-controller:set-current-release` crosses from the separate build environment to the corporate network and has unverified `encryption_in_transit`. The flow authenticates the call with the shared, never-rotated build token. If transport protection is absent, an attacker able to observe this inter-zone path can intercept that credential while `process:build-runner` sets the release on `process:deploy-controller`. The disclosed token enables subsequent use of the controller's current-release path; every `process:store-server` polls that controller and then pulls the selected image, so one recovered credential can reach the release mechanism for the whole estate. This is conditional on the unknown transport-encryption value, not a claim that the channel is plaintext.",
+          "affected_element_ids": [
+            "flow:build-runner-to-deploy-controller:set-current-release",
+            "process:build-runner",
+            "process:deploy-controller"
+          ],
+          "verb": "intercept",
+          "evidence_refs": [
+            "unknown:flow:build-runner-to-deploy-controller:set-current-release:encryption_in_transit",
+            "crossing:flow:build-runner-to-deploy-controller:set-current-release"
+          ],
+          "quotes": [
+            {
+              "text": "The token the runner uses to call the controller is a shared build token that is the same for every pipeline and has not been rotated since the pipeline was set up.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 1,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional on `unknown:flow:build-runner-to-deploy-controller:set-current-release:encryption_in_transit`: an attacker needs an on-path position, but the flow crosses the build-environment/corporate-network boundary and exposes a long-lived shared credential if unencrypted. Impact is high because the intercepted credential governs the release record at `process:deploy-controller`, which is polled by every `process:store-server` in the approximately 1,200-store estate."
+          },
+          "mitigations": [
+            {
+              "summary": "Protect and mutually authenticate the controller call",
+              "detail": "Set `encryption_in_transit` on `flow:build-runner-to-deploy-controller:set-current-release` to TLS 1.2+ with mTLS, preventing passive recovery of the token and verifying both service peers."
+            },
+            {
+              "summary": "Replace the shared static build token",
+              "detail": "Issue a distinct short-lived workload credential to each pipeline, scope it only to its permitted release operation, and rotate the existing token immediately."
+            }
+          ]
+        },
+        {
+          "title": "Source code may be readable on the unverified build-runner-to-git-server link",
+          "description": "`flow:build-runner-to-git-server:fetch-source` carries the merged source commit across the build-environment/corporate-network boundary, but its `encryption_in_transit` is unknown. If that attribute resolves to no effective transport encryption, a network observer on this path can intercept the application's source code while `process:build-runner` reads it from `store:git-server`. The disclosed source can reveal implementation details and vulnerabilities that help an attacker target the later build and deployment path, including image production and release selection. This finding is conditional on the unverified transport control.",
+          "affected_element_ids": [
+            "flow:build-runner-to-git-server:fetch-source",
+            "process:build-runner",
+            "store:git-server"
+          ],
+          "verb": "intercept",
+          "evidence_refs": [
+            "unknown:flow:build-runner-to-git-server:fetch-source:encryption_in_transit",
+            "crossing:flow:build-runner-to-git-server:fetch-source"
+          ],
+          "quotes": [
+            {
+              "text": "The build runner picks the merge up, fetches the source, resolves the dependency lockfile and produces a container image.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 2,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium and conditional on `unknown:flow:build-runner-to-git-server:fetch-source:encryption_in_transit`: interception requires access to an inter-zone path, but the path is a documented boundary crossing. Impact is medium because the flow and `store:git-server` contain business-critical source code, whose disclosure assists attacks on the software and build pipeline."
+          },
+          "mitigations": [
+            {
+              "summary": "Encrypt the source-fetch hop",
+              "detail": "Require TLS 1.2+ for `flow:build-runner-to-git-server:fetch-source`, preferably with mTLS between the build runner and git server."
+            },
+            {
+              "summary": "Restrict source-read credentials",
+              "detail": "Use a narrowly scoped runner identity that can read only the required repository and commit, reducing exposure if a client identity is compromised."
+            }
+          ]
+        },
+        {
+          "title": "Container images may be intercepted while stores pull them over the WAN",
+          "description": "`flow:store-server-to-image-registry:pull-image` transfers the current container image from `store:image-registry` to `process:store-server` across the store-estate/build-environment boundary, and its `encryption_in_transit` is unknown. If the WAN pull lacks effective encryption, an attacker with an observation position on the retail WAN can intercept image layers and inspect the till software used throughout the store estate. The image contents can expose operational implementation details that enable more targeted attacks against the running store-server software; the exposure applies repeatedly as stores update. This is conditional on verifying that the unknown transport-encryption attribute is not protective.",
+          "affected_element_ids": [
+            "flow:store-server-to-image-registry:pull-image",
+            "process:store-server",
+            "store:image-registry"
+          ],
+          "verb": "intercept",
+          "evidence_refs": [
+            "unknown:flow:store-server-to-image-registry:pull-image:encryption_in_transit",
+            "crossing:flow:store-server-to-image-registry:pull-image"
+          ],
+          "quotes": [
+            {
+              "text": "The image registry is reachable from the store estate over the WAN. Traffic between the stores and the corporate network goes over the retail WAN.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 3,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium and conditional on `unknown:flow:store-server-to-image-registry:pull-image:encryption_in_transit`: an attacker must observe the retail-WAN boundary crossing, but every store retrieves images over that path. Impact is medium because the images are tagged business-critical data and disclose the software deployed across the roughly 1,200-store estate."
+          },
+          "mitigations": [
+            {
+              "summary": "Require encrypted registry pulls from every store",
+              "detail": "Configure `flow:store-server-to-image-registry:pull-image` for TLS 1.2+ and authenticate the registry endpoint; use mTLS where store identities can be managed."
+            },
+            {
+              "summary": "Minimize sensitive image contents",
+              "detail": "Keep credentials, tokens, and environment-specific configuration out of container layers, and obtain them at runtime from a dedicated secret-management mechanism."
+            }
+          ]
+        },
+        {
+          "title": "Git source may be exposed from operational copies if at-rest encryption is absent",
+          "description": "`store:git-server` holds developer branches and main, while its `encryption_at_rest` and data classification are unknown. If the unverified encryption attribute resolves to unencrypted storage, an attacker or over-privileged operator who obtains a server volume, backup, snapshot, or decommissioned storage copy can read the repository contents directly without using `flow:build-runner-to-git-server:fetch-source`. The source disclosure supplies implementation detail that can be used to target `process:build-runner` and the downstream image and release pipeline. This is conditional on `store:git-server` lacking effective at-rest encryption; it does not assert that it is currently unencrypted.",
+          "affected_element_ids": [
+            "store:git-server"
+          ],
+          "verb": "read",
+          "evidence_refs": [
+            "unknown:store:git-server:encryption_at_rest",
+            "unknown:store:git-server:data_classification"
+          ],
+          "quotes": [
+            {
+              "text": "Nobody has documented whether the git server encrypts what it stores",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 4,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium and conditional on `unknown:store:git-server:encryption_at_rest`: obtaining an operational storage copy requires storage-layer or operational access, but no verified encryption control is recorded. Impact is medium because `store:git-server` holds business-critical source code that can reveal implementation details relevant to the build and deployment path."
+          },
+          "mitigations": [
+            {
+              "summary": "Verify and enforce encryption for repository storage and copies",
+              "detail": "Establish the at-rest posture of `store:git-server`, then require KMS-managed encryption for its primary volumes, backups, snapshots, and replicas; limit export and restore permissions."
+            },
+            {
+              "summary": "Protect repository backup access separately",
+              "detail": "Apply deny-by-default access controls and distinct least-privilege principals to backup and snapshot operations rather than relying on git-server application access controls."
+            }
+          ]
+        },
+        {
+          "title": "Registry images may be exposed from operational copies if at-rest encryption is absent",
+          "description": "`store:image-registry` stores built container images used by the store fleet, but its `encryption_at_rest` and data classification are unknown. If this unresolved encryption state means images are stored without effective at-rest protection, a person who accesses an exported image-store volume, backup, snapshot, or decommissioned media can read image layers outside the registry's normal pull path. This exposes business-critical till-software implementation details and can enable more focused attacks against `process:store-server` when it runs those images across the estate. The threat is conditional on the unknown at-rest control and does not claim the registry is unencrypted.",
+          "affected_element_ids": [
+            "store:image-registry"
+          ],
+          "verb": "read",
+          "evidence_refs": [
+            "unknown:store:image-registry:encryption_at_rest",
+            "unknown:store:image-registry:data_classification"
+          ],
+          "quotes": [
+            {
+              "text": "Nobody has documented whether the git server encrypts what it stores, or whether the image registry does.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 5,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium and conditional on `unknown:store:image-registry:encryption_at_rest`: storage-layer access is required, but the model records no verified encryption for the registry. Impact is medium because `store:image-registry` contains business-critical container images deployed to the approximately 1,200-store estate."
+          },
+          "mitigations": [
+            {
+              "summary": "Encrypt registry storage and every operational copy",
+              "detail": "Determine the actual protection for `store:image-registry`, then enforce managed-key encryption on image blobs, backing volumes, backups, snapshots, and replicas."
+            },
+            {
+              "summary": "Limit storage-layer readers and image exports",
+              "detail": "Use separate least-privilege principals for registry administration, backup, and restore, and audit bulk image export or snapshot retrieval."
+            }
+          ]
+        }
+      ],
+      "invalid": []
+    },
+    "denial-of-service": {
+      "claims": [
+        {
+          "title": "Repeated manual rebuilds can exhaust the shared build runner",
+          "description": "A malicious or compromised `entity:developer` on `boundary:corporate-network` can repeatedly invoke `flow:developer-to-build-runner:manual-rebuild` across the boundary into `process:build-runner`. Each invocation performs source fetching, dependency resolution, image production, and image publication, so the attacker spends only repeated rebuild requests while consuming the runner's finite CPU, memory, worker, network, and dependency-resolution capacity. Whether authentication-specific rate limits, concurrent-build limits, queuing bounds, and cancellation controls exist on this flow is unknown. Second-order, exhaustion of `process:build-runner` delays legitimate builds and the update path through `flow:build-runner-to-deploy-controller:set-current-release` and `flow:build-runner-to-image-registry:push-image`, preventing timely fixes and releases to `process:store-server` across the estate.",
+          "affected_element_ids": [
+            "entity:developer",
+            "flow:developer-to-build-runner:manual-rebuild",
+            "process:build-runner"
+          ],
+          "verb": "flood",
+          "evidence_refs": [
+            "crossing:flow:developer-to-build-runner:manual-rebuild",
+            "unknown:flow:developer-to-build-runner:manual-rebuild:authentication"
+          ],
+          "quotes": [
+            {
+              "text": "any developer can log in to the build runner and kick off a rebuild of `main` by hand; that path does not require a merge and is not reviewed.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 1,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium: any `entity:developer` can access the boundary-crossing `flow:developer-to-build-runner:manual-rebuild`, but the attacker needs an internal developer account or its compromise; the flow's authentication details are `unknown`. Impact is medium: `process:build-runner` carries `business-critical-data`, and its exhaustion blocks the build-and-release path needed to update the store fleet, but the model does not establish that currently running tills immediately stop."
+          },
+          "mitigations": [
+            {
+              "summary": "Bound and meter manual rebuild requests",
+              "detail": "Require an approved trigger for `flow:developer-to-build-runner:manual-rebuild`, enforce per-developer rate and concurrent-build limits, and reject or coalesce duplicate builds of the same `main` revision before expensive work starts."
+            },
+            {
+              "summary": "Isolate and shed build workload",
+              "detail": "Set bounded build-worker, CPU, memory, disk, network, and dependency-download budgets on `process:build-runner`; use cancellation and fail-fast queue limits so manual rebuild bursts cannot indefinitely delay legitimate releases."
+            }
+          ]
+        },
+        {
+          "title": "Unverified public dependency downloads can exhaust build-runner resources",
+          "description": "An attacker able to control or impersonate content from `entity:public-package-registry` can return an oversized or pathological dependency package over `flow:build-runner-to-public-package-registry:resolve-dependencies`. `process:build-runner` accepts downloaded packages without signature verification, so, if package-size, extraction, parse-complexity, timeout, and storage quotas are not enforced, one inexpensive hostile response can consume disproportionate runner bandwidth, disk, CPU, or memory and crash or stall builds. Second-order, a stalled `process:build-runner` cannot publish images through `flow:build-runner-to-image-registry:push-image` or set releases through `flow:build-runner-to-deploy-controller:set-current-release`, delaying updates to `process:store-server`.",
+          "affected_element_ids": [
+            "entity:public-package-registry",
+            "flow:build-runner-to-public-package-registry:resolve-dependencies",
+            "process:build-runner"
+          ],
+          "verb": "flood",
+          "evidence_refs": [
+            "crossing:flow:build-runner-to-public-package-registry:resolve-dependencies",
+            "absent:flow:build-runner-to-public-package-registry:resolve-dependencies:authentication"
+          ],
+          "quotes": [
+            {
+              "text": "the lockfile is taken as given \u2014 the runner does not verify signatures on what it downloads.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 2,
+          "severity": {
+            "likelihood": "low",
+            "impact": "medium",
+            "level": "low",
+            "justification": "Likelihood is low: exploiting `flow:build-runner-to-public-package-registry:resolve-dependencies` requires control of, or the ability to impersonate, dependency content from the external registry, although package authentication is stated absent. Impact is medium: exhausting `process:build-runner`, which holds `business-critical-data`, blocks the release pipeline and delays deployment across the store estate, but the model does not establish immediate interruption of running tills."
+          },
+          "mitigations": [
+            {
+              "summary": "Verify and constrain dependency artifacts before build processing",
+              "detail": "Require authenticated signature or provenance verification for artifacts on `flow:build-runner-to-public-package-registry:resolve-dependencies`, pin trusted registries or mirrors, and reject artifacts that fail verification before extraction or build execution."
+            },
+            {
+              "summary": "Apply dependency download and extraction resource limits",
+              "detail": "Enforce per-artifact and total download-size caps, decompression-ratio and archive-entry limits, parse timeouts, and isolated CPU, memory, disk, and network quotas for dependency resolution in `process:build-runner`."
+            }
+          ]
+        }
+      ],
+      "invalid": []
+    },
+    "elevation-of-privilege": {
+      "claims": [
+        {
+          "title": "Unverified public dependencies can gain the build runner's deployment authority",
+          "description": "An attacker who controls content served for a dependency named by the lockfile at `entity:public-package-registry` starts outside the build environment and can supply a malicious package on `flow:build-runner-to-public-package-registry:resolve-dependencies`. The build runner accepts downloaded packages without signature verification. If the dependency resolution or image-build tooling executes package-provided lifecycle or build logic, that logic executes as `process:build-runner` and inherits its shared build token. It can then use `flow:build-runner-to-deploy-controller:set-current-release` to designate an attacker-controlled image as the release. Second-order, the release is pushed through `flow:build-runner-to-image-registry:push-image`; every `process:store-server` obtains the selected image through `flow:store-server-to-image-registry:pull-image` and restarts it, extending the external package supplier's authority into the till-container context across the store estate. This is conditional on the unverified `technology` of `process:build-runner` permitting dependency-supplied logic to execute during resolution or image creation.",
+          "affected_element_ids": [
+            "process:build-runner",
+            "flow:build-runner-to-public-package-registry:resolve-dependencies",
+            "flow:build-runner-to-deploy-controller:set-current-release",
+            "process:store-server"
+          ],
+          "verb": "escalate",
+          "evidence_refs": [
+            "crossing:flow:build-runner-to-public-package-registry:resolve-dependencies",
+            "absent:flow:build-runner-to-public-package-registry:resolve-dependencies:authentication",
+            "unknown:process:build-runner:technology",
+            "crossing:flow:store-server-to-image-registry:pull-image"
+          ],
+          "quotes": [
+            {
+              "text": "The token the runner uses to call the controller is a shared build token that is the same for every pipeline and has not been rotated since the pipeline was set up.",
+              "source_label": "System description"
+            },
+            {
+              "text": "We run about 1,200 stores.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 1,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional on `unknown:process:build-runner:technology`: an attacker must control a resolved package or registry response, but the package flow crosses to `boundary:internet` and has stated-absent package authentication in `absent:flow:build-runner-to-public-package-registry:resolve-dependencies:authentication`. Impact is high because `process:build-runner` holds credentials and can set the release through `flow:build-runner-to-deploy-controller:set-current-release`, after which the image reaches the approximately 1,200 `process:store-server` instances, which are tagged `availability-critical`."
+          },
+          "mitigations": [
+            {
+              "summary": "Verify and pin dependency provenance before building",
+              "detail": "Require signature or attestation verification for packages retrieved on `flow:build-runner-to-public-package-registry:resolve-dependencies`, enforce immutable content digests from the lockfile, and fail the build when the expected publisher or artifact digest cannot be verified."
+            },
+            {
+              "summary": "Isolate untrusted build logic from deployment authority",
+              "detail": "Run dependency resolution and package build scripts in a sandboxed workload without the build token; give only a separately controlled promotion step the narrowly scoped, short-lived authority needed on `flow:build-runner-to-deploy-controller:set-current-release`."
+            },
+            {
+              "summary": "Require independently verified release artifacts at deployment",
+              "detail": "Have `process:store-server` accept only images signed by a trusted release-promotion identity, so an image produced after a compromised build step cannot become executable across the store estate."
+            }
+          ]
+        }
+      ],
+      "invalid": []
+    }
+  }
+}

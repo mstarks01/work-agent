@@ -22,5 +22,30 @@ many findings a person has judged — the coverage column says how many. Read
 this small rewards overfitting to it. The submitter is named because the
 manifest records it.
 
-No Baseline is merged yet, so there is nothing to compare. The first
-contributed sweep starts this table — see [`../BASELINES.md`](../BASELINES.md).
+## Commit `352b72d46f4f`, corpus `09772afde754`
+
+1 baseline(s). Numbers in this section compare with each other and with nothing above or below it.
+
+### `352b72d-gpt-5.6-terra-2f7e336d`
+
+`strong`: `openai/gpt-5.6-terra` · frameworks stride · 1 sweep(s) · $5.68 recorded · submitted by mstarks01 · merged unknown
+
+Vote coverage: 0 of 16 unmatched finding(s) judged by a person.
+
+Nobody has voted on this Baseline's findings, so every vote-dependent number below reads `no votes yet`.
+
+**Series `maintainer`** — reads maintainer votes.
+
+`stride`
+
+| recall | must-find recall | rejected rate | writing objections |
+| --- | --- | --- | --- |
+| 0.467 | 0.479 | no votes yet | no votes yet |
+
+**Series `all`** — reads maintainer, contributor votes.
+
+`stride`
+
+| recall | must-find recall | rejected rate | writing objections |
+| --- | --- | --- | --- |
+| 0.467 | 0.479 | no votes yet | no votes yet |
