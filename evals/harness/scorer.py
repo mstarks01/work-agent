@@ -28,9 +28,9 @@ It is mechanical everywhere, and a human answers the one question code cannot:
 Two things this module deliberately does not do. It scores element agreement at
 the citation level and never uses it as a prefilter: the endpoint resolution
 inside the rule handles the flow-versus-process spelling, and the per-pair
-Jaccard here reports citation quality on matched pairs. It also never treats a
-``needs-info`` threat as a false positive. Those are the designed behaviour the
-third exemplar per category teaches, and they get their own bucket.
+Jaccard here reports citation quality on matched pairs. It also never calls an
+unmatched threat a false positive on its own: a ``needs-info`` threat is keyed
+and looked up like a confirmed one, and only a person's vote rejects either.
 
 Every number here is rule-relative and ledger-relative. It is valid for tracking
 movement and comparing configurations. It is not an absolute, and it is not
@@ -42,10 +42,8 @@ The scorer takes :class:`~analysis_service.frameworks.stride.record.DraftThreat`
 :class:`~analysis_service.frameworks.stride.record.Threat`, so the same function scores the
 pre-critic union and the post-critic report. Nothing is promoted to make that
 work. ``verdict`` and ``confidence`` are the critic's outputs, and synthesizing
-them to measure the critic would decide the answer by fiat. The one field a
-draft cannot supply is the ``needs-info`` standing bypass, and it is simply
-inactive before the critic has ruled, which is the honest reading of a set
-nobody has ruled on yet.
+them to measure the critic would decide the answer by fiat, so the scorer reads
+neither.
 """
 
 from __future__ import annotations
@@ -55,11 +53,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from analysis_service.frameworks.stride.record import (
-    DraftThreat,
-    StrideCategory,
-    Threat,
-)
+from analysis_service.frameworks.stride.record import DraftThreat, StrideCategory
 from analysis_service.report import SeverityLevel, derive_severity_level
 from evals.harness.fingerprint import key_claim
 from evals.harness.identity import ClaimPair, Matcher
@@ -81,15 +75,6 @@ def candidate_claim(threat: DraftThreat) -> str:
     were never comparable.
     """
     return threat.title
-
-
-def _is_needs_info(threat: DraftThreat) -> bool:
-    """Whether a produced threat carries the critic's ``needs-info`` verdict.
-
-    Only a ruled :class:`Threat` can: a draft has no verdict yet, so the
-    decision-9 bypass is inactive on the pre-critic side rather than guessed at.
-    """
-    return isinstance(threat, Threat) and threat.verdict.status == "needs-info"
 
 
 @dataclass(frozen=True)
@@ -220,7 +205,6 @@ class CaseScore:
     missed: tuple[int, ...]
     lane_errors: tuple[LaneError, ...]
     unlisted: tuple[UnlistedThreat, ...]
-    needs_info_unmatched: tuple[str, ...]
     #: Unmatched threats citing an element the blessed model does not hold.
     #: Only an ``end-to-end`` run can fill this: its lanes cite the IDs a live
     #: extraction spelled, and the references cite the blessed ones, so such a
@@ -286,8 +270,8 @@ class CaseScore:
 
         The size of ``unlisted``, which is the only population
         :func:`_standing_of_unmatched` keys and looks up. A matched finding
-        never reaches it; neither does a ``needs-info``, a lane error, or one
-        citing an element the blessed model does not hold. So this is smaller
+        never reaches it; neither does a lane error, or one citing an element
+        the blessed model does not hold. So this is smaller
         than ``produced_count``, sometimes much smaller, and the gap is the
         part of the report the rate says nothing about.
         """
@@ -356,7 +340,6 @@ class CaseScore:
                 "missed": len(self.missed),
                 "must_find_total": self.must_find_total,
                 "must_find_matched": self.must_find_matched,
-                "needs_info_unmatched": len(self.needs_info_unmatched),
                 "foreign": len(self.foreign),
                 # The two denominators `rejected_rate` hides. It divides by
                 # `produced`, and its numerator can only come from `eligible`
@@ -383,7 +366,6 @@ class CaseScore:
             "missed": list(self.missed),
             "lane_errors": [error.to_json() for error in self.lane_errors],
             "unlisted": [entry.to_json() for entry in self.unlisted],
-            "needs_info_unmatched": list(self.needs_info_unmatched),
             "foreign": list(self.foreign),
             "rulings": [ruling.to_json() for ruling in self.rulings],
         }
@@ -439,7 +421,7 @@ def score_case(
         case, produced, matcher, rulings, unmatched_positions, missed
     )
     misfiled = {error.threat_id for error in lane_errors}
-    unlisted, needs_info, foreign = _standing_of_unmatched(
+    unlisted, foreign = _standing_of_unmatched(
         case, produced, votes, unmatched_positions, misfiled
     )
 
@@ -454,7 +436,6 @@ def score_case(
         missed=missed,
         lane_errors=lane_errors,
         unlisted=unlisted,
-        needs_info_unmatched=needs_info,
         foreign=foreign,
         rulings=tuple(rulings),
         severity_confusion=_severity_confusion(matched),
@@ -639,14 +620,17 @@ def _standing_of_unmatched(
     votes: Ledger,
     unmatched_positions: Sequence[int],
     misfiled: set[str],
-) -> tuple[tuple[UnlistedThreat, ...], tuple[str, ...], tuple[str, ...]]:
+) -> tuple[tuple[UnlistedThreat, ...], tuple[str, ...]]:
     """Step 4: each unmatched threat's fingerprint, looked up in the ledger.
 
     Whether the **System Model** supports a claim nobody wrote down is a
     question about prose, and a person answers it — once per fingerprint,
     kept forever. This function only reads the answers. A ``needs-info``
-    threat is never a false positive — it is the designed response to an
-    unknown attribute — so it is counted, not keyed. A threat already recorded
+    threat is keyed like any other: a conditional finding can ask an
+    irrelevant question, invent its prerequisite, or attach to the wrong
+    control, and the first Baseline carried 100 unmatched ones against 16 a
+    person could answer. The verdict exempted nothing from a vote; it only
+    hid the vote from the numbers. A threat already recorded
     as a lane error is accounted for too, and keying it again would
     double-count one mistake. A threat citing an element the blessed model
     does not hold is counted as ``foreign`` and not keyed either: only an
@@ -661,7 +645,6 @@ def _standing_of_unmatched(
     one rule, and the two would have disagreed the first time either moved.
     """
     unlisted: list[UnlistedThreat] = []
-    needs_info: list[str] = []
     foreign: list[str] = []
     flows = {flow.id: (flow.source, flow.destination) for flow in case.model.data_flows}
     blessed_ids = {element.id for element in case.model.elements()}
@@ -669,9 +652,6 @@ def _standing_of_unmatched(
     for position in unmatched_positions:
         threat = produced[position]
         if threat.id in misfiled:
-            continue
-        if _is_needs_info(threat):
-            needs_info.append(threat.id)
             continue
         if not blessed_ids.issuperset(threat.affected_element_ids):
             foreign.append(threat.id)
@@ -693,7 +673,7 @@ def _standing_of_unmatched(
                 standing=_standing(votes, value),
             )
         )
-    return tuple(unlisted), tuple(needs_info), tuple(foreign)
+    return tuple(unlisted), tuple(foreign)
 
 
 def _standing(votes: Ledger, value: str) -> Standing:
