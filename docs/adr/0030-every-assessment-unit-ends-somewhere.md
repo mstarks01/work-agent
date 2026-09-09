@@ -1,6 +1,6 @@
 # 30. Every assessment unit ends somewhere
 
-- **Status**: proposed
+- **Status**: proposed, priced on the first Baseline below
 - **Date**: 2026-09-09
 - **Effort**: [#739 — a bounded coverage pass that recovers what a lane omitted](https://github.com/mstarks01/work-agent/issues/739),
   finding 4 of the audit on [#732](https://github.com/mstarks01/work-agent/issues/732)
@@ -29,10 +29,12 @@ answer is asked about once more, bounded.**
 **An assessment unit is the package's own.** The neutral `units_for` hook
 already names them for a package whose claims rule on a catalog: the selected
 requirements. For a package whose claims compose an identity from an action
-and a place, a unit is one offered place in one lane: an element or a
-boundary crossing the lane's rules led to, or that the roster holds. Both come
-out of what the graph already computes for the coverage instrument, so no
-table is added.
+and a place, a unit is one **candidate** or one **boundary crossing** in one
+lane, never every element: the first Baseline offered each STRIDE lane 223
+elements and the lanes cited about half, so a unit per element makes the
+second call a second pass. Candidates and crossings are what the lane's rules
+led it to, and both come out of what the graph already computes for the
+coverage instrument, so no table is added.
 
 **A unit ends one of three ways.** A **Claim** cites it; a **Cleared** mark
 names it with one sentence of why nothing follows, which the lane writes in
@@ -85,9 +87,30 @@ with no candidates and no exemplars.
 **A structural lint on coverage.** Rejected: it is what the coverage
 instrument already is, and it recovers nothing.
 
+## Priced on the first Baseline
+
+Offline, 2026-09-09, over `352b72d-gpt-5.6-terra-2f7e336d`. Units unanswered
+today, across 13 cases: 121 of 323 candidates and 85 of 258 crossings were
+cited by no draft, about 16 units per case across six lanes. Elements: 555
+of 1,338, which is why an element is not a unit. What the pass can recover,
+by lane, from the `place` and `unled` rows:
+
+| lane | place | unled | must-find |
+|---|---:|---:|---:|
+| elevation-of-privilege | 6 | 13 | 13 |
+| tampering | 11 | 3 | 6 |
+| denial-of-service | 16 | 4 | 6 |
+| repudiation | 8 | 4 | 5 |
+| spoofing | 6 | 3 | 2 |
+| information-disclosure | 8 | 1 | 1 |
+
+Ceiling 33 must-finds of 129, and the elevation lane holds 13 of them. The
+ceiling is a price and not a bound, as `evals/TUNING.md` step 3 says.
+
 ## Measurement before acceptance
 
 Five runs of case 01 each way against the control, reading matched and
 must-find counts, the unanswered count per lane, the cleared count, the
-unlisted count and the cost. Priced first against the `place` and `unled`
-rows of the Baseline, offline. The runs wait on spend approval.
+unlisted count and the cost. The runs wait on spend approval, and the code
+waits on the runs: a second call on every lane is a cost every job pays, and
+it ships measured or not at all.
