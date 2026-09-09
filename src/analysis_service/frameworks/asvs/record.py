@@ -237,7 +237,7 @@ class RequirementProposal(Proposal):
     """What a lane agent emits: a ruling that *names* its evidence.
 
     The neutral :class:`~analysis_service.report.Proposal` carries the title, the
-    description, the element refs and the two evidence lists. ASVS adds its ID
+    description, the element refs and the three evidence lists. ASVS adds its ID
     key and nothing else, because it judges nothing else.
 
     ``affected_element_ids`` keeps the base's empty default rather than STRIDE's

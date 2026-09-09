@@ -531,8 +531,8 @@ def duplicate_groups(
 def rating_disagreements(drafts: Sequence[Claim]) -> dict[str, list[str]]:
     """Each draft against the others with one fact pattern and another rating.
 
-    Critic step 4 asks that identical fact patterns carry identical ratings
-    across lanes. Two drafts with the same verb and the same set of catalogued
+    The STRIDE critic's rating step asks that identical fact patterns carry
+    identical ratings across lanes. Two drafts with the same verb and the same set of catalogued
     grounds are one fact pattern, and whether their ``likelihood`` or
     ``impact`` differ is a comparison of four fields, made here so the critic
     reads the pair and only picks the rating (#444). Quotes are left out of the
@@ -854,7 +854,7 @@ def _ruling_view(
             view["filed_in_wrong_lane"] = reason
         # Computed too: the other drafts with this one's fact pattern and a
         # different rating (:func:`~analysis_service.critic.rating_disagreements`),
-        # which is the pair step 4 calibrates across.
+        # which is the pair the rating step calibrates across.
         if draft.id in rated_unlike:
             view["rated_unlike"] = list(rated_unlike[draft.id])
         # The framework's own words for the unit this draft rules on, so the

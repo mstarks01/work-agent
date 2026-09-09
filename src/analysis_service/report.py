@@ -1118,7 +1118,7 @@ class Proposal(BaseModel):
 
     The neutral base, shared by every framework. It carries exactly what
     :func:`~analysis_service.evidence.resolve_proposals` reads — the element refs,
-    the two evidence lists, the title and the description — and each framework
+    the three evidence lists, the title and the description — and each framework
     adds its own judgement fields and its own ID key on top. The reason this
     shape exists at all, that a provider's schema compiler cannot express a
     :class:`Ground`'s branch relationship, is identical for any framework.
