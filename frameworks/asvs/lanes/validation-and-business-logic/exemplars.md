@@ -26,14 +26,14 @@ The requirement asks which side enforces a validation rule. The model answers wh
 
 ## V2.1.1 — Documented input validation rules cannot be settled from this input
 
-A documentation requirement. The subject is an artifact of the organization, not of the system, so no model can hold the answer. Say that plainly — it is the honest ruling and not a weak one.
+A documentation requirement. The subject is an artifact of the organization, not of the system, so no model can hold the answer — but the submitter does. The policy exists or it does not, and one sentence from them settles it, so ask for more description rather than sending the question to a person the job cannot reach.
 
 ```json
 {
   "requirement": "1.1",
-  "needs_evidence": "people",
+  "needs_evidence": "prose",
   "title": "Documented input validation rules cannot be settled from this input",
-  "description": "V2.1.1 verifies that the application's input validation rules are documented. It applies to this system: `process:web-api` accepts payment instructions and account identifiers from `entity:customer` across a trust boundary, so there are rules to document. The subject of the requirement is a document held by the organization that built the system, and this job carries a description of the system rather than that document. So the requirement applies and this input cannot settle it. Supplying the validation policy, or stating that none exists, settles it.",
+  "description": "V2.1.1 verifies that the application's input validation rules are documented. It applies to this system: `process:web-api` accepts payment instructions and account identifiers from `entity:customer` across a trust boundary, so there are rules to document. The subject of the requirement is a document held by the organization that built the system, and this description says nothing about it. So the requirement applies and this input does not settle it. A fuller description would: supply the validation policy, or state that none exists.",
   "affected_element_ids": [
     "process:web-api"
   ],
