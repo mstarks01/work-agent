@@ -14,7 +14,7 @@ blessing pass. The metrics are relative to the rule and the ledger. Track
 movement with them, and never quote them as absolutes.
 
 Everything the run produced lands beside it, as one whole report per case, in
-the directory :func:`reports_dir` names. The artifact answers the questions the
+the directory :func:`~evals.harness.bundle.reports_dir` names. The artifact answers the questions the
 metric set anticipated. The reports answer the rest, offline and for free
 ([#180](https://github.com/mstarks01/work-agent/issues/180)).
 
@@ -47,18 +47,15 @@ from typing import Any
 from analysis_service.actions import VerbError
 from analysis_service.certification import CertificationError, CertifyResult, certify
 from analysis_service.claims import (
-    FrameworkAnalysis,
     FrameworkName,
 )
 from analysis_service.deployment import Deployment
 from analysis_service.frameworks import PACKAGES
-from analysis_service.frameworks.stride.record import Threat
 from analysis_service.graph import Pipeline
 from analysis_service.identity import build_identity
 from analysis_service.report import (
     NodeLatency,
     NodeRun,
-    Report,
     TokenUsage,
     latency_by_node,
     usage_by_node,
@@ -89,6 +86,12 @@ from evals.harness.artifact import (
 )
 from evals.harness.artifact import build as build_artifact
 from evals.harness.baseline import BASELINES_DIR
+from evals.harness.bundle import (
+    optional_block,
+    runs_from_reports,
+    stride_threats,
+    write_reports,
+)
 from evals.harness.calibration import (
     AGREEMENT_BAR,
     DEFAULT_PAIRS_PATH,
@@ -126,6 +129,7 @@ from evals.harness.reference import (
     CorpusError,
     GoldenCase,
     corpus_refusal,
+    flows_by_case,
     load_corpus,
 )
 from evals.harness.scorer import CaseScore
@@ -143,53 +147,6 @@ EVALS_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CORPUS_DIR = EVALS_ROOT / "corpus"
 
 
-def framework_block(report: Report, framework: FrameworkName) -> FrameworkAnalysis:
-    """One framework's block off a report that carries one per selection.
-
-    The grading contract is per framework (#167), so every scorer names the
-    block it grades rather than assuming the report holds one. A report missing
-    a block the job selected is a driver defect rather than a sweep result: the
-    envelope's own check requires the blocks to answer the job's frameworks with
-    none dropped.
-    """
-    for block in report.analyses:
-        if block.framework == framework:
-            return block
-    raise modes.EvalRunError(f"the report carries no {framework} analysis block")
-
-
-def optional_block(
-    report: Report, framework: FrameworkName
-) -> FrameworkAnalysis | None:
-    """The same, for a framework a case may not have declared."""
-    return next(
-        (block for block in report.analyses if block.framework == framework), None
-    )
-
-
-def stride_block(report: Report) -> FrameworkAnalysis:
-    """STRIDE's block, which every case declares and every mode builds for."""
-    return framework_block(report, "stride")
-
-
-def stride_threats(report: Report) -> list[Threat]:
-    """This report's STRIDE claims, at the record type they validate as.
-
-    ``claims`` is annotated at the neutral :class:`~analysis_service.claims.RuledClaim` because a block
-    holds whatever its own package produced; the scorers grade ``category`` and
-    ``severity``, which only STRIDE's record carries. The envelope already
-    validated this block as its package's own shape, so this re-states that
-    where a caller needs it and fails loudly if it ever stops being true.
-    """
-    claims = stride_block(report).claims
-    narrowed = [claim for claim in claims if isinstance(claim, Threat)]
-    if len(narrowed) != len(claims):
-        raise modes.EvalRunError(
-            "the stride block's claims did not load as Threat records"
-        )
-    return narrowed
-
-
 def _select(cases: Sequence[GoldenCase], wanted: Sequence[str]) -> list[GoldenCase]:
     if not wanted:
         return list(cases)
@@ -198,73 +155,6 @@ def _select(cases: Sequence[GoldenCase], wanted: Sequence[str]) -> list[GoldenCa
     if missing:
         raise SystemExit(f"unknown case(s): {', '.join(missing)}")
     return [by_id[case_id] for case_id in wanted]
-
-
-#: The extension a sweep's report directory takes, replacing the artifact's.
-REPORTS_SUFFIX = ".reports"
-
-
-def reports_dir(out: str | Path) -> Path:
-    """Where a sweep's per-case reports land, given its artifact path.
-
-    Derived from ``--out`` rather than selected by a second flag: the reports
-    and the artifact describe one sweep, and two independent paths let an
-    operator point them at two different ones.
-    """
-    return Path(out).with_suffix(REPORTS_SUFFIX)
-
-
-def _write_reports(out: str, mode: str, runs: Mapping[str, modes.AnalysisRun]) -> None:
-    """Persist every finished case's whole report beside the artifact.
-
-    A sweep is paid work and the report is the only record of what the agents
-    said: what each threat cited, what the critic rejected and on what
-    reasoning, and what the ``scope`` list carried. The artifact holds the
-    measurements somebody thought of in advance, so without this file every
-    other question about a finished sweep costs a second sweep
-    ([#180](https://github.com/mstarks01/work-agent/issues/180)).
-
-    Beside the artifact rather than inside it. A report embeds the whole
-    **Valid System Model** and every claim's grounds, so folding a corpus of
-    them into the artifact would bury the aggregates a reader opens it for.
-
-    **These reports are publishable.** They carry corpus source text, which is
-    in this repository, so writing them raises no disclosure question. That is
-    stated rather than assumed, because the same code path carries a
-    submitter's own text the moment it runs outside the corpus.
-    """
-    if mode not in modes.REPORTING_MODES:
-        print(f"no reports written: {mode} mode produces none")
-        return
-    directory = reports_dir(out)
-    directory.mkdir(parents=True, exist_ok=True)
-    total_bytes = 0
-    for case_id, run in sorted(runs.items()):
-        path = directory / f"{case_id}.report.json"
-        path.write_text(run.report.model_dump_json(indent=2) + "\n", "utf-8")
-        # The drafts beside the report, because the report is what survived the
-        # critic and half of what a score reads is what did not. Without them
-        # ``score`` could recompute recall and not critic yield, and a command
-        # that re-scores some of a sweep is worse than one that refuses.
-        drafts = directory / f"{case_id}.drafts.json"
-        drafts.write_text(
-            json.dumps(
-                {
-                    framework: [claim.model_dump(mode="json") for claim in claims]
-                    for framework, claims in run.drafts.items()
-                },
-                indent=2,
-            )
-            + "\n",
-            "utf-8",
-        )
-        # The lanes' own emissions, before the fan-in routed anything away.
-        # ``score`` does not read them: they exist so a reader can ask what a
-        # lane answered, which the drafts no longer say.
-        proposals = directory / f"{case_id}.proposals.json"
-        proposals.write_text(json.dumps(dict(run.proposals), indent=2) + "\n", "utf-8")
-        total_bytes += path.stat().st_size + drafts.stat().st_size
-    print(f"{len(runs)} report(s) written to {directory} ({total_bytes / 1024:.0f} KB)")
 
 
 async def _run_mode(
@@ -482,22 +372,6 @@ async def _run_mode(
     )
 
 
-def _flows_by_case(
-    cases: Sequence[GoldenCase],
-) -> dict[str, dict[str, tuple[str, str]]]:
-    """Each case's **Data Flow** map, which the identity rule resolves against.
-
-    Per case rather than pooled: two cases may spell one flow ID differently,
-    and a shared map would resolve one case's citation against another's graph.
-    """
-    return {
-        case.id: {
-            flow.id: (flow.source, flow.destination) for flow in case.model.data_flows
-        }
-        for case in cases
-    }
-
-
 def _score_runs(
     cases: Sequence[GoldenCase],
     runs: dict[str, modes.AnalysisRun],
@@ -585,14 +459,14 @@ def _scored_sweep(
             f"{len(unrostered)} voter(s) have no roster line and no series"
             f" reads them: {', '.join(unrostered)}"
         )
-    flows_by_case = _flows_by_case(cases)
-    matcher = SubsetVerbIdentity(flows_by_case)
+    flow_maps = flows_by_case(cases)
+    matcher = SubsetVerbIdentity(flow_maps)
     reports = {case: run.report for case, run in runs.items()}
 
     by_series = {}
     for name, included in standings.SERIES.items():
         read = standings.narrow(votes, table, included)
-        scores, yields, charged = _score_runs(cases, runs, matcher, read, flows_by_case)
+        scores, yields, charged = _score_runs(cases, runs, matcher, read, flow_maps)
         by_series[name] = replace(
             sweep,
             scores=scores,
@@ -836,7 +710,7 @@ def command_run(args: argparse.Namespace) -> int:
     if args.out:
         Path(args.out).write_text(json.dumps(artifact, indent=2) + "\n", "utf-8")
         print(f"artifact written to {args.out}")
-        _write_reports(args.out, args.mode, mode_run.runs)
+        write_reports(args.out, args.mode, mode_run.runs)
 
     for failure in failures:
         print(f"TIER 1 FAILURE: {failure}", file=sys.stderr)
@@ -998,49 +872,6 @@ def command_promote(args: argparse.Namespace) -> int:
     return 0
 
 
-def _runs_from_reports(artifact: Path, cases: Sequence[GoldenCase]) -> dict[str, Any]:
-    """Read a finished sweep's saved reports and drafts back into runs.
-
-    The pair is what a score needs: the report holds what survived the critic
-    and the drafts hold what it was handed, and critic yield is the difference.
-    A sweep whose directory carries a report and no drafts refuses here rather
-    than scoring the half it can — re-run that sweep.
-    """
-    directory = reports_dir(artifact)
-    if not directory.is_dir():
-        raise modes.EvalRunError(
-            f"{directory} does not exist; a score reads the reports a sweep"
-            " writes beside its artifact, not the artifact alone"
-        )
-
-    runs: dict[str, Any] = {}
-    for case in cases:
-        report_path = directory / f"{case.id}.report.json"
-        drafts_path = directory / f"{case.id}.drafts.json"
-        if not report_path.exists():
-            continue
-        if not drafts_path.exists():
-            raise modes.EvalRunError(
-                f"{drafts_path} is missing; this sweep predates the drafts"
-                " being written beside its report, so its critic yield cannot"
-                " be recomputed. Re-run the sweep rather than scoring half of it"
-            )
-        report = Report.model_validate_json(report_path.read_text(encoding="utf-8"))
-        raw = json.loads(drafts_path.read_text(encoding="utf-8"))
-        drafts = {
-            framework: tuple(
-                PACKAGES[framework].record.model_validate(claim) for claim in claims
-            )
-            for framework, claims in raw.items()
-        }
-        runs[case.id] = modes.AnalysisRun(report=report, drafts=drafts)
-    if not runs:
-        raise modes.EvalRunError(
-            f"{directory} carries no report for any case in the artifact"
-        )
-    return runs
-
-
 def command_score(args: argparse.Namespace) -> int:
     """Re-score a finished sweep against the ledger as it stands now.
 
@@ -1074,7 +905,7 @@ def command_score(args: argparse.Namespace) -> int:
         print(f"{path}: none of its cases are in {args.corpus}", file=sys.stderr)
         return 1
 
-    runs = _runs_from_reports(path, cases)
+    runs = runs_from_reports(path, cases)
     frameworks = tuple(
         sorted(
             {block.framework for run in runs.values() for block in run.report.analyses}
@@ -1116,13 +947,13 @@ def command_price_verbs(args: argparse.Namespace) -> int:
     table is what a decision on ``EQUIVALENT`` reads (#730).
     """
     corpus = load_corpus(args.corpus)
-    flows_by_case = _flows_by_case(corpus)
+    flow_maps = flows_by_case(corpus)
     pairs = load_pairs(args.pairs)
     produced = None
     if args.artifact is not None:
         path = Path(args.artifact)
         cases = [case for case in corpus if case.id in load_artifact(path).cases]
-        runs = _runs_from_reports(path, cases)
+        runs = runs_from_reports(path, cases)
         produced = {
             case_id: stride_threats(run.report)
             for case_id, run in runs.items()
@@ -1137,9 +968,9 @@ def command_price_verbs(args: argparse.Namespace) -> int:
     except (ValueError, VerbError) as exc:
         print(str(exc), file=sys.stderr)
         return 1
-    shipped = verb_pricing.price(None, corpus, flows_by_case, pairs, produced)
+    shipped = verb_pricing.price(None, corpus, flow_maps, pairs, produced)
     priced = [
-        verb_pricing.price(groups, corpus, flows_by_case, pairs, produced)
+        verb_pricing.price(groups, corpus, flow_maps, pairs, produced)
         for groups in candidates
     ]
     verb_pricing.render(shipped, priced)
@@ -1184,7 +1015,7 @@ def command_pairing(args: argparse.Namespace) -> int:
         print(f"{path} carries no case {args.case!r}", file=sys.stderr)
         return 1
 
-    runs = _runs_from_reports(path, [case])
+    runs = runs_from_reports(path, [case])
     block = next(
         (
             candidate
@@ -1354,7 +1185,7 @@ def command_calibrate(args: argparse.Namespace) -> int:
     """
     pairs = load_pairs()
     corpus = load_corpus(args.corpus)
-    flows = _flows_by_case(corpus)
+    flows = flows_by_case(corpus)
     matcher = SubsetVerbIdentity(flows)
     result = measure_agreement(matcher, pairs)
     # Which package the labelled pairs belong to is read off the contract, never

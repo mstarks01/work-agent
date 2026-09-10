@@ -183,6 +183,7 @@ somewhere else.
 | Module | What it owns |
 |---|---|
 | `harness/reference.py` | The `ReferenceThreat` type and the fail-closed corpus loader. |
+| `harness/bundle.py` | A sweep's report bundle: the per-case report, drafts and proposals files beside an artifact, their writer and reader, and the block accessors every reader of a saved report starts from. |
 | `harness/structural.py` | The structural gates — the only checks that fail a run. |
 | `harness/scorer.py` | The scoring pipeline: prefilter → rule → match → standing → severity. |
 | `harness/pairing.py` | The reading view behind one applicability disagreement: every requirement the run applied that the case did not expect, and every one the case expected that the run did not deliver, each with the standard's text and the argument made for it. Scores nothing and rules on nothing. |

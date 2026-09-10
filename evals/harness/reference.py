@@ -41,7 +41,7 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
@@ -784,3 +784,19 @@ def load_corpus(corpus_dir: Path | str) -> tuple[GoldenCase, ...]:
     if not cases:
         raise CorpusError(f"no cases under {corpus_dir}")
     return cases
+
+
+def flows_by_case(
+    cases: Sequence[GoldenCase],
+) -> dict[str, dict[str, tuple[str, str]]]:
+    """Each case's **Data Flow** map, which the identity rule resolves against.
+
+    Per case rather than pooled: two cases may spell one flow ID differently,
+    and a shared map would resolve one case's citation against another's graph.
+    """
+    return {
+        case.id: {
+            flow.id: (flow.source, flow.destination) for flow in case.model.data_flows
+        }
+        for case in cases
+    }

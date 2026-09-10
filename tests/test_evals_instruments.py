@@ -200,7 +200,8 @@ class TestScoringSkipsAPackageItDoesNotRead:
         This raised ``EvalRunError`` before: the STRIDE scorer asked every case
         in the sweep for a block only STRIDE produces.
         """
-        from evals.harness.run import _score_runs, optional_block
+        from evals.harness.bundle import optional_block
+        from evals.harness.run import _score_runs
 
         report = sample_report(analyses=[asvs_block(1)])
         assert optional_block(report, "stride") is None

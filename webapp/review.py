@@ -74,8 +74,8 @@ if str(REPO_ROOT) not in sys.path:
 
 from analysis_service.frameworks import PACKAGES
 from evals import verify_corpus
+from evals.harness import bundle
 from evals.harness import queue as review_queue
-from evals.harness import run
 from evals.harness.fingerprint import FingerprintError, identifier_of, lane_field
 from evals.harness.ledger import (
     DEFAULT_LEDGER_PATH,
@@ -551,7 +551,7 @@ def findings_from_artifact(path: Path) -> tuple[list[review_queue.Finding], dict
     # The one definition of the reports directory is the harness's: `run.py`
     # replaces the artifact's suffix, and a name composed here would be a
     # second definition nothing compares to the first.
-    reports_dir = run.reports_dir(path)
+    reports_dir = bundle.reports_dir(path)
     if not reports_dir.is_dir():
         raise FileNotFoundError(
             f"{reports_dir} does not exist; a queue is built from the reports a"

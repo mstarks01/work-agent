@@ -18,10 +18,11 @@ import pytest
 
 from analysis_service.report import Report
 from evals.harness.artifact import ARTIFACT_VERSION
+from evals.harness.bundle import reports_dir, stride_threats, write_reports
 from evals.harness.fingerprint import components_for
 from evals.harness.ledger import append, cast
 from evals.harness.reference import load_case
-from evals.harness.run import _write_reports, main, reports_dir, stride_threats
+from evals.harness.run import main
 from tests.test_evals_run_grounds import CASE_DIR, sweep
 
 
@@ -35,7 +36,7 @@ def swept(monkeypatch, case, tmp_path):
     """A finished sweep on disk: its artifact, its reports and its drafts."""
     run = sweep(monkeypatch, case, None)
     out = tmp_path / "artifact.json"
-    _write_reports(str(out), "analysis", run.runs)
+    write_reports(str(out), "analysis", run.runs)
     out.write_text(
         json.dumps(
             {
