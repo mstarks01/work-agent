@@ -350,9 +350,9 @@ on either of them. That is the finding this sitting exists for.
 
 **23.** An attacker who takes one store server uses whatever it presents to reach the deploy controller on the corporate network and the registry in the build environment.
 
-- `process:store-server`, `process:deploy-controller`
+- `flow:store-server-to-deploy-controller:poll-current-release`, `flow:store-server-to-image-registry:pull-image`, `process:store-server`
 - severity: low/high · verb: `escalate`
-- A back-office box in one of 1,200 stores is the least defensible element in the model and it is stated to reach across two boundaries.
+- A back-office box in one of 1,200 stores is the least defensible element in the model and it is stated to reach across two boundaries. It cites the two flows it crosses on, so the image registry it reaches is part of the place and this claim does not sit at the same place as the dependency one.
 
 > mark:
 
@@ -410,7 +410,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "1bfb96ef3374b697ef78e76661daa3d2b227792a3b20d2d1ee1d526cde02652c",
       "model.json": "8d0b808bd8e65df6bd975fcd5050596c32040e1eac75b4b8252593bf5de3aa2c",
-      "claims/stride.json": "a1fa75acf29fff06ad85624f37ce91b7904d0085e17be6175135e8a935be9360"
+      "claims/stride.json": "20819276989745ff8df40a7b64cbaf6f595c1324b30ea2f160caa68c35363e1f"
       }
     }
   }

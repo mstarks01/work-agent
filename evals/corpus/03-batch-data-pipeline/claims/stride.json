@@ -11,8 +11,8 @@
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "Long-lived shared secret held by a third party; the primary identity weakness on the ingest path.",
-    "verb": "impersonate"
+    "notes": "Long-lived shared secret held by a third party; the primary identity weakness on the ingest path. The attacker holds a key they were not issued, which is use-credential rather than impersonate.",
+    "verb": "use-credential"
   },
   {
     "category": "spoofing",

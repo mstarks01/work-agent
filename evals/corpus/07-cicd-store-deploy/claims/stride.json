@@ -325,8 +325,9 @@
   {
     "category": "elevation-of-privilege",
     "affected_element_ids": [
-      "process:store-server",
-      "process:deploy-controller"
+      "flow:store-server-to-deploy-controller:poll-current-release",
+      "flow:store-server-to-image-registry:pull-image",
+      "process:store-server"
     ],
     "claim": "An attacker who takes one store server uses whatever it presents to reach the deploy controller on the corporate network and the registry in the build environment.",
     "tier": "expected",
@@ -334,7 +335,7 @@
       "likelihood": "low",
       "impact": "high"
     },
-    "notes": "A back-office box in one of 1,200 stores is the least defensible element in the model and it is stated to reach across two boundaries.",
+    "notes": "A back-office box in one of 1,200 stores is the least defensible element in the model and it is stated to reach across two boundaries. It cites the two flows it crosses on, so the image registry it reaches is part of the place and this claim does not sit at the same place as the dependency one.",
     "verb": "escalate"
   },
   {

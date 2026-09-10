@@ -11,8 +11,8 @@
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "Sign-in is the one control the source actually states, so this claim rests on a stated fact rather than on an unknown. Whether a second factor exists is never stated, and asserting its absence would be unsupported.",
-    "verb": "impersonate"
+    "notes": "Sign-in is the one control the source actually states, so this claim rests on a stated fact rather than on an unknown. Whether a second factor exists is never stated, and asserting its absence would be unsupported. The attacker holds the supplier's password, which is use-credential rather than impersonate.",
+    "verb": "use-credential"
   },
   {
     "category": "spoofing",
