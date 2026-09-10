@@ -2441,21 +2441,25 @@ def build_pipeline(
     resilience = binding.resilience
     tier_nodes = tier_node_by_graph_node(frameworks)
 
-    if entry == ENTRY_EXTRACT_ONLY:
-        extract = _extract_node(
-            prompt_loader, resolve_model, resolve_sampling, resilience
-        )
+    def pipeline(workflow: Workflow, llm_nodes: list[LlmAgent]) -> Pipeline:
+        """The metadata every entry shape attests to, composed once."""
         return Pipeline(
-            workflow=Workflow(name=name, edges=[(START, extract)]),
-            node_models={extract.name: _model_name(extract.model)},
+            workflow=workflow,
+            node_models={node.name: _model_name(node.model) for node in llm_nodes},
             tier_sampling=dict(binding.tier_sampling),
-            node_sampling=_node_sampling([extract], resolve_sampling, tier_nodes),
-            instruction_sha256=instruction_digest([extract]),
-            node_instructions=instruction_sizes([extract]),
+            node_sampling=_node_sampling(llm_nodes, resolve_sampling, tier_nodes),
+            instruction_sha256=instruction_digest(llm_nodes),
+            node_instructions=instruction_sizes(llm_nodes),
             frameworks=tuple(frameworks),
             tier_nodes=tier_nodes,
             review_independence=binding.review_independence,
         )
+
+    if entry == ENTRY_EXTRACT_ONLY:
+        extract = _extract_node(
+            prompt_loader, resolve_model, resolve_sampling, resilience
+        )
+        return pipeline(Workflow(name=name, edges=[(START, extract)]), [extract])
 
     keys = GraphKeys.of(frameworks)
     disclaimers = {
@@ -2532,17 +2536,7 @@ def build_pipeline(
         *extraction_nodes,
         *(node for sub in subgraphs for node in sub.llm_nodes),
     ]
-    return Pipeline(
-        workflow=workflow,
-        node_models={node.name: _model_name(node.model) for node in llm_nodes},
-        tier_sampling=dict(binding.tier_sampling),
-        node_sampling=_node_sampling(llm_nodes, resolve_sampling, tier_nodes),
-        instruction_sha256=instruction_digest(llm_nodes),
-        node_instructions=instruction_sizes(llm_nodes),
-        frameworks=tuple(frameworks),
-        tier_nodes=tier_nodes,
-        review_independence=binding.review_independence,
-    )
+    return pipeline(workflow, llm_nodes)
 
 
 def _validate_node_func(keys: GraphKeys) -> Callable[..., Any]:
