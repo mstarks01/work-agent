@@ -625,3 +625,17 @@ class TestRepoSlug:
 
         monkeypatch.setattr(submit, "run_command", refuse)
         assert submit.repo_slug(Path("/nowhere")) == submit.DEFAULT_REPO
+
+
+def test_the_comparison_table_is_derived_and_selects_no_kind(repo):
+    """`run.py comparison` writes evals/baselines/README.md from the merged
+    Baselines, so a change to it alone is the generator changing. Read as a
+    Baseline submission, a code change that altered the table's shape failed
+    "the change is one Baseline directory" with no diff that could pass."""
+    assert submit._is_derived("evals/baselines/README.md")
+    assert not submit._is_derived("evals/baselines/one/baseline.json")
+    table = repo / "evals" / "baselines" / "README.md"
+    table.parent.mkdir(parents=True, exist_ok=True)
+    table.write_text("# Merged baselines\n", encoding="utf-8")
+
+    assert submit.detect_kind(repo) is None
