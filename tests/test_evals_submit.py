@@ -378,6 +378,22 @@ class TestWhatCIRuns:
         assert self.verify("ada") == 0
         assert "checking this vote PR as ada" in capsys.readouterr().out
 
+    def test_a_pass_reads_the_delta_once(self, monkeypatch):
+        """The kind, the checks and the roster question read one tree: nothing
+        in the pass writes, so a second read could only disagree by accident."""
+        reads = []
+        real = submit.run_command
+
+        def counted(args, cwd):
+            if args[:3] == ["git", "diff", "--name-only"]:
+                reads.append(args)
+            return real(args, cwd)
+
+        monkeypatch.setattr(submit, "run_command", counted)
+        prepare_vote(self.repo)
+        assert self.verify("ada") == 0
+        assert len(reads) == 1
+
     def test_the_same_pr_fails_under_another_login(self, capsys):
         """The binding: a submission enters only through its own author's PR."""
         prepare_vote(self.repo)

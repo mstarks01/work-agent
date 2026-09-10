@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import subprocess
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -35,7 +34,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 from analysis_service.certification import CertifyResult
 from analysis_service.identity import IDENTITY_VERSION
 from evals.harness.instruments import INSTRUMENTS, Sweep, artifact_blocks
-from evals.harness.provenance import ProvenanceError, RunProvenance
+from evals.harness.provenance import ProvenanceError, RunProvenance, checkout_state
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CORPUS_DIR = REPO_ROOT / "evals" / "corpus"
@@ -126,27 +125,14 @@ def repo_commit() -> RepoCommit:
     what produced it.
     """
     try:
-        commit = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            cwd=REPO_ROOT,
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout.strip()
-        status = subprocess.run(
-            ["git", "status", "--porcelain"],
-            cwd=REPO_ROOT,
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout
-    except (OSError, subprocess.CalledProcessError) as exc:
+        commit, clean = checkout_state(REPO_ROOT)
+    except ProvenanceError as exc:
         raise ProvenanceError(
-            f"cannot read the commit this sweep would run from: {exc}. An"
+            f"{exc}, so this sweep cannot say what it would run from. An"
             " artifact that cannot name the prompts and reference sets behind"
             " its numbers is not worth what the sweep costs."
         ) from exc
-    return RepoCommit(commit=commit, clean=not status.strip())
+    return RepoCommit(commit=commit, clean=clean)
 
 
 def corpus_digest() -> str:
