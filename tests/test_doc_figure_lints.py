@@ -55,8 +55,7 @@ from evals.harness.calibration import (
     measure_merges,
 )
 from evals.harness.identity import MechanicalIdentity, SubsetVerbIdentity
-from evals.harness.reference import load_corpus
-from evals.harness.run import _flows_by_case
+from evals.harness.reference import flows_by_case, load_corpus
 from evals.review_submission import unreviewed_cases
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -113,7 +112,7 @@ class Figure:
 
 def _calibration() -> Mapping[str, object]:
     """The admission-gate ratio, for both rules the guides tabulate."""
-    matcher = SubsetVerbIdentity(_flows_by_case(load_corpus(verify_corpus.CORPUS_DIR)))
+    matcher = SubsetVerbIdentity(flows_by_case(load_corpus(verify_corpus.CORPUS_DIR)))
     pairs = load_pairs()
     result = measure_agreement(matcher, pairs)
     floor = measure_agreement(MechanicalIdentity(), pairs)
@@ -136,10 +135,10 @@ def _error_directions() -> Mapping[str, object]:
     three populations and are named apart for that reason.
     """
     corpus = load_corpus(verify_corpus.CORPUS_DIR)
-    matcher = SubsetVerbIdentity(_flows_by_case(corpus))
+    matcher = SubsetVerbIdentity(flows_by_case(corpus))
     pairs = [pair for pair in load_pairs() if pair.is_scored]
     result = measure_agreement(matcher, pairs)
-    merges = measure_merges(corpus, "stride", _flows_by_case(corpus))
+    merges = measure_merges(corpus, "stride", flows_by_case(corpus))
     positives = sum(1 for pair in pairs if pair.label_match)
     assigned = [pair for pair in pairs if pair.candidate_element_ids is not None]
     floor = _frontier_row(assigned, corpus)
@@ -165,7 +164,7 @@ def _frontier_row(pairs, corpus):
     """
     from evals.harness.identity import endpoint_subset
 
-    flows = _flows_by_case(corpus)
+    flows = flows_by_case(corpus)
     splits = candidate_merges = 0
     for pair in pairs:
         ruled = endpoint_subset(
