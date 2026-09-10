@@ -133,8 +133,8 @@ on either of them. That is the finding this sitting exists for.
 **1.** An attacker who obtains a partner's never-rotated static SFTP key uploads extracts as that partner.
 
 - `flow:insurance-partner-to-landing-bucket:push-daily-extract`, `entity:insurance-partner`
-- severity: medium/high · verb: `impersonate`
-- Long-lived shared secret held by a third party; the primary identity weakness on the ingest path.
+- severity: medium/high · verb: `use-credential`
+- Long-lived shared secret held by a third party; the primary identity weakness on the ingest path. The attacker holds a key they were not issued, which is use-credential rather than impersonate.
 
 > mark:
 
@@ -327,7 +327,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "df7757178c394258cbcf1643e81fca5b01f324058a0841824f008e74346da2d0",
       "model.json": "466b9d3e1a737fa1ea723b7977841ad49860fb7397b27ab278e7b4936b81701c",
-      "claims/stride.json": "0cff7f5fd30438bc4a6152acea87bf84fbaf5404252d9c19caeebb2b67f2e12d"
+      "claims/stride.json": "d0791056d4dddc1245a51bc0a23598dbddb827c399b444643f49916c10003433"
       }
     }
   }

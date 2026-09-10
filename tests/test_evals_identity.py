@@ -62,11 +62,11 @@ MEASURED = {
     "no_match_pairs": 111,
     # The rule the record can express today: the two element sets are equal,
     # with zones dropped.
-    "equality_agreements": 201,
+    "equality_agreements": 200,
     # It splits nearly half the pairs a label calls the same, and merges a
     # fifth of the ones it calls different.
     "false_matches": 22,
-    "false_non_matches": 88,
+    "false_non_matches": 89,
 }
 
 #: The frontier, all three ways of being wrong at once.
@@ -84,7 +84,7 @@ MEASURED = {
 #: on the candidates a run actually produces, it merges **81 of 111** — it is
 #: barely a rule at all. The verb takes that to 3 while also avoiding one split.
 FRONTIER = {
-    "equality": {"splits": 88, "candidate_merges": 22, "reference_merges": 2},
+    "equality": {"splits": 89, "candidate_merges": 22, "reference_merges": 2},
     #: The rule #201 argues for, and the only row here that is usable.
     #: It is not an element rule, so it is measured by :func:`_rules`'s
     #: verb-aware entry rather than by a shape function.
@@ -93,8 +93,8 @@ FRONTIER = {
         "candidate_merges": 3,
         "reference_merges": 3,
     },
-    "endpoint equality": {"splits": 59, "candidate_merges": 36, "reference_merges": 7},
-    "subset": {"splits": 41, "candidate_merges": 64, "reference_merges": 8},
+    "endpoint equality": {"splits": 60, "candidate_merges": 36, "reference_merges": 7},
+    "subset": {"splits": 42, "candidate_merges": 64, "reference_merges": 8},
     "endpoint subset": {"splits": 14, "candidate_merges": 81, "reference_merges": 24},
     "overlap": {"splits": 4, "candidate_merges": 83, "reference_merges": 35},
     "endpoint overlap": {

@@ -6,18 +6,18 @@ that validates a shipped model has to ship with it. This module is the
 measurement's half. It says which verbs count as one action for matching, and
 records what the rule cannot do.
 
-The figures are measured rather than asserted, over the whole corpus. All 243
+The figures are measured rather than asserted, over the whole corpus. All 244
 reference claims carry a verb. ``tests/test_evals_identity.py``'s ``FRONTIER``
 prices the rule on every error at once. Against ``endpoint subset`` alone,
 the verb adds no false split over 200 labelled pairs, and removes
 78 of the 81 false merges of
-111 candidate negatives, and twenty of the 23 false merges of 287 reference
+111 candidate negatives, and 21 of the 24 false merges of 291 reference
 pairs. :class:`~evals.harness.identity.SubsetVerbIdentity` scores
 294/311 against the recorded labels, where element agreement alone scores
-201/311.
+200/311.
 
 The candidate column is the one that argues for the vocabulary. Priced on
-reference pairs alone, the element rule merges 23 of 287 and reads as
+reference pairs alone, the element rule merges 24 of 291 and reads as
 survivable. Priced on the paraphrases a live run emits, it merges 81 of 111.
 """
 

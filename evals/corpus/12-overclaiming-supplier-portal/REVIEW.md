@@ -233,8 +233,8 @@ on either of them. That is the finding this sitting exists for.
 **1.** An attacker who obtains a supplier's vendor-issued password signs in as that supplier and uploads paperwork in their name.
 
 - `flow:supplier-to-supplier-portal:upload-documents`, `entity:supplier`
-- severity: medium/medium · verb: `impersonate`
-- Sign-in is the one control the source actually states, so this claim rests on a stated fact rather than on an unknown. Whether a second factor exists is never stated, and asserting its absence would be unsupported.
+- severity: medium/medium · verb: `use-credential`
+- Sign-in is the one control the source actually states, so this claim rests on a stated fact rather than on an unknown. Whether a second factor exists is never stated, and asserting its absence would be unsupported. The attacker holds the supplier's password, which is use-credential rather than impersonate.
 
 > mark:
 
@@ -412,7 +412,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
       "model.json": "02086ed0c4df27e78ba3de3ff5b636d7001554fe09c6c9942b96d687836eedeb",
       "claims/asvs.json": "52c00ea520ff7d309bfb232c3c53f582862a1139bad518535449fc3dc69f57eb",
-      "claims/stride.json": "327cc5e15d9c46c69ea9f67a3a83cc9721fa8630d7d829bf116e87be72e3361e"
+      "claims/stride.json": "ba62b3d4e2587cf389a824acaeffbfe6c37097cdff1c9aed2859c4309b6c5cf3"
       }
     }
   }
