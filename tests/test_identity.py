@@ -455,7 +455,7 @@ class TestAPlatformIdentityModePassesNoAmbientCredential:
         """The behaviour the registry works around, pinned as its counter-example.
 
         If a litellm bump stopped reading the variable, this fails and the
-        empty-string entry in `_MODE_KWARGS` becomes unnecessary rather than
+        empty-string `fixed` entry on the Bedrock IAM source becomes unnecessary rather than
         wrong — which is a thing to find out here rather than to keep carrying.
         """
         assert self.AMBIENT in self._authorization(None)

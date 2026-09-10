@@ -49,7 +49,6 @@ from analysis_service.claims import FRAMEWORK_NAMES
 from analysis_service.config_files import read_toml
 from analysis_service.errors import ConfigError
 from analysis_service.vendors import (
-    CREDENTIAL_MODES,
     VENDOR_NAMES,
     CredentialMode,
     Vendor,
@@ -267,8 +266,8 @@ class ModelTierConfig(BaseModel):
     def _credential_mode_problems(self) -> list[str]:
         """Every vendor whose declared mode is absent, spurious or not allowed.
 
-        Both halves read :data:`~analysis_service.vendors.CREDENTIAL_MODES`, so
-        the rule follows the registry rather than a second copy of it. A key for
+        Both halves read :attr:`~analysis_service.vendors.Vendor.credential_modes`,
+        so the rule follows the registry rather than a second copy of it. A key for
         a single-mode vendor is an error because it is not a choice, and letting
         it sit there would let a file state a mode the registry has since
         replaced.
@@ -279,7 +278,7 @@ class ModelTierConfig(BaseModel):
         problems = []
         selected = {selection.vendor for selection in self.tiers.values()}
         for vendor, mode in self.credentials.items():
-            allowed = CREDENTIAL_MODES[vendor]
+            allowed = vendor_for(vendor).credential_modes
             if len(allowed) == 1:
                 problems.append(
                     f"credentials.{vendor} is set, but {vendor!r} allows only"
@@ -293,7 +292,7 @@ class ModelTierConfig(BaseModel):
                     f" does not allow (it allows: {names})"
                 )
         for vendor in sorted(selected - set(self.credentials)):
-            allowed = CREDENTIAL_MODES[vendor]
+            allowed = vendor_for(vendor).credential_modes
             if len(allowed) > 1:
                 names = ", ".join(sorted(m.value for m in allowed))
                 problems.append(
