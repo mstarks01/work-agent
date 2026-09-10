@@ -450,6 +450,9 @@ def held_draft(session: Session, case_id: str) -> sittings.Draft | None:
     try:
         prepared = session.prepare(case_id)
         opened = sittings.digests(session.corpus_dir / prepared.case_id, prepared.files)
+        # Two merged marks the current rule folds into one finding must agree,
+        # and a disagreement is the same kind of refusal as an unreadable case.
+        current = sittings.current_marks(prepared, merged.answers.marks)
     except sittings.SittingError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     resumed = sittings.Draft(
@@ -458,11 +461,7 @@ def held_draft(session: Session, case_id: str) -> sittings.Draft | None:
         opened_digests=opened,
     )
     known = {target.fingerprint for target in prepared.mark_targets}
-    resumed.marks = {
-        key: mark
-        for key, mark in sittings.current_marks(prepared, merged.answers.marks).items()
-        if key in known
-    }
+    resumed.marks = {key: mark for key, mark in current.items() if key in known}
     resumed.missing = list(merged.answers.missing)
     save_draft(session, resumed)
     return resumed
