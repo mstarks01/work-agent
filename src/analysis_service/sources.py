@@ -58,16 +58,18 @@ DEFAULT_TRANSCRIPT_LABEL = "Call transcript"
 # escaping one would mean the report cites something the caller did not submit.
 MAX_LABEL_CHARS = 200
 
+# A system name is optional metadata rather than a citation key, so unlike a
+# label it *is* trimmed: nobody cites it, and a caller who pads one means the
+# name without the padding. Measured after the trim, so the bound counts what a
+# reader sees. See :func:`clean_system_name`.
+MAX_SYSTEM_NAME_CHARS = 200
+
 # Rejected in a label. The header inside the fence is positional — first line
 # the label, second the separator — so a label spanning lines would make the
 # text below it unreadable as text. Includes the Unicode line separators, which
 # a caller can paste without seeing.
 
 LINE_BREAKS = ("\n", "\r", "\u2028", "\u2029")
-
-#: The private spelling, kept so this module reads as it did. Callers outside
-#: it take :data:`LINE_BREAKS`; there is one tuple and one rule.
-_LINE_BREAKS = LINE_BREAKS
 
 # Also rejected in a label, by Unicode general category. ``Cc`` is the C0 and C1
 # control characters; ``Cf`` the invisible formatting ones — the bidi overrides
@@ -88,6 +90,17 @@ _LINE_BREAKS = LINE_BREAKS
 # Categories rather than an enumerated list of code points: a list is a thing
 # that rots as Unicode grows, and the property is what actually matters.
 _FORMATTING_CATEGORIES = frozenset({"Cc", "Cf"})
+
+
+def _carries_line_break(value: str) -> bool:
+    """Whether ``value`` spans lines, by any of the four terminators."""
+    return any(char in value for char in LINE_BREAKS)
+
+
+def _carries_formatting(value: str) -> bool:
+    """Whether ``value`` holds a control, bidi or zero-width character."""
+    return any(unicodedata.category(char) in _FORMATTING_CATEGORIES for char in value)
+
 
 # All that ``kind`` still selects: one phrase telling the model what register
 # the text below is in. It sits outside the fence, so it is this module's bytes
@@ -138,9 +151,9 @@ class Source(BaseModel):
     def _single_line_label(cls, value: str) -> str:
         if not value.strip():
             raise ValueError("label must not be blank")
-        if any(char in value for char in _LINE_BREAKS):
+        if _carries_line_break(value):
             raise ValueError("label must be a single line")
-        if any(unicodedata.category(char) in _FORMATTING_CATEGORIES for char in value):
+        if _carries_formatting(value):
             raise ValueError(
                 "label must not contain control, bidi or zero-width characters"
             )
@@ -280,11 +293,37 @@ def plain_name(value: str) -> str:
     bidirectional override: either changes what they see without changing what
     they are told they are seeing.
     """
-    if any(char in value for char in _LINE_BREAKS):
+    if _carries_line_break(value):
         raise ValueError("carries a line break")
-    if any(unicodedata.category(char) in _FORMATTING_CATEGORIES for char in value):
+    if _carries_formatting(value):
         raise ValueError("carries a control or formatting character")
     return value
+
+
+def clean_system_name(value: str | None) -> str | None:
+    """The one rule for a caller-supplied system name, at every entry point.
+
+    The HTTP route and the in-process engine both ask this, so a name one
+    accepts the other accepts, and a name one refuses the other refuses.
+    ``tests/test_system_name_readers.py`` holds the two doors against each
+    other rather than each against an expectation of its own.
+
+    ``None`` is the answer for a name that is absent or blank. Both mean the
+    caller named no system, so both fall through to the report's own default
+    rather than putting whitespace where a name belongs.
+
+    The value is trimmed before it is measured and before its characters are
+    read, so the bound counts what a reader sees and padding cannot carry a
+    name past either check.
+    """
+    if value is None:
+        return None
+    trimmed = value.strip()
+    if not trimmed:
+        return None
+    if len(trimmed) > MAX_SYSTEM_NAME_CHARS:
+        raise ValueError(f"exceeds {MAX_SYSTEM_NAME_CHARS} characters")
+    return plain_name(trimmed)
 
 
 def fence_for(body: str) -> str:

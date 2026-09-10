@@ -37,12 +37,7 @@ from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pydantic import (
-    AfterValidator,
-    BaseModel,
-    ConfigDict,
-    Field,
-)
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from starlette._utils import get_route_path
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -70,7 +65,7 @@ from analysis_service.jobs import (
 from analysis_service.parsing import ascii_int
 from analysis_service.report import FrameworkSelection
 from analysis_service.selection import SelectionError, resolve_selection
-from analysis_service.sources import Source, SourceLimits, plain_name
+from analysis_service.sources import Source, SourceLimits, clean_system_name
 from analysis_service.validation import ValidationIssue
 
 logger = logging.getLogger(__name__)
@@ -290,14 +285,23 @@ class JobSubmission(BaseModel):
     # route's per-name work runs. The bound tracks the registry, so a new
     # package raises it with no edit here.
     frameworks: list[FrameworkRequest] = Field(min_length=1, max_length=len(PACKAGES))
-    #: Bounded like a Source label rather than merely in length: it reaches the
-    #: report a consumer renders, and this is the one entry point to the
-    #: pipeline that refused it nothing but a length. A control, format or
-    #: bidirectional character in a name has no reading a person wants and one
-    #: a renderer might.
-    system_name: Annotated[str, AfterValidator(plain_name)] | None = Field(
-        default=None, min_length=1, max_length=200
-    )
+    #: Read by :func:`~analysis_service.sources.clean_system_name`, the same
+    #: rule the in-process engine applies, so the two entry points accept and
+    #: refuse the same names. It reaches the report a consumer renders, so a
+    #: control, format or bidirectional character is refused: none has a
+    #: reading a person wants and each has one a renderer might.
+    #:
+    #: No ``min_length`` or ``max_length`` beside it. The rule trims first and
+    #: measures what is left, so a schema bound on the untrimmed value would
+    #: refuse a padded name the rule accepts — two readers of one bound, which
+    #: is what this field exists to avoid. The body as a whole stays bounded by
+    #: ``BodyLimitMiddleware``.
+    system_name: str | None = None
+
+    @field_validator("system_name")
+    @classmethod
+    def _clean_system_name(cls, value: str | None) -> str | None:
+        return clean_system_name(value)
 
 
 class NodeCompletion(BaseModel):

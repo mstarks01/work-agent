@@ -53,7 +53,7 @@ from analysis_service.jobs import (
 )
 from analysis_service.report import FrameworkSelection
 from analysis_service.selection import SelectionError, resolve_selection
-from analysis_service.sources import Source, SourceLimits
+from analysis_service.sources import Source, SourceLimits, clean_system_name
 
 logger = logging.getLogger(__name__)
 
@@ -61,10 +61,6 @@ logger = logging.getLogger(__name__)
 # isolates session state and carries none of the token-subject meaning it has
 # on the HTTP path. Callers embedding the engine per tenant may pass their own.
 DEFAULT_CALLER = "in-process"
-
-# Mirrors the HTTP contract's system_name bound. Optional metadata, so an
-# over-long name is a caller error rather than a model-judged rejection.
-MAX_SYSTEM_NAME_CHARS = 200
 
 
 class EngineInputError(ValueError):
@@ -286,22 +282,22 @@ class Engine:
             owner_subject=caller,
             sources=sources,
             frameworks=self._frameworks,
-            system_name=_clean_system_name(system_name),
+            system_name=_engine_system_name(system_name),
         )
 
 
-def _clean_system_name(system_name: str | None) -> str | None:
-    """Empty or whitespace-only names fall through to the report default."""
-    if system_name is None:
-        return None
-    trimmed = system_name.strip()
-    if not trimmed:
-        return None
-    if len(trimmed) > MAX_SYSTEM_NAME_CHARS:
-        raise EngineInputError(
-            f"system_name exceeds {MAX_SYSTEM_NAME_CHARS} characters"
-        )
-    return trimmed
+def _engine_system_name(system_name: str | None) -> str | None:
+    """The shared rule, refused in this facade's own error type.
+
+    What is refused is :func:`clean_system_name`'s decision, so the engine and
+    the HTTP route cannot drift apart. How it is refused stays local: an
+    embedding caller catches :class:`EngineInputError`, not a Pydantic
+    ``ValidationError`` raised from inside a record.
+    """
+    try:
+        return clean_system_name(system_name)
+    except ValueError as exc:
+        raise EngineInputError(f"system_name {exc}") from exc
 
 
 def _event_loop_running() -> bool:
