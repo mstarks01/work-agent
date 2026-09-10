@@ -98,7 +98,6 @@ reverting a node to never-retry, no-timeout behaviour.
 from __future__ import annotations
 
 import os
-import tomllib
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import TypeVar
@@ -107,6 +106,7 @@ from google.genai import types
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from analysis_service.budgets import BudgetPolicy
+from analysis_service.config_files import read_toml
 from analysis_service.retry import RetryBudget, RetryPolicy
 from analysis_service.sources import SourceLimits
 
@@ -247,12 +247,7 @@ def load_resilience(
     """
     if env is None:
         env = os.environ
-    try:
-        raw = tomllib.loads(Path(path).read_text(encoding="utf-8"))
-    except tomllib.TOMLDecodeError as exc:
-        raise ResilienceConfigError(f"{path}: invalid TOML: {exc}") from exc
-    except OSError as exc:
-        raise ResilienceConfigError(f"{path}: cannot be read: {exc}") from exc
+    raw = read_toml(path, ResilienceConfigError)
 
     version = raw.get("version")
     if version != SUPPORTED_VERSION:
