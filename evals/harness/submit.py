@@ -774,6 +774,12 @@ KINDS: dict[str, Kind] = {
     ),
     "baseline": Kind(
         prefix="evals/baselines/",
+        # The comparison table: `run.py comparison` writes it from the merged
+        # Baselines, so a change to it alone is the generator changing and not
+        # a Baseline arriving. Before this, a code change that altered the
+        # table's shape was read as a Baseline submission and failed its own
+        # checks.
+        derived=frozenset({"README.md"}),
         noun="baseline submission",
         subject="Baseline",
         preflight=_baseline_preflight,

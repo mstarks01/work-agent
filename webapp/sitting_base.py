@@ -459,7 +459,9 @@ def held_draft(session: Session, case_id: str) -> sittings.Draft | None:
     )
     known = {target.fingerprint for target in prepared.mark_targets}
     resumed.marks = {
-        key: mark for key, mark in merged.answers.marks.items() if key in known
+        key: mark
+        for key, mark in sittings.current_marks(prepared, merged.answers.marks).items()
+        if key in known
     }
     resumed.missing = list(merged.answers.missing)
     save_draft(session, resumed)

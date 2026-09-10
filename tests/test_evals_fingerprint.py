@@ -142,8 +142,27 @@ def test_the_table_and_the_hash_agree_about_what_a_version_reads(version):
         return
     with pytest.raises(FingerprintError):
         fingerprint(without, version=version)
-    supplied = replace(without, **{reads: "read" if reads == "verb" else "V6.2.1"})
+    field = "identifier" if reads == "identifier" else "verb"
+    supplied = replace(without, **{field: "read" if field == "verb" else "V6.2.1"})
     assert fingerprint(supplied, version=version)
+
+
+def test_version_6_keys_two_equivalent_verbs_alike_and_version_4_does_not():
+    """The matcher and the vote key read "one action" through one table.
+
+    Version 4 hashed the verb as written, so the first EQUIVALENT group would
+    have let the scorer match an `inject` draft to a `forge` reference while a
+    vote on the `forge` claim missed it. Version 6 reads the canonical verb.
+    """
+    from evals.harness.verbs import EQUIVALENT
+
+    group = sorted(EQUIVALENT[0])
+    left = Components("stride", "tampering", ("process:a",), verb=group[0], scope="01")
+    right = replace(left, verb=group[1])
+    assert fingerprint(left, version=6) == fingerprint(right, version=6)
+    assert fingerprint(left, version=4) != fingerprint(right, version=4)
+    outside = replace(left, verb="flood")
+    assert fingerprint(left, version=6) != fingerprint(outside, version=6)
 
 
 @pytest.mark.parametrize("version", SUPPORTED_VERSIONS)
@@ -194,7 +213,7 @@ def test_the_declared_versions_follow_from_what_a_claim_carries():
     package started on: an element slug is unique inside one **System Model**
     and two models may derive the same one.
     """
-    assert version_for("stride") == 4
+    assert version_for("stride") == 6
     assert version_for("asvs") == 5
     assert READS_SCOPE[version_for("stride")]
     assert READS_SCOPE[version_for("asvs")]

@@ -160,14 +160,21 @@ This is the property the retired judge design could not offer — a judge
 upgrade silently re-scored every historical number, with no way to recompute
 the old ones. Here the re-score is explicit, total, offline and free.
 
+A sitting's marks are keyed the same way and store only the key, and a
+merged sitting is a record a person signed, so no file moves when a version
+does. The reader maps instead: each mark target carries every key its claim
+ever had under a version this build computes, recomputed from the corpus, and
+`sitting.current_marks` reads an older key to the current one at read time.
+A version moved without that mapping read every merged sitting as unread.
+
 **The version is not one global default.** It is `VERSION_FOR`, a table keyed by
 framework, checked against `PACKAGES` and declared in
 `tests/test_framework_neutrality.py`:
 
 | Package | Version | Why |
 |---|---|---|
-| `stride` | 2 | an open claim set, so the action is half of what makes two claims one finding |
-| `asvs` | 3 | its claims name a requirement in a catalog, so the identifier and the place it was ruled in are the key |
+| `stride` | 6 | an open claim set, so the action is half of what makes two claims one finding; read through the equivalence table, so two verbs the labels cannot separate are one key; with the scope |
+| `asvs` | 5 | its claims name a requirement in a catalog, so the identifier and the place it was ruled in are the key; with the scope |
 
 Version 1 — place alone — keys nothing today. ASVS sat there until the collapse
 it caused was named: two requirements ruled on one element in one chapter shared
