@@ -343,8 +343,9 @@ def command_review(args: argparse.Namespace) -> int:
 
     runs, _ = findings_from_artifacts([Path(path) for path in args.artifact])
     session = build_session(runs, args.voter, Path(args.ledger))
-    waiting = session.remaining()
-    summary = summarise(waiting, ledger.load(Path(args.ledger)))
+    recorded = ledger.load(Path(args.ledger))
+    waiting = session.remaining(recorded)
+    summary = summarise(waiting, recorded)
 
     print(
         f"{summary['waiting']} findings waiting for {args.voter},"

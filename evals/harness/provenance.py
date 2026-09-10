@@ -363,14 +363,14 @@ def _unique(values: Iterable[str]) -> tuple[str, ...]:
     return tuple(sorted(set(values)))
 
 
-def tree_identity(root: Path | None = None) -> str:
-    """The commit this checkout is at, ``-dirty`` when the tree differs from it.
+def checkout_state(root: Path | None = None) -> tuple[str, bool]:
+    """The commit this checkout is at, and whether the tree is clean.
 
-    Empty where there is no checkout to ask — an installed copy, or a tree
-    without ``git`` — so an artifact never carries a guess. Read once per sweep,
-    beside :func:`~analysis_service.identity.build_identity`, because the two
-    answer different questions: the build names a release, and this names the
-    exact tree a release does not.
+    **The one reader of the tree's identity.** :func:`tree_identity` records
+    it and :func:`~evals.harness.artifact.repo_commit` stops a sweep on it;
+    each used to run the same two git commands and could have read two
+    different answers. Raises :class:`ProvenanceError` naming the cause where
+    there is no checkout to ask, and the callers decide what that means.
     """
     cwd = str(root) if root is not None else None
     try:
@@ -388,9 +388,27 @@ def tree_identity(root: Path | None = None) -> str:
             text=True,
             check=True,
         ).stdout
-    except (OSError, subprocess.CalledProcessError):
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise ProvenanceError(
+            f"cannot read the commit this checkout is at: {exc}"
+        ) from exc
+    return head, not status.strip()
+
+
+def tree_identity(root: Path | None = None) -> str:
+    """The commit this checkout is at, ``-dirty`` when the tree differs from it.
+
+    Empty where there is no checkout to ask — an installed copy, or a tree
+    without ``git`` — so an artifact never carries a guess. Read once per sweep,
+    beside :func:`~analysis_service.identity.build_identity`, because the two
+    answer different questions: the build names a release, and this names the
+    exact tree a release does not.
+    """
+    try:
+        head, clean = checkout_state(root)
+    except ProvenanceError:
         return ""
-    return f"{head}-dirty" if status.strip() else head
+    return head if clean else f"{head}-dirty"
 
 
 def provenance_of(

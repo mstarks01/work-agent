@@ -82,6 +82,7 @@ from evals.harness.ledger import (
     REASON_GLOSS,
     STYLE_REASONS,
     SUBSTANCE_REASONS,
+    Ledger,
     LedgerError,
     Verdict,
     append,
@@ -181,8 +182,12 @@ class Session:
     #: one endpoint that writes -- the same pair the sitting app's writes carry.
     token: str = field(default_factory=lambda: secrets.token_urlsafe(24))
 
-    def remaining(self) -> list[review_queue.QueueItem]:
-        """The queue minus anything this voter has answered since it was built.
+    def remaining(self, ledger: Ledger) -> list[review_queue.QueueItem]:
+        """The queue minus anything this voter has answered, as ``ledger`` holds it.
+
+        ``ledger`` is the one load a request makes: the summary endpoint reads
+        the remaining items and the totals off the same observation, so a vote
+        appended between two loads cannot be counted by one and not the other.
 
         Recomputed per request rather than popped from a list: two tabs open on
         one sitting is a thing people do, and a list would let the second tab
@@ -194,9 +199,7 @@ class Session:
         a `needs-evidence` answer as answered and dropped, on every serve, the
         finding the queue had just re-offered.
         """
-        skip = review_queue.answered(
-            load(self.ledger_path), voter=self.voter, sitting=self.sitting
-        )
+        skip = review_queue.answered(ledger, voter=self.voter, sitting=self.sitting)
         return [item for item in self.items if item.fingerprint not in skip]
 
     def find(self, value: str) -> review_queue.QueueItem:
@@ -291,13 +294,13 @@ def create_app(session: Session) -> FastAPI:
 
     @app.get("/api/summary")
     def summary() -> JSONResponse:
-        remaining = session.remaining()
-        payload = review_queue.summarise(remaining, load(session.ledger_path))
+        ledger = load(session.ledger_path)
+        payload = review_queue.summarise(session.remaining(ledger), ledger)
         return JSONResponse(payload)
 
     @app.get("/api/next")
     def next_item() -> JSONResponse:
-        remaining = session.remaining()
+        remaining = session.remaining(load(session.ledger_path))
         if not remaining:
             return JSONResponse({"done": True, "remaining": 0})
         item = remaining[0]

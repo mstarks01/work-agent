@@ -922,22 +922,23 @@ def command_verify(args: argparse.Namespace) -> int:
         print("no PR author given; the binding cannot be checked")
         return 1
 
-    try:
-        kind = detect_kind(root)
-    except SubmitError as exc:
-        print(f"FAIL  {exc}")
-        return 1
-
+    # One observation of the delta for the whole pass: nothing here writes,
+    # so the kind, the checks and the roster question read one tree.
     with _delta_cache(root):
+        try:
+            kind = detect_kind(root)
+        except SubmitError as exc:
+            print(f"FAIL  {exc}")
+            return 1
         checks = list(KINDS[kind].preflight(root, author)) if kind else []
-    if kind is None:
-        # A roster line with no submission behind it still may not raise its
-        # own author's standing — the one edit that is dangerous alone.
-        if ROSTER_FILE in changed_paths(root):
-            checks = [_check_no_self_raise(root, author)]
-        else:
-            print("no contribution in this diff; nothing to check")
-            return 0
+        if kind is None:
+            # A roster line with no submission behind it still may not raise
+            # its own author's standing — the one edit that is dangerous alone.
+            if ROSTER_FILE in changed_paths(root):
+                checks = [_check_no_self_raise(root, author)]
+            else:
+                print("no contribution in this diff; nothing to check")
+                return 0
 
     print(f"checking this {kind or 'roster'} PR as {author}\n")
     for check in checks:

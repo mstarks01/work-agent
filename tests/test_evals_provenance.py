@@ -609,3 +609,29 @@ class TestTheTreeIsRecorded:
         assert tree_identity(tmp_path) == ""
         here = tree_identity()
         assert here == "" or len(here.split("-")[0]) == 40
+
+
+def test_the_record_and_the_stop_read_one_checkout(tmp_path, monkeypatch):
+    """`tree_identity` records the tree and `repo_commit` stops a sweep on it.
+
+    Each used to run the same two git commands and could have read two answers.
+    Both now read `checkout_state`, so one scripted git answers both: no
+    checkout gives the record an empty tree and stops the sweep by name, and a
+    dirty tree reads as dirty on both sides."""
+    import subprocess
+
+    from evals.harness import artifact, provenance
+
+    monkeypatch.setattr(artifact, "REPO_ROOT", tmp_path)
+    assert provenance.tree_identity(tmp_path) == ""
+    with pytest.raises(provenance.ProvenanceError, match="cannot read the commit"):
+        artifact.repo_commit()
+
+    def scripted(args, **kwargs):
+        out = "f" * 40 + "\n" if args[1] == "rev-parse" else " M a-file\n"
+        return subprocess.CompletedProcess(args, 0, stdout=out, stderr="")
+
+    monkeypatch.setattr(provenance.subprocess, "run", scripted)
+
+    assert provenance.tree_identity(tmp_path) == "f" * 40 + "-dirty"
+    assert artifact.repo_commit() == artifact.RepoCommit(commit="f" * 40, clean=False)

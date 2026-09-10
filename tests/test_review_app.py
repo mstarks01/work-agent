@@ -507,7 +507,7 @@ def test_a_needs_evidence_finding_comes_back_in_a_later_sitting(runs, tmp_path):
     """
     ledger_path = tmp_path / "votes"
     first = build_session(runs, voter="ada", ledger_path=ledger_path)
-    item = first.remaining()[0]
+    item = first.remaining(load(ledger_path))[0]
     append(
         cast(
             item.components,
@@ -520,22 +520,43 @@ def test_a_needs_evidence_finding_comes_back_in_a_later_sitting(runs, tmp_path):
     )
 
     assert item.fingerprint not in {
-        served.fingerprint for served in first.remaining()
+        served.fingerprint for served in first.remaining(load(ledger_path))
     }, "within its own sitting it stays down"
 
     later = build_session(runs, voter="ada", ledger_path=ledger_path)
 
-    assert item.fingerprint in {served.fingerprint for served in later.remaining()}, (
-        "a later sitting asks again, which is what the button says"
-    )
+    assert item.fingerprint in {
+        served.fingerprint for served in later.remaining(load(ledger_path))
+    }, "a later sitting asks again, which is what the button says"
 
 
 def test_an_ordinary_answer_is_still_spent(runs, tmp_path):
     ledger_path = tmp_path / "votes"
     first = build_session(runs, voter="ada", ledger_path=ledger_path)
-    item = first.remaining()[0]
+    item = first.remaining(load(ledger_path))[0]
     append(cast(item.components, item.finding.case, "up", "ada"), ledger_path)
 
     later = build_session(runs, voter="ada", ledger_path=ledger_path)
 
-    assert item.fingerprint not in {served.fingerprint for served in later.remaining()}
+    assert item.fingerprint not in {
+        served.fingerprint for served in later.remaining(load(ledger_path))
+    }
+
+
+def test_the_summary_reads_the_ledger_once(client, monkeypatch):
+    """The remaining items and the totals come off one observation, so a vote
+    appended between two loads cannot be counted by one and not the other."""
+    from webapp import review as review_module
+
+    loads = []
+    real = review_module.load
+
+    def counted(path):
+        loads.append(path)
+        return real(path)
+
+    monkeypatch.setattr(review_module, "load", counted)
+    app, _ = client
+
+    assert app.get("/api/summary").status_code == 200
+    assert len(loads) == 1
