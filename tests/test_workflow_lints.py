@@ -20,7 +20,8 @@ from pathlib import Path
 
 import pytest
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+from tests.source_tree import REPO_ROOT, parse, source_files
+
 PACKAGE = REPO_ROOT / "src" / "analysis_service"
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "evals-live.yml"
 PACKAGE_GLOB = "src/analysis_service/**"
@@ -41,7 +42,7 @@ def _package_modules() -> set[str]:
 def _imported_modules(source: Path, modules: set[str]) -> set[str]:
     """Which package modules ``source`` imports, however it spells the import."""
     found = set()
-    for node in ast.walk(ast.parse(source.read_text(encoding="utf-8"))):
+    for node in ast.walk(parse(source)):
         if isinstance(node, ast.ImportFrom):
             module = node.module or ""
             if module.startswith("analysis_service"):
@@ -59,7 +60,7 @@ def _reachable_from_evals() -> set[str]:
     """Every package module the eval harness reaches, directly or transitively."""
     modules = _package_modules()
     pending = set()
-    for source in (REPO_ROOT / "evals").rglob("*.py"):
+    for source in source_files("evals"):
         pending |= _imported_modules(source, modules)
 
     reached: set[str] = set()

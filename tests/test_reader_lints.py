@@ -32,10 +32,10 @@ from pathlib import Path
 
 import pytest
 
+from tests.source_tree import REPO_ROOT, parse, source_files
 from webapp import main, offline_sitting, review, sitting
 from webapp.page import client_script
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
 #: Every directory that may legitimately read a fact, including the tests.
 SEARCHED = ("src", "evals", "webapp", "tests")
 
@@ -77,16 +77,6 @@ DECLARED_FIELDS: dict[str, str] = {
         " source. Its own docstring says nothing scores it."
     ),
 }
-
-
-def _source_files(*roots: str, suffixes: tuple[str, ...] = (".py",)) -> list[Path]:
-    return [
-        path
-        for root in roots
-        for suffix in suffixes
-        for path in sorted((REPO_ROOT / root).rglob(f"*{suffix}"))
-        if "research" not in path.parts and ".venv" not in path.parts
-    ]
 
 
 # --- 1. An answer the page never reads ------------------------------------------
@@ -162,7 +152,7 @@ def _without_comments(pages: tuple[str, ...], scripts: tuple[str, ...]) -> str:
 
 def _asserted_spellings() -> list[tuple[str, int, str]]:
     found = []
-    for path in _source_files("tests"):
+    for path in source_files("tests"):
         for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
             match = _ASSERTION.search(line)
             if match is None or not _PAGE_TARGET.search(match.group(3)):
@@ -206,9 +196,8 @@ _MODEL_BASES = re.compile(r"BaseModel|dataclass|NamedTuple|TypedDict")
 def _declared_fields() -> dict[str, tuple[Path, int]]:
     """Every field of every model, dataclass or named tuple, by ``Class.field``."""
     fields: dict[str, tuple[Path, int]] = {}
-    for path in _source_files("src", "evals", "webapp"):
-        tree = ast.parse(path.read_text(encoding="utf-8"))
-        for node in ast.walk(tree):
+    for path in source_files("src", "evals", "webapp"):
+        for node in ast.walk(parse(path)):
             if not isinstance(node, ast.ClassDef):
                 continue
             shape = " ".join(
@@ -235,7 +224,7 @@ def _readers_corpus() -> str:
     match, so the lint would read its own table as a reader and the rot check
     would fail on every declared row.
     """
-    files = _source_files(*SEARCHED, suffixes=(".py", ".js", ".html"))
+    files = source_files(*SEARCHED, suffixes=(".py", ".js", ".html"))
     own = Path(__file__).resolve()
     return "\n".join(
         path.read_text(encoding="utf-8") for path in files if path.resolve() != own

@@ -45,9 +45,9 @@ by a test is covered, not dead.
 from __future__ import annotations
 
 import ast
-from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+from tests.source_tree import REPO_ROOT, parse, source_files
+
 # Every directory that may legitimately reach a name, including the tests.
 SEARCHED = ("src", "tests", "evals", "examples", "webapp")
 
@@ -63,19 +63,6 @@ SCOPES: tuple[tuple[str, bool], ...] = (
 _DEFINITIONS = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
 
 
-def _parse(path: Path) -> ast.Module:
-    return ast.parse(path.read_text(encoding="utf-8"))
-
-
-def _sources() -> list[Path]:
-    return [
-        path
-        for directory in SEARCHED
-        for path in sorted((REPO_ROOT / directory).rglob("*.py"))
-        if "__pycache__" not in path.parts
-    ]
-
-
 def _definitions() -> dict[str, str]:
     """Every module-level name this lint judges, with where it is defined.
 
@@ -84,10 +71,8 @@ def _definitions() -> dict[str, str]:
     """
     found: dict[str, str] = {}
     for scope, public_is_api in SCOPES:
-        for path in sorted((REPO_ROOT / scope).rglob("*.py")):
-            if "__pycache__" in path.parts:
-                continue
-            for node in _parse(path).body:
+        for path in source_files(scope):
+            for node in parse(path).body:
                 if not isinstance(node, _DEFINITIONS):
                     continue
                 private = node.name.startswith("_")
@@ -124,8 +109,8 @@ def _used_names(ignoring: frozenset[str]) -> set[str]:
                 used.update(alias.asname or alias.name for alias in child.names)
             walk(child)
 
-    for path in _sources():
-        walk(_parse(path))
+    for path in source_files(*SEARCHED):
+        walk(parse(path))
     return used
 
 
