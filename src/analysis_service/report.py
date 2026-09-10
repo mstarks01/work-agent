@@ -25,9 +25,10 @@ from __future__ import annotations
 import hashlib
 from collections.abc import Iterable, Sequence
 from datetime import datetime
-from typing import Any, Literal, Self
+from typing import Annotated, Any, Literal, Self
 
 from pydantic import (
+    AfterValidator,
     BaseModel,
     ConfigDict,
     Field,
@@ -40,7 +41,7 @@ from pydantic import (
 from analysis_service.claims import FrameworkAnalysis, FrameworkName, SharedElementName
 from analysis_service.evidence import ground_issues
 from analysis_service.frameworks import block_type_for
-from analysis_service.sources import Source
+from analysis_service.sources import MAX_SYSTEM_NAME_CHARS, Source, plain_name
 from analysis_service.system_model import (
     BoundaryCrossing,
     SystemModel,
@@ -640,7 +641,14 @@ class InputRef(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    system_name: str = Field(min_length=1, max_length=200)
+    #: Already clean by the time a report is built — both entry points run
+    #: :func:`~analysis_service.sources.clean_system_name` before a job exists.
+    #: Stated again here because a report is also *read back*: an artifact or a
+    #: saved report is deserialized into this model, and a stored name is only
+    #: as trustworthy as whatever wrote it.
+    system_name: Annotated[str, AfterValidator(plain_name)] = Field(
+        min_length=1, max_length=MAX_SYSTEM_NAME_CHARS
+    )
     sources: list[SourceRef] = Field(min_length=1)
     # Taken **over the refs**, not over the concatenated text: the refs are in
     # the report, so this stays recomputable from the report alone — which a

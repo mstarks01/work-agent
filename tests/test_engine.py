@@ -16,7 +16,6 @@ from pydantic import ValidationError
 from analysis_service.deployment import DEFAULT_RESILIENCE_PATH
 from analysis_service.engine import (
     DEFAULT_CALLER,
-    MAX_SYSTEM_NAME_CHARS,
     Engine,
     EngineDeadlineError,
     EngineInputError,
@@ -30,7 +29,7 @@ from analysis_service.jobs import (
 )
 from analysis_service.pipeline import AdkPipelineRunner
 from analysis_service.resilience import load_resilience
-from analysis_service.sources import Source, SourceLimits
+from analysis_service.sources import MAX_SYSTEM_NAME_CHARS, Source, SourceLimits
 from tests.factories import DEFAULT_FRAMEWORKS, DESCRIPTION_TEXT, sample_selection
 from tests.test_pipeline import build, happy_replies
 
