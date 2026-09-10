@@ -579,7 +579,7 @@ def build_eval_pipeline(
     """
     deployment = deployment or Deployment.from_env()
     if sampling is not None:
-        deployment = replace(deployment, sampling=sampling, _built={})
+        deployment = replace(deployment, sampling=sampling)
     return deployment.pipeline(frameworks, entry=entry, resolve_model=resolve_model)
 
 

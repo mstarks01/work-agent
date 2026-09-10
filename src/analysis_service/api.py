@@ -29,7 +29,7 @@ import logging
 from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime
 from http import HTTPStatus
-from typing import Annotated, Any
+from typing import Annotated, Any, TypeVar
 from uuid import uuid4
 
 import anyio.to_thread
@@ -484,6 +484,31 @@ _REFUSALS: dict[str, Callable[[Admission, int], str]] = {
 }
 
 
+T = TypeVar("T")
+
+
+def _setting(
+    value: T | None,
+    deployment: Deployment | None,
+    name: str,
+    read: Callable[[Deployment], T],
+) -> T:
+    """One optional ``create_app`` setting: the caller's, else the deployment's.
+
+    A caller who injects a runner instead of a deployment must state every
+    setting, because reading a second configuration behind their back is how
+    an app comes to enforce bounds its deployment never chose.
+    """
+    if value is not None:
+        return value
+    if deployment is None:
+        raise ConfigError(
+            f"create_app needs {name}= when it is given a runner instead of a"
+            " deployment"
+        )
+    return read(deployment)
+
+
 def create_app(
     *,
     deployment: Deployment | None = None,
@@ -529,47 +554,27 @@ def create_app(
     else:
         deployment = deployment if deployment is not None else Deployment.from_env()
         app.state.runner_for = deployment.runner
-        app.state.certification = deployment.gate()
-    if frameworks is None:
-        if deployment is None:
-            raise ConfigError(
-                "create_app needs frameworks= when it is given a runner instead "
-                "of a deployment"
-            )
-        frameworks = deployment.frameworks
+        app.state.certification = deployment.gate
+    frameworks = _setting(frameworks, deployment, "frameworks", lambda d: d.frameworks)
     app.state.frameworks = tuple(frameworks)
-    if limits is None:
-        if deployment is None:
-            raise ConfigError(
-                "create_app needs limits= when it is given a runner instead of "
-                "a deployment"
-            )
-        limits = deployment.resilience.source_limits()
-    if job_deadline_seconds is None:
-        if deployment is None:
-            raise ConfigError(
-                "create_app needs job_deadline_seconds= when it is given a "
-                "runner instead of a deployment"
-            )
-        job_deadline_seconds = deployment.resilience.deadline_seconds()
-    if max_active_jobs is None:
-        if deployment is None:
-            raise ConfigError(
-                "create_app needs max_active_jobs= when it is given a runner "
-                "instead of a deployment"
-            )
-        max_active_jobs = deployment.resilience.max_active_jobs
-    if budget is None:
-        if deployment is None:
-            raise ConfigError(
-                "create_app needs budget= when it is given a runner "
-                "instead of a deployment"
-            )
-        budget = deployment.resilience.budget_policy()
-    app.state.limits = limits
-    app.state.job_deadline_seconds = job_deadline_seconds
-    app.state.max_active_jobs = max_active_jobs
-    app.state.budget = budget
+    app.state.limits = limits = _setting(
+        limits, deployment, "limits", lambda d: d.resilience.source_limits()
+    )
+    app.state.job_deadline_seconds = _setting(
+        job_deadline_seconds,
+        deployment,
+        "job_deadline_seconds",
+        lambda d: d.resilience.deadline_seconds(),
+    )
+    app.state.max_active_jobs = _setting(
+        max_active_jobs,
+        deployment,
+        "max_active_jobs",
+        lambda d: d.resilience.max_active_jobs,
+    )
+    app.state.budget = _setting(
+        budget, deployment, "budget", lambda d: d.resilience.budget_policy()
+    )
     max_body_bytes = limits.max_total_bytes * _BODY_SLACK
     app.state.verifier = verifier if verifier is not None else build_verifier()
 

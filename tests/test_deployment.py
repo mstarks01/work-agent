@@ -769,7 +769,7 @@ def test_the_gate_is_built_once():
     """Two jobs in one process can never be certified against two manifests."""
     deployment = Deployment.from_env(env=VERTEX_TIERS)
 
-    assert deployment.gate() is deployment.gate()
+    assert deployment.gate is deployment.gate
 
 
 def test_the_runner_is_built_once():
@@ -780,13 +780,27 @@ def test_the_runner_is_built_once():
     )
 
 
+def test_a_replaced_deployment_starts_with_an_empty_runner_cache():
+    """The eval path swaps the sampling in with ``replace``; a copied cache
+    would hand the new deployment the graph the old adapters built."""
+    from dataclasses import replace
+
+    deployment = Deployment.from_env(env=VERTEX_ENV)
+    runner = deployment.runner(DEFAULT_FRAMEWORKS)
+
+    swapped = replace(deployment, sampling=deployment.sampling)
+
+    assert swapped.runner(DEFAULT_FRAMEWORKS) is not runner
+    assert swapped.gate is not deployment.gate
+
+
 def test_the_route_enforces_the_gate_the_runner_certified_with():
     """The reach through the runner's private attribute this replaced."""
     deployment = Deployment.from_env(env=VERTEX_ENV)
 
     app = create_app(deployment=deployment, store=InMemoryJobStore(), verifier=object())
 
-    assert app.state.certification is deployment.gate()
+    assert app.state.certification is deployment.gate
     # The app holds a *function* from a selection to its runner, not one runner:
     # a graph is built for one selection, so a runner is too, and a selection
     # nobody has asked for costs nothing.
@@ -811,17 +825,17 @@ def test_the_app_enforces_the_bounds_its_deployment_configured():
 
 
 def test_require_certified_is_off_unless_explicitly_affirmative():
-    assert Deployment.from_env(env=VERTEX_TIERS).gate().require_certified is False
+    assert Deployment.from_env(env=VERTEX_TIERS).gate.require_certified is False
     assert (
-        Deployment.from_env(env=VERTEX_TIERS | {"ANALYSIS_REQUIRE_CERTIFIED": "no"})
-        .gate()
-        .require_certified
+        Deployment.from_env(
+            env=VERTEX_TIERS | {"ANALYSIS_REQUIRE_CERTIFIED": "no"}
+        ).gate.require_certified
         is False
     )
     assert (
-        Deployment.from_env(env=VERTEX_TIERS | {"ANALYSIS_REQUIRE_CERTIFIED": "true"})
-        .gate()
-        .require_certified
+        Deployment.from_env(
+            env=VERTEX_TIERS | {"ANALYSIS_REQUIRE_CERTIFIED": "true"}
+        ).gate.require_certified
         is True
     )
 
