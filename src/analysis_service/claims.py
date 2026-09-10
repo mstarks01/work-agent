@@ -2047,6 +2047,30 @@ class FrameworkAnalysis(BaseModel):
         """Both arrays, for the checks that do not care which one a claim is in."""
         return (*self.claims, *self.rejected_claims)
 
+    def re_ask_kinds(self, claim_id: str) -> tuple[UnreconciledKind, ...]:
+        """Which problems the *first* critic pass recorded against one claim.
+
+        Empty for a claim the first pass ruled cleanly, which is the common
+        case. A non-empty answer says the ruling this block carries came out of
+        the bounded re-ask, and names what the first pass got wrong — which is
+        the difference between a rejection the critic argued for and one that
+        arrived after a repair.
+
+        **The one reader of that join.** Both loss instruments under ``evals/``
+        ask it, keyed by the claim ID each already holds, so neither grows its
+        own fold over the marks and the two cannot disagree about what counts
+        as a re-asked claim.
+
+        Deduplicated and ordered by :data:`UnreconciledKind` rather than by
+        emission: one claim carries a kind more than once — two broken rules on
+        one verdict are two problems — and a caller counting kinds wants the
+        set. Count the marks themselves for the multiplicity.
+        """
+        found = {
+            mark.kind for mark in self.unreconciled_rulings if mark.claim_id == claim_id
+        }
+        return tuple(kind for kind in get_args(UnreconciledKind) if kind in found)
+
     @classmethod
     def summarize(
         cls, claims: Sequence[RuledClaim], rejected_claims: Sequence[RuledClaim]

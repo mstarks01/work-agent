@@ -12,7 +12,7 @@ from typing import get_args, get_type_hints
 
 import pytest
 
-from analysis_service.claims import ScopeEntry
+from analysis_service.claims import ScopeEntry, UnreconciledRuling
 from analysis_service.sources import CARRIED_EVIDENCE_KINDS
 from evals import verify_corpus
 from evals.harness.applicability import (
@@ -47,7 +47,15 @@ def attribute(case, block):
     )
 
 
-def perfect(case, *, without=(), claims=(), scope=(), rejected_claims=()):
+def perfect(
+    case,
+    *,
+    without=(),
+    claims=(),
+    scope=(),
+    rejected_claims=(),
+    unreconciled_rulings=(),
+):
     """The block a run that answers every record right would produce.
 
     Each record's own satisfying answer, read off the disposition table rather
@@ -73,6 +81,7 @@ def perfect(case, *, without=(), claims=(), scope=(), rejected_claims=()):
         [*right_claims, *claims],
         scope=[*right_scope, *scope],
         rejected_claims=rejected_claims,
+        unreconciled_rulings=unreconciled_rulings,
     )
 
 
@@ -256,6 +265,97 @@ def test_pooling_counts_losses_and_the_must_find_ones_apart(case):
     # V1.2.4 and V6.2.1 are must-find; V4.1.1 is not.
     assert totals["must_find_by_stage"]["generation"] == 1
     assert totals["must_find_by_stage"]["verdict"] == 1
+
+
+class TestARuleFromARepairIsChargedApartFromOneTheCriticArgued:
+    """#796: a rejection the critic reasoned out and one that arrived after a
+    bounded re-ask are two different things to fix, and the stage alone prints
+    the same number for both.
+
+    The join is on the claim's own ID, which is what
+    ``unreconciled_rulings`` names. A requirement lost before any lane drafted
+    it has no claim, so it has nothing to charge and says so.
+    """
+
+    def _fumbled(self, requirement, kind="dropped"):
+        return UnreconciledRuling.of(
+            claim_id=f"v5.0.0-{requirement[1:]}",
+            kind=kind,
+            message="the first pass got this wrong",
+        )
+
+    def test_a_rejection_the_first_pass_ruled_cleanly_charges_no_re_ask(self, case):
+        rejected = [ruling("V1.2.4", "rejected", rejected_because="evidence")]
+        block = perfect(case, without={"V1.2.4"}, rejected_claims=rejected)
+
+        (loss,) = attribute(case, block).losses
+
+        assert loss.stage == "critic"
+        assert loss.re_ask == ()
+
+    def test_a_rejection_written_by_the_re_ask_names_the_first_pass_problem(self, case):
+        rejected = [ruling("V1.2.4", "rejected", rejected_because="evidence")]
+        block = perfect(
+            case,
+            without={"V1.2.4"},
+            rejected_claims=rejected,
+            unreconciled_rulings=[self._fumbled("V1.2.4")],
+        )
+
+        (loss,) = attribute(case, block).losses
+
+        assert loss.stage == "critic"
+        assert loss.re_ask == ("dropped",)
+
+    def test_a_misrouted_verdict_carries_it_too(self, case):
+        """Every stage that names a claim can be charged, not only the critic."""
+        block = perfect(
+            case,
+            without={"V6.2.1"},
+            claims=[ruling("V6.2.1", "needs-info")],
+            unreconciled_rulings=[self._fumbled("V6.2.1", "verdict-shape")],
+        )
+
+        (loss,) = attribute(case, block).losses
+
+        assert loss.stage == "verdict"
+        assert loss.re_ask == ("verdict-shape",)
+
+    def test_a_requirement_no_lane_drafted_has_no_ruling_to_charge(self, case):
+        """A mark naming a claim the block does not carry annotates no row."""
+        block = perfect(
+            case,
+            without={"V1.2.4"},
+            scope=[not_raised("V1.2.4")],
+            unreconciled_rulings=[self._fumbled("V1.2.4")],
+        )
+
+        (loss,) = attribute(case, block).losses
+
+        assert loss.stage == "generation"
+        assert loss.re_ask == ()
+
+    def test_the_fold_counts_the_rows_and_the_kinds_apart(self, case):
+        """One claim carries a kind more than once and more than one kind, so
+        the kinds do not add up to the losses."""
+        rejected = [ruling("V1.2.4", "rejected", rejected_because="evidence")]
+        block = perfect(
+            case,
+            without={"V1.2.4"},
+            rejected_claims=rejected,
+            unreconciled_rulings=[
+                self._fumbled("V1.2.4"),
+                self._fumbled("V1.2.4", "verdict-shape"),
+                self._fumbled("V1.2.4", "verdict-shape"),
+            ],
+        )
+        row = attribute(case, block)
+
+        assert row.losses[0].re_ask == ("dropped", "verdict-shape")
+        totals = pooled([row])
+        assert totals["re_asked"] == 1
+        assert totals["re_asked_by_stage"]["critic"] == 1
+        assert totals["by_re_ask_kind"] == {"dropped": 1, "verdict-shape": 1}
 
 
 def test_the_artifact_carries_the_rows_and_their_fold(case):
