@@ -39,13 +39,13 @@ fallback and no compatibility shim for other schema versions.
 from __future__ import annotations
 
 import os
-import tomllib
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
+from analysis_service.config_files import read_toml
 from analysis_service.errors import ConfigError
 from analysis_service.report import FRAMEWORK_NAMES
 from analysis_service.vendors import (
@@ -549,12 +549,7 @@ def load_model_tiers(
     """
     if env is None:
         env = os.environ
-    try:
-        raw = tomllib.loads(Path(path).read_text(encoding="utf-8"))
-    except tomllib.TOMLDecodeError as exc:
-        raise ModelConfigError(f"{path}: invalid TOML: {exc}") from exc
-    except OSError as exc:
-        raise ModelConfigError(f"{path}: cannot be read: {exc}") from exc
+    raw = read_toml(path, ModelConfigError)
 
     _apply_env_overrides(raw, env)
 
