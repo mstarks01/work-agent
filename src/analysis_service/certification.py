@@ -48,7 +48,6 @@ against a silently empty set.
 
 from __future__ import annotations
 
-import tomllib
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -56,6 +55,7 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from analysis_service.config_files import read_toml
 from analysis_service.model_tiers import TIER_NAMES, TierName
 from analysis_service.report import NodeRun, Report
 
@@ -230,12 +230,7 @@ def load_manifest(path: Path | str) -> BlessedManifest:
     invalid TOML, an unsupported version, an unknown tier, or a non-hex
     fingerprint — never a silently-empty manifest that would certify every run.
     """
-    try:
-        raw = tomllib.loads(Path(path).read_text(encoding="utf-8"))
-    except tomllib.TOMLDecodeError as exc:
-        raise CertificationError(f"{path}: invalid TOML: {exc}") from exc
-    except OSError as exc:
-        raise CertificationError(f"{path}: cannot be read: {exc}") from exc
+    raw = read_toml(path, CertificationError)
 
     # The version check fires before shape validation, so a file on another
     # schema is named as such rather than reported as a set of stray keys.

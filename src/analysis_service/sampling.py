@@ -70,7 +70,6 @@ knob surface is exactly the offered surface and no wider.
 from __future__ import annotations
 
 import os
-import tomllib
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any, Literal, Self
@@ -85,6 +84,7 @@ from pydantic import (
     model_validator,
 )
 
+from analysis_service.config_files import read_toml
 from analysis_service.errors import ConfigError
 from analysis_service.model_tiers import TIER_NAMES, TierName
 
@@ -381,12 +381,7 @@ def load_sampling(
     """
     if env is None:
         env = os.environ
-    try:
-        raw = tomllib.loads(Path(path).read_text(encoding="utf-8"))
-    except tomllib.TOMLDecodeError as exc:
-        raise SamplingConfigError(f"{path}: invalid TOML: {exc}") from exc
-    except OSError as exc:
-        raise SamplingConfigError(f"{path}: cannot be read: {exc}") from exc
+    raw = read_toml(path, SamplingConfigError)
 
     _apply_env_overrides(raw.get("tiers"), env)
 
