@@ -42,6 +42,7 @@ import time
 from collections.abc import Mapping, Sequence
 from typing import Self
 
+from analysis_service.claims import FrameworkName
 from analysis_service.deployment import Deployment
 from analysis_service.frameworks import PACKAGES
 from analysis_service.jobs import (
@@ -50,7 +51,7 @@ from analysis_service.jobs import (
     PipelineOutcome,
     PipelineRunner,
 )
-from analysis_service.report import FrameworkName, FrameworkSelection
+from analysis_service.report import FrameworkSelection
 from analysis_service.selection import SelectionError, resolve_selection
 from analysis_service.sources import Source, SourceLimits
 

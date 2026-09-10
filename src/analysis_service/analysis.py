@@ -129,7 +129,7 @@ class UnknownControl(BaseModel):
     """One security-relevant attribute that the model does not verify.
 
     Deliberately shaped like the ``unknown-attribute`` ground branch
-    (:class:`~analysis_service.report.Ground`) it will most often justify: an
+    (:class:`~analysis_service.claims.Ground`) it will most often justify: an
     element ID and an attribute name, no free text. ``value`` carries the raw
     attribute so an agent can see *which* of the two states it is in without
     re-deriving it — ``unknown`` is a question to ask, ``none`` is a control

@@ -380,7 +380,8 @@ and the selection seam are in place for all of them.
 | `analysis_service.candidates` | The rule table. Structural conditions an agent should investigate — leads, never findings, never evidence. |
 | `analysis_service.domains` | Which `skills/domains/` packs a model earns, decided from its own technology fields. |
 | `analysis_service.coverage` | Per-lane accounting: what each agent was offered, and what its drafts cite. |
-| `analysis_service.report` | The `Report` envelope, the neutral `Claim` and the severity model. |
+| `analysis_service.claims` | The neutral `Claim`, its grounds, the proposal and ruling wrappers, the marks, the severity model and the `FrameworkAnalysis` block. |
+| `analysis_service.report` | The `Report` envelope: the job, the input, the node runs and the blocks. |
 | `analysis_service.frameworks` | The framework-package contract, its registry and its deployment gate. |
 | `analysis_service.validation` | The mechanical validity gate. |
 | `analysis_service.fan_in` | One framework's lane batches merged into the drafts its critic reads: evidence resolution, the whole-set checks, and every mark the service records about a draft, behind one call. |

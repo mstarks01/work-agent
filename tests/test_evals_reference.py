@@ -12,8 +12,8 @@ from pathlib import Path
 
 import pytest
 
+from analysis_service.claims import derive_severity_level
 from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
-from analysis_service.report import derive_severity_level
 from evals.harness import envelope as envelopes
 from evals.harness import sitting as sittings
 from evals.harness.reference import (

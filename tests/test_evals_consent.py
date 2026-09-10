@@ -19,7 +19,10 @@ import pytest
 
 from analysis_service.budgets import measured_tokens
 from analysis_service.identity import IDENTITY_VERSION, build_identity
-from analysis_service.report import NodeRun, TokenUsage
+from analysis_service.report import (
+    NodeRun,
+    TokenUsage,
+)
 from analysis_service.sampling import TierSampling
 from evals.harness import consent, modes, prices, run
 from evals.harness.artifact import ARTIFACT_VERSION, RepoCommit

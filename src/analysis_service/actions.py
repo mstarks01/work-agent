@@ -14,7 +14,7 @@ the same reason. "Reads customer records" and "reads the whole database" are one
 verb, because the **Element** IDs beside it carry the object.
 
 The vocabulary is service-side rather than eval-side, and that placement is the
-point. The field is on :class:`~analysis_service.report.Claim`, so the
+point. The field is on :class:`~analysis_service.claims.Claim`, so the
 vocabulary that validates it has to ship in the same package.
 ``evals/harness/verbs.py`` reads this module and adds what only a measurement
 needs: which verbs count as one action, and the pairs the corpus cannot
@@ -23,7 +23,7 @@ separate.
 The vocabulary is framework-neutral. A package whose claims carry a catalog
 identifier needs no verb at all, because the identifier already decides
 identity, and composing a verb would add a field nothing reads. That is why
-:class:`~analysis_service.report.Claim` leaves it optional, and why only a
+:class:`~analysis_service.claims.Claim` leaves it optional, and why only a
 package with an open claim set narrows it.
 """
 

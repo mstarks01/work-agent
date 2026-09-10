@@ -24,6 +24,12 @@ from evals.harness.structural import report_issues
 
 CORPUS = Path(__file__).resolve().parents[1] / "evals" / "corpus"
 from analysis_service.certification import fingerprints_of
+from analysis_service.claims import (
+    AnalysisMarks,
+    Mitigation,
+    Severity,
+    SharedElementName,
+)
 from analysis_service.evidence import evidence_catalog
 from analysis_service.frameworks import package_for
 from analysis_service.frameworks.stride.record import (
@@ -39,13 +45,7 @@ from analysis_service.graph import (
     analyze_node_name,
     tier_node_by_graph_node,
 )
-from analysis_service.report import (
-    AnalysisMarks,
-    Mitigation,
-    Report,
-    Severity,
-    SharedElementName,
-)
+from analysis_service.report import Report
 from analysis_service.sampling import load_sampling
 from tests.factories import DEFAULT_FRAMEWORKS, EVAL_MODEL, ScriptedLlm
 
@@ -280,7 +280,7 @@ def test_an_eval_report_carries_every_field_production_stamps(case):
     that then read an empty list for it.
 
     The marks are pinned through
-    :class:`~analysis_service.report.AnalysisMarks`, which is the one field
+    :class:`~analysis_service.claims.AnalysisMarks`, which is the one field
     an ``Analysis`` holds them on.
     """
     pipeline = build(case, ENTRY_PREPARE, {})

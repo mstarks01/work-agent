@@ -6,12 +6,7 @@ from typing import get_args
 import pytest
 from pydantic import ValidationError
 
-from analysis_service.frameworks import PACKAGES, schemas_for
-from analysis_service.frameworks.stride.record import (
-    ThreatRulings,
-    build_stride_summary,
-)
-from analysis_service.report import (
+from analysis_service.claims import (
     CLAIM_BOUND_MARKS,
     CLAIM_ID_MAX_CHARS,
     DROPPED_REASON_MAX_CHARS,
@@ -25,7 +20,6 @@ from analysis_service.report import (
     MissingMitigation,
     ProposedVerdict,
     RepairedQuote,
-    Report,
     Severity,
     UnknownRef,
     UnresolvedEvidence,
@@ -34,6 +28,12 @@ from analysis_service.report import (
     Verdict,
     derive_severity_level,
 )
+from analysis_service.frameworks import PACKAGES, schemas_for
+from analysis_service.frameworks.stride.record import (
+    ThreatRulings,
+    build_stride_summary,
+)
+from analysis_service.report import Report
 from analysis_service.sampling import TierSampling
 from analysis_service.system_model import all_attribute_names, attribute_names
 from tests.factories import (
@@ -659,8 +659,9 @@ class TestAnalysisMarks:
         from the registry rather than listed, so a package that arrives with a
         mark of its own is covered by this test existing.
         """
+        from analysis_service.claims import FrameworkAnalysis
         from analysis_service.frameworks import SCHEMAS
-        from analysis_service.report import FrameworkAnalysis, Report
+        from analysis_service.report import Report
 
         blocks = {FrameworkAnalysis, *(schemas.block for schemas in SCHEMAS.values())}
         lands = set(Report.model_fields)
@@ -928,7 +929,11 @@ class TestARulingRulesOnItsUnit:
     """#657: only an evidence rejection says the unit does not apply."""
 
     def _ruled(self, status, cause=None):
-        from analysis_service.report import Ground, RuledClaim, Verdict
+        from analysis_service.claims import (
+            Ground,
+            RuledClaim,
+            Verdict,
+        )
 
         return RuledClaim(
             id="X-01",

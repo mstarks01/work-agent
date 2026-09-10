@@ -12,7 +12,7 @@ from typing import get_args, get_type_hints
 
 import pytest
 
-from analysis_service.report import ScopeEntry
+from analysis_service.claims import ScopeEntry
 from analysis_service.sources import CARRIED_EVIDENCE_KINDS
 from evals import verify_corpus
 from evals.harness.applicability import (

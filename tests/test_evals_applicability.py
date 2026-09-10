@@ -18,16 +18,16 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.frameworks import PACKAGES
-from analysis_service.frameworks.asvs.catalog import requirements_for
-from analysis_service.frameworks.asvs.record import RequirementRuling
-from analysis_service.report import (
+from analysis_service.claims import (
     Ground,
     RejectionStep,
     UnknownRef,
     Verdict,
     VerdictStatus,
 )
+from analysis_service.frameworks import PACKAGES
+from analysis_service.frameworks.asvs.catalog import requirements_for
+from analysis_service.frameworks.asvs.record import RequirementRuling
 from evals import verify_corpus
 from evals.harness.applicability import (
     APPLIES,

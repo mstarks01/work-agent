@@ -44,6 +44,21 @@ from types import MappingProxyType
 from typing import NamedTuple
 
 from analysis_service.candidates import generate_candidates
+from analysis_service.claims import (
+    BEYOND_GROUNDS,
+    ELEMENT_REF_MAX_CHARS,
+    MENTION_MAX_CHARS,
+    AnalysisMarks,
+    Claim,
+    DroppedClaim,
+    Ground,
+    LaneCoverage,
+    ProposalBatch,
+    RepairedQuote,
+    UnresolvedMention,
+    UnresolvedReference,
+    UnverifiedGround,
+)
 from analysis_service.coverage import build_coverage
 from analysis_service.critic import endpoint_targets
 from analysis_service.evidence import (
@@ -65,21 +80,6 @@ from analysis_service.grounding import (
     verify_normalized,
 )
 from analysis_service.references import canonical, snap
-from analysis_service.report import (
-    BEYOND_GROUNDS,
-    ELEMENT_REF_MAX_CHARS,
-    MENTION_MAX_CHARS,
-    AnalysisMarks,
-    Claim,
-    DroppedClaim,
-    Ground,
-    LaneCoverage,
-    ProposalBatch,
-    RepairedQuote,
-    UnresolvedMention,
-    UnresolvedReference,
-    UnverifiedGround,
-)
 from analysis_service.sources import CARRIED_EVIDENCE_KINDS
 from analysis_service.system_model import ModelIndex, SystemModel, mentioned_ids
 
@@ -116,7 +116,7 @@ def fan_in(
     """Merge one framework's lane batches into the drafts its critic sees.
 
     ``batches`` is each lane against the batch its agent emitted, validated as
-    the package's own :class:`~analysis_service.report.ProposalBatch` type. A
+    the package's own :class:`~analysis_service.claims.ProposalBatch` type. A
     lane with no entry contributes nothing; whether an absent lane is a failed
     job is the graph's question, answered before this is called.
 
@@ -251,11 +251,11 @@ class JoinedDrafts(NamedTuple):
     """What the fan-in produces: the merged drafts, and what did not check out.
 
     Two returns rather than one because they have different owners. The drafts
-    are the agents'; the :class:`~analysis_service.report.AnalysisMarks` are the
+    are the agents'; the :class:`~analysis_service.claims.AnalysisMarks` are the
     *service's* record of what each draft failed to make good on — a quote that
     is not in the source it named, an element ID a description cited that does
     not exist, and whatever the package's own record adds
-    (:meth:`~analysis_service.report.Claim.claim_marks`). They ride beside the
+    (:meth:`~analysis_service.claims.Claim.claim_marks`). They ride beside the
     drafts rather than on them, because a field an agent could set about its own
     accuracy is not evidence of it.
 
@@ -512,7 +512,7 @@ def _verify_quotes(claims: Sequence[Claim], sources: Mapping[str, str]) -> _Quot
     **Per entry**, a quote the ladder refused is offered to
     :func:`~analysis_service.grounding.repair_prepared` first: where the source holds
     a span near enough, the ground is rewritten to that span — the submitter's
-    words, never the model's — and a :class:`~analysis_service.report.RepairedQuote`
+    words, never the model's — and a :class:`~analysis_service.claims.RepairedQuote`
     keeps what the agent wrote. Otherwise the quote is *marked* and still renders: 0
     failures in 206 measured excerpts is not evidence of zero, and the Rule of
     Three puts the 95% bound at 1.46% per quote — which at the corpus mean of
@@ -520,7 +520,7 @@ def _verify_quotes(claims: Sequence[Claim], sources: Mapping[str, str]) -> _Quot
     cosmetic mismatch. That is not enough evidence to license killing a job.
 
     **Per claim**, if *no* ground verifies at all, the claim is dropped and
-    recorded as a :class:`~analysis_service.report.DroppedClaim` whose reason
+    recorded as a :class:`~analysis_service.claims.DroppedClaim` whose reason
     carries the quotes that were not found. A claim with one bad quote beside
     good ones is still justified; a claim where nothing holds is a finding with
     no machine-checkable justification. Every catalogued ground verifies by set
@@ -668,11 +668,11 @@ def join_drafts(
     re-ask path and a whole report is too much to trade for either: a quote
     absent from the source it names, and an element ID a description cites in
     prose that the model does not contain
-    (:class:`~analysis_service.report.UnresolvedMention`). A claim whose every
+    (:class:`~analysis_service.claims.UnresolvedMention`). A claim whose every
     ground is such a quote is *dropped* and marked
-    (:class:`~analysis_service.report.DroppedClaim`), on the same trade. A
+    (:class:`~analysis_service.claims.DroppedClaim`), on the same trade. A
     package's record adds whatever else its own judgement fields earn
-    (:meth:`~analysis_service.report.Claim.claim_marks`).
+    (:meth:`~analysis_service.claims.Claim.claim_marks`).
 
     References are snapped to their canonical spelling first
     (:func:`snap_drafts`), so the checks below — and the report, which carries

@@ -37,15 +37,15 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any, Literal
 
-from analysis_service.frameworks.asvs.catalog import requirements_for
-from analysis_service.frameworks.asvs.record import requirement_of
-from analysis_service.report import (
+from analysis_service.claims import (
     Claim,
     FrameworkAnalysis,
     FrameworkName,
     RuledClaim,
     ScopeEntry,
 )
+from analysis_service.frameworks.asvs.catalog import requirements_for
+from analysis_service.frameworks.asvs.record import requirement_of
 from analysis_service.sources import CARRIED_EVIDENCE_KINDS
 from evals.harness import attribution
 from evals.harness.reference import (
@@ -232,7 +232,7 @@ def applied_requirements(claims: Sequence[RuledClaim]) -> tuple[set[str], set[st
     checks report a malformed ID, and counting it here as a miss would charge one
     defect to a metric that is not about it. Neither does a rejection that does
     not rule on its unit — a draft the critic sent back for its lane or as a
-    duplicate — because :meth:`~analysis_service.report.RuledClaim.rules_on_unit`
+    duplicate — because :meth:`~analysis_service.claims.RuledClaim.rules_on_unit`
     is the one reader of that distinction and it says the requirement was never
     answered.
     """
@@ -938,7 +938,7 @@ class ApplicabilityYield:
 
     Only ``rejected`` rulings count. A draft the critic sent back for its lane
     or as a duplicate says nothing about its requirement
-    (:meth:`~analysis_service.report.RuledClaim.rules_on_unit`), so it can
+    (:meth:`~analysis_service.claims.RuledClaim.rules_on_unit`), so it can
     neither destroy nor earn one.
 
     A rejection count alone reads as either working or breaking things.

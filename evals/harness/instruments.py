@@ -42,10 +42,12 @@ from dataclasses import dataclass
 from functools import cached_property
 from typing import Any
 
-from analysis_service.identity import IDENTITY_VERSION
-from analysis_service.report import (
+from analysis_service.claims import (
     FrameworkAnalysis,
     FrameworkName,
+)
+from analysis_service.identity import IDENTITY_VERSION
+from analysis_service.report import (
     NodeLatency,
     Report,
     TokenUsage,

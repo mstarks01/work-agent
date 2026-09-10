@@ -17,6 +17,7 @@ from analysis_service.api import (
 )
 from analysis_service.auth import AuthenticationError
 from analysis_service.budgets import BudgetPolicy
+from analysis_service.claims import FrameworkName
 from analysis_service.deployment import Deployment
 from analysis_service.errors import ConfigError
 from analysis_service.jobs import (
@@ -30,7 +31,7 @@ from analysis_service.jobs import (
 )
 from analysis_service.parsing import ascii_int
 from analysis_service.pipeline import AdkPipelineRunner
-from analysis_service.report import FrameworkName, Report
+from analysis_service.report import Report
 from analysis_service.sources import Source, SourceLimits
 from analysis_service.validation import ValidationIssue
 from tests.factories import (

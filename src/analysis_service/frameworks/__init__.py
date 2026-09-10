@@ -19,7 +19,7 @@ registry. There is no entry point, no import by name from config, and no path in
 a config file, because a package writes into a ``strong``-tier prompt. External
 plugin loading is out of scope for this architecture.
 
-Three sets must agree. :data:`~analysis_service.report.FrameworkName` names what
+Three sets must agree. :data:`~analysis_service.claims.FrameworkName` names what
 this repository can spell. :data:`PACKAGES` names what this repository carries.
 ``config/frameworks.toml`` names what this install runs. The first two agree at
 import. The third agrees at :func:`validate_package`, which a **Deployment**
@@ -37,9 +37,7 @@ from typing import Literal, get_args
 from pydantic import BaseModel
 
 from analysis_service.candidates import Rule
-from analysis_service.errors import ConfigError
-from analysis_service.markdown_loader import _inside
-from analysis_service.report import (
+from analysis_service.claims import (
     Claim,
     FrameworkAnalysis,
     FrameworkName,
@@ -47,6 +45,8 @@ from analysis_service.report import (
     RuledClaim,
     RulingBatch,
 )
+from analysis_service.errors import ConfigError
+from analysis_service.markdown_loader import _inside
 from analysis_service.system_model import SystemModel
 
 __all__ = [
@@ -222,7 +222,7 @@ class IdRule:
 
         The predicate does not raise and does not explain. A false answer costs
         the claim its place and earns a
-        :class:`~analysis_service.report.UnknownClaimIdentity` mark; see
+        :class:`~analysis_service.claims.UnknownClaimIdentity` mark; see
         :func:`~analysis_service.evidence.resolve_proposals`.
     """
 
@@ -251,7 +251,7 @@ class FrameworkPackage:
     Nine members, plus text under one root by convention.
 
     ``name``
-        The closed :data:`~analysis_service.report.FrameworkName`. A package
+        The closed :data:`~analysis_service.claims.FrameworkName`. A package
         cannot invent a name.
     ``version``
         Required and non-empty. A framework identifier with no version is
@@ -337,18 +337,18 @@ class FrameworkSchemas:
 
     ``proposals`` / ``rulings``
         The wrappers a lane agent and a critic emit, narrowing
-        :class:`~analysis_service.report.ProposalBatch` and
-        :class:`~analysis_service.report.RulingBatch` to this framework's own
+        :class:`~analysis_service.claims.ProposalBatch` and
+        :class:`~analysis_service.claims.RulingBatch` to this framework's own
         element types. The graph never names the field inside; it unwraps
         ``claims``, which is neutral because the prompt that asks for it is
         shared.
     ``ruled_record``
         What a draft becomes once its ruling is merged on: the package's own
-        :class:`~analysis_service.report.RuledClaim`. The draft side is the
+        :class:`~analysis_service.claims.RuledClaim`. The draft side is the
         package's ``record`` member, because that is what the gate checks and
         what the resolver builds; this is the shape the report carries.
     ``block``
-        The :class:`~analysis_service.report.FrameworkAnalysis` subclass this
+        The :class:`~analysis_service.claims.FrameworkAnalysis` subclass this
         framework's output validates as, narrowing the claim arrays and the
         summary. The envelope dispatches on ``framework`` to read the right one
         back.

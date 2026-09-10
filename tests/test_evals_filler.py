@@ -8,7 +8,11 @@ check went green over two packages and eight months.
 
 from __future__ import annotations
 
-from analysis_service.report import Ground, UnknownRef, Verdict
+from analysis_service.claims import (
+    Ground,
+    UnknownRef,
+    Verdict,
+)
 from evals.harness import filler
 from tests.factories import sample_report, sample_threat
 
