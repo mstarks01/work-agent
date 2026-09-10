@@ -33,6 +33,10 @@ from datetime import UTC, datetime
 from typing import Any
 
 from analysis_service.analysis import control_state, states_a_protocol
+from analysis_service.claims import (
+    Claim,
+    FrameworkName,
+)
 from analysis_service.deployment import Deployment
 from analysis_service.execution import GraphExecutor, GraphFailed, GraphRun
 from analysis_service.frameworks.stride.record import DraftThreat
@@ -50,8 +54,6 @@ from analysis_service.graph import (
     Rejected,
 )
 from analysis_service.report import (
-    Claim,
-    FrameworkName,
     FrameworkSelection,
     InputRef,
     Job,

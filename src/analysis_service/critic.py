@@ -20,13 +20,13 @@ supports the finding it was filed under.
 
 The checks are neutral, and there is one seam per framework rather than one
 across frameworks. Every check here reads
-:class:`~analysis_service.report.Claim`,
-:class:`~analysis_service.report.Ruling` and the package contract, so a second
+:class:`~analysis_service.claims.Claim`,
+:class:`~analysis_service.claims.Ruling` and the package contract, so a second
 framework's output goes through the same code.
 
 The assemble seam is where a ruling becomes a claim. A critic emits judgements
 keyed by draft ID rather than the drafts themselves, as a
-:class:`~analysis_service.report.Ruling`. The agent's own fields therefore reach
+:class:`~analysis_service.claims.Ruling`. The agent's own fields therefore reach
 the report from the copy this service already holds, rather than round-tripping
 through a model that was never asked to change them.
 
@@ -44,9 +44,7 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any, NamedTuple
 
-from analysis_service.frameworks import FrameworkSchemas, lane_of
-from analysis_service.references import snap
-from analysis_service.report import (
+from analysis_service.claims import (
     Claim,
     RepairedQuote,
     RuledClaim,
@@ -55,6 +53,8 @@ from analysis_service.report import (
     UnknownRef,
     Verdict,
 )
+from analysis_service.frameworks import FrameworkSchemas, lane_of
+from analysis_service.references import snap
 from analysis_service.system_model import (
     ModelIndex,
     SystemModel,
@@ -64,7 +64,7 @@ from analysis_service.system_model import (
 
 # Most severe first — the order a graded framework's ``claims`` array carries.
 # The service holds the order because it holds
-# :data:`~analysis_service.report.SeverityLevel`; whether a framework grades at all
+# :data:`~analysis_service.claims.SeverityLevel`; whether a framework grades at all
 # is its record's business, and one that does not is ordered by ID alone.
 SEVERITY_ORDER: tuple[SeverityLevel, ...] = ("critical", "high", "medium", "low")
 
@@ -162,11 +162,11 @@ class ReviewProblems(NamedTuple):
 def _verdict_shape_issues(rulings: Iterable[Ruling]) -> list[CriticIssue]:
     """Every ruling whose verdict's fields disagree with its own ``status``.
 
-    The four rules :class:`~analysis_service.report.Verdict` states, plus the
+    The four rules :class:`~analysis_service.claims.Verdict` states, plus the
     one it deliberately does not: a rejection must name the check that killed
     it. That one is asked only here, because a report read back from before the
     field carries no answer and ``None`` is the truthful value for it — see
-    :class:`~analysis_service.report.Verdict`. Asked here rather than in the
+    :class:`~analysis_service.claims.Verdict`. Asked here rather than in the
     schema. The schema is the wrong place for them twice
     over: a provider cannot be made to enforce a dependency between fields, and
     a validator that raises does so at the node boundary, killing the critic
@@ -252,7 +252,7 @@ def _unresolved_unknown_ref_issues(
     not literally ``unknown``.
 
     A ``Ground``'s unknown-attribute branch is spelled identically to
-    :class:`~analysis_service.report.UnknownRef` and is checked one step
+    :class:`~analysis_service.claims.UnknownRef` and is checked one step
     deeper, by catalog membership
     (:func:`~analysis_service.evidence.ground_issues`). The two differ because
     their writers differ: a ground is written by code out of the catalog, so
@@ -340,7 +340,7 @@ def complete_rulings(
     a draft, which :func:`review_issues` reports.
 
     A ruling on a draft the package's own table calls misfiled
-    (:meth:`~analysis_service.report.Claim.misfiled`) becomes ``rejected`` with
+    (:meth:`~analysis_service.claims.Claim.misfiled`) becomes ``rejected`` with
     the table's reason and ``rejected_because="lane"``, whatever the critic
     ruled. That is the one rejection this service writes rather than reads.
 
@@ -594,7 +594,7 @@ def review_issues(
     ID fails on both sides at once — the draft it meant to name reads as dropped,
     and the ID it actually wrote reads as invented. That is a stronger
     constraint than a pattern and it produces better messages, so
-    :class:`~analysis_service.report.Ruling` carries no pattern to fire first and
+    :class:`~analysis_service.claims.Ruling` carries no pattern to fire first and
     fatally.
 
     Element references are deliberately **not** checked: a ruling carries none.
@@ -707,7 +707,7 @@ def _ruled(draft: Claim, ruling: Ruling, ruled_record: type[RuledClaim]) -> Rule
     a description or an element reference.
 
     **What a ruling may replace is stated by the ruling's own shape, not by a
-    list here.** Every field a package's :class:`~analysis_service.report.Ruling`
+    list here.** Every field a package's :class:`~analysis_service.claims.Ruling`
     subclass declares beyond ``id`` and ``verdict`` is merged onto the draft, and
     a field holding ``None`` leaves the draft's alone. That one rule covers both
     of the things a package actually does with those fields: STRIDE's
@@ -717,8 +717,8 @@ def _ruled(draft: Claim, ruling: Ruling, ruled_record: type[RuledClaim]) -> Rule
     justification that argues for it together.
 
     The verdict is **rebuilt** rather than carried across, promoting the
-    critic's unruled :class:`~analysis_service.report.ProposedVerdict` to the
-    :class:`~analysis_service.report.Verdict` the report defines. It cannot fail:
+    critic's unruled :class:`~analysis_service.claims.ProposedVerdict` to the
+    :class:`~analysis_service.claims.Verdict` the report defines. It cannot fail:
     :func:`review_issues` has already passed on exactly these rulings, and its
     three verdict checks are that model's validator asked one seam earlier. A
     raise here would mean the two had drifted, which is why the promotion is
@@ -798,14 +798,14 @@ def _ruling_view(
     A critic's steps read ``description`` (evidence), the lane,
     ``affected_element_ids`` (duplicate), and ``grounds`` — plus whatever its own
     framework grades. ``mitigations`` is read by none of them, and the prompt
-    already says so. A :class:`~analysis_service.report.Mitigation` is a
+    already says so. A :class:`~analysis_service.claims.Mitigation` is a
     200-character summary plus 2000 characters of detail, and a draft carries a
     list of them, so this is the largest block in the longest prompt the graph
     sends that no judgement is spent on. Same argument as
     :func:`~analysis_service.graph._without_source_fields`, one node further down.
 
     ``exclude_defaults`` is what drops the empty branches of a
-    :class:`~analysis_service.report.Ground`. That model is one flat object
+    :class:`~analysis_service.claims.Ground`. That model is one flat object
     rather than a discriminated union — a deliberate choice, for provider
     schema-compiler reasons it documents itself — so four of its six fields are
     the empty string on any given ground, and rendering them spends a line each
@@ -889,7 +889,7 @@ def critic_view(
     is *rendered* and nothing else: the re-ask reproduces rulings rather than
     drafts, and an ID is the whole of a claim it need not read.
 
-    ``repaired`` is the fan-in's :class:`~analysis_service.report.RepairedQuote`
+    ``repaired`` is the fan-in's :class:`~analysis_service.claims.RepairedQuote`
     marks, rendered onto the draft each one names so the evidence step reads
     what the agent wrote beside the span the service put in its place. The
     first pass hands them in; the re-ask hands in none, because its job is

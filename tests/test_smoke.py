@@ -35,7 +35,11 @@ from analysis_service.jobs import (
     PipelineOutcome,
     PipelineRejected,
 )
-from analysis_service.report import ExecutionEnvelope, NodeRun, Report
+from analysis_service.report import (
+    ExecutionEnvelope,
+    NodeRun,
+    Report,
+)
 from analysis_service.smoke import (
     ANALYST,
     BINDING,

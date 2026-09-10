@@ -3,7 +3,7 @@
 Two properties carry the whole design and both are pinned here: the catalog is
 a pure function of the validated System Model, and resolution is total over the
 catalog and refuses everything else. Together they are what makes a mis-shaped
-:class:`~analysis_service.report.Ground` unreachable from an agent rather than
+:class:`~analysis_service.claims.Ground` unreachable from an agent rather than
 merely rare — the last class in this module is the traceback that motivated the
 cutover, asserted to be inexpressible.
 """
@@ -13,6 +13,10 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
+from analysis_service.claims import (
+    GROUND_TERM_MAX_CHARS,
+    Ground,
+)
 from analysis_service.evidence import (
     absent_evidence_ref,
     crossing_evidence_ref,
@@ -24,7 +28,6 @@ from analysis_service.evidence import (
 )
 from analysis_service.frameworks.stride import STRIDE
 from analysis_service.frameworks.stride.record import ThreatProposal, ThreatProposals
-from analysis_service.report import GROUND_TERM_MAX_CHARS, Ground
 from analysis_service.system_model import UNKNOWN, DataStore, SystemModel
 from tests.factories import sample_draft, sample_proposal, valid_model
 
@@ -204,7 +207,7 @@ class TestRenderCatalog:
     A JSON array of IDs reads as a specimen of the format; these pin the
     properties that make the rendering a menu instead. The shape is the half of
     the fix that stops the reference being composed — dropping it costs its
-    entry rather than the job (:class:`~analysis_service.report.UnresolvedEvidence`) once it has been.
+    entry rather than the job (:class:`~analysis_service.claims.UnresolvedEvidence`) once it has been.
     """
 
     def test_every_entry_appears_as_its_own_row(self):

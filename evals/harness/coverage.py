@@ -1,6 +1,6 @@
 """What the lane agents were offered across a sweep, and what they cited.
 
-:class:`~analysis_service.report.LaneCoverage` is computed per job and rides on
+:class:`~analysis_service.claims.LaneCoverage` is computed per job and rides on
 each **Framework Analysis**, one row per lane. One job's rows are close to
 unreadable: an agent that examined a flow and correctly found nothing cites
 nothing, and no observable separates it from one that never looked. The
@@ -32,9 +32,9 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from analysis_service.claims import FrameworkName
+from analysis_service.claims import LaneCoverage as ReportLaneCoverage
 from analysis_service.frameworks import PACKAGES
-from analysis_service.report import FrameworkName
-from analysis_service.report import LaneCoverage as ReportLaneCoverage
 from evals.harness.scorer import ratio
 
 # The offered/cited pairs, in the order they read on a row. Named once because

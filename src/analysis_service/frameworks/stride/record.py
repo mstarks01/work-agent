@@ -1,13 +1,13 @@
 """STRIDE's own record: what this framework judges, on top of a neutral Claim.
 
-A :class:`~analysis_service.report.Claim` carries what the service constructs and
+A :class:`~analysis_service.claims.Claim` carries what the service constructs and
 what identifies it. Everything here is what STRIDE *judges* — the category, the
 severity band, the countermeasures, and the critic's confidence — which is
 exactly the split #163 ruled: a field the report's neutral checks do not read
 has no place on the shared shape.
 
 The layering is ``Claim`` -> :class:`DraftThreat` -> :class:`Threat`, where
-``Threat`` also inherits :class:`~analysis_service.report.RuledClaim` so that
+``Threat`` also inherits :class:`~analysis_service.claims.RuledClaim` so that
 ``verdict`` arrives from the neutral side rather than being declared twice. Both
 existing class names survive: renaming them would cost a schema bump and buy
 nothing.
@@ -21,7 +21,7 @@ from typing import Literal, get_args
 from pydantic import ConfigDict, Field
 
 from analysis_service.actions import ActionVerb
-from analysis_service.report import (
+from analysis_service.claims import (
     MAX_CLAIMS_PER_BATCH,
     MAX_ELEMENTS_PER_PROPOSAL,
     AnalysisMarks,
@@ -169,7 +169,7 @@ class DraftThreat(Claim):
     from that answer. So a ``grounds`` list here is code's own output: every
     entry either came out of the evidence catalog whole or is a quote assembled
     from the two fields an agent supplied, and neither route can express a
-    mis-shaped :class:`~analysis_service.report.Ground`.
+    mis-shaped :class:`~analysis_service.claims.Ground`.
 
     ``affected_element_ids`` is narrowed to ``min_length=1`` here where the base
     allows it to be empty. Every STRIDE finding is about something in the graph
@@ -277,7 +277,7 @@ class DraftThreat(Claim):
 
         **STRIDE's, not the service's**, which is why it is here. "Numbered
         ``01..N``" is a statement about :data:`ID_FORMAT` and a two-digit integer
-        key, and :class:`~analysis_service.report.Claim` has neither — ``id`` has no
+        key, and :class:`~analysis_service.claims.Claim` has neither — ``id`` has no
         shared grammar, so a framework keyed by requirement number has no gaps to
         have. The neutral hook it overrides says nothing at all.
         """
@@ -303,7 +303,7 @@ class Threat(DraftThreat, RuledClaim):
     """One ruled STRIDE finding, traceable to the elements it affects.
 
     A draft plus the critic's two judgements. ``verdict`` arrives from
-    :class:`~analysis_service.report.RuledClaim` — both parents derive from
+    :class:`~analysis_service.claims.RuledClaim` — both parents derive from
     ``Claim``, so Pydantic resolves the field order without ambiguity — and
     ``confidence`` is the one ruling field that is STRIDE's alone.
     """
@@ -314,7 +314,7 @@ class Threat(DraftThreat, RuledClaim):
 class ThreatProposal(Proposal):
     """What a category agent emits: a finding that *names* its evidence.
 
-    The neutral :class:`~analysis_service.report.Proposal` carries the title, the
+    The neutral :class:`~analysis_service.claims.Proposal` carries the title, the
     description, the element refs and the three evidence lists. STRIDE adds its
     own ID key and its own judgement fields.
     """
@@ -348,7 +348,7 @@ class ThreatProposals(ProposalBatch):
     """What a category agent node emits, narrowed to STRIDE's own proposal.
 
     The wrapper and its ``claims`` field are
-    :class:`~analysis_service.report.ProposalBatch`'s, for the schema-compiler
+    :class:`~analysis_service.claims.ProposalBatch`'s, for the schema-compiler
     reasons that class documents. All this adds is the element type.
 
     **The field used to be spelled ``threats``**, because the prompt spelled it
@@ -378,7 +378,7 @@ class ThreatRuling(Ruling):
     common case — keeps the agent's rating and justification as written.
     Present, it replaces both together, which is what stops a corrected rating
     from sitting beside a justification that argues for the old one. It is a
-    whole :class:`~analysis_service.report.Severity` rather than loose scalars so
+    whole :class:`~analysis_service.claims.Severity` rather than loose scalars so
     a partial override cannot be expressed.
     """
 
@@ -392,7 +392,7 @@ class ThreatRulings(RulingBatch):
     """What the critic and its re-ask emit, narrowed to STRIDE's own ruling.
 
     Separate from :class:`ThreatProposals` because the element type differs. See
-    :class:`~analysis_service.report.ProposalBatch` for why the wrapper exists at
+    :class:`~analysis_service.claims.ProposalBatch` for why the wrapper exists at
     all and why its field is spelled ``claims`` on both.
     """
 

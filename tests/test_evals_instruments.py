@@ -30,8 +30,8 @@ from pathlib import Path
 
 import pytest
 
+from analysis_service.claims import FrameworkName
 from analysis_service.frameworks import PACKAGES
-from analysis_service.report import FrameworkName
 from evals.harness.instruments import (
     INSTRUMENTS,
     ModeRun,

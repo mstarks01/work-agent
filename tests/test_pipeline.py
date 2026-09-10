@@ -30,7 +30,10 @@ from analysis_service.jobs import (
     StubPipelineRunner,
 )
 from analysis_service.pipeline import AdkPipelineRunner, PipelineError
-from analysis_service.report import FrameworkSelection, InputRef
+from analysis_service.report import (
+    FrameworkSelection,
+    InputRef,
+)
 from analysis_service.sampling import TierSampling, load_sampling
 from analysis_service.sources import DEFAULT_DESCRIPTION_LABEL, Source
 from tests.factories import (

@@ -36,16 +36,18 @@ sys.path.insert(0, str(_REPO_ROOT / "src"))
 # twenty verbs twice would guarantee the two copies drift.
 sys.path.insert(0, str(_REPO_ROOT))
 
+from analysis_service.claims import (
+    FrameworkName,
+    Rating,
+    derive_severity_level,
+)
 from analysis_service.frameworks import PACKAGES, run_precondition
 from analysis_service.frameworks.asvs.catalog import ASVS_LEVELS, requirements_for
 from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
 from analysis_service.grounding import verify_quote
 from analysis_service.report import (
-    FrameworkName,
     InputRef,
-    Rating,
     SourceRef,
-    derive_severity_level,
 )
 from analysis_service.sources import SourceKind
 from analysis_service.system_model import SystemModel

@@ -28,7 +28,7 @@ emits it removes 78 of 81.
 :class:`~evals.harness.identity.SubsetVerbIdentity` scores 294/311 against the
 recorded labels, where element agreement alone scores 201/311.
 
-Version 2 is the default. :class:`~analysis_service.report.Claim` carries the
+Version 2 is the default. :class:`~analysis_service.claims.Claim` carries the
 verb, and :class:`~analysis_service.frameworks.stride.record.DraftThreat`
 requires it, so a finding out of a live run fingerprints as a reference claim
 does.
@@ -72,9 +72,9 @@ from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from analysis_service.claims import FrameworkName
 from analysis_service.frameworks.asvs.record import requirement_of
 from analysis_service.parsing import ascii_int
-from analysis_service.report import FrameworkName
 from evals.harness.identity import FlowMap, endpoint_form
 from evals.harness.verbs import canonical, check_verb
 

@@ -64,8 +64,8 @@ from pathlib import Path
 
 import pytest
 
+from analysis_service.claims import FRAMEWORK_NAMES
 from analysis_service.frameworks import CONTENT_LICENSE, PACKAGES, SCHEMAS
-from analysis_service.report import FRAMEWORK_NAMES
 from evals.harness.calibration import IDENTITY_VALIDATION
 from evals.harness.instruments import INSTRUMENTS, PACKAGE_SCORERS
 from tests.factories import SCRIPTED_FRAMEWORKS
@@ -112,7 +112,7 @@ IN_WORD = re.compile(r"stride|asvs", re.IGNORECASE)
 #: An entry that is neither is a gap. There are none today; if one appears, say
 #: so in the reason rather than filing it beside the legitimate ones.
 DECLARED: dict[str, str] = {
-    "src/analysis_service/report.py": (
+    "src/analysis_service/claims.py": (
         "The registry. `FrameworkName` is the closed type every other module"
         " reads, so this is the one place the names are spelled at all."
     ),
@@ -574,7 +574,7 @@ def test_the_service_carries_no_framework_selection_of_its_own():
     }
 
     assert service == {
-        "src/analysis_service/report.py",
+        "src/analysis_service/claims.py",
         "src/analysis_service/frameworks/__init__.py",
     }
 
@@ -965,7 +965,10 @@ def test_no_package_override_is_orphaned():
 
 def test_the_hook_table_names_only_real_hooks():
     """Guards the guard: a hook nothing declares can never be orphaned."""
-    from analysis_service.report import Claim, FrameworkAnalysis
+    from analysis_service.claims import (
+        Claim,
+        FrameworkAnalysis,
+    )
 
     for hook, attribute in NEUTRAL_HOOKS.items():
         base = Claim if attribute == "record" else FrameworkAnalysis
@@ -1128,8 +1131,8 @@ def test_every_package_caps_the_drafts_one_lane_may_emit():
     """
     import annotated_types
 
+    from analysis_service.claims import MAX_CLAIMS_PER_BATCH
     from analysis_service.frameworks import SCHEMAS
-    from analysis_service.report import MAX_CLAIMS_PER_BATCH
 
     for name, schemas in SCHEMAS.items():
         field = schemas.proposals.model_fields["claims"]
@@ -1223,7 +1226,7 @@ def test_a_package_that_rules_on_a_unit_declares_a_direction():
     registry rather than as a name, so a package nobody has written yet answers
     for itself: one that overrides ``unit_of`` emits the field, one that keeps
     the neutral default does not."""
-    from analysis_service.report import Claim
+    from analysis_service.claims import Claim
 
     for name, schemas in SCHEMAS.items():
         draft = schemas.proposals.model_fields["claims"].annotation.__args__[0]

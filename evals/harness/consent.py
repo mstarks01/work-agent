@@ -52,7 +52,10 @@ from typing import Any, Literal
 
 from analysis_service.budgets import retried_prompt_tokens
 from analysis_service.markdown_loader import RESOLVE_ERRORS
-from analysis_service.report import NodeRun, TokenUsage
+from analysis_service.report import (
+    NodeRun,
+    TokenUsage,
+)
 from evals.harness import baseline
 from evals.harness.artifact import load_artifact
 from evals.harness.prices import UnitPrices, price_calls, unit_prices

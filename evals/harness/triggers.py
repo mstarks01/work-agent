@@ -53,8 +53,8 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
 from analysis_service.candidates import generate_candidates
+from analysis_service.claims import FrameworkName
 from analysis_service.frameworks import package_for
-from analysis_service.report import FrameworkName
 from analysis_service.system_model import SystemModel
 from evals.harness.reference import GoldenCase, ReferenceClaim
 

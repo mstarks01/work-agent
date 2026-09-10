@@ -1,7 +1,7 @@
 """``ReferenceClaim``, its STRIDE narrowing, and the loader for the golden corpus.
 
 ``ReferenceClaim`` is an eval-side model, and deliberately not
-:class:`~analysis_service.report.Claim`. A produced claim carries fields that
+:class:`~analysis_service.claims.Claim`. A produced claim carries fields that
 must not be graded, such as a 4000-character ``description`` nobody asked the
 model to reproduce verbatim. It also lacks ``tier``, which is the field that
 makes a recall threshold mean anything. Its ``id`` would be actively misleading:
@@ -56,15 +56,15 @@ from pydantic import (
     model_validator,
 )
 
-from analysis_service.frameworks.asvs.record import AsvsChapter
-from analysis_service.frameworks.stride.record import StrideCategory
-from analysis_service.markdown_loader import RESOLVE_ERRORS
-from analysis_service.report import (
+from analysis_service.claims import (
     FrameworkName,
     Rating,
     SeverityLevel,
     derive_severity_level,
 )
+from analysis_service.frameworks.asvs.record import AsvsChapter
+from analysis_service.frameworks.stride.record import StrideCategory
+from analysis_service.markdown_loader import RESOLVE_ERRORS
 from analysis_service.sources import MAX_LABEL_CHARS, Source, SourceKind
 from analysis_service.system_model import SystemModel
 from analysis_service.validation import parse_and_validate
@@ -336,7 +336,7 @@ class ReferenceRequirement(ReferenceClaim):
 
 
 #: The reference record each framework's corpus file validates as. Harness data
-#: keyed off the closed :data:`~analysis_service.report.FrameworkName`, not a
+#: keyed off the closed :data:`~analysis_service.claims.FrameworkName`, not a
 #: tenth package member: what a reference set looks like is the *eval's*
 #: business, and a package that shipped its own would be asserting how well it
 #: must be measured.

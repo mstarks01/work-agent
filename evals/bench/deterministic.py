@@ -62,6 +62,7 @@ from typing import Any, get_args
 from google.adk.workflow import FunctionNode
 
 from analysis_service import evidence, fan_in, graph
+from analysis_service.claims import Ground
 from analysis_service.critic import duplicate_groups
 from analysis_service.execution import GraphExecutor
 from analysis_service.fan_in import _bound_element_references, _verify_quotes
@@ -71,7 +72,6 @@ from analysis_service.frameworks import (
     FrameworkPackage,
 )
 from analysis_service.grounding import PreparedSource, prepare_source
-from analysis_service.report import Ground
 from analysis_service.sources import Source
 from analysis_service.system_model import ModelIndex, SystemModel
 

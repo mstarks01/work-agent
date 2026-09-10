@@ -37,8 +37,8 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from analysis_service.budgets import BudgetPolicy, measured_tokens, spent_tokens
 from analysis_service.certification import CertifyResult
+from analysis_service.claims import FrameworkAnalysis
 from analysis_service.report import (
-    FrameworkAnalysis,
     FrameworkSelection,
     InputRef,
     Job,
@@ -573,7 +573,7 @@ class StubPipelineRunner:
     It answers the job's selection with one empty block per framework, because
     the envelope refuses a report whose blocks are not the job's frameworks in
     order — and that check is exactly the contract this stand-in exists to
-    exercise. The blocks are the neutral :class:`~analysis_service.report.
+    exercise. The blocks are the neutral :class:`~analysis_service.claims.
     FrameworkAnalysis` rather than each package's own narrowed shape: nothing
     here judges anything, so claiming a package's block type would assert a
     method that never ran.

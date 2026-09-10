@@ -3,6 +3,15 @@
 import pytest
 
 from analysis_service import critic
+from analysis_service.claims import (
+    REASON_MAX_CHARS,
+    Ground,
+    Mitigation,
+    ProposedVerdict,
+    Severity,
+    UnknownRef,
+    Verdict,
+)
 from analysis_service.critic import (
     CriticOutputError,
     assemble_claims,
@@ -12,15 +21,6 @@ from analysis_service.critic import (
 from analysis_service.fan_in import join_drafts, snap_drafts
 from analysis_service.frameworks import schemas_for
 from analysis_service.frameworks.stride import STRIDE
-from analysis_service.report import (
-    REASON_MAX_CHARS,
-    Ground,
-    Mitigation,
-    ProposedVerdict,
-    Severity,
-    UnknownRef,
-    Verdict,
-)
 from analysis_service.sources import DEFAULT_DESCRIPTION_LABEL
 from analysis_service.system_model import mentioned_ids
 from tests.factories import sample_draft, sample_ruling, valid_model
@@ -1000,9 +1000,12 @@ def test_ruling_view_carries_the_unit_text_a_package_supplies():
     STRIDE has no unit text, so its view carries no key; an ASVS draft carries
     the catalog's words for the requirement it rules on.
     """
+    from analysis_service.claims import (
+        Ground,
+        Verdict,
+    )
     from analysis_service.frameworks.asvs.catalog import requirement_text
     from analysis_service.frameworks.asvs.record import RequirementRuling
-    from analysis_service.report import Ground, Verdict
 
     (stride_view,) = critic._ruling_view([sample_draft("S-01", "spoofing")])
     asvs = RequirementRuling(

@@ -18,8 +18,11 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import get_args
 
+from analysis_service.claims import (
+    FRAMEWORK_NAMES,
+    FrameworkName,
+)
 from analysis_service.errors import ConfigError
-from analysis_service.report import FRAMEWORK_NAMES, FrameworkName
 
 __all__ = ["SUPPORTED_VERSION", "FrameworkConfigError", "load_frameworks"]
 

@@ -56,10 +56,10 @@ from dataclasses import dataclass
 from typing import get_args
 
 from analysis_service.actions import family_of
+from analysis_service.claims import FrameworkName
 from analysis_service.deployment import DEFAULT_FRAMEWORKS_DIR
 from analysis_service.frameworks import PACKAGES, package_for, schemas_for
 from analysis_service.markdown_loader import MarkdownLoader, split_sections
-from analysis_service.report import FrameworkName
 from analysis_service.skills import lane_exemplars_doc
 from evals.harness.fingerprint import IDENTIFIER_OF
 from evals.harness.identity import endpoint_subset

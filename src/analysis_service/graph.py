@@ -127,6 +127,16 @@ from google.genai import types
 from pydantic import ValidationError
 
 from analysis_service.candidates import generate_candidates
+from analysis_service.claims import (
+    AnalysisMarks,
+    Claim,
+    FrameworkAnalysis,
+    FrameworkName,
+    LaneCoverage,
+    Refusal,
+    Ruling,
+    SharedElementName,
+)
 from analysis_service.coverage import lane_scope
 from analysis_service.critic import (
     Revision,
@@ -172,20 +182,12 @@ from analysis_service.prompts import (
 )
 from analysis_service.report import (
     AnalysisContext,
-    AnalysisMarks,
-    Claim,
     ExecutionEnvelope,
-    FrameworkAnalysis,
-    FrameworkName,
     InputRef,
     Job,
-    LaneCoverage,
     ModelRepair,
     NodeRun,
-    Refusal,
     Report,
-    Ruling,
-    SharedElementName,
 )
 from analysis_service.resilience import ResilienceConfig
 from analysis_service.retry import TRUNCATION_REMEDY
@@ -599,7 +601,7 @@ STATE_FRAMEWORK_OPTIONS = "framework_options"
 # ``assemble_claims`` merges rulings onto; ``draft_view`` is the *prompt* view of
 # the same drafts, built by :func:`~analysis_service.critic.critic_view` and
 # narrowed to the fields a verdict is reached from. ``marks`` is every service-owned mark that fan-in produced, as
-# one :class:`~analysis_service.report.AnalysisMarks` — one key rather than one per
+# one :class:`~analysis_service.claims.AnalysisMarks` — one key rather than one per
 # mark kind, since they share an owner, a standing and a policy.
 FRAMEWORK_RENDERED_ARTIFACTS: tuple[str, ...] = (
     "draft_view",
@@ -1476,7 +1478,7 @@ def _claims_of(payload: object) -> list[Any]:
     wrapper is the schema's shape, not the domain's, so it is unwrapped here at
     the boundary and nothing downstream carries it. The field name is neutral
     because the prompt asking for it is shared; see
-    :class:`~analysis_service.report.ProposalBatch`.
+    :class:`~analysis_service.claims.ProposalBatch`.
 
     A missing key is a node that produced nothing, which is the same absence the
     bare-list read treated as empty; a *malformed* payload is not this
@@ -1970,12 +1972,12 @@ def _framework_block(
     The block type is the package's own, so a package's narrowed claim arrays and
     narrowed summary are built here rather than validated into existence
     downstream. Its summary comes from that same type
-    (:meth:`~analysis_service.report.FrameworkAnalysis.summarize`), which is what
+    (:meth:`~analysis_service.claims.FrameworkAnalysis.summarize`), which is what
     keeps the count the block declares and the count its own validator recomputes
     from disagreeing.
 
     **A mark lands on the block that declares it.** The fan-in produces one
-    :class:`~analysis_service.report.AnalysisMarks` carrying every mark kind; only
+    :class:`~analysis_service.claims.AnalysisMarks` carrying every mark kind; only
     the fields this block type actually declares are set from it. That is how
     STRIDE's ``missing_mitigations`` reaches a STRIDE block while a framework
     that recommends nothing carries no such field and is handed nothing —

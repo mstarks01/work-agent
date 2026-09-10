@@ -34,8 +34,9 @@ from typing import Any, Protocol, cast
 
 from pydantic import ValidationError
 
+from analysis_service.claims import FrameworkName
 from analysis_service.frameworks import package_for
-from analysis_service.report import FrameworkName, FrameworkSelection
+from analysis_service.report import FrameworkSelection
 
 
 class Requested(Protocol):

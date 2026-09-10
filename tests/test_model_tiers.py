@@ -7,6 +7,7 @@ from typing import ClassVar
 import pytest
 from pydantic import ValidationError
 
+from analysis_service.claims import FRAMEWORK_NAMES
 from analysis_service.model_tiers import (
     FRAMEWORK_NODES,
     LLM_NODES,
@@ -19,7 +20,6 @@ from analysis_service.model_tiers import (
     load_model_tiers,
     validate_model_string,
 )
-from analysis_service.report import FRAMEWORK_NAMES
 from analysis_service.vendors import VENDOR_NAMES, CredentialMode, vendor_for
 
 PROJECT_ROOT = Path(__file__).parents[1]

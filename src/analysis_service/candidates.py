@@ -13,7 +13,7 @@ table against one model.
 
 There is a line this module does not cross: a candidate is never evidence. It
 carries no severity, no attacker story and no claim that anything is wrong, and
-it cannot become a :class:`~analysis_service.report.Claim`. Nothing downstream
+it cannot become a :class:`~analysis_service.claims.Claim`. Nothing downstream
 of the prompt reads a candidate at all. A rule's whole contribution is
 attention.
 """

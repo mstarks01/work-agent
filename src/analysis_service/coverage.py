@@ -17,7 +17,7 @@ counted from that package's own rules, and a coverage table pooled across
 frameworks would divide one framework's citations by another's leads.
 
 The honest limit is stated once here, and again on
-:class:`~analysis_service.report.LaneCoverage`. What is measured is citation
+:class:`~analysis_service.claims.LaneCoverage`. What is measured is citation
 rather than attention. An agent that read a flow and rightly concluded it was
 harmless cites nothing, and from here it looks exactly like one that skipped it.
 No observable separates them: a model's own claim to have examined something is
@@ -57,9 +57,12 @@ from types import MappingProxyType
 
 from analysis_service.analysis import unknown_controls
 from analysis_service.candidates import CandidateSet
+from analysis_service.claims import (
+    Claim,
+    LaneCoverage,
+)
 from analysis_service.frameworks import FrameworkPackage
 from analysis_service.references import canonical
-from analysis_service.report import Claim, LaneCoverage
 from analysis_service.system_model import SystemModel, mentioned_ids
 
 __all__ = ["build_coverage", "cited_element_ids", "lane_scope"]
@@ -148,7 +151,7 @@ def cited_element_ids(
     marked rather than failed on, so a description naming ``process:web-api``
     in a job with no such element reaches here. Counted raw it would make
     ``elements_cited`` exceed ``elements``, and it would do so worst on exactly
-    the runs :class:`~analysis_service.report.UnresolvedMention` exists to catch:
+    the runs :class:`~analysis_service.claims.UnresolvedMention` exists to catch:
     a lane contaminated by the exemplar system inflates the number that is
     supposed to say how much of *this* system it looked at.
 

@@ -16,8 +16,8 @@ from __future__ import annotations
 
 import pytest
 
+from analysis_service.claims import FrameworkName
 from analysis_service.frameworks.stride.record import StrideCategory
-from analysis_service.report import FrameworkName
 from evals.harness import writing
 from evals.harness.fingerprint import key_claim
 from evals.harness.ledger import Ledger, Vote

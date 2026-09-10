@@ -684,8 +684,8 @@ def test_the_viewer_reads_every_service_mark_the_report_carries():
     """
     from typing import get_args, get_origin
 
+    from analysis_service.claims import FrameworkAnalysis
     from analysis_service.frameworks import SCHEMAS
-    from analysis_service.report import FrameworkAnalysis
 
     block_types = {FrameworkAnalysis, *(schemas.block for schemas in SCHEMAS.values())}
     marks = set()
@@ -878,7 +878,12 @@ def report_with_markup_everywhere():
     attribute ground carries no prose: its two fields are references the
     report refuses unless they resolve in the embedded model's catalog.
     """
-    from analysis_service.report import Ground, Mitigation, Severity, Verdict
+    from analysis_service.claims import (
+        Ground,
+        Mitigation,
+        Severity,
+        Verdict,
+    )
     from tests.factories import sample_report, sample_threat
 
     threat = sample_threat(

@@ -16,7 +16,12 @@ from analysis_service.budgets import (
 )
 from analysis_service.frameworks import PACKAGES
 from analysis_service.jobs import Admission, InMemoryJobStore, JobRecord
-from analysis_service.report import FrameworkSelection, NodeRun, Report, TokenUsage
+from analysis_service.report import (
+    FrameworkSelection,
+    NodeRun,
+    Report,
+    TokenUsage,
+)
 from analysis_service.sources import Source
 from tests.factories import sample_report, sample_selection
 

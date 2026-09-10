@@ -37,6 +37,12 @@ from pydantic import BaseModel, Field
 from analysis_service import frameworks as framework_registry
 from analysis_service.binding import NodeBinding
 from analysis_service.budgets import BudgetPolicy
+from analysis_service.claims import (
+    Ground,
+    Mitigation,
+    Severity,
+    Verdict,
+)
 from analysis_service.conformance import REFERENCE_MODELS
 from analysis_service.frameworks import PACKAGES, FrameworkName, FrameworkPackage
 from analysis_service.frameworks.asvs.record import (
@@ -66,14 +72,10 @@ from analysis_service.model_tiers import (
 )
 from analysis_service.report import (
     FrameworkSelection,
-    Ground,
     InputRef,
     Job,
-    Mitigation,
     NodeRun,
     Report,
-    Severity,
-    Verdict,
 )
 from analysis_service.retry import ATTEMPTS_METADATA_KEY
 from analysis_service.sampling import SamplingConfig, load_sampling
@@ -671,7 +673,7 @@ def claims_json(*claims: BaseModel) -> str:
 
     The key is ``claims`` rather than ``threats`` because one shared
     ``prompts/analyze.md`` serves every registered framework's lane agents; see
-    :class:`~analysis_service.report.ProposalBatch`.
+    :class:`~analysis_service.claims.ProposalBatch`.
     """
     return json.dumps({"claims": [claim.model_dump(mode="json") for claim in claims]})
 

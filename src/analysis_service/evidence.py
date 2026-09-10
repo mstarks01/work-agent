@@ -1,6 +1,6 @@
 """Every fact a lane agent may cite, enumerated from the validated model.
 
-A finding's justification is a :class:`~analysis_service.report.Ground`, and the
+A finding's justification is a :class:`~analysis_service.claims.Ground`, and the
 three non-quote branches of one are pure functions of the System Model: an
 attribute the input never settled, a control attribute the input says is not
 there, and a Data Flow whose endpoints sit in different trust zones. None of
@@ -27,7 +27,7 @@ is weak" could enter it.
 Quotes are not catalogued, and could not be. A quote is a span of the
 submitter's own words chosen for what it states, which is the judgement no
 enumeration can make. An agent proposes one as a
-:class:`~analysis_service.report.QuoteCandidate`, which is the span and the
+:class:`~analysis_service.claims.QuoteCandidate`, which is the span and the
 source it came from, and :func:`resolve_proposals` assembles the ground. It does
 not check the quote. Presence in the named source stays
 :func:`~analysis_service.fan_in.join_drafts`'s question, answered by the pinned
@@ -59,8 +59,7 @@ from analysis_service.analysis import (
     control_state,
     names_term,
 )
-from analysis_service.frameworks import FrameworkPackage, schemas_for
-from analysis_service.report import (
+from analysis_service.claims import (
     GROUND_TERM_MAX_CHARS,
     REFERENCE_MAX_CHARS,
     AnalysisMarks,
@@ -72,6 +71,7 @@ from analysis_service.report import (
     UnknownClaimIdentity,
     UnresolvedEvidence,
 )
+from analysis_service.frameworks import FrameworkPackage, schemas_for
 from analysis_service.system_model import (
     DataFlow,
     Element,
@@ -400,13 +400,13 @@ class Resolution(NamedTuple):
     reference is recorded and the analysis continues, so the caller needs both
     halves. Shaped like :class:`~analysis_service.fan_in.JoinedDrafts` — marks
     beside drafts — and carrying the same
-    :class:`~analysis_service.report.AnalysisMarks`, so the fan-in merges what
+    :class:`~analysis_service.claims.AnalysisMarks`, so the fan-in merges what
     every lane and the join produced without knowing which mark came from where.
     Only ``unresolved_evidence`` is ever populated here; the other four lists
     have no producer this early.
 
     The drafts are the package's own record type; they are typed as the neutral
-    :class:`~analysis_service.report.Claim` here because this module builds them
+    :class:`~analysis_service.claims.Claim` here because this module builds them
     from a contract rather than from a framework it knows.
     """
 
@@ -420,7 +420,7 @@ def _grounds_of(
     """One proposal's grounds, and every reference of its that named nothing.
 
     Quotes first, then evidence, then absences, and the order is fixed rather
-    than incidental: :class:`~analysis_service.report.UnverifiedGround` marks a
+    than incidental: :class:`~analysis_service.claims.UnverifiedGround` marks a
     quote by its *index* into the finished list, so a reader following a mark
     back to the quote it is about depends on this being the one place the list
     is built. Quotes lead because they are the submitter's own words, which is
@@ -440,7 +440,7 @@ def _grounds_of(
     An agent claiming a system has no directory service, in a model whose store
     is called "LDAP directory", has asserted an absence the model contradicts,
     and this is where that costs its entry. A term longer than
-    :data:`~analysis_service.report.GROUND_TERM_MAX_CHARS` leaves the same way:
+    :data:`~analysis_service.claims.GROUND_TERM_MAX_CHARS` leaves the same way:
     the field holds one term, an agent that wrote a sentence named no term, and
     the entry is what that costs — never the run. A blank one leaves with no
     mark at all, because an empty string names nothing for a mark to be about.
@@ -535,7 +535,7 @@ def resolve_proposals(
     A claim whose every ground evaporates has nothing supporting it, and a
     finding with empty ``grounds`` is the one thing this schema refuses to
     represent — so the claim is dropped and recorded as a
-    :class:`~analysis_service.report.DroppedClaim`, with the references it
+    :class:`~analysis_service.claims.DroppedClaim`, with the references it
     cited in the reason. It is the same rule
     :func:`~analysis_service.fan_in.join_drafts` applies to unverified quotes:
     marked per entry, dropped per claim. Nothing here raises on what an agent
@@ -643,8 +643,8 @@ def invalid_proposal_marks(
     """The marks for the proposals a lane's batch could not validate.
 
     A schema fault is a fault in one entry, so it costs that entry: the batch
-    already dropped it (:class:`~analysis_service.report.ProposalBatch`), and
-    this records it as a :class:`~analysis_service.report.DroppedClaim` with
+    already dropped it (:class:`~analysis_service.claims.ProposalBatch`), and
+    this records it as a :class:`~analysis_service.claims.DroppedClaim` with
     the first error pydantic reported. The ID is composed from the package's
     rule where the key is readable, so the mark names the claim the agent
     meant; where it is not, the mark is keyed by the lane and the position,

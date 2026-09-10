@@ -57,7 +57,10 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from analysis_service.config_files import read_toml
 from analysis_service.model_tiers import TIER_NAMES, TierName
-from analysis_service.report import NodeRun, Report
+from analysis_service.report import (
+    NodeRun,
+    Report,
+)
 
 # The manifest schema version. Keyed by tier, with no compatibility shim for
 # older files.

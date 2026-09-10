@@ -22,8 +22,8 @@ resolve and quotes always verify, and every check here passes against a scripted
 model. This instrument therefore reads finished reports rather than fixtures.
 
 There are two readings, and both are neutral. Each reads only the shared
-:class:`~analysis_service.report.Claim` and
-:class:`~analysis_service.report.Verdict` shape, so a package nobody has written
+:class:`~analysis_service.claims.Claim` and
+:class:`~analysis_service.claims.Verdict` shape, so a package nobody has written
 is measured on arrival, with no entry added here.
 
 Ineligible pointers is the crisper of the two, and it is not a threshold. The

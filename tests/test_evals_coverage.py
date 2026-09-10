@@ -2,8 +2,8 @@
 
 import pytest
 
+from analysis_service.claims import LaneCoverage
 from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
-from analysis_service.report import LaneCoverage
 from evals.harness.coverage import aggregate_coverage, coverage_totals
 
 

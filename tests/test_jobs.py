@@ -21,7 +21,11 @@ from analysis_service.jobs import (
     build_store,
     execute_job,
 )
-from analysis_service.report import InputRef, NodeRun, TokenUsage
+from analysis_service.report import (
+    InputRef,
+    NodeRun,
+    TokenUsage,
+)
 from analysis_service.sources import Source
 from analysis_service.validation import ValidationIssue
 from tests.factories import (

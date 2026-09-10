@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.report import Verdict
+from analysis_service.claims import Verdict
 from evals.harness import critic_yield
 from evals.harness.critic_yield import aggregate_yield, score_case_with_yield
 from evals.harness.fingerprint import components_for, version_for

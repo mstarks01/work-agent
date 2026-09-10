@@ -5,16 +5,16 @@ import time
 import pytest
 
 from analysis_service import critic, fan_in
-from analysis_service.fan_in import DraftJoinError, join_drafts, snap_drafts
-from analysis_service.frameworks import schemas_for
-from analysis_service.frameworks.stride import STRIDE
-from analysis_service.frameworks.stride.record import DraftThreat
-from analysis_service.report import (
+from analysis_service.claims import (
     MENTION_MAX_CHARS,
     Ground,
     Mitigation,
     Severity,
 )
+from analysis_service.fan_in import DraftJoinError, join_drafts, snap_drafts
+from analysis_service.frameworks import schemas_for
+from analysis_service.frameworks.stride import STRIDE
+from analysis_service.frameworks.stride.record import DraftThreat
 from analysis_service.sources import DEFAULT_DESCRIPTION_LABEL
 from analysis_service.system_model import ModelIndex
 from tests.factories import (
@@ -793,7 +793,7 @@ class TestTheGroundsBoundTheCitedElements:
         return valid_model()
 
     def test_an_element_two_hops_away_is_dropped_and_marked(self, model):
-        from analysis_service.report import BEYOND_GROUNDS
+        from analysis_service.claims import BEYOND_GROUNDS
 
         drafts = {
             "spoofing": [
@@ -809,7 +809,7 @@ class TestTheGroundsBoundTheCitedElements:
         assert (mark.element_id, mark.reason) == ("store:orders-db", BEYOND_GROUNDS)
 
     def test_a_claim_on_quotes_alone_is_bounded_by_what_its_prose_cites(self, model):
-        from analysis_service.report import BEYOND_GROUNDS
+        from analysis_service.claims import BEYOND_GROUNDS
 
         drafts = {
             "spoofing": [

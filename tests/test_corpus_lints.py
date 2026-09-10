@@ -13,7 +13,10 @@ import shutil
 
 import pytest
 
-from analysis_service.report import InputRef, SourceRef
+from analysis_service.report import (
+    InputRef,
+    SourceRef,
+)
 from analysis_service.validation import parse_and_validate
 from evals import build_review_docs, verify_corpus
 

@@ -46,7 +46,11 @@ from analysis_service.jobs import (
     PipelineOutcome,
     PipelineRejected,
 )
-from analysis_service.report import InputRef, Job, Report
+from analysis_service.report import (
+    InputRef,
+    Job,
+    Report,
+)
 
 logger = logging.getLogger(__name__)
 

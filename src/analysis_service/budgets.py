@@ -70,7 +70,10 @@ from datetime import UTC, datetime, timedelta
 from pydantic import BaseModel, ConfigDict, Field
 
 from analysis_service.frameworks import PACKAGES
-from analysis_service.report import FrameworkSelection, NodeRun
+from analysis_service.report import (
+    FrameworkSelection,
+    NodeRun,
+)
 from analysis_service.sources import Source
 
 # Calls every job makes whatever it selects: one extraction, and the repair that

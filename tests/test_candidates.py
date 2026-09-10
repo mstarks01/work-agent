@@ -8,9 +8,9 @@ candidate is a lead, and nothing downstream can turn one into a finding.
 import pytest
 
 from analysis_service.candidates import Candidate, generate_candidates
+from analysis_service.claims import Ground
 from analysis_service.frameworks.stride import STRIDE
 from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
-from analysis_service.report import Ground
 from analysis_service.system_model import (
     DataFlow,
     DataStore,

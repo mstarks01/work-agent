@@ -23,6 +23,14 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
+from analysis_service.claims import (
+    Ground,
+    QuoteCandidate,
+    Refusal,
+    RejectionStep,
+    ScopeEntry,
+    Verdict,
+)
 from analysis_service.engine import Engine, EngineInputError
 from analysis_service.evidence import (
     evidence_catalog,
@@ -59,13 +67,7 @@ from analysis_service.frameworks.asvs.roster import replace_roster, roster_block
 from analysis_service.markdown_loader import MarkdownLoader, split_sections
 from analysis_service.report import (
     FrameworkSelection,
-    Ground,
-    QuoteCandidate,
-    Refusal,
-    RejectionStep,
     Report,
-    ScopeEntry,
-    Verdict,
 )
 from analysis_service.skills import lane_skill_doc
 from analysis_service.sources import SourceLimits
@@ -1105,7 +1107,7 @@ class TestNothingIsRuledOutByVocabulary:
         """It overrides nothing, which is the written statement that it rules
         nothing out. A package that can refute a unit from *stated* facts may
         still override; silence is what this one stopped reading."""
-        from analysis_service.report import Claim
+        from analysis_service.claims import Claim
 
         assert "ruled_out" not in vars(DraftRequirementRuling)
         assert DraftRequirementRuling.ruled_out.__func__ is Claim.ruled_out.__func__
@@ -1135,8 +1137,11 @@ class TestARejectionThatDoesNotRuleLeavesItsRequirementListed:
 
     @staticmethod
     def _rejected(requirement: str, cause: RejectionStep):
+        from analysis_service.claims import (
+            Ground,
+            Verdict,
+        )
         from analysis_service.frameworks.asvs.record import RequirementRuling
-        from analysis_service.report import Ground, Verdict
 
         return RequirementRuling(
             id=f"v5.0.0-{requirement[1:]}",

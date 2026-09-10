@@ -19,7 +19,10 @@ from analysis_service.certification import (
     report_fingerprints,
 )
 from analysis_service.model_tiers import TierName
-from analysis_service.report import NodeRun, Report
+from analysis_service.report import (
+    NodeRun,
+    Report,
+)
 from tests.factories import sample_report
 
 FP_A = "a" * 64

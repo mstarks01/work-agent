@@ -23,7 +23,7 @@ consequences follow from the package contract. The package carries no
 ``severity_rubric.md``, because the gate refuses a rubric beside a record that
 grades nothing. And ``affected_element_ids`` stays empty on the many claims that
 address a coding practice, which is legal on the neutral
-:class:`~analysis_service.report.Claim`, and is the reason the base widened it.
+:class:`~analysis_service.claims.Claim`, and is the reason the base widened it.
 
 The layering is ``Claim``, then :class:`DraftRequirementRuling`, then
 :class:`RequirementRuling`, which is the same shape STRIDE's record uses.
@@ -38,16 +38,7 @@ from typing import Any, Literal, Self, get_args
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic.json_schema import SkipJsonSchema
 
-from analysis_service.frameworks.asvs.catalog import (
-    ASVS_VERSION,
-    CHAPTER_NUMBERS,
-    LANES,
-    AsvsLevel,
-    requirement_id,
-    requirement_text,
-    requirements_for,
-)
-from analysis_service.report import (
+from analysis_service.claims import (
     MAX_CLAIMS_PER_BATCH,
     BlockSummary,
     Claim,
@@ -60,6 +51,15 @@ from analysis_service.report import (
     RulingBatch,
     ScopeEntry,
     build_block_summary,
+)
+from analysis_service.frameworks.asvs.catalog import (
+    ASVS_VERSION,
+    CHAPTER_NUMBERS,
+    LANES,
+    AsvsLevel,
+    requirement_id,
+    requirement_text,
+    requirements_for,
 )
 
 __all__ = [
@@ -260,7 +260,7 @@ class DraftRequirementRuling(Claim):
 class RequirementRuling(DraftRequirementRuling, RuledClaim):
     """One ruled ASVS finding: a draft plus the critic's verdict.
 
-    ``verdict`` arrives from :class:`~analysis_service.report.RuledClaim` and is the
+    ``verdict`` arrives from :class:`~analysis_service.claims.RuledClaim` and is the
     only thing the critic adds. STRIDE's ``confidence`` has no counterpart here:
     a framework that grades nothing has no rating to calibrate.
     """
@@ -269,7 +269,7 @@ class RequirementRuling(DraftRequirementRuling, RuledClaim):
 class RequirementProposal(Proposal):
     """What a lane agent emits: a ruling that *names* its evidence.
 
-    The neutral :class:`~analysis_service.report.Proposal` carries the title, the
+    The neutral :class:`~analysis_service.claims.Proposal` carries the title, the
     description, the element refs and the three evidence lists. ASVS adds its ID
     key and nothing else, because it judges nothing else.
 
@@ -308,7 +308,7 @@ class RequirementProposal(Proposal):
     # NARROWED CLOSED, AND OFF THE PROVIDER SCHEMA. A verb is half of what makes
     # two claims of an open set the same finding; this package's claims carry a
     # catalog requirement and compose their identity from that and the place, so
-    # a verb here is a field nothing reads. :class:`~analysis_service.report.Claim`
+    # a verb here is a field nothing reads. :class:`~analysis_service.claims.Claim`
     # says as much and left it optional, which is not the same as forbidden.
     #
     # A live sweep found 42 of 960 claims carrying one — `replay`, `impersonate`,
@@ -317,7 +317,7 @@ class RequirementProposal(Proposal):
     # a requirement is answering a different framework's question, and the verb
     # is the visible half of it.
     #
-    # ``SkipJsonSchema`` on the precedent :class:`~analysis_service.report.Severity`
+    # ``SkipJsonSchema`` on the precedent :class:`~analysis_service.claims.Severity`
     # sets: an agent is never handed the field, so it cannot fill it, and a value
     # arriving any other way is refused rather than carried.
     verb: SkipJsonSchema[None] = None
