@@ -187,7 +187,14 @@ from analysis_service.vendors import ServedTrust, vendor_for_route
 # this list too.
 # 3.0 also carries ``unreconciled_rulings``, an eleventh list: how the *first*
 # critic pass failed to reconcile with its drafts, before the bounded re-ask
-# repaired it.
+# repaired it. Each entry is a record — the claim, a closed ``kind``, and the
+# sentence — rather than the sentence alone (#710). A consumer reading the
+# list as strings meets objects, which would be major on its own; it rides
+# 3.0 for the reason every change above does, and because the only way to
+# count a cause before it was a regular expression over prose. Archived runs
+# were typed by
+# ``evals/migrations/2026-09-10-unreconciled-ruling-kinds.py``, which reads
+# the kind out of the sentence once so nothing downstream ever does.
 #
 # 3.0 also carries a fifth ``GroundKind``, ``absent-element``: a term no element
 # of the model names, which is the only branch whose referent is the whole model

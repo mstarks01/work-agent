@@ -1327,7 +1327,13 @@ def test_the_first_pass_problems_are_recorded_on_the_marks():
     )
 
     marks = AnalysisMarks.model_validate(ctx.state[NODES.key("marks")])
-    assert any("T-01" in message for message in marks.unreconciled_rulings)
+    # The claim and the kind are read off the record. Counting a cause used to
+    # mean a regular expression over the sentence, and one ruling writes more
+    # than one sentence, so the count was not recoverable at all.
+    assert [(m.claim_id, m.kind) for m in marks.unreconciled_rulings] == [
+        ("T-01", "dropped")
+    ]
+    assert "T-01" in marks.unreconciled_rulings[0].message
     # Merged, not assigned: what fan-in already recorded survives a second look.
     assert marks.unresolved_mentions[0].claim_id == "S-01"
 
@@ -1390,11 +1396,12 @@ def test_a_re_ask_may_change_only_the_rulings_the_problems_named():
     assert second.actions.route == graph.ROUTE_ACCEPT
     assert _reviewed_verdicts(ctx) == {"S-01": "confirmed", "T-01": "confirmed"}
     marks = AnalysisMarks.model_validate(ctx.state[NODES.key("marks")])
-    assert any(
-        "changed ruling 'S-01'" in message for message in marks.unreconciled_rulings
-    )
-    # The first pass's own problem stays on record beside the drift.
-    assert any("T-01" in message for message in marks.unreconciled_rulings)
+    # The first pass's own problem stays on record beside the drift, and the
+    # kind is what tells the two apart.
+    assert [(m.claim_id, m.kind) for m in marks.unreconciled_rulings] == [
+        ("T-01", "dropped"),
+        ("S-01", "unbriefed-change"),
+    ]
 
 
 def test_a_re_ask_that_repairs_only_what_was_named_leaves_no_drift_mark():
@@ -1411,7 +1418,7 @@ def test_a_re_ask_that_repairs_only_what_was_named_leaves_no_drift_mark():
 
     assert second.actions.route == graph.ROUTE_ACCEPT
     marks = AnalysisMarks.model_validate(ctx.state[NODES.key("marks")])
-    assert [m for m in marks.unreconciled_rulings if "re-ask" in m] == []
+    assert [m for m in marks.unreconciled_rulings if m.kind == "unbriefed-change"] == []
 
 
 def test_a_re_ask_that_respells_a_ruling_is_not_drift():
@@ -1437,7 +1444,7 @@ def test_a_re_ask_that_respells_a_ruling_is_not_drift():
 
     assert second.actions.route == graph.ROUTE_ACCEPT
     marks = AnalysisMarks.model_validate(ctx.state[NODES.key("marks")])
-    assert [m for m in marks.unreconciled_rulings if "re-ask" in m] == []
+    assert [m for m in marks.unreconciled_rulings if m.kind == "unbriefed-change"] == []
 
 
 def test_an_invented_ruling_in_the_re_ask_still_fails_the_second_look():

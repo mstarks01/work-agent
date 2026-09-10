@@ -82,7 +82,7 @@ class FrameworkAnalysis:
     coverage: list[LaneCoverage]  # per-lane account of what each agent was offered
     unverified_grounds: list[UnverifiedGround]
     unreconciled_rulings: list[
-        str
+        UnreconciledRuling
     ]  # how the first critic pass failed, before the re-ask
     repaired_quotes: list[RepairedQuote]
     unresolved_mentions: list[UnresolvedMention]
@@ -763,14 +763,43 @@ model does not describe, and it passes every check while saying nothing.
 
 ### `unreconciled_rulings`
 
-How the *first* critic pass failed to reconcile with its drafts, one message
-per problem, before the bounded re-ask repaired it. **Empty means the first
-pass was clean**, which is the reading that matters: a run that repaired itself
-is a successful run but not a clean one, and the two were previously
+How the *first* critic pass failed to reconcile with its drafts, one entry per
+problem, before the bounded re-ask repaired it. **Empty means the first pass
+was clean**, which is the reading that matters: a run that repaired itself is a
+successful run but not a clean one, and the two were previously
 indistinguishable in every artifact the service keeps.
 
 A framework whose first pass never reconciles is running on its single retry.
 That is worth knowing from a report rather than from a live run.
+
+```python
+class UnreconciledRuling:
+    claim_id: str  # the claim the problem is about
+    kind: str      # which check found it, from the closed set below
+    message: str   # the sentence the re-ask was asked to fix it by
+```
+
+The eight kinds, each one a check the service already distinguishes in code:
+
+| `kind` | What went wrong |
+| --- | --- |
+| `dropped` | The critic returned no ruling on a draft it was shown. |
+| `invented` | It ruled on an ID no lane agent drafted. |
+| `duplicate-id` | One ID carries more than one ruling. |
+| `confirmed-on-unknown` | A draft whose own grounds cite an unknown was ruled confirmed. |
+| `duplicate-on-unit` | A draft naming a catalog unit was rejected as a duplicate, which that framework decides by identifier first. |
+| `verdict-shape` | A verdict's fields disagree with its own `status`. |
+| `unresolved-unknown` | A `needs-info` names an element or attribute the model does not hold, or names nothing at all. |
+| `unbriefed-change` | The re-ask changed a ruling no problem named; the first pass's ruling was kept. |
+
+**Read `kind`, never the sentence.** The first seven kinds come from the first
+pass and the last from the second look, and one ruling can produce more than
+one entry — so a consumer counting causes reads the field, and a consumer
+counting distinct rulings reads `claim_id`.
+
+**A `claim_id` here need not be in the block.** An `invented` entry names an ID
+no lane drafted, and a `dropped` entry names one the re-ask may have ruled
+correctly afterwards.
 
 ### Severity is derived, never asserted
 

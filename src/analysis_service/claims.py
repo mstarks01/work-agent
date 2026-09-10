@@ -1513,6 +1513,106 @@ class MissingMitigation(BaseModel):
     claim_id: str = Field(min_length=1, max_length=CLAIM_ID_MAX_CHARS)
 
 
+# How much of one problem's sentence a mark carries. Set above what the
+# longest of the eight sentences can compose from its own inputs at their
+# field bounds — a claim ID, an element ID, an attribute and the attribute
+# names of one element type, about 1,040 characters together — so the cut is
+# a fail-safe against a producer nobody has written yet and never a silent
+# edit of a sentence the re-ask reads in full.
+UNRECONCILED_MESSAGE_MAX_CHARS = 1500
+
+#: What a problem calls the claim where the critic named it nothing.
+#: :class:`Ruling` carries **no** ``min_length`` on ``id`` on purpose — an
+#: empty ID is one more ID no lane agent drafted, and it must reach the re-ask
+#: as that rather than raise — so the empty string is a shape this mark has to
+#: hold, and a required field cannot hold it.
+UNNAMED_CLAIM = "(unnamed)"
+
+#: What went wrong with one ruling, as a closed set. Every value is a check
+#: :mod:`analysis_service.critic` already distinguishes in code, so a reader
+#: counts causes without parsing the sentence that describes one:
+#:
+#: * ``dropped`` — the critic returned no ruling on a draft it was shown;
+#: * ``invented`` — it ruled on an ID no lane agent drafted;
+#: * ``duplicate-id`` — one ID carries more than one ruling;
+#: * ``confirmed-on-unknown`` — a draft whose own grounds cite an unknown was
+#:   ruled confirmed;
+#: * ``duplicate-on-unit`` — a draft naming a catalog unit was rejected as a
+#:   duplicate, which that framework decides by identifier before any critic
+#:   reads it;
+#: * ``verdict-shape`` — a verdict's fields disagree with its own ``status``;
+#: * ``unresolved-unknown`` — a ``needs-info`` names an element or attribute
+#:   the model does not hold, or names nothing at all;
+#: * ``unbriefed-change`` — the re-ask changed a ruling no problem named, and
+#:   the first pass's ruling was kept.
+#:
+#: The first seven are the *first* pass's problems and the last is the second
+#: look's, which is why one field carries both: each is a way the review did
+#: not reconcile, and a reader asking "did this run repair itself" wants one
+#: list rather than two.
+UnreconciledKind = Literal[
+    "dropped",
+    "invented",
+    "duplicate-id",
+    "confirmed-on-unknown",
+    "duplicate-on-unit",
+    "verdict-shape",
+    "unresolved-unknown",
+    "unbriefed-change",
+]
+
+
+class UnreconciledRuling(BaseModel):
+    """One way a critic pass failed to reconcile: the claim, the kind, the words.
+
+    **The typed half is what a reader counts by.** This list carried bare
+    sentences once, and the only way to say what caused a re-ask was a regular
+    expression over prose: six archived runs of one case carried 238 of them,
+    and no consumer could count distinct rulings at all, because one ruling
+    produces more than one sentence. ``claim_id`` and ``kind`` answer both
+    questions off the record, and the wording of an error string stops being
+    load-bearing for anything but the prompt.
+
+    ``message`` stays, and it is the half the re-ask reads: the sentences are
+    what the bounded re-ask is asked to fix, in the words a model can act on.
+
+    **A claim named here need not be in the block.** An ``invented`` kind names
+    an ID no lane drafted, and a ``dropped`` kind names one the re-ask may have
+    ruled correctly afterwards. So this is not a
+    :data:`CLAIM_BOUND_MARKS` field, and the block's claim check does not run
+    over it.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    claim_id: str = Field(min_length=1, max_length=CLAIM_ID_MAX_CHARS)
+    kind: UnreconciledKind
+    message: str = Field(min_length=1, max_length=UNRECONCILED_MESSAGE_MAX_CHARS)
+
+    @classmethod
+    def of(
+        cls, *, claim_id: str, kind: UnreconciledKind, message: str
+    ) -> UnreconciledRuling:
+        """This problem as a mark, with both agent-quoted values made to fit.
+
+        **The only way one is built.** A critic names its own claim IDs and the
+        attributes it hangs a question on, and both reach the sentence, so a
+        model that answers with a paragraph where an attribute belongs would
+        cost the job the report this mark exists to annotate. The cut sits
+        beside the bound, once, rather than at each of the eight places a
+        problem is found.
+
+        An empty ID becomes :data:`UNNAMED_CLAIM` for the same reason: a critic
+        may return one, the re-ask is told about it as an invention, and the
+        mark that records the telling must not be the thing that raises.
+        """
+        return cls(
+            claim_id=claim_id[:CLAIM_ID_MAX_CHARS] or UNNAMED_CLAIM,
+            kind=kind,
+            message=message[:UNRECONCILED_MESSAGE_MAX_CHARS],
+        )
+
+
 # The marks whose whole placement claim is the claim they name, so one check
 # covers them all (:meth:`FrameworkAnalysis._claim_mark_issues`).
 # :class:`UnverifiedGround` is deliberately absent: it also names an *index*
@@ -1527,10 +1627,10 @@ ClaimMark = (
 #: Every :class:`AnalysisMarks` field whose entries annotate a claim the block
 #: must carry: the four :data:`ClaimMark` kinds and the two indexed marks. The
 #: block's own checks refuse an entry here that names a claim it does not hold.
-#: ``dropped_claims`` and ``unknown_claim_identities`` name a claim that is
-#: absent on purpose, so they are not here. ``tests/test_report.py`` holds this
-#: tuple to the mark models, so a mark kind added with a ``claim_id`` joins it
-#: or fails a test.
+#: ``dropped_claims``, ``unknown_claim_identities`` and
+#: ``unreconciled_rulings`` name a claim that may be absent on purpose, so they
+#: are not here. ``tests/test_report.py`` holds this tuple to the mark models,
+#: so a mark kind added with a ``claim_id`` joins it or fails a test.
 CLAIM_BOUND_MARKS: tuple[str, ...] = (
     "unverified_grounds",
     "repaired_quotes",
@@ -1616,8 +1716,9 @@ class AnalysisMarks(BaseModel):
 
     unverified_grounds: list[UnverifiedGround] = Field(default_factory=list)
     #: How the *first* critic pass failed to reconcile with its drafts, one
-    #: message per problem, as the bounded re-ask was asked to fix them. Empty
-    #: means the first pass was clean.
+    #: :class:`UnreconciledRuling` per problem, carrying the claim it is about,
+    #: the kind of problem, and the sentence the bounded re-ask was asked to fix
+    #: it by. Empty means the first pass was clean.
     #:
     #: **Recorded because nothing else can see it.** ``route_review`` renders
     #: these messages into the re-ask's prompt, and without this list a
@@ -1628,10 +1729,10 @@ class AnalysisMarks(BaseModel):
     #: A mark, not a failure: the re-ask exists for these, and a run that
     #: repaired itself is a successful run. What it is not is a *clean* one.
     #:
-    #: The second look appends what the re-ask changed beyond its brief — a
-    #: ruling no problem named, or an ID no lane agent drafted — each one
-    #: discarded in favour of the first pass and recorded here.
-    unreconciled_rulings: list[str] = Field(default_factory=list)
+    #: The second look appends one ``unbriefed-change`` entry per ruling the
+    #: re-ask changed that no problem named, each one discarded in favour of
+    #: the first pass and recorded here.
+    unreconciled_rulings: list[UnreconciledRuling] = Field(default_factory=list)
     repaired_quotes: list[RepairedQuote] = Field(default_factory=list)
     unresolved_references: list[UnresolvedReference] = Field(default_factory=list)
     unresolved_mentions: list[UnresolvedMention] = Field(default_factory=list)
@@ -1931,7 +2032,7 @@ class FrameworkAnalysis(BaseModel):
     unverified_grounds: list[UnverifiedGround] = Field(default_factory=list)
     #: See :attr:`AnalysisMarks.unreconciled_rulings`; the marks are flattened
     #: onto the block one field each.
-    unreconciled_rulings: list[str] = Field(default_factory=list)
+    unreconciled_rulings: list[UnreconciledRuling] = Field(default_factory=list)
     repaired_quotes: list[RepairedQuote] = Field(default_factory=list)
     unresolved_references: list[UnresolvedReference] = Field(default_factory=list)
     unresolved_mentions: list[UnresolvedMention] = Field(default_factory=list)
