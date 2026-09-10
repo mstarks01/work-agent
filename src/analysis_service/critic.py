@@ -51,6 +51,7 @@ from analysis_service.claims import (
     Ruling,
     SeverityLevel,
     UnknownRef,
+    UnreconciledRuling,
     Verdict,
 )
 from analysis_service.frameworks import FrameworkSchemas, lane_of
@@ -116,35 +117,27 @@ def snap_rulings(
     ]
 
 
-class CriticIssue(NamedTuple):
-    """One unresolved-unknown problem, and the claim whose ruling carries it.
-
-    The ID rides beside the message because two callers need different halves.
-    The re-ask prompt reads the *message*; the seam that builds that prompt
-    reads the *ID*, to decide which drafts the re-ask has to be shown in full.
-    Recovering the ID by parsing it back out of the message would make the
-    wording of an error string load-bearing for what the graph sends a model.
-    """
-
-    claim_id: str
-    message: str
-
-
 class ReviewProblems(NamedTuple):
     """The mechanical check's verdict on one set of rulings.
 
-    ``messages`` is what the re-ask is asked to fix, in the words it reads.
-    ``implicated`` is the subset of *drafted* IDs whose drafts the re-ask
-    cannot fix without reading: a draft it never ruled, which it must rule
-    now, and a draft whose needs-info verdict must be repointed or replaced by
-    a verdict the stated facts support. Neither is answerable from an ID.
+    ``problems`` is what the re-ask is asked to fix: one
+    :class:`~analysis_service.claims.UnreconciledRuling` per problem, carrying
+    the claim it is about, which check found it, and the sentence a model
+    reads. ``implicated`` is the subset of *drafted* IDs whose drafts the
+    re-ask cannot fix without reading: a draft it never ruled, which it must
+    rule now, and a draft whose needs-info verdict must be repointed or
+    replaced by a verdict the stated facts support. Neither is answerable from
+    an ID.
 
     Both come out of one pass so they cannot disagree about what went wrong —
     the reason this is a record rather than two functions over the same inputs.
     Falsy when the rulings are assemblable, so callers read it as the check.
+
+    ``messages`` is the sentences alone, and it is a property rather than a
+    field so the prompt and the mark cannot carry different words.
     """
 
-    messages: list[str]
+    problems: list[UnreconciledRuling]
     implicated: frozenset[str]
     #: The rulings as :func:`complete_rulings` left them, so assembly reads
     #: the set the check ran over rather than completing it a second time.
@@ -155,11 +148,16 @@ class ReviewProblems(NamedTuple):
     #: first pass by :func:`merge_retry`, whatever the re-ask returns for it.
     repairable: frozenset[str] = frozenset()
 
+    @property
+    def messages(self) -> list[str]:
+        """Each problem's sentence, in the words the re-ask reads."""
+        return [problem.message for problem in self.problems]
+
     def __bool__(self) -> bool:
-        return bool(self.messages)
+        return bool(self.problems)
 
 
-def _verdict_shape_issues(rulings: Iterable[Ruling]) -> list[CriticIssue]:
+def _verdict_shape_issues(rulings: Iterable[Ruling]) -> list[UnreconciledRuling]:
     """Every ruling whose verdict's fields disagree with its own ``status``.
 
     The four rules :class:`~analysis_service.claims.Verdict` states, plus the
@@ -187,45 +185,50 @@ def _verdict_shape_issues(rulings: Iterable[Ruling]) -> list[CriticIssue]:
         verdict = ruling.verdict
         if verdict.status == "needs-info" and not verdict.related_unknowns:
             issues.append(
-                CriticIssue(
-                    ruling.id,
-                    f"claim {ruling.id!r} is ruled needs-info but names no"
+                UnreconciledRuling.of(
+                    claim_id=ruling.id,
+                    kind="verdict-shape",
+                    message=f"claim {ruling.id!r} is ruled needs-info but names no"
                     " unknown attribute in related_unknowns, so nothing says"
                     " what has to be answered",
                 )
             )
         if verdict.status != "needs-info" and verdict.related_unknowns:
             issues.append(
-                CriticIssue(
-                    ruling.id,
-                    f"claim {ruling.id!r} is ruled {verdict.status} but carries"
+                UnreconciledRuling.of(
+                    claim_id=ruling.id,
+                    kind="verdict-shape",
+                    message=f"claim {ruling.id!r} is ruled {verdict.status} but carries"
                     " related_unknowns, which is only meaningful on a"
                     " needs-info verdict",
                 )
             )
         if verdict.status == "rejected" and verdict.rejected_because is None:
             issues.append(
-                CriticIssue(
-                    ruling.id,
-                    f"claim {ruling.id!r} is rejected but names no check in"
+                UnreconciledRuling.of(
+                    claim_id=ruling.id,
+                    kind="verdict-shape",
+                    message=f"claim {ruling.id!r} is rejected but names no check in"
                     " rejected_because, so nothing says which of evidence,"
                     " reasoning, lane or duplicate ended it",
                 )
             )
         if verdict.status != "rejected" and verdict.rejected_because is not None:
             issues.append(
-                CriticIssue(
-                    ruling.id,
-                    f"claim {ruling.id!r} is ruled {verdict.status} but carries"
+                UnreconciledRuling.of(
+                    claim_id=ruling.id,
+                    kind="verdict-shape",
+                    message=f"claim {ruling.id!r} is ruled {verdict.status} but carries"
                     " rejected_because, which is only meaningful on a rejected"
                     " verdict",
                 )
             )
         if verdict.status != "confirmed" and not verdict.reason:
             issues.append(
-                CriticIssue(
-                    ruling.id,
-                    f"claim {ruling.id!r} is ruled {verdict.status} and states"
+                UnreconciledRuling.of(
+                    claim_id=ruling.id,
+                    kind="verdict-shape",
+                    message=f"claim {ruling.id!r} is ruled {verdict.status} and states"
                     " no reason",
                 )
             )
@@ -234,7 +237,7 @@ def _verdict_shape_issues(rulings: Iterable[Ruling]) -> list[CriticIssue]:
 
 def _unresolved_unknown_ref_issues(
     rulings: Iterable[Ruling], system_model: SystemModel
-) -> list[CriticIssue]:
+) -> list[UnreconciledRuling]:
     """Every ``related_unknowns`` entry naming an element or attribute not there.
 
     The ``attribute`` half is the element type's security-relevant fields —
@@ -276,9 +279,10 @@ def _unresolved_unknown_ref_issues(
             if not ref.names_an_element:
                 if not ref.subject.strip():
                     issues.append(
-                        CriticIssue(
-                            ruling.id,
-                            f"claim {ruling.id!r} is ruled needs-info and its"
+                        UnreconciledRuling.of(
+                            claim_id=ruling.id,
+                            kind="unresolved-unknown",
+                            message=f"claim {ruling.id!r} is ruled needs-info and its"
                             " related_unknowns entry names neither an element"
                             " attribute nor a subject, so nothing says what has"
                             " to be answered",
@@ -288,9 +292,10 @@ def _unresolved_unknown_ref_issues(
             element = by_id.get(ref.element_id)
             if element is None:
                 issues.append(
-                    CriticIssue(
-                        ruling.id,
-                        f"claim {ruling.id!r} hangs its needs-info verdict on"
+                    UnreconciledRuling.of(
+                        claim_id=ruling.id,
+                        kind="unresolved-unknown",
+                        message=f"claim {ruling.id!r} hangs its needs-info verdict on"
                         f" element {ref.element_id!r}, which is not in the system"
                         " model",
                     )
@@ -304,9 +309,10 @@ def _unresolved_unknown_ref_issues(
                 # what is there is what lets it repoint rather than fall back on
                 # whichever field resolves everywhere.
                 issues.append(
-                    CriticIssue(
-                        ruling.id,
-                        f"claim {ruling.id!r} hangs its needs-info verdict on"
+                    UnreconciledRuling.of(
+                        claim_id=ruling.id,
+                        kind="unresolved-unknown",
+                        message=f"claim {ruling.id!r} hangs its needs-info verdict on"
                         f" attribute {ref.attribute!r}, which element"
                         f" {ref.element_id!r} does not have. That element has:"
                         f" {', '.join(attribute_names(element))}."
@@ -317,10 +323,16 @@ def _unresolved_unknown_ref_issues(
     return issues
 
 
-def _duplicate_id_issues(entries: Iterable[Claim | Ruling]) -> list[str]:
+def _duplicate_id_issues(
+    entries: Iterable[Claim | Ruling],
+) -> list[UnreconciledRuling]:
     counts = Counter(entry.id for entry in entries)
     return [
-        f"claim ID {claim_id!r} is used by {count} drafts"
+        UnreconciledRuling.of(
+            claim_id=claim_id,
+            kind="duplicate-id",
+            message=f"claim ID {claim_id!r} is used by {count} drafts",
+        )
         for claim_id, count in counts.items()
         if count > 1
     ]
@@ -411,7 +423,7 @@ def unsettled_drafts(drafts: Sequence[Claim]) -> list[Claim]:
 
 def _duplicate_on_unit_issues(
     drafts: Sequence[Claim], rulings: Iterable[Ruling]
-) -> list[CriticIssue]:
+) -> list[UnreconciledRuling]:
     """Every ``duplicate`` rejection of a draft that rules on a unit of its own.
 
     A package whose drafts name a unit — a catalog requirement — decides
@@ -426,9 +438,10 @@ def _duplicate_on_unit_issues(
     """
     unit_by_id = {draft.id: type(draft).unit_of(draft) for draft in drafts}
     return [
-        CriticIssue(
-            ruling.id,
-            f"claim {ruling.id!r} rules on {unit_by_id[ruling.id]!r}, and a"
+        UnreconciledRuling.of(
+            claim_id=ruling.id,
+            kind="duplicate-on-unit",
+            message=f"claim {ruling.id!r} rules on {unit_by_id[ruling.id]!r}, and a"
             " duplicate of a unit-bearing draft is decided by its identifier"
             " before you see it, so rejecting it as a duplicate of another"
             " requirement names no check: rule on this requirement, or reject it"
@@ -443,7 +456,7 @@ def _duplicate_on_unit_issues(
 
 def _confirmed_on_unknown_issues(
     drafts: Sequence[Claim], rulings: Iterable[Ruling]
-) -> list[CriticIssue]:
+) -> list[UnreconciledRuling]:
     """Every ``confirmed`` ruling on a draft whose grounds cite an unknown.
 
     The draft's own evidence says the fact is open, so a confirmation asserts
@@ -453,9 +466,10 @@ def _confirmed_on_unknown_issues(
     """
     by_id = {draft.id: draft.unknown_grounds() for draft in drafts}
     return [
-        CriticIssue(
-            ruling.id,
-            f"claim {ruling.id!r} is ruled confirmed but its own grounds cite"
+        UnreconciledRuling.of(
+            claim_id=ruling.id,
+            kind="confirmed-on-unknown",
+            message=f"claim {ruling.id!r} is ruled confirmed but its own grounds cite"
             f" {_named(by_id[ruling.id])} as never stated, so it cannot"
             " be confirmed: rule it needs-info, or reject it with a reason",
         )
@@ -615,13 +629,26 @@ def review_issues(
         + _verdict_shape_issues(rulings)
         + _unresolved_unknown_ref_issues(rulings, system_model)
     )
-    messages = [f"critic dropped draft {claim_id!r}" for claim_id in dropped]
-    messages += [
-        f"critic returned claim {claim_id!r}, which no lane agent drafted"
+    problems = [
+        UnreconciledRuling.of(
+            claim_id=claim_id,
+            kind="dropped",
+            message=f"critic dropped draft {claim_id!r}",
+        )
+        for claim_id in dropped
+    ]
+    problems += [
+        UnreconciledRuling.of(
+            claim_id=claim_id,
+            kind="invented",
+            message=(
+                f"critic returned claim {claim_id!r}, which no lane agent drafted"
+            ),
+        )
         for claim_id in sorted(ruled_ids - drafted_ids)
     ]
-    messages += _duplicate_id_issues(rulings)
-    messages += [issue.message for issue in per_ruling]
+    problems += _duplicate_id_issues(rulings)
+    problems += per_ruling
     # A duplicate ID implicates no draft: the re-ask drops one of two rulings on
     # an ID it already ruled, which is answerable from the rulings alone. An
     # invented ID implicates none either — there is no draft behind it to show.
@@ -639,7 +666,7 @@ def review_issues(
         if count > 1 and claim_id in drafted_ids
     }
     return ReviewProblems(
-        messages=messages,
+        problems=problems,
         implicated=frozenset(implicated),
         rulings=tuple(rulings),
         repairable=frozenset(implicated | duplicated),
@@ -651,7 +678,7 @@ def merge_retry(
     retry: Sequence[Mapping[str, Any]],
     repairable: Collection[str],
     drafted: Collection[str],
-) -> tuple[list[Mapping[str, Any]], list[str]]:
+) -> tuple[list[Mapping[str, Any]], list[UnreconciledRuling]]:
     """The re-ask's rulings for what the problems named, the first pass's for the rest.
 
     The re-ask prompt asks for exactly this and nothing enforced it: the first
@@ -686,15 +713,21 @@ def merge_retry(
         if ruling["id"] in known and ruling["id"] not in named
     }
     merged: list[Mapping[str, Any]] = list(kept_first.values())
-    drift: list[str] = []
+    drift: list[UnreconciledRuling] = []
     for ruling in retry:
         claim_id = ruling["id"]
         if claim_id in named or claim_id not in known:
             merged.append(ruling)
         elif ruling != kept_first.get(claim_id):
             drift.append(
-                f"re-ask changed ruling {claim_id!r}, which no problem named;"
-                " the first ruling was kept"
+                UnreconciledRuling.of(
+                    claim_id=claim_id,
+                    kind="unbriefed-change",
+                    message=(
+                        f"re-ask changed ruling {claim_id!r}, which no problem"
+                        " named; the first ruling was kept"
+                    ),
+                )
             )
     return merged, drift
 
@@ -920,8 +953,10 @@ class Revision:
     same call over the same set.
     """
 
-    #: One message per problem, as the re-ask is asked to fix them.
-    messages: list[str]
+    #: One :class:`~analysis_service.claims.UnreconciledRuling` per problem:
+    #: the claim, which check found it, and the sentence the re-ask is asked to
+    #: fix it by.
+    problems: list[UnreconciledRuling]
     #: Every drafted ID: the covering set the re-ask must reproduce.
     roster: list[str]
     #: The few drafts a structural fix cannot be made without reading.
@@ -929,6 +964,11 @@ class Revision:
     #: Every drafted ID a problem names, sorted: the whole of what the re-ask
     #: may change. :func:`merge_retry` holds it to that.
     repairable: list[str]
+
+    @property
+    def messages(self) -> list[str]:
+        """Each problem's sentence, in the words the re-ask reads."""
+        return [problem.message for problem in self.problems]
 
 
 def review(
@@ -951,7 +991,7 @@ def review(
         return Accepted(count=len(rulings))
     shown = unsettled_drafts(drafts)
     return Revision(
-        messages=list(problems.messages),
+        problems=list(problems.problems),
         roster=[draft.id for draft in shown],
         unreconciled=critic_view(drafts, system_model, only=problems.implicated),
         repairable=sorted(problems.repairable),

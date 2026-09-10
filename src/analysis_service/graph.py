@@ -1724,7 +1724,7 @@ def route_review(
                 update={
                     "unreconciled_rulings": [
                         *parked.unreconciled_rulings,
-                        *outcome.messages,
+                        *outcome.problems,
                     ]
                 }
             ).model_dump(mode="json"),
