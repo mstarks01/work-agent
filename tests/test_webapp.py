@@ -1392,3 +1392,24 @@ def test_a_unit_part_that_is_a_digit_but_not_a_decimal_sorts_as_text():
 
     assert _unit_order("V1.\u00b2") == (1, "\u00b2")
     assert _unit_order("V6.2.10") > _unit_order("V6.2.9")
+
+
+def test_a_ruling_that_a_unit_does_not_apply_sits_on_the_units_row():
+    """An `evidence` rejection rules on the unit its draft names, so the page
+    shows it as "Does not apply" on the requirement's row and keeps it out of
+    the dismissed list. Only a block that answers in units reads it so: for an
+    open-set framework an `evidence` rejection is a draft that failed on its
+    own substance, and the page has no row to hang it on. The page draws into
+    a DOM, so this holds the script's text to the rule the way the other page
+    lints do."""
+    from webapp.main import client_script
+
+    script = client_script("report_view.js")
+    assert 'c.verdict.rejected_because === "evidence"' in script
+    assert "answersInUnits(block) &&" in script, "gated on the block answering in units"
+    assert (
+        'SCOPE_STATE["not-applicable"]'
+        in script.split("function unitTable")[1].split("function renderBlock")[0]
+    ), "the requirement row reads the ruling as Does not apply"
+    assert "dismissed.forEach" in script, "the dismissed list is the rest"
+    assert '"Does not apply"]] : []' in script, "the tile exists only where units do"
