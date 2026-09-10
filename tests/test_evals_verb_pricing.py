@@ -61,22 +61,22 @@ def test_the_shipped_rule_prices_as_the_frontier_pins_it(corpus, flows, pairs):
     assert shipped.new_reference_merges == ()
 
 
-def test_a_free_merge_costs_nothing_on_any_axis(corpus, flows, pairs, produced):
-    """`forge` = `inject` = `plant`: no labelled pair and no reference pair tells
-    them apart, and the Baseline gains four must-finds under it (#730)."""
+def test_the_shipped_group_carries_its_gain_and_a_repeat_adds_nothing(
+    corpus, flows, pairs, produced
+):
+    """`forge` = `inject` = `plant` shipped on 2026-09-10 (#730). The Baseline
+    re-scored under the shipped rule reads four more matched references and
+    four more must-finds than its recorded 113 and 62, and a candidate that
+    names the same group again changes nothing on any axis."""
     shipped = price(None, corpus, flows, pairs, produced)
-    candidate = price(
-        parse_groups(["forge=inject=plant"]), corpus, flows, pairs, produced
-    )
+    again = price(parse_groups(["forge=inject=plant"]), corpus, flows, pairs, produced)
 
-    assert candidate.false_splits == shipped.false_splits
-    assert candidate.false_merges == shipped.false_merges
-    assert candidate.reference_merges == shipped.reference_merges
-    assert candidate.new_reference_merges == ()
-    assert candidate.matched is not None and shipped.matched is not None
-    assert candidate.matched - shipped.matched == 4
-    assert candidate.must_find is not None and shipped.must_find is not None
-    assert candidate.must_find - shipped.must_find == 4
+    assert (shipped.matched, shipped.must_find) == (117, 66)
+    assert again.false_splits == shipped.false_splits
+    assert again.false_merges == shipped.false_merges
+    assert again.reference_merges == shipped.reference_merges
+    assert again.new_reference_merges == ()
+    assert (again.matched, again.must_find) == (shipped.matched, shipped.must_find)
 
 
 def test_a_merge_with_a_price_names_what_it_would_merge(corpus, flows, pairs):

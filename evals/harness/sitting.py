@@ -60,7 +60,13 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from analysis_service.markdown_loader import RESOLVE_ERRORS
 from analysis_service.report import FrameworkName
 from evals import build_review_docs as docs
-from evals.harness.fingerprint import FingerprintError, key_claim
+from evals.harness.fingerprint import (
+    SUPPORTED_VERSIONS,
+    FingerprintError,
+    components_for,
+    fingerprint,
+    key_claim,
+)
 from evals.harness.identity import FlowMap
 from evals.harness.reference import (
     CLAIMS_DIR,
@@ -585,6 +591,12 @@ class MarkTarget:
     fingerprint: str
     framework: FrameworkName
     claims: tuple[str, ...]
+    #: Every key this target carried under an earlier version of its
+    #: framework's rule. A mark stores only its key, so a merged sitting keyed
+    #: before a version moved still names this target through one of these;
+    #: :func:`current_marks` reads them. Recomputed from the claim, never
+    #: stored, so a version can move without a record moving.
+    aliases: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -645,15 +657,85 @@ def mark_targets(case: GoldenCase) -> tuple[MarkTarget, ...]:
     }
     grouped: dict[str, list[str]] = {}
     frameworks: dict[str, FrameworkName] = {}
+    aliases: dict[str, set[str]] = {}
     for framework in case.frameworks:
         for claim in case.claims_for(framework):
             value = _key_of(case.id, framework, claim, flows)
             grouped.setdefault(value, []).append(claim.claim)
             frameworks[value] = framework
+            aliases.setdefault(value, set()).update(
+                _older_keys_of(case.id, framework, claim, flows) - {value}
+            )
     return tuple(
-        MarkTarget(fingerprint=value, framework=frameworks[value], claims=tuple(claims))
+        MarkTarget(
+            fingerprint=value,
+            framework=frameworks[value],
+            claims=tuple(claims),
+            aliases=tuple(sorted(aliases[value])),
+        )
         for value, claims in grouped.items()
     )
+
+
+def _older_keys_of(
+    case_id: str, framework: FrameworkName, claim: ReferenceClaim, flows: FlowMap
+) -> set[str]:
+    """Every key this claim carried under any version this build computes.
+
+    A version a claim cannot satisfy — one that reads a catalog identifier of
+    a claim that composes its identity — is skipped, because no mark was ever
+    keyed under it. The current version is among the answers; the caller
+    drops it.
+    """
+    full = components_for(
+        framework,
+        claim.lane,
+        claim.affected_element_ids,
+        flows,
+        verb=claim.verb,
+        identifier=claim.identifier,
+        scope=case_id,
+    )
+    keys: set[str] = set()
+    for version in SUPPORTED_VERSIONS:
+        try:
+            keys.add(fingerprint(full, version=version))
+        except FingerprintError:
+            continue
+    return keys
+
+
+def current_marks(prepared: Prepared, marks: Mapping[str, Mark]) -> dict[str, Mark]:
+    """The marks keyed as this build keys the targets, whatever version keyed them.
+
+    **The sitting's counterpart of the ledger's re-key, done at read time.** A
+    vote stores its components and re-keys from them; a mark stores only its
+    key, and a merged sitting is a record a person signed, so no file moves.
+    The finding a mark names is a reference claim in the corpus, and every key
+    it ever carried recomputes from the case, so an older key is read through
+    :attr:`MarkTarget.aliases` to the current one.
+
+    Two marks the current rule folds into one finding must agree, or the
+    sitting is refused with the finding named: that is a reading question, and
+    no re-key answers it. A key that is neither current nor an alias is left
+    as it is, for :func:`check_marks` to refuse by name.
+    """
+    to_current = {
+        alias: target.fingerprint
+        for target in prepared.mark_targets
+        for alias in target.aliases
+    }
+    folded: dict[str, Mark] = {}
+    for key, mark in marks.items():
+        current = to_current.get(key, key)
+        if current in folded and folded[current] != mark:
+            raise SittingError(
+                f"{prepared.case_id}: two marks name one recorded finding"
+                f" ({current}) and disagree ({folded[current]!r} against"
+                f" {mark!r}); a person settles that"
+            )
+        folded[current] = mark
+    return folded
 
 
 def _key_of(
@@ -707,7 +789,8 @@ def check_marks(prepared: Prepared, marks: Mapping[str, Mark]) -> None:
     that never read one, and either way the mark answers nothing.
     """
     unknown = sorted(
-        set(marks) - {target.fingerprint for target in prepared.mark_targets}
+        set(current_marks(prepared, marks))
+        - {target.fingerprint for target in prepared.mark_targets}
     )
     if unknown:
         raise SittingError(
@@ -749,6 +832,7 @@ def check_every_finding_marked(
     unfinished work, so a message that counted across both would name a debt
     the reader does not owe.
     """
+    marks = current_marks(prepared, marks)
     for framework in frameworks:
         targets = targets_of(prepared, framework)
         unmarked = [target for target in targets if target.fingerprint not in marks]
@@ -812,15 +896,16 @@ def document(
         # Selected off the target's framework, which the fingerprint's own
         # components carry. A key prefix would read the identity's spelling
         # rather than the identity.
+        current = current_marks(prepared, marks)
         answered = [
             target
             for target in prepared.mark_targets
-            if target.framework == framework and target.fingerprint in marks
+            if target.framework == framework and target.fingerprint in current
         ]
         if answered:
             lines.append("\n### Marks\n")
             lines += [
-                _mark_line(target, marks[target.fingerprint]) for target in answered
+                _mark_line(target, current[target.fingerprint]) for target in answered
             ]
     lines.append("\n---\n\n## On your list and not on theirs\n")
     lines += [f"- {item}" for item in missing] or ["- (nothing)"]
@@ -929,6 +1014,12 @@ def sitting_problems(
             rule(prepared, marks)
         except SittingError as exc:
             problems.append(str(exc))
+    try:
+        marks = current_marks(prepared, marks)
+    except SittingError:
+        # Already reported by check_marks above; the unread check below reads
+        # the keys as written rather than reporting the fold twice.
+        pass
 
     # Named by framework rather than by fingerprint: a reader who marked a set
     # they did not record reading needs the set's name, and a list of every key

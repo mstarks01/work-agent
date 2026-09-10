@@ -446,8 +446,24 @@ def corpus_digest_at(commit: str, root: Path = REPO_ROOT) -> str | None:
     return digest.hexdigest()
 
 
+def default_base_ref(root: Path) -> str:
+    """The name the ancestor check measures against in this clone.
+
+    ``origin/main`` where the clone has one, which is every clone with a
+    remote and every pull-request checkout in CI, where no local ``main``
+    exists at all. A clone with no remote falls back to its own ``main``.
+    The contribution workflow failed on every pull request since the first
+    Baseline landed because the check asked for ``main`` in a checkout that
+    carried only ``origin/main``, and read a merged Baseline as a fork-only
+    commit.
+    """
+    if _git(root, "rev-parse", "--verify", "--quiet", "origin/main") is not None:
+        return "origin/main"
+    return "main"
+
+
 def verify(
-    directory: Path, root: Path = REPO_ROOT, base_ref: str = "main"
+    directory: Path, root: Path = REPO_ROOT, base_ref: str | None = None
 ) -> list[str]:
     """Every #323 check that needs no PR context, as a list of problems.
 
@@ -458,6 +474,7 @@ def verify(
     skips them rather than failing honest work it cannot see.
     """
     problems: list[str] = []
+    base_ref = base_ref or default_base_ref(root)
     manifest_path = directory / "baseline.json"
     if not manifest_path.is_file():
         return [f"{directory.name}: carries no baseline.json"]

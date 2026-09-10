@@ -53,18 +53,23 @@ __all__ = [
 
 #: Verbs that count as **one** action for matching, as a set of groups.
 #:
-#: **Deliberately empty, and that is a finding rather than a stub.** The obvious
-#: candidates — "recovers the partner keys" against "reads the partner keys",
-#: "erases the log records" against "deletes them" — turn out not to need an
-#: entry: both sides resolve to one verb once the verb is assigned from the
-#: action and its object class, which is what :data:`GLOSS` is for. Every pair
-#: that looked like a synonym in the screen over the calibration labels was an
-#: assignment that had not been made yet, not two verbs meaning one thing.
+#: **One group, and it was priced before it shipped.** The table was empty
+#: from the vocabulary's first cut, because every apparent synonym over the
+#: calibration labels resolved to one verb once the verb was assigned from the
+#: action and its object class, which is what :data:`GLOSS` is for. The first
+#: Baseline (#728) then showed a pair the labels cannot separate at any price:
+#: ``forge``, ``inject`` and ``plant`` name the same finding in five reference
+#: rows and two lane drafts, and ``run.py price-verbs`` measured the merge at
+#: zero new false merges over the labelled pairs and zero new reference merges
+#: over the corpus, for four more matched references (#730). A merge that
+#: costs nothing on either error axis is the one this mechanism exists for.
 #:
-#: The mechanism stays because the next vocabulary edit may need it and a table
-#: added under pressure is a table added wrong. ``test_evals_verbs.py`` checks
-#: every verb named here is a real one, so an entry cannot rot into a typo.
-EQUIVALENT: tuple[frozenset[str], ...] = ()
+#: The fingerprint reads a verb through :func:`canonical` at the version
+#: :data:`~evals.harness.fingerprint.VERSION_FOR` names, so a vote on a
+#: ``forge`` claim reaches an ``inject`` one: the matcher and the vote key are
+#: one reader of "one action". ``test_evals_verbs.py`` checks every verb named
+#: here is a real one and that the shipped table is still free on both axes.
+EQUIVALENT: tuple[frozenset[str], ...] = (frozenset({"forge", "inject", "plant"}),)
 
 #: The reference-claim pairs this vocabulary does **not** separate, with why.
 #: Kept whole rather than counted, for the reason

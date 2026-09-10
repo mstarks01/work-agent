@@ -9,6 +9,7 @@ from pathlib import Path
 from evals import review_submission as reviews
 from evals.harness import envelope as envelopes
 from evals.harness import sitting as sittings
+from evals.harness.reference import load_case
 
 CASE = "03-batch-data-pipeline"
 OWN = ["a malicious batch row"]
@@ -177,3 +178,78 @@ def test_two_readers_on_one_date_both_cover(tmp_path: Path):
     assert reviews.repository_problems(tree) == []
     assert set(reviews.current_reviews(tree)[CASE]) == set(reviews.declared(tree, CASE))
     assert reviews.unreviewed_cases(tree) == []
+
+
+def test_a_sitting_keyed_under_an_older_version_still_covers_its_case(tmp_path):
+    """A mark stores only its key, so a version that reads more would orphan
+    every merged sitting: the case reads as unread and a person's answers are
+    lost. The finding a mark names is a reference claim in the corpus, so the
+    key recomputes from the case, and the reader maps an older key to the
+    current one at read time. No record moves."""
+    from evals.harness.fingerprint import components_for, fingerprint, version_for
+
+    tree = tree_for(tmp_path)
+    corpus = tree / "evals" / "corpus"
+    envelope = envelope_for(tree)
+    case = load_case(corpus / CASE)
+    flows = {flow.id: (flow.source, flow.destination) for flow in case.model.data_flows}
+    current = version_for("stride")
+    older = {}
+    for claim in case.claims_for("stride"):
+        full = components_for(
+            "stride",
+            claim.lane,
+            claim.affected_element_ids,
+            flows,
+            verb=claim.verb,
+            scope=case.id,
+        )
+        now = fingerprint(full, version=current)
+        if now in envelope.cases[CASE].marks:
+            older[fingerprint(full, version=current - 2)] = envelope.cases[CASE].marks[
+                now
+            ]
+    assert older, "the case carries STRIDE targets"
+    stale = envelope.model_copy(
+        update={
+            "cases": {CASE: envelope.cases[CASE].model_copy(update={"marks": older})}
+        }
+    )
+    write_review(tree, stale)
+
+    covering = reviews.current_for_case(tree, CASE)
+
+    assert covering is not None, "an older key still names its finding"
+    prepared = sittings.prepare(corpus / CASE)
+    read = sittings.current_marks(prepared, covering.answers.marks)
+    assert set(read) == set(envelope.cases[CASE].marks)
+
+
+def test_two_marks_the_current_rule_folds_into_one_finding_must_agree(tmp_path):
+    from evals.harness.sitting import MarkTarget, SittingError
+
+    tree = tree_for(tmp_path)
+    prepared = sittings.prepare(tree / "evals" / "corpus" / CASE)
+    first = prepared.mark_targets[0]
+    from dataclasses import replace
+
+    aliased = replace(
+        prepared,
+        mark_targets=(
+            MarkTarget(
+                fingerprint=first.fingerprint,
+                framework=first.framework,
+                claims=first.claims,
+                aliases=("v0:old",),
+            ),
+            *prepared.mark_targets[1:],
+        ),
+    )
+
+    assert sittings.current_marks(aliased, {"v0:old": "agree"}) == {
+        first.fingerprint: "agree"
+    }
+    with __import__("pytest").raises(SittingError, match="disagree"):
+        sittings.current_marks(
+            aliased, {"v0:old": "agree", first.fingerprint: "reject"}
+        )

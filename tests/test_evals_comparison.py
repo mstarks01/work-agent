@@ -157,6 +157,21 @@ class TestGroupingAndSort:
         assert text.count("## Commit ") == 1
         assert "2 baseline(s)" in text
 
+    def test_the_table_reads_nothing_from_git(self, tmp_path, monkeypatch):
+        """The merge date used to come from ``git log`` at build time, and a
+        depth-one checkout answered with its boundary commit's date, so the
+        committed table read as stale on any pull request dated after the
+        Baseline landed. The table is a function of the Baseline files alone."""
+        import subprocess
+
+        def refuse(*args, **kwargs):
+            raise AssertionError("the comparison table shelled out")
+
+        monkeypatch.setattr(subprocess, "run", refuse)
+        merged(tmp_path, "one")
+
+        assert "`one`" in build(tmp_path)
+
     def test_the_sort_key_is_never_a_score(self, tmp_path):
         """A leaderboard over this corpus would reward overfitting to it."""
         merged(tmp_path, "b-low", scores=[score_row(recall=0.1)])

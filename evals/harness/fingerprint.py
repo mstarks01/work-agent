@@ -51,6 +51,14 @@ Model** and says nothing across two, so the scope is the missing half of the
 place. :data:`READS_SCOPE` says which versions read it, and a version that does
 refuses an empty one the way version 2 refuses a missing verb.
 
+Version 6 reads the action through :data:`~evals.harness.verbs.EQUIVALENT`,
+so two verbs the labels cannot separate key alike. Version 4 hashed the verb
+as written, which was one reader of "one action" beside the matcher's
+:func:`~evals.harness.verbs.same_action`: the day a group landed, a vote on a
+``forge`` claim would have missed an ``inject`` one the scorer matched. The
+version is in the value, so a ledger row keyed at 4 re-keys to 6 by
+recomputation and never compares across the table change by accident.
+
 Every version stays computable, and that is not a compatibility shim. Which rule
 keys a package is :data:`VERSION_FOR`, and the entries follow from what a
 package's claims are. A ledger row written under an older rule re-keys by
@@ -68,7 +76,7 @@ from analysis_service.frameworks.asvs.record import requirement_of
 from analysis_service.parsing import ascii_int
 from analysis_service.report import FrameworkName
 from evals.harness.identity import FlowMap, endpoint_form
-from evals.harness.verbs import check_verb
+from evals.harness.verbs import canonical, check_verb
 
 #: The version a caller gets when it does not choose. Bumping it is a re-keying
 #: event, so it is a reviewed edit rather than a default that drifts — and a
@@ -89,7 +97,7 @@ from evals.harness.verbs import check_verb
 #: finding it produces, which is the question its author should answer: does
 #: this package's claim carry its own identity, or compose one?
 VERSION_FOR: dict[FrameworkName, int] = {
-    "stride": 4,
+    "stride": 6,
     "asvs": 5,
 }
 
@@ -126,7 +134,7 @@ IDENTIFIER_OF: dict[FrameworkName, Callable[[str], str] | None] = {
 #: Every version this module can compute. A key missing here raises rather than
 #: falling back — a fingerprint quietly computed under the wrong rule is a vote
 #: silently attached to the wrong finding.
-SUPPORTED_VERSIONS = (1, 2, 3, 4, 5)
+SUPPORTED_VERSIONS = (1, 2, 3, 4, 5, 6)
 
 #: Which component each version reads on top of the framework, lane and targets
 #: every version hashes. ``None`` says this version reads those three alone.
@@ -140,12 +148,15 @@ SUPPORTED_VERSIONS = (1, 2, 3, 4, 5)
 #: ``test_every_supported_version_declares_what_it_reads`` checks it against
 #: :data:`SUPPORTED_VERSIONS` in both directions, because a table nobody
 #: compares to its registry fails as quietly as the ``if`` it replaced.
+#: ``action`` is the verb read through the equivalence table; ``verb`` is the
+#: verb as written. Both require a verb on the claim.
 EXTRA_COMPONENT: dict[int, str | None] = {
     1: None,
     2: "verb",
     3: "identifier",
     4: "verb",
     5: "identifier",
+    6: "action",
 }
 
 #: Which versions read the scope a claim was reached in. **Keyed, never
@@ -168,6 +179,7 @@ READS_SCOPE: dict[int, bool] = {
     3: False,
     4: True,
     5: True,
+    6: True,
 }
 
 
@@ -352,14 +364,15 @@ def fingerprint(components: Components, version: int) -> str:
                 " key two systems' claims about one element slug alike"
             )
         parts.append(components.scope)
-    if EXTRA_COMPONENT[version] == "verb":
+    if EXTRA_COMPONENT[version] in ("verb", "action"):
         if components.verb is None:
             raise FingerprintError(
                 f"version {version} reads the action verb and this claim"
                 " carries none; assign one from evals.harness.verbs, or"
                 " fingerprint at version 1"
             )
-        parts.append(check_verb(components.verb))
+        verb = check_verb(components.verb)
+        parts.append(canonical(verb) if EXTRA_COMPONENT[version] == "action" else verb)
     if EXTRA_COMPONENT[version] == "identifier":
         if not components.identifier:
             raise FingerprintError(
@@ -416,7 +429,7 @@ def key_claim(
         lane,
         element_ids,
         flows,
-        verb=verb if reads == "verb" else None,
+        verb=verb if reads in ("verb", "action") else None,
         identifier=identifier if reads == "identifier" else None,
         scope=scope if READS_SCOPE[version] else "",
     )
