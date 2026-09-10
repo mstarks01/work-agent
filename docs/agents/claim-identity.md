@@ -166,8 +166,8 @@ framework, checked against `PACKAGES` and declared in
 
 | Package | Version | Why |
 |---|---|---|
-| `stride` | 2 | an open claim set, so the action is half of what makes two claims one finding |
-| `asvs` | 3 | its claims name a requirement in a catalog, so the identifier and the place it was ruled in are the key |
+| `stride` | 6 | an open claim set, so the action is half of what makes two claims one finding; read through the equivalence table, so two verbs the labels cannot separate are one key; with the scope |
+| `asvs` | 5 | its claims name a requirement in a catalog, so the identifier and the place it was ruled in are the key; with the scope |
 
 Version 1 — place alone — keys nothing today. ASVS sat there until the collapse
 it caused was named: two requirements ruled on one element in one chapter shared

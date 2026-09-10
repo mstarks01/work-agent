@@ -31,18 +31,40 @@ def test_equivalence_groups_name_real_verbs():
         assert len(group) > 1, "a group of one is not an equivalence"
 
 
-def test_the_equivalence_table_is_empty_and_that_is_recorded():
-    """Pinned, because the emptiness is a measurement and not an oversight.
+def test_the_shipped_equivalence_is_free_on_both_error_axes():
+    """The table held one group as of 2026-09-10, and it was priced first.
 
-    Every apparent synonym over the calibration labels resolved to one verb once
-    the verb was assigned from the action and its object class. If a later edit
-    adds a group, this test is where the reason gets written down.
+    The table was empty from the first cut because every apparent synonym
+    resolved to one verb once assigned from the action and its object class.
+    The first Baseline showed a pair the labels cannot separate: forge, inject
+    and plant. A group earns its place by costing nothing on either axis: no
+    labelled non-match it merges, no reference pair the corpus records as two
+    findings it calls one. Priced here against an empty table, through the
+    pricing module's own readers, so a later group is held to the same bar.
     """
-    assert EQUIVALENT == ()
+    from evals import verify_corpus
+    from evals.harness.calibration import load_pairs
+    from evals.harness.reference import load_corpus
+    from evals.harness.run import _flows_by_case
+    from evals.harness.verb_pricing import _labelled, _references
+
+    assert EQUIVALENT == (frozenset({"forge", "inject", "plant"}),)
+    corpus = load_corpus(verify_corpus.CORPUS_DIR)
+    flows = _flows_by_case(corpus)
+    pairs = load_pairs()
+    bare_splits, bare_merges = _labelled(pairs, flows, ())
+    splits, merges = _labelled(pairs, flows, EQUIVALENT)
+    assert splits <= bare_splits
+    assert len(merges) == len(bare_merges), "the group merges a labelled non-match"
+    assert len(_references(corpus, flows, EQUIVALENT)) == len(
+        _references(corpus, flows, ())
+    ), "the group merges a reference pair the corpus records as two findings"
 
 
-def test_canonical_is_identity_while_nothing_is_equivalent():
-    assert all(canonical(verb) == verb for verb in ACTION_VERBS)
+def test_canonical_is_identity_outside_the_shipped_group():
+    grouped = set().union(*EQUIVALENT)
+    assert all(canonical(verb) == verb for verb in ACTION_VERBS if verb not in grouped)
+    assert {canonical(verb) for verb in grouped} == {min(grouped)}
     assert same_action("read", "read")
     assert not same_action("read", "intercept")
 

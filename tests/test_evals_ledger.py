@@ -304,10 +304,9 @@ def test_a_rekey_moves_each_row_under_its_own_frameworks_rule(tmp_path):
 
     moved = rekey(load(path).votes)
 
-    assert sorted(vote.fingerprint.split(":")[0] for vote in moved) == [
-        f"v{version_for('stride')}",
-        f"v{version_for('asvs')}",
-    ]
+    assert sorted(vote.fingerprint.split(":")[0] for vote in moved) == sorted(
+        [f"v{version_for('stride')}", f"v{version_for('asvs')}"]
+    )
 
 
 class TestTheScopeIsTheCase:
