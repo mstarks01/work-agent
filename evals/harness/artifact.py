@@ -34,9 +34,13 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 from analysis_service.certification import CertifyResult
 from analysis_service.identity import IDENTITY_VERSION
 from evals.harness.instruments import INSTRUMENTS, Sweep, artifact_blocks
-from evals.harness.provenance import ProvenanceError, RunProvenance, checkout_state
+from evals.harness.provenance import (
+    REPO_ROOT,
+    ProvenanceError,
+    RunProvenance,
+    checkout_state,
+)
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
 CORPUS_DIR = REPO_ROOT / "evals" / "corpus"
 
 # The eval artifact's schema version. Bump it for any change to the declared
@@ -125,7 +129,7 @@ def repo_commit() -> RepoCommit:
     what produced it.
     """
     try:
-        commit, clean = checkout_state(REPO_ROOT)
+        commit, clean = checkout_state()
     except ProvenanceError as exc:
         raise ProvenanceError(
             f"{exc}, so this sweep cannot say what it would run from. An"

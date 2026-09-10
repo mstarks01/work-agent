@@ -67,6 +67,13 @@ from analysis_service.model_tiers import TIER_NAMES, TierName
 from analysis_service.report import NodeRun
 from analysis_service.sampling import SamplingConfig, TierSampling
 
+#: The checkout this harness is part of. Every reader of the tree's identity
+#: asks about this directory, so the commit an artifact stops on and the tree
+#: its provenance records name one checkout wherever the sweep was launched
+#: from. The process working directory is not that fact: a sweep run from
+#: another clone would have recorded that clone's HEAD.
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
 # How an unset param reads in the operator-facing display. A param this
 # deployment leaves unset is not the same claim as one pinned to zero, and the
 # two must not render alike in the block someone approves a promotion from.
@@ -366,13 +373,19 @@ def _unique(values: Iterable[str]) -> tuple[str, ...]:
 def checkout_state(root: Path | None = None) -> tuple[str, bool]:
     """The commit this checkout is at, and whether the tree is clean.
 
-    **The one reader of the tree's identity.** :func:`tree_identity` records
-    it and :func:`~evals.harness.artifact.repo_commit` stops a sweep on it;
-    each used to run the same two git commands and could have read two
-    different answers. Raises :class:`ProvenanceError` naming the cause where
-    there is no checkout to ask, and the callers decide what that means.
+    **The one reader of the tree's identity, over one checkout.**
+    :func:`tree_identity` records it and
+    :func:`~evals.harness.artifact.repo_commit` stops a sweep on it, and both
+    ask about :data:`REPO_ROOT`. One command is half of that: two callers
+    running one command over two directories still read two answers, and the
+    artifact would carry a commit from this checkout beside a tree from
+    whichever one the operator happened to stand in.
+
+    ``root`` names another directory, for a test that scripts a checkout.
+    Raises :class:`ProvenanceError` naming the cause where there is no
+    checkout to ask, and the callers decide what that means.
     """
-    cwd = str(root) if root is not None else None
+    cwd = str(root if root is not None else REPO_ROOT)
     try:
         head = subprocess.run(
             ["git", "rev-parse", "HEAD"],
