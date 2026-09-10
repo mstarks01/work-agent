@@ -31,8 +31,10 @@ import pytest
 from evals import verify_corpus
 from evals.harness.calibration import (
     AGREEMENT_BAR,
+    CalibrationError,
     load_pairs,
     measure_agreement,
+    measure_direction,
     measure_merges,
 )
 from evals.harness.identity import (
@@ -41,6 +43,7 @@ from evals.harness.identity import (
     MechanicalIdentity,
     SubsetVerbIdentity,
     comparable_elements,
+    direction_state,
     endpoint_form,
     endpoint_subset,
 )
@@ -67,6 +70,38 @@ MEASURED = {
     # fifth of the ones it calls different.
     "false_matches": 22,
     "false_non_matches": 89,
+}
+
+#: What a **direction** across the boundary is worth, which
+#: [#652](https://github.com/mstarks01/work-agent/issues/652) asks. Nothing in
+#: the identity tuple carries one, so two escalations the opposite way round
+#: fingerprint the same. The question is whether that costs anything.
+#:
+#: **A direction is not a field, so it has to be derived, and it is derivable
+#: on two thirds of the corpus.** ``affected_element_ids`` is a list whose order
+#: no rule reads, so a claim naming two processes says nothing about which way
+#: the attacker moves between them. A claim naming a **Data Flow** says it
+#: through that flow's endpoints, and 155 of 244 corpus claims name exactly one.
+#:
+#: The two readings of an absent direction are both dead ends, and the numbers
+#: below are why. Read it as a mismatch and the rule splits 90 of the 186
+#: labelled pairs it merges correctly today, to recover 2 of its 3 candidate
+#: merges. Read it as a wildcard and it changes nothing at all, because in every
+#: merge that survives the verb the coarser side cites no flow.
+DIRECTION = {
+    # Over the corpus, what a claim yields without a new field.
+    "claims": 244,
+    "one_flow_cited": 155,
+    "several_flows_cited": 3,
+    "no_flow_cited": 86,
+    # Over the 3 reference merges the shipped rule makes.
+    "merges_with_a_direction_on_both_sides": 0,
+    "merges_that_run_opposite_ways": 0,
+    # Over the 311 scored pairs, an absent direction read each way.
+    "as_a_mismatch_new_splits": 90,
+    "as_a_mismatch_merges_recovered": 2,
+    "as_a_wildcard_new_splits": 0,
+    "as_a_wildcard_merges_recovered": 0,
 }
 
 #: The frontier, all three ways of being wrong at once.
@@ -457,6 +492,125 @@ def test_every_surviving_merge_is_a_recorded_one(corpus, flows_by_case):
                     " is not in verbs.UNSEPARATED. Add it with the reason, or"
                     f" separate it:\n  A: {left.claim}\n  B: {right.claim}"
                 )
+
+
+def test_a_direction_is_underivable_on_a_third_of_the_corpus(corpus, flows_by_case):
+    """#652's first obstacle: the field a direction would come from is absent.
+
+    A component the corpus cannot state on 86 of 244 claims is not a component
+    the identity can read. Moving this number means a blessing pass re-cited
+    claims against flows, which is the one thing that would reopen the question.
+    """
+    result = measure_direction(
+        corpus, load_pairs(), flows_by_case, SubsetVerbIdentity(flows_by_case)
+    )
+
+    measured = {
+        "claims": result.claims,
+        "one_flow_cited": result.directed_claims,
+        "several_flows_cited": result.ambiguous_claims,
+        "no_flow_cited": result.undirected_claims,
+    }
+    assert measured == {key: DIRECTION[key] for key in measured}, (
+        f"the corpus now cites flows as {measured}. Update DIRECTION and"
+        " re-quote it in docs/agents/claim-identity.md, which cites these"
+        " numbers as the answer to #652."
+    )
+
+
+def test_a_direction_component_is_a_no_op_or_a_catastrophe(corpus, flows_by_case):
+    """#652's third question, priced: what would adding a direction cost?
+
+    Both readings of an absent direction are measured, because the choice
+    between them is the whole design and neither survives it. As a mismatch it
+    splits 90 of the 186 labelled pairs the rule merges correctly, to recover 2
+    of its 3 candidate merges. As a wildcard it moves nothing.
+    """
+    result = measure_direction(
+        corpus, load_pairs(), flows_by_case, SubsetVerbIdentity(flows_by_case)
+    )
+
+    assert (
+        result.merged
+        == MEASURED["match_pairs"] - FRONTIER["endpoint subset + verb"]["splits"]
+    ), "the priced population must be the pairs the shipped rule merges"
+    assert (
+        result.candidate_merges
+        == FRONTIER["endpoint subset + verb"]["candidate_merges"]
+    )
+    measured = {
+        "as_a_mismatch_new_splits": result.as_a_mismatch[0],
+        "as_a_mismatch_merges_recovered": result.as_a_mismatch[1],
+        "as_a_wildcard_new_splits": result.as_a_wildcard[0],
+        "as_a_wildcard_merges_recovered": result.as_a_wildcard[1],
+    }
+    assert measured == {key: DIRECTION[key] for key in measured}, (
+        f"a direction component now prices at {measured}. Update DIRECTION and"
+        " re-quote it in docs/agents/claim-identity.md; #652 was closed on"
+        " these numbers."
+    )
+
+
+def test_no_surviving_merge_runs_in_two_directions(corpus, flows_by_case):
+    """#652's second obstacle: on the merges that survive, one side has no way.
+
+    The three merges ``UNSEPARATED`` records each pair a claim citing a flow
+    with a coarser claim citing only its endpoints or its store. So a direction
+    read as a wildcard separates none of them, and this is the test that says
+    so. A fourth merge that *did* run two ways would land here as a failure and
+    reopen #652 with a case behind it.
+
+    ``measure_merges`` finds the same pairs and reports them as prose, which a
+    direction cannot be derived from. So this enumerates them a second time to
+    reach the element IDs, and checks the two enumerations pair for pair rather
+    than each against its own expectation.
+    """
+    states = collections.Counter()
+    enumerated = set()
+    for case in corpus:
+        claims = [
+            claim
+            for claim in case.references.get("stride", ())
+            if isinstance(claim, ReferenceThreat)
+        ]
+        if not claims or not all(claim.verb for claim in claims):
+            continue
+        flows = flows_by_case[case.meta.id]
+        for left, right in itertools.combinations(claims, 2):
+            merged = left.category == right.category and endpoint_subset(
+                left.affected_element_ids, right.affected_element_ids, flows
+            )
+            if not merged or not same_action(left.verb, right.verb):
+                continue
+            enumerated.add((case.meta.id, left.category, left.claim, right.claim))
+            states[
+                direction_state(
+                    left.affected_element_ids, right.affected_element_ids, flows
+                )
+            ] += 1
+
+    shared = measure_merges(corpus, "stride", flows_by_case)
+    assert enumerated == {
+        (merge.case, merge.lane, merge.left, merge.right) for merge in shared.merges
+    }, "this and measure_merges must find the same merges, pair for pair"
+    both_sides = sum(count for state, count in states.items() if state != "underivable")
+    assert both_sides == DIRECTION["merges_with_a_direction_on_both_sides"]
+    assert states["opposed"] == DIRECTION["merges_that_run_opposite_ways"]
+
+
+def test_the_direction_price_refuses_an_empty_population(corpus, flows_by_case):
+    """A vacuous ``(0, 0)`` reads exactly like the answer, so it must not exist.
+
+    "A direction breaks nothing here" and "nothing was measured" are the same
+    two numbers, and #652 was closed on the first of them.
+    """
+    with pytest.raises(CalibrationError, match="nothing to break"):
+        measure_direction(corpus, (), flows_by_case, SubsetVerbIdentity(flows_by_case))
+
+    with pytest.raises(CalibrationError, match="how often a direction"):
+        measure_direction(
+            (), load_pairs(), flows_by_case, SubsetVerbIdentity(flows_by_case)
+        )
 
 
 def test_the_rule_clears_the_bar(assigned, flows_by_case):

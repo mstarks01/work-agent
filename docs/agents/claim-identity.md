@@ -111,11 +111,49 @@ this is the measurement that answered it. It is not a claim about accuracy, and
 nothing downstream should quote it as one.
 
 **The three merges the verb does not break** are in `verbs.UNSEPARATED`, each
-with the reason. None is a gap in the vocabulary: one is arguably a correct
-merge the corpus itself calls adjacent, one is a repudiation lane where no
-attacker acts so no verb applies, and one is a corpus wording gap. Review 02
-moved the disputed case-13 "writes"/"alters" pair to `unclear` rather than
-forcing it to move either the rule or the score.
+with the reason. None is a gap in the vocabulary: one is a correct merge of two
+spellings of one pivot, one is a repudiation lane where no attacker acts so no
+verb applies, and one is a corpus wording gap. Review 02 moved the disputed
+case-13 "writes"/"alters" pair to `unclear` rather than forcing it to move
+either the rule or the score.
+
+### Why no direction enters the identity
+
+Nothing in the tuple says which way the attacker moves across a boundary. Two
+escalations in opposite directions therefore fingerprint the same, which
+[#652](https://github.com/mstarks01/work-agent/issues/652) raised. The frontier
+answered it: a direction is not available, and it would not pay if it were.
+
+**A direction is not a field.** `affected_element_ids` is a list whose order no
+rule reads, so a claim naming two processes says nothing about which way the
+attacker moves between them. Only a claim naming a **Data Flow** states a
+direction, through that flow's endpoints. 155 of the 244 corpus claims name
+exactly one flow; 3 name several and 86 name none, and neither of those yields
+the single direction a comparison needs.
+
+**The merge that raised the question runs one way, not two.** Case 01's two
+`escalate` claims both name the DMZ-to-core pivot. One cites the flow into the
+order service and the process it ends at, the other cites the two processes.
+The corpus already treats them as adjacent, so the merge is correct.
+
+**Neither reading of an absent direction is usable.** Both are priced over the
+labelled pairs the shipped rule merges today:
+
+| An absent direction read as | New false splits, of the 186 merged correctly | Candidate merges recovered, of 3 |
+|---|---:|---:|
+| a mismatch | 90 | 2 |
+| a wildcard | 0 | 0 |
+
+Read as a mismatch, a direction destroys half of what the rule gets right. Read
+as a wildcard it changes nothing, because in all three surviving merges the
+coarser side cites no flow. `tests/test_evals_identity.py` asserts both numbers
+and the flow-citation counts, so a blessing pass that re-cites claims against
+flows reopens the question by failing.
+
+The second candidate #652 names is the authority domain a claim moves between.
+The **System Model** holds no such field, so pricing it needs the field first.
+[ADR 31](../adr/0031-a-claim-identity-carries-no-direction.md) records the
+decision and what would reopen it.
 
 ### A label may decline, and the reviewed set stays small
 
