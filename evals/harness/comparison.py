@@ -32,7 +32,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -66,7 +65,6 @@ class Row:
     submitters: tuple[str, ...]
     sweeps: int
     cost_usd: float
-    merged: str
     #: ``{series: {framework: {column label: cell}}}``, already rendered.
     cells: dict[str, dict[str, dict[str, str]]]
     #: (findings a person answered, findings offered) across every sweep, so
@@ -83,21 +81,6 @@ class Row:
             str(self.identity.get("repo_commit", "")),
             str(self.identity.get("corpus_digest", "")),
         )
-
-
-def _merged_at(directory: Path, root: Path) -> str:
-    """When this Baseline last landed, as the neutral sort key."""
-    try:
-        stamp = subprocess.run(
-            ["git", "log", "-1", "--format=%cI", "--", str(directory)],
-            cwd=root,
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout.strip()
-    except (OSError, subprocess.CalledProcessError):
-        return ""
-    return stamp[:10]
 
 
 def _series_blocks(raw: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -194,7 +177,6 @@ def read_baseline(directory: Path, root: Path = REPO_ROOT) -> Row | None:
         cost_usd=sum(
             baseline.recorded_usd(entry.get("cost", {})) or 0.0 for entry in entries
         ),
-        merged=_merged_at(directory, root),
         cells=cells,
         coverage=coverage,
     )
@@ -245,13 +227,17 @@ def build(root: Path = REPO_ROOT) -> str:
         return HEADER + EMPTY
 
     parts = [HEADER]
-    rows.sort(key=lambda row: (row.merged, row.name))
+    # By name, and by name alone: one tree gives one table. A merge date used
+    # to sort here, read from git at build time, and a depth-one checkout
+    # answered with its boundary commit's date, so the committed table read
+    # as stale on any pull request dated after the Baseline landed.
+    rows.sort(key=lambda row: row.name)
     grouped: dict[tuple[str, str], list[Row]] = {}
     for row in rows:
         grouped.setdefault(row.group, []).append(row)
 
     for (commit, digest), group in sorted(
-        grouped.items(), key=lambda item: min(row.merged for row in item[1])
+        grouped.items(), key=lambda item: min(row.name for row in item[1])
     ):
         parts.append(
             f"\n## Commit `{commit[:12]}`, corpus `{digest[:12]}`\n"
@@ -297,8 +283,7 @@ def _render_row(row: Row) -> str:
     summary = (
         f"\n{models} · frameworks {frameworks} · {row.sweeps} sweep(s)"
         f" · ${row.cost_usd:.2f} recorded"
-        f" · submitted by {', '.join(_inline(who) for who in row.submitters) or 'nobody'}"
-        f" · merged {_inline(row.merged) if row.merged else 'unknown'}\n"
+        f" · submitted by {', '.join(_inline(who) for who in row.submitters) or 'nobody'}\n"
         f"\nVote coverage: {row.coverage[0]} of {row.coverage[1]} unmatched"
         f" finding(s) judged by a person.\n"
     )
