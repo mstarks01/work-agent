@@ -49,6 +49,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from functools import partial
@@ -595,7 +596,10 @@ class MarkTarget:
     #: framework's rule. A mark stores only its key, so a merged sitting keyed
     #: before a version moved still names this target through one of these;
     #: :func:`current_marks` reads them. Recomputed from the claim, never
-    #: stored, so a version can move without a record moving.
+    #: stored, so a version can move without a record moving. An older key
+    #: two findings share — version 1 reads no verb and no scope — names
+    #: neither, so a mark under it is refused by name rather than read as an
+    #: answer on whichever finding was listed last.
     aliases: tuple[str, ...] = ()
 
 
@@ -666,12 +670,13 @@ def mark_targets(case: GoldenCase) -> tuple[MarkTarget, ...]:
             aliases.setdefault(value, set()).update(
                 _older_keys_of(case.id, framework, claim, flows) - {value}
             )
+    owners = Counter(alias for known in aliases.values() for alias in known)
     return tuple(
         MarkTarget(
             fingerprint=value,
             framework=frameworks[value],
             claims=tuple(claims),
-            aliases=tuple(sorted(aliases[value])),
+            aliases=tuple(sorted(a for a in aliases[value] if owners[a] == 1)),
         )
         for value, claims in grouped.items()
     )

@@ -2579,3 +2579,23 @@ class TestARecordSignsWhatWasServed:
 
         assert after != before
         assert len(after) == len(before)
+
+
+def test_two_merged_marks_that_fold_and_disagree_refuse_the_case_with_a_409(
+    tree, monkeypatch
+):
+    """The fold runs when a merged sitting is resumed. Its refusal names the
+    finding a person has to settle, and it reaches the reader as the 409 every
+    other refusal on this path does, not as a 500."""
+    sign(tree, CASE, "ada")
+
+    def disagree(prepared, marks):
+        raise sittings.SittingError("two marks name one recorded finding")
+
+    monkeypatch.setattr(sittings, "current_marks", disagree)
+    app = browser(session_for(tree, "ada"))
+
+    response = app.get(f"/api/part-one?case={CASE}")
+
+    assert response.status_code == 409
+    assert "two marks name one recorded finding" in response.json()["detail"]
