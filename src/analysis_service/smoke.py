@@ -306,7 +306,7 @@ def _llm_runs(report: Report, deployment: Deployment) -> list[NodeRun]:
     built over every framework this install carries, which is exactly the set
     this run selects.
     """
-    tier_nodes = deployment.tier_nodes()
+    tier_nodes = deployment.tier_nodes
     return [run for run in report.nodes if run.node in tier_nodes]
 
 
@@ -314,7 +314,7 @@ def _selected_routes(deployment: Deployment) -> dict[str, str]:
     """Each LLM graph node -> the route this deployment's config selects for it."""
     return {
         node: deployment.tiers.resolve_model(tier_node).route
-        for node, tier_node in deployment.tier_nodes().items()
+        for node, tier_node in deployment.tier_nodes.items()
     }
 
 
