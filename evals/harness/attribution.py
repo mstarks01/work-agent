@@ -29,13 +29,13 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Literal
 
-from analysis_service.frameworks.asvs.record import requirement_of
-from analysis_service.report import (
+from analysis_service.claims import (
     FrameworkAnalysis,
     FrameworkName,
     RuledClaim,
     ScopeEntry,
 )
+from analysis_service.frameworks.asvs.record import requirement_of
 from evals.harness.reference import GoldenCase, ReferenceRequirement
 
 if TYPE_CHECKING:
@@ -59,7 +59,7 @@ STAGES: tuple[Stage, ...] = (
 )
 
 #: What a scope entry's state says about a requirement the run never applied.
-#: Keyed by every state :class:`~analysis_service.report.ScopeEntry` can carry,
+#: Keyed by every state :class:`~analysis_service.claims.ScopeEntry` can carry,
 #: and ``tests/test_evals_attribution.py`` holds it to that set, so a fifth
 #: state raises here rather than reading as one of these four.
 #: ``needs-other-evidence`` cannot be a miss — the matrix counts it applied —

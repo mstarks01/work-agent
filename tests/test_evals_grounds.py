@@ -11,14 +11,14 @@ from __future__ import annotations
 import pytest
 from pydantic import BaseModel, ValidationError
 
-from analysis_service.fan_in import DraftJoinError
-from analysis_service.frameworks.stride.record import STRIDE_VERSION, DraftThreat
-from analysis_service.report import (
+from analysis_service.claims import (
     DroppedClaim,
     Ground,
     RepairedQuote,
     UnverifiedGround,
 )
+from analysis_service.fan_in import DraftJoinError
+from analysis_service.frameworks.stride.record import STRIDE_VERSION, DraftThreat
 from evals.harness.grounds import (
     GroundMisShape,
     aggregate_grounds,

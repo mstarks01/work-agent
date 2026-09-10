@@ -53,6 +53,7 @@ from analysis_service.auth import (
     build_verifier,
 )
 from analysis_service.budgets import BudgetPolicy
+from analysis_service.claims import FrameworkName
 from analysis_service.deployment import Deployment
 from analysis_service.errors import ConfigError
 from analysis_service.frameworks import PACKAGES
@@ -67,7 +68,7 @@ from analysis_service.jobs import (
     execute_job,
 )
 from analysis_service.parsing import ascii_int
-from analysis_service.report import FrameworkName, FrameworkSelection
+from analysis_service.report import FrameworkSelection
 from analysis_service.selection import SelectionError, resolve_selection
 from analysis_service.sources import Source, SourceLimits, plain_name
 from analysis_service.validation import ValidationIssue

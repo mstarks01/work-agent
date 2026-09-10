@@ -57,8 +57,8 @@ from typing import Literal, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from analysis_service.claims import FrameworkName
 from analysis_service.markdown_loader import RESOLVE_ERRORS
-from analysis_service.report import FrameworkName
 from evals import build_review_docs as docs
 from evals.harness.fingerprint import (
     SUPPORTED_VERSIONS,

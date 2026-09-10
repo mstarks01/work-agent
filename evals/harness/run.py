@@ -46,14 +46,16 @@ from typing import Any
 
 from analysis_service.actions import VerbError
 from analysis_service.certification import CertificationError, CertifyResult, certify
+from analysis_service.claims import (
+    FrameworkAnalysis,
+    FrameworkName,
+)
 from analysis_service.deployment import Deployment
 from analysis_service.frameworks import PACKAGES
 from analysis_service.frameworks.stride.record import Threat
 from analysis_service.graph import Pipeline
 from analysis_service.identity import build_identity
 from analysis_service.report import (
-    FrameworkAnalysis,
-    FrameworkName,
     NodeLatency,
     NodeRun,
     Report,
@@ -173,7 +175,7 @@ def stride_block(report: Report) -> FrameworkAnalysis:
 def stride_threats(report: Report) -> list[Threat]:
     """This report's STRIDE claims, at the record type they validate as.
 
-    ``claims`` is annotated at the neutral :class:`~analysis_service.report.RuledClaim` because a block
+    ``claims`` is annotated at the neutral :class:`~analysis_service.claims.RuledClaim` because a block
     holds whatever its own package produced; the scorers grade ``category`` and
     ``severity``, which only STRIDE's record carries. The envelope already
     validated this block as its package's own shape, so this re-states that

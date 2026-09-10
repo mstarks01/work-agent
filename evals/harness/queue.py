@@ -33,7 +33,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
-from analysis_service.report import FrameworkName
+from analysis_service.claims import FrameworkName
 from evals.harness import ledger
 from evals.harness.fingerprint import Components, key_claim
 from evals.harness.identity import FlowMap
@@ -44,7 +44,7 @@ from evals.harness.ledger import Ledger
 class Finding:
     """One produced claim, reduced to what a reviewer and the queue read.
 
-    Deliberately not a :class:`~analysis_service.report.Claim`: a queue item must
+    Deliberately not a :class:`~analysis_service.claims.Claim`: a queue item must
     not carry a field a reviewer should not see, and the cheapest way to
     guarantee that is a type that has no room for one.
     """

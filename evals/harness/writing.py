@@ -32,7 +32,11 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-from analysis_service.report import Claim, FrameworkName, Report
+from analysis_service.claims import (
+    Claim,
+    FrameworkName,
+)
+from analysis_service.report import Report
 from evals.harness.fingerprint import identifier_of, key_claim, lane_field
 from evals.harness.identity import FlowMap
 from evals.harness.ledger import STYLE_REASONS, Ledger

@@ -55,9 +55,7 @@ from typing import Any, Literal
 
 from pydantic import ValidationError
 
-from analysis_service.fan_in import DraftJoinError
-from analysis_service.frameworks import PACKAGES
-from analysis_service.report import (
+from analysis_service.claims import (
     Claim,
     DroppedClaim,
     FrameworkName,
@@ -65,6 +63,8 @@ from analysis_service.report import (
     RepairedQuote,
     UnverifiedGround,
 )
+from analysis_service.fan_in import DraftJoinError
+from analysis_service.frameworks import PACKAGES
 
 # Why the fan-in killed a case. A claim that loses every ground costs its own
 # entry rather than the case: it is dropped and marked, and
@@ -92,7 +92,7 @@ class ThreatGrounds:
 
     The audit trail under the aggregates. ``unverified`` holds indices into the
     draft's own ``grounds`` list, exactly as
-    :class:`~analysis_service.report.UnverifiedGround` records them, so a
+    :class:`~analysis_service.claims.UnverifiedGround` records them, so a
     surprising rate can be walked back to the quote that produced it.
     """
 
@@ -316,7 +316,7 @@ def measure_grounds(
     packages' drafts here would put one number over two populations whose agents
     were given different instructions.
 
-    Typed against the neutral :class:`~analysis_service.report.Claim` because that
+    Typed against the neutral :class:`~analysis_service.claims.Claim` because that
     is what carries ``grounds``. Nothing here reads a field a package declares.
 
     A mark naming a draft that is not here is dropped rather than raised on:

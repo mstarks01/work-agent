@@ -425,7 +425,7 @@ class SystemModel(BaseModel):
         **A suspicion, never a verdict.** It is not always wrong — a system
         really can run a process and keep a store that share a name — so this
         returns what it found and rules on nothing. Nothing routes on it; see
-        :class:`~analysis_service.report.SharedElementName` for where it lands
+        :class:`~analysis_service.claims.SharedElementName` for where it lands
         and why it is marked rather than failed.
 
         Reads IDs rather than names because the gate has already pinned every

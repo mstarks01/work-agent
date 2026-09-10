@@ -40,9 +40,12 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from analysis_service.claims import (
+    FrameworkAnalysis,
+    RuledClaim,
+)
 from analysis_service.frameworks.asvs.catalog import Requirement, requirements_for
 from analysis_service.frameworks.asvs.record import requirement_of
-from analysis_service.report import FrameworkAnalysis, RuledClaim
 from evals.harness.applicability import (
     FRAMEWORK,
     ApplicabilityScore,

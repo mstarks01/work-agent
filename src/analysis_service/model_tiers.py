@@ -45,9 +45,9 @@ from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
+from analysis_service.claims import FRAMEWORK_NAMES
 from analysis_service.config_files import read_toml
 from analysis_service.errors import ConfigError
-from analysis_service.report import FRAMEWORK_NAMES
 from analysis_service.vendors import (
     CREDENTIAL_MODES,
     VENDOR_NAMES,

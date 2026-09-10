@@ -40,7 +40,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from analysis_service.report import FrameworkName
+from analysis_service.claims import FrameworkName
 from evals.harness.artifact import EvalArtifact, load_artifact
 from evals.harness.provenance import ProvenanceError
 from evals.harness.scorer import ratio

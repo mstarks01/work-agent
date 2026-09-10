@@ -27,7 +27,7 @@ refuse a sweep of reports the service serves happily, and
 :func:`test_the_gate_is_never_stricter_than_the_service` is what says so.
 
 **Every fault runs against every package.** The rules under test read
-:class:`~analysis_service.report.Claim` and nothing a package declares, so they
+:class:`~analysis_service.claims.Claim` and nothing a package declares, so they
 are neutral — and a neutral-looking rule that diverged for one package is
 exactly what cost the first ASVS corpus sweep eleven correctly shaped claims.
 :data:`BLOCKS` is therefore a table keyed by framework, checked against
@@ -44,21 +44,21 @@ import pytest
 from pydantic import ValidationError
 
 from analysis_service import FrameworkName
-from analysis_service.frameworks import PACKAGES, FrameworkPackage, package_for
-from analysis_service.frameworks.asvs import ASVS
-from analysis_service.frameworks.asvs.record import AsvsAnalysis, RequirementRuling
-from analysis_service.frameworks.stride.record import Threat
-from analysis_service.report import (
+from analysis_service.claims import (
     FrameworkAnalysis,
     Ground,
     RepairedQuote,
-    Report,
     ScopeEntry,
     UnknownRef,
     UnresolvedReference,
     UnverifiedGround,
     Verdict,
 )
+from analysis_service.frameworks import PACKAGES, FrameworkPackage, package_for
+from analysis_service.frameworks.asvs import ASVS
+from analysis_service.frameworks.asvs.record import AsvsAnalysis, RequirementRuling
+from analysis_service.frameworks.stride.record import Threat
+from analysis_service.report import Report
 from evals.harness.structural import report_issues
 from tests.factories import PROJECT_ROOT, sample_analysis, sample_report
 
@@ -287,7 +287,7 @@ class Fault:
 #: drift apart without a line here going stale.
 FAULTS: Mapping[str, Fault] = {
     # The shared rules. Each of these is written twice, once in
-    # `analysis_service.report` and once in `evals.harness.structural`.
+    # `analysis_service.claims` and once in `evals.harness.structural`.
     "a claim names an element the model does not hold": Fault(
         _dangling_reference, BOTH
     ),

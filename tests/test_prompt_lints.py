@@ -50,6 +50,11 @@ import pytest
 from pydantic import ValidationError
 
 from analysis_service.actions import menu
+from analysis_service.claims import (
+    Ground,
+    Proposal,
+    RejectionStep,
+)
 from analysis_service.evidence import (
     _RESOLVED_AWAY,
     ABSENT_PREFIX,
@@ -69,7 +74,6 @@ from analysis_service.prompts import (
     compose_analyze_prompt,
     lane_exemplars_doc,
 )
-from analysis_service.report import Ground, Proposal, RejectionStep
 from analysis_service.skills import estimate_tokens
 from analysis_service.system_model import mentioned_ids
 from analysis_service.token_caps import (

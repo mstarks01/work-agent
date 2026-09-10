@@ -22,6 +22,14 @@ from google.adk.workflow import FunctionNode, JoinNode
 
 from analysis_service import graph
 from analysis_service.binding import NodeBinding
+from analysis_service.claims import (
+    CLAIM_BOUND_MARKS,
+    AnalysisMarks,
+    FrameworkName,
+    UnknownRef,
+    UnresolvedMention,
+    Verdict,
+)
 from analysis_service.critic import CriticOutputError
 from analysis_service.frameworks import (
     PRECONDITION_RESULTS,
@@ -37,16 +45,10 @@ from analysis_service.frameworks.stride.record import (
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.model_tiers import LLM_NODES
 from analysis_service.report import (
-    CLAIM_BOUND_MARKS,
-    AnalysisMarks,
-    FrameworkName,
     InputRef,
     Job,
     NodeRun,
     Report,
-    UnknownRef,
-    UnresolvedMention,
-    Verdict,
 )
 from analysis_service.resilience import load_resilience
 from analysis_service.sampling import load_sampling
@@ -1082,7 +1084,7 @@ def test_merge_parks_every_mark_kind_under_one_key():
     """One key, whatever the fan-in found.
 
     The marks have one owner, one standing and one policy, so they travel as
-    one :class:`~analysis_service.report.AnalysisMarks`. A sixth kind is a field
+    one :class:`~analysis_service.claims.AnalysisMarks`. A sixth kind is a field
     on that model and no new key here.
 
     The key is the *framework's*, because the fan-in that produced them is: two

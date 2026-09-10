@@ -49,6 +49,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
+from analysis_service.claims import FrameworkName
 from analysis_service.deployment import Deployment
 from analysis_service.engine import Engine
 from analysis_service.errors import ConfigError
@@ -62,7 +63,11 @@ from analysis_service.graph import (
 from analysis_service.identity import execution_fingerprint
 from analysis_service.jobs import PipelineRejected
 from analysis_service.model_tiers import TierName
-from analysis_service.report import FrameworkName, NodeRun, Report, SamplingValue
+from analysis_service.report import (
+    NodeRun,
+    Report,
+    SamplingValue,
+)
 from analysis_service.sampling import TierSampling
 from analysis_service.sources import Source
 

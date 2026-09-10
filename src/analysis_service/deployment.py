@@ -66,6 +66,7 @@ from analysis_service.certification import (
     CertificationGate,
     load_manifest,
 )
+from analysis_service.claims import FrameworkName
 from analysis_service.errors import ConfigError
 from analysis_service.framework_config import load_frameworks
 from analysis_service.frameworks import validate_packages
@@ -80,7 +81,6 @@ from analysis_service.graph import (
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.model_tiers import ModelTierConfig, TierName, load_model_tiers
 from analysis_service.pipeline import AdkPipelineRunner
-from analysis_service.report import FrameworkName
 from analysis_service.resilience import ResilienceConfig, load_resilience
 from analysis_service.sampling import SamplingConfig, load_sampling
 from analysis_service.selection import SelectionError, resolve_names

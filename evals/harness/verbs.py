@@ -1,7 +1,7 @@
 """What counts as one action, and the pairs this corpus cannot separate.
 
 The vocabulary itself is :mod:`analysis_service.actions`, and it lives there
-because :class:`~analysis_service.report.Claim` carries the field: a vocabulary
+because :class:`~analysis_service.claims.Claim` carries the field: a vocabulary
 that validates a shipped model has to ship with it. This module is the
 measurement's half. It says which verbs count as one action for matching, and
 records what the rule cannot do.
