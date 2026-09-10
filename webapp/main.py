@@ -137,7 +137,6 @@ from analysis_service.vendors import (
     CREDENTIAL_MODE_NOTES,
     VendorName,
     missing_sdk,
-    sdk_for,
     vendor_for,
 )
 from webapp.page import (
@@ -761,7 +760,7 @@ def _sdk_item(vendor: VendorName) -> str:
     reads as a missing one, and the section is a list of what an operator has
     to arrange.
     """
-    sdk = sdk_for(vendor)
+    sdk = vendor_for(vendor).sdk
     if sdk is None:
         return ""
     installed = missing_sdk(vendor) is None

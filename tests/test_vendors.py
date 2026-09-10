@@ -20,13 +20,10 @@ import pytest
 from analysis_service.vendors import (
     _CATCH_ALL,
     _CLAUDE_RULE,
-    _CREDENTIAL_VARS,
-    _MODE_KWARGS,
     CREDENTIAL_MODE_NOTES,
-    CREDENTIAL_MODES,
     REASONING_KWARG,
     VENDOR_NAMES,
-    VENDOR_SDKS,
+    VENDORS,
     CredentialMode,
     ProviderAuthError,
     ServedTrust,
@@ -37,7 +34,6 @@ from analysis_service.vendors import (
     missing_sdk,
     openai_reasoning_model,
     require_sdk,
-    sdk_for,
     vendor_for,
     vendor_for_route,
 )
@@ -69,16 +65,10 @@ class TestRouting:
 
 
 class TestVendorSdks:
-    """The client library a vendor's provider needs, as a table nobody may skip."""
+    """The client library a vendor's provider needs, a field no row may skip."""
 
-    def test_every_vendor_says_whether_it_needs_a_client_library(self):
-        # ``None`` is an answer and an absent key is not: a row that never
-        # answered would raise at ``missing_sdk`` on the first build that
-        # selected it, rather than here.
-        assert set(VENDOR_SDKS) == set(VENDOR_NAMES)
-
-    def test_every_extra_the_table_names_exists_in_pyproject(self):
-        """The table checked against the file that would install from it.
+    def test_every_extra_the_registry_names_exists_in_pyproject(self):
+        """The registry checked against the file that would install from it.
 
         Two readers of one fact — the registry names an extra and packaging
         defines one — so they are checked against each other rather than each
@@ -89,27 +79,15 @@ class TestVendorSdks:
             (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
         )
         defined = set(pyproject["project"].get("optional-dependencies", {}))
-        named = {sdk.extra for sdk in VENDOR_SDKS.values() if sdk is not None}
+        named = {vendor.sdk.extra for vendor in VENDORS.values() if vendor.sdk}
         assert named <= defined, (
             f"these extras are named by the registry and defined nowhere:"
             f" {sorted(named - defined)}"
         )
 
-    def test_the_table_has_one_reader(self):
-        """Both questions about the table go through `sdk_for`.
-
-        `missing_sdk` answers `None` for "needs nothing" and for "already
-        installed" alike, so the page needs the raw entry — and reading the
-        table for it would be a second accessor that keeps printing a row the
-        day the first answer becomes conditional.
-        """
-        assert sdk_for("bedrock") is VENDOR_SDKS["bedrock"]
-        for name in VENDOR_NAMES:
-            assert sdk_for(name) is VENDOR_SDKS[name]
-
     def test_a_vendor_that_needs_nothing_reports_nothing_missing(self):
         for name in VENDOR_NAMES:
-            if VENDOR_SDKS[name] is None:
+            if vendor_for(name).sdk is None:
                 assert missing_sdk(name) is None
                 require_sdk(name)
 
@@ -148,26 +126,6 @@ class TestVendorSdks:
 class TestCredentialModes:
     """The mechanism is declared; the material may be discovered."""
 
-    def test_every_vendor_declares_its_allowed_modes(self):
-        # A missing key raises, which is the point: no vendor can be silent
-        # about how it authenticates.
-        assert set(CREDENTIAL_MODES) == set(VENDOR_NAMES)
-
-    def test_the_var_table_answers_for_every_allowed_pair(self):
-        """The table is checked against its registry, in both directions.
-
-        A table nobody compares to ``CREDENTIAL_MODES`` fails as quietly as the
-        branch it replaced: an allowed mode with no entry raises at build time
-        on a deployment nobody tested, and an entry for a mode the vendor does
-        not allow is a shape that can never run.
-        """
-        declared = {
-            (vendor, mode)
-            for vendor, modes in CREDENTIAL_MODES.items()
-            for mode in modes
-        }
-        assert set(_CREDENTIAL_VARS) == declared
-
     def test_every_mode_tells_an_operator_what_to_arrange(self):
         assert set(CREDENTIAL_MODE_NOTES) == set(CredentialMode)
 
@@ -178,20 +136,12 @@ class TestCredentialModes:
     def test_the_api_key_vendors_are_api_key(self, name):
         assert vendor_for(name).credential_modes == (CredentialMode.API_KEY,)
 
-    def test_every_pair_states_the_kwargs_it_passes_with_a_fixed_value(self):
-        """The two credential tables are keyed alike, and checked against each other.
-
-        A pair that answered in one and was silent in the other would pass a
-        kwarg set nobody wrote down, or fail to pass one somebody did.
-        """
-        assert set(_MODE_KWARGS) == set(_CREDENTIAL_VARS)
-
     @pytest.mark.parametrize(
         ("name", "mode"),
         [
             (name, mode)
-            for name in VENDOR_NAMES
-            for mode in CREDENTIAL_MODES.get(name, ())
+            for name, vendor in VENDORS.items()
+            for mode in vendor.credential_modes
             if mode is CredentialMode.IAM
         ],
     )
@@ -282,16 +232,17 @@ class TestCredentialModes:
         "gemini": ("GOOGLE_API_KEY", "GEMINI_API_KEY"),
     }
 
-    # ``.get`` rather than ``[]``: this check runs at collection time, and a
-    # vendor added to ``VENDOR_NAMES`` before its ``CREDENTIAL_MODES`` entry
-    # would raise here and stop the whole suite from collecting — including
-    # ``test_vendor_neutrality``, whose message is what names the missing entry.
-    # A guard that cannot run when the tree is half-built helps nobody.
+    # Read from ``VENDORS`` rather than from ``VENDOR_NAMES``: this check runs
+    # at collection time, and a vendor added to ``VENDOR_NAMES`` before its
+    # ``VENDORS`` row would raise here and stop the whole suite from collecting
+    # — including ``test_vendor_neutrality``, whose message is what names the
+    # missing row. A guard that cannot run when the tree is half-built helps
+    # nobody.
     def test_every_key_bearing_vendor_names_its_ambient_variables(self):
         takes_a_key = {
             name
-            for name in VENDOR_NAMES
-            if CredentialMode.API_KEY in CREDENTIAL_MODES.get(name, ())
+            for name, vendor in VENDORS.items()
+            if CredentialMode.API_KEY in vendor.credential_modes
         }
         assert set(self.AMBIENT_KEY_VARS) == takes_a_key
 
@@ -360,9 +311,10 @@ class TestPlatformIdentity:
     def test_the_registry_names_no_credentials_file_at_all(self):
         # An operator who sets it still gets it, through ADC's own chain.
         # Nothing here names it or requires it.
-        for entries in _CREDENTIAL_VARS.values():
-            for entry in entries:
-                assert entry.var != "GOOGLE_APPLICATION_CREDENTIALS"
+        for vendor in VENDORS.values():
+            for source in vendor.credentials.values():
+                for entry in source.env:
+                    assert entry.var != "GOOGLE_APPLICATION_CREDENTIALS"
 
     @pytest.mark.parametrize(
         "missing", ["ANALYSIS_VERTEX_PROJECT", "ANALYSIS_VERTEX_LOCATION"]
@@ -402,7 +354,10 @@ class TestWhichVariablesAreSecret:
 
     # Sorted so the parameter ids are stable; ``CredentialMode`` is a
     # ``StrEnum``, so the pairs order as the strings they spell.
-    @pytest.mark.parametrize(("vendor", "mode"), sorted(_CREDENTIAL_VARS))
+    @pytest.mark.parametrize(
+        ("vendor", "mode"),
+        sorted((name, mode) for name, v in VENDORS.items() for mode in v.credentials),
+    )
     def test_the_secret_set_is_a_subset_of_the_required_set(self, vendor, mode):
         entry = vendor_for(vendor)
         assert set(entry.secret_env_vars(mode)) <= set(entry.required_env_vars(mode))

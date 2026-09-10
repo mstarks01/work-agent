@@ -6,8 +6,8 @@ provider is not how to call it. It is three facts the adapter cannot supply:
 * the router prefix LiteLLM dispatches on — ``vertex_ai/``, ``anthropic/``,
   ``openai/``, ``bedrock/`` or ``gemini/`` — which is also the vendor half of
   an **Execution Identity** fingerprint;
-* the credential modes a vendor allows, which :data:`CREDENTIAL_MODES` holds and
-  a deployment declares from. Vertex admits no raw-API-key path under any
+* the credential modes a vendor allows, which :attr:`Vendor.credentials` holds
+  and a deployment declares from. Vertex admits no raw-API-key path under any
   adapter (``BerriAI/litellm#21036``), so ``vertex + api_key`` is
   unrepresentable rather than validated against;
 * the floating-form rule for model identifiers, which differs by model family
@@ -16,7 +16,7 @@ provider is not how to call it. It is three facts the adapter cannot supply:
   region scope and a family segment — so the rule is keyed by vendor and the
   shapes it is built from are written down once;
 * the client library the vendor's provider needs in the image, which
-  :data:`VENDOR_SDKS` holds. A vendor whose provider signs its own requests
+  :attr:`Vendor.sdk` holds. A vendor whose provider signs its own requests
   needs one, and an optional extra is what supplies it (ADR 0023).
 
 The per-``(vendor, model)`` sampling support set is deliberately not here.
@@ -131,32 +131,11 @@ class CredentialMode(StrEnum):
     IAM = "iam"
 
 
-#: Which modes each vendor allows, keyed by vendor. A missing key raises, which
-#: is the point: a table nobody can be silent in, rather than a default that
-#: answers for a vendor its author never considered.
-#:
-#: Bedrock is the first vendor with a choice, so a deployment that selects it
-#: declares which mode it uses. The loader's rules are what carry that: a
-#: ``[credentials]`` key for a single-mode vendor is an error, and a missing key
-#: for a multi-mode vendor is an error. Both read this table.
-CREDENTIAL_MODES: dict[VendorName, tuple[CredentialMode, ...]] = {
-    "vertex": (CredentialMode.IAM,),
-    "anthropic": (CredentialMode.API_KEY,),
-    "openai": (CredentialMode.API_KEY,),
-    "bedrock": (CredentialMode.API_KEY, CredentialMode.IAM),
-    # The Gemini Developer API takes a key and nothing else. It is a different
-    # provider from ``vertex`` rather than a second mode on it:
-    # ``get_llm_provider`` resolves ``gemini/`` and ``vertex_ai/`` to two
-    # providers, and Vertex admits no key under any adapter.
-    "gemini": (CredentialMode.API_KEY,),
-}
-
-
 @dataclass(frozen=True)
 class _CredentialVar:
     """One environment variable a ``(vendor, mode)`` pair reads.
 
-    ``secret`` is the field that separates this table's two readers.
+    ``secret`` is the field that separates this entry's two readers.
     :attr:`Vendor.required_env_vars` reports every entry, because an operator
     has to set every one. :meth:`Vendor.secret_env_vars` reports only the
     secret ones, because that is what must never survive into a job summary.
@@ -169,94 +148,44 @@ class _CredentialVar:
     secret: bool
 
 
+@dataclass(frozen=True)
+class _CredentialSource:
+    """What one ``(vendor, mode)`` pair reads from the environment and states outright.
+
+    ``env`` holds the ``(LiteLlm kwarg, env var, secret)`` entries the pair
+    authenticates and addresses with. ``fixed`` holds the kwargs the pair passes
+    with a **fixed** value rather than reading one from the environment, and
+    every pair states it, empty or not, because **"pass no credential
+    material" is not the same as "pass nothing"**. litellm reads
+    ``AWS_BEARER_TOKEN_BEDROCK`` out of the process environment whenever
+    ``api_key`` is ``None`` and authenticates with it, skipping SigV4 — so an
+    *absent* kwarg means "look in the environment", which is the ASI03
+    inherited-credential path this registry exists to close. An empty string
+    states the platform-identity choice positively: litellm tests
+    ``api_key is not None`` first and the value's truthiness second, so ``""``
+    passes the first test, fails the second, and the request is signed from the
+    identity the vendor's own SDK resolved.
+
+    Stated as a property rather than as one vendor's name: a mode that passes
+    no credential material has to say so to any provider whose SDK would
+    otherwise read one from the environment on its own.
+    """
+
+    env: tuple[_CredentialVar, ...]
+    fixed: Mapping[str, str]
+
+
 def _api_key_var(vendor: VendorName) -> str:
     """The env var holding one vendor's API key."""
     return _API_KEY_TEMPLATE.format(vendor=vendor.upper())
 
 
-#: The ``(LiteLlm kwarg, env var, secret)`` entries each ``(vendor, mode)`` pair
-#: authenticates and addresses with. A table rather than a branch on the mode:
-#: a branch answers for the vendors its author had in front of them, and a
-#: missing key here raises instead of falling through to somebody else's shape.
-#: ``tests/test_vendors.py`` checks this table's keys against
-#: :data:`CREDENTIAL_MODES`, because a table nobody compares to its registry
-#: fails as quietly as the branch it replaced.
-#:
-#: Vertex under ``IAM`` passes a project and a location and **no credential**.
-#: ``vertex_credentials`` is omitted so that ``google.auth.default()`` runs and
-#: resolves whatever identity the platform supplies — a Workload Identity
-#: binding, a metadata server, or an operator's own
-#: ``GOOGLE_APPLICATION_CREDENTIALS``, through ADC's chain rather than through
-#: anything this registry names.
-_CREDENTIAL_VARS: dict[
-    tuple[VendorName, CredentialMode], tuple[_CredentialVar, ...]
-] = {
-    ("vertex", CredentialMode.IAM): (
-        _CredentialVar("vertex_project", VERTEX_PROJECT_VAR, secret=False),
-        _CredentialVar("vertex_location", VERTEX_LOCATION_VAR, secret=False),
-    ),
-    ("anthropic", CredentialMode.API_KEY): (
-        _CredentialVar("api_key", _api_key_var("anthropic"), secret=True),
-    ),
-    ("openai", CredentialMode.API_KEY): (
-        _CredentialVar("api_key", _api_key_var("openai"), secret=True),
-    ),
-    # Bedrock under ``API_KEY`` passes a bearer token and a region. litellm's
-    # ``_sign_request`` reads the bearer off the ``api_key`` parameter, sets the
-    # ``Authorization`` header and skips SigV4 entirely, so this is the same
-    # shape the other key-bearing vendors use.
-    ("bedrock", CredentialMode.API_KEY): (
-        _CredentialVar("api_key", _api_key_var("bedrock"), secret=True),
-        _CredentialVar("aws_region_name", BEDROCK_REGION_VAR, secret=False),
-    ),
-    # Bedrock under ``IAM`` passes the region and **no credential**. litellm
-    # then falls to its terminal branch and boto3's own chain runs, which covers
-    # an attached role, a workload identity binding, ``AWS_PROFILE`` and SSO.
-    #
-    # litellm's web-identity branch is deliberately not reached: it applies a
-    # hardcoded session policy — an IAM permission ceiling with a fixed action
-    # list — so a third party's list would decide what this service may call,
-    # and a version bump could change it. The terminal branch has no ceiling.
-    ("bedrock", CredentialMode.IAM): (
-        _CredentialVar("aws_region_name", BEDROCK_REGION_VAR, secret=False),
-    ),
-    # litellm reads ``GOOGLE_API_KEY`` and then ``GEMINI_API_KEY`` out of the
-    # process environment whenever ``api_key`` is absent. Two ambient names
-    # for one provider, and the registry declares neither: the key is read
-    # from this service's own variable, as it is for every key-bearing vendor.
-    ("gemini", CredentialMode.API_KEY): (
-        _CredentialVar("api_key", _api_key_var("gemini"), secret=True),
-    ),
-}
+def _api_key_source(vendor: VendorName) -> _CredentialSource:
+    """The source every key-bearing vendor shares: its own scoped variable, and nothing fixed."""
+    return _CredentialSource(
+        env=(_CredentialVar("api_key", _api_key_var(vendor), secret=True),), fixed={}
+    )
 
-#: The kwargs a ``(vendor, mode)`` pair passes with a **fixed** value, rather
-#: than reading one from the environment. Keyed exactly like
-#: :data:`_CREDENTIAL_VARS`, and ``tests/test_vendors.py`` checks the two key
-#: sets against each other, so a pair cannot answer in one table and be silent
-#: in the other.
-#:
-#: One entry carries a value, and it exists because **"pass no credential
-#: material" is not the same as "pass nothing"**. litellm reads
-#: ``AWS_BEARER_TOKEN_BEDROCK`` out of the process environment whenever
-#: ``api_key`` is ``None`` and authenticates with it, skipping SigV4 — so an
-#: *absent* kwarg means "look in the environment", which is the ASI03
-#: inherited-credential path this registry exists to close. An empty string
-#: states the platform-identity choice positively: litellm tests
-#: ``api_key is not None`` first and the value's truthiness second, so ``""``
-#: passes the first test, fails the second, and the request is signed from the
-#: identity the vendor's own SDK resolved.
-#:
-#: Stated as a property rather than as one vendor's name: a mode that passes no
-#: credential material has to say so to any provider whose SDK would otherwise
-#: read one from the environment on its own.
-_MODE_KWARGS: dict[tuple[VendorName, CredentialMode], dict[str, str]] = {
-    ("vertex", CredentialMode.IAM): {},
-    ("anthropic", CredentialMode.API_KEY): {},
-    ("openai", CredentialMode.API_KEY): {},
-    ("bedrock", CredentialMode.API_KEY): {},
-    ("bedrock", CredentialMode.IAM): {"api_key": ""},
-    ("gemini", CredentialMode.API_KEY): {},
-}
 
 #: What an operator must arrange outside this service, per mode. The diagnostic
 #: page reports this beside the declared mode; it never resolves a credential to
@@ -517,44 +446,6 @@ _BEDROCK_CLAUDE_RULE = _FormRule(
 # The o-series is a separate case again: it ships no dated form at all.
 _CATCH_ALL = _FormRule(family=re.compile(""), pinned=None, hint="")
 
-# Which family rules each vendor applies, in order, with the catch-all last.
-#
-# **A vendor's entry lists every family that vendor can serve, and the rule
-# itself is a property of the family.** The entry is keyed by vendor only
-# because one family can be spelled differently on different vendors, which is
-# what a future row serving ``anthropic.claude-…`` will need — not because a
-# vendor decides what a Claude identifier looks like.
-#
-# ``openai`` listed the catch-all alone, and that was the defect: the prefix
-# reaches any OpenAI-compatible endpoint, and a gateway serving Claude passes
-# the vendor's own identifier straight through. So ``claude-3-opus`` — a
-# floating alias — and ``claude-opus-4-20250514`` — a dated form — were refused
-# on two vendors and accepted on the third. An operator moving a tier between
-# vendors met a different set of legal identifiers, which is the disagreement
-# the pinned-form rule exists to remove.
-#
-# This is the mirror of the reason ``check_temperature`` and
-# ``openai_reasoning_model`` refuse to key on the vendor at all: nothing stops a
-# family arriving through a gateway under a vendor that did not train it, and
-# the number of routes to one family only ever grows.
-_FORM_RULES: dict[VendorName, tuple[_FormRule, ...]] = {
-    "vertex": (_CLAUDE_RULE, _CATCH_ALL),
-    "anthropic": (_CLAUDE_RULE, _CATCH_ALL),
-    "openai": (_CLAUDE_RULE, _CATCH_ALL),
-    # Bedrock reads the same family under its own spelling. Everything else it
-    # serves — Nova, Llama, Mistral and 28 more families — reaches the catch-all,
-    # where only the shared denylist applies, scope segment and all.
-    "bedrock": (_BEDROCK_CLAUDE_RULE, _CATCH_ALL),
-    # The Developer API serves Gemini alone today, and it still lists the
-    # Claude rule: ``get_llm_provider`` resolves ``gemini/claude-opus-5`` to
-    # this provider without complaint, and a family rule follows the family.
-    # A Claude identifier arriving here gets the verdict every bare-spelling
-    # vendor gives it, and a tier row moved between ``gemini`` and ``vertex``
-    # meets one set of legal identifiers.
-    "gemini": (_CLAUDE_RULE, _CATCH_ALL),
-}
-
-
 # The parse, composed from the same two atoms as the rules above and reading a
 # Claude wherever one starts a segment. ``(?:^|\.)`` is what earns that: it
 # requires the match to start the identifier or to follow a dot, so a ``claude-``
@@ -622,14 +513,32 @@ def openai_reasoning_model(model: str) -> bool:
 
 
 @dataclass(frozen=True)
+class VendorSdk:
+    """The client library one vendor's provider needs, and what supplies it.
+
+    ``module`` is the name probed with :func:`importlib.util.find_spec`, and
+    ``extra`` is the ``pip install analysis-service[<extra>]`` that installs it.
+    """
+
+    module: str
+    extra: str
+
+
+@dataclass(frozen=True)
 class Vendor:
-    """One provider's registry entry."""
+    """One provider's registry entry.
+
+    Every per-vendor fact is a field with no default, so :data:`VENDORS` is the
+    one table and a new row cannot construct without answering each one.
+    ``tests/test_vendor_neutrality.py`` checks that no field here, and none on
+    a record a row nests, ever grows a default: a default is how a new row
+    stays silent about a fact.
+    """
 
     name: VendorName
     prefix: str
     #: What this vendor's served build identifier is worth, under the pinned
-    #: translator. A field rather than a module table, so ``VENDORS`` is the
-    #: table and a fourth vendor cannot construct without an answer.
+    #: translator.
     #:
     #: This is a property of the vendor **and** of the translator that reads it,
     #: which is why ``tests/test_identity.py`` drives each vendor's installed
@@ -640,6 +549,50 @@ class Vendor:
     #: would move for an unrelated reason and the stale entry would stay
     #: invisible.
     served_trust: ServedTrust
+    #: The credential modes this vendor allows, each with what it reads and
+    #: states, in the order a deployment sees them listed. A mode absent here
+    #: is a mode the vendor does not allow, and :meth:`_source_for` raises on
+    #: it rather than falling through to somebody else's shape.
+    #:
+    #: Bedrock is the first vendor with a choice, so a deployment that selects
+    #: it declares which mode it uses. The loader's rules are what carry that:
+    #: a ``[credentials]`` key for a single-mode vendor is an error, and a
+    #: missing key for a multi-mode vendor is an error. Both read
+    #: :attr:`credential_modes`.
+    credentials: Mapping[CredentialMode, _CredentialSource]
+    #: Which family rules apply to this vendor's identifiers, in order, with
+    #: the catch-all last.
+    #:
+    #: **A vendor's entry lists every family that vendor can serve, and the
+    #: rule itself is a property of the family.** The entry sits on the vendor
+    #: only because one family can be spelled differently on different
+    #: vendors — Bedrock reads Claude under its own spelling — not because a
+    #: vendor decides what a Claude identifier looks like.
+    #:
+    #: ``openai`` once listed the catch-all alone, and that was a defect: the
+    #: prefix reaches any OpenAI-compatible endpoint, and a gateway serving
+    #: Claude passes the vendor's own identifier straight through. So a
+    #: floating alias and a dated form were refused on two vendors and accepted
+    #: on the third, and an operator moving a tier between vendors met a
+    #: different set of legal identifiers, which is the disagreement the
+    #: pinned-form rule exists to remove.
+    #:
+    #: This is the mirror of the reason ``check_temperature`` and
+    #: ``openai_reasoning_model`` refuse to key on the vendor at all: nothing
+    #: stops a family arriving through a gateway under a vendor that did not
+    #: train it, and the number of routes to one family only ever grows.
+    form_rules: tuple[_FormRule, ...]
+    #: The client library this vendor's provider needs in the image. ``None``
+    #: is a real answer and not an absent one: every row states whether it
+    #: needs a library.
+    #:
+    #: Only a provider that signs or resolves its own requests needs a library
+    #: here. The others reach an HTTPS endpoint with a bearer token or with a
+    #: credential ``google-auth`` already resolves, and litellm carries both.
+    #:
+    #: An optional extra rather than a wheel dependency, per ADR 0023: a
+    #: deployment that never selects this vendor should not carry its SDK.
+    sdk: VendorSdk | None
 
     @property
     def litellm_provider(self) -> str:
@@ -657,8 +610,8 @@ class Vendor:
 
     @property
     def credential_modes(self) -> tuple[CredentialMode, ...]:
-        """Every mode this vendor allows, from :data:`CREDENTIAL_MODES`."""
-        return CREDENTIAL_MODES[self.name]
+        """Every mode this vendor allows, in the order :attr:`credentials` lists them."""
+        return tuple(self.credentials)
 
     @property
     def sole_credential_mode(self) -> CredentialMode:
@@ -732,8 +685,9 @@ class Vendor:
 
     def _rule_for(self, model: str) -> _FormRule:
         """The first family rule matching this model; the catch-all always does."""
-        rules = _FORM_RULES[self.name]
-        return next(rule for rule in rules if rule.family.match(model) is not None)
+        return next(
+            rule for rule in self.form_rules if rule.family.match(model) is not None
+        )
 
     def credential_kwargs(
         self, env: Mapping[str, str], mode: CredentialMode
@@ -747,32 +701,30 @@ class Vendor:
         inherited-credential path.
 
         Under a mode that passes no credential material this returns the
-        vendor's addressing kwargs, plus whatever :data:`_MODE_KWARGS` says that
-        pair must state positively — because for one provider "no credential"
-        has to be said out loud or the library reads one from the environment.
-        That is what lets the vendor's SDK resolve the platform's identity and
-        nothing else. See :class:`CredentialMode` for why the mechanism is
-        still declared.
+        vendor's addressing kwargs, plus whatever the source's ``fixed`` half
+        says that pair must state positively — because for one provider "no
+        credential" has to be said out loud or the library reads one from the
+        environment. That is what lets the vendor's SDK resolve the platform's
+        identity and nothing else. See :class:`CredentialMode` for why the
+        mechanism is still declared.
 
         Long-lived API keys are accepted with controls, not avoided: none of
         these vendors issues a short-lived token, so the residual risk is real
         and is mitigated by keeping keys env-only, out of logs, out of the
         report, and out of the fingerprint, plus rotation.
         """
-        kwargs = dict(_MODE_KWARGS.get((self.name, mode), {}))
+        source = self._source_for(mode)
+        kwargs = dict(source.fixed)
         kwargs.update(
-            {
-                entry.kwarg: self._require(env, entry.var, mode)
-                for entry in self._credential_vars(mode)
-            }
+            {entry.kwarg: self._require(env, entry.var, mode) for entry in source.env}
         )
         return kwargs
 
-    def _credential_vars(self, mode: CredentialMode) -> tuple[_CredentialVar, ...]:
-        """This ``(vendor, mode)`` pair's entries, or raise on an unallowed mode.
+    def _source_for(self, mode: CredentialMode) -> _CredentialSource:
+        """This ``(vendor, mode)`` pair's source, or raise on an unallowed mode.
 
-        One table, three readers: :meth:`credential_kwargs` builds the adapter's
-        auth from it, :meth:`required_env_vars` reports it and
+        One record, three readers: :meth:`credential_kwargs` builds the
+        adapter's auth from it, :meth:`required_env_vars` reports it and
         :meth:`secret_env_vars` says which values must never be echoed.
         Deriving all three from the same place is the point — a vendor -> env-var
         table copied into a caller drifts from the check that actually runs, and
@@ -780,7 +732,7 @@ class Vendor:
         right about which variables are missing.
         """
         try:
-            return _CREDENTIAL_VARS[self.name, mode]
+            return self.credentials[mode]
         except KeyError as exc:
             allowed = ", ".join(sorted(m.value for m in self.credential_modes))
             raise ValueError(
@@ -796,7 +748,7 @@ class Vendor:
         Callers reporting a credential failure list this whole set and mark the
         unset ones — presence only, never values (OWASP A09).
         """
-        return tuple(entry.var for entry in self._credential_vars(mode))
+        return tuple(entry.var for entry in self._source_for(mode).env)
 
     def secret_env_vars(self, mode: CredentialMode) -> tuple[str, ...]:
         """Only the variables holding credential material.
@@ -807,7 +759,7 @@ class Vendor:
         questions removed the region, which is the one fact that diagnoses a
         wrong-region request.
         """
-        return tuple(entry.var for entry in self._credential_vars(mode) if entry.secret)
+        return tuple(entry.var for entry in self._source_for(mode).env if entry.secret)
 
     def _require(self, env: Mapping[str, str], var: str, mode: CredentialMode) -> str:
         value = env.get(var, "")
@@ -819,6 +771,9 @@ class Vendor:
         return value.strip()
 
 
+#: The registry. A missing key raises, which is the point: a table nobody can
+#: be silent in, rather than a default that answers for a vendor its author
+#: never considered.
 VENDORS: dict[VendorName, Vendor] = {
     "vertex": Vendor(
         name="vertex",
@@ -827,6 +782,28 @@ VENDORS: dict[VendorName, Vendor] = {
         # transformation. The response body carries ``modelVersion`` and litellm
         # never reads it.
         served_trust="requested_echo",
+        # Vertex admits no raw-API-key path under any adapter
+        # (``BerriAI/litellm#21036``), so ``vertex + api_key`` is
+        # unrepresentable rather than validated against. Under ``IAM`` it
+        # passes a project and a location and **no credential**.
+        # ``vertex_credentials`` is omitted so that ``google.auth.default()``
+        # runs and resolves whatever identity the platform supplies — a
+        # Workload Identity binding, a metadata server, or an operator's own
+        # ``GOOGLE_APPLICATION_CREDENTIALS``, through ADC's chain rather than
+        # through anything this registry names.
+        credentials={
+            CredentialMode.IAM: _CredentialSource(
+                env=(
+                    _CredentialVar("vertex_project", VERTEX_PROJECT_VAR, secret=False),
+                    _CredentialVar(
+                        "vertex_location", VERTEX_LOCATION_VAR, secret=False
+                    ),
+                ),
+                fixed={},
+            ),
+        },
+        form_rules=(_CLAUDE_RULE, _CATCH_ALL),
+        sdk=None,
     ),
     "anthropic": Vendor(
         name="anthropic",
@@ -834,6 +811,9 @@ VENDORS: dict[VendorName, Vendor] = {
         # litellm reads ``completion_response["model"]`` in its Anthropic chat
         # transformation.
         served_trust="provider_reported",
+        credentials={CredentialMode.API_KEY: _api_key_source("anthropic")},
+        form_rules=(_CLAUDE_RULE, _CATCH_ALL),
+        sdk=None,
     ),
     "openai": Vendor(
         name="openai",
@@ -841,6 +821,9 @@ VENDORS: dict[VendorName, Vendor] = {
         # litellm reads ``response_object["model"]`` when it converts an
         # OpenAI-shaped response dict.
         served_trust="provider_reported",
+        credentials={CredentialMode.API_KEY: _api_key_source("openai")},
+        form_rules=(_CLAUDE_RULE, _CATCH_ALL),
+        sdk=None,
     ),
     "bedrock": Vendor(
         name="bedrock",
@@ -851,6 +834,48 @@ VENDORS: dict[VendorName, Vendor] = {
         # A Converse response carries no model identifier at all, so litellm
         # fills ``model_response.model`` from the request.
         served_trust="requested_echo",
+        credentials={
+            # Under ``API_KEY`` Bedrock passes a bearer token and a region.
+            # litellm's ``_sign_request`` reads the bearer off the ``api_key``
+            # parameter, sets the ``Authorization`` header and skips SigV4
+            # entirely, so this is the same shape the other key-bearing vendors
+            # use.
+            CredentialMode.API_KEY: _CredentialSource(
+                env=(
+                    _CredentialVar("api_key", _api_key_var("bedrock"), secret=True),
+                    _CredentialVar("aws_region_name", BEDROCK_REGION_VAR, secret=False),
+                ),
+                fixed={},
+            ),
+            # Under ``IAM`` Bedrock passes the region and **no credential**.
+            # litellm then falls to its terminal branch and boto3's own chain
+            # runs, which covers an attached role, a workload identity binding,
+            # ``AWS_PROFILE`` and SSO. The empty ``api_key`` is what keeps
+            # ``AWS_BEARER_TOKEN_BEDROCK`` out of the request; see
+            # :class:`_CredentialSource`.
+            #
+            # litellm's web-identity branch is deliberately not reached: it
+            # applies a hardcoded session policy — an IAM permission ceiling
+            # with a fixed action list — so a third party's list would decide
+            # what this service may call, and a version bump could change it.
+            # The terminal branch has no ceiling.
+            CredentialMode.IAM: _CredentialSource(
+                env=(
+                    _CredentialVar("aws_region_name", BEDROCK_REGION_VAR, secret=False),
+                ),
+                fixed={"api_key": ""},
+            ),
+        },
+        # Bedrock reads the Claude family under its own spelling. Everything
+        # else it serves — Nova, Llama, Mistral and 28 more families — reaches
+        # the catch-all, where only the shared denylist applies, scope segment
+        # and all.
+        form_rules=(_BEDROCK_CLAUDE_RULE, _CATCH_ALL),
+        # Both of Bedrock's credential modes need ``boto3`` and not ``botocore``
+        # alone — ``converse_handler`` calls ``get_credentials`` before anything
+        # reads a bearer token, and with no AWS kwarg that chain ends in a bare
+        # ``import boto3``.
+        sdk=VendorSdk(module="boto3", extra="bedrock"),
     ),
     # The Gemini Developer API: the same weights ``vertex`` serves, behind a
     # key instead of a platform identity. Two rows and not one, because the
@@ -865,42 +890,24 @@ VENDORS: dict[VendorName, Vendor] = {
         # transformation, which fills ``model_response.model`` from the
         # request and never reads the body's ``modelVersion``.
         served_trust="requested_echo",
+        # The Developer API takes a key and nothing else. It is a different
+        # provider from ``vertex`` rather than a second mode on it:
+        # ``get_llm_provider`` resolves ``gemini/`` and ``vertex_ai/`` to two
+        # providers, and Vertex admits no key under any adapter. litellm reads
+        # ``GOOGLE_API_KEY`` and then ``GEMINI_API_KEY`` out of the process
+        # environment whenever ``api_key`` is absent. Two ambient names for one
+        # provider, and the registry declares neither: the key is read from
+        # this service's own variable, as it is for every key-bearing vendor.
+        credentials={CredentialMode.API_KEY: _api_key_source("gemini")},
+        # The Developer API serves Gemini alone today, and it still lists the
+        # Claude rule: ``get_llm_provider`` resolves ``gemini/claude-opus-5`` to
+        # this provider without complaint, and a family rule follows the family.
+        # A Claude identifier arriving here gets the verdict every bare-spelling
+        # vendor gives it, and a tier row moved between ``gemini`` and
+        # ``vertex`` meets one set of legal identifiers.
+        form_rules=(_CLAUDE_RULE, _CATCH_ALL),
+        sdk=None,
     ),
-}
-
-
-@dataclass(frozen=True)
-class VendorSdk:
-    """The client library one vendor's provider needs, and what supplies it.
-
-    ``module`` is the name probed with :func:`importlib.util.find_spec`, and
-    ``extra`` is the ``pip install analysis-service[<extra>]`` that installs it.
-    """
-
-    module: str
-    extra: str
-
-
-#: Which client library each vendor's provider needs in the image, keyed by
-#: vendor. ``None`` is a real answer and not an absent one: every vendor states
-#: whether it needs a library, so the completeness guard in
-#: ``tests/test_vendor_neutrality.py`` can see a row that never answered.
-#:
-#: Only a provider that signs or resolves its own requests needs a library here.
-#: The other four reach an HTTPS endpoint with a bearer token or with a
-#: credential ``google-auth`` already resolves, and litellm carries both.
-#:
-#: An optional extra rather than a wheel dependency, per ADR 0023: a deployment
-#: that never selects this vendor should not carry its SDK. Both of Bedrock's
-#: credential modes need ``boto3`` and not ``botocore`` alone —
-#: ``converse_handler`` calls ``get_credentials`` before anything reads a bearer
-#: token, and with no AWS kwarg that chain ends in a bare ``import boto3``.
-VENDOR_SDKS: dict[VendorName, VendorSdk | None] = {
-    "vertex": None,
-    "anthropic": None,
-    "openai": None,
-    "bedrock": VendorSdk(module="boto3", extra="bedrock"),
-    "gemini": None,
 }
 
 
@@ -914,32 +921,21 @@ class VendorSdkError(ConfigError):
     """
 
 
-def sdk_for(name: VendorName) -> VendorSdk | None:
-    """The client library this vendor's provider needs, or ``None``.
-
-    The one reader of :data:`VENDOR_SDKS`. Two callers ask two different
-    questions — the diagnostic page asks *which* library, and :func:`missing_sdk`
-    asks whether it is there — and both go through here, because ``None`` from
-    :func:`missing_sdk` answers "needs nothing" and "already installed" alike.
-    A page reading the table itself would keep printing a row from it the day
-    that answer became conditional.
-    """
-    return VENDOR_SDKS[name]
-
-
 def missing_sdk(name: VendorName) -> VendorSdk | None:
     """The client library this vendor needs and this image does not carry.
 
     Called by the build-time gate in :mod:`analysis_service.binding` and by the
     diagnostic page. A page that marked every variable "set" while the run still
-    failed at bind time would break the no-drift promise it is built on.
+    failed at bind time would break the no-drift promise it is built on. The
+    page reads :attr:`Vendor.sdk` for *which* library, because ``None`` from
+    here answers "needs nothing" and "already installed" alike.
 
     :func:`importlib.util.find_spec` and **never** an import.
     ``tests/test_identity.py`` asserts that every import ``src/`` makes is
     declared in ``project.dependencies``, so ``import boto3`` would turn an
     optional extra into a hard dependency of the wheel.
     """
-    sdk = sdk_for(name)
+    sdk = vendor_for(name).sdk
     if sdk is None or importlib.util.find_spec(sdk.module) is not None:
         return None
     return sdk
