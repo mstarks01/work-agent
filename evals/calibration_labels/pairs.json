@@ -596,10 +596,10 @@
       "entity:insurance-partner",
       "flow:insurance-partner-to-landing-bucket:push-daily-extract"
     ],
-    "reference_verb": "impersonate",
-    "candidate_verb": "impersonate",
+    "reference_verb": "use-credential",
+    "candidate_verb": "use-credential",
     "label": "match",
-    "note": "Same action, same target."
+    "note": "Same action, same target: the candidate names the stolen key, which is the credential the reference names."
   },
   {
     "case": "03-batch-data-pipeline",
@@ -2755,7 +2755,8 @@
     "category": "elevation-of-privilege",
     "reference_claim": "An attacker who takes one store server uses whatever it presents to reach the deploy controller on the corporate network and the registry in the build environment.",
     "reference_element_ids": [
-      "process:deploy-controller",
+      "flow:store-server-to-deploy-controller:poll-current-release",
+      "flow:store-server-to-image-registry:pull-image",
       "process:store-server"
     ],
     "candidate_claim": "An attacker who compromises a back-office store server pivots to the deploy controller.",
@@ -2773,7 +2774,8 @@
     "category": "elevation-of-privilege",
     "reference_claim": "An attacker who takes one store server uses whatever it presents to reach the deploy controller on the corporate network and the registry in the build environment.",
     "reference_element_ids": [
-      "process:deploy-controller",
+      "flow:store-server-to-deploy-controller:poll-current-release",
+      "flow:store-server-to-image-registry:pull-image",
       "process:store-server"
     ],
     "candidate_claim": "An attacker who compromises the build runner reaches the store estate.",
@@ -5031,10 +5033,10 @@
       "entity:supplier",
       "flow:supplier-to-supplier-portal:upload-documents"
     ],
-    "reference_verb": "impersonate",
-    "candidate_verb": "impersonate",
+    "reference_verb": "use-credential",
+    "candidate_verb": "use-credential",
     "label": "match",
-    "note": "Same action, same target; sign-in is the one control the source states, and both phrasings rest on it."
+    "note": "Same action, same target; sign-in is the one control the source states, and both phrasings name the password the attacker holds."
   },
   {
     "case": "12-overclaiming-supplier-portal",
@@ -5049,7 +5051,7 @@
       "entity:supplier",
       "flow:supplier-to-supplier-portal:upload-documents"
     ],
-    "reference_verb": "impersonate",
+    "reference_verb": "use-credential",
     "candidate_verb": "impersonate",
     "label": "unsupported",
     "note": "Unsupported: the source states a username and password and never states that nothing else is required, so the asserted absence is invented."

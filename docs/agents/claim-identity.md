@@ -93,7 +93,7 @@ Scored on the shared scoreboard, through `measure_agreement`:
 
 | Rule | Agreement with the recorded labels |
 |---|---|
-| `MechanicalIdentity` (element equality) | 201/311 = 64.6% |
+| `MechanicalIdentity` (element equality) | 200/311 = 64.3% |
 | `SubsetVerbIdentity` | **294/311 = 94.5%** |
 
 **This is an admission gate, not a quality statement.** It clears the 90% bar,
