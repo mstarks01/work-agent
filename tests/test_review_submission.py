@@ -253,3 +253,44 @@ def test_two_marks_the_current_rule_folds_into_one_finding_must_agree(tmp_path):
         sittings.current_marks(
             aliased, {"v0:old": "agree", first.fingerprint: "reject"}
         )
+
+
+def test_an_older_key_two_findings_share_names_neither():
+    """Version 1 reads no verb and no scope, so two claims of one case that
+    differ only by verb carried one key under it. Six corpus cases hold such a
+    pair whose claims key to two findings today. Read as an alias of both, the
+    fold kept whichever target was listed last, and a mark under that key
+    would have answered for the wrong finding. The key belongs to no target,
+    so :func:`evals.harness.sitting.check_marks` refuses it by name; a key two claims share that
+    key to one finding today stays that finding's alias."""
+    from collections import Counter
+
+    from evals import verify_corpus
+    from evals.harness.fingerprint import components_for, fingerprint
+    from evals.harness.reference import load_corpus
+
+    shared_somewhere = False
+    for case in load_corpus(verify_corpus.CORPUS_DIR):
+        targets = sittings.mark_targets(case)
+        owners = Counter(alias for target in targets for alias in target.aliases)
+        assert not [a for a, n in owners.items() if n > 1], f"{case.id}: two owners"
+        flows = {f.id: (f.source, f.destination) for f in case.model.data_flows}
+        findings_of: dict[str, set[str]] = {}
+        for claim in case.claims_for("stride"):
+            oldest = fingerprint(
+                components_for(
+                    "stride",
+                    claim.lane,
+                    claim.affected_element_ids,
+                    flows,
+                    verb=claim.verb,
+                ),
+                version=1,
+            )
+            current = sittings._key_of(case.id, "stride", claim, flows)
+            findings_of.setdefault(oldest, set()).add(current)
+        for oldest, findings in findings_of.items():
+            if len(findings) > 1:
+                shared_somewhere = True
+                assert oldest not in owners, f"{case.id}: {oldest} names two findings"
+    assert shared_somewhere, "the corpus no longer holds the shape this proves"
