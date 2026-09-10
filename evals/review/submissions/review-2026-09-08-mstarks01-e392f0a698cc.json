@@ -2,7 +2,7 @@
   "envelope": 1,
   "submitted_by": "mstarks01",
   "submitted_for": "anonymous",
-  "generated": "2026-09-09",
+  "generated": "2026-09-08",
   "cases": {
     "01-payments-checkout": {
       "own_list": [
@@ -33,27 +33,26 @@
         "v5:26417fabecbcdf95": "agree",
         "v5:24d318438f2b84c8": "agree",
         "v5:aff9a2d34eaf1b79": "agree",
-        "v6:6500a06262a31a1f": "agree",
-        "v6:f9359ba8e162f344": "agree",
-        "v6:2f47011053e07b48": "agree",
-        "v6:4f140b4fdc4756f3": "agree",
-        "v6:1bb536caff886f09": "agree",
-        "v6:d6e8452ca410f55f": "agree",
-        "v6:8e1df5b65b166564": "agree",
-        "v6:d7b7b8eb3b4c68d2": "agree",
-        "v6:d8860a071c14255a": "agree",
-        "v6:db16495d7bc4f394": "agree",
-        "v6:b2b1372076d75638": "agree",
-        "v6:a960649290ed6a8b": "agree",
-        "v6:a30cabb85dbcb62c": "agree",
-        "v6:0510f11efb1c5b74": "agree",
-        "v6:df21ea8a3fef953a": "agree",
-        "v6:630e61e2b73c9bd6": "agree",
-        "v6:5d28d9bb65c150d1": "agree",
-        "v6:3982f85004e1a8db": "agree",
-        "v6:8dabf9b6b076e1a3": "agree",
-        "v6:4518271ab9139bf4": "agree",
-        "v6:da698b4318cc71e7": "agree"
+        "v4:6500a06262a31a1f": "agree",
+        "v4:f9359ba8e162f344": "agree",
+        "v4:2f47011053e07b48": "agree",
+        "v4:4f140b4fdc4756f3": "agree",
+        "v4:1bb536caff886f09": "agree",
+        "v4:d6e8452ca410f55f": "agree",
+        "v4:8e1df5b65b166564": "agree",
+        "v4:d7b7b8eb3b4c68d2": "agree",
+        "v4:d8860a071c14255a": "agree",
+        "v4:db16495d7bc4f394": "agree",
+        "v4:b2b1372076d75638": "agree",
+        "v4:a960649290ed6a8b": "agree",
+        "v4:a30cabb85dbcb62c": "agree",
+        "v4:0510f11efb1c5b74": "agree",
+        "v4:df21ea8a3fef953a": "agree",
+        "v4:630e61e2b73c9bd6": "agree",
+        "v4:5d28d9bb65c150d1": "agree",
+        "v4:3982f85004e1a8db": "agree",
+        "v4:8dabf9b6b076e1a3": "agree",
+        "v4:4518271ab9139bf4": "agree"
       },
       "missing": [],
       "notes": "",
@@ -61,7 +60,7 @@
         "source.md": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08",
         "model.json": "2fa9366ef8b21225b9ac1919c0072acac8fc06b20efc91b55dd3fee50de16c06",
         "claims/asvs.json": "7177bbb81fb27dd8df326913ca15a5afb40fdc0ced016b01e0c2dfb4a402a4dc",
-        "claims/stride.json": "3f825287e325d5d49b26b237bbfb0ea342a7cd8d6c1b5743b21be97dd180719f"
+        "claims/stride.json": "82ab5d7ae542d7f9bf76f5023802247b1e0137a2ac9a6ad0b5acc2362993d815"
       }
     }
   }
