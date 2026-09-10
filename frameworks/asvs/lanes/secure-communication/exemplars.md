@@ -27,15 +27,15 @@ Two drafts against exemplar system A. This is the chapter the System Model answe
 ```
 ## V12.3.1 — Transport protection on the database link is never stated
 
-A database connection is not an HTTP service, so the requirement for it is the one that names databases. The flow's attribute is `unknown`, and the remedy differs from the draft above — one is a fix, the other is a question — so the two are never written the same way.
+A database connection is not an HTTP service, so the requirement for it is the one that names databases. The flow's attribute is `unknown`, and the remedy differs from the draft above — one is a fix, the other is a question — so the two are never written the same way. The question goes to configuration, because a transport setting is read off the deployment and a submitter's word for it is a statement, not the setting.
 
 ```json
 {
   "requirement": "3.1",
   "direction": "question",
-  "needs_evidence": "prose",
+  "needs_evidence": "config",
   "title": "Transport protection on the database link is never stated",
-  "description": "V12.3.1 asks that every connection into and out of the application — databases, middleware, management tools and partner systems among them — runs over an encrypted protocol such as TLS with no fallback to plaintext. It applies to `flow:ledger-service-to-accounts-db:read-write-balances`, which carries balances and account-holder PII over the PostgreSQL wire protocol. Its `encryption_in_transit` is never stated, which is a different fact from the stated absence on `flow:web-api-to-ledger-service:post-transfer`: here the input left the question open rather than answering it. The requirement applies and the input does not settle it.",
+  "description": "V12.3.1 asks that every connection into and out of the application — databases, middleware, management tools and partner systems among them — runs over an encrypted protocol such as TLS with no fallback to plaintext. It applies to `flow:ledger-service-to-accounts-db:read-write-balances`, which carries balances and account-holder PII over the PostgreSQL wire protocol. Its `encryption_in_transit` is never stated, which is a different fact from the stated absence on `flow:web-api-to-ledger-service:post-transfer`: here the input left the question open rather than answering it. The requirement applies and the input does not settle it. What protects the link is a deployed setting, the connection's TLS mode, so the answer is in configuration: a sentence saying the link is TLS would state support this framework does not verify.",
   "affected_element_ids": [
     "process:ledger-service",
     "store:accounts-db",

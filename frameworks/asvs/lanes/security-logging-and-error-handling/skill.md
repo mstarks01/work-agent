@@ -4,7 +4,7 @@
 
 Chapter V16 of ASVS 5.0: what the application records and what it reveals when something goes wrong. Your lane covers which security events are logged, what a log entry may and may not contain, the protection of log data itself, and error handling that neither leaks internals nor fails open.
 
-Chapter boundaries: who may read a log is chapter V8. Encrypting a log store is chapter V11 and V14. Your subject is the record of what happened.
+Chapter boundaries: who may read a log is chapter V8. Encrypting a log store is chapter V11 and V14. Your subject is the record of what happened. A record the system writes so an action can be reconstructed later — an audit entry, a receipt, an event — is such a record whatever the submitter calls it; the name is not the test. A record whose stated content names the acting service and not the acting party has stated that the party is not recorded: that is a gap, not a question.
 
 This chapter carries no level 1 requirement. A run at level 1 rules on nothing here, and that is the standard's ranking rather than a judgement about logging.
 
