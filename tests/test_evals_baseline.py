@@ -469,3 +469,34 @@ class TestOneReaderForRecordedDollars:
 
         assert baseline.recorded_usd(poisoned) is None
         assert (baseline.recorded_usd(poisoned) or 0.0) == 0.0
+
+
+def test_the_ancestor_check_measures_against_the_remote_main_where_one_exists(tmp_path):
+    """A pull-request checkout in CI carries origin/main and no local main, so
+    a check that asked for main read every merged Baseline as a fork-only
+    commit. The contribution workflow failed on every pull request since the
+    first Baseline landed. A clone with no remote still measures against its
+    own main."""
+    import subprocess
+
+    def git(cwd, *args):
+        subprocess.run(["git", *args], cwd=cwd, capture_output=True, check=True)
+
+    origin = tmp_path / "origin.git"
+    git(tmp_path, "init", "--bare", "-b", "main", str(origin))
+    local = tmp_path / "local"
+    git(tmp_path, "init", "-b", "main", str(local))
+    git(local, "config", "user.email", "t@example.test")
+    git(local, "config", "user.name", "T")
+    (local / "f").write_text("x", encoding="utf-8")
+    git(local, "add", "f")
+    git(local, "commit", "-m", "seed")
+    assert baseline.default_base_ref(local) == "main"
+
+    git(local, "remote", "add", "origin", str(origin))
+    git(local, "push", "-u", "origin", "main")
+    clone = tmp_path / "clone"
+    git(tmp_path, "clone", str(origin), str(clone))
+    git(clone, "checkout", "--detach", "origin/main")
+    git(clone, "branch", "-D", "main")
+    assert baseline.default_base_ref(clone) == "origin/main"
