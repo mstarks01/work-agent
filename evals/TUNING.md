@@ -296,6 +296,12 @@ it as a number: must-finds of 129.
 each miss to what lost it. `losses` is STRIDE's: the verb (the lane cited the
 place and wrote another action), `merged`, the critic, the place (a rule led
 there and nothing was drafted), or `unled`. `attribution` is ASVS's, by stage.
+
+Both split a critic charge in two. A row carrying a non-empty `re_ask` names a
+claim the *first* critic pass got wrong, so the ruling that lost it came out of
+the bounded re-ask rather than out of the pass that reasoned about it. Price
+those against the first pass and `recritic`, not against the critic's
+reasoning; the `by_re_ask_kind` fold says which problem the first pass had.
 `run.py score` writes both over any archived sweep, and the merged Baselines
 under `evals/baselines/` are the sweeps to read first. A Baseline's files are
 digest-sealed, so score it to a copy: the command refuses to write inside

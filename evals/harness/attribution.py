@@ -96,6 +96,16 @@ class Loss:
     rejection step, or an observation kind — so a reader can group rows without
     parsing ``reason``. ``reason`` is the report's own sentence for that row,
     carried for reading and never counted.
+
+    ``re_ask`` is what the *first* critic pass got wrong on this row's own
+    claim, from
+    :meth:`~analysis_service.claims.FrameworkAnalysis.re_ask_kinds`. Empty is
+    the common case and means the ruling that lost the requirement is the one
+    the first pass wrote. Non-empty splits a ``critic`` or a ``verdict`` charge
+    in two: a rejection the critic argued for is priced against its reasoning,
+    and one that arrived after a repair is priced against the first pass and
+    ``recritic``. It rides every row, because a re-asked claim can lose at any
+    stage that names one.
     """
 
     requirement: str
@@ -104,6 +114,7 @@ class Loss:
     reason: str
     must_find: bool
     expected: str
+    re_ask: tuple[str, ...] = ()
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -113,6 +124,7 @@ class Loss:
             "reason": self.reason,
             "must_find": self.must_find,
             "expected": self.expected,
+            "re_ask": list(self.re_ask),
         }
 
 
@@ -127,12 +139,20 @@ class CaseAttribution:
     def by_stage(self) -> Counter[str]:
         return Counter(loss.stage for loss in self.losses)
 
+    @property
+    def re_asked_by_stage(self) -> Counter[str]:
+        """The subset of :attr:`by_stage` whose claim the first pass fumbled."""
+        return Counter(loss.stage for loss in self.losses if loss.re_ask)
+
     def to_json(self) -> dict[str, Any]:
         return {
             "case": self.case,
             "framework": FRAMEWORK,
             "losses": [loss.to_json() for loss in self.losses],
             "by_stage": {stage: self.by_stage[stage] for stage in STAGES},
+            "re_asked_by_stage": {
+                stage: self.re_asked_by_stage[stage] for stage in STAGES
+            },
         }
 
 
@@ -201,6 +221,17 @@ def attribute_case(
     scope = {entry.unit: entry for entry in block.scope}
     losses: list[Loss] = []
 
+    def re_ask(requirement: str) -> tuple[str, ...]:
+        """What the first critic pass got wrong on this requirement's claim.
+
+        Keyed by the claim's own ID rather than by the requirement, because
+        that is what the mark names. A requirement with no claim in either
+        array — lost before any lane drafted it — has no ruling to charge, and
+        the empty answer says so.
+        """
+        claim = applied.get(requirement) or rejections.get(requirement)
+        return () if claim is None else block.re_ask_kinds(claim.id)
+
     for requirement in matrix.missed:
         reference = references[requirement]
         stage, cause, reason = _charge_miss(requirement, rejections, scope)
@@ -212,6 +243,7 @@ def attribute_case(
                 reason,
                 reference.must_find,
                 reference.disposition or "",
+                re_ask(requirement),
             )
         )
 
@@ -235,6 +267,7 @@ def attribute_case(
                 reason,
                 reference.must_find,
                 judged.expected,
+                re_ask(judged.requirement),
             )
         )
 
@@ -245,14 +278,26 @@ def pooled(rows: Sequence[CaseAttribution]) -> Mapping[str, Any]:
     """Losses per stage over the corpus, counted rather than averaged."""
     totals: Counter[str] = Counter()
     must_find: Counter[str] = Counter()
+    re_asked: Counter[str] = Counter()
+    kinds: Counter[str] = Counter()
     for row in rows:
         totals.update(row.by_stage)
         must_find.update(loss.stage for loss in row.losses if loss.must_find)
+        re_asked.update(row.re_asked_by_stage)
+        for loss in row.losses:
+            kinds.update(loss.re_ask)
     return {
         "cases": len(rows),
         "losses": sum(totals.values()),
         "by_stage": {stage: totals[stage] for stage in STAGES},
         "must_find_by_stage": {stage: must_find[stage] for stage in STAGES},
+        # The subset of each stage's losses whose ruling came out of a re-ask,
+        # and which problems the first pass had on those claims. Counted per
+        # loss and per kind rather than summed together: one claim carries
+        # more than one kind, so the kinds do not add up to the losses.
+        "re_asked_by_stage": {stage: re_asked[stage] for stage in STAGES},
+        "re_asked": sum(re_asked.values()),
+        "by_re_ask_kind": dict(sorted(kinds.items())),
     }
 
 
@@ -271,6 +316,20 @@ def render(rows: Sequence[CaseAttribution]) -> None:
         + ", ".join(f"{stage} {totals['by_stage'][stage]}" for stage in STAGES)
         + " (instrument, non-gating)"
     )
+    if totals["re_asked"]:
+        print(
+            f"  of those, {totals['re_asked']} lost a claim the first critic"
+            " pass fumbled: "
+            + ", ".join(
+                f"{stage} {totals['re_asked_by_stage'][stage]}"
+                for stage in STAGES
+                if totals["re_asked_by_stage"][stage]
+            )
+            + " — first-pass problems: "
+            + ", ".join(
+                f"{kind} {count}" for kind, count in totals["by_re_ask_kind"].items()
+            )
+        )
 
 
 def artifact(rows: Sequence[CaseAttribution]) -> dict[str, Any]:

@@ -19,6 +19,7 @@ from pathlib import Path
 import pytest
 
 from analysis_service.claims import (
+    FrameworkAnalysis,
     Ground,
     RejectionStep,
     UnknownRef,
@@ -133,13 +134,19 @@ class Block:
     it would let the scorer pass against a report nothing can emit.
     """
 
-    def __init__(self, claims, scope=(), rejected_claims=()):
+    def __init__(self, claims, scope=(), rejected_claims=(), unreconciled_rulings=()):
         self.claims = list(claims)
         self.scope = list(scope)
         self.rejected_claims = list(rejected_claims)
+        self.unreconciled_rulings = list(unreconciled_rulings)
 
     def all_claims(self):
         return (*self.claims, *self.rejected_claims)
+
+    #: The real reader, bound onto the fake rather than reimplemented here. A
+    #: second copy of "which problems name this claim" is exactly the shape
+    #: that lets a fake agree with itself while the block disagrees.
+    re_ask_kinds = FrameworkAnalysis.re_ask_kinds
 
 
 class Scoped:

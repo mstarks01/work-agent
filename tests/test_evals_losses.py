@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 
+from analysis_service.claims import UnreconciledRuling
 from evals.harness import losses
 from evals.harness.identity import SubsetVerbIdentity, endpoint_subset
 from evals.harness.ledger import Ledger
@@ -21,6 +22,7 @@ from evals.harness.reference import load_case
 from evals.harness.scorer import score_case
 from evals.harness.triggers import case_trigger_recall
 from tests.eval_factories import draft_threat, promote
+from tests.test_evals_applicability import Block
 
 CASE_DIR = (
     Path(__file__).resolve().parents[1] / "evals" / "corpus" / "01-payments-checkout"
@@ -37,9 +39,10 @@ def flows(case):
     return {flow.id: (flow.source, flow.destination) for flow in case.model.data_flows}
 
 
-def charge(case, flows, drafts, produced):
+def charge(case, flows, drafts, produced, unreconciled=()):
     score = score_case(case, produced, SubsetVerbIdentity({case.id: flows}), Ledger())
-    return attribute_case(case, score, drafts, produced, flows)
+    block = Block(produced, unreconciled_rulings=unreconciled)
+    return attribute_case(case, score, drafts, produced, flows, block)
 
 
 def at(reference, sequence, verb):
@@ -205,3 +208,99 @@ def test_render_prints_the_causes_in_order(case, flows, capsys):
         < out.index(" place")
         < out.index(" unled")
     )
+
+
+class TestAKillDuringARepairIsChargedApartFromOneTheCriticArgued:
+    """#796: a draft the critic reasoned its way to killing and one killed by
+    the re-ask that repaired a fumbled first pass are two different things to
+    fix, and the cause alone prints the same number for both.
+
+    The join is on the draft's own ID, which is what
+    ``unreconciled_rulings`` names, and it is asked through the block's own
+    reader so this and the ASVS instrument cannot disagree about what a
+    re-asked claim is.
+    """
+
+    def _fumbled(self, claim_id, kind="dropped"):
+        return UnreconciledRuling.of(
+            claim_id=claim_id, kind=kind, message="the first pass got this wrong"
+        )
+
+    def test_a_kill_the_first_pass_ruled_cleanly_charges_no_re_ask(self, case, flows):
+        reference = case.stride_claims()[0]
+        draft = at(reference, 1, reference.verb)
+
+        charged = charge(case, flows, [draft], [])
+
+        assert by_index(charged)[0].re_ask == ()
+
+    def test_a_kill_written_by_the_re_ask_names_the_first_pass_problem(
+        self, case, flows
+    ):
+        reference = case.stride_claims()[0]
+        draft = at(reference, 1, reference.verb)
+
+        charged = charge(
+            case, flows, [draft], [], unreconciled=[self._fumbled(draft.id)]
+        )
+
+        loss = by_index(charged)[0]
+        assert (loss.cause, loss.re_ask) == ("critic", ("dropped",))
+
+    def test_a_verb_loss_carries_it_too(self, case, flows):
+        """Every cause that names a draft can be charged, not only the critic."""
+        reference = case.stride_claims()[0]
+        other = "guess-credential" if reference.verb != "guess-credential" else "replay"
+        draft = at(reference, 1, other)
+
+        charged = charge(
+            case,
+            flows,
+            [draft],
+            [promote(draft)],
+            unreconciled=[self._fumbled(draft.id, "verdict-shape")],
+        )
+
+        loss = by_index(charged)[0]
+        assert (loss.cause, loss.re_ask) == ("verb", ("verdict-shape",))
+
+    def test_a_reference_no_draft_reached_has_no_ruling_to_charge(self, case, flows):
+        """A mark naming a claim no row names annotates nothing."""
+        charged = charge(case, flows, [], [], unreconciled=[self._fumbled("stride-1")])
+
+        assert all(loss.re_ask == () for loss in charged.losses)
+
+    def test_the_fold_counts_the_rows_and_the_kinds_apart(self, case, flows):
+        reference = case.stride_claims()[0]
+        draft = at(reference, 1, reference.verb)
+        charged = charge(
+            case,
+            flows,
+            [draft],
+            [],
+            unreconciled=[
+                self._fumbled(draft.id),
+                self._fumbled(draft.id, "verdict-shape"),
+                self._fumbled(draft.id, "verdict-shape"),
+            ],
+        )
+
+        assert by_index(charged)[0].re_ask == ("dropped", "verdict-shape")
+        totals = pooled([charged])
+        assert totals["re_asked"] == 1
+        assert totals["re_asked_by_cause"]["critic"] == 1
+        assert totals["by_re_ask_kind"] == {"dropped": 1, "verdict-shape": 1}
+
+    def test_the_render_says_so_only_when_a_row_carries_one(self, case, flows, capsys):
+        reference = case.stride_claims()[0]
+        draft = at(reference, 1, reference.verb)
+
+        losses.render([charge(case, flows, [draft], [])])
+        assert "first critic pass fumbled" not in capsys.readouterr().out
+
+        losses.render(
+            [charge(case, flows, [draft], [], unreconciled=[self._fumbled(draft.id)])]
+        )
+        out = capsys.readouterr().out
+        assert "first critic pass fumbled" in out
+        assert "dropped 1" in out
