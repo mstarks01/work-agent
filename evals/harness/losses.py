@@ -49,6 +49,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
+from analysis_service.claims import FrameworkAnalysis
 from analysis_service.frameworks.stride.record import DraftThreat
 from evals.harness.identity import FlowMap, endpoint_subset
 from evals.harness.reference import GoldenCase
@@ -75,6 +76,14 @@ class Loss:
     #: Absent otherwise.
     draft_id: str | None = None
     draft_verb: str | None = None
+    #: What the *first* critic pass got wrong on ``draft_id``, from
+    #: :meth:`~analysis_service.claims.FrameworkAnalysis.re_ask_kinds`. Empty
+    #: is the common case and means the ruling that lost this reference is the
+    #: one the first pass wrote. Non-empty splits a ``critic`` charge in two: a
+    #: kill the critic argued for is priced against its reasoning, and one that
+    #: arrived after a repair is priced against the first pass and ``recritic``.
+    #: A ``place`` or ``unled`` row names no draft, so it is always empty there.
+    re_ask: tuple[str, ...] = ()
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -85,6 +94,7 @@ class Loss:
             "reference_verb": self.reference_verb,
             "draft_id": self.draft_id,
             "draft_verb": self.draft_verb,
+            "re_ask": list(self.re_ask),
         }
 
 
@@ -98,10 +108,17 @@ class CaseLosses:
         counts = Counter(loss.cause for loss in self.losses)
         return {cause: counts[cause] for cause in CAUSES}
 
+    @property
+    def re_asked_by_cause(self) -> dict[str, int]:
+        """The subset of :attr:`by_cause` whose draft the first pass fumbled."""
+        counts = Counter(loss.cause for loss in self.losses if loss.re_ask)
+        return {cause: counts[cause] for cause in CAUSES}
+
     def to_json(self) -> dict[str, Any]:
         return {
             "case": self.case,
             "by_cause": self.by_cause,
+            "re_asked_by_cause": self.re_asked_by_cause,
             "losses": [loss.to_json() for loss in self.losses],
         }
 
@@ -123,12 +140,19 @@ def attribute_case(
     drafts: Sequence[DraftThreat],
     produced: Sequence[DraftThreat],
     flows: FlowMap,
+    block: FrameworkAnalysis,
 ) -> CaseLosses:
     """Charge each of one case's misses to its cause.
 
     ``drafts`` are the pre-critic drafts and ``produced`` the report's claims,
     the two sides :mod:`evals.harness.critic_yield` already scores; a draft in
     the first and not the second is one the critic killed.
+
+    ``block`` is the report's own STRIDE block, read for one fact the drafts do
+    not carry: whether the ruling on the draft a row names came out of a
+    bounded re-ask (#796). Asked through the block's own
+    :meth:`~analysis_service.claims.FrameworkAnalysis.re_ask_kinds`, so this
+    and the ASVS instrument cannot disagree about what a re-asked claim is.
     """
     references = case.stride_claims()
     must_find = {
@@ -160,6 +184,7 @@ def attribute_case(
                     verb,
                     draft_id=claim.id,
                     draft_verb=claim.verb,
+                    re_ask=block.re_ask_kinds(claim.id),
                 )
             )
             continue
@@ -182,6 +207,7 @@ def attribute_case(
                     verb,
                     draft_id=draft.id,
                     draft_verb=draft.verb,
+                    re_ask=block.re_ask_kinds(draft.id),
                 )
             )
             continue
@@ -194,12 +220,17 @@ def pooled(rows: Sequence[CaseLosses]) -> dict[str, Any]:
     """Losses per cause over the corpus, counted rather than averaged, and the verb pairs."""
     totals: Counter[str] = Counter()
     must_find: Counter[str] = Counter()
+    re_asked: Counter[str] = Counter()
+    kinds: Counter[str] = Counter()
     pairs: Counter[tuple[str, str]] = Counter()
     pairs_must_find: Counter[tuple[str, str]] = Counter()
     for row in rows:
         for loss in row.losses:
             totals[loss.cause] += 1
             must_find[loss.cause] += loss.must_find
+            if loss.re_ask:
+                re_asked[loss.cause] += 1
+                kinds.update(loss.re_ask)
             if loss.cause == "verb" and loss.draft_verb is not None:
                 pair = (loss.reference_verb, loss.draft_verb)
                 pairs[pair] += 1
@@ -209,6 +240,13 @@ def pooled(rows: Sequence[CaseLosses]) -> dict[str, Any]:
         "losses": sum(totals.values()),
         "by_cause": {cause: totals[cause] for cause in CAUSES},
         "must_find_by_cause": {cause: must_find[cause] for cause in CAUSES},
+        # The subset of each cause's misses whose ruling came out of a re-ask,
+        # and which problems the first pass had on those drafts. Counted per
+        # miss and per kind rather than summed together: one draft carries more
+        # than one kind, so the kinds do not add up to the misses.
+        "re_asked_by_cause": {cause: re_asked[cause] for cause in CAUSES},
+        "re_asked": sum(re_asked.values()),
+        "by_re_ask_kind": dict(sorted(kinds.items())),
         # Reference verb first, then what the lane wrote, most frequent first.
         "verb_pairs": [
             {
@@ -243,6 +281,20 @@ def render(rows: Sequence[CaseLosses]) -> None:
         )
         + " (instrument, non-gating)"
     )
+    if totals["re_asked"]:
+        print(
+            f"  of those, {totals['re_asked']} lost a draft the first critic"
+            " pass fumbled: "
+            + ", ".join(
+                f"{cause} {totals['re_asked_by_cause'][cause]}"
+                for cause in CAUSES
+                if totals["re_asked_by_cause"][cause]
+            )
+            + " — first-pass problems: "
+            + ", ".join(
+                f"{kind} {count}" for kind, count in totals["by_re_ask_kind"].items()
+            )
+        )
     for pair in totals["verb_pairs"][:8]:
         print(
             f"  verb: reference {pair['reference_verb']:<18} lane wrote"

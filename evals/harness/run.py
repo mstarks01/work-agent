@@ -396,17 +396,21 @@ def _score_runs(
     scored = []
     charged = []
     for case in cases:
-        if case.id not in runs or not optional_block(runs[case.id].report, "stride"):
+        block = (
+            optional_block(runs[case.id].report, "stride") if case.id in runs else None
+        )
+        if block is None:
             continue
         drafts = runs[case.id].merged_drafts
         produced = stride_threats(runs[case.id].report)
         entry = score_case_with_yield(case, drafts, produced, matcher, votes)
         scored.append(entry)
         # The third reading off the same pass: what lost each miss, from the
-        # score's own misses and the two sides the yield already compares.
+        # score's own misses, the two sides the yield already compares, and the
+        # block's own record of how its first critic pass failed.
         charged.append(
             losses.attribute_case(
-                case, entry.score, drafts, produced, flows_by_case[case.id]
+                case, entry.score, drafts, produced, flows_by_case[case.id], block
             )
         )
     return (

@@ -22,6 +22,7 @@ from analysis_service.claims import (
     RepairedQuote,
     Severity,
     UnknownRef,
+    UnreconciledRuling,
     UnresolvedEvidence,
     UnresolvedMention,
     UnresolvedReference,
@@ -489,6 +490,44 @@ class TestReportInvariants:
         payload["analyses"][0]["summary"]["claim_count"] += 1
         with pytest.raises(ValidationError, match="does not match the stride analysis"):
             Report.model_validate(payload)
+
+
+class TestTheBlockAnswersWhichProblemsAReAskInherited:
+    """``re_ask_kinds`` is the one reader of "did this claim reach the report
+    through a repair", and both loss instruments under ``evals/`` ask it (#796).
+    A second copy of the join is how the two would come to disagree.
+    """
+
+    def _mark(self, claim_id, kind):
+        return UnreconciledRuling.of(
+            claim_id=claim_id, kind=kind, message="the first pass got this wrong"
+        )
+
+    def test_a_claim_the_first_pass_ruled_cleanly_answers_empty(self):
+        (block,) = sample_report().analyses
+
+        assert block.re_ask_kinds("S-01") == ()
+
+    def test_the_kinds_are_deduplicated_and_ordered_by_the_vocabulary(self):
+        """One claim carries a kind twice — two broken rules on one verdict are
+        two problems — and a caller counting kinds wants the set."""
+        (block,) = sample_report(
+            unreconciled_rulings=[
+                self._mark("S-01", "verdict-shape"),
+                self._mark("S-01", "dropped"),
+                self._mark("S-01", "verdict-shape"),
+            ]
+        ).analyses
+
+        assert block.re_ask_kinds("S-01") == ("dropped", "verdict-shape")
+
+    def test_a_mark_on_another_claim_answers_nothing_here(self):
+        (block,) = sample_report(
+            unreconciled_rulings=[self._mark("S-02", "dropped")]
+        ).analyses
+
+        assert block.re_ask_kinds("S-01") == ()
+        assert block.re_ask_kinds("S-02") == ("dropped",)
 
 
 class TestEveryClaimMarkPointsAtAThreat:
