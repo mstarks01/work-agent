@@ -80,6 +80,17 @@
     "rejected": ["Rejected", "The critic ruled this draft out. The reason says which check ended it."],
   };
 
+  // A rejection for `evidence` is the one rejection that rules on the unit a
+  // draft names: for a framework that answers in units it means the unit does
+  // not apply, and the reason says why. That is an answer about the
+  // requirement, so it belongs on the requirement's own row and not in the
+  // list of drafts that argued badly. Only a block with unit rows reads it so:
+  // for a framework whose claims are an open set, an `evidence` rejection is a
+  // draft that failed on its own substance, and it stays dismissed.
+  const answersInUnits = (block) => (UNITS[block.framework] || []).length > 0;
+  const rulesOut = (block, c) =>
+    answersInUnits(block) && c.verdict.status === "rejected" && c.verdict.rejected_because === "evidence";
+
   // Each branch named in its own words, so the four read as different *kinds*
   // of justification rather than four formattings of one. The two attribute
   // branches carry identical fields, so this line is the only place a reader
@@ -386,7 +397,9 @@
       const claim = row.claim_id ? byId[row.claim_id] : null;
       const entry = byUnit[row.unit];
       const [label, meaning] = claim
-        ? (VERDICT_STATE[claim.verdict.status] || ["Ruled", ""])
+        ? (rulesOut(block, claim)
+            ? SCOPE_STATE["not-applicable"]
+            : (VERDICT_STATE[claim.verdict.status] || ["Ruled", ""]))
         : (SCOPE_STATE[entry ? entry.state : "not-raised"] || ["Listed", ""]);
 
       const box = el("details", "unit");
@@ -444,10 +457,15 @@
     // than there is (#659).
     const deferredCount =
       block.scope.filter(e => e.state === "needs-other-evidence").length;
+    // Split out of the rejected count on the page: a requirement ruled out
+    // is an answer, and a draft dismissed for arguing badly is not.
+    const ruledOutClaims = block.rejected_claims.filter(c => rulesOut(block, c));
+    const dismissed = block.rejected_claims.filter(c => !rulesOut(block, c));
     [
       [block.summary.claim_count, "Actionable claims"],
       [block.summary.needs_info_count, "Needs info"],
-      [block.summary.rejected_count, "Rejected"],
+      ...(answersInUnits(block) ? [[ruledOutClaims.length, "Does not apply"]] : []),
+      [dismissed.length, "Rejected"],
       [deferredCount, "Needs other evidence"],
     ].forEach(([n, k]) => {
       const t = el("div","tile");
@@ -477,6 +495,10 @@
       const ruledOut = (byState["not-applicable"] || []).length;
       if (ruledOut) {
         wrap.append(el("div", null, `\u00a0\u00a0${ruledOut} ruled out — does not apply`));
+      }
+      if (ruledOutClaims.length) {
+        wrap.append(el("div", null,
+          `\u00a0\u00a0${ruledOutClaims.length} ruled out by review — does not apply; each on its own row below`));
       }
       const undecided = (byState["undecidable"] || []).length;
       if (undecided) {
@@ -589,9 +611,9 @@
     // Only where there are any. Every block carries this heading otherwise, and
     // on a report with two frameworks that is two empty sections a reader has
     // to scroll past to reach the model.
-    if (block.rejected_claims.length) {
+    if (dismissed.length) {
       section.append(el("h3", null, "Rejected \u2014 considered and dismissed"));
-      block.rejected_claims.forEach(t => section.append(claimCard(marks, t, true)));
+      dismissed.forEach(t => section.append(claimCard(marks, t, true)));
     }
     $("analyses").append(section);
   }
