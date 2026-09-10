@@ -52,6 +52,7 @@ from evals.harness.calibration import (
     AGREEMENT_BAR,
     load_pairs,
     measure_agreement,
+    measure_direction,
     measure_merges,
 )
 from evals.harness.identity import MechanicalIdentity, SubsetVerbIdentity
@@ -177,6 +178,31 @@ def _frontier_row(pairs, corpus):
         elif ruled and not pair.label_match:
             candidate_merges += 1
     return {"splits": splits, "candidate_merges": candidate_merges}
+
+
+def _direction() -> Mapping[str, object]:
+    """What a direction across the boundary would cost, which #652 asked.
+
+    One figure rather than two, because the guide states the coverage and the
+    price as one argument: a direction is underivable on a third of the corpus,
+    and that is *why* both readings of an absent one are dead. Split apart, a
+    guide could update the price and leave the coverage saying otherwise.
+    """
+    corpus = load_corpus(verify_corpus.CORPUS_DIR)
+    flows = flows_by_case(corpus)
+    result = measure_direction(corpus, load_pairs(), flows, SubsetVerbIdentity(flows))
+    return {
+        "claims": result.claims,
+        "one_flow": result.directed_claims,
+        "several_flows": result.ambiguous_claims,
+        "no_flow": result.undirected_claims,
+        "merged": result.merged,
+        "candidate_merges": result.candidate_merges,
+        "mismatch_splits": result.as_a_mismatch[0],
+        "mismatch_recovered": result.as_a_mismatch[1],
+        "wildcard_splits": result.as_a_wildcard[0],
+        "wildcard_recovered": result.as_a_wildcard[1],
+    }
 
 
 def _corpus() -> Mapping[str, object]:
@@ -307,6 +333,38 @@ FIGURES: tuple[Figure, ...] = (
             (
                 "evals/harness/verbs.py",
                 "merges {floor_cand_merges} of {cand_of}",
+                1,
+            ),
+        ),
+    ),
+    Figure(
+        name="what a direction across the boundary would cost",
+        compute=_direction,
+        claims=(
+            (
+                "docs/agents/claim-identity.md",
+                (
+                    "{one_flow} of the {claims} corpus claims name\nexactly one"
+                    " flow; {several_flows} name several and {no_flow} name none"
+                ),
+                1,
+            ),
+            (
+                "docs/agents/claim-identity.md",
+                (
+                    "| New false splits, of the {merged} merged correctly |"
+                    " Candidate merges recovered, of {candidate_merges} |"
+                ),
+                1,
+            ),
+            (
+                "docs/agents/claim-identity.md",
+                "| a mismatch | {mismatch_splits} | {mismatch_recovered} |",
+                1,
+            ),
+            (
+                "docs/agents/claim-identity.md",
+                "| a wildcard | {wildcard_splits} | {wildcard_recovered} |",
                 1,
             ),
         ),

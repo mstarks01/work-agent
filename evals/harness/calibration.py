@@ -89,11 +89,14 @@ from analysis_service.frameworks import FrameworkName
 from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES, StrideCategory
 from evals.harness.identity import (
     ClaimPair,
+    DirectionState,
     FlowMap,
     IdentityError,
     Matcher,
+    direction_state,
     endpoint_form,
     endpoint_subset,
+    flow_directions,
 )
 from evals.harness.reference import GoldenCase
 from evals.harness.verbs import UNSEPARATED, same_action
@@ -517,6 +520,111 @@ IDENTITY_VALIDATION: dict[FrameworkName, IdentityValidation] = {
         recorded_collisions={},
     ),
 }
+
+
+@dataclass(frozen=True)
+class DirectionResult:
+    """What a direction across the boundary is worth, if the identity read one.
+
+    [#652](https://github.com/mstarks01/work-agent/issues/652) asks whether two
+    escalations the opposite way round should stay two findings. Nothing in the
+    identity tuple carries a direction, so answering it needs one derived from
+    the **Data Flow**s a claim cites — and the first two fields say how often
+    that is even possible.
+
+    ``as_a_mismatch`` and ``as_a_wildcard`` are the two ways to treat a pair
+    where one side cites no flow, and the choice between them is the whole
+    design. Both are reported, because a figure quoting one alone reads as a
+    verdict the measurement did not reach.
+    """
+
+    claims: int
+    directed_claims: int
+    ambiguous_claims: int
+    undirected_claims: int
+    as_a_mismatch: tuple[int, int]
+    as_a_wildcard: tuple[int, int]
+    merged: int
+    candidate_merges: int
+
+
+def measure_direction(
+    corpus: Sequence[GoldenCase],
+    pairs: Sequence[LabelledPair],
+    flows_by_case: Mapping[str, FlowMap],
+    matcher: Matcher,
+) -> DirectionResult:
+    """Price a direction component on the recorded labels and the corpus.
+
+    One aggregation, because two would drift: ``tests/test_evals_identity.py``
+    pins the numbers and ``tests/test_doc_figure_lints.py`` checks the guide
+    still states them, and both read this.
+
+    ``matcher`` decides which pairs are priced, and it is the shipped rule
+    rather than a copy of it: a direction can only break a merge that already
+    happens. A pair the matcher refuses is not a merge, so it is skipped.
+
+    Each tuple is ``(new false splits, candidate merges recovered)`` over those
+    merged pairs. A split is a labelled ``match`` the direction would break; a
+    recovered merge is a labelled ``no-match`` it would break, which is the
+    only thing a direction could buy.
+    """
+    cited: Counter[int] = Counter()
+    for case in corpus:
+        flows = flows_by_case.get(case.id, {})
+        for claim in case.references.get("stride", ()):
+            cited[len(flow_directions(claim.affected_element_ids, flows))] += 1
+
+    priced: Counter[tuple[bool, DirectionState]] = Counter()
+    for pair in pairs:
+        candidate_ids = pair.candidate_element_ids
+        if not pair.is_scored or candidate_ids is None:
+            continue
+        try:
+            merged = matcher.equivalent(pair.to_claim_pair()).match
+        except IdentityError:
+            continue
+        if not merged:
+            continue
+        state = direction_state(
+            pair.reference_element_ids,
+            candidate_ids,
+            flows_by_case.get(pair.case, {}),
+        )
+        priced[(pair.label_match, state)] += 1
+
+    def cost(label: bool, states: frozenset[DirectionState]) -> int:
+        return sum(
+            count
+            for (matched, state), count in priced.items()
+            if matched is label and state in states
+        )
+
+    if not cited:
+        raise CalibrationError(
+            "no stride reference claim was read, so nothing says how often a"
+            " direction is derivable at all"
+        )
+    if not priced:
+        raise CalibrationError(
+            "the matcher merges none of these pairs, so a direction has nothing"
+            " to break. A vacuous (0, 0) here reads exactly like the answer"
+            " that a direction costs nothing, so this refuses instead"
+        )
+
+    disagreeing: frozenset[DirectionState] = frozenset({"opposed", "different"})
+    absent: frozenset[DirectionState] = disagreeing | {"underivable"}
+    every = frozenset(state for _, state in priced)
+    return DirectionResult(
+        claims=sum(cited.values()),
+        directed_claims=cited[1],
+        ambiguous_claims=sum(count for size, count in cited.items() if size > 1),
+        undirected_claims=cited[0],
+        as_a_mismatch=(cost(True, absent), cost(False, absent)),
+        as_a_wildcard=(cost(True, disagreeing), cost(False, disagreeing)),
+        merged=cost(True, every),
+        candidate_merges=cost(False, every),
+    )
 
 
 def measure_merges(

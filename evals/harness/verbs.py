@@ -80,10 +80,13 @@ UNSEPARATED: tuple[tuple[str, str, str], ...] = (
         "01-payments-checkout",
         "elevation-of-privilege",
         (
-            "Two escalations across one boundary. The corpus itself treats them"
-            " as adjacent — its calibration note says assignment decides which"
-            " one a threat consumes — so this is arguably a correct merge rather"
-            " than a miss, and it is what #201's `mechanism` would rule on."
+            "Two escalations across one boundary, and #652 ruled the merge"
+            " correct rather than a miss. Both claims name the one DMZ-to-core"
+            " pivot; one cites the flow into the order service and the process"
+            " it ends at, the other cites the two processes. A direction"
+            " separates them no better than the verb does, because the coarser"
+            " side cites no flow and so states no direction at all — the"
+            " DIRECTION table in tests/test_evals_identity.py prices that."
         ),
     ),
     (
