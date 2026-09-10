@@ -127,8 +127,8 @@ def pins_scalar(text: str, value: str) -> bool:
 # remove.
 #
 # Derived from the registry rather than written down. A hand-kept copy was a
-# second reader of `_CREDENTIAL_VARS`, and it answered for four vendors on the
-# day a fifth arrived: the binding check raised on the one variable this
+# second reader of the credential sources, and it answered for four vendors on
+# the day a fifth arrived: the binding check raised on the one variable this
 # mapping had never heard of. The loader checks that a variable is declared,
 # never that its value has a shape, so one placeholder serves every variable.
 FAKE_ENV = {

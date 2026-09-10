@@ -548,7 +548,7 @@ def findings_from_artifact(path: Path) -> tuple[list[review_queue.Finding], dict
     holds the aggregates this harness computed, and the reports hold what the
     agents actually said.
     """
-    # The one definition of the reports directory is the harness's: `run.py`
+    # The one definition of the reports directory is the harness's: `bundle`
     # replaces the artifact's suffix, and a name composed here would be a
     # second definition nothing compares to the first.
     reports_dir = bundle.reports_dir(path)

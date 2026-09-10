@@ -221,9 +221,10 @@ def _shipped_modules() -> list[str]:
 def _vendors_in(key: object, vocabulary: frozenset) -> set:
     """Which members of ``vocabulary`` a mapping key names.
 
-    A key is either a member itself, or a tuple carrying one —
-    ``_CREDENTIAL_VARS`` is keyed by ``(vendor, mode)``, and a table keyed by a
-    pair has to answer for every vendor in it just as a flat one does.
+    A key is either a member itself, or a tuple carrying one. A table keyed by
+    a pair — a vendor and something else — has to answer for every vendor in it
+    just as a flat one does, so the pair is read for its vendor half rather
+    than skipped as an unrecognised key.
     """
     if isinstance(key, tuple):
         return {part for part in key if part in vocabulary}
@@ -234,9 +235,9 @@ def _assigned_at_module_level(path: Path) -> set[str]:
     """Every name this module *defines* at module level.
 
     Read from the source rather than from ``vars()``, which cannot tell a table
-    a module defines from one it imports. ``model_tiers`` re-exports
-    ``CREDENTIAL_MODES``, and reporting one table under two names would read as
-    two broken tables in a failure message.
+    a module defines from one it imports. A module that imports the registry
+    would otherwise report it under a second name, and one incomplete table
+    would read as two broken ones in a failure message.
     """
     names: set[str] = set()
     for node in ast.parse(path.read_text(encoding="utf-8")).body:

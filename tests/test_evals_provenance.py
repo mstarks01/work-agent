@@ -614,24 +614,43 @@ class TestTheTreeIsRecorded:
 def test_the_record_and_the_stop_read_one_checkout(tmp_path, monkeypatch):
     """`tree_identity` records the tree and `repo_commit` stops a sweep on it.
 
-    Each used to run the same two git commands and could have read two answers.
-    Both now read `checkout_state`, so one scripted git answers both: no
-    checkout gives the record an empty tree and stops the sweep by name, and a
-    dirty tree reads as dirty on both sides."""
+    **One command is not one checkout.** Both call `checkout_state`, and this
+    is what pins the directory they ask about: the record used to read the
+    process working directory and the stop used to read `REPO_ROOT`, so a
+    sweep launched from another clone wrote that clone's HEAD into the
+    artifact beside this checkout's commit, and nothing compared the two.
+
+    The working directory is moved away from the repository here, which is
+    what a sweep run from anywhere else does.
+    """
     import subprocess
 
     from evals.harness import artifact, provenance
 
-    monkeypatch.setattr(artifact, "REPO_ROOT", tmp_path)
-    assert provenance.tree_identity(tmp_path) == ""
-    with pytest.raises(provenance.ProvenanceError, match="cannot read the commit"):
-        artifact.repo_commit()
+    asked = []
 
     def scripted(args, **kwargs):
+        asked.append(kwargs["cwd"])
         out = "f" * 40 + "\n" if args[1] == "rev-parse" else " M a-file\n"
         return subprocess.CompletedProcess(args, 0, stdout=out, stderr="")
 
+    monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(provenance.subprocess, "run", scripted)
 
-    assert provenance.tree_identity(tmp_path) == "f" * 40 + "-dirty"
+    assert provenance.tree_identity() == "f" * 40 + "-dirty"
     assert artifact.repo_commit() == artifact.RepoCommit(commit="f" * 40, clean=False)
+    assert set(asked) == {str(provenance.REPO_ROOT)}
+
+
+def test_no_checkout_gives_an_empty_record_and_a_named_stop(tmp_path, monkeypatch):
+    """The two answers a directory without `git` gets, from the one reader.
+
+    The record carries no guess and the sweep stops by name, which is the
+    split the callers own rather than `checkout_state`.
+    """
+    from evals.harness import artifact, provenance
+
+    monkeypatch.setattr(provenance, "REPO_ROOT", tmp_path)
+    assert provenance.tree_identity() == ""
+    with pytest.raises(provenance.ProvenanceError, match="cannot read the commit"):
+        artifact.repo_commit()
