@@ -281,6 +281,28 @@ class TestTheDeclaredKeysAreTheWrittenKeys:
         assert set(artifact) == DECLARED_KEYS
 
 
+class TestASweepReadsEachDerivedValueOnce:
+    """The console line and the artifact value come from one computation."""
+
+    def test_the_pooled_coverage_is_one_object(self):
+        sweep = Sweep(run=empty_run(tuple(PACKAGES)))
+
+        assert sweep.lanes is sweep.lanes
+
+    def test_the_filler_rows_are_one_object(self):
+        sweep = Sweep(run=empty_run(tuple(PACKAGES)))
+
+        assert sweep.filler_rows is sweep.filler_rows
+
+    def test_a_scored_sweep_starts_its_own_cache(self):
+        from dataclasses import replace
+
+        sweep = Sweep(run=empty_run(tuple(PACKAGES)))
+        lanes = sweep.lanes
+
+        assert replace(sweep, scores=()).lanes is not lanes
+
+
 class TestReadingABlockFailsClosed:
     """``EvalArtifact.block`` over an artifact that lost one."""
 

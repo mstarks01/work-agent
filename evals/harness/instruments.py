@@ -39,6 +39,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+from functools import cached_property
 from typing import Any
 
 from analysis_service.identity import IDENTITY_VERSION
@@ -224,10 +225,18 @@ class Sweep:
         """
         return self.run.rows.get(instrument, ())
 
-    @property
+    # Cached on the instance, and safe because a sweep is built after the run
+    # is complete and a scored sweep is a ``replace``, which starts empty. The
+    # console line and the artifact value read the same rows.
+    @cached_property
     def lanes(self) -> list[LaneCoverage]:
         """The pooled coverage rows, over the frameworks the sweep built."""
         return coverage.aggregate_coverage(self.run.coverage, self.run.frameworks)
+
+    @cached_property
+    def filler_rows(self) -> tuple[filler.FillerRow, ...]:
+        """The filler readings over every finished report in the sweep."""
+        return filler.rows(run.report for run in self.run.runs.values())
 
 
 @dataclass(frozen=True)
@@ -315,12 +324,8 @@ INSTRUMENTS: dict[str, Instrument] = {
         # scripts the agents, so pointers always resolve and quotes always
         # verify. Neutral — it reads the shared claim and verdict shape, so a
         # package nobody has written is measured on arrival.
-        render=lambda sweep: filler.render(
-            filler.rows(run.report for run in sweep.run.runs.values())
-        ),
-        artifact=lambda sweep: filler.artifact(
-            filler.rows(run.report for run in sweep.run.runs.values())
-        ),
+        render=lambda sweep: filler.render(sweep.filler_rows),
+        artifact=lambda sweep: filler.artifact(sweep.filler_rows),
         keys=("filler",),
     ),
     "instruction": Instrument(
