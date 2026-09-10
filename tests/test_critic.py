@@ -1024,3 +1024,178 @@ def test_ruling_view_carries_the_unit_text_a_package_supplies():
     assert "unit_text" not in stride_view
     assert asvs_view["unit_text"] == requirement_text("V6.2.1")
     assert "8 characters" in asvs_view["unit_text"]
+
+
+#: Each :data:`~analysis_service.claims.UnreconciledKind` against a check that
+#: writes it and the claim it names. The two-in-one entry is deliberate: one
+#: malformed ID is both halves.
+PRODUCERS = {
+    "dropped": ("_dropped_and_invented", "S-01"),
+    "invented": ("_dropped_and_invented", "S-1"),
+    "duplicate-id": ("_duplicate_id", "S-01"),
+    "confirmed-on-unknown": ("_confirmed_on_unknown", "S-01"),
+    "duplicate-on-unit": ("_duplicate_on_unit", "v5.0.0-6.2.1"),
+    "verdict-shape": ("_verdict_shape", "S-01"),
+    "unresolved-unknown": ("_unresolved_unknown", "S-01"),
+    "unbriefed-change": ("_unbriefed_change", "S-01"),
+}
+
+
+class TestEveryProblemCarriesItsClaimAndItsKind:
+    """The typed half of a review problem, and the table that keeps it whole.
+
+    ``unreconciled_rulings`` carried bare sentences once, so counting causes
+    meant a regular expression over prose, and counting distinct *rulings* was
+    not possible at all — one ruling writes more than one sentence. Each check
+    now names the claim it is about and which check found it.
+
+    **The table below is checked against the closed set**, so a kind nobody
+    writes and a check whose kind is not in the vocabulary both fail here. That
+    is the rule this repo applies to every table keyed by a vocabulary: a
+    table nobody compares to its registry fails as quietly as the branch it
+    replaced.
+    """
+
+    def _asvs_draft(self):
+        from analysis_service.frameworks.asvs.record import DraftRequirementRuling
+
+        return DraftRequirementRuling.model_validate(
+            {
+                **sample_draft("S-01").model_dump(
+                    exclude={"category", "verb", "severity", "mitigations"}
+                ),
+                "id": "v5.0.0-6.2.1",
+                "chapter": "authentication",
+            }
+        )
+
+    def _dropped_and_invented(self):
+        """One typo: the draft goes unruled and the ID nobody drafted arrives."""
+        ruling = sample_ruling("S-01").model_copy(update={"id": "S-1"})
+        return review_issues([sample_draft("S-01")], [ruling], valid_model()).problems
+
+    def _duplicate_id(self):
+        return review_issues(
+            [sample_draft("S-01")],
+            [sample_ruling("S-01"), sample_ruling("S-01")],
+            valid_model(),
+        ).problems
+
+    def _confirmed_on_unknown(self):
+        draft = sample_draft(
+            "S-01",
+            grounds=[
+                Ground(
+                    kind="unknown-attribute",
+                    element_id="store:orders-db",
+                    attribute="encryption_at_rest",
+                )
+            ],
+        )
+        return review_issues([draft], [sample_ruling("S-01")], valid_model()).problems
+
+    def _duplicate_on_unit(self):
+        draft = self._asvs_draft()
+        ruling = sample_ruling(
+            draft.id,
+            verdict=ProposedVerdict(
+                status="rejected", reason="dup", rejected_because="duplicate"
+            ),
+        )
+        return review_issues([draft], [ruling], valid_model()).problems
+
+    def _verdict_shape(self):
+        ruling = sample_ruling("S-01", verdict=ProposedVerdict(status="rejected"))
+        return review_issues([sample_draft("S-01")], [ruling], valid_model()).problems
+
+    def _unresolved_unknown(self):
+        ruling = sample_ruling(
+            "S-01",
+            verdict=ProposedVerdict(
+                status="needs-info",
+                reason="unclear",
+                related_unknowns=[
+                    UnknownRef(element_id="store:ghost", attribute="technology")
+                ],
+            ),
+        )
+        return review_issues([sample_draft("S-01")], [ruling], valid_model()).problems
+
+    def _unbriefed_change(self):
+        first = sample_ruling("S-01").model_dump(mode="json")
+        changed = sample_ruling(
+            "S-01",
+            verdict=ProposedVerdict(
+                status="rejected", reason="re-decided", rejected_because="reasoning"
+            ),
+        ).model_dump(mode="json")
+        _, drift = critic.merge_retry([first], [changed], [], ["S-01"])
+        return drift
+
+    @pytest.mark.parametrize("kind", sorted(PRODUCERS))
+    def test_the_check_names_its_kind_and_its_claim(self, kind):
+        producer, claim_id = PRODUCERS[kind]
+        problems = getattr(self, producer)()
+
+        named = [p for p in problems if p.kind == kind]
+        assert named, f"no {kind!r} problem from {producer}"
+        assert {p.claim_id for p in named} == {claim_id}
+        assert all(p.message for p in named)
+
+    def test_the_table_answers_for_every_kind_the_vocabulary_holds(self):
+        """A kind no check writes is a hole, and a check writing a kind the
+        vocabulary does not hold cannot be recorded at all."""
+        from typing import get_args
+
+        from analysis_service.claims import UnreconciledKind
+
+        assert set(get_args(UnreconciledKind)) == set(PRODUCERS)
+
+    def test_the_sentences_are_still_what_the_re_ask_reads(self):
+        """The prompt reads prose, so ``messages`` stays the same list of words
+        it was — derived from the problems rather than parked beside them."""
+        problems = self._verdict_shape()
+        review = review_issues(
+            [sample_draft("S-01")],
+            [sample_ruling("S-01", verdict=ProposedVerdict(status="rejected"))],
+            valid_model(),
+        )
+
+        assert review.messages == [p.message for p in problems]
+
+    def test_the_bound_cuts_rather_than_raises(self):
+        """Every sentence composes below the bound today, so this is the
+        fail-safe: a producer that quotes more agent text than the eight do
+        must not cost the job the report this mark annotates."""
+        from analysis_service.claims import (
+            UNRECONCILED_MESSAGE_MAX_CHARS,
+            UnreconciledRuling,
+        )
+
+        mark = UnreconciledRuling.of(
+            claim_id="S-01", kind="dropped", message="x" * 9000
+        )
+
+        assert len(mark.message) == UNRECONCILED_MESSAGE_MAX_CHARS
+
+    def test_the_bound_sits_above_what_a_check_composes(self):
+        """A cut that fired on a real message would leave the mark and the
+        re-ask's prompt reading two different sentences."""
+        from analysis_service.claims import UNRECONCILED_MESSAGE_MAX_CHARS
+
+        for producer, _ in PRODUCERS.values():
+            for problem in getattr(self, producer)():
+                assert len(problem.message) < UNRECONCILED_MESSAGE_MAX_CHARS
+
+    def test_a_critic_that_names_no_claim_at_all_is_still_recorded(self):
+        """``Ruling.id`` carries no ``min_length`` on purpose: an empty ID is
+        one more ID no lane agent drafted, and the re-ask is asked to drop it.
+        The mark that records that must not be what raises instead."""
+        from analysis_service.claims import UNNAMED_CLAIM
+
+        ruling = sample_ruling("S-01").model_copy(update={"id": ""})
+
+        problems = review_issues([sample_draft("S-01")], [ruling], valid_model())
+
+        invented = [p for p in problems.problems if p.kind == "invented"]
+        assert [p.claim_id for p in invented] == [UNNAMED_CLAIM]

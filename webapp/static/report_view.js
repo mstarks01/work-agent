@@ -161,7 +161,13 @@
     // not hold. Dropped the same way, listed the same way, and the reason
     // carries the lost quote or reference so a reader can judge the loss.
     const groundless = (block.dropped_claims || []);
-    return { unverified, repaired, references, mentions, composed, unmitigated, unknown, groundless };
+    // How the first critic pass failed to reconcile with its drafts, before
+    // the bounded re-ask. These key to a claim that may or may not be in the
+    // block -- a dropped draft is ruled on the second pass and a ruling on an
+    // invented ID never had a claim -- so they render as a block-level note
+    // rather than on a card, grouped by kind.
+    const unreconciled = (block.unreconciled_rulings || []);
+    return { unverified, repaired, references, mentions, composed, unmitigated, unknown, groundless, unreconciled };
   }
 
   const SEV = { critical: ["Critical","--sev-critical"], high: ["High","--sev-high"], medium: ["Medium","--sev-medium"], low: ["Low","--sev-low"] };
@@ -552,6 +558,29 @@
         const item = el("li");
         item.append(code(m.claim_id), " \u2014 ", prose(m.title),
           " (", prose(m.reason), ")");
+        list.append(item);
+      });
+      note.append(list);
+      section.append(note);
+    }
+    // A repaired run and a clean one read alike without this. The count per
+    // kind is what a reader acts on -- one dropped draft is a slip, and forty
+    // needs-info verdicts hung on attributes the model does not have is a
+    // prompt that needs work -- so the kinds are grouped rather than listed
+    // one sentence at a time.
+    if (marks.unreconciled.length) {
+      const note = el("div", "dropped");
+      note.append(el("b", null,
+        `${marks.unreconciled.length} problem(s) the review's first pass left for its re-ask`));
+      const byKind = new Map();
+      marks.unreconciled.forEach(m => {
+        if (!byKind.has(m.kind)) byKind.set(m.kind, []);
+        byKind.get(m.kind).push(m.claim_id);
+      });
+      const list = el("ul");
+      byKind.forEach((ids, kind) => {
+        const item = el("li");
+        item.append(code(kind), ` \u2014 ${ids.length}: `, prose(ids.join(", ")));
         list.append(item);
       });
       note.append(list);

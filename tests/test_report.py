@@ -544,8 +544,14 @@ class TestEveryClaimMarkPointsAtAThreat:
     def test_the_claim_bound_table_is_every_mark_field_that_names_a_claim(self):
         """The table the fan-in narrows by, held to the mark models: every
         ``AnalysisMarks`` field whose entry carries a ``claim_id`` is in it,
-        except the two that name a claim absent on purpose."""
-        absent_on_purpose = {"dropped_claims", "unknown_claim_identities"}
+        except the three that name a claim which may not be there."""
+        absent_on_purpose = {
+            "dropped_claims",
+            "unknown_claim_identities",
+            # A problem may name a draft the critic dropped and the re-ask
+            # then ruled, or an ID no lane agent ever drafted.
+            "unreconciled_rulings",
+        }
         naming = {
             name
             for name, field in AnalysisMarks.model_fields.items()
