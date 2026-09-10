@@ -51,9 +51,10 @@ from __future__ import annotations
 import os
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from functools import cached_property
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Self
+from typing import Self
 
 from analysis_service.binding import (
     NodeBinding,
@@ -213,7 +214,12 @@ class Deployment:
     # deployment reads the environment it was built from, and a variable set
     # afterwards belongs to the next deployment built (#675 D24).
     env: Mapping[str, str] = field(default_factory=dict, repr=False, compare=False)
-    _built: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
+    # The runner cache. ``init=False`` so a ``replace`` starts a fresh one: a
+    # deployment with a different sampling builds different adapters, and a
+    # copied cache would hand it the old graph.
+    _runners: dict[tuple[FrameworkName, ...], AdkPipelineRunner] = field(
+        default_factory=dict, init=False, repr=False, compare=False
+    )
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> Self:
@@ -287,8 +293,9 @@ class Deployment:
         selection: a graph node name carries its own framework, so the carried
         map is a superset of any selection's with no key belonging to two.
         """
-        return self.tiers.resolve_tier(self.tier_nodes()[graph_node])
+        return self.tiers.resolve_tier(self.tier_nodes[graph_node])
 
+    @cached_property
     def tier_nodes(self) -> Mapping[str, str]:
         """Every LLM graph node this install can run, against its tier key.
 
@@ -297,9 +304,7 @@ class Deployment:
         otherwise re-derive it from the framework list and drift from the map the
         gate actually resolves against.
         """
-        return self._memo(
-            "tier_nodes", lambda: tier_node_by_graph_node(self.frameworks)
-        )
+        return tier_node_by_graph_node(self.frameworks)
 
     def pipeline(
         self,
@@ -346,6 +351,7 @@ class Deployment:
             entry=entry,
         )
 
+    @cached_property
     def gate(self) -> CertificationGate:
         """This deployment's certification gate, built once.
 
@@ -354,7 +360,11 @@ class Deployment:
         same object the runner certified with. One gate serves every selection
         — see :meth:`tier_of` for why that is sound.
         """
-        return self._memo("gate", self._build_gate)
+        return CertificationGate(
+            manifest=self.manifest,
+            tier_of=self.tier_of,
+            require_certified=self.require_certified,
+        )
 
     def runner(self, frameworks: Sequence[FrameworkName]) -> AdkPipelineRunner:
         """The production runner for one framework selection: its graph and the gate.
@@ -367,24 +377,11 @@ class Deployment:
         the report's block order and a different order is a different graph.
         """
         selection = self.selection(frameworks)
-        return self._memo(
-            f"runner:{','.join(selection)}",
-            lambda: AdkPipelineRunner(
-                self.pipeline(selection), certification=self.gate()
-            ),
-        )
-
-    def _build_gate(self) -> CertificationGate:
-        return CertificationGate(
-            manifest=self.manifest,
-            tier_of=self.tier_of,
-            require_certified=self.require_certified,
-        )
-
-    def _memo(self, key: str, build):
-        if key not in self._built:
-            self._built[key] = build()
-        return self._built[key]
+        if selection not in self._runners:
+            self._runners[selection] = AdkPipelineRunner(
+                self.pipeline(selection), certification=self.gate
+            )
+        return self._runners[selection]
 
 
 def _flag(env: Mapping[str, str], var: str) -> bool:
