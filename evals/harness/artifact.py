@@ -34,7 +34,6 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 
 from analysis_service.certification import CertifyResult
 from analysis_service.identity import IDENTITY_VERSION
-from analysis_service.report import NodeLatency, TokenUsage
 from evals.harness.instruments import INSTRUMENTS, Sweep, artifact_blocks
 from evals.harness.provenance import ProvenanceError, RunProvenance
 
@@ -370,11 +369,6 @@ def build(
     cases: Sequence[str],
     models: Mapping[str, Any],
     certification: CertifyResult,
-    provenance: RunProvenance,
-    usage: Mapping[str, TokenUsage],
-    latency: Mapping[str, NodeLatency],
-    structural_failures: Sequence[str],
-    payloads: Sequence[Mapping[str, Any]],
     trusted: bool,
     sweep: Sweep,
     commit: RepoCommit,
@@ -383,10 +377,13 @@ def build(
 ) -> dict[str, Any]:
     """The whole artifact: the sweep's envelope, plus every instrument's keys.
 
-    ``provenance`` is what actually generated, per node execution — the record
-    ``promote`` reads back. It replaces the ``node_fingerprints`` map, which
-    carried the hashes without the served builds they were computed from, so a
-    promotion could not be driven from a finished sweep at all
+    The run-level facts — provenance, usage, latency, structural failures and
+    the payloads — are read off ``sweep.run``, which is the one record of what
+    the sweep did. ``provenance`` is what actually generated, per node
+    execution: the record ``promote`` reads back. It replaces the
+    ``node_fingerprints`` map, which carried the hashes without the served
+    builds they were computed from, so a promotion could not be driven from a
+    finished sweep at all
     ([#117](https://github.com/mstarks01/work-agent/issues/117)).
 
     ``trusted`` rides beside the aggregates so nothing downstream folds an
@@ -409,14 +406,16 @@ def build(
         "models": dict(models),
         "gating": "tier-1-structural-only",
         "certification": certification.to_json(),
-        "provenance": provenance.to_json(),
-        "node_usage": {node: entry.model_dump() for node, entry in usage.items()},
+        "provenance": sweep.run.provenance.to_json(),
+        "node_usage": {
+            node: entry.model_dump() for node, entry in sweep.run.usage.items()
+        },
         "node_latency": {
             node: {**entry.model_dump(), "mean_ms": round(entry.mean_ms)}
-            for node, entry in latency.items()
+            for node, entry in sweep.run.latency.items()
         },
-        "structural_failures": list(structural_failures),
-        "mode_output": list(payloads),
+        "structural_failures": list(sweep.run.failures),
+        "mode_output": list(sweep.run.payloads),
         "trusted": trusted,
         "repo_commit": commit.model_dump(),
         "corpus_digest": corpus,
