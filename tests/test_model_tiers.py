@@ -397,8 +397,8 @@ class TestPinValidation:
 class TestDeclaredCredentialMode:
     """A deployment declares a mode only where the vendor gives it a choice.
 
-    Both rules read ``CREDENTIAL_MODES``, so they follow the registry rather
-    than a second copy of it. The shipped table is empty because no shipped
+    Both rules read ``Vendor.credential_modes``, so they follow the registry
+    rather than a second copy of it. The shipped table is empty because no shipped
     file selects a vendor at all; a deployment that selects a vendor with a
     choice fills it, from the file or from the environment.
     """
