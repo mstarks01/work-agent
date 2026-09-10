@@ -129,12 +129,38 @@ class SamplingConfigError(ConfigError):
     """The sampling configuration is invalid or unusable."""
 
 
-class _RawTier(BaseModel):
-    """One tier's decoding params exactly as written in the file / overrides.
+class _TierParams(BaseModel):
+    """The decoding params one tier carries, declared once for both shapes.
+
+    :class:`_RawTier` is the file's shape and adds the bounds the loader
+    enforces; :class:`TierSampling` is the resolved shape and adds the methods
+    that split the params at the point of use. The fields, their types and
+    their defaults are the same in both, so they are written here once.
 
     ``extra="forbid"`` rejects an unknown or misspelled key rather than
     silently ignoring it — which is also how a stray ``top_k`` line is caught
     rather than quietly dropped.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    temperature: float | None = None
+    top_p: float | None = None
+    seed: int | None = None
+    max_output_tokens: int | None = None
+    candidate_count: int = 1
+    presence_penalty: float | None = None
+    frequency_penalty: float | None = None
+    thinking: ReasoningEffort | None = None
+    constrain_output: bool = True
+
+
+class _RawTier(_TierParams):
+    """One tier's decoding params exactly as written in the file / overrides.
+
+    The three bounded fields are redeclared here with their bounds, and the
+    reserved ``candidate_count`` value is checked here, so an out-of-range
+    value fails at the loader and never reaches a resolved tier.
 
     No upper bound is placed on ``max_output_tokens``: the ceiling is a
     per-``(vendor, model)`` fact, and mirroring one here would be a table that
@@ -144,17 +170,9 @@ class _RawTier(BaseModel):
     the *loader*, not unchecked.
     """
 
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
     temperature: float | None = Field(default=None, ge=0.0, le=2.0)
     top_p: float | None = Field(default=None, gt=0.0, le=1.0)
-    seed: int | None = None
     max_output_tokens: int | None = Field(default=None, ge=1)
-    candidate_count: int = 1
-    presence_penalty: float | None = None
-    frequency_penalty: float | None = None
-    thinking: ReasoningEffort | None = None
-    constrain_output: bool = True
 
     @field_validator("candidate_count")
     @classmethod
@@ -178,7 +196,7 @@ class _RawSampling(BaseModel):
     tiers: dict[TierName, _RawTier]
 
 
-class TierSampling(BaseModel):
+class TierSampling(_TierParams):
     """One tier's resolved decoding params, ready to bind onto a tier's adapter.
 
     Split three ways at the point of use, because ADK carries only some of it:
@@ -191,18 +209,6 @@ class TierSampling(BaseModel):
     * :meth:`gate_params` — everything, for the build-time supported-param
       check.
     """
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    temperature: float | None = None
-    top_p: float | None = None
-    seed: int | None = None
-    max_output_tokens: int | None = None
-    candidate_count: int = 1
-    presence_penalty: float | None = None
-    frequency_penalty: float | None = None
-    thinking: ReasoningEffort | None = None
-    constrain_output: bool = True
 
     def constructor_kwargs(self) -> dict[str, Any]:
         """The params that must ride the ``LiteLlm`` constructor, not the config.
