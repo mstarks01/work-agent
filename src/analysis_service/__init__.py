@@ -35,7 +35,6 @@ from analysis_service.claims import (
 from analysis_service.deployment import ConfigPaths, Deployment
 from analysis_service.engine import (
     DEFAULT_CALLER,
-    MAX_SYSTEM_NAME_CHARS,
     Engine,
     EngineDeadlineError,
     EngineInputError,
@@ -115,9 +114,11 @@ from analysis_service.skills import (
 )
 from analysis_service.sources import (
     MAX_LABEL_CHARS,
+    MAX_SYSTEM_NAME_CHARS,
     Source,
     SourceKind,
     SourceLimits,
+    clean_system_name,
     render_sources,
 )
 from analysis_service.system_model import (
@@ -242,6 +243,7 @@ __all__ = [
     "allowed_asset_tags",
     "build_store",
     "build_verifier",
+    "clean_system_name",
     "compose_critic_skills",
     "compose_domain_skills",
     "compose_lane_skills",
