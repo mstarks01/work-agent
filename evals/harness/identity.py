@@ -35,13 +35,18 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Literal, Protocol
 
 from analysis_service.frameworks.stride.record import StrideCategory
 from evals.harness.verbs import same_action
 
 #: One case's **Data Flow**s as ``flow id -> (source id, destination id)``.
 FlowMap = Mapping[str, tuple[str, str]]
+
+#: How two claims' derivable directions stand, as :func:`direction_state`
+#: answers it. Closed, so a caller counting these into a table cannot key it
+#: on a word the function never returns.
+DirectionState = Literal["same", "opposed", "different", "underivable"]
 
 
 class IdentityError(ValueError):
@@ -124,6 +129,56 @@ def endpoint_form(element_ids: Iterable[str], flows: FlowMap) -> frozenset[str]:
         else:
             resolved.update(endpoints)
     return frozenset(resolved)
+
+
+def flow_directions(
+    element_ids: Iterable[str], flows: FlowMap
+) -> frozenset[tuple[str, str]]:
+    """Every ``(source, destination)`` the **Data Flow**s a claim cites carry.
+
+    The only direction a **Claim** yields, because no field holds one.
+    ``affected_element_ids`` is a list whose order no rule reads, so a claim
+    naming two processes says nothing about which way the attacker moves
+    between them; a claim naming a flow says it through that flow's endpoints.
+
+    Measured, never matched on, in the same way :func:`endpoint_form` is
+    measured by the frontier and is not what :class:`MechanicalIdentity`
+    answers with. It exists so that
+    [#652](https://github.com/mstarks01/work-agent/issues/652) — two escalations
+    in opposite directions fingerprint the same — is a number rather than an
+    opinion, and the number said no direction enters the identity.
+    """
+    return frozenset(
+        flows[element_id]
+        for element_id in comparable_elements(element_ids)
+        if element_id in flows
+    )
+
+
+def direction_state(
+    left_ids: Iterable[str], right_ids: Iterable[str], flows: FlowMap
+) -> DirectionState:
+    """How two claims' derivable directions stand, in one of four words.
+
+    ``underivable`` covers a claim citing no flow and a claim citing several
+    alike, because neither yields the single direction a comparison needs. It
+    is the answer on most of the corpus, which is why a direction component
+    recovers nothing: the ``DIRECTION`` table in
+    ``tests/test_evals_identity.py`` carries the counts.
+
+    A ``Literal`` rather than a bare ``str``, because every caller counts these
+    words into a table and a misspelt key would count zero rather than raise.
+    """
+    left = flow_directions(left_ids, flows)
+    right = flow_directions(right_ids, flows)
+    if len(left) != 1 or len(right) != 1:
+        return "underivable"
+    source, destination = next(iter(left))
+    if (source, destination) == next(iter(right)):
+        return "same"
+    if (destination, source) == next(iter(right)):
+        return "opposed"
+    return "different"
 
 
 def endpoint_subset(
