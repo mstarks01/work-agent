@@ -82,9 +82,9 @@ import importlib
 import pkgutil
 import re
 from collections.abc import Mapping
-from dataclasses import fields
+from dataclasses import fields, is_dataclass
 from pathlib import Path
-from typing import get_args
+from typing import get_args, get_type_hints
 
 import pytest
 
@@ -92,7 +92,6 @@ import pytest
 # litellm; `vendor_keyed_tables` imports every shipped module.
 from analysis_service import model_gate  # noqa: F401
 from analysis_service.vendors import (
-    CREDENTIAL_MODES,
     VENDOR_NAMES,
     VENDORS,
     CredentialMode,
@@ -144,11 +143,11 @@ DECLARED: dict[str, str] = {
     "src/analysis_service/vendors.py": (
         "The registry. `VendorName` is the closed type every other module"
         " reads, so this is the one place the names are spelled at all."
-        " Its six tables — VENDORS, CREDENTIAL_MODES, _CREDENTIAL_VARS,"
-        " _MODE_KWARGS, _FORM_RULES and VENDOR_SDKS — are keyed by vendor and"
-        " self-completing. VERTEX_PROJECT_VAR, VERTEX_LOCATION_VAR and"
-        " BEDROCK_REGION_VAR name one vendor's own addressing config, which no"
-        " other vendor reads."
+        " VENDORS is its one table, keyed by vendor and self-completing, and"
+        " every other per-vendor fact is a required field on the `Vendor` row"
+        " or on a record the row nests. VERTEX_PROJECT_VAR,"
+        " VERTEX_LOCATION_VAR and BEDROCK_REGION_VAR name one vendor's own"
+        " addressing config, which no other vendor reads."
     ),
     "src/analysis_service/conformance.py": (
         "REFERENCE_MODELS is a table keyed by vendor: the pair the offline"
@@ -320,16 +319,12 @@ def test_the_scan_finds_the_tables_we_already_know_about(tables):
 
     The failure one level up from the one this module fixes: a check that reads
     a registry is worth what its reader finds, and a reflective reader that
-    silently matched no table would report a clean tree forever. These five are
-    the tables the vertex audit worked through, so the scan has to see them.
+    silently matched no table would report a clean tree forever. These two are
+    the tables that remain keyed by vendor: the registry itself, which nests
+    every other per-vendor fact as a required field, and the reference matrix.
     """
     expected = {
         "analysis_service.vendors.VENDORS",
-        "analysis_service.vendors.CREDENTIAL_MODES",
-        "analysis_service.vendors._CREDENTIAL_VARS",
-        "analysis_service.vendors._MODE_KWARGS",
-        "analysis_service.vendors._FORM_RULES",
-        "analysis_service.vendors.VENDOR_SDKS",
         "analysis_service.conformance.REFERENCE_MODELS",
     }
     assert expected <= set(tables), (
@@ -375,6 +370,29 @@ def test_the_closed_type_and_the_name_tuple_agree():
     assert set(VENDORS) == set(VENDOR_NAMES)
 
 
+def _nested_records(record: type) -> set[type]:
+    """``record`` and every dataclass reachable through its field annotations.
+
+    Walked from the annotations rather than listed, so a record a row grows
+    tomorrow is covered without an edit. A ``Mapping[CredentialMode, X]``, a
+    ``tuple[X, ...]`` and an ``X | None`` all lead to ``X``.
+    """
+    found = {record}
+    pending = list(get_type_hints(record).values())
+    while pending:
+        hint = pending.pop()
+        pending.extend(get_args(hint))
+        if is_dataclass(hint) and isinstance(hint, type) and hint not in found:
+            found |= _nested_records(hint)
+    return found
+
+
+def test_the_walk_reaches_the_records_a_row_nests():
+    """A walker that reaches nothing passes everything, so its reach is pinned."""
+    reached = {record.__name__ for record in _nested_records(Vendor)}
+    assert {"_CredentialSource", "_CredentialVar", "_FormRule", "VendorSdk"} <= reached
+
+
 def test_no_vendor_field_has_a_default():
     """A default is how a new vendor row stays silent about a fact.
 
@@ -383,14 +401,20 @@ def test_no_vendor_field_has_a_default():
     answer and nobody was asked. Making it a required field means a fourth row
     cannot construct without stating its own — and a field that later grows a
     default would quietly restore the constant.
+
+    The rule covers every record a row nests, not `Vendor` alone: the
+    credential sources, their variables, the form rules and the SDK entry are
+    where the facts the old module tables held now live, and a default on any
+    of them is the same constant one level down.
     """
     defaulted = [
-        field.name
-        for field in fields(Vendor)
+        f"{record.__name__}.{field.name}"
+        for record in sorted(_nested_records(Vendor), key=lambda r: r.__name__)
+        for field in fields(record)
         if field.default is not field.default_factory  # both MISSING when required
     ]
     assert not defaulted, (
-        f"these Vendor fields have a default: {defaulted}. A default answers"
+        f"these registry fields have a default: {defaulted}. A default answers"
         " for a vendor nobody asked, which is what the `served_trust` constant"
         " did for two rows. Make it required, or move it to a table this"
         " module's completeness check can see."
@@ -398,15 +422,18 @@ def test_no_vendor_field_has_a_default():
 
 
 def test_every_vendor_declares_at_least_one_credential_mode():
-    # ``.get``, so a row missing from the table is reported here rather than
-    # raising. This module has to survive a half-built registry: that is
+    # ``.get``, so a row missing from the registry is reported here rather
+    # than raising. This module has to survive a half-built registry: that is
     # precisely when its messages are the ones somebody needs.
-    empty = sorted(name for name in VENDOR_NAMES if not CREDENTIAL_MODES.get(name))
+    empty = sorted(
+        name
+        for name in VENDOR_NAMES
+        if not getattr(VENDORS.get(name), "credential_modes", ())
+    )
     assert not empty, (
         f"these vendors declare no credential mode: {empty}. A row that"
         " authenticates in no way cannot be built, and one absent from"
-        " CREDENTIAL_MODES raises at `Vendor.credential_modes` on its first"
-        " use rather than here."
+        " VENDORS raises at `vendor_for` on its first use rather than here."
     )
 
 

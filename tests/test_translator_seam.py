@@ -36,7 +36,7 @@ from pathlib import Path
 import pytest
 
 from analysis_service.sampling import OFFERED_PARAMS, TierSampling
-from analysis_service.vendors import _CREDENTIAL_VARS
+from analysis_service.vendors import VENDORS
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = REPO_ROOT / "src" / "analysis_service"
@@ -206,9 +206,10 @@ def test_the_credential_table_carries_no_address():
     where a request goes into deploy-time config, and the point of the registry
     is that it is code.
 
-    Driven over the whole `(vendor, mode)` table rather than over `VENDORS`, so
-    a mode a vendor allows but nobody has selected still answers.
+    Driven over every mode each vendor allows rather than over the modes a
+    deployment selects, so a mode nobody has selected still answers.
     """
-    for (vendor, mode), entries in _CREDENTIAL_VARS.items():
-        kwargs = {entry.kwarg for entry in entries}
-        assert not kwargs & set(FORBIDDEN_ENDPOINT_KWARGS), (vendor, mode)
+    for vendor in VENDORS.values():
+        for mode, source in vendor.credentials.items():
+            kwargs = {entry.kwarg for entry in source.env}
+            assert not kwargs & set(FORBIDDEN_ENDPOINT_KWARGS), (vendor.name, mode)
