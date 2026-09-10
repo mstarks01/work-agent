@@ -213,7 +213,7 @@ def test_the_declared_versions_follow_from_what_a_claim_carries():
     package started on: an element slug is unique inside one **System Model**
     and two models may derive the same one.
     """
-    assert version_for("stride") == 4
+    assert version_for("stride") == 6
     assert version_for("asvs") == 5
     assert READS_SCOPE[version_for("stride")]
     assert READS_SCOPE[version_for("asvs")]

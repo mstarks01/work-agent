@@ -160,6 +160,13 @@ This is the property the retired judge design could not offer — a judge
 upgrade silently re-scored every historical number, with no way to recompute
 the old ones. Here the re-score is explicit, total, offline and free.
 
+A sitting's marks are keyed the same way and store only the key. They re-key
+by `run.py rekey-sittings`, which recomputes each mark's finding from the
+case's own reference claims under every version this build computes, and
+writes the file again under its new digest name. Run it in the pull request
+that moves a version, and commit the renamed files: a version moved without
+it reads every merged sitting as unread.
+
 **The version is not one global default.** It is `VERSION_FOR`, a table keyed by
 framework, checked against `PACKAGES` and declared in
 `tests/test_framework_neutrality.py`:

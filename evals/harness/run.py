@@ -61,6 +61,7 @@ from analysis_service.report import (
     latency_by_node,
     usage_by_node,
 )
+from evals import review_submission as review_submissions
 from evals.harness import (
     comparison,
     consent,
@@ -1587,6 +1588,29 @@ def _pairing_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def command_rekey_sittings(args: argparse.Namespace) -> int:
+    """Move every merged sitting's marks to the current fingerprints (no credentials).
+
+    The sitting's counterpart of ``rekey``: a mark is keyed by a finding's
+    fingerprint, and the finding is a reference claim in the corpus, so the
+    key recomputes from the case. Run it after a version in ``VERSION_FOR``
+    moves, and commit the renamed files.
+    """
+    try:
+        moves = review_submissions.rekey_submissions(REPO_ROOT, Path(args.corpus))
+    except review_submissions.ReviewSubmissionError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    for old, new in moves:
+        print(f"{old} -> {new}")
+    print(f"{len(moves)} sitting file(s) re-keyed")
+    return 0
+
+
+def _rekey_sittings_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--corpus", default=DEFAULT_CORPUS_DIR)
+
+
 def _rekey_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--ledger", default=str(ledger.DEFAULT_LEDGER_PATH), help="the vote ledger"
@@ -1713,6 +1737,12 @@ COMMANDS: dict[str, Command] = {
         help="the two sides of one case's applicability disagreement (no credentials)",
         run=command_pairing,
         arguments=_pairing_arguments,
+    ),
+    "rekey-sittings": Command(
+        help="move every merged sitting's marks to the current fingerprints"
+        " (no credentials)",
+        run=command_rekey_sittings,
+        arguments=_rekey_sittings_arguments,
     ),
     "rekey": Command(
         help="recompute every vote's fingerprint under another rule",

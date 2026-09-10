@@ -9,6 +9,7 @@ from pathlib import Path
 from evals import review_submission as reviews
 from evals.harness import envelope as envelopes
 from evals.harness import sitting as sittings
+from evals.harness.reference import load_case
 
 CASE = "03-batch-data-pipeline"
 OWN = ["a malicious batch row"]
@@ -177,3 +178,55 @@ def test_two_readers_on_one_date_both_cover(tmp_path: Path):
     assert reviews.repository_problems(tree) == []
     assert set(reviews.current_reviews(tree)[CASE]) == set(reviews.declared(tree, CASE))
     assert reviews.unreviewed_cases(tree) == []
+
+
+def test_a_merged_sitting_re_keys_to_the_current_rule_without_a_re_read(tmp_path):
+    """A mark stores only its key, so a version that reads more would orphan
+    every merged sitting: the case reads as unread and the reader's answers
+    are lost. The finding a mark names is a reference claim in the corpus,
+    so the key recomputes from the case, as a vote re-keys from its
+    components. The file is written again under its new digest name."""
+    from evals.harness.fingerprint import (
+        components_for,
+        fingerprint,
+        version_for,
+    )
+
+    tree = tree_for(tmp_path)
+    corpus = tree / "evals" / "corpus"
+    envelope = envelope_for(tree)
+    case = load_case(corpus / CASE)
+    flows = {flow.id: (flow.source, flow.destination) for flow in case.model.data_flows}
+    old_version = version_for("stride") - 2
+    old_keys = {}
+    for target in envelope.cases[CASE].marks:
+        for claim in case.claims_for("stride"):
+            full = components_for(
+                "stride",
+                claim.lane,
+                claim.affected_element_ids,
+                flows,
+                verb=claim.verb,
+                scope=case.id,
+            )
+            if fingerprint(full, version=version_for("stride")) == target:
+                old_keys[fingerprint(full, version=old_version)] = envelope.cases[
+                    CASE
+                ].marks[target]
+    assert old_keys, "the case carries STRIDE targets"
+    stale = envelope.model_copy(
+        update={
+            "cases": {CASE: envelope.cases[CASE].model_copy(update={"marks": old_keys})}
+        }
+    )
+    old_path = write_review(tree, stale)
+    assert reviews.current_for_case(tree, CASE) is None, "old keys cover nothing"
+
+    moves = reviews.rekey_submissions(tree, corpus)
+
+    assert moves == [(old_path.name, reviews.relative_path(envelope).split("/")[-1])]
+    assert not old_path.exists()
+    covering = reviews.current_for_case(tree, CASE)
+    assert covering is not None
+    assert set(covering.answers.marks) == set(envelope.cases[CASE].marks)
+    assert reviews.rekey_submissions(tree, corpus) == [], "a second pass moves nothing"

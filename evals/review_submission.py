@@ -25,7 +25,14 @@ from evals.harness import envelope as envelopes
 from evals.harness import sitting as sittings
 from evals.harness import submit as submit_spine
 from evals.harness.envelope import relative_path, serialize, submission_name
-from evals.harness.reference import CorpusError
+from evals.harness.fingerprint import (
+    SUPPORTED_VERSIONS,
+    FingerprintError,
+    components_for,
+    fingerprint,
+    version_for,
+)
+from evals.harness.reference import CorpusError, load_case
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SUBMISSIONS_DIR = envelopes.SUBMISSIONS_DIR
@@ -554,3 +561,81 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+def _current_keys(case_dir: Path) -> dict[str, str]:
+    """Every key one case's reference claims ever carried, against the key they carry now.
+
+    A mark is keyed by a finding's fingerprint, and a fingerprint is a pure
+    function of the reference claim under one version. So the map from an old
+    key to the current one is computed from the corpus alone: each claim is
+    keyed under every version this build computes, and every one of those
+    spellings points at the version :data:`~evals.harness.fingerprint.VERSION_FOR`
+    names today. A version a claim cannot satisfy — one that reads a catalog
+    identifier of a claim that composes its identity — is skipped, because no
+    mark was ever keyed under it.
+    """
+    case = load_case(case_dir)
+    flows = {flow.id: (flow.source, flow.destination) for flow in case.model.data_flows}
+    keys: dict[str, str] = {}
+    for framework in case.frameworks:
+        for claim in case.claims_for(framework):
+            full = components_for(
+                framework,
+                claim.lane,
+                claim.affected_element_ids,
+                flows,
+                verb=claim.verb,
+                identifier=claim.identifier,
+                scope=case.id,
+            )
+            now = fingerprint(full, version=version_for(framework))
+            for version in SUPPORTED_VERSIONS:
+                try:
+                    keys[fingerprint(full, version=version)] = now
+                except FingerprintError:
+                    continue
+    return keys
+
+
+def rekey_submissions(root: Path, corpus_dir: Path) -> list[tuple[str, str]]:
+    """Move every merged sitting's marks to the keys the current rule computes.
+
+    The sitting's counterpart of :func:`evals.harness.ledger.rekey`. A vote
+    stores its components and re-keys from them; a mark stores only the key,
+    but the finding it names is a reference claim in the corpus, so the key
+    recomputes from the case (:func:`_current_keys`). No re-read, no provider.
+
+    A file whose marks move is written again under the name its new bytes
+    take, and the old file is removed, because a submission is named by its
+    own digest. Two marks that the new rule folds into one finding must agree,
+    or the file is refused with both claims named: that is a reading question,
+    and a re-key answers none. Returns the ``(old name, new name)`` pairs.
+    """
+    moves: list[tuple[str, str]] = []
+    for path, envelope in list(iter_submissions(root)):
+        cases = {}
+        changed = False
+        for case_id, answers in envelope.cases.items():
+            keys = _current_keys(corpus_dir / case_id)
+            marks: dict[str, str] = {}
+            for old, mark in answers.marks.items():
+                new = keys.get(old, old)
+                if new in marks and marks[new] != mark:
+                    raise ReviewSubmissionError(
+                        f"{path.name}: {case_id} marks two findings the current"
+                        f" rule calls one, and the marks disagree ({marks[new]!r}"
+                        f" against {mark!r} at {new}); a person settles that"
+                    )
+                marks[new] = mark
+                changed = changed or new != old
+            cases[case_id] = answers.model_copy(update={"marks": marks})
+        if not changed:
+            continue
+        moved = envelope.model_copy(update={"cases": cases})
+        target = root / relative_path(moved)
+        target.write_bytes(serialize(moved))
+        if target != path:
+            path.unlink()
+        moves.append((path.name, target.name))
+    return moves
