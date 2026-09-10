@@ -14,9 +14,9 @@ import pytest
 
 from analysis_service.actions import VerbError
 from evals import verify_corpus
+from evals.harness.bundle import runs_from_reports, stride_threats
 from evals.harness.calibration import load_pairs
-from evals.harness.reference import load_corpus
-from evals.harness.run import _flows_by_case, _runs_from_reports, stride_threats
+from evals.harness.reference import flows_by_case, load_corpus
 from evals.harness.verb_pricing import parse_groups, price
 from tests.test_evals_identity import FRONTIER
 
@@ -36,7 +36,7 @@ def corpus():
 
 @pytest.fixture(scope="module")
 def flows(corpus):
-    return _flows_by_case(corpus)
+    return flows_by_case(corpus)
 
 
 @pytest.fixture(scope="module")
@@ -46,7 +46,7 @@ def pairs():
 
 @pytest.fixture(scope="module")
 def produced(corpus):
-    runs = _runs_from_reports(BASELINE, corpus)
+    runs = runs_from_reports(BASELINE, corpus)
     return {case_id: stride_threats(run.report) for case_id, run in runs.items()}
 
 

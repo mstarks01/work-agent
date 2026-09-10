@@ -182,9 +182,13 @@ DECLARED: dict[str, str] = {
         " `test_every_package_has_an_instrument` is what keeps the declarations"
         " complete."
     ),
+    "evals/harness/bundle.py": (
+        "`stride_block` and `stride_threats` are named accessors over the"
+        " neutral `framework_block`, for the scorer that grades STRIDE's open"
+        " claim set; every neutral reader names the block it was handed."
+    ),
     "evals/harness/run.py": (
-        "`stride_block` is a named accessor over the neutral `framework_block`."
-        " The scoring pass is that package's, because grading an open claim set"
+        "The scoring pass is that package's, because grading an open claim set"
         " is not a per-case fold; it names the block it grades so a sweep of"
         " another package skips it rather than fails in it. The"
         " per-case mechanical dispatch that used to branch here is now"

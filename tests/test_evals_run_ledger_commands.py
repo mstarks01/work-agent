@@ -12,9 +12,10 @@ from __future__ import annotations
 
 import json
 
+from evals.harness.bundle import reports_dir
 from evals.harness.fingerprint import Components, version_for
 from evals.harness.ledger import append, cast, load
-from evals.harness.run import main, reports_dir
+from evals.harness.run import main
 
 
 def seed(path, *, version=1):

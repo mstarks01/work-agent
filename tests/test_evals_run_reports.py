@@ -18,8 +18,8 @@ from pathlib import Path
 import pytest
 
 from analysis_service.report import Report
+from evals.harness.bundle import reports_dir, write_reports
 from evals.harness.reference import load_case
-from evals.harness.run import _write_reports, reports_dir
 from tests.test_evals_run_grounds import CASE_DIR, DEAD, sweep
 
 
@@ -37,7 +37,7 @@ def test_every_finished_case_keeps_a_report(monkeypatch, case, tmp_path):
     run = sweep(monkeypatch, case, None)
     out = tmp_path / "artifact.json"
 
-    _write_reports(str(out), "analysis", run.runs)
+    write_reports(str(out), "analysis", run.runs)
 
     written = sorted(path.name for path in reports_dir(out).iterdir())
     assert written == [
@@ -58,7 +58,7 @@ def test_a_persisted_report_carries_what_the_artifact_cannot(
     run = sweep(monkeypatch, case, None)
     out = tmp_path / "artifact.json"
 
-    _write_reports(str(out), "analysis", run.runs)
+    write_reports(str(out), "analysis", run.runs)
 
     path = reports_dir(out) / f"{case.id}.report.json"
     report = Report.model_validate_json(path.read_text("utf-8"))
@@ -74,7 +74,7 @@ def test_a_case_that_died_leaves_no_report(monkeypatch, case, tmp_path):
     run = sweep(monkeypatch, case, DEAD)
     out = tmp_path / "artifact.json"
 
-    _write_reports(str(out), "analysis", run.runs)
+    write_reports(str(out), "analysis", run.runs)
 
     written = sorted(path.name for path in reports_dir(out).iterdir())
     assert written == [
@@ -88,7 +88,7 @@ def test_extraction_says_it_has_no_reports(tmp_path, capsys):
     """That mode stops at the validity gate, so it writes nothing and says so."""
     out = tmp_path / "artifact.json"
 
-    _write_reports(str(out), "extraction", {})
+    write_reports(str(out), "extraction", {})
 
     assert "produces none" in capsys.readouterr().out
     assert not reports_dir(out).exists()

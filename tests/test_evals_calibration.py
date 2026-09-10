@@ -29,8 +29,7 @@ from evals.harness.calibration import (
     measure_merges,
 )
 from evals.harness.identity import SubsetVerbIdentity
-from evals.harness.reference import load_corpus
-from evals.harness.run import _flows_by_case
+from evals.harness.reference import flows_by_case, load_corpus
 from tests.eval_factories import LabelReplayMatcher
 
 
@@ -42,7 +41,7 @@ def pairs():
 @pytest.fixture(scope="module")
 def corpus_and_flows():
     corpus = load_corpus("evals/corpus")
-    return corpus, _flows_by_case(corpus)
+    return corpus, flows_by_case(corpus)
 
 
 @pytest.fixture(scope="module")
@@ -183,7 +182,7 @@ def test_the_shipped_rule_clears_the_bar_on_the_recorded_labels(pairs):
     with it. The bar is not the measurement — the split and merge counts in
     ``tests/test_evals_identity.py`` are, and they bind harder.
     """
-    matcher = SubsetVerbIdentity(_flows_by_case(load_corpus("evals/corpus")))
+    matcher = SubsetVerbIdentity(flows_by_case(load_corpus("evals/corpus")))
 
     result = measure_agreement(matcher, pairs)
 
@@ -196,7 +195,7 @@ def test_the_shipped_rule_clears_the_bar_on_the_recorded_labels(pairs):
 
 def test_the_shipped_fixtures_cause_no_matcher_refusals(pairs):
     """Non-comparable candidates are disposed before the matcher is called."""
-    matcher = SubsetVerbIdentity(_flows_by_case(load_corpus("evals/corpus")))
+    matcher = SubsetVerbIdentity(flows_by_case(load_corpus("evals/corpus")))
 
     result = measure_agreement(matcher, pairs)
 
@@ -218,7 +217,7 @@ def test_a_refusal_is_reported_and_never_scored(tmp_path, pairs):
             ]
         )
     )
-    matcher = SubsetVerbIdentity(_flows_by_case(load_corpus("evals/corpus")))
+    matcher = SubsetVerbIdentity(flows_by_case(load_corpus("evals/corpus")))
 
     result = measure_agreement(matcher, load_pairs(path))
 
@@ -352,10 +351,10 @@ def test_the_merge_direction_is_measured_over_distinct_reference_claims(pairs):
     findings, so every merge there is an error by construction.
     """
     corpus = load_corpus("evals/corpus")
-    matcher = SubsetVerbIdentity(_flows_by_case(corpus))
+    matcher = SubsetVerbIdentity(flows_by_case(corpus))
 
     result = measure_agreement(matcher, pairs)
-    merges = measure_merges(corpus, "stride", _flows_by_case(corpus))
+    merges = measure_merges(corpus, "stride", flows_by_case(corpus))
 
     assert 0 < len(result.false_matches) < len(pairs), (
         "the candidate merge direction is measurable since #511; a zero here"
@@ -375,7 +374,7 @@ def test_the_merge_direction_refuses_a_package_with_no_contract():
     corpus = load_corpus("evals/corpus")
 
     with pytest.raises(CalibrationError, match="declares no identity validation"):
-        measure_merges(corpus, "nomogram", _flows_by_case(corpus))
+        measure_merges(corpus, "nomogram", flows_by_case(corpus))
 
 
 #: Each package's collision count over this corpus, asserted exactly rather

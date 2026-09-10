@@ -44,13 +44,12 @@ def test_the_shipped_equivalence_is_free_on_both_error_axes():
     """
     from evals import verify_corpus
     from evals.harness.calibration import load_pairs
-    from evals.harness.reference import load_corpus
-    from evals.harness.run import _flows_by_case
+    from evals.harness.reference import flows_by_case, load_corpus
     from evals.harness.verb_pricing import _labelled, _references
 
     assert EQUIVALENT == (frozenset({"forge", "inject", "plant"}),)
     corpus = load_corpus(verify_corpus.CORPUS_DIR)
-    flows = _flows_by_case(corpus)
+    flows = flows_by_case(corpus)
     pairs = load_pairs()
     bare_splits, bare_merges = _labelled(pairs, flows, ())
     splits, merges = _labelled(pairs, flows, EQUIVALENT)
