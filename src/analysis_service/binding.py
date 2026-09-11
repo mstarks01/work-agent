@@ -90,7 +90,7 @@ from analysis_service.model_gate import (
     ModelGateError,
     assert_kwarg_supported,
     check_supported,
-    native_structured_output,
+    library_sends_no_native_schema,
     output_ceiling,
 )
 from analysis_service.model_tiers import (
@@ -326,28 +326,28 @@ def _check_native_structured_output(
     Checked per tier at build time for the same reason as everything else in
     this module — a misconfiguration should cost nothing.
 
-    **It reads the tri-state, which is the reader the matrix reads.**
-    :func:`~analysis_service.model_gate.native_structured_output` answers
-    ``False`` for every way a schema is known not to reach the model natively,
-    ``None`` where the pinned map is silent, and ``True`` where it says yes.
-    This gate refuses the first and binds the other two: a silent entry is not
-    a no, and ``tests/test_openrouter_compatibility.py`` holds that decision.
+    **It reads the probe and never the map.**
+    :func:`~analysis_service.model_gate.library_sends_no_native_schema` is what
+    the installed library will do with the request: emulate the constraint with
+    a synthesised tool, or refuse ``response_format`` outright. Both mean no
+    schema reaches the model, and both are the one shape a gate may act on.
 
-    Asking ``emulates_structured_output`` here instead left this reader one
-    shape short of the one #821 gave the matrix. That probe raises
-    ``UnsupportedParamsError`` for a model the library will not hand
-    ``response_format`` to at all — 79 of the pinned map's rows under a
-    registered prefix — so a deployment naming one got a library traceback
-    where the answer was a plain refusal.
+    Asking ``emulates_structured_output`` here left this reader one shape short
+    of the one #821 gave the matrix, so a deployment naming one of the 79 rows
+    that refuse the parameter got a library traceback where the answer was a
+    plain refusal.
 
-    Measured across the map before the change: of 618 pairs the old reader
-    could answer for, 606 keep their verdict and 12 move from bind to refuse.
-    All 12 are audio or music rows whose entry states no schema support and
-    which the library does not emulate, so a schema never reached them either.
+    **The map is deliberately not consulted**, which is what separates this
+    from :func:`~analysis_service.model_gate.native_structured_output`.
+    ``supports_response_schema`` is a claim in a data file, and #819 measured
+    one that was wrong. Reading it here would refuse four ``responses``-mode
+    OpenAI models a deployment could reasonably name, on the strength of an
+    entry that has been stale before. A report may print what the map says; a
+    gate may not stop a build on it.
     """
     if not sampling.constrain_output:
         return
-    if native_structured_output(vendor, model) is False:
+    if library_sends_no_native_schema(vendor, model):
         raise ModelGateError(
             f"{source}: {vendor.name} cannot constrain {model!r} to a schema"
             " natively. Either the provider library would emulate it with a"
