@@ -126,6 +126,7 @@ from google.adk.workflow import START, FunctionNode, JoinNode, Workflow
 from google.genai import types
 from pydantic import ValidationError
 
+from analysis_service.basis import unbased_controls
 from analysis_service.candidates import generate_candidates
 from analysis_service.claims import (
     AnalysisMarks,
@@ -1177,6 +1178,11 @@ def validate_extraction(
         )
         return _routed(ROUTE_INVALID, {"issue_count": len(issues)})
 
+    # Logged and nothing else, after the gate has passed the model: a control
+    # the source does not echo is a diagnostic and never a route. See
+    # :mod:`analysis_service.basis` for why token overlap cannot gate.
+    for flag in unbased_controls(model, source_texts or {}):
+        logger.warning("stated control with no basis in its source: %s", flag)
     state.put(STATE_VALID_MODEL, model.model_dump(mode="json"))
     return _routed(ROUTE_VALID, {"issue_count": 0})
 

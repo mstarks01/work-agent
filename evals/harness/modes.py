@@ -33,6 +33,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from analysis_service.analysis import control_state, states_a_protocol
+from analysis_service.basis import UnbasedControl, unbased_controls
 from analysis_service.claims import (
     Claim,
     FrameworkName,
@@ -305,6 +306,13 @@ class ExtractionScore:
     #: whose endpoints are not zoned has said nothing, not "nothing crosses".
     blessed_crossings: tuple[str, ...] = ()
     extracted_crossings: tuple[str, ...] | None = None
+    #: The extraction's stated controls that its own cited source does not echo
+    #: (:mod:`analysis_service.basis`). The same failure the ``unverified ->
+    #: stated`` attribute check names, read from the other side: that check asks
+    #: what the blessed model says, and this one asks what the *source* says, so
+    #: it fires on an invented control the blessed model happens to state too.
+    #: Non-gating, like every number here.
+    unbased: tuple[UnbasedControl, ...] = ()
 
     @property
     def recall(self) -> float:
@@ -425,6 +433,7 @@ class ExtractionScore:
             # count above carries it; writing all of them out would bury the
             # few lines a reader opens this file for.
             "attributes_differing": [check.to_json() for check in self.differing],
+            "unbased_controls": [flag.model_dump(mode="json") for flag in self.unbased],
         }
 
 
@@ -648,7 +657,24 @@ def score_extraction(case: GoldenCase, result: ExtractionResult) -> ExtractionSc
         blessed_initiators=tuple(sorted(pure_initiators(case.model))),
         blessed_crossings=crossing_keys(case.model) or (),
         extracted_crossings=crossing_keys(result.extracted),
+        unbased=_unbased(case, result.extracted),
     )
+
+
+def _unbased(
+    case: GoldenCase, extracted: SystemModel | None
+) -> tuple[UnbasedControl, ...]:
+    """The extraction's stated controls that the case's own sources do not echo.
+
+    Read against the **extracted** model, not the blessed one: the question is
+    what this run asserted about the text it was given. The blessed model's own
+    rate is the false-rejection figure published in
+    :mod:`analysis_service.basis`, and ``tests/test_basis.py`` re-derives it.
+    """
+    if extracted is None:
+        return ()
+    sources = {source.label: source.text for source in case.sources}
+    return tuple(unbased_controls(extracted, sources))
 
 
 def _check_attributes(
@@ -911,6 +937,11 @@ def render_extraction(scores: Sequence[ExtractionScore]) -> None:
         f"crossings: {sum(s.crossings_match for s in scores)}/{len(scores)} match"
         f" by name, {crossings:.2f} recall by endpoint pair"
         + (f"; underivable on {len(undrivable)}" if undrivable else "")
+    )
+    unbased = sum(len(score.unbased) for score in scores)
+    print(
+        f"unbased controls: {unbased} stated with no word in the cited source"
+        f" — a diagnostic, gating nothing (analysis_service.basis)"
     )
     totals = aggregate_attributes(scores)
     print(

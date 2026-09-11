@@ -9,6 +9,7 @@ canonical name resolves to.
 from __future__ import annotations
 
 import json
+import logging
 import re
 from dataclasses import fields
 from datetime import UTC, datetime
@@ -52,11 +53,12 @@ from analysis_service.report import (
 )
 from analysis_service.resilience import load_resilience
 from analysis_service.sampling import load_sampling
-from analysis_service.sources import Source
+from analysis_service.sources import DEFAULT_DESCRIPTION_LABEL, Source
 from analysis_service.system_model import SystemModel
 from analysis_service.validation import ValidationIssue
 from tests.factories import (
     DEFAULT_FRAMEWORKS,
+    DESCRIPTION_TEXT,
     carrying,
     package_answering,
     repo_package_loaders,
@@ -853,6 +855,38 @@ def test_validate_routes_valid_and_publishes_the_model():
     event = graph.validate_extraction(ctx, KEYS, valid_model().model_dump(mode="json"))
     assert event.actions.route == graph.ROUTE_VALID
     assert ctx.state[graph.STATE_VALID_MODEL]["processes"][0]["id"] == "process:web-app"
+
+
+def test_validate_logs_a_stated_control_its_source_never_mentions(caplog):
+    """The #470 diagnostic runs here, and changes nothing about the route.
+
+    The shared fixture is itself an example: its model states ``TLS 1.3`` and
+    ``session cookie`` over a description that mentions neither. So this asserts
+    the wiring — the node hands the real sources to
+    :func:`~analysis_service.basis.unbased_controls` — and asserts that a job
+    carrying three flagged controls still routes valid and publishes its model.
+    """
+    ctx = FakeContext()
+    with caplog.at_level(logging.WARNING, logger="analysis_service.graph"):
+        event = graph.validate_extraction(
+            ctx,
+            KEYS,
+            valid_model().model_dump(mode="json"),
+            {DEFAULT_DESCRIPTION_LABEL: DESCRIPTION_TEXT},
+        )
+
+    assert event.actions.route == graph.ROUTE_VALID
+    assert graph.STATE_VALID_MODEL in ctx.state
+    flagged = [
+        record.getMessage()
+        for record in caplog.records
+        if "stated control with no basis" in record.getMessage()
+    ]
+    assert len(flagged) == 3
+    assert "'authentication'" in flagged[0]
+    assert "none of session, cookie appears in 'System description'" in flagged[0]
+    assert "'encryption_in_transit'" in flagged[1]
+    assert "none of tls, 1.3 appears" in flagged[1]
 
 
 def test_validate_routes_invalid_and_feeds_the_repair_prompt():
