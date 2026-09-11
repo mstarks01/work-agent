@@ -44,6 +44,13 @@ number is:
 | `estimated` | Another Baseline's token counts, repriced for your models. A best guess. |
 | `unpriced` | No number exists — a tier's model is absent from the price map, its vendor is a gateway with no one rate per model, or no merged Baseline exists to calibrate from. Never a zero. |
 
+A sweep on a gateway route stays `unpriced` before the run and is not silent
+after it. Such a provider states what it charged, the run records that figure
+per node, and the artifact carries it under `node_charges` — so the sweep's
+manifest reports what the account paid even where no rate could have predicted
+it. Every other vendor reports token counts alone, where the arithmetic over
+recorded rates is the answer and this block is empty.
+
 **Accepting means typing the amount back.** An enter or a `y` never proceeds,
 because a habit should not be able to spend money for you. Where no amount can
 be stated, type `unknown` — that is a real acceptance of a cost nobody can

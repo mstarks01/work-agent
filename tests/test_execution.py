@@ -23,6 +23,7 @@ from analysis_service.report import (
     InputRef,
     Job,
     Report,
+    charges_by_node,
     latency_by_node,
     usage_by_node,
 )
@@ -244,6 +245,25 @@ def test_usage_by_node_omits_what_was_never_measured(graph_run):
     """Absent, not zeroed — a node with no usage is not a node that cost nothing."""
     assert graph.ASSEMBLE_NODE not in usage_by_node(graph_run.node_runs)
     assert CRITIC in usage_by_node(graph_run.node_runs)
+
+
+def test_charges_by_node_sums_what_the_providers_reported(graph_run):
+    """The same question as the usage fold, over the figure a gateway has."""
+    critic = by_node(graph_run)[CRITIC]
+    charged = critic.model_copy(update={"reported_charge_usd": 0.002})
+
+    totals = charges_by_node([charged, charged.model_copy()])
+
+    assert totals[CRITIC] == pytest.approx(0.004)
+
+
+def test_charges_by_node_omits_a_node_whose_provider_reported_nothing(graph_run):
+    """Absent, not zero — which is every node on a vendor that states no charge.
+
+    Most vendors report token counts alone, so a zeroed entry here would read
+    as a free call on nearly every run this repository makes.
+    """
+    assert charges_by_node(graph_run.node_runs) == {}
 
 
 def test_latency_by_node_sums_and_keeps_the_slowest(graph_run):

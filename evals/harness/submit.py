@@ -697,8 +697,46 @@ def added_sweeps(root: Path, name: str) -> list[Mapping[str, Any]]:
         raise SubmitError(
             f"{manifest_rel}: the base copy will not parse: {exc}"
         ) from exc
-    known = {str(entry.get("artifact")) for entry in _sweeps_of(base, manifest_rel)}
-    return [entry for entry in manifest if str(entry.get("artifact")) not in known]
+    base_entries = _sweeps_of(base, manifest_rel)
+    known = {str(entry.get("artifact")) for entry in base_entries}
+    produced = {_reports_of(entry) for entry in base_entries} - {frozenset()}
+    return [
+        entry
+        for entry in manifest
+        if str(entry.get("artifact")) not in known
+        and _reports_of(entry) not in produced
+    ]
+
+
+def _reports_of(entry: Mapping[str, Any]) -> frozenset[tuple[str, str]]:
+    """What one manifest entry's sweep produced: its report files, digested.
+
+    **The filename is not an identity.** A sweep is keyed by its artifact's own
+    bytes, so a migration that edits the artifact — a schema version, an
+    encoding — moves the name, and a sweep that has sat in the archive for
+    months then reads as one this diff contributed. It fails "nothing outside
+    this kind's allowlist changed" with no diff that could pass, which is the
+    state :func:`_baseline_selects` exists to prevent and could not see.
+
+    The reports are what the sweep produced, and a migration of the artifact
+    leaves them alone. The other shape a migration takes — rewriting the
+    reports — leaves the artifact's bytes alone, so its filename still matches.
+    Between them the two cover every maintenance diff this archive has taken.
+
+    The stem is stripped from each name, because the stem is the artifact
+    filename and that is the thing that moved. An entry whose ``files`` this
+    cannot read answers with an empty set, which :func:`added_sweeps` never
+    matches against another — an unreadable entry is not evidence that two
+    sweeps are one.
+    """
+    files = entry.get("files")
+    if not isinstance(files, Mapping):
+        return frozenset()
+    return frozenset(
+        (name.split("/", 1)[-1], str(digest))
+        for name, digest in files.items()
+        if ".reports/" in name
+    )
 
 
 def _sweeps_of(manifest: Any, rel: str) -> list[Mapping[str, Any]]:

@@ -253,26 +253,26 @@ def configuration_label(artifact: EvalArtifact) -> str:
     )
 
 
-def recorded_usd(cost: Any) -> float | None:
-    """A committed manifest's recorded dollars, or ``None`` if it is not money.
+def money(raw: Any) -> float | None:
+    """One recorded figure in dollars, or ``None`` where it is not money.
 
-    One reader for a value four sites read and one site checked. A manifest is a
-    contributor's file, and `float()` accepts "inf" and "nan": a non-finite or
-    negative `actual_usd` poisons a mean, a total and a comparison, and renders
-    as an acceptable offer in the consent gate. `math.isfinite` guarded the
-    consent path alone, which left the published table, the contribution summary
-    and the baseline re-check reading the same field without it.
+    **The one rule for what money looks like in a file a contributor writes**,
+    and two questions read it: what a manifest recorded for a whole sweep, and
+    what an artifact recorded for one node. A second copy of these rules would
+    admit in one place what it refused in the other.
+
+    A manifest is a contributor's file, and `float()` accepts "inf" and "nan": a
+    non-finite or negative figure poisons a mean, a total and a comparison, and
+    renders as an acceptable offer in the consent gate. `math.isfinite` guarded
+    the consent path alone, which left the published table, the contribution
+    summary and the baseline re-check reading the same field without it.
 
     The shape is the one :meth:`SweepCost.to_json` writes: a JSON number. A
     string is refused even when `float()` would read it -- "1_000" and
     non-ASCII digits both would -- and so is a boolean, which is an `int` to
     `float()`. A JSON integer too large for a float raises `OverflowError`,
-    which is not a `ValueError`. ``cost`` itself is whatever the manifest holds
-    under that key, and a scalar there is not a cost.
+    which is not a `ValueError`.
     """
-    if not isinstance(cost, Mapping):
-        return None
-    raw = cost.get("actual_usd")
     if isinstance(raw, bool) or not isinstance(raw, int | float):
         return None
     try:
@@ -280,6 +280,22 @@ def recorded_usd(cost: Any) -> float | None:
     except OverflowError:
         return None
     return value if math.isfinite(value) and value >= 0 else None
+
+
+def recorded_usd(cost: Any, key: str = "actual_usd") -> float | None:
+    """A committed manifest's recorded dollars, or ``None`` if it is not money.
+
+    ``key`` names which figure: ``actual_usd``, the arithmetic over recorded
+    tokens, or ``reported_usd``, what the providers said they charged. One
+    reader for both, because :func:`money` decides what a figure has to look
+    like and neither question changes that.
+
+    ``cost`` itself is whatever the manifest holds under that key, and a scalar
+    there is not a cost.
+    """
+    if not isinstance(cost, Mapping):
+        return None
+    return money(cost.get(key))
 
 
 @dataclass(frozen=True)
@@ -290,6 +306,16 @@ class SweepCost:
     unpriced: tuple[str, ...]
     fallbacks: tuple[tuple[str, str], ...]
     actual_usd: float
+    #: What the providers said they charged, summed over the sweep, or ``None``
+    #: where none of them said anything — which is every sweep on a direct
+    #: vendor.
+    #:
+    #: **Beside ``actual_usd`` and never instead of it.** The two answer
+    #: different questions: one is recorded tokens at recorded rates, which any
+    #: reader can recompute from the artifact, and the other is what an account
+    #: was charged, which no reader can derive. A sweep on a gateway route has
+    #: only the second, because ``unpriced`` holds every model in it.
+    reported_usd: float | None
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -297,6 +323,7 @@ class SweepCost:
             "unpriced": list(self.unpriced),
             "fallbacks": dict(self.fallbacks),
             "actual_usd": self.actual_usd,
+            "reported_usd": self.reported_usd,
         }
 
 
@@ -310,6 +337,26 @@ def usage_of(artifact: EvalArtifact) -> dict[str, TokenUsage]:
     return {
         node: TokenUsage(**fields)
         for node, fields in artifact.block("node_usage").items()
+    }
+
+
+def charges_of(artifact: EvalArtifact) -> dict[str, float]:
+    """One sweep's recorded charges per node, as the providers reported them.
+
+    Public for the reason :func:`usage_of` is: the block has more than one
+    reader, and two readers of one block are two chances to disagree about its
+    shape.
+
+    A figure that is not money is dropped rather than summed.
+    ``node_charges`` is written by :func:`evals.harness.artifact.build` from a
+    fold this repository owns, so a bad value there means a hand-edited
+    artifact — and :func:`money` is the rule that says what a recorded figure
+    has to look like, wherever it was written.
+    """
+    return {
+        node: value
+        for node, raw in artifact.block("node_charges").items()
+        if (value := money(raw)) is not None
     }
 
 
@@ -341,12 +388,56 @@ def price_sweep(artifact: EvalArtifact) -> SweepCost:
     only what is priced.
     """
     priced = price_calls(_calls(artifact))
+    reported = charges_of(artifact)
     return SweepCost(
         unit_prices=priced.unit_prices,
         unpriced=priced.unpriced,
         fallbacks=priced.fallbacks,
         actual_usd=priced.total_usd,
+        # ``None`` and not 0.0 where nothing reported: a sweep on a vendor that
+        # states no charge has no such figure, and a zero there would read as a
+        # sweep that was charged nothing.
+        reported_usd=sum(reported.values()) if reported else None,
     )
+
+
+def _reported_problems(
+    filename: str, artifact: EvalArtifact, recorded: Mapping[str, Any]
+) -> list[str]:
+    """The manifest's reported charge against the artifact's own node charges.
+
+    **A different kind of check from the one above, and the difference is the
+    point.** The recorded actual is arithmetic, so CI re-multiplies recorded
+    units by recorded rates and compares. A reported charge cannot be
+    recomputed from anything — it is a provider's statement — so the only
+    honest re-check is that the manifest repeats what the artifact holds, and
+    that the artifact's own block adds up to it.
+
+    Both directions are checked, because each catches what the other cannot: a
+    manifest naming a figure the artifact never recorded, and an artifact whose
+    charges nothing in the manifest reports.
+    """
+    summed = charges_of(artifact)
+    expected = sum(summed.values()) if summed else None
+    stated = recorded_usd(recorded, "reported_usd")
+    if expected is None and stated is None:
+        return []
+    if expected is None:
+        return [
+            (
+                f"{filename}: the manifest reports a charge of {stated!r}, and"
+                " the artifact records none; a figure no sweep produced is not"
+                " a cost"
+            )
+        ]
+    if stated is None or not math.isclose(expected, stated, rel_tol=1e-9):
+        return [
+            (
+                f"{filename}: the artifact's node charges sum to {expected},"
+                f" not the manifest's reported {recorded.get('reported_usd')!r}"
+            )
+        ]
+    return []
 
 
 def _recomputed_cost(artifact: EvalArtifact, recorded: Mapping[str, Any]) -> float:
@@ -686,6 +777,7 @@ def verify(
                 )
         except BaselineError as exc:
             problems.append(str(exc))
+        problems += _reported_problems(filename, artifact, recorded)
 
     strays = sorted(
         path.relative_to(directory).as_posix()

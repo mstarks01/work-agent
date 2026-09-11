@@ -55,6 +55,13 @@ CORPUS_DIR = REPO_ROOT / "evals" / "corpus"
 # commands that exist to read it. The version guards the declared keys below,
 # not every field an instrument adds inside its own block.
 #
+# * Version 6 adds ``node_charges``: what each node's providers said they
+#   charged, summed across the sweep's executions (#822). Empty on every vendor
+#   that reports token counts alone, which is every direct vendor — the key is
+#   what a gateway route has instead of a unit price, because no published rate
+#   describes a slug that reaches many endpoints. This is a declared key rather
+#   than a field inside one, so it is a version event and the one merged
+#   Baseline was migrated rather than re-run.
 # * Version 5 adds ``series``: which standings each published series reads,
 #   and the scored blocks for every series but the primary one (#326). The
 #   top-level scored keys are the primary series — maintainer votes only —
@@ -67,7 +74,7 @@ CORPUS_DIR = REPO_ROOT / "evals" / "corpus"
 #   inference over blocks that write their keys whether or not a framework ran.
 # * Version 2 adds the two keys that say which *repository state* produced a
 #   sweep, beside the ``provenance`` block that already said which models did.
-ARTIFACT_VERSION = 5
+ARTIFACT_VERSION = 6
 
 #: What a recorded artifact carries where the fact was never captured. Only
 #: the sweeps taken before version 2 hold it: :func:`build` computes both keys
@@ -320,6 +327,7 @@ ENVELOPE_KEYS: tuple[str, ...] = (
     "certification",
     "provenance",
     "node_usage",
+    "node_charges",
     "node_latency",
     "structural_failures",
     "mode_output",
@@ -408,6 +416,10 @@ def build(
         "node_usage": {
             node: entry.model_dump() for node, entry in sweep.run.usage.items()
         },
+        # Beside the token counts rather than inside them: the counts are what
+        # a call consumed and this is what a provider charged for it, and a
+        # block holding both would ask one reader to tell them apart.
+        "node_charges": dict(sweep.run.charges),
         "node_latency": {
             node: {**entry.model_dump(), "mean_ms": round(entry.mean_ms)}
             for node, entry in sweep.run.latency.items()
