@@ -699,6 +699,70 @@ class TestOnlyAnAddedSweepIsABaselineSubmission:
         )
         assert submit.detect_kind(repo) is None
 
+    @staticmethod
+    def sealed(repo, stem, reports):
+        """One Baseline whose entry carries the report digests a sweep produced.
+
+        The shape the real manifest has: ``files`` keyed by a path that opens
+        with the artifact's stem, which is what a re-seal moves.
+        """
+        directory = repo / "evals" / "baselines" / "one"
+        directory.mkdir(parents=True, exist_ok=True)
+        manifest = {
+            "name": "one",
+            "identity": {"repo_commit": "0" * 40},
+            "sweeps": [
+                {
+                    "artifact": f"{stem}.json",
+                    "submitted_by": "mstarks01",
+                    "files": {
+                        f"{stem}.json": "a" * 64,
+                        **{
+                            f"{stem}.reports/{name}": digest
+                            for name, digest in reports.items()
+                        },
+                    },
+                }
+            ],
+        }
+        (directory / "baseline.json").write_text(
+            json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
+        )
+        (directory / f"{stem}.json").write_text("{}\n", encoding="utf-8")
+        return directory
+
+    def test_a_reseal_that_renames_the_artifact_adds_no_sweep(self, repo):
+        """A sweep is keyed by its own bytes, so editing it moves its filename.
+
+        A version migration rewrites the artifact and re-stamps the manifest,
+        and the reports it produced do not move. Read by filename alone, the
+        renamed sweep looked contributed and the code change beside it had no
+        diff that could pass — which is the state this selector exists to
+        prevent.
+        """
+        reports = {"01-a-case.report.json": "b" * 64}
+        self.sealed(repo, "mstarks01-6d1837ed", reports)
+        git(repo, "add", "-A")
+        git(repo, "commit", "-m", "the merged Baseline")
+        git(repo, "push", "origin", "main")
+
+        directory = repo / "evals" / "baselines" / "one"
+        (directory / "mstarks01-6d1837ed.json").unlink()
+        self.sealed(repo, "mstarks01-0ebfcca1", reports)
+
+        assert submit.detect_kind(repo) is None
+
+    def test_a_sweep_whose_reports_differ_is_still_added(self, repo):
+        """The identity is what the sweep produced, so new output still counts."""
+        self.sealed(repo, "mstarks01-6d1837ed", {"01-a-case.report.json": "b" * 64})
+        git(repo, "add", "-A")
+        git(repo, "commit", "-m", "the merged Baseline")
+        git(repo, "push", "origin", "main")
+
+        self.sealed(repo, "mstarks01-0ebfcca1", {"01-a-case.report.json": "c" * 64})
+
+        assert submit.detect_kind(repo) == "baseline"
+
     def test_adding_a_sweep_still_selects_the_kind(self, repo):
         directory = self.merged(repo)
         git(repo, "add", "-A")
