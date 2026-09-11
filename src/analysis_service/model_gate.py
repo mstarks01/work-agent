@@ -113,12 +113,54 @@ def supports_structured_output(vendor: Vendor, model: str) -> bool:
     question: ``response_format`` is an accepted *parameter* on every provider,
     but only some models honour it as a schema rather than as a hint. A caller
     that depends on parsing structured output needs the stronger fact.
+
+    **LiteLLM's own lookup, and it answers two questions with one ``False``.**
+    A model the map says cannot honour a schema and a model the map says
+    nothing about both come back ``False`` here. That is the right shape for a
+    gate, which needs a boolean, and the wrong shape for a report.
+    :func:`native_structured_output` is the reader that tells the two apart.
     """
     return bool(
         _litellm.utils.supports_response_schema(
             model=model, custom_llm_provider=vendor.litellm_provider
         )
     )
+
+
+def native_structured_output(vendor: Vendor, model: str) -> bool | None:
+    """Whether a response schema reaches this model natively, or ``None`` if unknown.
+
+    The tri-state :func:`supports_structured_output` cannot express. ``None``
+    means the pinned map carries an entry for this pair and that entry says
+    nothing about response schemas — 2029 of its entries are silent, against
+    881 that say yes and 72 that say no.
+
+    **A report may not turn that silence into a no.** LiteLLM's lookup returns
+    ``False`` for a silent entry, so a matrix built on it printed
+    ``unsupported`` for ``openrouter/anthropic/claude-sonnet-4.6`` — a pair that
+    honours a schema when asked. Measured live on 2026-09-11: the request
+    carried ``response_format`` and the reply parsed as JSON against it. The map
+    had simply not caught up with the slug.
+
+    Emulation is checked first and is definitive. Where LiteLLM would satisfy
+    the constraint with a synthesised tool, the schema does not reach the model
+    natively whatever the map claims, and
+    :func:`~analysis_service.binding._check_native_structured_output` refuses
+    the tier on that same fact.
+
+    The map's own key is read rather than LiteLLM's lookup, because the lookup
+    is where the two answers were collapsed. An unmapped pair yields ``None``
+    here for the same reason :func:`output_ceiling` yields ``None``: nobody
+    knows, and saying so is the open-world residual this module reports rather
+    than hides.
+    """
+    if emulates_structured_output(vendor, model):
+        return False
+    info = model_info(vendor, model)
+    if info is None:
+        return None
+    supported = info.get("supports_response_schema")
+    return supported if isinstance(supported, bool) else None
 
 
 # A minimal schema-constrained request, used only to ask LiteLLM *which way* it

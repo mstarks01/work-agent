@@ -642,7 +642,6 @@ def _tier_summary(deployment: Deployment) -> dict[TierName, dict[str, str]]:
     would report a provider the smoke never called, which is exactly the
     "unexercised reads like exercised" failure this whole file exists to avoid.
     """
-    bound = set(deployment.tiers.nodes.values())
     return {
         tier: {
             "vendor": selection.vendor,
@@ -650,7 +649,7 @@ def _tier_summary(deployment: Deployment) -> dict[TierName, dict[str, str]]:
             "route": selection.route,
         }
         for tier, selection in deployment.tiers.tiers.items()
-        if tier in bound
+        if tier in deployment.tiers.bound_tiers
     }
 
 

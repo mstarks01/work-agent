@@ -177,9 +177,13 @@ and wins over the file — the same precedence a tier's own vendor and model
 override carries.
 
 A key for a single-mode vendor is an error, because it is not a choice. A
-missing key for a multi-mode vendor is an error too, but only where a tier
-selects that vendor: a vendor nobody calls needs no identity. Both rules read
-the same registry table the check reads, so neither can drift from it.
+missing key for a multi-mode vendor is an error too, but only where a **bound**
+tier selects that vendor — a tier your `[nodes]` map points something at. A
+vendor nobody calls needs no identity, and a tier nothing runs on builds no
+adapter, so an unused `review` tier may name a multi-mode vendor and declare
+nothing. Move a node onto that tier and the loader asks for the declaration at
+that edit, rather than at a first run. Both rules read the same registry table
+the check reads, so neither can drift from it.
 
 Under `iam`, Work Agent passes an **empty** `api_key` rather than none at all.
 That is not a detail: LiteLLM reads `AWS_BEARER_TOKEN_BEDROCK` out of the

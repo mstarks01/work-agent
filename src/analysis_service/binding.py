@@ -378,10 +378,11 @@ def build_tier_adapters(
 
     adapters: dict[TierName, LiteLlm] = {}
     # Walked in the vocabulary's order rather than the map's, so the build order
-    # does not vary with how a config file happens to list its nodes.
-    bound = set(tiers.nodes.values())
+    # does not vary with how a config file happens to list its nodes. Which
+    # tiers are bound comes from the config, which is the one reader of that
+    # rule — this module wrote the walk out for itself, and so did two others.
     for tier in TIER_NAMES:
-        if tier not in bound:
+        if tier not in tiers.bound_tiers:
             continue
         selection = tiers.tiers[tier]
         vendor = selection.vendor_entry

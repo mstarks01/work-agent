@@ -189,6 +189,25 @@ def _pipeline_for(vendor: VendorName) -> Pipeline:
 class TestTheMatrixItself:
     """The tri-state is load-bearing, not decoration."""
 
+    #: Every capability the pinned map does not answer, per reference pair, and
+    #: why. A pair absent here must answer all of them.
+    #:
+    #: **A table, for the reason ``LIVE_SWEEP_LANE`` is one**: an unanswered
+    #: capability is a state this suite records, never coverage nobody looked
+    #: for. A *new* unanswered cell fails below; the recorded one does not, and
+    #: it is on the screen with its reason rather than hidden behind a relaxed
+    #: assertion.
+    #:
+    #: The map holds an entry for this slug and that entry is silent about
+    #: response schemas, as 2029 of its entries are. It is silence and not a
+    #: refusal: measured live on 2026-09-11, a request for this pair carried
+    #: ``response_format`` and the reply parsed as JSON against the schema. The
+    #: matrix printed ``unsupported`` here until ``native_structured_output``
+    #: told the map's two kinds of ``False`` apart.
+    UNANSWERED: ClassVar[dict[tuple[str, str], tuple[str, ...]]] = {
+        ("openrouter", "anthropic/claude-sonnet-4.6"): ("structured_output",),
+    }
+
     @pytest.mark.parametrize(("vendor", "model"), reference_pairs())
     def test_every_reference_pair_is_answerable(self, vendor, model):
         """A matrix of all-``unknown`` would pass every other test vacuously.
@@ -198,10 +217,52 @@ class TestTheMatrixItself:
         ``UNKNOWN`` and the capability claims below become claims about
         nothing. Failing here is the signal to re-pin the model or the library,
         not to relax the test.
+
+        **Two facts, and they used to be one assertion.** While every probe
+        returned a boolean, ``unknowns`` could only be non-empty when the map
+        had no entry at all — so "the library carries this pair" and "every
+        capability is answered" were the same check. They are not: a carried
+        entry can be silent about one capability, and reporting that silence as
+        a refusal is the defect this module exists to avoid. So the first half
+        stays exactly as strict, and the second is checked against the record
+        above.
         """
         entry = profile(vendor_for(vendor), model)
         assert entry.known, f"{vendor}/{model} is not in the pinned model map"
-        assert entry.unknowns == ()
+        assert entry.unknowns == self.UNANSWERED.get((vendor, model), ())
+
+    def test_the_unanswered_record_names_only_real_pairs(self):
+        """A record keyed by a pair nobody profiles excuses nothing.
+
+        The shape a stale entry takes: a pair is re-pinned, its recorded
+        exemption is left behind, and it then sits ready to excuse a capability
+        going unanswered on a pair the suite never checks.
+        """
+        assert set(self.UNANSWERED) <= set(reference_pairs())
+
+    def test_a_silent_capability_is_unknown_rather_than_unsupported(self):
+        """The narrower half of the same rule, and the one that was wrong.
+
+        ``model_info`` answers per *entry*, so ``known`` cannot see this: the
+        pinned map carries this slug and says nothing about response schemas.
+        LiteLLM's own lookup returns ``False`` for that silence exactly as it
+        does for a refusal, and the matrix printed ``unsupported``.
+
+        Pinned against ``opus-4.7`` beside it, whose entry does answer, so this
+        fails if the map starts answering for both — which is a re-pin, not a
+        relaxation.
+        """
+        vendor = vendor_for("openrouter")
+        silent = profile(vendor, "anthropic/claude-sonnet-4.6")
+        answered = profile(vendor, "anthropic/claude-opus-4.7")
+
+        assert silent.known, "the map no longer carries the silent slug at all"
+        assert silent.structured_output is Capability.UNKNOWN
+        assert answered.structured_output is Capability.SUPPORTED
+        # The cells that are answered stay answered: silence about one
+        # capability must not spread to the params, which are probed by a call
+        # rather than read off a key.
+        assert Capability.UNKNOWN not in set(silent.params.values())
 
     def test_an_unmapped_model_is_unknown_rather_than_unsupported(self):
         """The distinction the module exists for.
@@ -247,6 +308,56 @@ class TestTheMatrixItself:
         } == {name: cell for name, cell in gemini.params.items() if name != "seed"}
         assert developer_api.structured_output is gemini.structured_output
         assert developer_api.output_ceiling == gemini.output_ceiling
+
+    def test_the_matrix_and_the_build_gate_agree_about_a_refusal(self):
+        """The two readers of schema support, tested against each other.
+
+        They answer different questions from different evidence, which is
+        recorded and deliberate: ``binding`` reads LiteLLM's *mapped params*,
+        so a slug the capability lookup has not caught up with still binds
+        (``tests/test_openrouter_compatibility.py`` holds that decision). This
+        matrix reads the map and may say it does not know.
+
+        What must never happen is the matrix calling a pair ``unsupported``
+        that the build accepts, or calling one ``supported`` that the build
+        refuses. That is the direction a reader acts on: an ``unsupported``
+        cell is how somebody decides not to try a vendor.
+
+        Asserted against the emulated pair rather than only against the
+        reference matrix, because every reference pair binds — a test that
+        only saw those would agree with itself and see nothing.
+        """
+        from analysis_service.binding import _check_native_structured_output
+        from analysis_service.model_gate import ModelGateError
+        from analysis_service.sampling import TierSampling
+
+        constrained = TierSampling(constrain_output=True)
+
+        def build_refuses(vendor: str, model: str) -> bool:
+            try:
+                _check_native_structured_output(
+                    vendor_for(vendor), model, constrained, source="cross-reader"
+                )
+            except ModelGateError:
+                return True
+            return False
+
+        # The pair the pinned library emulates, which both readers must call a
+        # refusal. `test_deployment.py` keeps this pair honest in its own right.
+        assert build_refuses("vertex", "claude-opus-5")
+        assert (
+            profile(vendor_for("vertex"), "claude-opus-5").structured_output
+            is Capability.UNSUPPORTED
+        )
+
+        for vendor, model in reference_pairs():
+            entry = profile(vendor_for(vendor), model)
+            refused = build_refuses(vendor, model)
+            assert not refused, f"{vendor}/{model} no longer binds"
+            assert entry.structured_output is not Capability.UNSUPPORTED, (
+                f"the matrix calls {vendor}/{model} unsupported while the build"
+                " accepts it; a reader would skip a vendor that works"
+            )
 
     def test_the_matrix_covers_every_supported_vendor(self):
         """A vendor absent from the matrix is a vendor nobody profiled."""
