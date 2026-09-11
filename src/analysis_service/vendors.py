@@ -287,23 +287,61 @@ _FLOATING_WORDS: dict[str, str] = {
     "experimental": _PRE_GA,
 }
 
-#: An identifier that names a **cloud resource** rather than a model build.
-#: Refused for every vendor, on two properties rather than on whose syntax it
-#: is. A resource identifier hides which model answers behind it, so a blessed
-#: fingerprint would go on certifying a target somebody can repoint at other
-#: weights. And it carries the account that owns the resource, which would then
-#: reach a fingerprint and a report.
+#: Every spelling of a **cloud resource** this service refuses, and what each
+#: one names. Refused for every vendor, on two properties rather than on whose
+#: syntax it is. A resource identifier hides which model answers behind it, so a
+#: blessed fingerprint would go on certifying a target somebody can repoint at
+#: other weights. And it carries the account or project that owns the resource,
+#: which would then reach a fingerprint and a report.
 #:
-#: ``litellm.get_llm_provider`` accepts an ARN and resolves a provider from it,
-#: so this refusal is this service's own and nothing upstream makes it.
+#: **A table, because the properties are vendor-neutral and the syntax is not.**
+#: This was the pattern ``arn:`` alone, which is one cloud's spelling standing
+#: in for a rule written about every cloud — the shape ``CLAUDE.md`` names, and
+#: the one that let three Google forms through while refusing the AWS one.
+#: ``litellm.get_llm_provider`` resolves each entry below to a provider exactly
+#: as it resolves an ARN, so every refusal here is this service's own and
+#: nothing upstream makes it.
 #:
-#: **Searched, never anchored, and case-blind.** An ARN does not have to start
-#: the identifier: litellm routes one behind its own segment, and
+#: This costs the ability to address a tuned or privately deployed model, on
+#: every cloud equally. That is the trade the ARN entry already made: a
+#: provisioned-throughput ARN is likewise the only way to name its resource, and
+#: it is refused because what it names is not a build.
+#:
+#: **Searched, never anchored, and case-blind.** A resource identifier does not
+#: have to start the string: litellm routes one behind its own segment, and
 #: ``get_llm_provider`` resolves ``bedrock/invoke/arn:…``,
 #: ``bedrock/converse/arn:…`` and ``bedrock/anthropic/arn:…`` alike. A rule that
 #: read position zero refused the shape an operator would never write and
 #: admitted the three a router document shows them.
-_RESOURCE_ID = re.compile(r"arn:", re.IGNORECASE)
+_RESOURCE_FORMS: tuple[tuple[re.Pattern[str], str], ...] = (
+    (re.compile(r"arn:", re.IGNORECASE), "an AWS ARN"),
+    # ``projects/<p>/locations/<l>/endpoints/<id>`` is Vertex's repointable
+    # endpoint, and ``projects/<p>/locations/<l>/publishers/google/models/<m>``
+    # its full resource name for a public model. Both carry the project; the
+    # first also hides which weights answer. The second needs no replacement
+    # syntax — name the model and let ``ANALYSIS_VERTEX_PROJECT`` address it.
+    (
+        re.compile(r"projects/[^/]+/locations/[^/]+/", re.IGNORECASE),
+        "a Google Cloud resource path, which carries the project that owns it",
+    ),
+    # The Developer API's own resource, reached under ``gemini/``. It names no
+    # base build at all, which is the first property outright.
+    (
+        re.compile(r"(?:^|/)tunedModels/", re.IGNORECASE),
+        "a Gemini Developer API tuned model, which names no base build",
+    ),
+)
+
+
+def _resource_form(model: str) -> str | None:
+    """What cloud resource this identifier names, or ``None`` if it names a build.
+
+    One reader of :data:`_RESOURCE_FORMS`, so the refusal and the message an
+    operator reads can never disagree about which form matched.
+    """
+    return next(
+        (named for pattern, named in _RESOURCE_FORMS if pattern.search(model)), None
+    )
 
 
 # Claude is the family that *does* publish a canonical form, so it gets a closed
@@ -454,7 +492,7 @@ _BEDROCK_CLAUDE_ID = re.compile(
 
 # Three forms this shape refuses by decision, each for a stated property. The
 # fourth Bedrock refusal — an ARN — is not one of them: it names a resource
-# rather than a model and is refused for every vendor by :data:`_RESOURCE_ID`,
+# rather than a model and is refused for every vendor by :data:`_RESOURCE_FORMS`,
 # so a rule that lives in the Claude shape would leave a Nova ARN accepted.
 #
 # * **The ``@date`` spelling.** It is Vertex's, it appears on one key against
@@ -823,11 +861,12 @@ class Vendor:
         """
         if not model or model != model.strip():
             raise ValueError(f"{source}: {model!r} is not a model identifier")
-        if _RESOURCE_ID.search(model):
+        resource = _resource_form(model)
+        if resource is not None:
             raise ValueError(
-                f"{source}: {model!r} names a cloud resource rather than a model"
-                " build; a resource can be repointed at other weights and its"
-                " identifier carries an account, so name the model itself"
+                f"{source}: {model!r} names {resource} rather than a model build;"
+                " a resource can be repointed at other weights and its identifier"
+                " reaches the execution fingerprint, so name the model itself"
             )
         word = next(
             (w for w in _WORDS.findall(model.lower()) if w in _FLOATING_WORDS), None

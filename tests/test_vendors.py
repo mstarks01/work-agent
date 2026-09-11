@@ -698,21 +698,70 @@ class TestPinnedFormRule:
             "anthropic/arn:aws:bedrock:us-east-1:123456789012:imported-model/y",
             # Case is not part of the property either.
             "invoke/ARN:aws:bedrock:us-east-1:123456789012:imported-model/y",
+            # Google's resource paths, which the rule admitted while refusing
+            # the AWS one. `litellm.get_llm_provider` resolves each of these to
+            # a provider exactly as it resolves an ARN.
+            #
+            # A Vertex endpoint is the repointable one: it names no weights at
+            # all, so a blessing over it certifies whatever it is pointed at
+            # next.
+            "projects/acme-prod/locations/us-central1/endpoints/1234567890",
+            # A full resource name for a public model carries the project even
+            # though it does name the model. The project is the account half of
+            # the property, and it would reach a fingerprint and a report.
+            "projects/acme-prod/locations/us-central1/publishers/google/models/gemini-2.5-pro",
+            # The Developer API's own resource, reached under `gemini/`. It
+            # names no base build, which is the first property outright.
+            "tunedModels/my-tuned-abc123",
+            # Behind a router segment and in another case, for the same reason
+            # the ARN forms above are listed three ways.
+            "vertex_ai/projects/p/locations/l/endpoints/9",
+            "TunedModels/my-tuned-abc123",
         ],
     )
     def test_an_identifier_naming_a_resource_is_refused_on_every_vendor(
         self, name, model
     ):
-        """A resource is not a build, and the rule follows that rather than AWS.
+        """A resource is not a build, and the rule follows that rather than a cloud.
 
         Refused for every vendor, and outside the Claude shape, because both
         reasons are properties of a resource identifier: it can be repointed at
         other weights, so a blessed fingerprint would go on certifying it, and
         it carries the account that owns it into a fingerprint and a report.
         A rule that lived in the Claude shape would leave a Nova ARN accepted.
+
+        **The Google forms are here because the rule was one cloud's syntax.**
+        The docstring said "on two properties rather than on whose syntax it
+        is" and the pattern was ``arn:``, so a Vertex endpoint and a Developer
+        API tuned model both passed. Parametrizing over every vendor is what
+        keeps the next spelling from being a `bedrock`-only thought.
         """
-        with pytest.raises(ValueError, match="cloud resource"):
+        with pytest.raises(ValueError, match="rather than a model build"):
             vendor_for(name).validate_model(model, source="t")
+
+    @pytest.mark.parametrize("name", VENDOR_NAMES)
+    @pytest.mark.parametrize(
+        "model",
+        [
+            # The Developer API's resource form for a *public* model. It names
+            # the build and carries no account, so neither property holds and
+            # refusing it would refuse a model under a published name.
+            "models/gemini-2.5-pro",
+            # Ordinary identifiers that merely contain a listed word.
+            "gemini-2.5-pro",
+            "claude-opus-5",
+        ],
+    )
+    def test_an_identifier_that_is_not_a_resource_still_passes_the_check(
+        self, name, model
+    ):
+        """The refusal is narrow: a resource, never anything shaped like one."""
+        try:
+            vendor_for(name).validate_model(model, source="t")
+        except ValueError as exc:
+            assert "rather than a model build" not in str(exc), (
+                f"{model!r} was refused as a resource on {name}"
+            )
 
     @pytest.mark.parametrize(
         "model",
