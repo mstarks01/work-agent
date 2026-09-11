@@ -180,6 +180,27 @@ class TestAModelThatRefusesTheParameterAtAll:
         """
         assert native_structured_output(vendor_for("bedrock"), self.REFUSING) is False
 
+    def test_the_build_gate_refuses_it_rather_than_raising(self):
+        """The other reader of the same probe, held against the first.
+
+        #821 taught the matrix that the probe has a third answer and left this
+        reader asking the probe directly, so a deployment naming one of these
+        models got ``UnsupportedParamsError`` out of the library where the
+        answer was a plain refusal. Both readers answer from
+        ``native_structured_output`` now.
+        """
+        from analysis_service.binding import _check_native_structured_output
+        from analysis_service.model_gate import ModelGateError
+        from analysis_service.sampling import TierSampling
+
+        with pytest.raises(ModelGateError, match="cannot constrain"):
+            _check_native_structured_output(
+                vendor_for("bedrock"),
+                self.REFUSING,
+                TierSampling(constrain_output=True),
+                source="tiers.base",
+            )
+
     def test_the_matrix_renders_a_cell_rather_than_failing(self):
         from analysis_service.conformance import Capability, profile
 

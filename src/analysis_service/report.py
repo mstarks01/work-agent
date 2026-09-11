@@ -38,6 +38,7 @@ from pydantic import (
     model_validator,
 )
 
+from analysis_service.charges import UPSTREAM_MAX_CHARS
 from analysis_service.claims import FrameworkAnalysis, FrameworkName, SharedElementName
 from analysis_service.evidence import ground_issues
 from analysis_service.frameworks import block_type_for
@@ -423,8 +424,16 @@ class NodeRun(BaseModel):
     duration_ms: int = Field(ge=0)
     usage: TokenUsage | None = None
     attempts: int = Field(default=1, ge=1)
-    reported_charge_usd: float | None = Field(default=None, ge=0)
-    served_upstream: str | None = Field(default=None, max_length=100)
+    # ``allow_inf_nan`` off, because a stored figure is only as trustworthy as
+    # whatever wrote it — the reasoning ``_stored_system_name`` states below.
+    # ``analysis_service.charges.reported_charge_of`` refuses a non-finite
+    # figure on the way in and ``evals.harness.baseline.money`` refuses one in a
+    # contributor's file, and this reader admitted what both refuse: an ``inf``
+    # validated, summed to ``inf`` through :func:`charges_by_node`, and
+    # re-serialised as ``null`` — so a report read back and re-dumped moved the
+    # bytes an attestation seals.
+    reported_charge_usd: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    served_upstream: str | None = Field(default=None, max_length=UPSTREAM_MAX_CHARS)
 
     @model_validator(mode="before")
     @classmethod

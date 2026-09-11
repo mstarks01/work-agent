@@ -38,6 +38,7 @@ from analysis_service.retry import (
     RetryBudget,
     RetryBudgetExhausted,
     RetryPolicy,
+    RetryRefusal,
     TruncatedCompletionError,
     _backoff_seconds,
     _is_transient,
@@ -374,7 +375,7 @@ class TestRetryAfter:
         pol = policy()
         long_wait = rate_limited(**{"retry-after": "3600"})
 
-        assert not pol.should_retry(1, classify(long_wait))
+        assert pol.refuse_retry(1, classify(long_wait)) is RetryRefusal.WAIT_TOO_LONG
         assert pol.budget.tokens == pytest.approx(policy().budget.tokens), (
             "a refusal that spends a token charges the storm budget for a call"
             " it never made"
@@ -382,13 +383,19 @@ class TestRetryAfter:
 
     def test_a_wait_inside_the_ceiling_is_still_retried(self):
         """The rule refuses a long wait, not every stated one."""
-        assert policy().should_retry(1, classify(rate_limited(**{"retry-after": "5"})))
+        assert (
+            policy().refuse_retry(1, classify(rate_limited(**{"retry-after": "5"})))
+            is None
+        )
 
     def test_a_full_token_window_is_still_retried(self):
         """What the ceiling was raised for, named as the case rather than as a
         number: a tokens-per-minute window is 60 seconds wide, so a provider
         asking for 45 names a limit that really does reopen."""
-        assert policy().should_retry(1, classify(rate_limited(**{"retry-after": "45"})))
+        assert (
+            policy().refuse_retry(1, classify(rate_limited(**{"retry-after": "45"})))
+            is None
+        )
 
     def test_the_ceiling_covers_a_whole_per_minute_window(self):
         """The reasoning behind the constant, held rather than written down.
@@ -401,12 +408,12 @@ class TestRetryAfter:
 
     def test_an_error_with_no_hint_is_judged_as_before(self):
         """An absent header says nothing about when capacity returns."""
-        assert policy().should_retry(1, classify(rate_limited()))
+        assert policy().refuse_retry(1, classify(rate_limited())) is None
 
     def test_the_sleep_is_bounded_whatever_the_header_says(self):
         """The second reader of one rule, and deliberately so.
 
-        ``should_retry`` refuses a long wait, and this clamp is what stops a
+        ``refuse_retry`` refuses a long wait, and this clamp is what stops a
         caller that slept first from handing a header the process's schedule.
         """
         pol = policy()
@@ -465,27 +472,56 @@ class TestBackoff:
         assert all(_backoff_seconds(50) <= 30.0 for _ in range(200))
 
 
-class TestShouldRetry:
+class TestRefuseRetry:
     def test_a_transient_failure_earns_another_try(self):
-        assert policy().should_retry(1, classify(rate_limited()))
+        assert policy().refuse_retry(1, classify(rate_limited())) is None
 
     def test_a_non_transient_failure_does_not(self):
-        assert not policy().should_retry(1, classify(ValueError("malformed request")))
+        assert (
+            policy().refuse_retry(1, classify(ValueError("malformed request")))
+            is RetryRefusal.NOT_RETRYABLE
+        )
 
     def test_a_non_transient_failure_spends_no_budget(self):
         # Order matters: a token spent on a failure that will never benefit
         # from a retry is a token the next real outage cannot draw on.
         pol = policy()
-        pol.should_retry(1, classify(ValueError("malformed request")))
+        pol.refuse_retry(1, classify(ValueError("malformed request")))
         assert pol.budget.tokens == 10
 
     def test_the_last_attempt_does_not_retry(self):
-        assert not policy(attempts=3).should_retry(3, classify(rate_limited()))
+        assert (
+            policy(attempts=3).refuse_retry(3, classify(rate_limited()))
+            is RetryRefusal.ATTEMPTS_SPENT
+        )
+
+    def test_a_long_wait_is_named_as_such_even_on_an_empty_budget(self):
+        """The regression: four conditions overlap, and only one fired.
+
+        ``give_up`` used to re-derive why the loop stopped, from ``attempt``,
+        ``retryable`` and ``budget.tokens``. All three hold here while the
+        rule that actually refused is the ``Retry-After``, so it raised
+        ``RetryBudgetExhausted`` in place of the provider's own exception and
+        logged that the service was failing. The refusal is one value now.
+        """
+        pol = policy(attempts=3, capacity=0.5)
+        long_wait = classify(rate_limited(**{"retry-after": "120"}))
+
+        refusal = pol.refuse_retry(1, long_wait)
+
+        assert refusal is RetryRefusal.WAIT_TOO_LONG
+        raised = pol.give_up(refusal, 1, long_wait, "openrouter/m")
+        assert raised is long_wait.cause, (
+            "the caller loses the provider's own exception to a budget error"
+            " the budget did not cause"
+        )
 
     def test_an_exhausted_budget_stops_retrying_a_transient_failure(self):
         pol = policy(capacity=1)
-        assert pol.should_retry(1, classify(rate_limited()))
-        assert not pol.should_retry(1, classify(rate_limited()))
+        assert pol.refuse_retry(1, classify(rate_limited())) is None
+        assert (
+            pol.refuse_retry(1, classify(rate_limited())) is RetryRefusal.BUDGET_SPENT
+        )
 
 
 class TestWhatCountsAsTransient:

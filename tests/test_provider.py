@@ -37,6 +37,7 @@ from analysis_service.retry import (
     ProviderFailure,
     RetryBudget,
     RetryPolicy,
+    RetryRefusal,
     classify,
 )
 from analysis_service.system_model import SystemModel
@@ -352,7 +353,9 @@ class TestTheAdapterOverTheSeam:
             cause=None,
         )
 
-        raised = policy(attempts=1).give_up(1, crossed, "openai/gpt-4o")
+        raised = policy(attempts=1).give_up(
+            RetryRefusal.NOT_RETRYABLE, 1, crossed, "openai/gpt-4o"
+        )
 
         assert isinstance(raised, RuntimeError)
         assert "authentication" in str(raised)
