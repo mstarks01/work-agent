@@ -29,9 +29,13 @@ it, where two bounds become expressible that could not exist below:
   This is the half of the storm that survives even a perfectly sized budget.
 
 Where the provider says when to come back, in a ``Retry-After`` on a 429, that
-wins over any curve computed here. It is the one authoritative number in the
-exchange, and the service does not cap it. A deliberately long ``Retry-After``
-is the provider asking for room, and the job deadline is what bounds the wait.
+wins over any curve computed here, up to
+:data:`_RETRY_AFTER_CEILING_SECONDS`. It is the one authoritative number in the
+exchange and it is still a third party's, so it cannot decide how long this
+process blocks: a hint past the ceiling ends the node rather than parking it,
+because a provider asking for an hour has already answered the question a retry
+exists to ask. It arrives on the exception where litellm files it, which is not
+where an exception's ``headers`` attribute is — see :data:`_HEADER_ATTRIBUTES`.
 
 This reverses version 2's removal of the backoff knobs, and only because the
 premise changed. They went because they connected to nothing: LiteLLM picked its
@@ -287,6 +291,44 @@ def _clears_with_time(exc: BaseException) -> bool:
     return _RATE_LIMIT_CLEARS_WITH_TIME.get(dimension, True)
 
 
+#: Where a raised exception carries the provider's response headers, in the
+#: order they are read. **Two attributes, because the obvious one is empty on
+#: every real failure.** litellm declines to copy a vendor's response headers
+#: onto ``exc.headers`` — its own comment says a malicious upstream could
+#: otherwise inject browser-interpreted headers through a proxy that forwarded
+#: them — and fills ``exc.headers`` only from the ``headers=`` kwarg a proxy
+#: supplies. What it does instead is attach every mapped exception's response
+#: headers as ``litellm_response_headers``, which is where a real
+#: ``Retry-After`` arrives. Reading ``headers`` alone therefore found nothing on
+#: every provider failure this service can meet, while a test that built the
+#: exception with ``headers={...}`` agreed with the rule.
+#:
+#: ``tests/test_provider_contract.py`` drives a 429 from an HTTP transport up to
+#: this function, so the attribute name is held against the installed library
+#: rather than against a remembered one.
+_HEADER_ATTRIBUTES = ("headers", "litellm_response_headers")
+
+
+def _response_headers(exc: BaseException) -> Mapping | None:
+    """The provider's response headers off a raised exception, or ``None``.
+
+    Every shape the producers emit, handled rather than assumed: a plain
+    ``dict`` from a proxy-supplied ``headers=``, an ``httpx.Headers`` from
+    litellm's own attachment — a ``Mapping`` and not a ``dict``, which an
+    ``isinstance(..., dict)`` test silently refused — ``None`` where the
+    attribute exists and was never filled, and no attribute at all on an
+    exception from outside the provider library.
+
+    An empty mapping is passed over rather than returned, so a first attribute
+    that exists and says nothing does not hide a second one that speaks.
+    """
+    for attribute in _HEADER_ATTRIBUTES:
+        headers = getattr(exc, attribute, None)
+        if isinstance(headers, Mapping) and headers:
+            return headers
+    return None
+
+
 def _retry_after_seconds(exc: BaseException) -> float | None:
     """What the provider asked us to wait, if it said anything readable.
 
@@ -307,8 +349,8 @@ def _retry_after_seconds(exc: BaseException) -> float | None:
     own curve. That covers a date-formatted ``Retry-After``, which this does not
     parse — guessing at a date is worse than the curve.
     """
-    headers = getattr(exc, "headers", None)
-    if not isinstance(headers, dict):
+    headers = _response_headers(exc)
+    if headers is None:
         return None
     lowered = {str(key).lower(): value for key, value in headers.items()}
     for name, scale in (("retry-after", 1.0), ("retry-after-ms", 0.001)):
