@@ -2,13 +2,19 @@
 
 from __future__ import annotations
 
+import logging
+from unittest import mock
+
 import pytest
 
-from analysis_service.analysis import CONTROL_ATTRIBUTES, control_state, matches_term
+from analysis_service import basis
+from analysis_service.analysis import CONTROL_ATTRIBUTES, matches_term
 from analysis_service.basis import (
     CONTROL_SCOPE,
     IN_SCOPE,
+    MAX_SCAN_WORK,
     content_tokens,
+    stated_controls,
     unbased_controls,
 )
 from analysis_service.system_model import SystemModel
@@ -183,24 +189,20 @@ def _corpus_values() -> list[tuple[str, tuple[str, ...], str]]:
     """Every stated in-scope control the corpus carries, with its cited source.
 
     One row per value: the case, the value's content tokens, and the lowered
-    text of the source it cites. Values with no tokens and elements citing no
-    source are dropped here for the same reasons :func:`unbased_controls` drops
-    them, so both rungs are measured over one denominator.
+    text of the source it cites. Walked through
+    :func:`~analysis_service.basis.stated_controls`, which is the same reader
+    :func:`~analysis_service.basis.unbased_controls` walks, so the published
+    denominator and the published rates cannot be computed over two different
+    sets of values. Only the rung differs between them: ``any`` here, ``all``
+    below.
     """
     rows = []
     for case_dir in verify_corpus.case_dirs():
         case = load_case(case_dir)
-        sources = {source.label: source.text.lower() for source in case.sources}
-        for element in case.model.elements():
-            source = sources.get(element.source_label, "")
-            if not source:
-                continue
-            for attribute in IN_SCOPE:
-                value = getattr(element, attribute, None)
-                if not isinstance(value, str) or control_state(value) != "stated":
-                    continue
-                if tokens := content_tokens(value):
-                    rows.append((case.id, tokens, source))
+        sources = {source.label: source.text for source in case.sources}
+        lowered = {label: text.lower() for label, text in sources.items()}
+        for control in stated_controls(case.model, sources):
+            rows.append((case.id, control.tokens, lowered[control.source_label]))
     return rows
 
 
@@ -240,14 +242,13 @@ def test_the_published_strict_rung_rate_is_what_the_corpus_gives(corpus_values):
     assert len(flagged) == CORPUS_FLAGGED_STRICT, flagged
 
 
-def test_the_corpus_runs_clean_through_the_shipped_reader(corpus_values):
-    """The rule the service runs, over the same corpus, agrees with the rung.
+def test_the_corpus_runs_clean_through_the_shipped_reader():
+    """The rule a job runs, over the same corpus, agrees with the weak rung.
 
-    Two readers of one rule otherwise: the loop above measures both rungs, and
-    :func:`unbased_controls` is what a job calls. They are tested against each
-    other rather than each against its own expectation.
+    Two readers of one rung otherwise: the loop above applies ``any`` to the
+    rows, and :func:`unbased_controls` applies it inside a budgeted scan. They
+    are tested against each other rather than each against its own expectation.
     """
-    del corpus_values
     flagged = []
     for case_dir in verify_corpus.case_dirs():
         case = load_case(case_dir)
@@ -255,3 +256,65 @@ def test_the_corpus_runs_clean_through_the_shipped_reader(corpus_values):
         flagged.extend(unbased_controls(case.model, sources))
 
     assert flagged == []
+
+
+def test_the_corpus_spends_a_fraction_of_the_scan_budget():
+    """The worst case is 440 times under the bound, which is what the constant says.
+
+    Re-derived rather than asserted in prose: the budget is a number somebody
+    will want to lower, and this says what lowering it would cost.
+    """
+    worst = 0
+    for case_dir in verify_corpus.case_dirs():
+        case = load_case(case_dir)
+        sources = {source.label: source.text for source in case.sources}
+        scans = {
+            (token, control.source_label)
+            for control in stated_controls(case.model, sources)
+            for token in control.tokens
+        }
+        worst = max(worst, sum(len(sources[label]) for _, label in scans))
+
+    assert worst == 45_448
+    assert worst * 400 < MAX_SCAN_WORK
+
+
+def test_the_scan_stops_at_the_budget_and_says_so(caplog):
+    """A model that spends the budget is unmeasured from there on, not accused.
+
+    The values below share no word with the source, so an unbudgeted scan flags
+    every one of them. The budget admits two searches and the rest read as
+    echoed, because a diagnostic that ran out of work must not start accusing.
+    """
+    source = "quaternary " * 200
+    model = _model(authentication="zeta eta theta iota", encryption_in_transit="kappa")
+
+    with caplog.at_level(logging.WARNING, logger="analysis_service.basis"):
+        flagged = unbased_controls(model, {"System description": source})
+        with mock.patch.object(basis, "MAX_SCAN_WORK", 2 * len(source)):
+            budgeted = unbased_controls(model, {"System description": source})
+
+    assert [flag.attribute for flag in flagged] == [
+        "authentication",
+        "encryption_in_transit",
+    ]
+    assert budgeted == []
+    assert "the rest of this model is unmeasured" in caplog.text
+
+
+def test_one_token_is_searched_once_however_many_values_carry_it():
+    """The memo, which is what takes the 150-element worst case off 13 seconds.
+
+    Measured through the budget rather than through a call count: three values
+    naming the same token spend one token's worth of it.
+    """
+    source = "quaternary " * 200
+    model = _model(authentication="zeta", encryption_in_transit="zeta")
+
+    with mock.patch.object(basis, "MAX_SCAN_WORK", len(source)):
+        flagged = unbased_controls(model, {"System description": source})
+
+    assert [flag.attribute for flag in flagged] == [
+        "authentication",
+        "encryption_in_transit",
+    ]

@@ -27,6 +27,14 @@ logged beside the job and nothing reads it: no route branches on it, no repair
 pass is asked for, and no report carries it. Promotion to a gate is a separate
 decision with its own evidence (#470), and this module does not make it.
 
+**The cost is submitted text times submitted text**, which is the one thing
+here worth reading twice. A search costs the length of a source, and the number
+of searches is how many different words a model's controls name — so a
+150-element model of invented controls over a 100 KiB source cost 13.5 seconds
+of CPU before :class:`_Scan` existed. Memoizing takes the repeated half of that
+away and :data:`MAX_SCAN_WORK` bounds the rest. Stopping is affordable for the
+same reason the whole module is safe: nothing downstream reads the result.
+
 Scope
 =====
 
@@ -106,9 +114,11 @@ than an answer to it.
 
 from __future__ import annotations
 
+import logging
 import re
 from collections.abc import Iterator, Mapping
 from types import MappingProxyType
+from typing import NamedTuple
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -117,16 +127,21 @@ from analysis_service.analysis import (
     control_state,
     matches_term,
 )
-from analysis_service.system_model import Element, SystemModel
+from analysis_service.system_model import SystemModel
 
 __all__ = [
     "CONTROL_SCOPE",
     "FUNCTION_WORDS",
     "IN_SCOPE",
+    "MAX_SCAN_WORK",
+    "StatedControl",
     "UnbasedControl",
     "content_tokens",
+    "stated_controls",
     "unbased_controls",
 ]
+
+logger = logging.getLogger(__name__)
 
 #: Why a control attribute is out of scope, or ``None`` where it is measured.
 #: Keyed by :data:`~analysis_service.analysis.CONTROL_ATTRIBUTES` so the registry
@@ -176,6 +191,21 @@ FUNCTION_WORDS: frozenset[str] = frozenset(
     """.split()  # noqa: SIM905 -- one block reads as the rule it was written from
 )
 
+#: The most source characters one job's diagnostic will read, summed over every
+#: token search it makes. **A budget the scan spends, not a size it is refused
+#: for**, on the same reasoning as :data:`~analysis_service.grounding.MAX_REPAIR_WORK`:
+#: the cost is the number of distinct tokens times the length of the source each
+#: is searched against, and submitted text sets both terms, so no function of
+#: either one alone can see it.
+#:
+#: Measured, on the tree that carries this constant: a search runs at about
+#: 70,000 characters per millisecond, so 20 million characters is about 285 ms
+#: of CPU. The worst of the 13 corpus cases spends 45,448, which is 440 times
+#: under the budget. A job that spends it names over a thousand different words
+#: across its controls and matches none of them, which is not a model this
+#: measures usefully.
+MAX_SCAN_WORK = 20_000_000
+
 #: A run of letters and digits, keeping an internal dot between digits so a
 #: version number survives as one token: ``1.3`` rather than ``1`` and ``3``.
 _TOKEN = re.compile(r"[a-z0-9]+(?:\.[0-9]+)*")
@@ -218,10 +248,26 @@ def content_tokens(value: str) -> tuple[str, ...]:
     )
 
 
-def unbased_controls(
+class StatedControl(NamedTuple):
+    """One stated in-scope control, with the tokens to look for and where.
+
+    **The one reader of "which values does this diagnostic measure".** Both
+    rungs of the published measurement and the shipped
+    :func:`unbased_controls` walk the model through :func:`stated_controls`, so
+    a denominator and a rate can never be computed over two different sets.
+    """
+
+    element_id: str
+    attribute: str
+    value: str
+    source_label: str
+    tokens: tuple[str, ...]
+
+
+def stated_controls(
     model: SystemModel, sources: Mapping[str, str]
-) -> list[UnbasedControl]:
-    """Every stated in-scope control that its cited source does not echo.
+) -> Iterator[StatedControl]:
+    """Every control this diagnostic has something to say about.
 
     Walks elements in :meth:`SystemModel.elements` order and attributes in
     :data:`IN_SCOPE` order, so the output is stable and complete.
@@ -229,38 +275,109 @@ def unbased_controls(
     Three values are passed over, each for a reason that is not a pass:
 
     * a control that is not ``stated`` — there is no assertion to have a basis.
-    * a value whose content tokens are empty, so there is nothing to look for.
+    * a value with no content token, so there is nothing to look for. A value
+      of function words alone is one; so is one written in a script
+      :data:`_TOKEN` does not read, since the token rule is ASCII.
     * an element whose ``source_label`` names no source the job carried. The
       validity gate already refuses that shape
       (:func:`~analysis_service.validation.validate`), and an element citing
       nothing is a different failure from one citing a source that does not
       support it.
     """
+    for element in model.elements():
+        if not sources.get(element.source_label):
+            continue
+        for attribute in IN_SCOPE:
+            value = getattr(element, attribute, None)
+            if not isinstance(value, str) or control_state(value) != "stated":
+                continue
+            if tokens := content_tokens(value):
+                yield StatedControl(
+                    element_id=element.id,
+                    attribute=attribute,
+                    value=value[:200],
+                    source_label=element.source_label,
+                    tokens=tokens,
+                )
+
+
+def unbased_controls(
+    model: SystemModel, sources: Mapping[str, str]
+) -> list[UnbasedControl]:
+    """Every stated in-scope control that its cited source does not echo.
+
+    Spends :data:`MAX_SCAN_WORK` and then stops, which is why this returns a
+    list rather than a generator: the budget is the whole job's, and a caller
+    that abandoned the walk part-way would leave it half spent.
+    """
+    scan = _Scan(sources)
     return [
-        flag
-        for element in model.elements()
-        for flag in _element_flags(element, sources)
+        UnbasedControl(
+            element_id=control.element_id,
+            attribute=control.attribute,
+            value=control.value,
+            source_label=control.source_label,
+            tokens=control.tokens,
+        )
+        for control in stated_controls(model, sources)
+        if scan.echoes_none(control)
     ]
 
 
-def _element_flags(
-    element: Element, sources: Mapping[str, str]
-) -> Iterator[UnbasedControl]:
-    """This element's unbased controls, in :data:`IN_SCOPE` order."""
-    source = sources.get(element.source_label, "").lower()
-    if not source:
-        return
-    for attribute in IN_SCOPE:
-        value = getattr(element, attribute, None)
-        if not isinstance(value, str) or control_state(value) != "stated":
-            continue
-        tokens = content_tokens(value)
-        if not tokens or any(matches_term(token, source) for token in tokens):
-            continue
-        yield UnbasedControl(
-            element_id=element.id,
-            attribute=attribute,
-            value=value[:200],
-            source_label=element.source_label,
-            tokens=tokens,
+class _Scan:
+    """One call's token searches: cached, and spent against a budget.
+
+    Two things make the naive walk cost what it does. It lower-cases the source
+    once per element, and it searches the same token against the same source
+    once per value that carries it — and a model's control vocabulary repeats
+    heavily, because the systems it describes use the same few mechanisms. Both
+    are memoized here, which is what takes the 150-element worst case from 13.5
+    seconds of CPU to 71 milliseconds.
+
+    Memoizing is not a bound: distinct tokens can keep arriving, and the cost
+    of each is the length of the source it is searched against — both set by
+    submitted text. :data:`MAX_SCAN_WORK` is the bound, and the fact that this
+    is a diagnostic is what makes stopping affordable. Nothing downstream reads
+    the result, so a job that runs out of budget loses a log line and keeps
+    every guarantee it had.
+    """
+
+    def __init__(self, sources: Mapping[str, str]) -> None:
+        self._sources = sources
+        self._lowered: dict[str, str] = {}
+        self._present: dict[tuple[str, str], bool] = {}
+        self._work = 0
+        self._stopped = False
+
+    def echoes_none(self, control: StatedControl) -> bool:
+        """Whether the cited source carries none of this value's tokens."""
+        return not any(
+            self._present_in(token, control.source_label) for token in control.tokens
+        )
+
+    def _present_in(self, token: str, label: str) -> bool:
+        key = (token, label)
+        if key in self._present:
+            return self._present[key]
+        if label not in self._lowered:
+            self._lowered[label] = self._sources[label].lower()
+        source = self._lowered[label]
+        if self._work + len(source) > MAX_SCAN_WORK:
+            self._stop()
+            # True, so the control reads as echoed and nothing is flagged: a
+            # diagnostic that ran out of budget must not start accusing.
+            return True
+        self._work += len(source)
+        self._present[key] = matches_term(token, source)
+        return self._present[key]
+
+    def _stop(self) -> None:
+        """Say once that the rest of this model went unmeasured."""
+        if self._stopped:
+            return
+        self._stopped = True
+        logger.warning(
+            "stated-control diagnostic stopped after reading %d source"
+            " characters; the rest of this model is unmeasured",
+            self._work,
         )
