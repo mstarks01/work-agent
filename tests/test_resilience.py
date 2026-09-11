@@ -137,8 +137,95 @@ def test_a_zero_retry_budget_is_refused(tmp_path):
         config(retry_budget_ratio=0)
 
 
-def test_http_options_carry_the_timeout():
-    assert config().to_http_options().timeout == 300000
+def test_the_request_timeout_converts_like_the_deadline_does():
+    """Both durations are milliseconds in the file and seconds to their consumer.
+
+    One of them converting was the whole defect: ``deadline_seconds`` divided
+    and the timeout's carrier did not, so a five-minute bound reached LiteLLM
+    as 300000 seconds.
+    """
+    loaded = config()
+    assert loaded.request_timeout_seconds() == 300.0
+    assert loaded.deadline_seconds() == 900.0
+
+
+def test_a_sub_second_timeout_survives_the_conversion():
+    """The shape the old carrier could not hold.
+
+    ``types.HttpOptions.timeout`` is typed ``int``, so converting there turned
+    any ``timeout_ms`` below 1000 into a validation error at graph build time
+    rather than into a short bound. LiteLLM's kwarg takes a float.
+    """
+    assert config(timeout_ms=500).request_timeout_seconds() == 0.5
+
+
+def test_the_timeout_reaching_litellm_is_the_one_the_file_states(monkeypatch):
+    """The two readers, tested against each other rather than each against itself.
+
+    This is the assertion the defect got past. ``timeout_ms`` was asserted
+    against ``http_options.timeout`` here and in ``test_graph.py``, and both
+    agreed with the code because both read the same side of the seam. The unit
+    changed on the *other* side, inside ADK, where nothing looked.
+
+    So this drives the installed ADK adapter the shipped build produces and
+    reads the kwarg LiteLLM is actually handed. No request is made: the
+    transport is replaced, and the assertion is on what it received.
+    """
+    import asyncio
+
+    from google.adk.models.llm_request import LlmRequest
+    from google.genai import types
+
+    from analysis_service.binding import build_tier_adapters
+    from analysis_service.model_tiers import load_model_tiers
+    from analysis_service.sampling import load_sampling
+
+    resilience = load_resilience(CONFIG_PATH, env={})
+    env = {
+        "ANALYSIS_MODEL_BASE_VENDOR": "openai",
+        "ANALYSIS_MODEL_BASE_MODEL": "gpt-4o-2024-08-06",
+        "ANALYSIS_MODEL_STRONG_VENDOR": "openai",
+        "ANALYSIS_MODEL_STRONG_MODEL": "gpt-5.6",
+        "ANALYSIS_MODEL_REVIEW_VENDOR": "openai",
+        "ANALYSIS_MODEL_REVIEW_MODEL": "gpt-5.6",
+        "ANALYSIS_OPENAI_API_KEY": "not-a-real-key",
+    }
+    adapter = build_tier_adapters(
+        load_model_tiers(PROJECT_ROOT / "config" / "model_tiers.toml", env=env),
+        load_sampling(PROJECT_ROOT / "config" / "sampling.toml", env={}),
+        resilience,
+        env=env,
+    )["base"]
+
+    received: dict = {}
+
+    async def capture(**kwargs):
+        received.update(kwargs)
+        raise _StopBeforeTheRequest
+
+    monkeypatch.setattr(adapter.llm_client, "acompletion", capture)
+
+    request = LlmRequest(
+        model=adapter.model,
+        contents=[types.Content(role="user", parts=[types.Part(text="hi")])],
+        config=types.GenerateContentConfig(),
+    )
+
+    async def drive():
+        async for _ in adapter.generate_content_async(request, stream=False):
+            pass
+
+    with pytest.raises(_StopBeforeTheRequest):
+        asyncio.run(drive())
+
+    assert received["timeout"] == resilience.request_timeout_seconds()
+    # Stated as the wall-clock bound an operator set, so the assertion fails
+    # with the number they would recognise rather than with a bare ratio.
+    assert received["timeout"] == 300.0
+
+
+class _StopBeforeTheRequest(Exception):
+    """Raised by the stand-in transport, so no provider is ever reached."""
 
 
 def test_the_backoff_knobs_stay_out_of_the_schema():

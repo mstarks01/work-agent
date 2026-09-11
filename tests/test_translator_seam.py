@@ -140,10 +140,11 @@ def test_the_override_surface_is_no_wider_than_the_sampling_surface():
 def test_every_adapter_kwarg_comes_from_a_closed_set():
     """What `build_tier_adapters` hands `LiteLlm`, and where each part is from.
 
-    Four sources, all of them code or deploy-time config: the route from the
-    vendor registry, one literal, the tier's sampling constructor kwargs, and
-    the vendor's credential kwargs. A fifth spread would be the thing to look
-    at, which is why the count is asserted rather than the names alone.
+    Five sources, all of them code or deploy-time config: the route from the
+    vendor registry, one literal, the per-request timeout from
+    `config/resilience.toml`, the tier's sampling constructor kwargs, and the
+    vendor's credential kwargs. A sixth spread would be the thing to look at,
+    which is why the count is asserted rather than the names alone.
     """
     source = (PACKAGE / "binding.py").read_text(encoding="utf-8")
     call = re.search(
@@ -154,7 +155,8 @@ def test_every_adapter_kwarg_comes_from_a_closed_set():
     assert "model=selection.route" in body
     assert "**tier_sampling.constructor_kwargs()" in body
     assert "**vendor.credential_kwargs(env, tiers.credential_mode(" in body
-    assert body.count("**") == 3, (
+    assert "**{_TIMEOUT_KWARG: resilience.request_timeout_seconds()}" in body
+    assert body.count("**") == 4, (
         "a new spread reaches the translator constructor. Every value crossing"
         " this seam has to come from the vendor registry or from deploy-time"
         " config, never from anything a request can influence."

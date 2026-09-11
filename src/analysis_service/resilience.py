@@ -102,7 +102,6 @@ from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import TypeVar
 
-from google.genai import types
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from analysis_service.budgets import BudgetPolicy
@@ -211,13 +210,31 @@ class ResilienceConfig(BaseModel):
             max_total_bytes=self.max_source_bytes, max_sources=self.max_sources
         )
 
-    def to_http_options(self) -> types.HttpOptions:
-        """Per-request HTTP options carrying the deadline.
+    def request_timeout_seconds(self) -> float:
+        """The per-request timeout as LiteLLM wants it: seconds, not milliseconds.
 
-        ADK merges its tracking headers and api version into a caller-supplied
-        ``http_options``, so setting the timeout here leaves those untouched.
+        The sibling of :meth:`deadline_seconds`, and it exists for the reason
+        that one gives: the file states every duration in milliseconds, so the
+        conversion lives here and no caller has to remember which unit it is
+        holding. Both durations convert in one place, because one of them
+        converting was how ``timeout_ms`` came to mean nothing.
+
+        **It does not ride on ``http_options``, and the reason is a type.**
+        That was the carrier, and ``types.HttpOptions.timeout`` is documented in
+        milliseconds while ADK's LiteLLM path forwards the number to LiteLLM
+        verbatim, where it is read as seconds. The shipped 300000 therefore
+        bought a 3.5-day bound and no request was ever cut. Converting at the
+        carrier does not fix it either: that field is typed ``int``, so a
+        sub-second ``timeout_ms`` would raise at graph build time rather than
+        time a request out. LiteLLM's own ``timeout`` kwarg is documented in
+        seconds and takes a float, so the value goes there instead — one hop,
+        no unit change, nothing to mistranslate.
+
+        ``tests/test_resilience.py`` drives the installed ADK adapter and reads
+        what LiteLLM receives, rather than asserting this number against a
+        second copy of itself.
         """
-        return types.HttpOptions(timeout=self.timeout_ms)
+        return self.timeout_ms / 1000
 
 
 def _override(

@@ -3,13 +3,22 @@
 There is one ``LiteLlm`` per tier, shared by that tier's nodes, so ten LLM nodes
 use two adapters. It owns every parameter ADK will not carry for the service.
 
-Three things ride the constructor rather than the generate-content config, for
-one underlying reason: ADK's request map forwards them nowhere, and LiteLLM's
-fail-closed ``drop_params`` cannot catch a param it is never told about.
+Four things ride the constructor rather than the generate-content config. Three
+share one underlying reason: ADK's request map forwards them nowhere, and
+LiteLLM's fail-closed ``drop_params`` cannot catch a param it is never told
+about. The fourth is there because the other carrier changes its unit.
 
 * ``seed`` and ``reasoning_effort``. On the config instead, they would vanish
   silently, while ``sampling_fingerprint`` went on attesting to a seed the
   request never carried.
+* ``timeout``, the per-request bound from ``config/resilience.toml``. ADK *does*
+  forward this one, off ``types.HttpOptions.timeout`` — and that field is
+  documented in milliseconds while LiteLLM reads the number it receives as
+  seconds. The shipped ``timeout_ms = 300000`` therefore bought a 3.5-day bound,
+  so no request was ever cut and a wedged provider connection held a job slot
+  until the job deadline fired. Converting at that carrier is not available: the
+  field is typed ``int``, so a sub-second timeout would raise at graph build
+  time. LiteLLM's own kwarg is documented in seconds and takes a float.
 * ``num_retries``, pinned at zero. That is not because retry is off. Retry is
   one layer up, in :mod:`analysis_service.retry`. It is because this kwarg keeps
   the library's own retry layer, and the provider SDK's beneath it, down to
@@ -109,6 +118,24 @@ if TYPE_CHECKING:
 # time because it is accepted as ``**kwargs`` — a misspelling would otherwise be
 # swallowed and silently revert retry to a single try.
 _NUM_RETRIES_KWARG = "num_retries"
+
+# The per-request timeout, in LiteLLM's own unit of seconds.
+#
+# It sits here rather than on the node's ``http_options`` because that carrier
+# changes the unit. ``types.HttpOptions.timeout`` is documented in milliseconds
+# and ADK's LiteLLM path hands the number to LiteLLM unchanged, where it is read
+# as seconds — so the shipped ``timeout_ms = 300000`` bought a 3.5-day bound and
+# no request was ever cut. See :meth:`ResilienceConfig.request_timeout_seconds`.
+#
+# Deliberately **not** run through ``assert_kwarg_supported``, for the reason
+# the ``response_format`` note below gives: that function asks
+# ``all_litellm_params``, which is LiteLLM's own extra-kwarg registry.
+# ``num_retries`` is in it and ``timeout`` is not, because ``timeout`` is a
+# named parameter on the completion signature rather than a LiteLLM addition —
+# so asserting it there fails on a correct name. The misspelling risk is covered
+# instead by the test that drives the built adapter and reads the value LiteLLM
+# was handed, which also pins the unit.
+_TIMEOUT_KWARG = "timeout"
 
 # ``constrain_output = false`` suppresses the schema by passing ``response_format``
 # as an explicit ``None`` constructor kwarg, which ADK applies over the one it
@@ -381,6 +408,11 @@ def build_tier_adapters(
             # value — down to exactly one request per call, so ``attempts``
             # means requests instead of half of a product with them.
             **{_NUM_RETRIES_KWARG: 0},
+            # One request's bound, from ``config/resilience.toml``. On the
+            # adapter rather than on each node's ``generate_content_config``,
+            # because the value is one number for the whole deployment and this
+            # is the one seam where its unit is LiteLLM's own.
+            **{_TIMEOUT_KWARG: resilience.request_timeout_seconds()},
             **tier_sampling.constructor_kwargs(),
             **vendor.credential_kwargs(env, tiers.credential_mode(selection.vendor)),
         )
@@ -424,7 +456,6 @@ class NodeBinding:
     resolve_model: ModelResolver
     resolve_sampling: SamplingResolver
     tier_sampling: dict[TierName, TierSampling]
-    resilience: ResilienceConfig | None = None
     #: How far this deployment required criticism to sit from the analysis it
     #: checks. Carried through the binding because that is the value the tier
     #: config already travels in, and the report has to state it: a reader of a
@@ -439,7 +470,6 @@ class NodeBinding:
         tiers: ModelTierConfig,
         sampling: SamplingConfig,
         resolve_model: ModelResolver,
-        resilience: ResilienceConfig | None = None,
     ) -> Self:
         """Bind one tier config and one sampling config onto the graph's nodes.
 
@@ -450,6 +480,5 @@ class NodeBinding:
             resolve_model=resolve_model,
             resolve_sampling=make_resolve_sampling(sampling, tiers.resolve_tier),
             tier_sampling=dict(sampling.tiers),
-            resilience=resilience,
             review_independence=tiers.review_independence,
         )

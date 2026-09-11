@@ -398,8 +398,12 @@ not know is not gated.
 
 Parameters that break the structured-output contract are **never** in the file
 and never overridable: `response_schema` (the SDK *raises*), `response_mime_type`
-(silently discarded), `stop_sequences` (would truncate mid-token), and
-`http_options` (owned by `resilience.toml`).
+(silently discarded), and `stop_sequences` (would truncate mid-token).
+
+The service sets no `http_options` either. That field carried the per-request
+timeout until the timeout changed unit on the way to the provider library, so
+`timeout_ms` now reaches the library as its own parameter. See
+[resilience.toml](#resiliencetoml).
 
 ### The startup parameter check
 

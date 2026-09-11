@@ -107,7 +107,10 @@
 #   response_schema     ADK *raises* if it appears on the generate config
 #   response_mime_type  silently discarded by ADK
 #   stop_sequences      would truncate structured output mid-token
-#   http_options        owned by resilience.toml, not sampling
+#   http_options        the service sets none. It carried the per-request
+#                       timeout and changed its unit on the way to the
+#                       provider library, so the timeout moved onto the
+#                       adapter. Sampling never owned it either way.
 
 version = 5
 
