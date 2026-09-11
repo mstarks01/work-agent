@@ -105,11 +105,12 @@ def _complete(client: httpx.Client, key: str, slug: str) -> dict[str, Any]:
 def _witness(client: httpx.Client, key: str, generation_id: str) -> dict[str, Any]:
     """Which upstream provider served, from OpenRouter's own generation record.
 
-    The record lands a moment after the completion returns, so a miss is
-    retried a few times and then reported as absent rather than raised. An
-    unavailable witness weakens leg 2 and invalidates nothing else.
+    The record lands some seconds after the completion returns, so a miss is
+    retried and then reported as absent rather than raised. An unavailable
+    witness weakens leg 2 and invalidates nothing else. Ten tries at three
+    seconds, because five at two seconds was measured too short.
     """
-    for _ in range(5):
+    for _ in range(10):
         response = client.get(
             f"{API_BASE}/generation",
             headers={"Authorization": f"Bearer {key}"},
@@ -117,8 +118,18 @@ def _witness(client: httpx.Client, key: str, generation_id: str) -> dict[str, An
         )
         if response.status_code == 200:
             return response.json().get("data", {})
-        time.sleep(2)
+        time.sleep(3)
     return {}
+
+
+def _permaslug(witness: dict[str, Any]) -> str | None:
+    """The pinned, dated identifier OpenRouter records for the build that served.
+
+    It sits on the per-upstream entry rather than on the record's own ``model``,
+    and it is the field that carries a build the request never named.
+    """
+    responses = witness.get("provider_responses") or [{}]
+    return responses[0].get("model_permaslug")
 
 
 def _translated(body: dict[str, Any], slug: str) -> str:
@@ -177,8 +188,9 @@ def probe_slug(client: httpx.Client, key: str, slug: str, repeat: int) -> None:
             print(f"  body.{field:<8} = {body.get(field)!r}")
         extra = sorted(set(body) - set(BODY_FIELDS) - {"choices", "usage"})
         print(f"  body other keys = {extra}")
-        print(f"  witness.provider_name = {witness.get('provider_name')!r}")
-        print(f"  witness.model         = {witness.get('model')!r}")
+        print(f"  witness.provider_name  = {witness.get('provider_name')!r}")
+        print(f"  witness.model          = {witness.get('model')!r}")
+        print(f"  witness.model_permaslug = {_permaslug(witness)!r}")
         print(f"  translated model      = {_translated(body, slug)!r}")
 
     print(f"\nsummary for {slug!r}")
