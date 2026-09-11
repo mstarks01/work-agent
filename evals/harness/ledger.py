@@ -27,6 +27,28 @@ Storing what the key was computed from makes a version bump a pure recompute
 over these files rather than a re-vote, which is what stops the ledger expiring
 the way a model-scored history does.
 
+A vote also stores **two digests of what it read**, from
+:mod:`evals.harness.content`, and ADR 0029 is the record that decided them. The
+fingerprint names the topic and survives a rewrite by design; the digests name
+what was in front of the reader. The 2026-09-09 audit rewrote every retained
+case 01 title and explanation to assert the opposite of the finding and no key
+moved, so a ledger holding the key alone cannot say whether a person judged what
+it is now attached to.
+
+``content`` is the structural digest — the verdict, the catalogued grounds and
+the package's ratings — and it decides whether a substance vote is still live.
+``prose`` is the description and the mitigations, and it decides whether a style
+vote is. They are separate because prose changes every run and structure does
+not: over the six case 01 runs of one configuration a prose digest was shared by
+0 of 234 pairs and a structural one by 155. :meth:`Vote.answers_for` and
+:meth:`Vote.reviewed_prose` are the two spellings of "this vote is still live",
+and every reader takes the one its question needs.
+
+An empty digest is a legal value and reads live against anything. It records
+that nothing was captured, which is the truthful reading of a row written before
+the field — the precedent ``rejected_because`` set for a report read back. No
+row in this repository carries one.
+
 A vote carries one reason code, from a closed set, and it decides where the vote
 lands. A reviewer who dislikes a finding's writing and a reviewer who says it is
 not a threat are reporting two different facts, and averaging them would let
@@ -55,6 +77,12 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
+from evals.harness.content import (
+    PROSE_PREFIX,
+    STRUCTURAL_PREFIX,
+    ContentError,
+)
+from evals.harness.content import version_of as digest_version_of
 from evals.harness.fingerprint import (
     Components,
     FingerprintError,
@@ -148,6 +176,16 @@ class Vote:
 
     fingerprint: str
     components: Components
+    #: The structural digest of what this vote answered, from
+    #: :mod:`evals.harness.content`: the verdict, the grounds and the ratings.
+    #: It decides whether a substance vote is still live -- see
+    #: :meth:`answers_for`.
+    content: str
+    #: The prose digest of the same claim: the description and the mitigations.
+    #: It decides whether a *style* vote is still live -- see
+    #: :meth:`reviewed_prose`. Separate from ``content`` because prose moves
+    #: every run and structure does not.
+    prose: str
     case: str
     verdict: Verdict
     voter: str
@@ -200,6 +238,22 @@ class Vote:
                 " is the case, and a row keyed to another system would answer"
                 " for a finding nobody voted on"
             )
+        # Each digest is a value of its own kind, not free text. The prefix is
+        # checked per field so the two cannot be swapped: a prose digest stored
+        # where the structural one belongs would read live against every claim,
+        # and no eye tells one sixteen-character hash from another.
+        #
+        # Empty is legal and means nothing was captured (ADR 0029).
+        for value, prefix, field_name in (
+            (self.content, STRUCTURAL_PREFIX, "content"),
+            (self.prose, PROSE_PREFIX, "prose"),
+        ):
+            if not value:
+                continue
+            try:
+                digest_version_of(value, prefix)
+            except ContentError as exc:
+                raise LedgerError(f"vote {field_name}: {exc}") from exc
         # The key is computed, never stated. A row arrives from a contributor's
         # pull request, and until this ran nothing recomputed it: the stored
         # string was taken on the row's word, while `components` -- the fields
@@ -264,10 +318,42 @@ class Vote:
             return True
         return self.verdict == "down" and self.reason in STYLE_REASONS
 
+    def answers_for(self, content: str) -> bool:
+        """Is this vote's **substance** judgement still live?
+
+        ``content`` is the structural digest of the claim now in front of the
+        reader. ``True`` means the verdict, the grounds and the ratings this
+        person judged are the ones produced now; ``False`` means the claim has
+        been re-argued since, and the vote stands as history rather than as a
+        judgement of what this run says.
+
+        The one spelling of the question, because the queue, the writing
+        instrument and the scorer all ask it and two readers of one rule
+        disagree eventually. An empty digest on the row reads live, which is
+        what "nothing was captured" has to mean.
+
+        The vote is kept either way. Nothing in this ledger is retired: a row
+        whose claim has moved on stays readable through
+        :meth:`Ledger.for_fingerprint`, and stays the topic's history.
+        """
+        return not self.content or self.content == content
+
+    def reviewed_prose(self, prose: str) -> bool:
+        """Is this vote's **writing** judgement still live?
+
+        Beside :meth:`answers_for` and never folded into it. A style objection
+        is about the words on the page, so it expires when the words do — which
+        in practice means within the sitting that cast it, because a model
+        writes new prose every run. That is the honest scope of a style vote.
+        """
+        return not self.prose or self.prose == prose
+
     def to_json(self) -> dict[str, Any]:
         return {
             "fingerprint": self.fingerprint,
             "components": self.components.to_json(),
+            "content": self.content,
+            "prose": self.prose,
             "case": self.case,
             "verdict": self.verdict,
             "voter": self.voter,
@@ -285,6 +371,8 @@ class Vote:
             vote = cls(
                 fingerprint=raw["fingerprint"],
                 components=Components.from_json(raw["components"]),
+                content=raw["content"],
+                prose=raw["prose"],
                 case=raw["case"],
                 verdict=raw["verdict"],
                 voter=raw["voter"],
@@ -299,6 +387,8 @@ class Vote:
             raise LedgerError(f"malformed vote: {exc}") from exc
         except FingerprintError as exc:
             raise LedgerError(f"malformed vote components: {exc}") from exc
+        except ContentError as exc:
+            raise LedgerError(f"malformed vote digest: {exc}") from exc
         return vote
 
 
@@ -307,6 +397,9 @@ def cast(
     case: str,
     verdict: Verdict,
     voter: str,
+    *,
+    content: str,
+    prose: str,
     reason: str | None = None,
     claim_text: str = "",
     config: str = "",
@@ -327,6 +420,12 @@ def cast(
     is made of and the case the row is filed under cannot disagree. A caller
     that composed both separately would be the second reader of one fact, and
     the disagreement would be sixteen hex characters nobody could read.
+
+    ``content`` and ``prose`` are keyword-only and have no default. They are
+    the two digests of the claim the reviewer was shown, from
+    :mod:`evals.harness.content`. A caller that could omit them would write a
+    row that goes on answering for a claim nobody has read since — which is
+    exactly what the fields exist to stop.
     """
     if version is None:
         version = version_for(components.framework)
@@ -334,6 +433,8 @@ def cast(
     return Vote(
         fingerprint=fingerprint(components, version=version),
         components=components,
+        content=content,
+        prose=prose,
         case=case,
         verdict=verdict,
         voter=voter,

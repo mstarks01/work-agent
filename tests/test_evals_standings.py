@@ -11,7 +11,7 @@ Deterministic and free of provider calls, so it gates on every PR.
 from __future__ import annotations
 
 from evals.harness.fingerprint import Components
-from evals.harness.ledger import Ledger, cast
+from evals.harness.ledger import Ledger
 from evals.harness.roster import Roster
 from evals.harness.standings import (
     PRIMARY,
@@ -22,6 +22,7 @@ from evals.harness.standings import (
     narrow,
     render,
 )
+from tests.eval_factories import cast
 
 
 def components(target="process:a"):

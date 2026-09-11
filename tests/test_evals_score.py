@@ -19,10 +19,12 @@ import pytest
 from analysis_service.report import Report
 from evals.harness.artifact import ARTIFACT_VERSION
 from evals.harness.bundle import reports_dir, stride_threats, write_reports
+from evals.harness.content import prose, structural
 from evals.harness.fingerprint import components_for
-from evals.harness.ledger import append, cast
+from evals.harness.ledger import append
 from evals.harness.reference import load_case
 from evals.harness.run import main
+from tests.eval_factories import cast
 from tests.test_evals_run_grounds import CASE_DIR, sweep
 
 
@@ -129,6 +131,8 @@ def down_vote(entry: dict, artifact: Path, case, path: Path) -> None:
     recorded = cast(
         components,
         case=case.id,
+        content=structural(claim),
+        prose=prose(claim),
         verdict="down",
         voter="ada",
         reason="not-a-threat",
@@ -240,6 +244,8 @@ class TestAVoteReachesTheNumbersWithoutASweep:
                 case=case.id,
                 verdict="down",
                 voter="ada",
+                content=structural(claim),
+                prose=prose(claim),
                 reason="poorly-written",
             ),
             ledger_path,
