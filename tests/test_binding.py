@@ -99,13 +99,16 @@ def test_resolve_model_stays_the_callers(tiers, sampling):
     assert binding.resolve_model("critic") == "model-for-critic"
 
 
-def test_resilience_is_optional_and_carried(tiers, sampling):
-    """Optional so offline stand-ins can build a graph with no config at all."""
-    resilience = load_resilience(PROJECT_ROOT / "config" / "resilience.toml", env={})
+def test_the_binding_carries_no_resilience_config(tiers, sampling):
+    """The graph reads no operational bound, so the binding carries none.
 
-    assert NodeBinding.from_configs(tiers, sampling, _resolver).resilience is None
-    with_config = NodeBinding.from_configs(tiers, sampling, _resolver, resilience)
-    assert with_config.resilience is resilience
+    It carried one, to put the per-request timeout on each node's
+    ``http_options``. That carrier changed the unit and the timeout moved to the
+    adapter, which left this field with no reader in ``src/``. A field nothing
+    reads is the shape that goes stale without anything noticing, so it went
+    too.
+    """
+    assert "resilience" not in {f.name for f in dataclasses.fields(NodeBinding)}
 
 
 def test_the_binding_is_frozen(tiers, sampling):
@@ -113,7 +116,7 @@ def test_the_binding_is_frozen(tiers, sampling):
     binding = NodeBinding.from_configs(tiers, sampling, _resolver)
 
     with pytest.raises(dataclasses.FrozenInstanceError):
-        binding.resilience = None
+        binding.tier_sampling = {}
 
 
 class TestReasoningTemperatureFloor:
