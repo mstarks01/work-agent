@@ -17,8 +17,19 @@ from fastapi.testclient import TestClient
 from analysis_service.frameworks import PACKAGES
 from evals.harness import bundle
 from evals.harness import queue as review_queue
+from evals.harness.artifact import load_artifact
+from evals.harness.baseline import configuration_label
 from evals.harness.ledger import append, load
-from tests.eval_factories import SAMPLE_CONTENT, SAMPLE_PROSE, cast, produced_threat
+from evals.harness.provenance import ProvenanceError
+from tests.eval_factories import (
+    SAMPLE_CONTENT,
+    SAMPLE_PROSE,
+    SWEEP_COMMIT,
+    cast,
+    produced_threat,
+    sweep_document,
+    write_sweep_document,
+)
 from tests.factories import sample_report
 from tests.test_asvs import _block as asvs_block
 from tests.test_asvs import sample_asvs_claim
@@ -307,17 +318,16 @@ class TestReadingSeveralSweeps:
     """What the app is handed: one artifact per sweep, kept apart until merged."""
 
     @staticmethod
-    def _sweep(tmp_path, name, report):
+    def _sweep(tmp_path, name, report, document=None):
         """One sweep's artifact and the report beside it.
 
-        The report is a real :class:`~analysis_service.report.Report`, dumped.
-        It used to be a hand-built dict, which is how the fixture came to carry
-        an ``engine_version`` key no report has ever written: the app read that
-        key, the test wrote it, and the two agreed with each other about a fact
-        the producer never produced.
+        Both halves are what the producers produce: the report is a
+        :class:`~analysis_service.report.Report`, dumped, and the artifact is a
+        document :func:`~evals.harness.artifact.load_artifact` accepts. A
+        hand-built dict here invents keys, and then the app and the test agree
+        with each other about a fact no producer produces.
         """
-        artifact = tmp_path / name
-        artifact.write_text("{}", encoding="utf-8")
+        artifact = write_sweep_document(tmp_path / name, document)
         # Named by the harness's own helper rather than composed here. These
         # fixtures used to append the suffix, which is what let the app and the
         # harness disagree about the directory without a test noticing.
@@ -354,21 +364,48 @@ class TestReadingSeveralSweeps:
 
         assert runs[0][0].lane == "authentication"
 
-    def test_no_configuration_label_is_recorded_yet(self, tmp_path):
-        """A vote's ``config`` is empty, and this is where that is decided.
+    def test_the_label_comes_from_the_artifact(self, tmp_path):
+        """A vote's ``config`` names the sweep that produced the finding (#802).
 
-        The app read ``engine_version`` off a report, and no report has ever
-        carried one — the key existed in this fixture and nowhere else. So every
-        vote the app has written names no configuration. Recorded here as the
-        truth it is, rather than restored by inventing the key again: the label
-        is a fact about a sweep, and it has to come from the artifact.
+        A configuration is a fact about a sweep rather than about one report
+        beside it, so the label comes from the artifact, through the reader
+        that also names a Baseline.
         """
         first = self._sweep(tmp_path, "one.json", self._stride())
         second = self._sweep(tmp_path, "two.json", self._stride())
 
         _, configs = findings_from_artifacts([first, second])
 
-        assert configs["01-payments-checkout"] == ""
+        label = configuration_label(load_artifact(first))
+        assert label.startswith(SWEEP_COMMIT[:7])
+        assert configs["01-payments-checkout"] == label, (
+            "two sweeps of one configuration take one label, not two"
+        )
+
+    def test_two_configurations_are_both_recorded(self, tmp_path):
+        """Neither sweep may be named as though it were the whole input."""
+        first = self._sweep(tmp_path, "one.json", self._stride())
+        second = self._sweep(
+            tmp_path, "two.json", self._stride(), sweep_document(temperature=0.7)
+        )
+
+        _, configs = findings_from_artifacts([first, second])
+
+        assert configs["01-payments-checkout"] == ", ".join(
+            sorted(configuration_label(load_artifact(path)) for path in (first, second))
+        )
+
+    def test_an_artifact_the_loader_refuses_stops_the_queue(self, tmp_path):
+        """The app names a sweep, so a file that is not one is refused here.
+
+        It read only the reports directory beside the path before, which let an
+        unreadable artifact build a queue whose votes could name nothing.
+        """
+        artifact = self._sweep(tmp_path, "one.json", self._stride())
+        artifact.write_text("{}", encoding="utf-8")
+
+        with pytest.raises(ProvenanceError, match="artifact_version"):
+            findings_from_artifacts([artifact])
 
 
 def test_a_rebound_host_is_refused_before_it_can_forge_a_vote(runs, tmp_path):

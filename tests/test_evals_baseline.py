@@ -16,96 +16,21 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.identity import IDENTITY_VERSION, build_identity
 from analysis_service.report import TokenUsage
-from analysis_service.sampling import TierSampling
 from evals.harness import baseline, prices
-from evals.harness.artifact import ARTIFACT_VERSION, load_artifact
+from evals.harness.artifact import load_artifact
 from evals.harness.baseline import (
+    DIRTY_MARKER,
     BaselineError,
     BaselineIdentity,
     artifact_filename,
     assemble,
+    configuration_label,
     price_sweep,
     verify,
 )
 from evals.harness.prices import UnitPrices
-from evals.harness.provenance import RunProvenance
-from tests.factories import SAMPLE_INSTRUCTIONS, sample_fingerprint
-
-COMMIT = "c" * 40
-CORPUS = "d" * 64
-
-
-def sampling(temperature: float = 0.2) -> dict[str, TierSampling]:
-    return {
-        "base": TierSampling(temperature=temperature, seed=7),
-        "strong": TierSampling(temperature=temperature, seed=7),
-    }
-
-
-def payload(
-    *,
-    clean: bool = True,
-    temperature: float = 0.2,
-    strong_model: str = "openai/gpt-5.6",
-    served_strong: str = "gpt-5.6-luna",
-    frameworks: tuple[str, ...] = ("stride",),
-    usage_nodes: tuple[str, ...] = ("extract", "critic"),
-    seed: int = 1,
-) -> dict:
-    """One admissible artifact document; ``seed`` varies the bytes only."""
-    tiers = sampling(temperature)
-    runs = {
-        "extract": ("base", "openai/gpt-base", "gpt-base-001"),
-        "critic": ("strong", strong_model, served_strong),
-    }
-    node_runs = {
-        node: [
-            {
-                "node": node,
-                "tier": tier,
-                "requested_model": requested,
-                "served_model": served,
-                "instruction_sha256": SAMPLE_INSTRUCTIONS,
-                "generation_fingerprint": sample_fingerprint(
-                    served, tiers[tier], requested=requested
-                ),
-            }
-        ]
-        for node, (tier, requested, served) in runs.items()
-    }
-    provenance = RunProvenance.model_validate(
-        {
-            "identity_version": IDENTITY_VERSION,
-            "build": dict(build_identity()),
-            "sampling_config_version": 1,
-            "tiers_config_version": 1,
-            "sampling": tiers,
-            "node_runs": node_runs,
-        }
-    )
-    usage = {
-        node: {
-            "prompt_tokens": 1000,
-            "cached_prompt_tokens": 200,
-            "completion_tokens": 300,
-        }
-        for node in usage_nodes
-    }
-    return {
-        "artifact_version": ARTIFACT_VERSION,
-        "mode": "end-to-end",
-        "cases": ["01-a-case"],
-        "trusted": False,
-        "structural_failures": [],
-        "repo_commit": {"commit": COMMIT, "clean": clean},
-        "corpus_digest": CORPUS,
-        "frameworks": list(frameworks),
-        "certification": {"verdict": "uncertified", "seed": seed},
-        "node_usage": usage,
-        "provenance": provenance.to_json(),
-    }
+from tests.eval_factories import SWEEP_COMMIT, sweep_document
 
 
 def write_sweep(directory: Path, document: dict, stem: str = "art") -> Path:
@@ -137,9 +62,9 @@ def priced(monkeypatch):
 
 class TestTheIdentity:
     def test_two_sweeps_of_one_configuration_share_a_name(self, tmp_path):
-        first = write_sweep(tmp_path, payload(seed=1), "one")
+        first = write_sweep(tmp_path, sweep_document(seed=1), "one")
         second = write_sweep(
-            tmp_path, payload(seed=2, served_strong="gpt-5.6-nova"), "two"
+            tmp_path, sweep_document(seed=2, served_strong="gpt-5.6-nova"), "two"
         )
         one = BaselineIdentity.from_artifact(load_artifact(first))
         two = BaselineIdentity.from_artifact(load_artifact(second))
@@ -147,30 +72,63 @@ class TestTheIdentity:
         assert one.name == two.name
 
     def test_the_name_is_derived_and_readable(self, tmp_path):
-        path = write_sweep(tmp_path, payload())
+        path = write_sweep(tmp_path, sweep_document())
         identity = BaselineIdentity.from_artifact(load_artifact(path))
-        assert identity.name.startswith(f"{COMMIT[:7]}-gpt-5.6-")
+        assert identity.name.startswith(f"{SWEEP_COMMIT[:7]}-gpt-5.6-")
         assert len(identity.name.rsplit("-", 1)[-1]) == 8
 
     def test_a_sampling_change_is_another_baseline(self, tmp_path):
-        one = write_sweep(tmp_path, payload(), "one")
-        two = write_sweep(tmp_path, payload(temperature=0.7), "two")
+        one = write_sweep(tmp_path, sweep_document(), "one")
+        two = write_sweep(tmp_path, sweep_document(temperature=0.7), "two")
         assert (
             BaselineIdentity.from_artifact(load_artifact(one)).name
             != BaselineIdentity.from_artifact(load_artifact(two)).name
         )
 
     def test_a_dirty_sweep_has_no_identity(self, tmp_path):
-        path = write_sweep(tmp_path, payload(clean=False))
+        path = write_sweep(tmp_path, sweep_document(clean=False))
         with pytest.raises(BaselineError, match="did not match its commit"):
             BaselineIdentity.from_artifact(load_artifact(path))
+
+
+class TestTheConfigurationLabel:
+    """What a vote records about the sweep that produced the finding (#802)."""
+
+    def test_a_clean_sweep_is_labelled_by_its_baseline_name(self, tmp_path):
+        """One reader, so a vote and a Baseline cannot spell one sweep twice."""
+        artifact = load_artifact(write_sweep(tmp_path, sweep_document()))
+        assert (
+            configuration_label(artifact)
+            == BaselineIdentity.from_artifact(artifact).name
+        )
+
+    def test_two_configurations_take_two_labels(self, tmp_path):
+        one = load_artifact(write_sweep(tmp_path, sweep_document(), "one"))
+        two = load_artifact(
+            write_sweep(tmp_path, sweep_document(temperature=0.7), "two")
+        )
+        assert configuration_label(one) != configuration_label(two)
+
+    def test_a_dirty_sweep_is_labelled_and_says_so(self, tmp_path):
+        """The Baseline refuses this sweep; the vote still records what ran.
+
+        ``TUNING.md`` step 3 runs a sweep from an edited tree on purpose, and a
+        reviewer's answer is worth keeping. Two dirty trees at one commit take
+        one label, which is why the label says the commit does not describe the
+        prompts rather than implying it does.
+        """
+        clean = load_artifact(write_sweep(tmp_path, sweep_document(), "clean"))
+        dirty = load_artifact(
+            write_sweep(tmp_path, sweep_document(clean=False), "dirty")
+        )
+        assert configuration_label(dirty) == configuration_label(clean) + DIRTY_MARKER
 
 
 class TestPricing:
     def test_the_suffixed_build_falls_back_to_its_route_and_says_so(
         self, tmp_path, priced
     ):
-        cost = price_sweep(load_artifact(write_sweep(tmp_path, payload())))
+        cost = price_sweep(load_artifact(write_sweep(tmp_path, sweep_document())))
         assert dict(cost.fallbacks) == {"gpt-5.6-luna": "openai/gpt-5.6"}
         assert cost.actual_usd > 0
         assert not cost.unpriced
@@ -178,7 +136,7 @@ class TestPricing:
     def test_a_model_nobody_prices_is_named_never_zeroed(self, tmp_path, priced):
         # A known vendor, so the fixture can compute a fingerprint; a model
         # identifier no price map carries, which is what the test is about.
-        document = payload(
+        document = sweep_document(
             strong_model="vertex_ai/mystery-model", served_strong="mystery-001"
         )
         cost = price_sweep(load_artifact(write_sweep(tmp_path, document)))
@@ -187,7 +145,7 @@ class TestPricing:
 
 class TestAssembleAndVerify:
     def test_a_clean_baseline_assembles_and_verifies(self, tmp_path, priced):
-        source = write_sweep(tmp_path, payload())
+        source = write_sweep(tmp_path, sweep_document())
         directory = assemble(tmp_path, "ada", [source])
         assert directory.parent == tmp_path / "evals" / "baselines"
         manifest = json.loads((directory / "baseline.json").read_text("utf-8"))
@@ -197,10 +155,10 @@ class TestAssembleAndVerify:
 
     def test_two_contributors_collide_at_one_directory(self, tmp_path, priced):
         first = assemble(
-            tmp_path, "ada", [write_sweep(tmp_path, payload(seed=1), "one")]
+            tmp_path, "ada", [write_sweep(tmp_path, sweep_document(seed=1), "one")]
         )
         second = assemble(
-            tmp_path, "sam", [write_sweep(tmp_path, payload(seed=2), "two")]
+            tmp_path, "sam", [write_sweep(tmp_path, sweep_document(seed=2), "two")]
         )
         assert first == second
         manifest = json.loads((first / "baseline.json").read_text("utf-8"))
@@ -217,7 +175,7 @@ class TestAssembleAndVerify:
         the digests and the cost recompute per entry, so a duplicate agrees
         with itself.
         """
-        source = write_sweep(tmp_path, payload())
+        source = write_sweep(tmp_path, sweep_document())
         assemble(tmp_path, "ada", [source])
         directory = assemble(tmp_path, "ada", [source])
 
@@ -227,7 +185,7 @@ class TestAssembleAndVerify:
 
     def test_a_manifest_naming_one_sweep_twice_is_refused(self, tmp_path, priced):
         """The writer keys them; the verifier still refuses a hand-edited one."""
-        directory = assemble(tmp_path, "ada", [write_sweep(tmp_path, payload())])
+        directory = assemble(tmp_path, "ada", [write_sweep(tmp_path, sweep_document())])
         path = directory / "baseline.json"
         manifest = json.loads(path.read_text("utf-8"))
         manifest["sweeps"] = manifest["sweeps"] * 2
@@ -237,21 +195,21 @@ class TestAssembleAndVerify:
         assert any("more than one sweep entry" in problem for problem in problems)
 
     def test_a_renamed_directory_is_refused(self, tmp_path, priced):
-        directory = assemble(tmp_path, "ada", [write_sweep(tmp_path, payload())])
+        directory = assemble(tmp_path, "ada", [write_sweep(tmp_path, sweep_document())])
         renamed = directory.with_name("7c3a007-hand-typed-00000000")
         directory.rename(renamed)
         problems = verify(renamed, root=tmp_path)
         assert any("derived, never typed" in problem for problem in problems)
 
     def test_an_edited_report_moves_a_digest(self, tmp_path, priced):
-        directory = assemble(tmp_path, "ada", [write_sweep(tmp_path, payload())])
+        directory = assemble(tmp_path, "ada", [write_sweep(tmp_path, sweep_document())])
         report = next(directory.glob("*.reports/*.json"))
         report.write_text('{"claims": ["invented"]}', encoding="utf-8")
         problems = verify(directory, root=tmp_path)
         assert any("digests do not recompute" in problem for problem in problems)
 
     def test_a_tampered_cost_fails_the_arithmetic(self, tmp_path, priced):
-        directory = assemble(tmp_path, "ada", [write_sweep(tmp_path, payload())])
+        directory = assemble(tmp_path, "ada", [write_sweep(tmp_path, sweep_document())])
         manifest_path = directory / "baseline.json"
         manifest = json.loads(manifest_path.read_text("utf-8"))
         manifest["sweeps"][0]["cost"]["actual_usd"] = 0.0
@@ -264,32 +222,33 @@ class TestAssembleAndVerify:
     def test_a_sweep_over_the_cap_is_refused(self, tmp_path, priced, monkeypatch):
         monkeypatch.setattr(baseline, "SWEEP_CAP", 1)
         sweeps = [
-            write_sweep(tmp_path, payload(seed=seed), f"s{seed}") for seed in (1, 2)
+            write_sweep(tmp_path, sweep_document(seed=seed), f"s{seed}")
+            for seed in (1, 2)
         ]
         directory = assemble(tmp_path, "ada", sweeps)
         problems = verify(directory, root=tmp_path)
         assert any("the cap is 1" in problem for problem in problems)
 
     def test_missing_usage_is_an_incomputable_cost(self, tmp_path, priced):
-        document = payload(usage_nodes=("extract",))
+        document = sweep_document(usage_nodes=("extract",))
         directory = assemble(tmp_path, "ada", [write_sweep(tmp_path, document)])
         problems = verify(directory, root=tmp_path)
         assert any("no node_usage" in problem for problem in problems)
 
     def test_disagreeing_artifacts_do_not_assemble(self, tmp_path, priced):
-        one = write_sweep(tmp_path, payload(), "one")
-        two = write_sweep(tmp_path, payload(temperature=0.9), "two")
+        one = write_sweep(tmp_path, sweep_document(), "one")
+        two = write_sweep(tmp_path, sweep_document(temperature=0.9), "two")
         with pytest.raises(BaselineError, match="different Baselines"):
             assemble(tmp_path, "ada", [one, two])
 
     def test_a_sweep_without_reports_is_refused(self, tmp_path, priced):
         source = tmp_path / "bare.json"
-        source.write_text(json.dumps(payload(), indent=2), encoding="utf-8")
+        source.write_text(json.dumps(sweep_document(), indent=2), encoding="utf-8")
         with pytest.raises(BaselineError, match="no reports directory"):
             assemble(tmp_path, "ada", [source])
 
     def test_a_stray_file_is_named(self, tmp_path, priced):
-        directory = assemble(tmp_path, "ada", [write_sweep(tmp_path, payload())])
+        directory = assemble(tmp_path, "ada", [write_sweep(tmp_path, sweep_document())])
         (directory / "notes.txt").write_text("hand-written\n", encoding="utf-8")
         problems = verify(directory, root=tmp_path)
         assert any("files no sweep owns" in problem for problem in problems)

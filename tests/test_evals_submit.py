@@ -486,7 +486,8 @@ class TestTheCommand:
     def test_a_baseline_runs_end_to_end(self, fake_gh, capsys, monkeypatch):
         from evals.harness import prices
         from evals.harness.prices import UnitPrices
-        from tests.test_evals_baseline import payload, write_sweep
+        from tests.eval_factories import sweep_document
+        from tests.test_evals_baseline import write_sweep
 
         monkeypatch.setattr(
             prices,
@@ -495,7 +496,7 @@ class TestTheCommand:
         )
         runs = self.repo / "evals" / "runs"
         runs.mkdir(parents=True)
-        source = write_sweep(runs, payload(), "art")
+        source = write_sweep(runs, sweep_document(), "art")
         (self.repo / "evals" / "review" / "voters.toml").write_text(
             ROSTER_WITH_ADA, encoding="utf-8"
         )

@@ -8,7 +8,9 @@ IDs and verbs that produce it.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable, Iterable
+from pathlib import Path
 
 from analysis_service.actions import ActionVerb
 from analysis_service.claims import (
@@ -24,10 +26,107 @@ from analysis_service.frameworks.stride.record import (
     StrideCategory,
     Threat,
 )
+from analysis_service.identity import IDENTITY_VERSION, build_identity
+from analysis_service.sampling import TierSampling
 from evals.harness import ledger
+from evals.harness.artifact import ARTIFACT_VERSION
 from evals.harness.identity import ClaimPair, ClaimRuling
 from evals.harness.ledger import Vote
+from evals.harness.provenance import RunProvenance
 from evals.harness.reference import ReferenceThreat
+from tests.factories import SAMPLE_INSTRUCTIONS, sample_fingerprint
+
+#: The commit and the corpus digest a synthetic sweep names. Neither is real,
+#: which is why no test here may reach the repository with them.
+SWEEP_COMMIT = "c" * 40
+SWEEP_CORPUS = "d" * 64
+
+
+def sweep_sampling(temperature: float = 0.2) -> dict[str, TierSampling]:
+    return {
+        "base": TierSampling(temperature=temperature, seed=7),
+        "strong": TierSampling(temperature=temperature, seed=7),
+    }
+
+
+def sweep_document(
+    *,
+    clean: bool = True,
+    temperature: float = 0.2,
+    strong_model: str = "openai/gpt-5.6",
+    served_strong: str = "gpt-5.6-luna",
+    frameworks: tuple[str, ...] = ("stride",),
+    usage_nodes: tuple[str, ...] = ("extract", "critic"),
+    cases: tuple[str, ...] = ("01-a-case",),
+    seed: int = 1,
+) -> dict:
+    """One admissible artifact document; ``seed`` varies the bytes only.
+
+    Synthetic but honest -- every fingerprint recomputes -- because
+    :func:`~evals.harness.artifact.load_artifact` refuses anything less. Shared
+    by the Baseline tests and the review app's, which read the same identity
+    out of it through one reader.
+    """
+    tiers = sweep_sampling(temperature)
+    runs = {
+        "extract": ("base", "openai/gpt-base", "gpt-base-001"),
+        "critic": ("strong", strong_model, served_strong),
+    }
+    node_runs = {
+        node: [
+            {
+                "node": node,
+                "tier": tier,
+                "requested_model": requested,
+                "served_model": served,
+                "instruction_sha256": SAMPLE_INSTRUCTIONS,
+                "generation_fingerprint": sample_fingerprint(
+                    served, tiers[tier], requested=requested
+                ),
+            }
+        ]
+        for node, (tier, requested, served) in runs.items()
+    }
+    provenance = RunProvenance.model_validate(
+        {
+            "identity_version": IDENTITY_VERSION,
+            "build": dict(build_identity()),
+            "sampling_config_version": 1,
+            "tiers_config_version": 1,
+            "sampling": tiers,
+            "node_runs": node_runs,
+        }
+    )
+    usage = {
+        node: {
+            "prompt_tokens": 1000,
+            "cached_prompt_tokens": 200,
+            "completion_tokens": 300,
+        }
+        for node in usage_nodes
+    }
+    return {
+        "artifact_version": ARTIFACT_VERSION,
+        "mode": "end-to-end",
+        "cases": list(cases),
+        "trusted": False,
+        "structural_failures": [],
+        "repo_commit": {"commit": SWEEP_COMMIT, "clean": clean},
+        "corpus_digest": SWEEP_CORPUS,
+        "frameworks": list(frameworks),
+        "certification": {"verdict": "uncertified", "seed": seed},
+        "node_usage": usage,
+        "provenance": provenance.to_json(),
+    }
+
+
+def write_sweep_document(path: Path, document: dict | None = None) -> Path:
+    """Lay one artifact document down at ``path`` and hand the path back."""
+    path.write_text(
+        json.dumps(document or sweep_document(), indent=2), encoding="utf-8"
+    )
+    return path
+
 
 CATEGORY_LETTERS = {
     "spoofing": "S",
