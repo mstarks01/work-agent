@@ -151,6 +151,10 @@ you for the tokens, so the figure it reports is a fraction of the cost and
 nothing records it. `ANALYSIS_MODEL_CHARGES_OPENROUTER` sets the same value from
 the environment.
 
+If you declare the wrong one, the first call says so and the run stops: every
+OpenRouter response states which arrangement served it, and a figure recorded
+under the wrong one is either a twentieth of a cost or a cost thrown away.
+
 An OpenRouter response repeats the slug you asked for rather than naming the
 build that answered, so your report's served model tells you nothing the
 requested model did not. Every other vendor here either names the build or

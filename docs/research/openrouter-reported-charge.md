@@ -1,9 +1,9 @@
 # OpenRouter states what it charged, and the record now keeps it (#822)
 
 Measured 2026-09-11 against `litellm==1.97.0`, ADK 2.5.0 and OpenRouter's live
-API, by `probe_openrouter_reported_charge.py` in this directory. Three billed
-completions on `meta-llama/llama-3.3-70b-instruct`, $0.0000076 in total, plus
-one unbilled `GET /generation`.
+API, by `probe_openrouter_reported_charge.py` in this directory. Four billed
+completions on `meta-llama/llama-3.3-70b-instruct`, $0.0000101 in total, plus
+unbilled `GET /generation` reads.
 
 ## The question
 
@@ -36,6 +36,19 @@ client to the adapter, and the adapter to the executor.
 The bound tier's client was `analysis_service.charges.ChargeCapturingClient`,
 which is the wiring decision made from the registry and the declared
 arrangement rather than from a vendor's name.
+
+## The reader sees the arrangement the provider states
+
+`stated_arrangement_of` over the same live response:
+
+```
+stated_arrangement_of(...) -> 'direct'
+```
+
+The deployment declared `direct`, the provider said `is_byok: false`, the two
+agree and the run proceeded. That is the whole of what a live call can show
+here: the disagreeing case needs a second account with an upstream provider key,
+and the refusal is exercised offline against a response carrying the other flag.
 
 ## The figure is the whole charge, under this arrangement
 
@@ -71,10 +84,15 @@ the credential modes already follow: **the mechanism is declared, and the
 material is discovered.** A figure that is worth recording only if a provider
 also says so is a figure that trusts the provider to describe its own charge.
 
-What it does offer is a **cross-check**: a deployment declaring `direct` whose
-responses carry `is_byok: true` has a declaration that does not match what ran,
-and today nothing notices. Reading the field to contradict the declaration —
-never to supply it — is the natural next step, and #822 records it.
+What it does offer is a **cross-check**, and that is what the field is used
+for: a deployment declaring `direct` whose responses carry `is_byok: true` has a
+declaration that does not match what ran, so the run stops at the node that
+found out. The flag contradicts a declaration and never supplies one.
+
+It is checked in both directions. A `direct` declaration answered as BYOK would
+record a routing fee as a whole cost. A `own_upstream_key` declaration answered
+as direct moves no number wrongly and is still wrong: the deployment discards a
+whole reported charge on every call and reports a cost of nothing.
 
 ## One trap, for whoever runs the probe next
 
