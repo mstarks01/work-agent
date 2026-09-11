@@ -1,5 +1,6 @@
 """Tests for model-tier config loading, env overrides, and pin validation."""
 
+import dataclasses
 import tempfile
 from pathlib import Path
 from typing import ClassVar
@@ -7,6 +8,7 @@ from typing import ClassVar
 import pytest
 from pydantic import ValidationError
 
+from analysis_service.charges import records_reported_charge
 from analysis_service.claims import FRAMEWORK_NAMES
 from analysis_service.model_tiers import (
     FRAMEWORK_NODES,
@@ -20,7 +22,13 @@ from analysis_service.model_tiers import (
     load_model_tiers,
     validate_model_string,
 )
-from analysis_service.vendors import VENDOR_NAMES, CredentialMode, vendor_for
+from analysis_service.vendors import (
+    VENDOR_NAMES,
+    VENDORS,
+    ChargeMode,
+    CredentialMode,
+    vendor_for,
+)
 
 PROJECT_ROOT = Path(__file__).parents[1]
 REPO_CONFIG = PROJECT_ROOT / "config" / "model_tiers.toml"
@@ -58,6 +66,16 @@ def config_toml(
         f'[tiers.strong]\nvendor = "{strong_vendor}"\nmodel = "{strong}"\n\n'
         f'[tiers.review]\nvendor = "{review_vendor}"\nmodel = "{review}"\n\n'
         f"[nodes]\n{node_lines}\n"
+    )
+
+
+def _openrouter_toml() -> str:
+    """A file whose bound tiers both select the one vendor that reports a charge."""
+    return config_toml(
+        base_vendor="openrouter",
+        base="anthropic/claude-sonnet-4.6",
+        strong_vendor="openrouter",
+        strong="anthropic/claude-opus-4.7",
     )
 
 
@@ -392,6 +410,109 @@ class TestPinValidation:
         path = config_path(config_toml(strong="gemini-2.5-pro-latest"))
         with pytest.raises(ModelConfigError, match="latest"):
             load_model_tiers(path, env={})
+
+
+class TestDeclaredChargeMode:
+    """A deployment declares an arrangement only where the vendor reports a charge.
+
+    The same shape as the credential rule below, and it exists for a different
+    hazard: a figure recorded under the wrong arrangement is not a refusal to
+    start but a number on the record that reads as a cost and covers a
+    twentieth of one. Both halves read ``Vendor.charge_modes``, so the rule
+    follows the registry.
+    """
+
+    def test_a_vendor_that_reports_no_charge_needs_no_declaration(self, config_path):
+        tiers = load_model_tiers(config_path(config_toml()), env={})
+        assert tiers.charges == {}
+        assert tiers.charge_mode("vertex") is None
+
+    def test_declaring_an_arrangement_for_such_a_vendor_is_an_error(self, config_path):
+        """There is no figure to describe, so the key describes nothing."""
+        path = config_path(config_toml() + '\n[charges]\nvertex = "direct"\n')
+        with pytest.raises(ModelConfigError, match="states no charge"):
+            load_model_tiers(path, env={})
+
+    def test_a_selected_reporting_vendor_must_declare_one(self, config_path):
+        """The state that would record a fee as though it were a cost."""
+        path = config_path(_openrouter_toml())
+        with pytest.raises(ModelConfigError, match="charges.openrouter"):
+            load_model_tiers(path, env={})
+
+    @pytest.mark.parametrize("mode", list(ChargeMode))
+    def test_the_file_declares_the_arrangement(self, config_path, mode):
+        path = config_path(
+            _openrouter_toml() + f'\n[charges]\nopenrouter = "{mode.value}"\n'
+        )
+        assert load_model_tiers(path, env={}).charge_mode("openrouter") is mode
+
+    def test_the_environment_declares_the_arrangement(self, config_path):
+        tiers = load_model_tiers(
+            config_path(config_toml()),
+            env={
+                "ANALYSIS_MODEL_BASE_VENDOR": "openrouter",
+                "ANALYSIS_MODEL_BASE_MODEL": "anthropic/claude-sonnet-4.6",
+                "ANALYSIS_MODEL_CHARGES_OPENROUTER": "direct",
+            },
+        )
+        assert tiers.charge_mode("openrouter") is ChargeMode.DIRECT
+
+    def test_an_empty_environment_declaration_is_an_error(self, config_path):
+        with pytest.raises(ModelConfigError, match="set but empty"):
+            load_model_tiers(
+                config_path(config_toml()),
+                env={"ANALYSIS_MODEL_CHARGES_OPENROUTER": "  "},
+            )
+
+    def test_an_unknown_arrangement_is_an_error(self, config_path):
+        path = config_path(_openrouter_toml() + '\n[charges]\nopenrouter = "free"\n')
+        with pytest.raises(ModelConfigError):
+            load_model_tiers(path, env={})
+
+    def test_declaring_an_arrangement_for_a_vendor_with_one_is_an_error(
+        self, config_path, monkeypatch
+    ):
+        """A vendor that reports a charge and offers no choice.
+
+        No row in the registry is that shape today, so the registry entry is
+        substituted to make one. The branch is not hypothetical: a gateway that
+        issues its own keys and nothing else is an ordinary row to add, and
+        without this the rule would accept a key that states what the registry
+        already knows and can later contradict.
+        """
+        entry = vendor_for("openrouter")
+        one_arrangement = dataclasses.replace(
+            entry, charges={ChargeMode.DIRECT: entry.charges[ChargeMode.DIRECT]}
+        )
+        monkeypatch.setitem(VENDORS, "openrouter", one_arrangement)
+        path = config_path(_openrouter_toml() + '\n[charges]\nopenrouter = "direct"\n')
+        with pytest.raises(ModelConfigError, match="nothing to choose"):
+            load_model_tiers(path, env={})
+
+    def test_a_reporting_vendor_nobody_selects_needs_no_declaration(self, config_path):
+        """Adding a row that reports a charge cannot break an existing file."""
+        tiers = load_model_tiers(config_path(config_toml()), env={})
+        assert "openrouter" not in tiers.charges
+
+    def test_the_declaration_decides_whether_a_figure_is_recorded(self, config_path):
+        """The rule's whole consequence, read through its one reader.
+
+        Both arrangements load. They differ in what the deployment then records,
+        which is what the declaration is for.
+        """
+        vendor = vendor_for("openrouter")
+        for mode, recorded in (
+            (ChargeMode.DIRECT, True),
+            (ChargeMode.OWN_UPSTREAM_KEY, False),
+        ):
+            path = config_path(
+                _openrouter_toml() + f'\n[charges]\nopenrouter = "{mode.value}"\n'
+            )
+            tiers = load_model_tiers(path, env={})
+            assert (
+                records_reported_charge(vendor, tiers.charge_mode("openrouter"))
+                is recorded
+            )
 
 
 class TestDeclaredCredentialMode:

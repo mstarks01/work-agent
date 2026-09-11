@@ -50,6 +50,7 @@ from analysis_service.config_files import read_toml
 from analysis_service.errors import ConfigError
 from analysis_service.vendors import (
     VENDOR_NAMES,
+    ChargeMode,
     CredentialMode,
     Vendor,
     VendorName,
@@ -64,7 +65,13 @@ from analysis_service.vendors import (
 # vendor that has the choice, so a file selecting it names a mode there or in
 # ``ANALYSIS_MODEL_CREDENTIALS_BEDROCK``. Every shipped file leaves the table
 # out, because no shipped file selects a vendor at all.
-SUPPORTED_VERSION = 7
+#
+# Version 8 adds the ``[charges]`` table, which is the same shape for the same
+# reason. A vendor that states what it charged may state a different thing under
+# a different arrangement, so a deployment declares which one it runs under.
+# OpenRouter is the vendor that has the choice, so a file selecting it names an
+# arrangement there or in ``ANALYSIS_MODEL_CHARGES_OPENROUTER``.
+SUPPORTED_VERSION = 8
 
 TierName = Literal["base", "strong", "review"]
 TIER_NAMES: tuple[TierName, ...] = ("base", "strong", "review")
@@ -142,6 +149,7 @@ _ENV_PREFIX = "ANALYSIS_MODEL_"
 _VENDOR_FIELD = "VENDOR"
 _MODEL_FIELD = "MODEL"
 _CREDENTIALS_STEM = f"{_ENV_PREFIX}CREDENTIALS"
+_CHARGES_STEM = f"{_ENV_PREFIX}CHARGES"
 
 
 class ModelConfigError(ConfigError):
@@ -168,6 +176,18 @@ def credentials_env_var_for(vendor: VendorName) -> str:
     carries.
     """
     return f"{_CREDENTIALS_STEM}_{vendor.upper()}"
+
+
+def charges_env_var_for(vendor: VendorName) -> str:
+    """The var declaring one vendor's charge arrangement.
+
+    Keyed by vendor, and movable from the environment, for the two reasons
+    :func:`credentials_env_var_for` gives: an arrangement describes the
+    deployment's relationship with a vendor rather than a tier's, and a
+    deployment that can select a vendor from the environment must be able to
+    declare everything that vendor requires from there too.
+    """
+    return f"{_CHARGES_STEM}_{vendor.upper()}"
 
 
 def validate_model_string(value: str, vendor: VendorName, source: str) -> str:
@@ -223,6 +243,20 @@ class ModelTierConfig(BaseModel):
     #: :func:`credentials_env_var_for` names the variable that fills it from the
     #: environment.
     credentials: dict[VendorName, CredentialMode] = Field(default_factory=dict)
+    #: Which charge arrangement this deployment declares for each vendor that
+    #: states what it charged. Keyed by vendor for the same reason
+    #: :attr:`credentials` is, and self-completing by the same rule: a key for a
+    #: vendor with nothing to choose is an error, and a missing key for a vendor
+    #: with a choice is an error.
+    #:
+    #: Empty in every shipped file. What the declaration buys is a recorded
+    #: figure that means one thing:
+    #: :func:`analysis_service.charges.records_reported_charge` records a
+    #: vendor's reported charge only where the declared arrangement says the
+    #: figure covers the whole call, and records nothing where it does not.
+    #: :func:`charges_env_var_for` names the variable that fills it from the
+    #: environment.
+    charges: dict[VendorName, ChargeMode] = Field(default_factory=dict)
     #: How far each framework's criticism must sit from its own analysis. No
     #: default: a deployment states it, because inheriting ``shared`` is how a
     #: high-assurance install ends up reviewing itself and reporting nothing
@@ -297,6 +331,7 @@ class ModelTierConfig(BaseModel):
         problems = critic_pairing_issues(self.nodes.__getitem__)
         problems += self.independence_breaches()
         problems += self._credential_mode_problems()
+        problems += self._charge_mode_problems()
         if problems:
             raise ValueError("; ".join(problems))
         return self
@@ -343,6 +378,71 @@ class ModelTierConfig(BaseModel):
                     " one this deployment uses"
                 )
         return problems
+
+    def _charge_mode_problems(self) -> list[str]:
+        """Every vendor whose declared arrangement is absent, spurious or not allowed.
+
+        The mirror of :meth:`_credential_mode_problems`, reading
+        :attr:`~analysis_service.vendors.Vendor.charge_modes` so the rule
+        follows the registry rather than a second copy of it. Three ways to be
+        wrong rather than two: a vendor may also report no charge at all, and a
+        key describing an arrangement with such a vendor describes nothing.
+
+        Only vendors a **bound** tier selects are required to declare, exactly
+        as with credentials. An undeclared arrangement costs nothing until a
+        call is made, and no call is made on a tier no node points at.
+        """
+        problems = []
+        selected = set(self.bound_vendors)
+        for vendor, mode in self.charges.items():
+            allowed = vendor_for(vendor).charge_modes
+            if not allowed:
+                problems.append(
+                    f"charges.{vendor} is {mode.value!r}, but {vendor!r} states"
+                    " no charge of its own, so the arrangement describes"
+                    " nothing; remove the key"
+                )
+            elif len(allowed) == 1:
+                problems.append(
+                    f"charges.{vendor} is set, but {vendor!r} allows only"
+                    f" {allowed[0].value!r}, so there is nothing to choose;"
+                    " remove the key"
+                )
+            elif mode not in allowed:
+                names = ", ".join(sorted(m.value for m in allowed))
+                problems.append(
+                    f"charges.{vendor} is {mode.value!r}, which {vendor!r}"
+                    f" does not allow (it allows: {names})"
+                )
+        for vendor in sorted(selected - set(self.charges)):
+            allowed = vendor_for(vendor).charge_modes
+            if len(allowed) > 1:
+                names = ", ".join(sorted(m.value for m in allowed))
+                problems.append(
+                    f"vendor {vendor!r} reports what it charged, and what that"
+                    f" figure covers depends on the arrangement ({names}), so"
+                    f" charges.{vendor} must declare which one this deployment"
+                    " runs under"
+                )
+        return problems
+
+    def charge_mode(self, vendor: VendorName) -> ChargeMode | None:
+        """The charge arrangement this deployment runs under for one vendor.
+
+        ``None`` where the vendor states no charge, which is not a missing
+        answer: there is no figure to describe, and the token arithmetic is what
+        that vendor's cost is made of.
+
+        The one reader of the declared-arrangement rule, on the same terms as
+        :meth:`credential_mode`: a vendor with a single arrangement needs no
+        declaration, and a vendor with a choice has already been required to
+        make one, so the lookup never falls through to a guess.
+        """
+        entry = vendor_for(vendor)
+        if not entry.reports_charge:
+            return None
+        declared = self.charges.get(vendor)
+        return declared if declared is not None else entry.sole_charge_mode
 
     def credential_mode(self, vendor: VendorName) -> CredentialMode:
         """The credential mode this deployment uses for one vendor.
@@ -432,6 +532,8 @@ def _apply_env_overrides(raw: dict[str, object], env: Mapping[str, str]) -> None
     table the same way, and the loader's own rules are what judge the result: a
     declaration for a single-mode vendor is an error whether it arrived from the
     file or from the environment, and so is a mode the vendor does not allow.
+    ``ANALYSIS_MODEL_CHARGES_{VENDOR}`` folds into ``[charges]`` under the same
+    arrangement, judged by :meth:`ModelTierConfig._charge_mode_problems`.
 
     An unrecognised ``ANALYSIS_MODEL_*`` variable also raises rather than being
     silently ignored while the tier quietly runs the file's model.
@@ -446,6 +548,7 @@ def _apply_env_overrides(raw: dict[str, object], env: Mapping[str, str]) -> None
     """
     known = {var for tier in TIER_NAMES for var in env_vars_for(tier)}
     known |= {credentials_env_var_for(vendor) for vendor in VENDOR_NAMES}
+    known |= {charges_env_var_for(vendor) for vendor in VENDOR_NAMES}
     unknown = sorted(
         var for var in env if var.startswith(_ENV_PREFIX) and var not in known
     )
@@ -456,6 +559,7 @@ def _apply_env_overrides(raw: dict[str, object], env: Mapping[str, str]) -> None
         )
 
     _apply_credential_overrides(raw, env)
+    _apply_charge_overrides(raw, env)
 
     tiers_raw = raw.setdefault("tiers", {})
     if not isinstance(tiers_raw, dict):
@@ -512,6 +616,31 @@ def _apply_credential_overrides(raw: dict[str, object], env: Mapping[str, str]) 
             raise ModelConfigError(
                 f"{credentials_env_var_for(vendor)} is set but empty"
             )
+        table[vendor] = mode.strip()
+
+
+def _apply_charge_overrides(raw: dict[str, object], env: Mapping[str, str]) -> None:
+    """Fold ``ANALYSIS_MODEL_CHARGES_{VENDOR}`` into the raw table.
+
+    Written through unvalidated, exactly as the credential override is: pydantic
+    rejects an arrangement outside
+    :class:`~analysis_service.vendors.ChargeMode`, and
+    :meth:`ModelTierConfig._charge_mode_problems` rejects one the vendor does
+    not allow.
+    """
+    declared = {
+        vendor: env[var]
+        for vendor in VENDOR_NAMES
+        if (var := charges_env_var_for(vendor)) in env
+    }
+    if not declared:
+        return
+    table = raw.setdefault("charges", {})
+    if not isinstance(table, dict):
+        raise ModelConfigError("charges: not a table")
+    for vendor, mode in declared.items():
+        if not mode.strip():
+            raise ModelConfigError(f"{charges_env_var_for(vendor)} is set but empty")
         table[vendor] = mode.strip()
 
 

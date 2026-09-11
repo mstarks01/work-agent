@@ -391,7 +391,13 @@ def _nested_records(record: type) -> set[type]:
 def test_the_walk_reaches_the_records_a_row_nests():
     """A walker that reaches nothing passes everything, so its reach is pinned."""
     reached = {record.__name__ for record in _nested_records(Vendor)}
-    assert {"_CredentialSource", "_CredentialVar", "_FormRule", "VendorSdk"} <= reached
+    assert {
+        "_CredentialSource",
+        "_CredentialVar",
+        "_FormRule",
+        "_ReportedCharge",
+        "VendorSdk",
+    } <= reached
 
 
 def test_no_vendor_field_has_a_default():
@@ -435,6 +441,47 @@ def test_every_vendor_declares_at_least_one_credential_mode():
         f"these vendors declare no credential mode: {empty}. A row that"
         " authenticates in no way cannot be built, and one absent from"
         " VENDORS raises at `vendor_for` on its first use rather than here."
+    )
+
+
+def test_every_vendor_answers_whether_it_reports_a_charge():
+    """An empty table is an answer here, and an absent field is not.
+
+    ``charges`` has no default, so a row cannot be built without stating one —
+    and a row that states ``{}`` says the vendor reports no charge, which is the
+    true answer for every direct provider. What this test adds is the other
+    half: the property is readable for every name in the vocabulary, including
+    one whose row is half-built.
+    """
+    missing = sorted(
+        name
+        for name in VENDOR_NAMES
+        if not hasattr(VENDORS.get(name), "reports_charge")
+    )
+    assert not missing, (
+        f"these vendors answer nothing about a reported charge: {missing}."
+        " A row absent from VENDORS raises at `vendor_for` on its first use"
+        " rather than here."
+    )
+
+
+def test_every_arrangement_a_vendor_lists_says_what_its_figure_covers():
+    """A key with nothing behind it is the silent map entry, one level down.
+
+    Completeness cannot see a wrong value — that is what the property tests in
+    ``tests/test_charges.py`` are for — but it can see an entry that answers
+    nothing, which is how a new arrangement would arrive.
+    """
+    holes = sorted(
+        f"{name}.{mode.value}"
+        for name in VENDOR_NAMES
+        for mode, report in getattr(VENDORS.get(name), "charges", {}).items()
+        if not isinstance(getattr(report, "covers_whole_call", None), bool)
+    )
+    assert not holes, (
+        f"these charge arrangements say nothing about what their figure"
+        f" covers: {holes}. A deployment declares the arrangement; the registry"
+        " says what the figure it produces is worth."
     )
 
 

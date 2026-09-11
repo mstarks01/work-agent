@@ -26,7 +26,7 @@ from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any
+from typing import Any, ClassVar
 
 from google.adk.agents.llm_agent import LlmAgent
 from google.adk.models.base_llm import BaseLlm
@@ -37,6 +37,7 @@ from pydantic import BaseModel, Field
 from analysis_service import frameworks as framework_registry
 from analysis_service.binding import NodeBinding
 from analysis_service.budgets import BudgetPolicy
+from analysis_service.charges import CHARGE_METADATA_KEY
 from analysis_service.claims import (
     Ground,
     Mitigation,
@@ -67,6 +68,7 @@ from analysis_service.identity import build_identity, execution_fingerprint
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.model_tiers import (
     ModelTierConfig,
+    charges_env_var_for,
     credentials_env_var_for,
     load_model_tiers,
 )
@@ -90,6 +92,7 @@ from analysis_service.system_model import (
     TrustBoundary,
 )
 from analysis_service.vendors import (
+    ChargeMode,
     CredentialMode,
     VendorName,
     join_served,
@@ -165,7 +168,9 @@ def repo_tiers() -> ModelTierConfig:
 
 
 def tiers_for(
-    vendor: VendorName, mode: CredentialMode | None = None
+    vendor: VendorName,
+    mode: CredentialMode | None = None,
+    charge_mode: ChargeMode | None = None,
 ) -> ModelTierConfig:
     """The shipped node -> tier map, with both tiers on one vendor's pair.
 
@@ -183,6 +188,11 @@ def tiers_for(
     Absent, the vendor's first allowed mode is declared — a value rather than a
     guess, because the loader refuses to build without one and the choice is
     what a deployment makes.
+
+    ``charge_mode`` is the same for the arrangement a vendor that states what it
+    charged is used under, and it defaults the same way. Both declarations are
+    made from the registry rather than from a vendor's name, so a row that gains
+    a second mode of either kind needs no edit here.
     """
     base, strong = REFERENCE_MODELS[vendor]
     entry = vendor_for(vendor)
@@ -197,6 +207,9 @@ def tiers_for(
     if len(entry.credential_modes) > 1:
         chosen = entry.credential_modes[0] if mode is None else mode
         env[credentials_env_var_for(vendor)] = chosen.value
+    if len(entry.charge_modes) > 1:
+        arrangement = entry.charge_modes[0] if charge_mode is None else charge_mode
+        env[charges_env_var_for(vendor)] = arrangement.value
     return load_model_tiers(PROJECT_ROOT / "config" / "model_tiers.toml", env=env)
 
 
@@ -813,6 +826,26 @@ class RetriedLlm(ScriptedLlm):
     ) -> AsyncGenerator[LlmResponse, None]:
         async for response in super().generate_content_async(llm_request, stream):
             response.custom_metadata = {ATTEMPTS_METADATA_KEY: 3}
+            yield response
+
+
+class ChargedLlm(ScriptedLlm):
+    """A stand-in whose answer carries what the provider said it charged.
+
+    The stamp is what an adapter on a charge-reporting vendor writes, so this
+    stands for a node whose cost is a figure rather than an arithmetic.
+    """
+
+    #: The charge every node of this stand-in reports, in USD. A ClassVar,
+    #: because ``ScriptedLlm`` is a pydantic model and an annotated attribute
+    #: there would be a field.
+    charge: ClassVar[float] = 0.0037
+
+    async def generate_content_async(
+        self, llm_request, stream: bool = False
+    ) -> AsyncGenerator[LlmResponse, None]:
+        async for response in super().generate_content_async(llm_request, stream):
+            response.custom_metadata = {CHARGE_METADATA_KEY: self.charge}
             yield response
 
 

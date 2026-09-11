@@ -65,7 +65,10 @@ registered vendors.
 so a deployment that selects it also passes `ANALYSIS_MODEL_CREDENTIALS_BEDROCK`,
 and installs `analysis-service[bedrock]` for the client library its provider
 needs. `openrouter` carries the upstream vendor inside the model identifier, so
-its `_MODEL` value has a slash in it — `anthropic/claude-opus-4.7`.
+its `_MODEL` value has a slash in it — `anthropic/claude-opus-4.7`. It also
+states what it charged, and what that figure covers depends on how the account
+reaches the upstream provider, so a deployment that selects it passes
+`ANALYSIS_MODEL_CHARGES_OPENROUTER` as well.
 
 `_MODEL` on its own retunes a tier whose vendor the file already names. Nothing
 is selected by default, so where the file names none — as it ships — both halves

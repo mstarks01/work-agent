@@ -136,6 +136,47 @@ class CredentialMode(StrEnum):
     IAM = "iam"
 
 
+class ChargeMode(StrEnum):
+    """The arrangement under which a vendor charges a deployment's account.
+
+    **The mechanism is declared, and the material is discovered**, which is the
+    rule :class:`CredentialMode` states one field earlier. A deployment declares
+    which arrangement it runs under, and what a call cost arrives from the
+    provider afterwards.
+
+    ``DIRECT`` means this account pays the vendor for the whole call, so a
+    figure the vendor reports is what the call cost. ``OWN_UPSTREAM_KEY`` means
+    the vendor charges this account a fee for routing the call while an upstream
+    provider charges the operator's own account for the tokens. There the
+    reported figure is a part of the cost, and the rest sits with a second
+    provider that this process never asked.
+
+    Spelled as a property of the arrangement rather than as a vendor's product
+    name, so a second gateway that offers the same choice declares it the day
+    its row lands.
+    """
+
+    DIRECT = "direct"
+    OWN_UPSTREAM_KEY = "own_upstream_key"
+
+
+@dataclass(frozen=True)
+class _ReportedCharge:
+    """What a vendor's reported figure covers under one :class:`ChargeMode`.
+
+    ``covers_whole_call`` is the whole of it, and it is what decides whether the
+    figure may be recorded as what a call cost.
+    :func:`analysis_service.charges.records_reported_charge` is the one reader.
+
+    A ``False`` here is not a smaller number to record with a note beside it. It
+    is a number that answers a different question from the one the field asks,
+    and recording it would state a cost that is a twentieth of the real one on
+    the record a deployment consents against.
+    """
+
+    covers_whole_call: bool
+
+
 @dataclass(frozen=True)
 class _CredentialVar:
     """One environment variable a ``(vendor, mode)`` pair reads.
@@ -746,6 +787,37 @@ class Vendor:
     #: row nobody has written: any route in front of more than one provider
     #: says ``False`` here, whoever operates it.
     routes_to_one_provider: bool
+    #: What this vendor reports about the charge it made, keyed by the
+    #: arrangement a deployment can run under.
+    #:
+    #: **Empty where the vendor reports no charge**, which is every direct
+    #: vendor here: those return token counts and nothing else, so the
+    #: arithmetic in ``evals/harness/prices.py`` is the only answer and it is a
+    #: good one. A non-empty entry says a figure arrives with the response, and
+    #: :attr:`_ReportedCharge.covers_whole_call` says whether that figure is the
+    #: whole of what the call cost.
+    #:
+    #: OpenRouter is the row this field was added for, and it is the row that
+    #: needs both halves. It states its charge in ``usage.cost``, which litellm
+    #: asks for on every request and keeps in ``_hidden_params``
+    #: (in the ``transform_response`` of its OpenRouter chat config, measured
+    #: on 1.97.0). Under
+    #: a key of the operator's own the same field carries the routing fee
+    #: alone, about a twentieth of the spend, and the upstream half sits in
+    #: ``cost_details.upstream_inference_cost`` — a field litellm never reads.
+    #: So which arrangement a deployment runs under decides whether the figure
+    #: is a cost or a fraction of one. The response does carry the answer, in an
+    #: ``is_byok`` field litellm never reads, and the deployment declares it
+    #: anyway: a figure worth recording only where the provider also describes
+    #: its own charge is a figure resting on that description.
+    #:
+    #: A mapping rather than a flag, on the same reasoning as
+    #: :attr:`credentials`: a vendor with a choice makes the deployment declare
+    #: which entry applies, and
+    #: :meth:`analysis_service.model_tiers.ModelTierConfig._charge_mode_problems`
+    #: is
+    #: what makes that self-completing.
+    charges: Mapping[ChargeMode, _ReportedCharge]
     #: The credential modes this vendor allows, each with what it reads and
     #: states, in the order a deployment sees them listed. A mode absent here
     #: is a mode the vendor does not allow, and :meth:`_source_for` raises on
@@ -824,6 +896,38 @@ class Vendor:
             raise ValueError(
                 f"vendor {self.name!r} allows {len(modes)} credential modes,"
                 " so the deployment declares which one; ask the tier config"
+            )
+        return modes[0]
+
+    @property
+    def charge_modes(self) -> tuple[ChargeMode, ...]:
+        """Every arrangement this vendor allows, in the order :attr:`charges` lists them."""
+        return tuple(self.charges)
+
+    @property
+    def reports_charge(self) -> bool:
+        """Whether this vendor states what it charged for a call.
+
+        Derived from :attr:`charges` rather than stored beside it, so the two
+        cannot disagree about a row that lists no arrangement.
+        """
+        return bool(self.charges)
+
+    @property
+    def sole_charge_mode(self) -> ChargeMode:
+        """This vendor's arrangement where it allows exactly one, or raise.
+
+        The mirror of :attr:`sole_credential_mode`, and it raises for the same
+        reason: a vendor with a choice has to be asked which one a deployment
+        declared, and a caller that never learned about the choice must not make
+        it silently. A vendor that reports no charge allows none, and raises
+        here as well — ask :attr:`reports_charge` first.
+        """
+        modes = self.charge_modes
+        if len(modes) != 1:
+            raise ValueError(
+                f"vendor {self.name!r} allows {len(modes)} charge modes, so the"
+                " deployment declares which one; ask the tier config"
             )
         return modes[0]
 
@@ -975,6 +1079,9 @@ class Vendor:
 VENDORS: dict[VendorName, Vendor] = {
     "vertex": Vendor(
         name="vertex",
+        # A completion carries token counts. What a project spends appears in
+        # the cloud account's own reporting and never beside the response.
+        charges={},
         prefix="vertex_ai/",
         # litellm fills ``model_response.model`` from the request in its Gemini
         # transformation. The response body carries ``modelVersion`` and litellm
@@ -1006,6 +1113,8 @@ VENDORS: dict[VendorName, Vendor] = {
     ),
     "anthropic": Vendor(
         name="anthropic",
+        # Token counts and nothing else.
+        charges={},
         prefix="anthropic/",
         # litellm reads ``completion_response["model"]`` in its Anthropic chat
         # transformation.
@@ -1017,6 +1126,8 @@ VENDORS: dict[VendorName, Vendor] = {
     ),
     "openai": Vendor(
         name="openai",
+        # Token counts and nothing else.
+        charges={},
         prefix="openai/",
         # litellm reads ``response_object["model"]`` when it converts an
         # OpenAI-shaped response dict.
@@ -1028,6 +1139,9 @@ VENDORS: dict[VendorName, Vendor] = {
     ),
     "bedrock": Vendor(
         name="bedrock",
+        # As with `vertex`: the cloud account reports the spend, the response
+        # does not.
+        charges={},
         # ``bedrock/`` and not ``bedrock_converse/``: ``get_llm_provider``
         # resolves the first and refuses the second, even though the pinned cost
         # map labels these models ``bedrock_converse`` internally.
@@ -1087,6 +1201,8 @@ VENDORS: dict[VendorName, Vendor] = {
     # apart and a fingerprint blessed on one never certifies the other.
     "gemini": Vendor(
         name="gemini",
+        # Token counts and nothing else.
+        charges={},
         prefix="gemini/",
         # litellm's Developer API config inherits the Vertex Gemini
         # transformation, which fills ``model_response.model`` from the
@@ -1138,6 +1254,36 @@ VENDORS: dict[VendorName, Vendor] = {
     # a direct route, and says so in the payload rather than in this comment.
     "openrouter": Vendor(
         name="openrouter",
+        # **The first row that states what it charged.** OpenRouter answers
+        # with ``usage.cost`` when a request asks for it, and litellm asks on
+        # every request: its OpenRouter config sets ``usage.include`` and files
+        # the figure under ``_hidden_params["additional_headers"]``
+        # ("llm_provider-x-litellm-response-cost"), measured on litellm 1.97.0
+        # in the `transform_response` of its OpenRouter chat config.
+        #
+        # Which arrangement the account runs under decides what that figure
+        # means. Under this service's own key at OpenRouter, the account pays
+        # OpenRouter for the whole call: measured 2026-09-11, a reported
+        # ``2.54e-06`` against a generation record stating the same total, no
+        # separate upstream charge and ``is_byok: false``. Under a key of the
+        # operator's own, OpenRouter charges a routing fee
+        # of about a twentieth of the list price and the upstream provider
+        # charges the operator directly — so the reported figure is the fee,
+        # and the tokens sit in ``cost_details.upstream_inference_cost``, which
+        # litellm does not read. The fee also stops above a monthly threshold,
+        # so it is not even a fixed fraction of the whole.
+        #
+        # `docs/research/openrouter-reported-charge.md` holds the live
+        # measurement of the direct half, and `openrouter-pricing.md` holds
+        # what the other half rests on.
+        #
+        # The reported figure is what a route here has instead of a unit price:
+        # a gateway slug reaches many endpoints at many rates, so
+        # ``evals/harness/prices.py`` refuses to state one.
+        charges={
+            ChargeMode.DIRECT: _ReportedCharge(covers_whole_call=True),
+            ChargeMode.OWN_UPSTREAM_KEY: _ReportedCharge(covers_whole_call=False),
+        },
         prefix="openrouter/",
         # litellm reads ``response_object["model"]`` through the OpenAI-shaped
         # conversion its OpenRouter config inherits, and what it reads is the
