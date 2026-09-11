@@ -53,6 +53,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 import random
 from collections.abc import AsyncGenerator, Sequence
 from dataclasses import dataclass
@@ -71,6 +72,19 @@ ATTEMPTS_METADATA_KEY = "attempts"
 # 429 usually does.
 _BACKOFF_BASE_SECONDS = 1.0
 _BACKOFF_CAP_SECONDS = 30.0
+
+# The longest wait this module will take on a provider's word, and it is the
+# longest it would ever choose for itself — the backoff cap. A hint beyond it is
+# not a pause, it is the provider saying capacity will not return inside the
+# window this job is willing to wait, and the honest answer to that is to stop
+# rather than to sleep and ask again into the same limit.
+#
+# **A third party must not control how long this process blocks.** Without a
+# ceiling, one ``Retry-After`` header decides that: a header of 86400 parks a
+# paid job for a day, and ``float("inf")`` — which ``float()`` accepts — parks
+# it forever, on a call that had a deadline. Pinned rather than configured, for
+# the reason the two constants above are.
+_RETRY_AFTER_CEILING_SECONDS = _BACKOFF_CAP_SECONDS
 
 # ADK maps LiteLLM's ``finish_reason="length"`` onto this member of
 # ``google.genai.types.FinishReason`` and hangs it on every non-streaming
@@ -222,12 +236,24 @@ def _is_transient(exc: BaseException) -> bool:
 
 
 def _retry_after_seconds(exc: BaseException) -> float | None:
-    """What the provider asked us to wait, if it said anything.
+    """What the provider asked us to wait, if it said anything readable.
 
     The only authoritative number in the exchange: a computed curve is a guess
     about when capacity returns, and this is the answer. Both spellings are
     accepted because providers disagree on which they send, and header lookup is
     case-insensitive because HTTP is.
+
+    **Finite, and not merely non-negative.** ``float()`` reads ``"inf"`` and
+    ``"nan"``, and ``float("inf") >= 0`` is true — so an ``inf`` here reached
+    :func:`asyncio.sleep` and parked the node forever, on a call that had a
+    deadline. It is the same rule ``evals/harness/baseline.py`` states for a
+    recorded figure, applied to a number a third party sends rather than to one
+    a contributor writes, and it belongs in both places for the same reason: a
+    non-finite value poisons whatever it reaches.
+
+    A value this cannot read is no hint at all, and the caller backs off on its
+    own curve. That covers a date-formatted ``Retry-After``, which this does not
+    parse — guessing at a date is worse than the curve.
     """
     headers = getattr(exc, "headers", None)
     if not isinstance(headers, dict):
@@ -240,13 +266,27 @@ def _retry_after_seconds(exc: BaseException) -> float | None:
         try:
             seconds = float(raw) * scale
         except (TypeError, ValueError):
-            # A date-formatted Retry-After, which this does not parse. Falling
-            # through to the jittered curve is right: an unreadable hint is no
-            # hint, and guessing at a date is worse than backing off.
             continue
-        if seconds >= 0:
+        if math.isfinite(seconds) and seconds >= 0:
             return seconds
     return None
+
+
+def _asks_a_longer_wait_than_we_take(exc: BaseException) -> bool:
+    """Whether the provider asked for a wait past :data:`_RETRY_AFTER_CEILING_SECONDS`.
+
+    Read as evidence rather than as a delay. A provider that says "come back in
+    an hour" has answered the question a retry exists to ask — will asking again
+    shortly work — and the answer is no. Sleeping the hour would park a paid job
+    on a third party's number; sleeping less and asking anyway spends an attempt
+    and a budget token to reach the same refusal.
+
+    Only a stated hint decides this. An error carrying none is judged by
+    :func:`_is_transient` as before, because an absent header says nothing about
+    how long capacity will take to return.
+    """
+    stated = _retry_after_seconds(exc)
+    return stated is not None and stated > _RETRY_AFTER_CEILING_SECONDS
 
 
 def _backoff_seconds(attempt: int) -> float:
@@ -277,11 +317,19 @@ class RetryPolicy:
     budget: RetryBudget
 
     async def sleep_before_retry(self, attempt: int, exc: BaseException) -> None:
-        """Wait out one backoff interval, preferring the provider's own answer."""
+        """Wait out one backoff interval, preferring the provider's own answer.
+
+        Bounded by :data:`_RETRY_AFTER_CEILING_SECONDS` whatever the provider
+        said. :meth:`should_retry` already refuses an error asking for longer,
+        so this clamp is the second reader of one rule and is here on purpose:
+        the two are called by different code paths, and a caller that slept
+        before asking whether to retry would hand a header the process's
+        schedule.
+        """
         delay = _retry_after_seconds(exc)
         if delay is None:
             delay = _backoff_seconds(attempt)
-        await asyncio.sleep(delay)
+        await asyncio.sleep(min(delay, _RETRY_AFTER_CEILING_SECONDS))
 
     def should_retry(self, attempt: int, exc: BaseException) -> bool:
         """Whether ``exc`` on ``attempt`` earns another try, budget included.
@@ -292,6 +340,13 @@ class RetryPolicy:
         if attempt >= self.attempts:
             return False
         if not _is_transient(exc):
+            return False
+        if _asks_a_longer_wait_than_we_take(exc):
+            logger.warning(
+                "provider asked for a wait longer than %.0fs; failing the node"
+                " rather than sleeping on its number",
+                _RETRY_AFTER_CEILING_SECONDS,
+            )
             return False
         return self.budget.withdraw()
 
