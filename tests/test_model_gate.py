@@ -201,6 +201,36 @@ class TestAModelThatRefusesTheParameterAtAll:
                 source="tiers.base",
             )
 
+    def test_a_map_that_says_no_does_not_stop_a_build_on_its_own(self):
+        """The guard on the fix, not on the defect.
+
+        The first attempt at the reader above pointed the gate at
+        ``native_structured_output``, which consults the map after the probe.
+        That refused four ``responses``-mode OpenAI models whose entry states
+        ``supports_response_schema: False`` while the library emulates nothing
+        for them — a build stopped on a claim in a data file, which is the
+        thing #819 measured wrong once already.
+
+        The matrix may print what the map says. The gate may not act on it.
+        """
+        from analysis_service.binding import _check_native_structured_output
+        from analysis_service.model_gate import (
+            library_sends_no_native_schema,
+            native_structured_output,
+        )
+        from analysis_service.sampling import TierSampling
+
+        vendor, model = vendor_for("openai"), "gpt-5.5-pro"
+
+        assert native_structured_output(vendor, model) is False, (
+            "the map no longer says no for this pair, so this test has stopped"
+            " asking its question — pick another map-says-no, not-emulated pair"
+        )
+        assert not library_sends_no_native_schema(vendor, model)
+        _check_native_structured_output(
+            vendor, model, TierSampling(constrain_output=True), source="tiers.strong"
+        )
+
     def test_the_matrix_renders_a_cell_rather_than_failing(self):
         from analysis_service.conformance import Capability, profile
 

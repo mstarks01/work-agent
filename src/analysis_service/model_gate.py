@@ -127,6 +127,33 @@ def supports_structured_output(vendor: Vendor, model: str) -> bool:
     )
 
 
+def library_sends_no_native_schema(vendor: Vendor, model: str) -> bool:
+    """Whether the pinned library will not put a schema on the wire for this pair.
+
+    **The probe's own answer, with no map lookup in it**, and the one reader of
+    it. Two shapes mean the same thing to a caller, and
+    :func:`emulates_structured_output` spells them differently:
+
+    * it returns ``True`` where LiteLLM would satisfy the constraint with a
+      synthesised tool, so an unresolved ``$defs`` schema reaches the model;
+    * it *raises* where LiteLLM will not map ``response_format`` at all — 79 of
+      the pinned map's rows under a registered prefix, Bedrock's Cohere text
+      models among them. A schema does not reach a model that refuses the
+      parameter carrying it.
+
+    Both are facts about what the installed library does with a request, which
+    is why they belong together and why this is what a **gate** reads.
+    :func:`native_structured_output` reads it too and then consults the map,
+    because a report also has to say "the map does not know". A gate must not
+    consult the map: ``supports_response_schema`` is a claim in a data file, and
+    #819 measured one that was wrong.
+    """
+    try:
+        return emulates_structured_output(vendor, model)
+    except Exception:  # noqa: BLE001 -- litellm raises its own param errors here
+        return True
+
+
 def native_structured_output(vendor: Vendor, model: str) -> bool | None:
     """Whether a response schema reaches this model natively, or ``None`` if unknown.
 
@@ -164,11 +191,7 @@ def native_structured_output(vendor: Vendor, model: str) -> bool | None:
     the caller, because the caller is a *report* and a matrix that raises
     answers nothing at all.
     """
-    try:
-        emulated = emulates_structured_output(vendor, model)
-    except Exception:  # noqa: BLE001 -- litellm raises its own param errors here
-        return False
-    if emulated:
+    if library_sends_no_native_schema(vendor, model):
         return False
     info = model_info(vendor, model)
     if info is None:
