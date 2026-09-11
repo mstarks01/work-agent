@@ -76,7 +76,7 @@ from analysis_service.retry import (
 from analysis_service.sampling import load_sampling
 from analysis_service.system_model import SystemModel
 from analysis_service.vendors import VendorName, vendor_for
-from tests.factories import PROJECT_ROOT, tiers_for
+from tests.factories import PROJECT_ROOT, tiers_for, translator_of
 
 CONFIG = PROJECT_ROOT / "config"
 
@@ -180,9 +180,8 @@ def _injecting_client_class(client_cls: type, client: Any) -> type:
     """``client_cls``, handing litellm ``client`` instead of a real connection.
 
     Takes the class rather than naming one, the way
-    :func:`analysis_service.retry.retrying_llm_class` and
-    :func:`analysis_service.charges.charge_capturing_client_class` do — the
-    adapter under test may be carrying either ADK's own client or the
+    :func:`analysis_service.charges.charge_capturing_client_class` does — the
+    translator under test may be carrying either ADK's own client or the
     charge-capturing subclass, and this must not care which.
     """
 
@@ -230,12 +229,15 @@ def _inject_transport(adapter: Any, vendor: VendorName, provider: _Provider) -> 
             " would reach the real provider"
         )
 
-    inner = adapter.llm_client
+    # One layer in: the adapter is an ``ExecutedLlm`` over the seam, and the
+    # translator holding the tier's credential is on the provider side of it.
+    translator = translator_of(adapter)
+    inner = translator.llm_client
     injecting = _injecting_client_class(type(inner), client)
     # ADK's own client takes no arguments; the charge-capturing one carries the
     # vendor and the arrangement its tier declared. Asked of the instance being
     # replaced rather than decided from the vendor, so the two stay one seam.
-    adapter.llm_client = (
+    translator.llm_client = (
         injecting(inner.vendor, inner.mode) if hasattr(inner, "vendor") else injecting()
     )
 
@@ -378,7 +380,7 @@ class TestWhatTheExecutorReadsOffAnEvent:
         )
 
     def test_the_attempt_count_reaches_the_event(self):
-        """``_stamped`` writes it on the response; this is the claim its
+        """``stamp_attempt`` writes it on the response; this is the claim its
         docstring makes about ADK carrying it onto the event."""
         (event,) = events_from("openai", answering("openai"))
 

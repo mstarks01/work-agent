@@ -867,8 +867,10 @@ the adapter did not close it, because the retry count LiteLLM is given overwrite
 it.
 
 So the library's retry layer is **off** (`num_retries = 0`, one request per call)
-and the loop runs a level up, in `analysis_service.retry`, where it can be bounded.
-Two things become possible there that could not exist below the adapter:
+and the loop runs a level up, above the provider seam, where it can be bounded.
+`analysis_service.retry` holds the rules it decides from and
+`analysis_service.provider` holds the loop. Two things become possible there
+that could not exist below the adapter:
 
 - **A shared budget.** `retry_budget_ratio` is one process-wide token bucket: a
   retry costs a token, a successful request credits `0.1` of one. Retries are

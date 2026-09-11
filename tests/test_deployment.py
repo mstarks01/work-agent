@@ -34,7 +34,7 @@ from analysis_service.model_gate import (
 from analysis_service.model_tiers import LLM_NODES, ModelConfigError
 from analysis_service.model_tiers import SUPPORTED_VERSION as TIERS_SUPPORTED_VERSION
 from analysis_service.vendors import ProviderAuthError, vendor_for
-from tests.factories import DEFAULT_FRAMEWORKS, PROJECT_ROOT
+from tests.factories import DEFAULT_FRAMEWORKS, PROJECT_ROOT, translator_of
 
 # This install's one package's critic nodes. Named per framework now, because
 # two packages each bring their own critic and its bounded re-ask.
@@ -287,7 +287,7 @@ def test_every_llm_node_carries_the_retry_loop():
     nodes = {node.name: node for node in pipeline.workflow.graph.nodes}
 
     for name in TIER_NODES:
-        policy = getattr(type(nodes[name].model), "retry_policy", None)
+        policy = getattr(nodes[name].model, "retry_policy", None)
         assert policy is not None, f"{name} has no retry loop"
         assert policy.attempts == 3
 
@@ -302,11 +302,11 @@ def test_both_tiers_draw_on_one_shared_retry_budget():
     pipeline = Deployment.from_env(env=VERTEX_ENV).pipeline(DEFAULT_FRAMEWORKS)
     nodes = {node.name: node for node in pipeline.workflow.graph.nodes}
 
-    budgets = {id(type(nodes[name].model).retry_policy.budget) for name in TIER_NODES}
+    budgets = {id(nodes[name].model.retry_policy.budget) for name in TIER_NODES}
     assert len(budgets) == 1
     # Capacity is one retry per LLM node in the graph: what one job may spend
     # from a cold bucket.
-    budget = type(nodes[CRITIC_NODE].model).retry_policy.budget
+    budget = nodes[CRITIC_NODE].model.retry_policy.budget
     assert budget.capacity == len(LLM_NODES)
     assert budget.ratio == 0.1
 
@@ -325,14 +325,14 @@ def test_the_pipeline_binds_retry_and_timeout():
     pipeline = deployment.pipeline(DEFAULT_FRAMEWORKS)
     critic = {node.name: node for node in pipeline.workflow.graph.nodes}[CRITIC_NODE]
 
-    assert isinstance(critic.model, LiteLlm)
+    assert isinstance(translator_of(critic.model), LiteLlm)
     # Zero on purpose: the library's retry layer is off so it cannot set the
     # provider SDK's max_retries from it, and the loop runs one level up in
     # analysis_service.retry, where a shared budget can bound it.
-    assert critic.model._additional_args["num_retries"] == 0
-    assert critic.model._additional_args["timeout"] == 300.0
+    assert translator_of(critic.model)._additional_args["num_retries"] == 0
+    assert translator_of(critic.model)._additional_args["timeout"] == 300.0
     assert (
-        critic.model._additional_args["timeout"]
+        translator_of(critic.model)._additional_args["timeout"]
         == deployment.resilience.request_timeout_seconds()
     )
 
@@ -342,7 +342,7 @@ def test_drop_params_is_never_set_so_litellm_stays_fail_closed():
     pipeline = Deployment.from_env(env=VERTEX_ENV).pipeline(DEFAULT_FRAMEWORKS)
     nodes = {node.name: node for node in pipeline.workflow.graph.nodes}
 
-    assert "drop_params" not in nodes[CRITIC_NODE].model._additional_args
+    assert "drop_params" not in translator_of(nodes[CRITIC_NODE].model)._additional_args
 
 
 def test_a_variable_set_after_construction_belongs_to_the_next_deployment():
@@ -363,7 +363,7 @@ def test_env_overrides_the_retry_attempts_without_touching_the_model():
 
     # The override reaches the retry policy, not the adapter: the library's
     # layer stays off whatever attempts says.
-    assert nodes[CRITIC_NODE].model._additional_args["num_retries"] == 0
+    assert translator_of(nodes[CRITIC_NODE].model)._additional_args["num_retries"] == 0
     assert deployment.resilience.attempts == 5
     assert pipeline.node_models[CRITIC_NODE] == "vertex_ai/gemini-2.5-pro"
 
@@ -713,8 +713,8 @@ def test_an_unconstrained_tier_suppresses_the_schema_on_the_adapter(tmp_path):
     nodes = {node.name: node for node in pipeline.workflow.graph.nodes}
     extract = nodes[graph.EXTRACT_NODE]
 
-    assert "response_format" in extract.model._additional_args
-    assert extract.model._additional_args["response_format"] is None
+    assert "response_format" in translator_of(extract.model)._additional_args
+    assert translator_of(extract.model)._additional_args["response_format"] is None
     # The node keeps its schema, so the response is still validated on arrival.
     assert extract.output_schema is not None
 
@@ -724,7 +724,10 @@ def test_a_constrained_tier_leaves_the_derived_schema_alone():
     pipeline = Deployment.from_env(env=VERTEX_ENV).pipeline(DEFAULT_FRAMEWORKS)
     nodes = {node.name: node for node in pipeline.workflow.graph.nodes}
 
-    assert "response_format" not in nodes[graph.EXTRACT_NODE].model._additional_args
+    assert (
+        "response_format"
+        not in translator_of(nodes[graph.EXTRACT_NODE].model)._additional_args
+    )
 
 
 def test_the_schema_gate_is_scoped_to_tiers_that_send_a_schema(tmp_path):

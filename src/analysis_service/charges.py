@@ -82,7 +82,7 @@ class ChargeModeMismatchError(ConfigError):
 
     It costs one node's tokens to find out, and the message names the key to
     change. That is the same trade
-    :func:`analysis_service.retry._reject_truncated` makes: fail the node rather
+    :func:`analysis_service.retry.reject_truncated` makes: fail the node rather
     than keep what it produced.
 
     Not transient, so the retry driver gives up at once rather than paying for
@@ -295,7 +295,7 @@ def charge_capturing_client_class(client_cls: type) -> type:
     """A ``LiteLLMClient`` subclass that reads what each call's provider said.
 
     Takes the class rather than importing it, for the reason
-    :func:`analysis_service.retry.retrying_llm_class` gives: this module stays
+    :class:`analysis_service.provider.ExecutedLlm` is built for: this module stays
     free of the provider libraries at import time, and ``binding`` already holds
     the class.
 

@@ -26,6 +26,7 @@ from analysis_service.resilience import (
     ResilienceConfigError,
     load_resilience,
 )
+from tests.factories import translator_of
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = PROJECT_ROOT / "config" / "resilience.toml"
@@ -203,7 +204,7 @@ def test_the_timeout_reaching_litellm_is_the_one_the_file_states(monkeypatch):
         received.update(kwargs)
         raise _StopBeforeTheRequest
 
-    monkeypatch.setattr(adapter.llm_client, "acompletion", capture)
+    monkeypatch.setattr(translator_of(adapter).llm_client, "acompletion", capture)
 
     request = LlmRequest(
         model=adapter.model,

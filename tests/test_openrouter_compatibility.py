@@ -188,10 +188,11 @@ class TestTheSchemaPathIsNativeHere:
 class TestStreamingIsNotAPathThisServiceTakes:
     """The fourth question, answered rather than tested into the void.
 
-    ``retry.retrying_llm_class`` passes a streaming call straight through to
-    the adapter — no retry, no truncation check — and nothing in the graph asks
-    for one. So chunk assembly is unreached machinery here, and an assertion
-    about it would read as coverage this service does not have.
+    :class:`~analysis_service.provider.ExecutedLlm` refuses a streaming call
+    outright — it would cross no seam, count no attempt and check no finish
+    reason — and nothing in the graph asks for one, because every node binds an
+    output schema. So chunk assembly is unreached machinery here, and an
+    assertion about it would read as coverage this service does not have.
 
     What is worth pinning is the one thing the streaming handler decides that
     the non-streaming path also depends on: an error inside a chunk keeps the

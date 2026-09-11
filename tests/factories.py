@@ -72,6 +72,7 @@ from analysis_service.model_tiers import (
     credentials_env_var_for,
     load_model_tiers,
 )
+from analysis_service.provider import InProcessExecutor
 from analysis_service.report import (
     FrameworkSelection,
     InputRef,
@@ -689,6 +690,24 @@ def claims_json(*claims: BaseModel) -> str:
     :class:`~analysis_service.claims.ProposalBatch`.
     """
     return json.dumps({"claims": [claim.model_dump(mode="json") for claim in claims]})
+
+
+def translator_of(model):
+    """The configured ``LiteLlm`` behind one bound tier's adapter.
+
+    One reader for what is otherwise a chain every test would spell for itself.
+    ``build_tier_adapters`` returns an
+    :class:`~analysis_service.provider.ExecutedLlm`, and the translator holding
+    the credential, the constructor kwargs and the client sits on the provider
+    side of its seam. A test asking what reached LiteLLM is asking about that
+    object.
+    """
+    executor = model.executor
+    assert isinstance(executor, InProcessExecutor), (
+        "this tier runs somewhere other than in process, so there is no"
+        f" translator here to inspect: {type(executor).__name__}"
+    )
+    return executor.translator
 
 
 def served_build(requested_route: str) -> str:

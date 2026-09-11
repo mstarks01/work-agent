@@ -36,7 +36,7 @@ from analysis_service.resilience import load_resilience
 from analysis_service.sampling import TierSampling, load_sampling
 from analysis_service.system_model import SystemModel
 from analysis_service.vendors import VendorName
-from tests.factories import PROJECT_ROOT, tiers_for
+from tests.factories import PROJECT_ROOT, tiers_for, translator_of
 
 CONFIG = PROJECT_ROOT / "config"
 
@@ -128,8 +128,11 @@ def _adapter(wire: _Wire, base: TierSampling | None = None):
                 model, messages, tools, client=client, **kwargs
             )
 
+    # One layer in: the adapter is an ``ExecutedLlm`` over the seam, and the
+    # translator that holds the tier's credential is on the provider side
+    # of it. That is where a transport goes.
     adapter = adapters["base"]
-    adapter.llm_client = _Injecting()
+    translator_of(adapter).llm_client = _Injecting()
     return adapter, sampling.for_tier("base")
 
 

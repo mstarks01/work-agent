@@ -45,12 +45,21 @@ configuration, because it does not vary by deployment. The one number that does
 vary is how much retrying a deployment will tolerate, and that is
 ``retry_budget_ratio`` in ``config/resilience.toml``.
 
-Retrying is no longer quite all this module does, and the exception is
-deliberate. :func:`retrying_llm_class` is the one object this service owns that sees
-every raw response from every provider for every node. That makes it the only
-place a length-stopped completion can be caught uniformly; see
-:func:`_reject_truncated`. Nothing here can change an answer. It can refuse one
-the provider has already said is incomplete.
+The loop itself is **not** here. It lives in
+:class:`analysis_service.provider.ExecutedLlm`, above the seam a provider call
+crosses, because that is where the two bounds above are expressible: a bucket
+shared by the whole process, and jitter that decorrelates lanes which failed
+together. Neither is something one call can do for itself. What is here is
+everything that loop decides from — the rules, the policy that reads them, and
+:func:`classify`, which turns a third party's exception into a value exactly
+once so that the same decision holds whether the call ran in this process or
+somewhere else.
+
+Retrying is not quite all this module supplies, and the exception is
+deliberate. :func:`reject_truncated` is the uniform refusal of a length-stopped
+completion, and it belongs beside the retry rule that must never retry one:
+the same request against the same cap truncates again. Nothing here can change
+an answer. It can refuse one the provider has already said is incomplete.
 """
 
 from __future__ import annotations
@@ -59,9 +68,9 @@ import asyncio
 import logging
 import math
 import random
-from collections.abc import AsyncGenerator, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import ClassVar
+from enum import StrEnum
 
 logger = logging.getLogger(__name__)
 
@@ -196,6 +205,11 @@ class RetryBudget:
         return True
 
 
+#: The one client-side code whose meaning the number alone does not settle.
+#: Named because two rules read it: whether to retry, and which kind of failure
+#: to call it.
+_RATE_LIMITED_STATUS = 429
+
 #: Status codes that mean "ask again" rather than "this request is wrong".
 #: ``408`` and ``429`` are the two client-side codes that describe the moment
 #: rather than the request. Everything from ``500`` up is a server saying it
@@ -205,7 +219,7 @@ class RetryBudget:
 #: and are still admitted here, because litellm flattens them to ``500`` on four
 #: of the six vendors and a rule that can only be obeyed on two is worse than a
 #: rule that retries a code no model endpoint sends.
-_TRANSIENT_CLIENT_STATUS_CODES = frozenset({408, 429})
+_TRANSIENT_CLIENT_STATUS_CODES = frozenset({408, _RATE_LIMITED_STATUS})
 _LOWEST_SERVER_STATUS_CODE = 500
 
 #: Whether a stated rate-limit dimension clears on the timescale a retry waits.
@@ -378,7 +392,7 @@ def _retry_after_seconds(exc: BaseException) -> float | None:
     return None
 
 
-def _asks_a_longer_wait_than_we_take(exc: BaseException) -> bool:
+def _asks_a_longer_wait_than_we_take(failure: ProviderFailure) -> bool:
     """Whether the provider asked for a wait past :data:`_RETRY_AFTER_CEILING_SECONDS`.
 
     Read as evidence rather than as a delay. A provider that says "come back in
@@ -387,12 +401,131 @@ def _asks_a_longer_wait_than_we_take(exc: BaseException) -> bool:
     on a third party's number; sleeping less and asking anyway spends an attempt
     and a budget token to reach the same refusal.
 
-    Only a stated hint decides this. An error carrying none is judged by
-    :func:`_is_transient` as before, because an absent header says nothing about
-    how long capacity will take to return.
+    Only a stated hint decides this. A failure carrying none is judged by its
+    ``retryable`` as before, because an absent header says nothing about how
+    long capacity will take to return.
     """
-    stated = _retry_after_seconds(exc)
+    stated = failure.retry_after_seconds
     return stated is not None and stated > _RETRY_AFTER_CEILING_SECONDS
+
+
+class FailureKind(StrEnum):
+    """What one provider failure was, in this service's own closed vocabulary.
+
+    **The value an exception cannot be.** Every rule in this module reads a
+    third party's exception object, and that object cannot cross a process
+    boundary: :mod:`analysis_service.provider` is the seam where a generation
+    request and its result are values, and a failure has to be one too. This
+    enum is the last row of that projection.
+
+    It is a **label derived from the rules above, never a second path to their
+    answer.** :func:`classify` computes ``retryable`` from
+    :func:`_is_transient` and the wait from :func:`_retry_after_seconds`, then
+    names what it saw. A kind that decided retrying for itself would be the
+    two-readers failure this module was already bitten by — the rule and its
+    test agreeing about a shape the provider does not send.
+
+    The members are #824's own list and nothing beyond it. A truncated
+    completion is deliberately **not** one: the provider reported that call a
+    success, and :func:`reject_truncated` refuses it above the seam, so it
+    never arrives as a failure to name. A member nothing can produce reads as
+    coverage.
+    """
+
+    AUTHENTICATION = "authentication"
+    INVALID_REQUEST = "invalid_request"
+    QUOTA_EXHAUSTED = "quota_exhausted"
+    THROTTLED = "throttled"
+    TIMEOUT = "timeout"
+    UNAVAILABLE = "unavailable"
+    UNKNOWN = "unknown"
+
+
+#: Which kind a status code names, for the codes that name one on their own.
+#: A label rather than a decision, so a code absent here costs a less specific
+#: name and nothing else. ``429`` is deliberately not in it: a throttle and a
+#: spent quota share the code, and only the dimension tells them apart.
+_KIND_FOR_STATUS: Mapping[int, FailureKind] = {
+    400: FailureKind.INVALID_REQUEST,
+    401: FailureKind.AUTHENTICATION,
+    403: FailureKind.AUTHENTICATION,
+    404: FailureKind.INVALID_REQUEST,
+    408: FailureKind.TIMEOUT,
+    413: FailureKind.INVALID_REQUEST,
+    422: FailureKind.INVALID_REQUEST,
+    504: FailureKind.TIMEOUT,
+}
+
+
+@dataclass(frozen=True)
+class ProviderFailure:
+    """One failed provider call, as the facts the callers actually ask for.
+
+    ``retryable`` and ``retry_after_seconds`` are the whole of what a retry
+    decision needs, and they are the outputs of the two rules above rather than
+    a re-derivation of them. ``kind`` is what a person reads afterwards, in a
+    log line or a failed case record, where an exception's own class name says
+    ``APIError`` on one vendor and ``InternalServerError`` on another for the
+    same upstream status.
+
+    ``detail`` is the exception **type's** name and never its text. A provider's
+    message can quote the prompt back, and this value is written to logs and
+    carried into records (OWASP LLM02).
+
+    ``cause`` is the exception itself where there is one to keep. In process
+    there always is, and the retry loop re-raises exactly what it caught, so
+    nothing loses a traceback to this refactor. A future out-of-process
+    implementation fills the other fields and leaves this ``None``, which is
+    the difference the seam exists to make visible rather than to hide.
+    """
+
+    kind: FailureKind
+    retryable: bool
+    retry_after_seconds: float | None
+    detail: str
+    cause: BaseException | None = None
+
+
+def classify(exc: BaseException) -> ProviderFailure:
+    """One provider failure as a value, read off the exception exactly once.
+
+    The single place this module turns a third party's object into facts. Every
+    other reader takes the :class:`ProviderFailure`, so the rules keep the one
+    reader each that they have, and a caller on the far side of a process
+    boundary gets the same answer without the object.
+    """
+    retryable = _is_transient(exc)
+    return ProviderFailure(
+        kind=_kind_of(exc, retryable),
+        retryable=retryable,
+        retry_after_seconds=_retry_after_seconds(exc),
+        detail=type(exc).__name__,
+        cause=exc,
+    )
+
+
+def _kind_of(exc: BaseException, retryable: bool) -> FailureKind:
+    """Name what this failure was, having already decided whether to retry it.
+
+    Takes ``retryable`` rather than asking again: the decision has one reader
+    and this is a label on its answer. A 429 splits on the same dimension
+    :data:`_RATE_LIMIT_CLEARS_WITH_TIME` reads — a window that reopens is a
+    throttle, a cap that does not is a spent quota — so the two meanings of one
+    status code stay distinguishable in a record.
+    """
+    status = getattr(exc, "status_code", None)
+    try:
+        code = int(status)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return FailureKind.UNKNOWN
+    if code == _RATE_LIMITED_STATUS:
+        return FailureKind.THROTTLED if retryable else FailureKind.QUOTA_EXHAUSTED
+    named = _KIND_FOR_STATUS.get(code)
+    if named is not None:
+        return named
+    if code >= _LOWEST_SERVER_STATUS_CODE:
+        return FailureKind.UNAVAILABLE
+    return FailureKind.UNKNOWN
 
 
 def _backoff_seconds(attempt: int) -> float:
@@ -422,32 +555,37 @@ class RetryPolicy:
     attempts: int
     budget: RetryBudget
 
-    async def sleep_before_retry(self, attempt: int, exc: BaseException) -> None:
+    async def sleep_before_retry(self, attempt: int, failure: ProviderFailure) -> None:
         """Wait out one backoff interval, preferring the provider's own answer.
 
         Bounded by :data:`_RETRY_AFTER_CEILING_SECONDS` whatever the provider
-        said. :meth:`should_retry` already refuses an error asking for longer,
+        said. :meth:`should_retry` already refuses a failure asking for longer,
         so this clamp is the second reader of one rule and is here on purpose:
         the two are called by different code paths, and a caller that slept
         before asking whether to retry would hand a header the process's
         schedule.
         """
-        delay = _retry_after_seconds(exc)
+        delay = failure.retry_after_seconds
         if delay is None:
             delay = _backoff_seconds(attempt)
         await asyncio.sleep(min(delay, _RETRY_AFTER_CEILING_SECONDS))
 
-    def should_retry(self, attempt: int, exc: BaseException) -> bool:
-        """Whether ``exc`` on ``attempt`` earns another try, budget included.
+    def should_retry(self, attempt: int, failure: ProviderFailure) -> bool:
+        """Whether ``failure`` on ``attempt`` earns another try, budget included.
+
+        Takes the facts rather than the exception, so this decision is the same
+        one whether the call ran in this process or behind
+        :mod:`analysis_service.provider`'s seam. Nothing is re-derived here:
+        :func:`classify` read the rules once.
 
         Order matters: the transient check comes first so a non-transient
         failure never spends a token it was never going to benefit from.
         """
         if attempt >= self.attempts:
             return False
-        if not _is_transient(exc):
+        if not failure.retryable:
             return False
-        if _asks_a_longer_wait_than_we_take(exc):
+        if _asks_a_longer_wait_than_we_take(failure):
             logger.warning(
                 "provider asked for a wait longer than %.0fs; failing the node"
                 " rather than sleeping on its number",
@@ -456,8 +594,59 @@ class RetryPolicy:
             return False
         return self.budget.withdraw()
 
+    def log_retry(self, attempt: int, failure: ProviderFailure, model: str) -> None:
+        """Say that one attempt failed and another is coming.
 
-def _stamped(responses: Sequence, attempt: int) -> Sequence:
+        Names the kind and the exception **type**, never the provider's
+        message: a message can quote the prompt back, and this line goes to an
+        ordinary log (OWASP LLM02).
+        """
+        logger.warning(
+            "%s: attempt %d/%d failed (%s: %s); retrying",
+            model,
+            attempt,
+            self.attempts,
+            failure.kind.value,
+            failure.detail,
+        )
+
+    def give_up(
+        self, attempt: int, failure: ProviderFailure, model: str
+    ) -> BaseException:
+        """What to raise when no further attempt is coming.
+
+        A run killed by an empty budget and a run killed by an unretryable 400
+        both stop on their first failure, but they mean opposite things to
+        whoever is paged: one says the whole service is failing, the other says
+        this one request was wrong. Only the first is worth renaming.
+
+        Everything else re-raises ``failure.cause``, which in process is the
+        exception the translator raised — so nothing loses a traceback or an
+        exception type a caller was already catching to the seam. A failure
+        that crossed a process boundary has no cause to re-raise and gets one
+        naming what it was.
+        """
+        spent_budget = (
+            attempt < self.attempts and failure.retryable and self.budget.tokens < 1.0
+        )
+        if not spent_budget:
+            return failure.cause or RuntimeError(
+                f"{failure.kind.value}: {failure.detail}"
+            )
+        logger.error(
+            "%s: retry budget exhausted at attempt %d/%d after %s;"
+            " failing fast rather than adding to the storm",
+            model,
+            attempt,
+            self.attempts,
+            failure.detail,
+        )
+        return RetryBudgetExhausted(
+            f"retry budget exhausted while retrying {failure.detail}"
+        )
+
+
+def stamp_attempt(responses: Sequence, attempt: int) -> Sequence:
     """``responses`` carrying the number of the attempt that produced them.
 
     A failed attempt yields no response and so meters nothing, and the one
@@ -475,7 +664,7 @@ def _stamped(responses: Sequence, attempt: int) -> Sequence:
     return responses
 
 
-def _reject_truncated(responses: Sequence, model: str) -> None:
+def reject_truncated(responses: Sequence, model: str) -> None:
     """Raise if the provider stopped any of ``responses`` at the token cap.
 
     Every response is checked rather than just the last: a non-streaming call
@@ -502,115 +691,3 @@ def _reject_truncated(responses: Sequence, model: str) -> None:
         f" what it emitted is a fragment rather than an answer."
         f" {TRUNCATION_REMEDY}"
     )
-
-
-def retrying_llm_class(litellm_cls: type, policy: RetryPolicy) -> type:
-    """A ``LiteLlm`` subclass that owns its retries, built against one policy.
-
-    Takes the class rather than importing it, so this module stays free of the
-    provider library at import time — ``binding`` already has it in hand, and
-    already had to defer that import for the cost-map ordering.
-
-    One class per policy rather than a pydantic field: the policy holds a
-    mutable budget, and a shared mutable object is not what a frozen model field
-    is for. It is readable back off the class as ``retry_policy``, which is what
-    makes the wiring assertable — every other test in this area can pass while
-    the adapters a deployment actually builds carry no retry loop at all.
-    """
-
-    class RetryingLlm(litellm_cls):
-        """One tier's adapter, retrying under the process-wide budget.
-
-        The responses of a non-streaming call are collected before any is
-        yielded. That is what makes a retry safe: a failure part-way through the
-        inner generator has produced nothing the caller has already seen, so
-        asking again cannot duplicate output. A streaming call cannot offer that
-        and is passed straight through — this service binds an ``output_schema``
-        on every node and so never streams, and a retry policy that silently
-        replayed half a stream would be worse than none.
-
-        The truncation check rides on that same split, and for the same reason:
-        a streamed answer is yielded before any chunk carries a
-        ``finish_reason``, so there is nothing left to refuse by the time the
-        caller has seen the text. Unreached today, and it stays that way for as
-        long as every node carries a schema.
-        """
-
-        # ClassVar, not a field: shared by every instance built against this
-        # policy, and pydantic leaves it alone on the LiteLlm path.
-        retry_policy: ClassVar[RetryPolicy] = policy
-
-        async def generate_content_async(
-            self, llm_request, stream: bool = False
-        ) -> AsyncGenerator:
-            if stream:
-                async for response in super().generate_content_async(
-                    llm_request, stream
-                ):
-                    yield response
-                return
-
-            # Checked here rather than inside ``_attempt_with_retries`` so that
-            # method keeps its one job — surviving transport failures — and a
-            # truncation is never mistaken for one of them.
-            responses = await self._attempt_with_retries(llm_request)
-            _reject_truncated(responses, self.model)
-            for response in responses:
-                yield response
-
-        async def _attempt_with_retries(self, llm_request) -> Sequence:
-            last_exc: BaseException | None = None
-            for attempt in range(1, self.retry_policy.attempts + 1):
-                try:
-                    responses = [
-                        response
-                        async for response in super().generate_content_async(
-                            llm_request, False
-                        )
-                    ]
-                except Exception as exc:
-                    last_exc = exc
-                    if not self.retry_policy.should_retry(attempt, exc):
-                        raise self._give_up(attempt, exc) from exc
-                    logger.warning(
-                        "%s: attempt %d/%d failed (%s); retrying",
-                        self.model,
-                        attempt,
-                        self.retry_policy.attempts,
-                        type(exc).__name__,
-                    )
-                    await self.retry_policy.sleep_before_retry(attempt, exc)
-                else:
-                    self.retry_policy.budget.credit()
-                    return _stamped(responses, attempt)
-            raise AssertionError(f"retry loop fell through: {last_exc!r}")
-
-        def _give_up(self, attempt: int, exc: BaseException) -> BaseException:
-            """The exception to raise, naming the budget when that is the cause.
-
-            A run killed by an empty budget and a run killed by an unretryable
-            400 both stop on their first exception, but they mean opposite
-            things to whoever is paged: one says the whole service is failing,
-            the other says this one request was wrong. Only the first is worth
-            renaming.
-            """
-            spent_budget = (
-                attempt < self.retry_policy.attempts
-                and _is_transient(exc)
-                and self.retry_policy.budget.tokens < 1.0
-            )
-            if not spent_budget:
-                return exc
-            logger.error(
-                "%s: retry budget exhausted at attempt %d/%d after %s;"
-                " failing fast rather than adding to the storm",
-                self.model,
-                attempt,
-                self.retry_policy.attempts,
-                type(exc).__name__,
-            )
-            return RetryBudgetExhausted(
-                f"retry budget exhausted while retrying {type(exc).__name__}"
-            )
-
-    return RetryingLlm

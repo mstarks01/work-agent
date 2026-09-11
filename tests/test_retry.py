@@ -1,26 +1,37 @@
 """The retry loop and the shared budget that keeps it from becoming a storm.
 
-Driven against a fake base class rather than ``LiteLlm``: ``retrying_llm_class``
-takes the class it wraps, so the loop is testable without a provider library,
-credentials or a request. The litellm exception *types* are real, because the
-classification is the one part that genuinely depends on them.
+Driven against a fake **executor** rather than a fake translator. The loop runs
+above :mod:`analysis_service.provider`'s seam, so what a test has to supply is
+one method returning results or raising — no provider library, no credential
+and no request. The adapter itself is the shipped
+:class:`~analysis_service.provider.ExecutedLlm`.
+
+The litellm exception *types* are real, because the classification is the one
+part that genuinely depends on them.
 """
 
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
 from types import MappingProxyType
 from typing import ClassVar
 
 import litellm
 import pytest
+from google.adk.models.llm_request import LlmRequest
+from google.adk.models.llm_response import LlmResponse
+from google.genai import types
 from litellm import APIConnectionError, RateLimitError
 from litellm.exceptions import RateLimitType
 
 # Imported through ``model_gate`` so the model-cost map is pinned before
 # anything here reaches litellm's own tables.
 from analysis_service import model_gate  # noqa: F401
+from analysis_service.provider import (
+    ExecutedLlm,
+    GenerationResult,
+    ProviderCallFailed,
+)
 from analysis_service.retry import (
     _RATE_LIMIT_CLEARS_WITH_TIME,
     _RETRY_AFTER_CEILING_SECONDS,
@@ -31,9 +42,16 @@ from analysis_service.retry import (
     _backoff_seconds,
     _is_transient,
     _retry_after_seconds,
-    retrying_llm_class,
+    classify,
 )
 from analysis_service.vendors import VENDOR_NAMES, vendor_for
+
+#: The loop projects whatever request it is handed and passes the projection
+#: to the executor, which here ignores it. One empty request stands in for
+#: every call, in ADK's own type because that is what the adapter takes.
+_ANY_REQUEST = LlmRequest(
+    contents=[types.Content(role="user", parts=[types.Part(text="hi")])]
+)
 
 
 def mapped_provider_exception(provider: str, model: str, status_code: int):
@@ -70,53 +88,58 @@ def rate_limited(**headers) -> RateLimitError:
     )
 
 
-@dataclass
-class FakeResponse:
-    """The response shape, minimal but not *less* than a response.
+def response(text: str, finish_reason: str | None = None) -> LlmResponse:
+    """One answer, in **ADK's own type** rather than a stand-in for it.
 
-    ``finish_reason`` is here rather than left off because a bare string stood in
-    for a response until the truncation check needed to read one, and that
-    substitution is the same shape as the bug it was hiding: what a provider
-    says about *how* a completion ended is part of the answer, not metadata
-    around it. ``custom_metadata`` is where the adapter writes the attempt
-    count, so it is mutable as the real response is.
+    A bare string stood in for a response until the truncation check needed to
+    read a ``finish_reason``, and that substitution was the same shape as the
+    bug it hid: what a provider says about *how* a completion ended is part of
+    the answer rather than metadata around it. The real type is what the seam
+    reduces to a :class:`~analysis_service.provider.GenerationResult`, so using
+    it here means every field the projection reads is a field that exists.
     """
+    return LlmResponse(
+        content=types.Content(role="model", parts=[types.Part(text=text)]),
+        finish_reason=finish_reason,  # type: ignore[arg-type]
+    )
 
-    text: str
-    finish_reason: str | None = None
-    custom_metadata: dict | None = None
 
-
-def truncated(text: str = "half a doc") -> FakeResponse:
+def truncated(text: str = "half a doc") -> LlmResponse:
     """What a provider that returns its partial output hands back at the cap."""
-    return FakeResponse(text=text, finish_reason="MAX_TOKENS")
+    return response(text, finish_reason="MAX_TOKENS")
 
 
 def texts(responses) -> list[str]:
-    return [response.text for response in responses]
+    return ["".join(part.text or "" for part in r.content.parts) for r in responses]
 
 
-class FakeLlm:
-    """A stand-in provider adapter: a scripted sequence of outcomes per call.
+class FakeExecutor:
+    """A stand-in for whatever runs a generation: scripted outcomes per call.
 
-    ``outcomes`` is consumed one entry per call — an exception to raise, a
-    :class:`FakeResponse` to yield, or a string wrapped into one. It counts
-    calls, which is the number every claim in this module is really about.
+    The seam's own interface, which is a smaller thing to fake than a
+    translator: ``outcomes`` is consumed one entry per call — an exception to
+    raise, an :class:`LlmResponse` to return, or a string wrapped into one. It
+    counts calls, which is the number every claim in this module is about.
+
+    It raises the provider's exception rather than a
+    :class:`~analysis_service.provider.ProviderCallFailed`, because that
+    translation is :class:`~analysis_service.provider.InProcessExecutor`'s job
+    and it is the thing under test here as much as the loop is.
     """
 
-    def __init__(self, model: str = "fake/model", outcomes=(), **_kwargs) -> None:
+    def __init__(self, model: str = "fake/model", outcomes=()) -> None:
         self.model = model
         self.outcomes = list(outcomes)
         self.calls = 0
 
-    async def generate_content_async(self, llm_request, stream: bool = False):
+    async def generate(self, request):
         self.calls += 1
         outcome = self.outcomes.pop(0) if self.outcomes else "ok"
         if isinstance(outcome, BaseException):
-            raise outcome
+            raise ProviderCallFailed(classify(outcome)) from outcome
         if isinstance(outcome, str):
-            outcome = FakeResponse(text=outcome)
-        yield outcome
+            outcome = response(outcome)
+        return [GenerationResult.of(outcome)]
 
 
 @pytest.fixture(autouse=True)
@@ -137,23 +160,19 @@ def policy(attempts: int = 3, capacity: float = 10, ratio: float = 0.1) -> Retry
     )
 
 
-def drive(base: FakeLlm, pol: RetryPolicy, stream: bool = False) -> list:
-    """Run one call through the retrying adapter, reflecting the count back.
+def drive(base: FakeExecutor, pol: RetryPolicy, stream: bool = False) -> list:
+    """Run one call through the shipped adapter, over a scripted executor.
 
-    The count is copied in a ``finally`` because the interesting cases are the
-    ones that raise, and a request count only observable on the happy path would
-    assert nothing about them.
+    The adapter is :class:`~analysis_service.provider.ExecutedLlm` — the one
+    ``binding`` builds — so the loop under test is the one that runs in
+    production, with only what sits on the far side of the seam replaced.
     """
-    cls = retrying_llm_class(FakeLlm, pol)
-    adapter = cls(model=base.model, outcomes=base.outcomes)
+    adapter = ExecutedLlm(model=base.model, executor=base, retry_policy=pol)
 
     async def scenario():
-        return [r async for r in adapter.generate_content_async(None, stream)]
+        return [r async for r in adapter.generate_content_async(_ANY_REQUEST, stream)]
 
-    try:
-        return asyncio.run(scenario())
-    finally:
-        base.calls = adapter.calls
+    return asyncio.run(scenario())
 
 
 class TestRetryBudget:
@@ -355,7 +374,7 @@ class TestRetryAfter:
         pol = policy()
         long_wait = rate_limited(**{"retry-after": "3600"})
 
-        assert not pol.should_retry(1, long_wait)
+        assert not pol.should_retry(1, classify(long_wait))
         assert pol.budget.tokens == pytest.approx(policy().budget.tokens), (
             "a refusal that spends a token charges the storm budget for a call"
             " it never made"
@@ -363,13 +382,13 @@ class TestRetryAfter:
 
     def test_a_wait_inside_the_ceiling_is_still_retried(self):
         """The rule refuses a long wait, not every stated one."""
-        assert policy().should_retry(1, rate_limited(**{"retry-after": "5"}))
+        assert policy().should_retry(1, classify(rate_limited(**{"retry-after": "5"})))
 
     def test_a_full_token_window_is_still_retried(self):
         """What the ceiling was raised for, named as the case rather than as a
         number: a tokens-per-minute window is 60 seconds wide, so a provider
         asking for 45 names a limit that really does reopen."""
-        assert policy().should_retry(1, rate_limited(**{"retry-after": "45"}))
+        assert policy().should_retry(1, classify(rate_limited(**{"retry-after": "45"})))
 
     def test_the_ceiling_covers_a_whole_per_minute_window(self):
         """The reasoning behind the constant, held rather than written down.
@@ -382,7 +401,7 @@ class TestRetryAfter:
 
     def test_an_error_with_no_hint_is_judged_as_before(self):
         """An absent header says nothing about when capacity returns."""
-        assert policy().should_retry(1, rate_limited())
+        assert policy().should_retry(1, classify(rate_limited()))
 
     def test_the_sleep_is_bounded_whatever_the_header_says(self):
         """The second reader of one rule, and deliberately so.
@@ -394,7 +413,9 @@ class TestRetryAfter:
         slept: list[float] = []
 
         async def scenario():
-            await pol.sleep_before_retry(1, rate_limited(**{"retry-after": "86400"}))
+            await pol.sleep_before_retry(
+                1, classify(rate_limited(**{"retry-after": "86400"}))
+            )
 
         async def fake_sleep(delay):
             slept.append(delay)
@@ -410,7 +431,9 @@ class TestRetryAfter:
         slept: list[float] = []
 
         async def scenario():
-            await pol.sleep_before_retry(1, rate_limited(**{"retry-after": "7"}))
+            await pol.sleep_before_retry(
+                1, classify(rate_limited(**{"retry-after": "7"}))
+            )
 
         async def fake_sleep(delay):
             slept.append(delay)
@@ -444,25 +467,25 @@ class TestBackoff:
 
 class TestShouldRetry:
     def test_a_transient_failure_earns_another_try(self):
-        assert policy().should_retry(1, rate_limited())
+        assert policy().should_retry(1, classify(rate_limited()))
 
     def test_a_non_transient_failure_does_not(self):
-        assert not policy().should_retry(1, ValueError("malformed request"))
+        assert not policy().should_retry(1, classify(ValueError("malformed request")))
 
     def test_a_non_transient_failure_spends_no_budget(self):
         # Order matters: a token spent on a failure that will never benefit
         # from a retry is a token the next real outage cannot draw on.
         pol = policy()
-        pol.should_retry(1, ValueError("malformed request"))
+        pol.should_retry(1, classify(ValueError("malformed request")))
         assert pol.budget.tokens == 10
 
     def test_the_last_attempt_does_not_retry(self):
-        assert not policy(attempts=3).should_retry(3, rate_limited())
+        assert not policy(attempts=3).should_retry(3, classify(rate_limited()))
 
     def test_an_exhausted_budget_stops_retrying_a_transient_failure(self):
         pol = policy(capacity=1)
-        assert pol.should_retry(1, rate_limited())
-        assert not pol.should_retry(1, rate_limited())
+        assert pol.should_retry(1, classify(rate_limited()))
+        assert not pol.should_retry(1, classify(rate_limited()))
 
 
 class TestWhatCountsAsTransient:
@@ -589,62 +612,74 @@ class TestTheLadderIsVendorNeutral:
 
 class TestRetryingAdapter:
     def test_a_clean_call_makes_one_request(self):
-        base = FakeLlm(outcomes=["ok"])
+        base = FakeExecutor(outcomes=["ok"])
         assert texts(drive(base, policy())) == ["ok"]
         assert base.calls == 1
 
     def test_a_transient_failure_is_retried_and_the_answer_survives(self):
-        base = FakeLlm(outcomes=[rate_limited(), "ok"])
+        base = FakeExecutor(outcomes=[rate_limited(), "ok"])
         assert texts(drive(base, policy())) == ["ok"]
         assert base.calls == 2
 
     def test_the_answer_says_which_attempt_produced_it(self):
         # A failed attempt meters nothing, so the count on the answer is what
         # lets a settlement charge the prompts the failed attempts sent.
-        assert drive(FakeLlm(outcomes=["ok"]), policy())[0].custom_metadata == {
+        assert drive(FakeExecutor(outcomes=["ok"]), policy())[0].custom_metadata == {
             "attempts": 1
         }
         retried = drive(
-            FakeLlm(outcomes=[rate_limited(), rate_limited(), "ok"]), policy()
+            FakeExecutor(outcomes=[rate_limited(), rate_limited(), "ok"]), policy()
         )
         assert retried[0].custom_metadata == {"attempts": 3}
 
     def test_success_credits_the_budget(self):
         pol = policy()
         pol.budget.tokens = 5
-        drive(FakeLlm(outcomes=["ok"]), pol)
+        drive(FakeExecutor(outcomes=["ok"]), pol)
         assert pol.budget.tokens == pytest.approx(5.1)
 
     def test_a_non_transient_failure_fails_on_the_first_request(self):
-        base = FakeLlm(outcomes=[ValueError("malformed"), "ok"])
+        base = FakeExecutor(outcomes=[ValueError("malformed"), "ok"])
         with pytest.raises(ValueError, match="malformed"):
             drive(base, policy())
         assert base.calls == 1
 
     def test_attempts_is_the_request_count_per_node(self):
         """The claim ``attempts`` could not make while LiteLLM retried beneath."""
-        base = FakeLlm(outcomes=[rate_limited()] * 5)
+        base = FakeExecutor(outcomes=[rate_limited()] * 5)
         with pytest.raises(RateLimitError):
             drive(base, policy(attempts=3))
         assert base.calls == 3
 
     def test_an_exhausted_budget_fails_fast_and_says_which_it_was(self):
-        base = FakeLlm(outcomes=[rate_limited()] * 5)
+        base = FakeExecutor(outcomes=[rate_limited()] * 5)
         with pytest.raises(RetryBudgetExhausted):
             drive(base, policy(attempts=3, capacity=0.5))
         assert base.calls == 1
 
     def test_a_partial_generator_never_reaches_the_caller(self):
         """Buffering is what makes the retry safe rather than duplicating."""
-        base = FakeLlm(outcomes=[APIConnectionError("dropped", "openai", "m"), "ok"])
+        base = FakeExecutor(
+            outcomes=[APIConnectionError("dropped", "openai", "m"), "ok"]
+        )
         assert texts(drive(base, policy())) == ["ok"]
 
-    def test_a_streaming_call_is_passed_straight_through(self):
-        # A replayed half-stream would be worse than no retry at all.
-        base = FakeLlm(outcomes=[rate_limited(), "ok"])
-        with pytest.raises(RateLimitError):
+    def test_a_streaming_call_is_refused_rather_than_passed_through(self):
+        """A change of behaviour, and a deliberate one.
+
+        The old adapter passed a streamed call straight down to the translator:
+        no retry, because a replayed half-stream is worse than no retry at all,
+        and no truncation check, because a chunk carries no finish reason until
+        the caller has already seen the text. It now crosses no seam either,
+        which is one silent skip too many. Every node here binds an output
+        schema and so never streams, so this branch was untravelled under both
+        rules — and an untravelled branch that refuses is found by whoever
+        first turns streaming on, while one that succeeds quietly is not.
+        """
+        base = FakeExecutor(outcomes=["ok"])
+        with pytest.raises(NotImplementedError):
             drive(base, policy(), stream=True)
-        assert base.calls == 1
+        assert base.calls == 0
 
 
 class TestTruncationIsRefused:
@@ -660,19 +695,19 @@ class TestTruncationIsRefused:
     """
 
     def test_a_length_stop_fails_the_node(self):
-        base = FakeLlm(outcomes=[truncated()])
+        base = FakeExecutor(outcomes=[truncated()])
         with pytest.raises(TruncatedCompletionError):
             drive(base, policy())
 
     def test_the_partial_output_never_reaches_the_caller(self):
         """The whole point: a fragment must not be validated as an answer."""
-        base = FakeLlm(outcomes=[truncated('{"threats":[{"id":')])
+        base = FakeExecutor(outcomes=[truncated('{"threats":[{"id":')])
         with pytest.raises(TruncatedCompletionError):
             drive(base, policy())
 
     def test_it_is_not_retried(self):
         """The same request against the same cap truncates again."""
-        base = FakeLlm(outcomes=[truncated(), "ok"])
+        base = FakeExecutor(outcomes=[truncated(), "ok"])
         with pytest.raises(TruncatedCompletionError):
             drive(base, policy(attempts=3))
         assert base.calls == 1
@@ -681,12 +716,12 @@ class TestTruncationIsRefused:
         pol = policy()
         pol.budget.tokens = 5
         with pytest.raises(TruncatedCompletionError):
-            drive(FakeLlm(outcomes=[truncated()]), pol)
+            drive(FakeExecutor(outcomes=[truncated()]), pol)
         assert pol.budget.tokens <= 5.1
 
     def test_the_message_names_the_model_and_the_knob(self):
         """An operator reading this should not have to find the cap themselves."""
-        base = FakeLlm(model="openai/gpt-5.6-sol", outcomes=[truncated()])
+        base = FakeExecutor(model="openai/gpt-5.6-sol", outcomes=[truncated()])
         with pytest.raises(TruncatedCompletionError) as excinfo:
             drive(base, policy())
         message = str(excinfo.value)
@@ -695,24 +730,32 @@ class TestTruncationIsRefused:
         assert "config/sampling.toml" in message
 
     def test_a_normal_stop_is_untouched(self):
-        base = FakeLlm(outcomes=[FakeResponse(text="ok", finish_reason="STOP")])
+        base = FakeExecutor(outcomes=[response("ok", finish_reason="STOP")])
         assert texts(drive(base, policy())) == ["ok"]
 
     def test_an_absent_finish_reason_is_not_truncation(self):
         """Vendors that say nothing are the silent half, and graph.py's to catch."""
-        base = FakeLlm(outcomes=[FakeResponse(text="ok")])
+        base = FakeExecutor(outcomes=[response("ok")])
         assert texts(drive(base, policy())) == ["ok"]
 
     def test_a_truncation_anywhere_in_the_sequence_counts(self):
-        """One call yields one response today; the collection is still a sequence."""
-        cls = retrying_llm_class(FakeLlm, policy())
-        adapter = cls(model="fake/model")
+        """One call yields one response today; the collection is still a sequence.
 
-        async def two_parts(llm_request, stream=False):
-            yield FakeResponse(text="first", finish_reason="STOP")
-            yield truncated("second")
+        Answered at the seam, which is where a call that produced more than one
+        result would arrive — the executor's contract is a sequence, and the
+        refusal has to scan all of it rather than the last entry.
+        """
 
-        adapter._attempt_with_retries = lambda _req: _collect(two_parts(None))
+        class TwoParts:
+            async def generate(self, request):
+                return [
+                    GenerationResult.of(response("first", finish_reason="STOP")),
+                    GenerationResult.of(truncated("second")),
+                ]
+
+        adapter = ExecutedLlm(
+            model="fake/model", executor=TwoParts(), retry_policy=policy()
+        )
         with pytest.raises(TruncatedCompletionError):
             asyncio.run(_drain(adapter))
 
@@ -720,7 +763,7 @@ class TestTruncationIsRefused:
 class TestTheFinishReasonContract:
     """The one assumption the fake cannot carry: what ADK actually puts there.
 
-    Every test above scripts the string ``_reject_truncated`` matches on, which
+    Every test above scripts the string ``reject_truncated`` matches on, which
     proves the check works and nothing about whether it will ever fire. These
     two probe the installed library instead — the same reason
     ``test_model_gate.py`` probes litellm rather than mirroring its behaviour.
@@ -744,7 +787,7 @@ async def _collect(agen) -> list:
 
 
 async def _drain(adapter) -> None:
-    async for _ in adapter.generate_content_async(None):
+    async for _ in adapter.generate_content_async(_ANY_REQUEST):
         pass
 
 
@@ -760,21 +803,21 @@ class TestTheStormItself:
 
     @staticmethod
     def fan_out(pol: RetryPolicy, lanes: int = 6) -> int:
-        cls = retrying_llm_class(FakeLlm, pol)
+        executors = [FakeExecutor(outcomes=[rate_limited()] * 10) for _ in range(lanes)]
         adapters = [
-            cls(model="fake/model", outcomes=[rate_limited()] * 10)
-            for _ in range(lanes)
+            ExecutedLlm(model="fake/model", executor=one, retry_policy=pol)
+            for one in executors
         ]
 
         async def scenario():
-            async def one(adapter):
-                async for _ in adapter.generate_content_async(None):
+            async def drain(adapter):
+                async for _ in adapter.generate_content_async(_ANY_REQUEST):
                     pass
 
-            await asyncio.gather(*(one(a) for a in adapters), return_exceptions=True)
+            await asyncio.gather(*(drain(a) for a in adapters), return_exceptions=True)
 
         asyncio.run(scenario())
-        return sum(adapter.calls for adapter in adapters)
+        return sum(one.calls for one in executors)
 
     def test_a_correlated_outage_costs_far_less_than_every_lane_retrying(self):
         # Six lanes x three attempts is eighteen requests if each lane keeps its
@@ -788,7 +831,7 @@ class TestTheStormItself:
         # The budget must not make the service brittle: with capacity to spare,
         # one unlucky lane retries exactly as it always did.
         pol = policy(attempts=3, capacity=10)
-        base = FakeLlm(outcomes=[rate_limited(), "ok"])
+        base = FakeExecutor(outcomes=[rate_limited(), "ok"])
         assert texts(drive(base, pol)) == ["ok"]
         assert base.calls == 2
 
