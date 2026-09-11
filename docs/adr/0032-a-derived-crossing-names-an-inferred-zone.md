@@ -109,6 +109,18 @@ inferred, because the value is derived — and refreshes the file digests in the
 one merged Baseline's manifest through the same reader `verify` uses. The
 migration rewrites all 78 so the archive holds one shape.
 
+**A merged Baseline outlives the PR that laid it down, and the contribution
+gate now says so.** `submit.detect_kind` read a touch of `evals/baselines/` as a
+baseline submission, so this PR's migration failed "nothing outside this kind's
+allowlist changed" for every code file beside it, with no diff that could pass.
+That is the shape the kind's `derived` entry already records for the comparison
+table. `Kind` gains a `selects` member with no default, and the baseline kind
+answers it with "this diff adds a sweep", read by the one reader
+`added_sweeps`, which the author-stamp check now calls too. A PR that adds a
+sweep still selects the kind, so #320's binding, #323's digests and the
+one-directory rule run on every contribution; a maintenance diff loses the
+checklist and no check that was protecting anything.
+
 **`prompts/critic` costs 16 more static tokens and its cap moves 2100 → 2400.**
 What the sentence buys is the critic's ability to weigh a ground it is already
 being shown: without it, `assumed_endpoints` arrives in a fenced JSON block as a
