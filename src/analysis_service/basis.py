@@ -131,6 +131,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from analysis_service.analysis import (
     CONTROL_ATTRIBUTES,
+    CONTROL_VALUE_MAX_CHARS,
     control_state,
     matches_term,
 )
@@ -230,7 +231,7 @@ class UnbasedControl(BaseModel):
 
     element_id: str = Field(min_length=1, max_length=300)
     attribute: str = Field(min_length=1, max_length=100)
-    value: str = Field(min_length=1, max_length=200)
+    value: str = Field(min_length=1, max_length=CONTROL_VALUE_MAX_CHARS)
     source_label: str = Field(min_length=1, max_length=200)
     tokens: tuple[str, ...]
 
@@ -302,7 +303,7 @@ def stated_controls(
                 yield StatedControl(
                     element_id=element.id,
                     attribute=attribute,
-                    value=value[:200],
+                    value=value[:CONTROL_VALUE_MAX_CHARS],
                     source_label=element.source_label,
                     tokens=tokens,
                 )

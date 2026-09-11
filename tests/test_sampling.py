@@ -442,3 +442,49 @@ class TestConstrainOutput:
         env = {env_var_for("base", "constrain_output"): value}
         with pytest.raises(SamplingConfigError, match="is not one of"):
             load_sampling(config_path(config_toml()), env=env)
+
+
+class TestAPenaltyIsFinite:
+    """The sweep of finding 3's class, over the file a contributor writes.
+
+    ``NodeRun.reported_charge_usd`` was the instance the checkpoint round
+    found. These two are the same shape one file over: TOML reads ``inf`` and
+    ``nan`` as float literals, and nothing between the loader and the wire
+    said otherwise.
+    """
+
+    @pytest.mark.parametrize("name", ("presence_penalty", "frequency_penalty"))
+    @pytest.mark.parametrize("literal", ("inf", "-inf", "nan"))
+    def test_the_loader_refuses_it(self, name, literal, tmp_path):
+        path = tmp_path / "sampling.toml"
+        path.write_text(
+            f"version = {SUPPORTED_VERSION}\n[tiers.base]\n{name} = {literal}\n",
+            encoding="utf-8",
+        )
+        with pytest.raises(SamplingConfigError):
+            load_sampling(path, env={})
+
+    def test_toml_really_does_read_those_words_as_numbers(self):
+        """The premise. Without it the test above could pass for the wrong reason."""
+        import tomllib
+
+        assert tomllib.loads("x = inf")["x"] == float("inf")
+        assert tomllib.loads("x = nan")["x"] != tomllib.loads("x = nan")["x"]
+
+    def test_the_build_gate_would_not_have_caught_it(self):
+        """Why the bound belongs at the loader and not at the gate.
+
+        ``check_supported`` asks whether a param maps, not whether its value is
+        sane, so every pair that takes a penalty at all takes an infinite one.
+        """
+        from analysis_service.model_gate import ModelGateError, check_supported
+        from analysis_service.vendors import vendor_for
+
+        vendor, model = vendor_for("bedrock"), "cohere.command-text-v14"
+        check_supported(vendor, model, {"presence_penalty": 0.5}, source="s")
+        try:
+            check_supported(
+                vendor, model, {"presence_penalty": float("inf")}, source="s"
+            )
+        except ModelGateError:  # pragma: no cover - a library that starts checking
+            pytest.fail("the gate now range-checks; the loader bound may be redundant")

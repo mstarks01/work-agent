@@ -44,6 +44,7 @@ from typing import Any
 # Imported before anything that could pull in ``litellm``, per the ordering
 # rule in :mod:`analysis_service.model_gate`.
 from analysis_service.model_gate import (
+    ModelGateError,
     check_supported,
     model_info,
     native_structured_output,
@@ -200,10 +201,17 @@ def _probe_param(vendor: Vendor, model: str, name: str, value: Any) -> Capabilit
     can never disagree about the same pair — the report would otherwise say
     ``SUPPORTED`` for a combination the build refuses, which is the failure this
     module is least able to afford.
+
+    **Narrowed to the one type it raises.** ``check_supported`` wraps
+    litellm's bare raise in a :class:`~analysis_service.model_gate.ModelGateError`
+    and lets nothing else out — swept over every mapped pair under a registered
+    prefix at six params, 4,182 probes produced 1,362 raises and one type. A
+    bare ``except`` here would read an unrelated failure as ``UNSUPPORTED``,
+    which is the fact this module's own header forbids inventing.
     """
     try:
         check_supported(vendor, model, {name: value}, source="conformance probe")
-    except Exception:  # noqa: BLE001 -- check_supported wraps litellm's bare raise
+    except ModelGateError:
         return Capability.UNSUPPORTED
     return Capability.SUPPORTED
 

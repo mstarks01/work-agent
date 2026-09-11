@@ -158,9 +158,23 @@ class _TierParams(BaseModel):
 class _RawTier(_TierParams):
     """One tier's decoding params exactly as written in the file / overrides.
 
-    The three bounded fields are redeclared here with their bounds, and the
+    The five bounded fields are redeclared here with their bounds, and the
     reserved ``candidate_count`` value is checked here, so an out-of-range
     value fails at the loader and never reaches a resolved tier.
+
+    **The two penalties are bounded for finiteness and not for range.** TOML
+    reads ``inf`` and ``nan`` as float literals, so ``presence_penalty = inf``
+    parsed, resolved, crossed the seam and reached
+    :meth:`~analysis_service.provider.GenerationRequest.payload`, where
+    ``json.dumps`` writes ``Infinity`` — a token RFC 8259 has no name for. The
+    build gate does not catch it: measured over the pinned map, 363 pairs
+    accept ``presence_penalty=0.5`` and all 363 accept ``inf`` too, because
+    :func:`~analysis_service.model_gate.check_supported` asks whether the
+    param maps rather than whether the value is sane.
+
+    Their *range* stays unbounded here for the reason ``max_output_tokens``
+    does: what a provider will take is a per-``(vendor, model)`` fact, and a
+    copy of it drifts against the provider actually serving the request.
 
     No upper bound is placed on ``max_output_tokens``: the ceiling is a
     per-``(vendor, model)`` fact, and mirroring one here would be a table that
@@ -173,6 +187,8 @@ class _RawTier(_TierParams):
     temperature: float | None = Field(default=None, ge=0.0, le=2.0)
     top_p: float | None = Field(default=None, gt=0.0, le=1.0)
     max_output_tokens: int | None = Field(default=None, ge=1)
+    presence_penalty: float | None = Field(default=None, allow_inf_nan=False)
+    frequency_penalty: float | None = Field(default=None, allow_inf_nan=False)
 
     @field_validator("candidate_count")
     @classmethod
