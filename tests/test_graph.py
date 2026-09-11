@@ -51,7 +51,6 @@ from analysis_service.report import (
     NodeRun,
     Report,
 )
-from analysis_service.resilience import load_resilience
 from analysis_service.sampling import load_sampling
 from analysis_service.sources import DEFAULT_DESCRIPTION_LABEL, Source
 from analysis_service.system_model import SystemModel
@@ -406,7 +405,7 @@ thinking = "high"
 
 
 def _pipeline_with_sampling(
-    prompt_loader, domain_loader, package_loaders, sampling_path, resilience
+    prompt_loader, domain_loader, package_loaders, sampling_path
 ):
     tiers = repo_tiers()
     sampling = load_sampling(sampling_path, env={})
@@ -415,9 +414,7 @@ def _pipeline_with_sampling(
         domain_loader=domain_loader,
         package_loaders=package_loaders,
         frameworks=FRAMEWORKS,
-        binding=NodeBinding.from_configs(
-            tiers, sampling, _route_resolver(tiers), resilience
-        ),
+        binding=NodeBinding.from_configs(tiers, sampling, _route_resolver(tiers)),
     )
 
 
@@ -432,10 +429,9 @@ def test_each_llm_node_binds_its_own_tier_sampling(
     """
     sampling_path = tmp_path / "sampling.toml"
     sampling_path.write_text(_DIVERGENT_SAMPLING, encoding="utf-8")
-    resilience = load_resilience(PROJECT_ROOT / "config" / "resilience.toml", env={})
     nodes = nodes_by_name(
         _pipeline_with_sampling(
-            prompt_loader, domain_loader, package_loaders, sampling_path, resilience
+            prompt_loader, domain_loader, package_loaders, sampling_path
         )
     )
 
@@ -470,7 +466,7 @@ def test_seed_and_reasoning_stay_off_the_node_config(
     sampling_path.write_text(_DIVERGENT_SAMPLING, encoding="utf-8")
     nodes = nodes_by_name(
         _pipeline_with_sampling(
-            prompt_loader, domain_loader, package_loaders, sampling_path, None
+            prompt_loader, domain_loader, package_loaders, sampling_path
         )
     )
     config = nodes[graph.EXTRACT_NODE].generate_content_config
@@ -478,40 +474,29 @@ def test_seed_and_reasoning_stay_off_the_node_config(
     assert config.thinking_config is None
 
 
-def test_per_node_sampling_composes_with_the_resilience_timeout(
+def test_a_node_config_carries_sampling_and_no_http_options(
     prompt_loader, domain_loader, package_loaders, tmp_path
 ):
-    """The node's tier sampling and the resilience timeout ride the one config.
+    """The node config is the tier's decoding params and nothing else.
 
-    ``http_options`` stays owned by ``resilience.toml`` — folding
-    per-node sampling in must not drop it, nor sampling source it.
+    ``http_options`` used to carry the per-request timeout here, and that
+    carrier changed the unit: ADK forwards ``types.HttpOptions.timeout`` to
+    LiteLLM unchanged, the field is milliseconds and LiteLLM reads seconds. The
+    timeout is a LiteLLM kwarg on the adapter now, so a node config that grew
+    one back would be re-opening the defect — see
+    ``test_resilience.py::test_the_timeout_reaching_litellm_is_the_one_the_file_states``.
     """
     sampling_path = tmp_path / "sampling.toml"
     sampling_path.write_text(_DIVERGENT_SAMPLING, encoding="utf-8")
-    resilience = load_resilience(PROJECT_ROOT / "config" / "resilience.toml", env={})
     nodes = nodes_by_name(
         _pipeline_with_sampling(
-            prompt_loader, domain_loader, package_loaders, sampling_path, resilience
+            prompt_loader, domain_loader, package_loaders, sampling_path
         )
     )
 
-    extract = nodes[graph.EXTRACT_NODE].generate_content_config
-    assert extract.http_options.timeout == resilience.timeout_ms
-    assert extract.temperature == 0.0  # sampling survives the http_options fold-in
-
-
-def test_llm_nodes_carry_no_http_options_without_resilience(
-    prompt_loader, domain_loader, package_loaders, tmp_path
-):
-    """Resilience is optional (offline stand-ins); its absence leaves no timeout."""
-    sampling_path = tmp_path / "sampling.toml"
-    sampling_path.write_text(_DIVERGENT_SAMPLING, encoding="utf-8")
-    nodes = nodes_by_name(
-        _pipeline_with_sampling(
-            prompt_loader, domain_loader, package_loaders, sampling_path, None
-        )
-    )
-    assert nodes[CRITIC_NODE].generate_content_config.http_options is None
+    for node in (graph.EXTRACT_NODE, CRITIC_NODE):
+        assert nodes[node].generate_content_config.http_options is None
+    assert nodes[graph.EXTRACT_NODE].generate_content_config.temperature == 0.0
 
 
 def test_deterministic_bookends_carry_no_model(pipeline):

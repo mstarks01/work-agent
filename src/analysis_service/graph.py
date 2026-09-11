@@ -190,7 +190,6 @@ from analysis_service.report import (
     NodeRun,
     Report,
 )
-from analysis_service.resilience import ResilienceConfig
 from analysis_service.retry import TRUNCATION_REMEDY
 from analysis_service.sampling import (
     SamplingResolver,
@@ -2145,22 +2144,22 @@ class Pipeline:
     review_independence: ReviewIndependence = "shared"
 
 
-def _generate_content_config(
-    sampling: TierSampling, resilience: ResilienceConfig | None
-) -> types.GenerateContentConfig:
-    """One node's tier sampling and the per-request timeout, composed together.
+def _generate_content_config(sampling: TierSampling) -> types.GenerateContentConfig:
+    """One node's own tier's decoding params, and nothing else.
 
-    ``sampling`` is the node's *own* tier's decoding params:
     ``resolve_sampling`` hands each node its :class:`TierSampling`, so nodes on
-    different tiers never share one graph-wide constant. The timeout rides on
-    ``http_options``, owned by ``config/resilience.toml`` and never sourced
-    from sampling. ``resilience`` is optional only so the offline stand-ins,
-    whose fakes never read a deadline, can build the graph without a config.
+    different tiers never share one graph-wide constant.
+
+    **The per-request timeout is not here, and no ``http_options`` is set.** It
+    was, and the carrier changed its unit: ADK hands
+    ``types.HttpOptions.timeout`` to LiteLLM unchanged, the field is documented
+    in milliseconds, and LiteLLM reads seconds. The timeout is now a LiteLLM
+    kwarg on the adapter, where the unit is LiteLLM's own — see
+    :func:`~analysis_service.binding.build_tier_adapters`. Nothing in this file
+    reads ``config/resilience.toml`` any more, which is why no builder below
+    carries it.
     """
-    config = sampling.to_generate_content_config()
-    if resilience is not None:
-        config.http_options = resilience.to_http_options()
-    return config
+    return sampling.to_generate_content_config()
 
 
 def _llm_node(
@@ -2172,7 +2171,6 @@ def _llm_node(
     output_key: str,
     resolve_model: ModelResolver,
     resolve_sampling: SamplingResolver,
-    resilience: ResilienceConfig | None,
 ) -> LlmAgent:
     """One LLM node: its model, its full instruction, its emitted schema.
 
@@ -2183,8 +2181,8 @@ def _llm_node(
     decoding params from the config shared with the eval suite — no node on
     library defaults, none on another tier's sampling. The tier key is passed in
     rather than looked up, because the map is now built per selection and the
-    caller already holds it. The request deadline comes from the resilience
-    config.
+    caller already holds it. The per-request timeout is not here: it rides the
+    adapter ``resolve_model`` returns.
     """
     return LlmAgent(
         name=name,
@@ -2193,9 +2191,7 @@ def _llm_node(
         output_schema=output_schema,
         output_key=output_key,
         include_contents="none",
-        generate_content_config=_generate_content_config(
-            resolve_sampling(tier_node), resilience
-        ),
+        generate_content_config=_generate_content_config(resolve_sampling(tier_node)),
     )
 
 
@@ -2203,7 +2199,6 @@ def _extract_node(
     prompt_loader: MarkdownLoader,
     resolve_model: ModelResolver,
     resolve_sampling: SamplingResolver,
-    resilience: ResilienceConfig | None,
 ) -> LlmAgent:
     """The extraction node, shared by the production graph and eval mode 1."""
     return _llm_node(
@@ -2214,7 +2209,6 @@ def _extract_node(
         output_key=STATE_EXTRACTED_MODEL,
         resolve_model=resolve_model,
         resolve_sampling=resolve_sampling,
-        resilience=resilience,
     )
 
 
@@ -2332,7 +2326,6 @@ def _framework_subgraph(
     tier_nodes: Mapping[str, str],
     resolve_model: ModelResolver,
     resolve_sampling: SamplingResolver,
-    resilience: ResilienceConfig | None,
 ) -> _FrameworkSubgraph:
     """Build one framework's lane agents, critic, re-ask and four function nodes."""
     package = nodes.package
@@ -2361,7 +2354,6 @@ def _framework_subgraph(
                 output_key=lane.drafts_key,
                 resolve_model=resolve_model,
                 resolve_sampling=resolve_sampling,
-                resilience=resilience,
             )
             for lane in nodes.lanes
         ),
@@ -2375,7 +2367,6 @@ def _framework_subgraph(
             output_key=reviewed_key,
             resolve_model=resolve_model,
             resolve_sampling=resolve_sampling,
-            resilience=resilience,
         ),
         recritic=_llm_node(
             name=nodes.node(RECRITIC_ROLE),
@@ -2387,7 +2378,6 @@ def _framework_subgraph(
             output_key=reviewed_key,
             resolve_model=resolve_model,
             resolve_sampling=resolve_sampling,
-            resilience=resilience,
         ),
         join=JoinNode(name=nodes.node(JOIN_ROLE)),
         merge=_node(merge, nodes.node(MERGE_ROLE)),
@@ -2444,7 +2434,6 @@ def build_pipeline(
 
     resolve_model = binding.resolve_model
     resolve_sampling = binding.resolve_sampling
-    resilience = binding.resilience
     tier_nodes = tier_node_by_graph_node(frameworks)
 
     def pipeline(workflow: Workflow, llm_nodes: list[LlmAgent]) -> Pipeline:
@@ -2462,9 +2451,7 @@ def build_pipeline(
         )
 
     if entry == ENTRY_EXTRACT_ONLY:
-        extract = _extract_node(
-            prompt_loader, resolve_model, resolve_sampling, resilience
-        )
+        extract = _extract_node(prompt_loader, resolve_model, resolve_sampling)
         return pipeline(Workflow(name=name, edges=[(START, extract)]), [extract])
 
     keys = GraphKeys.of(frameworks)
@@ -2484,16 +2471,13 @@ def build_pipeline(
             tier_nodes=tier_nodes,
             resolve_model=resolve_model,
             resolve_sampling=resolve_sampling,
-            resilience=resilience,
         )
         for framework in frameworks
     ]
 
     extraction_nodes: list[LlmAgent] = []
     if entry == ENTRY_EXTRACT:
-        extract = _extract_node(
-            prompt_loader, resolve_model, resolve_sampling, resilience
-        )
+        extract = _extract_node(prompt_loader, resolve_model, resolve_sampling)
         repair = _llm_node(
             name=REPAIR_NODE,
             tier_node="repair",
@@ -2502,7 +2486,6 @@ def build_pipeline(
             output_key=STATE_EXTRACTED_MODEL,
             resolve_model=resolve_model,
             resolve_sampling=resolve_sampling,
-            resilience=resilience,
         )
         validate = _node(_validate_node_func(keys), VALIDATE_NODE)
         revalidate = _node(_validate_node_func(keys), REVALIDATE_NODE)

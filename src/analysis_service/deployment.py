@@ -344,9 +344,7 @@ class Deployment:
             package_loaders={
                 name: MarkdownLoader(self.paths.frameworks / name) for name in selection
             },
-            binding=NodeBinding.from_configs(
-                self.tiers, self.sampling, resolve_model, self.resilience
-            ),
+            binding=NodeBinding.from_configs(self.tiers, self.sampling, resolve_model),
             frameworks=selection,
             entry=entry,
         )

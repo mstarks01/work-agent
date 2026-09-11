@@ -312,10 +312,17 @@ def test_both_tiers_draw_on_one_shared_retry_budget():
 
 
 def test_the_pipeline_binds_retry_and_timeout():
-    """Every LLM node carries the retry policy and the deadline."""
+    """Every LLM node carries the retry policy and the per-request timeout.
+
+    Both ride the adapter. The timeout is read in seconds here because that is
+    LiteLLM's unit and the adapter kwarg is the last hop before it — asserting
+    the file's milliseconds against something ADK hands on unchanged is how the
+    bound came to mean 3.5 days.
+    """
     from google.adk.models.lite_llm import LiteLlm
 
-    pipeline = Deployment.from_env(env=VERTEX_ENV).pipeline(DEFAULT_FRAMEWORKS)
+    deployment = Deployment.from_env(env=VERTEX_ENV)
+    pipeline = deployment.pipeline(DEFAULT_FRAMEWORKS)
     critic = {node.name: node for node in pipeline.workflow.graph.nodes}[CRITIC_NODE]
 
     assert isinstance(critic.model, LiteLlm)
@@ -323,7 +330,11 @@ def test_the_pipeline_binds_retry_and_timeout():
     # provider SDK's max_retries from it, and the loop runs one level up in
     # analysis_service.retry, where a shared budget can bound it.
     assert critic.model._additional_args["num_retries"] == 0
-    assert critic.generate_content_config.http_options.timeout == 300000
+    assert critic.model._additional_args["timeout"] == 300.0
+    assert (
+        critic.model._additional_args["timeout"]
+        == deployment.resilience.request_timeout_seconds()
+    )
 
 
 def test_drop_params_is_never_set_so_litellm_stays_fail_closed():
