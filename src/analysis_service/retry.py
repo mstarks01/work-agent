@@ -77,9 +77,8 @@ ATTEMPTS_METADATA_KEY = "attempts"
 _BACKOFF_BASE_SECONDS = 1.0
 _BACKOFF_CAP_SECONDS = 30.0
 
-# The longest wait this module will take on a provider's word, and it is the
-# longest it would ever choose for itself — the backoff cap. A hint beyond it is
-# not a pause, it is the provider saying capacity will not return inside the
+# The longest wait this module will take on a provider's word. A hint beyond it
+# is not a pause, it is the provider saying capacity will not return inside the
 # window this job is willing to wait, and the honest answer to that is to stop
 # rather than to sleep and ask again into the same limit.
 #
@@ -88,7 +87,20 @@ _BACKOFF_CAP_SECONDS = 30.0
 # paid job for a day, and ``float("inf")`` — which ``float()`` accepts — parks
 # it forever, on a call that had a deadline. Pinned rather than configured, for
 # the reason the two constants above are.
-_RETRY_AFTER_CEILING_SECONDS = _BACKOFF_CAP_SECONDS
+#
+# **60 seconds, sized against the limit that actually sends the header.** The
+# ceiling was the backoff cap — the longest wait this module would choose for
+# itself — for as long as no ``Retry-After`` reached it. PR #833 found that
+# none ever had, because the header arrives on an attribute this module was not
+# reading, so the number was chosen against a value that never came.
+#
+# A tokens-per-minute window is 60 seconds wide, so a provider naming 45 is
+# naming a limit that really does reopen, and refusing it fails a node that one
+# sleep would have carried. Beyond a minute the hint describes something other
+# than the current window and the refusal is right again. It sits inside both
+# bounds a job already has: one request's timeout is 300 s and the job deadline
+# is 900 s, so a full set of attempts sleeping the ceiling stays under either.
+_RETRY_AFTER_CEILING_SECONDS = 60.0
 
 # ADK maps LiteLLM's ``finish_reason="length"`` onto this member of
 # ``google.genai.types.FinishReason`` and hangs it on every non-streaming
