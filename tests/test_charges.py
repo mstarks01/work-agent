@@ -10,10 +10,12 @@ a deployment declares — is tested beside the loader that reads it, in
 from __future__ import annotations
 
 import asyncio
+import json
 import math
 from types import SimpleNamespace
 
 import pytest
+from pydantic import ValidationError
 
 from analysis_service.charges import (
     CHARGE_METADATA_KEY,
@@ -503,3 +505,50 @@ class TestTheChargeReachesTheRecord:
             for (response,) in asyncio.run(concurrently())
         ]
         assert stamped == pytest.approx(charges)
+
+
+class TestTheStoredFigureIsHeldToTheRuleThatWroteIt:
+    """The bounds this module states, held on the models that store its values.
+
+    Each was spelled twice: the finite rule here and ``ge=0`` alone on the
+    record, the length here and a literal in two models. A stored value is only
+    as trustworthy as whatever wrote it, and a hand-edited artifact is exactly
+    the case both readers exist for.
+    """
+
+    def test_a_non_finite_charge_cannot_be_read_back(self):
+        """The regression, in the shape that proved it.
+
+        ``inf`` validated, summed to ``inf`` through ``charges_by_node``, and
+        re-serialised as ``null`` — so a report read back and re-dumped moved
+        the bytes an attestation seals. Both read-back paths are driven,
+        because ``json.loads`` accepts ``Infinity`` and pydantic's own parser
+        does too.
+        """
+        from analysis_service.report import NodeRun
+
+        raw = '{"node":"x","duration_ms":1,"reported_charge_usd":Infinity}'
+        with pytest.raises(ValidationError):
+            NodeRun.model_validate_json(raw)
+        with pytest.raises(ValidationError):
+            NodeRun.model_validate(json.loads(raw))
+
+    def test_the_length_bound_has_one_reader(self):
+        """The producer's bound and the two records that store its output.
+
+        Compared against the bound rather than against 100, so widening it
+        moves all three together instead of making two readers refuse what the
+        third writes.
+        """
+        from analysis_service.charges import UPSTREAM_MAX_CHARS
+        from analysis_service.report import NodeRun
+        from evals.harness.provenance import NodeExecution
+
+        longest = "u" * UPSTREAM_MAX_CHARS
+        assert (
+            NodeRun(node="x", duration_ms=1, served_upstream=longest).served_upstream
+            == longest
+        )
+        for model in (NodeRun, NodeExecution):
+            with pytest.raises(ValidationError):
+                model.model_validate({"served_upstream": longest + "u"})

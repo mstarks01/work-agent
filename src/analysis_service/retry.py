@@ -541,6 +541,21 @@ def _backoff_seconds(attempt: int) -> float:
     return random.uniform(0, ceiling)
 
 
+class RetryRefusal(StrEnum):
+    """Which rule refused another attempt.
+
+    One value, computed once by :meth:`RetryPolicy.refuse_retry` and read by
+    :meth:`RetryPolicy.give_up`. It exists because the four conditions overlap
+    — an empty budget and an hour-long ``Retry-After`` can both hold — so the
+    question "why did the loop stop" has one answer and needs one reader.
+    """
+
+    ATTEMPTS_SPENT = "attempts_spent"
+    NOT_RETRYABLE = "not_retryable"
+    WAIT_TOO_LONG = "wait_too_long"
+    BUDGET_SPENT = "budget_spent"
+
+
 @dataclass(frozen=True)
 class RetryPolicy:
     """How hard to try again, and how much the process may try in total.
@@ -559,7 +574,7 @@ class RetryPolicy:
         """Wait out one backoff interval, preferring the provider's own answer.
 
         Bounded by :data:`_RETRY_AFTER_CEILING_SECONDS` whatever the provider
-        said. :meth:`should_retry` already refuses a failure asking for longer,
+        said. :meth:`refuse_retry` already refuses a failure asking for longer,
         so this clamp is the second reader of one rule and is here on purpose:
         the two are called by different code paths, and a caller that slept
         before asking whether to retry would hand a header the process's
@@ -570,29 +585,43 @@ class RetryPolicy:
             delay = _backoff_seconds(attempt)
         await asyncio.sleep(min(delay, _RETRY_AFTER_CEILING_SECONDS))
 
-    def should_retry(self, attempt: int, failure: ProviderFailure) -> bool:
-        """Whether ``failure`` on ``attempt`` earns another try, budget included.
+    def refuse_retry(
+        self, attempt: int, failure: ProviderFailure
+    ) -> RetryRefusal | None:
+        """Why ``failure`` on ``attempt`` earns no further try, or ``None``.
 
         Takes the facts rather than the exception, so this decision is the same
         one whether the call ran in this process or behind
         :mod:`analysis_service.provider`'s seam. Nothing is re-derived here:
         :func:`classify` read the rules once.
 
+        **The answer says which rule refused**, because :meth:`give_up` needs
+        that and asking again is how it got a different answer. Four conditions
+        overlap: a budget can be empty while a provider also asks for an hour,
+        and a reader that recomputed "was it the budget" from ``attempt``,
+        ``retryable`` and ``tokens`` named the budget for a refusal the header
+        made. It then raised :class:`RetryBudgetExhausted` in place of the
+        provider's own exception, so an operator read "the whole service is
+        failing" off one slow provider.
+
         Order matters: the transient check comes first so a non-transient
         failure never spends a token it was never going to benefit from.
+
+        Called **once** per failed attempt, because the last branch mutates:
+        :meth:`RetryBudget.withdraw` spends the token this answer grants.
         """
         if attempt >= self.attempts:
-            return False
+            return RetryRefusal.ATTEMPTS_SPENT
         if not failure.retryable:
-            return False
+            return RetryRefusal.NOT_RETRYABLE
         if _asks_a_longer_wait_than_we_take(failure):
             logger.warning(
                 "provider asked for a wait longer than %.0fs; failing the node"
                 " rather than sleeping on its number",
                 _RETRY_AFTER_CEILING_SECONDS,
             )
-            return False
-        return self.budget.withdraw()
+            return RetryRefusal.WAIT_TOO_LONG
+        return None if self.budget.withdraw() else RetryRefusal.BUDGET_SPENT
 
     def log_retry(self, attempt: int, failure: ProviderFailure, model: str) -> None:
         """Say that one attempt failed and another is coming.
@@ -611,7 +640,11 @@ class RetryPolicy:
         )
 
     def give_up(
-        self, attempt: int, failure: ProviderFailure, model: str
+        self,
+        refusal: RetryRefusal,
+        attempt: int,
+        failure: ProviderFailure,
+        model: str,
     ) -> BaseException:
         """What to raise when no further attempt is coming.
 
@@ -625,11 +658,13 @@ class RetryPolicy:
         exception type a caller was already catching to the seam. A failure
         that crossed a process boundary has no cause to re-raise and gets one
         naming what it was.
+
+        ``refusal`` is :meth:`refuse_retry`'s own answer, passed in rather than
+        recomputed. That is the whole of the fix: the four conditions overlap,
+        and a second derivation from the same three fields named the budget for
+        a refusal a ``Retry-After`` made.
         """
-        spent_budget = (
-            attempt < self.attempts and failure.retryable and self.budget.tokens < 1.0
-        )
-        if not spent_budget:
+        if refusal is not RetryRefusal.BUDGET_SPENT:
             return failure.cause or RuntimeError(
                 f"{failure.kind.value}: {failure.detail}"
             )

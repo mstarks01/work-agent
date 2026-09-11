@@ -124,7 +124,13 @@ _UPSTREAM_FIELD = "provider"
 #: How much of a provider's name is kept. A bound rather than trust: the value
 #: is a third party's free text, it lands in a report and in an eval artifact,
 #: and nothing downstream is served by an unbounded string.
-_UPSTREAM_LIMIT = 100
+#:
+#: Public, and imported by the two models that store the value —
+#: :class:`analysis_service.report.NodeRun` and
+#: :class:`evals.harness.provenance.NodeExecution`. It was spelled here and as
+#: a literal in both of those, so widening the producer's bound would have made
+#: the readers refuse what it writes.
+UPSTREAM_MAX_CHARS = 100
 
 #: Where litellm files a charge a provider reported. Its OpenRouter config sets
 #: ``usage.include`` on every request and copies ``usage.cost`` out of the
@@ -203,7 +209,7 @@ def served_upstream_of(response: Any) -> str | None:
     stated = getattr(response, _UPSTREAM_FIELD, None)
     if not isinstance(stated, str) or not stated.strip():
         return None
-    return stated.strip()[:_UPSTREAM_LIMIT]
+    return stated.strip()[:UPSTREAM_MAX_CHARS]
 
 
 def stated_arrangement_of(response: Any) -> ChargeMode | None:

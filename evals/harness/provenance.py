@@ -62,6 +62,7 @@ from analysis_service.certification import (
     Fingerprint,
     TierResolver,
 )
+from analysis_service.charges import UPSTREAM_MAX_CHARS
 from analysis_service.identity import IDENTITY_VERSION, execution_fingerprint
 from analysis_service.model_tiers import TIER_NAMES, TierName
 from analysis_service.report import NodeRun
@@ -131,7 +132,7 @@ class NodeExecution(BaseModel):
     #: from every direct route and from every sweep recorded before the field
     #: existed, which is why it defaults rather than being required: an absent
     #: value is a real answer here, and demanding one would refuse the archive.
-    served_upstream: str | None = Field(default=None, max_length=100)
+    served_upstream: str | None = Field(default=None, max_length=UPSTREAM_MAX_CHARS)
 
     def to_json(self) -> dict[str, str]:
         """One entry, self-describing.
