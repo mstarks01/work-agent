@@ -1084,6 +1084,10 @@ VENDORS: dict[VendorName, Vendor] = {
     # repeats the slug that was asked for, and OpenRouter may route one slug to
     # more than one upstream provider. That is a claim about a third party and
     # needs a live call to settle (#806).
+    # `docs/research/probe_openrouter_served_model.py` is that call: it reads
+    # `model` off the body beside the requested slug, and reads OpenRouter's own
+    # generation record for which upstream provider served. It needs a key
+    # nobody has provisioned, so it has not run.
     # Until it is settled, a fingerprint over an ``openrouter/`` route carries
     # less than one over a direct route, and
     # ``evals/harness/baseline.py`` refuses to name a **Baseline** after one.
