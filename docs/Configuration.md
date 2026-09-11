@@ -537,9 +537,10 @@ pinned library, the same Claude generation can be native on one vendor and
 emulated on another, so a rule keyed on the model alone would pass a
 configuration that does not work.
 
-`supports_structured_output` is a **different and weaker question** — whether a
-schema is honoured at all — and answers yes for models on both paths. It cannot
-substitute for this check.
+"Is a schema honoured at all" is a **different and weaker question**, and
+litellm's own `supports_response_schema` answers yes for models on both paths.
+It cannot substitute for this check — and it answers `False` for a map entry
+that simply says nothing, so nothing in this service reads it directly.
 
 **The check is scoped to tiers that send a schema.** A tier running
 `constrain_output = false` sends none, so how its provider *would* have

@@ -34,7 +34,8 @@ import pytest
 # does it.
 from analysis_service.model_gate import (
     emulates_structured_output,
-    supports_structured_output,
+    library_sends_no_native_schema,
+    native_structured_output,
 )
 from analysis_service.retry import _is_transient
 from analysis_service.vendors import vendor_for
@@ -181,8 +182,8 @@ class TestTheSchemaPathIsNativeHere:
         """
         vendor = vendor_for(VENDOR)
         unlisted = "anthropic/claude-sonnet-4.6"
-        assert not supports_structured_output(vendor, unlisted)
-        assert not emulates_structured_output(vendor, unlisted)
+        assert native_structured_output(vendor, unlisted) is None
+        assert not library_sends_no_native_schema(vendor, unlisted)
 
 
 class TestStreamingIsNotAPathThisServiceTakes:
@@ -247,12 +248,14 @@ def test_the_gate_probe_the_spec_asked_for():
     vendor = vendor_for(VENDOR)
     profile = {
         model: (
-            supports_structured_output(vendor, model),
+            native_structured_output(vendor, model),
             emulates_structured_output(vendor, model),
         )
         for model in ("anthropic/claude-sonnet-4.6", MODEL)
     }
     assert profile == {
-        "anthropic/claude-sonnet-4.6": (False, False),
+        # The map is silent, which is not a no — the distinction the reader
+        # exists to draw, and the one litellm's own boolean lookup collapses.
+        "anthropic/claude-sonnet-4.6": (None, False),
         MODEL: (True, False),
     }

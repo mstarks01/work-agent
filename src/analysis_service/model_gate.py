@@ -106,27 +106,6 @@ def _import_litellm_hermetically() -> Any:
 _litellm = _import_litellm_hermetically()
 
 
-def supports_structured_output(vendor: Vendor, model: str) -> bool:
-    """Whether this ``(vendor, model)`` can be constrained to a response schema.
-
-    Separate from :func:`check_supported` because it is not a raise/no-raise
-    question: ``response_format`` is an accepted *parameter* on every provider,
-    but only some models honour it as a schema rather than as a hint. A caller
-    that depends on parsing structured output needs the stronger fact.
-
-    **LiteLLM's own lookup, and it answers two questions with one ``False``.**
-    A model the map says cannot honour a schema and a model the map says
-    nothing about both come back ``False`` here. That is the right shape for a
-    gate, which needs a boolean, and the wrong shape for a report.
-    :func:`native_structured_output` is the reader that tells the two apart.
-    """
-    return bool(
-        _litellm.utils.supports_response_schema(
-            model=model, custom_llm_provider=vendor.litellm_provider
-        )
-    )
-
-
 def library_sends_no_native_schema(vendor: Vendor, model: str) -> bool:
     """Whether the pinned library will not put a schema on the wire for this pair.
 
@@ -141,6 +120,15 @@ def library_sends_no_native_schema(vendor: Vendor, model: str) -> bool:
       models among them. A schema does not reach a model that refuses the
       parameter carrying it.
 
+    **Narrowed, because the set was measured.** Swept over every row of the
+    pinned map under a registered prefix, plus an unmapped probe per vendor,
+    this call raises ``UnsupportedParamsError`` and nothing else — 80 times.
+    So a different exception is a fact nobody here has met, and it propagates
+    rather than being read as a refusal. That is the opposite of
+    :func:`model_info` one function down, where litellm raises ``Exception``
+    itself and there is no type to match on; the two look alike and are not the
+    same case.
+
     Both are facts about what the installed library does with a request, which
     is why they belong together and why this is what a **gate** reads.
     :func:`native_structured_output` reads it too and then consults the map,
@@ -150,14 +138,14 @@ def library_sends_no_native_schema(vendor: Vendor, model: str) -> bool:
     """
     try:
         return emulates_structured_output(vendor, model)
-    except Exception:  # noqa: BLE001 -- litellm raises its own param errors here
+    except _litellm.exceptions.UnsupportedParamsError:
         return True
 
 
 def native_structured_output(vendor: Vendor, model: str) -> bool | None:
     """Whether a response schema reaches this model natively, or ``None`` if unknown.
 
-    The tri-state :func:`supports_structured_output` cannot express. ``None``
+    The tri-state a boolean cannot express. ``None``
     means the pinned map carries an entry for this pair and that entry says
     nothing about response schemas — 2029 of its entries are silent, against
     881 that say yes and 72 that say no.
@@ -293,9 +281,11 @@ def emulates_structured_output(vendor: Vendor, model: str) -> bool:
     params. A table of supported models here would be the thing this module
     exists not to be, and would drift the moment a model is added upstream.
 
-    Deliberately **not** the same question as :func:`supports_structured_output`.
-    That one asks whether a schema is honoured at all, and answers ``True`` for
-    models on both paths — it cannot see this difference.
+    Deliberately **not** the question "is a schema honoured at all", which
+    litellm's own ``supports_response_schema`` answers. That one says ``True``
+    for models on both paths, so it cannot see this difference — and it says
+    ``False`` for a silent map entry too, which is why nothing in this service
+    reads it directly.
     """
     params = _litellm.utils.get_optional_params(
         model=model,
