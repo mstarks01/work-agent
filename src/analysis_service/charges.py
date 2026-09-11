@@ -16,18 +16,29 @@ that field to :attr:`analysis_service.report.NodeRun.reported_charge_usd`.
 **Three seams, because the value and the record are never in the same hand.**
 
 * The client subclass is the only code that holds litellm's own response, so it
-  is where the figure is read. It publishes into a :class:`~contextvars.ContextVar`.
+  is where the figure is read and judged. It publishes what may be recorded
+  into a :class:`~contextvars.ContextVar`.
 * The adapter subclass is the only code that holds the response ADK builds, so
   it is where the figure is stamped. It clears the variable before each call, so
   a figure captured for one adapter can never be stamped onto another's
   response.
-* :func:`records_reported_charge` decides whether a figure may be recorded at
-  all, and ``analysis_service.binding`` asks it once per bound tier.
+* :func:`recordable_charge` is the judgement: it refuses a declaration the
+  provider contradicts, and then asks :func:`records_reported_charge` whether
+  the declared arrangement covers the whole call. ``analysis_service.binding``
+  installs the client wherever a vendor reports a charge, and hands it the
+  arrangement that tier declared.
 
 A ``ContextVar`` rather than an attribute on the client: one adapter is shared by
 every node on its tier, and those nodes run concurrently. Each concurrent node
 runs in its own :class:`asyncio.Task`, which copies the context, so a value set
 inside one node's call is invisible to the others.
+
+**The provider is asked whether the declaration is true, never what it should
+be.** OpenRouter states ``is_byok`` in the same ``usage`` block it states the
+charge in. A flag that disagrees with the declared arrangement stops the run,
+because one of the two is wrong about every figure the run would record. A flag
+that agrees, or is absent, changes nothing — a figure worth recording only
+where a provider also describes its own charge would rest on that description.
 
 Measured live on 2026-09-11, and recorded in
 `docs/research/openrouter-reported-charge.md`: one call through this path
@@ -52,9 +63,47 @@ import math
 from collections.abc import Mapping
 from typing import Any
 
+from analysis_service.errors import ConfigError
 from analysis_service.vendors import ChargeMode, Vendor
 
 logger = logging.getLogger(__name__)
+
+
+class ChargeModeMismatchError(ConfigError):
+    """The provider says it charged under an arrangement nobody declared.
+
+    A configuration error, and it fails closed for the reason every other one
+    does: the declaration decides what a recorded figure means, so a wrong one
+    does not spoil a single number — it spoils every number the run records.
+    Under the arrangement this deployment did not declare, the figure is either
+    a twentieth of what a call cost or a whole charge being discarded, and
+    neither is something to note and carry on from.
+
+    It costs one node's tokens to find out, and the message names the key to
+    change. That is the same trade
+    :func:`analysis_service.retry._reject_truncated` makes: fail the node rather
+    than keep what it produced.
+
+    Not transient, so the retry driver gives up at once rather than paying for
+    the same contradiction three times.
+    """
+
+
+#: Which arrangement a provider's own flag names. A table rather than a branch,
+#: so an arrangement added to :class:`~analysis_service.vendors.ChargeMode` is
+#: not judged by a reader that knows two — a missing key states nothing rather
+#: than guessing.
+_STATED_ARRANGEMENT: Mapping[bool, ChargeMode] = {
+    True: ChargeMode.OWN_UPSTREAM_KEY,
+    False: ChargeMode.DIRECT,
+}
+
+#: The provider's own name for the flag. OpenRouter states it in the ``usage``
+#: block of every completion, beside the charge, and again in its generation
+#: record. litellm reads ``cost`` out of that block and keeps the rest of it
+#: verbatim, so the flag arrives as an attribute where it arrives at all
+#: (measured on 1.97.0; see `docs/research/openrouter-reported-charge.md`).
+_BYOK_FIELD = "is_byok"
 
 #: The ``custom_metadata`` key under which a response carries the charge its
 #: provider reported, in USD. ``analysis_service.execution`` reads it off the
@@ -78,8 +127,9 @@ _reported: contextvars.ContextVar[float | None] = contextvars.ContextVar(
 def records_reported_charge(vendor: Vendor, mode: ChargeMode | None) -> bool:
     """Whether a charge this vendor reports is what one of its calls cost.
 
-    The one reader of the rule, asked once per bound tier. Three ways to answer
-    no, and the last is the one this exists for:
+    The one reader of the rule, asked by :func:`recordable_charge` for every
+    response that carries a figure. Three ways to answer no, and the last is
+    the one this exists for:
 
     * the vendor reports no charge, so there is nothing to record;
     * no arrangement is declared, which for a vendor that reports a charge the
@@ -95,6 +145,58 @@ def records_reported_charge(vendor: Vendor, mode: ChargeMode | None) -> bool:
         return False
     report = vendor.charges.get(mode)
     return report is not None and report.covers_whole_call
+
+
+def stated_arrangement_of(response: Any) -> ChargeMode | None:
+    """The arrangement the provider says this call ran under, if it says.
+
+    ``None`` where nothing says: a provider that states no flag, a flag whose
+    value is not a real boolean, and every vendor that reports no charge at all.
+    Absence is not a contradiction — it is the ordinary case, and it leaves the
+    declaration standing.
+
+    ``isinstance(..., bool)`` and not a truth test, because the lookup below is
+    a dict keyed by ``True`` and ``False``: in Python ``1`` and ``0`` are equal
+    to those keys, so an integer flag would silently name an arrangement the
+    provider never stated.
+    """
+    usage = getattr(response, "usage", None)
+    stated = getattr(usage, _BYOK_FIELD, None)
+    if not isinstance(stated, bool):
+        return None
+    return _STATED_ARRANGEMENT.get(stated)
+
+
+def recordable_charge(
+    vendor: Vendor, mode: ChargeMode | None, response: Any
+) -> float | None:
+    """The figure this response may contribute to the record, or ``None``.
+
+    **The one reader of what a response is worth as money**, and it asks two
+    questions in order. First, does the provider contradict the declaration —
+    because a figure recorded under the wrong arrangement is worse than no
+    figure, and the contradiction is about the arrangement rather than about
+    the number, so it is checked even where no charge arrived. Second, does the
+    declared arrangement say the figure covers the whole call.
+
+    The provider's statement **contradicts** a declaration and never supplies
+    one. A deployment that declared nothing is not corrected into an
+    arrangement by a vendor's own flag: the mechanism is declared, and this is
+    the material.
+    """
+    stated = stated_arrangement_of(response)
+    if stated is not None and mode is not None and stated != mode:
+        raise ChargeModeMismatchError(
+            f"charges.{vendor.name} declares {mode.value!r}, and {vendor.name!r}"
+            f" says this call ran under {stated.value!r}. What a reported charge"
+            " covers depends on which one is true, so the run stops rather than"
+            " record a figure that means the other. Correct the declaration in"
+            " config/model_tiers.toml, or point the deployment at the account"
+            " it describes."
+        )
+    if not records_reported_charge(vendor, mode):
+        return None
+    return reported_charge_of(response)
 
 
 def reported_charge_of(response: Any) -> float | None:
@@ -131,24 +233,37 @@ def reported_charge_of(response: Any) -> float | None:
 
 
 def charge_capturing_client_class(client_cls: type) -> type:
-    """A ``LiteLLMClient`` subclass that publishes the charge each call reported.
+    """A ``LiteLLMClient`` subclass that reads what each call's provider said.
 
     Takes the class rather than importing it, for the reason
     :func:`analysis_service.retry.retrying_llm_class` gives: this module stays
     free of the provider libraries at import time, and ``binding`` already holds
     the class.
 
-    Installed only on the adapters of a vendor whose reported charge is
-    recordable. An adapter without it publishes nothing, and
-    :func:`charge_reporting_llm_class` stamps nothing.
+    Installed on the adapters of **every** vendor that reports a charge, not
+    only where the figure is recordable. A deployment that declares the wrong
+    arrangement is wrong in both directions — one records a fee as a cost, the
+    other discards a whole charge — and a client installed only for the first
+    could never see the second. :func:`recordable_charge` is what decides which
+    figure survives, and it raises where the provider contradicts the
+    declaration.
+
+    Each instance carries the vendor and the arrangement its tier declared,
+    because one process can bind two tiers to two vendors and a class shared by
+    both cannot answer for either.
     """
 
     class ChargeCapturingClient(client_cls):
-        """One tier's client, publishing what its provider said it charged."""
+        """One tier's client, reading what its provider said about money."""
+
+        def __init__(self, vendor: Vendor, mode: ChargeMode | None) -> None:
+            super().__init__()
+            self.vendor = vendor
+            self.mode = mode
 
         async def acompletion(self, *args: Any, **kwargs: Any) -> Any:
             response = await super().acompletion(*args, **kwargs)
-            _reported.set(reported_charge_of(response))
+            _reported.set(recordable_charge(self.vendor, self.mode, response))
             return response
 
     return ChargeCapturingClient

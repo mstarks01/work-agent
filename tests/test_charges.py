@@ -17,23 +17,32 @@ import pytest
 
 from analysis_service.charges import (
     CHARGE_METADATA_KEY,
+    ChargeModeMismatchError,
     charge_capturing_client_class,
     charge_reporting_llm_class,
+    recordable_charge,
     records_reported_charge,
     reported_charge_of,
+    stated_arrangement_of,
 )
 from analysis_service.vendors import VENDOR_NAMES, ChargeMode, vendor_for
 
 _COST_HEADER = "llm_provider-x-litellm-response-cost"
 
 
-def _response(hidden):
-    """A stand-in for litellm's own response object, carrying ``_hidden_params``."""
-    return SimpleNamespace(_hidden_params=hidden)
+def _response(hidden, byok=None):
+    """A stand-in for litellm's own response object.
+
+    ``_hidden_params`` is where litellm files the charge; ``usage`` is the block
+    it parses from the body and keeps verbatim, which is where the provider's
+    own statement of the arrangement arrives.
+    """
+    usage = SimpleNamespace() if byok is None else SimpleNamespace(is_byok=byok)
+    return SimpleNamespace(_hidden_params=hidden, usage=usage)
 
 
-def _with_charge(value):
-    return _response({"additional_headers": {_COST_HEADER: value}})
+def _with_charge(value, byok=None):
+    return _response({"additional_headers": {_COST_HEADER: value}}, byok=byok)
 
 
 class TestTheShapesAFigureArrivesIn:
@@ -156,6 +165,93 @@ class TestWhichFiguresAreRecorded:
             assert isinstance(vendor.charges[mode].covers_whole_call, bool)
 
 
+class TestTheProviderContradictsTheDeclaration:
+    """What a response says about the arrangement, against what was declared.
+
+    OpenRouter states ``is_byok`` in the same ``usage`` block it states the
+    charge in, and litellm keeps it. The declaration is still the mechanism —
+    the flag can **contradict** one and never supply one — because a figure
+    worth recording only where a provider describes its own charge rests on
+    that description.
+    """
+
+    def test_a_direct_account_that_answers_as_byok_stops_the_run(self):
+        """The figure would be the routing fee recorded as a whole cost."""
+        with pytest.raises(ChargeModeMismatchError) as caught:
+            recordable_charge(
+                REPORTING, ChargeMode.DIRECT, _with_charge(0.5, byok=True)
+            )
+        message = str(caught.value)
+        assert "charges.openrouter" in message
+        assert "'direct'" in message and "'own_upstream_key'" in message
+
+    def test_a_byok_account_that_answers_as_direct_stops_the_run(self):
+        """The other direction, which records nothing while a charge arrives.
+
+        It moves no number wrongly, and it is still a wrong declaration: the
+        deployment discards a whole charge every call and reports a cost of
+        nothing.
+        """
+        with pytest.raises(ChargeModeMismatchError):
+            recordable_charge(
+                REPORTING, ChargeMode.OWN_UPSTREAM_KEY, _with_charge(0.5, byok=False)
+            )
+
+    def test_the_arrangement_is_checked_even_where_no_charge_arrived(self):
+        """The contradiction is about the arrangement, not about the figure."""
+        response = _response({"additional_headers": {}}, byok=True)
+        with pytest.raises(ChargeModeMismatchError):
+            recordable_charge(REPORTING, ChargeMode.DIRECT, response)
+
+    def test_an_agreeing_flag_records_the_charge(self):
+        assert recordable_charge(
+            REPORTING, ChargeMode.DIRECT, _with_charge(0.5, byok=False)
+        ) == pytest.approx(0.5)
+
+    def test_an_agreeing_byok_flag_still_records_nothing(self):
+        """Agreement is not the question the recording rule asks.
+
+        Under this arrangement the reported figure covers part of the call,
+        which is true whether or not the provider confirms the arrangement.
+        """
+        assert (
+            recordable_charge(
+                REPORTING, ChargeMode.OWN_UPSTREAM_KEY, _with_charge(0.5, byok=True)
+            )
+            is None
+        )
+
+    def test_a_provider_that_states_no_arrangement_leaves_the_declaration(self):
+        """Absence is the ordinary case and never a contradiction."""
+        assert stated_arrangement_of(_with_charge(0.5)) is None
+        assert recordable_charge(
+            REPORTING, ChargeMode.DIRECT, _with_charge(0.5)
+        ) == pytest.approx(0.5)
+
+    @pytest.mark.parametrize("value", [1, 0, "true", "", None, [True]])
+    def test_a_flag_that_is_not_a_boolean_states_nothing(self, value):
+        """``1`` and ``0`` are equal to ``True`` and ``False`` as dict keys.
+
+        A lookup that accepted them would read an integer flag as an
+        arrangement the provider never stated, and stop a run over it.
+        """
+        response = _response({"additional_headers": {}}, byok=value)
+        assert stated_arrangement_of(response) is None
+        assert recordable_charge(REPORTING, ChargeMode.DIRECT, response) is None
+
+    def test_a_response_with_no_usage_block_states_nothing(self):
+        assert stated_arrangement_of(SimpleNamespace()) is None
+
+    def test_a_vendor_that_reports_no_charge_is_never_contradicted(self):
+        """It declares no arrangement, so a flag has nothing to disagree with.
+
+        Such a vendor never gets the capturing client either. This is the rule
+        answering for a caller that has one anyway, rather than a second rule
+        about who calls it.
+        """
+        assert recordable_charge(SILENT, None, _with_charge(0.5, byok=True)) is None
+
+
 class _FakeResponse:
     """The shape ADK hands back: something with ``custom_metadata``."""
 
@@ -164,14 +260,19 @@ class _FakeResponse:
 
 
 class _FakeClient:
-    """ADK's client seam, answering with whatever charge the test scripts."""
+    """ADK's client seam, answering with whatever the test scripts.
 
-    def __init__(self, charge=None):
-        self.charge = charge
+    The capturing subclass owns the constructor — it takes the vendor and the
+    declared arrangement — so what a response says is scripted onto the instance
+    afterwards by :func:`_client`.
+    """
+
+    charge = None
+    byok = None
 
     async def acompletion(self, **kwargs):
         headers = {} if self.charge is None else {_COST_HEADER: self.charge}
-        return _response({"additional_headers": headers})
+        return _response({"additional_headers": headers}, byok=self.byok)
 
 
 class _FakeLlm:
@@ -199,6 +300,20 @@ class _TwoResponseLlm(_FakeLlm):
 _Capturing = charge_capturing_client_class(_FakeClient)
 _Reporting = charge_reporting_llm_class(_FakeLlm)
 
+#: The registry's two answers: a vendor that states what it charged, and one
+#: that states token counts alone. Read from the registry rather than built, so
+#: these tests exercise the rows a deployment can actually select.
+REPORTING = vendor_for("openrouter")
+SILENT = vendor_for("anthropic")
+
+
+def _client(charge=None, byok=None, vendor=REPORTING, mode=ChargeMode.DIRECT):
+    """One capturing client, scripted to answer as a provider would."""
+    client = _Capturing(vendor, mode)
+    client.charge = charge
+    client.byok = byok
+    return client
+
 
 async def _drive(adapter):
     return [response async for response in adapter.generate_content_async(None)]
@@ -219,14 +334,14 @@ class TestTheChargeReachesTheRecord:
     """
 
     def test_a_captured_charge_is_stamped_on_the_response(self):
-        assert _stamp_of(_Reporting(_Capturing(charge=0.0031))) == pytest.approx(0.0031)
+        assert _stamp_of(_Reporting(_client(charge=0.0031))) == pytest.approx(0.0031)
 
     def test_a_client_that_captures_nothing_stamps_nothing(self):
         """An adapter on a vendor that reports no charge keeps ADK's own client."""
         assert _stamp_of(_Reporting(_FakeClient())) is None
 
     def test_a_provider_that_reported_no_charge_stamps_nothing(self):
-        assert _stamp_of(_Reporting(_Capturing(charge=None))) is None
+        assert _stamp_of(_Reporting(_client(charge=None))) is None
 
     def test_one_adapter_never_stamps_another_adapter_s_figure(self):
         """Two tiers can run in one task, and the second must not inherit.
@@ -237,7 +352,7 @@ class TestTheChargeReachesTheRecord:
         """
 
         async def both():
-            first = await _drive(_Reporting(_Capturing(charge=0.5)))
+            first = await _drive(_Reporting(_client(charge=0.5)))
             second = await _drive(_Reporting(_FakeClient()))
             return first, second
 
@@ -247,19 +362,30 @@ class TestTheChargeReachesTheRecord:
 
     def test_one_call_stamps_its_charge_once(self):
         """A charge on two responses of one call reads as twice the money."""
-        adapter = charge_reporting_llm_class(_TwoResponseLlm)(_Capturing(charge=0.25))
+        adapter = charge_reporting_llm_class(_TwoResponseLlm)(_client(charge=0.25))
         stamped = [
             (response.custom_metadata or {}).get(CHARGE_METADATA_KEY)
             for response in asyncio.run(_drive(adapter))
         ]
         assert stamped == [pytest.approx(0.25), None]
 
+    def test_a_contradicted_declaration_stops_the_drive(self):
+        """The refusal travels the path, not only the rule.
+
+        A run whose provider disagrees with the declaration stops at the node
+        that found out, which costs one node's tokens and names the key to
+        change.
+        """
+        adapter = _Reporting(_client(charge=0.5, byok=True))
+        with pytest.raises(ChargeModeMismatchError):
+            asyncio.run(_drive(adapter))
+
     def test_concurrent_nodes_each_keep_their_own_figure(self):
         """Every node on a tier shares one adapter and runs in its own task."""
         charges = [0.1, 0.2, 0.3]
 
         async def concurrently():
-            adapters = [_Reporting(_Capturing(charge=charge)) for charge in charges]
+            adapters = [_Reporting(_client(charge=charge)) for charge in charges]
             return await asyncio.gather(*(_drive(adapter) for adapter in adapters))
 
         stamped = [

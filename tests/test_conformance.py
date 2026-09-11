@@ -40,7 +40,6 @@ import pytest
 from google.adk.models.base_llm import BaseLlm
 
 from analysis_service.binding import NodeBinding, build_tier_adapters
-from analysis_service.charges import records_reported_charge
 from analysis_service.conformance import (
     PROBED_PARAMS,
     REFERENCE_MODELS,
@@ -434,17 +433,14 @@ class TestModelsCanBeBound:
             load_resilience(CONFIG / "resilience.toml", env={}),
             env=FAKE_ENV,
         )
-        tiers = tiers_for(vendor)
-        expected = records_reported_charge(
-            vendor_for(vendor), tiers.charge_mode(vendor)
-        )
+        expected = vendor_for(vendor).reports_charge
         for tier, adapter in adapters.items():
             captures = type(adapter.llm_client).__module__ == "analysis_service.charges"
             assert captures is expected, (
                 f"{vendor} {tier} binds a client that"
-                f" {'captures' if captures else 'ignores'} a reported charge,"
-                f" and the registry says it should"
-                f" {'capture' if expected else 'ignore'} one"
+                f" {'reads' if captures else 'ignores'} what the provider said"
+                f" about money, and the registry says it should"
+                f" {'read' if expected else 'ignore'} it"
             )
 
     def test_no_vendor_reaches_its_provider_by_a_different_class(self, tmp_path):
