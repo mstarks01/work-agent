@@ -87,11 +87,18 @@ version = 8
 #                       shipped node map below does. A critic on one model still
 #                       catches inconsistency and unsupported claims, and it
 #                       costs one tier rather than two.
-#   "distinct_model"    every framework's critic must run a different
-#                       (vendor, model) pair from its own analysis. Removes a
-#                       single build's blind spots; leaves the provider's.
-#   "distinct_provider" the vendor must differ too. Removes a provider's blind
-#                       spots, at the cost of a second credential and quota.
+#   "distinct_model"    every framework's critic must run a different model
+#                       from its own analysis. Removes a single build's blind
+#                       spots; leaves the provider's. Compared by the
+#                       identifier with any gateway segment stripped, so
+#                       "openai/gpt-5.6" through an aggregator and "gpt-5.6"
+#                       direct are one model and not two.
+#   "distinct_provider" the serving organisation must differ too. Removes a
+#                       provider's blind spots, at the cost of a second
+#                       credential and quota. A gateway route cannot satisfy
+#                       it: an aggregator picks the upstream per call, so
+#                       nothing here can say the two ran on different ones,
+#                       and it is a load error rather than an assumption.
 #
 # NONE OF THESE MAKES A REVIEW MORE ACCURATE. Independence bounds *correlated*
 # failure. It does not make a second opinion a better one, and no measurement in

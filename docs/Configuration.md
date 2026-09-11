@@ -591,8 +591,25 @@ itself independently ends up not doing so, and reporting nothing unusual.
 | Value | What it requires |
 | --- | --- |
 | `shared` | Nothing. Criticism may run on the very model it checks. |
-| `distinct_model` | Every framework's critic runs a different `(vendor, model)` pair from its own analysis. |
-| `distinct_provider` | The vendor must differ too. |
+| `distinct_model` | Every framework's critic runs a different model from its own analysis. |
+| `distinct_provider` | The serving organisation must differ too. |
+
+**A label is not the thing it names, and a gateway made that matter.** Both
+values used to compare what you wrote — the vendor key, and the
+`(vendor, model)` pair — and an aggregator's vendor key says nothing about which
+provider or which build answered.
+
+`distinct_model` now compares the model identifiers with any gateway segment
+stripped, so `openai/gpt-5.6` through OpenRouter and `gpt-5.6` direct are one
+model and not two. A family a vendor spells its own way is still two —
+Bedrock's `anthropic.claude-opus-5` beside `claude-opus-5` — because nothing
+here holds a cross-vendor identity for a build.
+
+`distinct_provider` cannot be satisfied by a gateway route on either side, and
+says so at load. An aggregator picks the upstream per call, so no configuration
+can state that two such routes reached different providers. Refusing is the
+point: unknown routing quietly satisfying a strict policy is the failure the
+setting exists to prevent.
 
 **None of these makes a review more accurate.** Independence bounds *correlated*
 failure — an analysis and a critic on one model share that model's blind spots,

@@ -794,6 +794,10 @@ class TestReviewIndependence:
     claims a second provider finds more.
     """
 
+    #: Declared wherever a case selects the vendor that reports a charge, so
+    #: these tests fail on the rule they are about rather than on that one.
+    CHARGES = '\n[charges]\nopenrouter = "direct"\n'
+
     def critic_on(self, tier: str, independence: str, **kwargs):
         """A config with every framework's critic and recritic on ``tier``."""
         nodes = {
@@ -865,8 +869,87 @@ class TestReviewIndependence:
         text = self.critic_on(
             "review", "distinct_model", review_vendor=VENDOR, review=STRONG
         )
-        with pytest.raises(ModelConfigError, match="both run vertex/gemini-2.5-pro"):
+        with pytest.raises(ModelConfigError, match="both run the model"):
             load_model_tiers(config_path(text), env={})
+
+    def test_a_gateway_route_cannot_satisfy_a_distinct_provider(self, config_path):
+        """An aggregator chooses the upstream per call, so nothing here knows it.
+
+        The case the old comparison answered confidently and wrongly: two
+        vendor keys, one of them a gateway that may route to the other's
+        provider. A deployment that asked for a distinct provider was told it
+        had one.
+        """
+        text = self.critic_on(
+            "review",
+            "distinct_provider",
+            review_vendor="openrouter",
+            review="anthropic/claude-opus-4.7",
+        )
+        with pytest.raises(ModelConfigError, match="more than one upstream provider"):
+            load_model_tiers(config_path(text + self.CHARGES), env={})
+
+    def test_a_gateway_route_on_the_analysis_side_is_refused_too(self, config_path):
+        """Either side, because the question is whether the two differ."""
+        text = self.critic_on(
+            "review",
+            "distinct_provider",
+            base_vendor="openrouter",
+            base="anthropic/claude-sonnet-4.6",
+            strong_vendor="openrouter",
+            strong="anthropic/claude-opus-4.7",
+            review_vendor="anthropic",
+            review="claude-opus-5",
+        )
+        with pytest.raises(ModelConfigError, match="more than one upstream provider"):
+            load_model_tiers(config_path(text + self.CHARGES), env={})
+
+    def test_two_direct_vendors_still_satisfy_a_distinct_provider(self, config_path):
+        """The rule refuses what it cannot know, not everything it is asked."""
+        text = self.critic_on(
+            "review",
+            "distinct_provider",
+            review_vendor="anthropic",
+            review="claude-opus-5",
+        )
+        assert load_model_tiers(config_path(text), env={}).independence_breaches() == []
+
+    def test_a_gateway_route_to_the_same_model_is_not_a_distinct_model(
+        self, config_path
+    ):
+        """Two strings, one model. A slug pins the build whichever route carries it.
+
+        ``openai/gpt-5.6`` through an aggregator and ``gpt-5.6`` direct are the
+        same weights, so a critic on the second removes none of the first's
+        blind spots — and by vendor key alone the pair read as independent.
+        """
+        text = self.critic_on(
+            "review",
+            "distinct_model",
+            base_vendor="openai",
+            base="gpt-4o-2024-08-06",
+            strong_vendor="openai",
+            strong="gpt-5.6",
+            review_vendor="openrouter",
+            review="openai/gpt-5.6",
+        )
+        with pytest.raises(ModelConfigError, match="both run the model 'gpt-5.6'"):
+            load_model_tiers(config_path(text + self.CHARGES), env={})
+
+    def test_a_gateway_route_to_another_model_is_still_distinct(self, config_path):
+        """A gateway is not a refusal under this policy, because the slug decides."""
+        text = self.critic_on(
+            "review",
+            "distinct_model",
+            review_vendor="openrouter",
+            review="anthropic/claude-opus-4.7",
+        )
+        assert (
+            load_model_tiers(
+                config_path(text + self.CHARGES), env={}
+            ).independence_breaches()
+            == []
+        )
 
     def test_an_unknown_policy_is_refused(self, config_path):
         with pytest.raises(ModelConfigError):
