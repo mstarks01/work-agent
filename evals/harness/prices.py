@@ -18,6 +18,15 @@ A lookup may fall back to a spelling of the same model; it may not fall back to
 a different route. :func:`_bare_name` is where the line sits, and an
 aggregator's two-segment identifier is what drew it.
 
+**A route in front of many providers carries no unit price at all**, whichever
+key the map happens to hold for it. A slug that reaches twelve endpoints at
+twelve rates has no one rate to state, so :func:`unit_prices` refuses it and
+the caller reports it as ``unpriced``. The registry's
+``routes_to_one_provider`` is the property that decides, so the refusal answers
+for a gateway nobody has added yet. What such a route costs is a number the
+provider reports after the call, not a number this module can compute before
+one; ``docs/research/openrouter-pricing.md`` is the measurement.
+
 That rule reaches the cache-read rate too, which is absent from most of the map.
 It is carried as ``None`` rather than zero, and :attr:`UnitPrices.cached_rate`
 bills those tokens at the full input rate. An unknown discount priced as no
@@ -39,6 +48,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from analysis_service.report import TokenUsage
+from analysis_service.vendors import vendor_for_route
 
 
 @dataclass(frozen=True)
@@ -174,13 +184,49 @@ def _bare_name(model: str) -> str | None:
 
     So a remainder that still carries a slash is not this route's model name,
     and there is no price here. The caller reports it as ``unpriced``, which is
-    this module's answer for a question it cannot answer — and the 39 that were
-    right were right by coincidence rather than by construction.
+    this module's answer for a question it cannot answer.
+
+    This rule covers a prefix no vendor claims. A registered aggregator is
+    refused one step earlier and for a stronger reason — see
+    :func:`_routes_to_many_providers`, which is what settled that the entries
+    reached *through* this rule were never the whole error.
     """
     _, separator, rest = model.partition("/")
     if not separator or "/" in rest:
         return None
     return rest
+
+
+def _routes_to_many_providers(model: str) -> bool:
+    """Whether ``model``'s vendor prefix names a gateway in front of many providers.
+
+    **A slug that spans endpoints has no unit price, and the map states one
+    anyway.** Measured against OpenRouter's live catalogue on 2026-09-11, with
+    ``docs/research/probe_openrouter_pricing.py`` as the record:
+    ``meta-llama/llama-3.3-70b-instruct`` lists 1.0e-07 per input token and its
+    12 endpoints charge from 1.0e-07 to 1.04e-06. The listed rate is the
+    cheapest endpoint, so the figure under-states by up to 10.4x depending on
+    which endpoint routes — and which one routes is not knowable before the
+    call.
+
+    The map's own gateway entries drift as well. Of the 82 listed slugs it
+    carries, 39 disagree with the rate OpenRouter lists, and
+    ``mistralai/mixtral-8x22b-instruct`` output reads 6.5e-07 against the
+    6.0e-06 listed, an under-statement of 9.23x. So narrowing
+    :func:`_bare_name` fixed the smaller half of this: it stopped a fallback to
+    a third party's entry and left the gateway's own entry pricing a route it
+    cannot price.
+
+    Keyed off the vendor property rather than off a name, so a second
+    aggregator is refused the day its row lands. A string that is not a route,
+    or a route whose prefix no vendor claims, is not this rule's business and
+    the map decides it as before.
+    """
+    try:
+        vendor = vendor_for_route(model)
+    except ValueError:
+        return False
+    return not vendor.routes_to_one_provider
 
 
 def unit_prices(model: str) -> UnitPrices | None:
@@ -193,7 +239,14 @@ def unit_prices(model: str) -> UnitPrices | None:
     :func:`_bare_name` decides what "bare of its provider prefix" means, and it
     refuses to answer for an aggregator's two-segment identifier rather than
     reaching another vendor's entry.
+
+    A route in front of many providers is refused before the map is read at
+    all, because there the map's answer is wrong rather than absent. See
+    :func:`_routes_to_many_providers`.
     """
+    if _routes_to_many_providers(model):
+        return None
+
     from litellm import model_cost  # deferred: importing litellm is slow
 
     bare = _bare_name(model)
