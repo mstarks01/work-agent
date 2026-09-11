@@ -445,6 +445,17 @@ def _usage_of(event) -> TokenUsage | None:
     Counters are read defensively because this runs against every vendor the
     ``strong`` and ``base`` tiers can independently select, and the usage block
     is the least uniform part of a completion response.
+
+    **The all-withheld case is unreachable through the shipped translator, and
+    that is a limit rather than a claim.** LiteLLM parses a response body with
+    no ``usage`` block at all into ``Usage(prompt_tokens=0,
+    completion_tokens=0, total_tokens=0)``, so a provider that metered nothing
+    arrives here already flattened into a call that cost nothing, and nothing
+    in the response survives to tell the two apart. The branch stays for a
+    stand-in that reports no usage and for a translator that stops
+    synthesising the block; ``tests/test_provider_contract.py`` drives the
+    current behaviour from the wire, so a change in it is a test failure rather
+    than a silent zero.
     """
     metadata = getattr(event, "usage_metadata", None)
     if metadata is None:

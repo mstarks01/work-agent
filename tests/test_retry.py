@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import ClassVar
 
 import litellm
@@ -299,6 +300,40 @@ class TestRetryAfter:
     def test_no_headers_at_all_is_no_hint(self):
         assert _retry_after_seconds(rate_limited()) is None
         assert _retry_after_seconds(ValueError("nothing")) is None
+
+    def test_a_mapping_that_is_not_a_dict_is_still_read(self):
+        """The shape a real failure arrives in, and the one that was refused.
+
+        litellm attaches a vendor's response headers as ``httpx.Headers``,
+        which is a ``Mapping`` and not a ``dict`` — so an ``isinstance(...,
+        dict)`` test discarded every real hint. Written as a plain ``Mapping``
+        rather than as ``httpx.Headers`` because the rule is about the shape,
+        and ``tests/test_provider_contract.py`` is what drives the library's
+        own object up to this function.
+        """
+        exc = ValueError("slow down")
+        exc.litellm_response_headers = MappingProxyType({"retry-after": "4"})
+
+        assert _retry_after_seconds(exc) == 4.0
+
+    def test_the_attribute_a_proxy_fills_is_read_before_the_attached_one(self):
+        """Two attributes carry headers, so which one wins is a rule.
+
+        ``headers`` is what a caller set deliberately; the attached copy is what
+        the library found on the response. The explicit one wins.
+        """
+        exc = rate_limited(**{"retry-after": "2"})
+        exc.litellm_response_headers = MappingProxyType({"retry-after": "9"})
+
+        assert _retry_after_seconds(exc) == 2.0
+
+    def test_an_empty_mapping_does_not_hide_the_next_attribute(self):
+        """A first attribute that exists and says nothing is not an answer."""
+        exc = rate_limited()
+        exc.headers = {}
+        exc.litellm_response_headers = MappingProxyType({"retry-after": "6"})
+
+        assert _retry_after_seconds(exc) == 6.0
 
     @pytest.mark.parametrize("value", ["inf", "-inf", "nan", "Infinity"])
     def test_a_value_that_is_not_a_finite_number_is_no_hint(self, value):
