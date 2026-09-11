@@ -387,6 +387,17 @@ class NodeRun(BaseModel):
     counts and nothing else — and it is also the answer where a provider states
     a figure that covers part of a call. See :mod:`analysis_service.charges`.
 
+    ``served_upstream`` is the serving organisation the provider named — a
+    gateway's ``DeepInfra`` or ``Claude Platform on AWS``. **Evidence, and never
+    identity.** It is not in ``execution_fingerprint`` and must not be: the
+    value is a third party's own vocabulary, so a provider renaming one of its
+    strings would move every blessed hash for a cosmetic reason. It is also
+    never invented — a direct vendor names no upstream and carries ``None``
+    here rather than the vendor copied out of the route, because attribution
+    derived from the request is what this field exists to replace. Only a route
+    that reaches more than one provider has anything to say, and until this
+    field there was nowhere for it to say it.
+
     ``attempts`` is how many provider calls the execution took, counted by the
     retry driver. ``usage`` meters the one that answered; a failed attempt
     reports nothing, so the count is the only trace the prompt bytes it sent
@@ -413,6 +424,7 @@ class NodeRun(BaseModel):
     usage: TokenUsage | None = None
     attempts: int = Field(default=1, ge=1)
     reported_charge_usd: float | None = Field(default=None, ge=0)
+    served_upstream: str | None = Field(default=None, max_length=100)
 
     @model_validator(mode="before")
     @classmethod

@@ -32,7 +32,7 @@ from google.adk.apps import App
 from google.adk.sessions import BaseSessionService, InMemorySessionService
 from google.genai import types
 
-from analysis_service.charges import CHARGE_METADATA_KEY
+from analysis_service.charges import CHARGE_METADATA_KEY, UPSTREAM_METADATA_KEY
 from analysis_service.claims import (
     Claim,
     FrameworkName,
@@ -125,6 +125,7 @@ class _NodeFinish:
     usage: TokenUsage | None = None
     attempts: int = 1
     reported_charge_usd: float | None = None
+    served_upstream: str | None = None
 
 
 @dataclass(frozen=True)
@@ -309,6 +310,7 @@ class GraphExecutor:
                             usage=_usage_of(event),
                             attempts=_attempts_of(event),
                             reported_charge_usd=_reported_charge_of(event),
+                            served_upstream=_served_upstream_of(event),
                         )
                     )
                     if on_node is not None:
@@ -375,6 +377,7 @@ class GraphExecutor:
                     usage=finish.usage,
                     attempts=finish.attempts,
                     reported_charge_usd=finish.reported_charge_usd,
+                    served_upstream=finish.served_upstream,
                 )
             )
             finished_at[finish.node] = finish.at
@@ -474,6 +477,18 @@ def _reported_charge_of(event) -> float | None:
     about which figures may be recorded, so nothing here decides anything.
     """
     return (getattr(event, "custom_metadata", None) or {}).get(CHARGE_METADATA_KEY)
+
+
+def _served_upstream_of(event) -> str | None:
+    """Which upstream the provider named for this event's call, if it named one.
+
+    The same ``custom_metadata`` stamp the charge travels in, and absent for the
+    same reasons: the call did not pass through an adapter that reads one, or
+    the provider named none. Only a route in front of many providers has an
+    upstream to name — a direct vendor is its own, and inventing that here from
+    the route would be the attribution this field exists to replace.
+    """
+    return (getattr(event, "custom_metadata", None) or {}).get(UPSTREAM_METADATA_KEY)
 
 
 def _served_route(requested_route: str | None, served_model: str | None) -> str | None:
