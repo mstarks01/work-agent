@@ -20,6 +20,7 @@ from litellm import APIConnectionError, RateLimitError
 # anything here reaches litellm's own tables.
 from analysis_service import model_gate  # noqa: F401
 from analysis_service.retry import (
+    _RETRY_AFTER_CEILING_SECONDS,
     RetryBudget,
     RetryBudgetExhausted,
     RetryPolicy,
@@ -216,6 +217,61 @@ class TestRetryAfter:
     def test_no_headers_at_all_is_no_hint(self):
         assert _retry_after_seconds(rate_limited()) is None
         assert _retry_after_seconds(ValueError("nothing")) is None
+
+    @pytest.mark.parametrize("value", ["inf", "-inf", "nan", "Infinity"])
+    def test_a_value_that_is_not_a_finite_number_is_no_hint(self, value):
+        """``float()`` reads these, and ``float("inf") >= 0`` is true.
+
+        An ``inf`` here reached ``asyncio.sleep`` and parked the node forever,
+        on a call that had a deadline. The same rule the recorded-money reader
+        states, applied to a number a third party sends.
+        """
+        assert _retry_after_seconds(rate_limited(**{"retry-after": value})) is None
+
+    def test_a_wait_past_the_ceiling_is_not_retried(self):
+        """The provider has answered the question a retry exists to ask.
+
+        Sleeping an hour would park a paid job on a third party's number, and
+        sleeping less and asking anyway spends an attempt and a budget token to
+        reach the same refusal.
+        """
+        pol = policy()
+        long_wait = rate_limited(**{"retry-after": "3600"})
+
+        assert not pol.should_retry(1, long_wait)
+        assert pol.budget.tokens == pytest.approx(policy().budget.tokens), (
+            "a refusal that spends a token charges the storm budget for a call"
+            " it never made"
+        )
+
+    def test_a_wait_inside_the_ceiling_is_still_retried(self):
+        """The rule refuses a long wait, not every stated one."""
+        assert policy().should_retry(1, rate_limited(**{"retry-after": "5"}))
+
+    def test_an_error_with_no_hint_is_judged_as_before(self):
+        """An absent header says nothing about when capacity returns."""
+        assert policy().should_retry(1, rate_limited())
+
+    def test_the_sleep_is_bounded_whatever_the_header_says(self):
+        """The second reader of one rule, and deliberately so.
+
+        ``should_retry`` refuses a long wait, and this clamp is what stops a
+        caller that slept first from handing a header the process's schedule.
+        """
+        pol = policy()
+        slept: list[float] = []
+
+        async def scenario():
+            await pol.sleep_before_retry(1, rate_limited(**{"retry-after": "86400"}))
+
+        async def fake_sleep(delay):
+            slept.append(delay)
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(asyncio, "sleep", fake_sleep)
+            asyncio.run(scenario())
+
+        assert slept == [_RETRY_AFTER_CEILING_SECONDS]
 
     def test_the_provider_beats_the_computed_curve(self):
         pol = policy()
