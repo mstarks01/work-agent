@@ -247,6 +247,82 @@ class TestPricing:
         assert cost.unpriced == ("mystery-001",)
 
 
+class TestThePrefixFallbackStopsAtOneSegment:
+    """The fallback may reach a spelling, never another vendor's entry.
+
+    These drive the real pinned map rather than the ``priced`` fixture, because
+    the defect was in which key the map was asked for.
+    """
+
+    def test_a_single_prefix_route_still_falls_back_to_its_bare_name(self):
+        """The reason the fallback exists, unchanged.
+
+        ``vertex_ai/gemini-2.5-pro`` is absent from the map and
+        ``gemini-2.5-pro`` is in it. So is the row the one merged Baseline
+        recorded, ``openai/gpt-5.6-terra``, which is what keeps this change from
+        re-pricing history.
+        """
+        assert prices.unit_prices("vertex_ai/gemini-2.5-pro") is not None
+        assert prices.unit_prices("openai/gpt-5.6-terra") is not None
+
+    def test_an_aggregator_route_is_unpriced_rather_than_priced_elsewhere(self):
+        """Two segments in front of the name, and the second is a vendor.
+
+        Taking the text after the last slash stripped both, so
+        ``openrouter/deepseek/deepseek-v4-pro`` was priced off DeepSeek's own
+        entry at 4.35e-07 per input token against the 9.48e-07 OpenRouter
+        charges — an under-statement of 2.2x reaching a consent screen with the
+        OpenRouter route printed beside it.
+
+        Unpriced is the honest answer, and the estimate path already states it.
+        """
+        route = "openrouter/deepseek/deepseek-v4-pro"
+        assert prices.unit_prices(route) is None
+        # The key it used to reach is still there, so this fails if the rule is
+        # relaxed rather than if the map moves.
+        assert prices.unit_prices("deepseek-v4-pro") is not None
+
+    def test_an_aggregator_route_the_map_carries_is_priced_from_its_own_entry(self):
+        """The narrowing does not cost a route the map actually answers for."""
+        entry = prices.unit_prices("openrouter/anthropic/claude-sonnet-4.6")
+        assert entry is not None
+        # OpenRouter's own entry, not the direct Anthropic one. Both read
+        # 3e-06 today, so the assertion is on which key answered.
+        assert prices._bare_name("openrouter/anthropic/claude-sonnet-4.6") is None
+
+    @pytest.mark.parametrize(
+        ("model", "expected"),
+        [
+            ("vertex_ai/gemini-2.5-pro", "gemini-2.5-pro"),
+            ("openai/gpt-5.6-terra", "gpt-5.6-terra"),
+            ("bedrock/anthropic.claude-opus-5", "anthropic.claude-opus-5"),
+            # No prefix to strip: the exact lookup already answered or missed.
+            ("gpt-5.6-luna", None),
+            # An aggregator's own identifier, and the shape the rule refuses.
+            ("openrouter/anthropic/claude-opus-5", None),
+            ("openrouter/deepseek/deepseek-v4-pro", None),
+        ],
+    )
+    def test_the_rule_reads_one_leading_segment(self, model, expected):
+        assert prices._bare_name(model) == expected
+
+    def test_every_reference_route_still_prices(self):
+        """The narrowing must not un-price a pair this project profiles.
+
+        A vendor whose reference pair went unpriced could not be estimated for
+        at all, which would be a worse regression than the one being fixed.
+        """
+        from analysis_service.conformance import REFERENCE_MODELS
+
+        unpriced = [
+            route
+            for vendor, models in REFERENCE_MODELS.items()
+            for model in models
+            if prices.unit_prices(route := vendor_for(vendor).route(model)) is None
+        ]
+        assert unpriced == []
+
+
 class TestAssembleAndVerify:
     def test_a_clean_baseline_assembles_and_verifies(self, tmp_path, priced):
         source = write_sweep(tmp_path, sweep_document())
