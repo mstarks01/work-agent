@@ -15,11 +15,13 @@ from typing import ClassVar
 import litellm
 import pytest
 from litellm import APIConnectionError, RateLimitError
+from litellm.exceptions import RateLimitType
 
 # Imported through ``model_gate`` so the model-cost map is pinned before
 # anything here reaches litellm's own tables.
 from analysis_service import model_gate  # noqa: F401
 from analysis_service.retry import (
+    _RATE_LIMIT_CLEARS_WITH_TIME,
     _RETRY_AFTER_CEILING_SECONDS,
     RetryBudget,
     RetryBudgetExhausted,
@@ -195,6 +197,86 @@ class TestRetryBudget:
             if budget.withdraw():
                 retries += 1
         assert retries <= 1000 * 0.1 + 5
+
+
+class TestNotEveryRateLimitIsAMoment:
+    """A 429 conflates a window that reopens with a ceiling that does not.
+
+    The pinned translator states which. Measured on litellm 1.97.0: every
+    ``RateLimitError`` carries ``category``, defaulting to
+    ``vendor_rate_limit``, and ``rate_limit_type``, which is ``None`` unless the
+    limiter that fired named a dimension.
+    """
+
+    @pytest.mark.parametrize("dimension", ["requests", "tokens", "concurrent_requests"])
+    def test_a_window_that_reopens_is_retried(self, dimension):
+        limited = rate_limited()
+        limited.rate_limit_type = dimension
+
+        assert _is_transient(limited)
+
+    @pytest.mark.parametrize("dimension", ["budget", "max_iterations"])
+    def test_a_ceiling_that_time_does_not_clear_is_not_retried(self, dimension):
+        """Asking again in eight seconds reaches the same refusal.
+
+        It costs an attempt, a budget token and the wall-clock of a paid job to
+        find that out, every time.
+        """
+        limited = rate_limited()
+        limited.rate_limit_type = dimension
+
+        assert not _is_transient(limited)
+
+    def test_the_dimension_is_read_from_an_enum_member_too(self):
+        """litellm ships the value as an enum, and ``validate_rate_limit_type``
+        exists precisely because read sites meet both spellings."""
+        limited = rate_limited()
+        limited.rate_limit_type = RateLimitType.BUDGET
+
+        assert not _is_transient(limited)
+
+    def test_an_unstated_dimension_is_judged_by_its_status_alone(self):
+        """The ordinary case, and the safe one.
+
+        A provider that names no dimension is throttling as far as anything
+        here can tell, and #824 asks that an ambiguous code keep its throttle.
+        """
+        assert rate_limited().rate_limit_type is None
+        assert _is_transient(rate_limited())
+
+    @pytest.mark.parametrize("stated", ["some_new_limit", 7, object()])
+    def test_a_dimension_this_table_has_not_met_is_retried(self, stated):
+        """A vocabulary that grew must not silently stop a genuine throttle."""
+        limited = rate_limited()
+        limited.rate_limit_type = stated
+
+        assert _is_transient(limited)
+
+    def test_the_table_answers_for_every_dimension_the_library_names(self):
+        """The table against its registry, which is what keeps it honest.
+
+        The rule is spelled as strings so this module stays free of the provider
+        libraries at import time. That leaves the table and the enum as two
+        readers of one vocabulary, so they are tested against each other: a
+        dimension added by a library bump fails here rather than defaulting
+        quietly to "ask again".
+        """
+        shipped = {member.value for member in RateLimitType}
+        missing = sorted(shipped - set(_RATE_LIMIT_CLEARS_WITH_TIME))
+
+        assert not missing, (
+            f"litellm names rate-limit dimensions this table does not:"
+            f" {missing}. Each one has to say whether waiting reopens it —"
+            " an absent entry is retried, which is safe for a throttle and"
+            " wrong for a cap."
+        )
+
+    def test_the_table_names_nothing_the_library_does_not(self):
+        """The other direction: an entry for a dimension that no longer exists
+        is a rule nobody can trigger, and it reads as coverage."""
+        shipped = {member.value for member in RateLimitType}
+
+        assert not sorted(set(_RATE_LIMIT_CLEARS_WITH_TIME) - shipped)
 
 
 class TestRetryAfter:
