@@ -415,14 +415,15 @@ class TestModelsCanBeBound:
         assert adapters["strong"].model == f"{prefix}{strong}"
 
     @pytest.mark.parametrize("vendor", sorted(REFERENCE_MODELS))
-    def test_only_a_reporting_vendor_binds_a_client_that_reads_a_charge(self, vendor):
+    def test_only_a_vendor_that_says_more_binds_the_reading_client(self, vendor):
         """Which client each tier gets, decided from the registry.
 
-        The adapter that captures a reported charge is installed where that
-        figure is what a call cost, and ADK's own client is used everywhere
-        else. Read off the built adapters rather than off the code that builds
-        them: a wiring test that passes while the deployment binds something
-        else is the failure this suite exists to catch.
+        The client that reads what a provider said beyond its token counts is
+        installed wherever a vendor says anything — a charge it made, or which
+        upstream answered — and ADK's own client is used everywhere else. Read
+        off the built adapters rather than off the code that builds them: a
+        wiring test that passes while the deployment binds something else is
+        the failure this suite exists to catch.
 
         The check is by defining module rather than by class, because both
         client classes are built per call and no two builds share one object.
@@ -433,13 +434,14 @@ class TestModelsCanBeBound:
             load_resilience(CONFIG / "resilience.toml", env={}),
             env=FAKE_ENV,
         )
-        expected = vendor_for(vendor).reports_charge
+        entry = vendor_for(vendor)
+        expected = entry.reports_charge or not entry.routes_to_one_provider
         for tier, adapter in adapters.items():
             captures = type(adapter.llm_client).__module__ == "analysis_service.charges"
             assert captures is expected, (
                 f"{vendor} {tier} binds a client that"
                 f" {'reads' if captures else 'ignores'} what the provider said"
-                f" about money, and the registry says it should"
+                f" beyond its tokens, and the registry says it should"
                 f" {'read' if expected else 'ignore'} it"
             )
 

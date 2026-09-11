@@ -435,9 +435,16 @@ def build_tier_adapters(
             # wherever the figure is recordable: the client is also what catches
             # a declared arrangement the provider contradicts, and a deployment
             # that declared the wrong one records nothing to be caught by.
+            #
+            # And wherever a route reaches more than one provider, because there
+            # the response may name which one answered — a fact only a gateway
+            # has, and the one an `openrouter` route's served build cannot give.
+            # Two registry properties rather than one, because they are two
+            # facts: a vendor could state a charge without naming an upstream,
+            # or the reverse, and an OR keeps both reaching the reader.
             llm_client=(
                 capturing_client(vendor, tiers.charge_mode(selection.vendor))
-                if vendor.reports_charge
+                if vendor.reports_charge or not vendor.routes_to_one_provider
                 else LiteLLMClient()
             ),
         )

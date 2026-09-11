@@ -17,12 +17,14 @@ import pytest
 
 from analysis_service.charges import (
     CHARGE_METADATA_KEY,
+    UPSTREAM_METADATA_KEY,
     ChargeModeMismatchError,
     charge_capturing_client_class,
     charge_reporting_llm_class,
     recordable_charge,
     records_reported_charge,
     reported_charge_of,
+    served_upstream_of,
     stated_arrangement_of,
 )
 from analysis_service.vendors import VENDOR_NAMES, ChargeMode, vendor_for
@@ -30,19 +32,25 @@ from analysis_service.vendors import VENDOR_NAMES, ChargeMode, vendor_for
 _COST_HEADER = "llm_provider-x-litellm-response-cost"
 
 
-def _response(hidden, byok=None):
+def _response(hidden, byok=None, provider=None):
     """A stand-in for litellm's own response object.
 
     ``_hidden_params`` is where litellm files the charge; ``usage`` is the block
     it parses from the body and keeps verbatim, which is where the provider's
-    own statement of the arrangement arrives.
+    own statement of the arrangement arrives; ``provider`` is a top-level extra
+    litellm keeps the same way.
     """
     usage = SimpleNamespace() if byok is None else SimpleNamespace(is_byok=byok)
-    return SimpleNamespace(_hidden_params=hidden, usage=usage)
+    response = SimpleNamespace(_hidden_params=hidden, usage=usage)
+    if provider is not None:
+        response.provider = provider
+    return response
 
 
-def _with_charge(value, byok=None):
-    return _response({"additional_headers": {_COST_HEADER: value}}, byok=byok)
+def _with_charge(value, byok=None, provider=None):
+    return _response(
+        {"additional_headers": {_COST_HEADER: value}}, byok=byok, provider=provider
+    )
 
 
 class TestTheShapesAFigureArrivesIn:
@@ -252,6 +260,59 @@ class TestTheProviderContradictsTheDeclaration:
         assert recordable_charge(SILENT, None, _with_charge(0.5, byok=True)) is None
 
 
+class TestWhichUpstreamAnswered:
+    """The evidence a gateway volunteers and litellm keeps.
+
+    Measured 2026-09-11: ``response.provider`` reads ``'DeepInfra'`` on a Llama
+    call and ``'Claude Platform on AWS'`` on a Claude one. It names a serving
+    organisation, so it is recorded and never hashed.
+    """
+
+    def test_a_named_upstream_is_read(self):
+        assert served_upstream_of(_with_charge(0.1, provider="DeepInfra")) == (
+            "DeepInfra"
+        )
+
+    def test_a_direct_vendor_names_none(self):
+        """``None`` rather than the vendor's own name.
+
+        Attribution derived from the route is exactly what this field replaces,
+        so a response that says nothing leaves it empty.
+        """
+        assert served_upstream_of(_with_charge(0.1)) is None
+
+    @pytest.mark.parametrize("value", ["", "   ", 7, True, None, ["DeepInfra"]])
+    def test_a_value_that_is_not_a_name_states_nothing(self, value):
+        assert served_upstream_of(_with_charge(0.1, provider=value)) is None
+
+    def test_a_name_is_trimmed_and_bounded(self):
+        """A third party's free text on its way into a report and an artifact."""
+        assert served_upstream_of(_with_charge(0.1, provider="  AWS  ")) == "AWS"
+        long = served_upstream_of(_with_charge(0.1, provider="x" * 400))
+        assert long is not None and len(long) == 100
+
+    def test_it_is_stamped_beside_the_charge(self):
+        (response,) = asyncio.run(
+            _drive(_Reporting(_client(charge=0.25, provider="DeepInfra")))
+        )
+        assert response.custom_metadata == {
+            CHARGE_METADATA_KEY: pytest.approx(0.25),
+            UPSTREAM_METADATA_KEY: "DeepInfra",
+        }
+
+    def test_an_upstream_is_stamped_where_no_charge_is_recorded(self):
+        """The two facts are independent, and a BYOK route records only one."""
+        client = _client(
+            charge=0.25, provider="DeepInfra", mode=ChargeMode.OWN_UPSTREAM_KEY
+        )
+        (response,) = asyncio.run(_drive(_Reporting(client)))
+        assert response.custom_metadata == {UPSTREAM_METADATA_KEY: "DeepInfra"}
+
+    def test_a_response_that_says_neither_is_stamped_with_neither(self):
+        (response,) = asyncio.run(_drive(_Reporting(_client())))
+        assert response.custom_metadata is None
+
+
 class _FakeResponse:
     """The shape ADK hands back: something with ``custom_metadata``."""
 
@@ -269,10 +330,13 @@ class _FakeClient:
 
     charge = None
     byok = None
+    provider = None
 
     async def acompletion(self, **kwargs):
         headers = {} if self.charge is None else {_COST_HEADER: self.charge}
-        return _response({"additional_headers": headers}, byok=self.byok)
+        return _response(
+            {"additional_headers": headers}, byok=self.byok, provider=self.provider
+        )
 
 
 class _FakeLlm:
@@ -297,6 +361,28 @@ class _TwoResponseLlm(_FakeLlm):
     responses = 2
 
 
+class _StreamingLlm(_FakeLlm):
+    """A call whose client answers with a stream wrapper rather than a response.
+
+    What ADK hands back when ``stream=True``: an object carrying neither
+    ``_hidden_params`` nor ``usage``. This service binds an ``output_schema`` on
+    every node and so never streams, which is what makes the branch untravelled
+    rather than absent — and an untravelled branch that raised would be found
+    by whoever first turned streaming on.
+    """
+
+    async def generate_content_async(self, llm_request, stream: bool = False):
+        await self.llm_client.acompletion(model="m", messages=[], tools=[])
+        yield _FakeResponse()
+
+
+class _StreamClient(_FakeClient):
+    """A client that answers with a wrapper, as litellm does for a stream."""
+
+    async def acompletion(self, **kwargs):
+        return SimpleNamespace()
+
+
 _Capturing = charge_capturing_client_class(_FakeClient)
 _Reporting = charge_reporting_llm_class(_FakeLlm)
 
@@ -307,11 +393,18 @@ REPORTING = vendor_for("openrouter")
 SILENT = vendor_for("anthropic")
 
 
-def _client(charge=None, byok=None, vendor=REPORTING, mode=ChargeMode.DIRECT):
+def _client(
+    charge=None,
+    byok=None,
+    provider=None,
+    vendor=REPORTING,
+    mode=ChargeMode.DIRECT,
+):
     """One capturing client, scripted to answer as a provider would."""
     client = _Capturing(vendor, mode)
     client.charge = charge
     client.byok = byok
+    client.provider = provider
     return client
 
 
@@ -379,6 +472,23 @@ class TestTheChargeReachesTheRecord:
         adapter = _Reporting(_client(charge=0.5, byok=True))
         with pytest.raises(ChargeModeMismatchError):
             asyncio.run(_drive(adapter))
+
+    def test_a_streamed_call_records_nothing_and_raises_nothing(self):
+        """The shape the reader was written for but never met.
+
+        A stream wrapper carries no usage block and no hidden params, so every
+        read answers "nothing said" rather than failing. Nothing is recorded,
+        which is honest: what a streamed call cost is stated in a place this
+        path does not see.
+        """
+        capturing = charge_capturing_client_class(_StreamClient)
+        adapter = charge_reporting_llm_class(_StreamingLlm)(
+            capturing(REPORTING, ChargeMode.DIRECT)
+        )
+
+        (response,) = asyncio.run(_drive(adapter))
+
+        assert response.custom_metadata is None
 
     def test_concurrent_nodes_each_keep_their_own_figure(self):
         """Every node on a tier shares one adapter and runs in its own task."""

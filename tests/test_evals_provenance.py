@@ -70,7 +70,9 @@ def sampling():
     return load_sampling(SAMPLING_PATH)
 
 
-def node_run(node: str, requested: str, served: str, sampling) -> NodeRun:
+def node_run(
+    node: str, requested: str, served: str, sampling, upstream: str | None = None
+) -> NodeRun:
     """One node execution as the runner would have recorded it."""
     return NodeRun(
         node=node,
@@ -81,6 +83,7 @@ def node_run(node: str, requested: str, served: str, sampling) -> NodeRun:
             served, sampling.for_tier(tier_of(node)), requested=requested
         ),
         duration_ms=1200,
+        served_upstream=upstream,
     )
 
 
@@ -178,6 +181,63 @@ class TestArtifactSerialization:
 
         assert len(loaded.provenance.node_runs["extract"]) == 2
         assert loaded.provenance.tier_identities()["base"].ambiguous
+
+    def test_a_tier_reports_every_upstream_that_answered_it(self, tmp_path, sampling):
+        """The spread a gateway route hits, which no served identifier shows.
+
+        One slug, one served identifier, two organisations. `baseline.py`
+        refuses to name a **Baseline** after such a route because the spread
+        makes sweeps incomparable; until this field nothing could report the
+        spread it actually hit.
+        """
+        executions = [
+            node_run("extract", BASE_REQUESTED, BASE_SERVED, sampling, "DeepInfra"),
+            node_run("extract", BASE_REQUESTED, BASE_SERVED, sampling, "Together"),
+        ]
+        loaded = load_artifact(
+            write_artifact(tmp_path, provenance(sampling, executions))
+        )
+
+        base = loaded.provenance.tier_identities()["base"]
+        assert base.served_upstreams == ("DeepInfra", "Together")
+        assert base.upstreams_varied
+        assert not base.ambiguous, "one served build, two places it came from"
+
+    def test_a_direct_route_reports_no_upstream_and_says_so(self, tmp_path, sampling):
+        """Empty rather than a hole: a direct vendor is its own upstream."""
+        loaded = load_artifact(
+            write_artifact(tmp_path, provenance(sampling, sweep(sampling)))
+        )
+
+        base = loaded.provenance.tier_identities()["base"]
+        assert base.served_upstreams == ()
+        assert not base.upstreams_varied
+
+    def test_the_upstream_survives_a_round_trip_through_the_artifact(
+        self, tmp_path, sampling
+    ):
+        """Written per execution, because that is where the observation was made."""
+        executions = [
+            node_run("extract", BASE_REQUESTED, BASE_SERVED, sampling, "DeepInfra"),
+        ]
+        loaded = load_artifact(
+            write_artifact(tmp_path, provenance(sampling, executions))
+        )
+
+        (recorded,) = loaded.provenance.node_runs["extract"]
+        assert recorded.served_upstream == "DeepInfra"
+
+    def test_an_execution_that_named_none_writes_no_key(self, tmp_path, sampling):
+        """An artifact from before the field is not a file with a hole in it.
+
+        The key is written only where an upstream was named, so every sweep
+        already in the archive reads back exactly as it was recorded.
+        """
+        executions = [node_run("extract", BASE_REQUESTED, BASE_SERVED, sampling)]
+        record = provenance(sampling, executions)
+
+        (entry,) = record.to_json()["node_runs"]["extract"]
+        assert "served_upstream" not in entry
 
     def test_a_deterministic_node_contributes_no_identity(self, sampling):
         # A FunctionNode has no served build and so no execution identity; it

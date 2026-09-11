@@ -225,6 +225,10 @@ The rules are the credential table's rules: a key for a vendor that reports no
 charge is an error, a key for a vendor with one arrangement is an error, and a
 missing key is an error only where a **bound** tier selects that vendor.
 
+A gateway also names the organisation that served each call, and the report
+records it per node as `served_upstream`. Nothing hashes it and nothing infers
+it from your route — a direct vendor records none rather than its own name.
+
 **The provider checks your declaration.** OpenRouter states `is_byok` in the
 same response field it states the charge in. Where that flag disagrees with what
 you declared, the run stops at the node that found out and the message names

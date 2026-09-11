@@ -780,8 +780,8 @@ That is worth knowing from a report rather than from a live run.
 ```python
 class UnreconciledRuling:
     claim_id: str  # the claim the problem is about
-    kind: str      # which check found it, from the closed set below
-    message: str   # the sentence the re-ask was asked to fix it by
+    kind: str  # which check found it, from the closed set below
+    message: str  # the sentence the re-ask was asked to fix it by
 ```
 
 The eight kinds, each one a check the service already distinguishes in code:

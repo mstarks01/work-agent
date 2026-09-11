@@ -160,7 +160,7 @@ def test_every_adapter_kwarg_comes_from_a_closed_set():
     assert "**{_TIMEOUT_KWARG: resilience.request_timeout_seconds()}" in body
     assert "llm_client=(" in body
     assert "capturing_client(vendor, tiers.charge_mode(" in body
-    assert "if vendor.reports_charge" in body
+    assert "if vendor.reports_charge or not vendor.routes_to_one_provider" in body
     assert body.count("**") == 4, (
         "a new spread reaches the translator constructor. Every value crossing"
         " this seam has to come from the vendor registry or from deploy-time"

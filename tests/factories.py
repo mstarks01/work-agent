@@ -37,7 +37,7 @@ from pydantic import BaseModel, Field
 from analysis_service import frameworks as framework_registry
 from analysis_service.binding import NodeBinding
 from analysis_service.budgets import BudgetPolicy
-from analysis_service.charges import CHARGE_METADATA_KEY
+from analysis_service.charges import CHARGE_METADATA_KEY, UPSTREAM_METADATA_KEY
 from analysis_service.claims import (
     Ground,
     Mitigation,
@@ -846,6 +846,24 @@ class ChargedLlm(ScriptedLlm):
     ) -> AsyncGenerator[LlmResponse, None]:
         async for response in super().generate_content_async(llm_request, stream):
             response.custom_metadata = {CHARGE_METADATA_KEY: self.charge}
+            yield response
+
+
+class UpstreamNamingLlm(ScriptedLlm):
+    """A stand-in whose answer names the upstream that served it.
+
+    The stamp an adapter writes for a gateway route. A direct vendor names
+    none, which is what every other stand-in here represents.
+    """
+
+    #: What the provider says answered. A serving organisation, not a build.
+    upstream: ClassVar[str] = "DeepInfra"
+
+    async def generate_content_async(
+        self, llm_request, stream: bool = False
+    ) -> AsyncGenerator[LlmResponse, None]:
+        async for response in super().generate_content_async(llm_request, stream):
+            response.custom_metadata = {UPSTREAM_METADATA_KEY: self.upstream}
             yield response
 
 

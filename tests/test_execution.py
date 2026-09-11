@@ -42,6 +42,7 @@ from tests.factories import (
     SilentLlm,
     SlowLlm,
     UnmeteredLlm,
+    UpstreamNamingLlm,
     carrying,
     claims_json,
     package_answering,
@@ -209,6 +210,37 @@ def test_a_node_whose_provider_reported_no_charge_records_none():
     runs = by_node(drive(pipeline))
 
     assert runs[graph.EXTRACT_NODE].reported_charge_usd is None
+
+
+def test_a_node_records_the_upstream_its_provider_named():
+    """Evidence a gateway volunteers, recorded and never hashed."""
+    pipeline, _ = scripted_pipeline(happy_replies(), llm_class=UpstreamNamingLlm)
+    runs = by_node(drive(pipeline))
+
+    extract = runs[graph.EXTRACT_NODE]
+    assert extract.served_upstream == UpstreamNamingLlm.upstream
+    assert (
+        extract.execution_fingerprint
+        == by_node(drive(pipeline))[graph.EXTRACT_NODE].execution_fingerprint
+    )
+
+
+def test_the_upstream_is_no_part_of_the_execution_fingerprint():
+    """A provider renaming its own string must not move a blessed hash.
+
+    Two runs of one configuration, one naming an upstream and one naming none,
+    have to fingerprint identically — otherwise a manifest blesses a vocabulary
+    nobody in this repository controls.
+    """
+    named, _ = scripted_pipeline(happy_replies(), llm_class=UpstreamNamingLlm)
+    silent, _ = scripted_pipeline(happy_replies())
+
+    with_upstream = by_node(drive(named))[graph.EXTRACT_NODE]
+    without = by_node(drive(silent))[graph.EXTRACT_NODE]
+
+    assert with_upstream.served_upstream == UpstreamNamingLlm.upstream
+    assert without.served_upstream is None
+    assert with_upstream.execution_fingerprint == without.execution_fingerprint
 
 
 def test_a_retried_node_records_how_many_attempts_it_took():

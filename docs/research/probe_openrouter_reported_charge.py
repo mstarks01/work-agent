@@ -56,7 +56,9 @@ from google.genai import types
 from analysis_service.binding import build_tier_adapters
 from analysis_service.charges import (
     CHARGE_METADATA_KEY,
+    UPSTREAM_METADATA_KEY,
     reported_charge_of,
+    served_upstream_of,
     stated_arrangement_of,
 )
 from analysis_service.model_tiers import load_model_tiers
@@ -165,11 +167,13 @@ def main() -> int:
         print(f"\nreported_charge_of(...) -> {reported_charge_of(raw)!r}")
         stated = stated_arrangement_of(raw)
         print(f"stated_arrangement_of(...) -> {stated.value if stated else None!r}")
+        print(f"served_upstream_of(...) -> {served_upstream_of(raw)!r}")
 
     print("\n--- what the record carries ---")
     for response in responses:
-        stamp = (response.custom_metadata or {}).get(CHARGE_METADATA_KEY)
-        print(f"custom_metadata[{CHARGE_METADATA_KEY!r}] -> {stamp!r}")
+        stamped = response.custom_metadata or {}
+        for key in (CHARGE_METADATA_KEY, UPSTREAM_METADATA_KEY):
+            print(f"custom_metadata[{key!r}] -> {stamped.get(key)!r}")
 
     for raw in recorder.seen:
         generation_id = _generation_id(raw)

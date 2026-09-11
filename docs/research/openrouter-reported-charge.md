@@ -1,9 +1,9 @@
 # OpenRouter states what it charged, and the record now keeps it (#822)
 
 Measured 2026-09-11 against `litellm==1.97.0`, ADK 2.5.0 and OpenRouter's live
-API, by `probe_openrouter_reported_charge.py` in this directory. Four billed
-completions on `meta-llama/llama-3.3-70b-instruct`, $0.0000101 in total, plus
-unbilled `GET /generation` reads.
+API, by `probe_openrouter_reported_charge.py` in this directory. Six billed
+completions on `meta-llama/llama-3.3-70b-instruct`, about $0.000015 in total,
+plus unbilled `GET /generation` reads.
 
 ## The question
 
@@ -49,6 +49,23 @@ The deployment declared `direct`, the provider said `is_byok: false`, the two
 agree and the run proceeded. That is the whole of what a live call can show
 here: the disagreeing case needs a second account with an upstream provider key,
 and the refusal is exercised offline against a response carrying the other flag.
+
+## The body names the upstream, and it agrees with the generation record
+
+litellm keeps `provider` as a pydantic extra on the response, so the evidence
+costs no second call:
+
+```
+served_upstream_of(...) -> 'DeepInfra'
+custom_metadata['served_upstream'] -> 'DeepInfra'
+```
+
+The unbilled generation record for the same call says `provider_name:
+DeepInfra`. The two fields agree, which is what makes the free one usable: the
+body's `provider` names the same organisation the generation record does, so a
+reader that takes the cheap one loses nothing but the dated build — and the
+dated build is not something this repository binds. See
+[#815](https://github.com/mstarks01/work-agent/issues/815).
 
 ## The figure is the whole charge, under this arrangement
 

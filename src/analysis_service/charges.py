@@ -61,6 +61,7 @@ import contextvars
 import logging
 import math
 from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import Any
 
 from analysis_service.errors import ConfigError
@@ -110,6 +111,21 @@ _BYOK_FIELD = "is_byok"
 #: event by this name, exactly as it reads ``attempts``.
 CHARGE_METADATA_KEY = "reported_charge_usd"
 
+#: The ``custom_metadata`` key under which a response carries the upstream its
+#: provider named.
+UPSTREAM_METADATA_KEY = "served_upstream"
+
+#: The provider's own name for the upstream that answered. OpenRouter states it
+#: at the top level of a completion body, and litellm keeps it as a pydantic
+#: extra on the response — measured 2026-09-11, ``response.provider`` reading
+#: ``'DeepInfra'``, so the evidence costs no second call.
+_UPSTREAM_FIELD = "provider"
+
+#: How much of a provider's name is kept. A bound rather than trust: the value
+#: is a third party's free text, it lands in a report and in an eval artifact,
+#: and nothing downstream is served by an unbounded string.
+_UPSTREAM_LIMIT = 100
+
 #: Where litellm files a charge a provider reported. Its OpenRouter config sets
 #: ``usage.include`` on every request and copies ``usage.cost`` out of the
 #: response body into this header slot, in the ``transform_response`` of its
@@ -119,8 +135,28 @@ CHARGE_METADATA_KEY = "reported_charge_usd"
 #: of the path as absent-able rather than asserting the shape.
 _COST_HEADER = "llm_provider-x-litellm-response-cost"
 
-_reported: contextvars.ContextVar[float | None] = contextvars.ContextVar(
-    "reported_charge", default=None
+
+@dataclass(frozen=True)
+class _Reported:
+    """What one response said beyond its token counts.
+
+    Two facts rather than two variables, because they are read in one place and
+    stamped in one place, and a second variable would be a second thing to clear
+    before each call — which is the whole of what keeps one tier's answer off
+    another tier's response.
+    """
+
+    charge_usd: float | None
+    upstream: str | None
+
+    @property
+    def empty(self) -> bool:
+        """Whether the response said nothing this module carries."""
+        return self.charge_usd is None and self.upstream is None
+
+
+_reported: contextvars.ContextVar[_Reported | None] = contextvars.ContextVar(
+    "reported", default=None
 )
 
 
@@ -145,6 +181,29 @@ def records_reported_charge(vendor: Vendor, mode: ChargeMode | None) -> bool:
         return False
     report = vendor.charges.get(mode)
     return report is not None and report.covers_whole_call
+
+
+def served_upstream_of(response: Any) -> str | None:
+    """Which upstream the provider says answered, or ``None`` where it says none.
+
+    **Evidence, never identity.** The value names a serving organisation —
+    ``Claude Platform on AWS``, ``DeepInfra`` — rather than a build, so it never
+    enters an execution fingerprint: a provider that renamed one of its own
+    strings would otherwise move every blessed hash for a cosmetic reason, and
+    nothing could tell that from a build that really changed.
+
+    It is also never **invented**. A direct vendor states no upstream and gets
+    ``None`` here, rather than its own name copied out of the route it was asked
+    for: attribution derived from the request is the thing this field exists to
+    replace.
+
+    Trimmed and bounded, because it is a third party's free text on its way into
+    a record. An empty or blank value is nothing said.
+    """
+    stated = getattr(response, _UPSTREAM_FIELD, None)
+    if not isinstance(stated, str) or not stated.strip():
+        return None
+    return stated.strip()[:_UPSTREAM_LIMIT]
 
 
 def stated_arrangement_of(response: Any) -> ChargeMode | None:
@@ -263,7 +322,12 @@ def charge_capturing_client_class(client_cls: type) -> type:
 
         async def acompletion(self, *args: Any, **kwargs: Any) -> Any:
             response = await super().acompletion(*args, **kwargs)
-            _reported.set(recordable_charge(self.vendor, self.mode, response))
+            _reported.set(
+                _Reported(
+                    charge_usd=recordable_charge(self.vendor, self.mode, response),
+                    upstream=served_upstream_of(response),
+                )
+            )
             return response
 
     return ChargeCapturingClient
@@ -291,12 +355,20 @@ def charge_reporting_llm_class(litellm_cls: type) -> type:
         async def generate_content_async(self, llm_request, stream: bool = False):
             _reported.set(None)
             async for response in super().generate_content_async(llm_request, stream):
-                charge = _reported.get()
-                if charge is not None:
+                reported = _reported.get()
+                if reported is not None and not reported.empty:
                     _reported.set(None)
+                    stamped = {
+                        CHARGE_METADATA_KEY: reported.charge_usd,
+                        UPSTREAM_METADATA_KEY: reported.upstream,
+                    }
                     response.custom_metadata = {
                         **(response.custom_metadata or {}),
-                        CHARGE_METADATA_KEY: charge,
+                        **{
+                            key: value
+                            for key, value in stamped.items()
+                            if value is not None
+                        },
                     }
                 yield response
 
