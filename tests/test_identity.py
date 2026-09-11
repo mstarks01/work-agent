@@ -358,6 +358,9 @@ class TestTheTableMatchesWhatTheTranslatorDoes:
         # build, and one slug may reach more than one upstream provider. That
         # is a claim about a third party, so it needs a live call and is
         # recorded as open on the row rather than asserted here.
+        # `docs/research/probe_openrouter_served_model.py` makes that call. Its
+        # third leg runs this same transformation over the body it received, so
+        # what changes when it runs is the body below, not the mechanism.
         "openrouter": {
             "id": "gen-offline",
             "object": "chat.completion",
