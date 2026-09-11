@@ -157,8 +157,15 @@ under the wrong one is either a twentieth of a cost or a cost thrown away.
 
 An OpenRouter response repeats the slug you asked for rather than naming the
 build that answered, so your report's served model tells you nothing the
-requested model did not. Every other vendor here either names the build or
-carries no build to name. See
+requested model did not. It does name the **organisation** that answered —
+`DeepInfra`, `Claude Platform on AWS` — and each node run records that under
+`served_upstream`. It is evidence and not identity: no fingerprint binds it,
+because the vocabulary is OpenRouter's and a rename there would move every
+blessed hash for nothing. A sweep's tier summary reports every upstream that
+answered, which is how you see a spread that the served model hides.
+
+Every other vendor here either names the build or carries no build to name, and
+none names an upstream: a direct route's upstream is the vendor itself. See
 [Configuration](Configuration.md#models-and-vendors) for what that costs a
 blessed fingerprint.
 

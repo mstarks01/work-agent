@@ -111,6 +111,12 @@ class NodeExecution(BaseModel):
     two selections therefore carry two digests and two fingerprints — which is
     an accurate record of two sanctioned identities, not an ambiguity to
     resolve.
+
+    ``served_upstream`` is the one observation here that is **not** part of an
+    identity. Every other field feeds a fingerprint or keys the record; this one
+    is evidence a gateway volunteered about which organisation answered, and it
+    is recorded so a reader can see a spread that no identity captures. It never
+    enters a hash — see :class:`~analysis_service.report.NodeRun`.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -121,6 +127,11 @@ class NodeExecution(BaseModel):
     served_model: str = Field(min_length=1, max_length=200)
     instruction_sha256: Fingerprint
     generation_fingerprint: Fingerprint
+    #: The serving organisation the provider named, where it named one. Absent
+    #: from every direct route and from every sweep recorded before the field
+    #: existed, which is why it defaults rather than being required: an absent
+    #: value is a real answer here, and demanding one would refuse the archive.
+    served_upstream: str | None = Field(default=None, max_length=100)
 
     def to_json(self) -> dict[str, str]:
         """One entry, self-describing.
@@ -137,6 +148,11 @@ class NodeExecution(BaseModel):
             "served_model": self.served_model,
             "instruction_sha256": self.instruction_sha256,
             "generation_fingerprint": self.generation_fingerprint,
+            **(
+                {"served_upstream": self.served_upstream}
+                if self.served_upstream is not None
+                else {}
+            ),
         }
 
 
@@ -155,6 +171,17 @@ class TierIdentity(BaseModel):
 
     requested_models: tuple[str, ...]
     served_models: tuple[str, ...]
+    #: Every upstream this tier's providers named, where any did. Empty on a
+    #: direct route, which names none, and that emptiness is the honest record
+    #: rather than a hole: a direct vendor *is* the upstream.
+    #:
+    #: **Not serialized by :meth:`to_json`**, and deliberately. That block is a
+    #: cache of this derivation, checked against the node runs it comes from —
+    #: an artifact whose stored view disagrees with its own executions is
+    #: refused, which is what makes the cache safe to read. The upstreams are
+    #: already on those executions, so writing them here would restate a
+    #: recomputable fact and re-seal every merged Baseline to say nothing new.
+    served_upstreams: tuple[str, ...]
     #: Every instruction digest this tier ran under, one per framework selection
     #: the sweep's corpus declared. Plural for a different reason than the
     #: served builds are: two served builds is a rotation an operator has to
@@ -168,6 +195,22 @@ class TierIdentity(BaseModel):
     def ambiguous(self) -> bool:
         """Whether this tier was answered by more than one served build."""
         return len(self.served_models) > 1
+
+    @property
+    def upstreams_varied(self) -> bool:
+        """Whether more than one organisation answered for this tier.
+
+        Separate from :attr:`ambiguous`, and a weaker statement: a rotation
+        between builds is something an operator has to choose between, and a
+        spread of upstreams is a sweep whose calls did not all reach the same
+        place. A gateway route can vary here while every served identifier
+        stays constant, because the served identifier is the slug that was
+        asked for.
+
+        This is the spread ``evals/harness/baseline.py`` refuses to name a
+        Baseline after, observed rather than assumed.
+        """
+        return len(self.served_upstreams) > 1
 
     def to_json(self) -> dict[str, list[str]]:
         return {
@@ -267,6 +310,9 @@ class RunProvenance(BaseModel):
             tier: TierIdentity(
                 requested_models=_unique(e.requested_model for e in executions),
                 served_models=_unique(e.served_model for e in executions),
+                served_upstreams=_unique(
+                    e.served_upstream for e in executions if e.served_upstream
+                ),
                 instruction_digests=_unique(e.instruction_sha256 for e in executions),
                 fingerprints=_unique(e.generation_fingerprint for e in executions),
                 nodes=_unique(e.node for e in executions),
@@ -490,6 +536,7 @@ def provenance_of(
                 served_model=served,
                 instruction_sha256=instructions,
                 generation_fingerprint=run.execution_fingerprint,
+                served_upstream=run.served_upstream,
             )
         )
     return RunProvenance(
