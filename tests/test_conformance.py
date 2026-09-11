@@ -71,6 +71,7 @@ from tests.factories import (
     repo_package_loaders,
     sample_fingerprint,
     tiers_for,
+    translator_of,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -437,7 +438,10 @@ class TestModelsCanBeBound:
         entry = vendor_for(vendor)
         expected = entry.reports_charge or not entry.routes_to_one_provider
         for tier, adapter in adapters.items():
-            captures = type(adapter.llm_client).__module__ == "analysis_service.charges"
+            captures = (
+                type(translator_of(adapter).llm_client).__module__
+                == "analysis_service.charges"
+            )
             assert captures is expected, (
                 f"{vendor} {tier} binds a client that"
                 f" {'reads' if captures else 'ignores'} what the provider said"
@@ -457,13 +461,15 @@ class TestModelsCanBeBound:
 
         So the class itself is the assertion. Identical across vendors means
         no vendor has a route the others lack — and the shared class is where
-        the retry budget, the pinned ``num_retries=0`` and the credential gate
-        live, so a vendor that escaped it would escape those too.
+        the pinned ``num_retries=0`` and the credential gate live, so a vendor
+        that escaped it would escape those too. The retry budget is one level
+        out, on the :class:`~analysis_service.provider.ExecutedLlm` every tier
+        is bound to, and ``tests/test_deployment.py`` is what holds that.
 
         The comparison is on the *ancestry* rather than the class object:
-        :func:`~analysis_service.retry.retrying_llm_class` mints one subclass per
-        call, so two identically-wired adapters are never the same class. What
-        must match is everything behind that subclass.
+        :func:`~analysis_service.charges.charge_reporting_llm_class` mints one
+        subclass per call, so two identically-wired translators are never the
+        same class. What must match is everything behind that subclass.
         """
         # Deferred exactly as ``binding`` defers it, so this test cannot be the
         # thing that pulls the provider library in ahead of the cost-map pin.
@@ -483,16 +489,19 @@ class TestModelsCanBeBound:
             # where a class is defined rather than by counting them, so a third
             # layer needs no edit here and cannot hide a vendor difference
             # underneath it either.
+            # The translator, not the adapter: every tier's adapter is this
+            # package's own ``ExecutedLlm``, and what varies by vendor is the
+            # object on the provider side of its seam.
             ancestries[vendor] = {
                 tier: tuple(
                     ancestor
-                    for ancestor in type(adapter).__mro__
+                    for ancestor in type(translator_of(adapter)).__mro__
                     if not ancestor.__module__.startswith("analysis_service.")
                 )
                 for tier, adapter in adapters.items()
             }
             for adapter in adapters.values():
-                assert isinstance(adapter, LiteLlm)
+                assert isinstance(translator_of(adapter), LiteLlm)
 
         reference = ancestries["vertex"]
         for vendor, per_tier in ancestries.items():

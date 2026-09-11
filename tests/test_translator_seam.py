@@ -138,7 +138,13 @@ def test_the_override_surface_is_no_wider_than_the_sampling_surface():
 
 
 def test_every_adapter_kwarg_comes_from_a_closed_set():
-    """What `build_tier_adapters` hands `LiteLlm`, and where each part is from.
+    """What `build_tier_adapters` hands the **translator**, and where each part
+    is from.
+
+    The translator is the object on the provider side of
+    `analysis_service.provider`'s seam, and it is what holds the tier's
+    configuration — so this is still the one constructor a deployment's values
+    reach LiteLLM through.
 
     Six sources, all of them code or deploy-time config: the route from the
     vendor registry, one literal, the per-request timeout from
@@ -149,9 +155,7 @@ def test_every_adapter_kwarg_comes_from_a_closed_set():
     the count is asserted rather than the names alone.
     """
     source = (PACKAGE / "binding.py").read_text(encoding="utf-8")
-    call = re.search(
-        r"adapters\[tier\] = retrying\((.*?)\n        \)", source, re.DOTALL
-    )
+    call = re.search(r"translator = translating\((.*?)\n        \)", source, re.DOTALL)
     assert call is not None, "build_tier_adapters no longer builds adapters this way"
     body = call.group(1)
     assert "model=selection.route" in body

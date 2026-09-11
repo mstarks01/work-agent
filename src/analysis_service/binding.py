@@ -1,7 +1,13 @@
 """Binding a tier's ``(vendor, model, sampling, resilience)`` to one adapter.
 
-There is one ``LiteLlm`` per tier, shared by that tier's nodes, so ten LLM nodes
-use two adapters. It owns every parameter ADK will not carry for the service.
+There is one adapter per tier, shared by that tier's nodes, so ten LLM nodes use
+two. Each is an :class:`~analysis_service.provider.ExecutedLlm` over an
+:class:`~analysis_service.provider.InProcessExecutor` holding the configured
+``LiteLlm``, and the split is the seam that module describes: the translator
+holds the tier's configuration — the credential, the seed, the reasoning effort,
+the request timeout — while one call's own request is what crosses.
+
+What this module owns is every parameter ADK will not carry for the service.
 
 Four things ride the constructor rather than the generate-content config. Three
 share one underlying reason: ADK's request map forwards them nowhere, and
@@ -26,7 +32,7 @@ about. The fourth is there because the other carrier changes its unit.
   ``2 * attempts - 1`` requests per node, uncoordinated across every lane agent
   the job fanned out. That is the burst that turns one 429 into a storm. The
   adapters this module builds are
-  :func:`~analysis_service.retry.retrying_llm_class` subclasses that share one
+  :class:`~analysis_service.provider.ExecutedLlm` instances sharing one
   process-wide budget.
 
 Constructor kwargs reach ``acompletion`` through ``_additional_args`` before
@@ -94,8 +100,8 @@ from analysis_service.model_tiers import (
     ReviewIndependence,
     TierName,
 )
+from analysis_service.provider import ExecutedLlm, InProcessExecutor
 from analysis_service.resilience import ResilienceConfig
-from analysis_service.retry import retrying_llm_class
 from analysis_service.sampling import (
     SamplingConfig,
     SamplingResolver,
@@ -114,7 +120,6 @@ if TYPE_CHECKING:
     # Both deliberately type-only. A runtime ``from analysis_service.graph import``
     # here would sort *above* the ``model_gate`` import and break the ordering
     # the comment above depends on.
-    from google.adk.models.lite_llm import LiteLlm
 
     from analysis_service.graph import ModelResolver
 
@@ -339,7 +344,7 @@ def build_tier_adapters(
     sampling: SamplingConfig,
     resilience: ResilienceConfig,
     env: Mapping[str, str] | None = None,
-) -> dict[TierName, LiteLlm]:
+) -> dict[TierName, ExecutedLlm]:
     """One configured ``LiteLlm`` per **bound** tier, or fail closed before any call.
 
     Bound, not every tier in the vocabulary. ``review`` exists so criticism can
@@ -379,13 +384,15 @@ def build_tier_adapters(
     # of the process, not of a tier. Capacity is one retry per LLM node in the
     # graph — what a single job may spend from a cold bucket.
     policy = resilience.retry_policy(budget_capacity=len(LLM_NODES))
-    # Two subclasses, composed in the order their jobs happen: the retry layer
-    # is outermost, so every attempt it makes passes through the charge layer
-    # and the attempt that answered is the one whose response is stamped.
-    retrying = retrying_llm_class(charge_reporting_llm_class(LiteLlm), policy)
+    # The charge layer sits on the translator, below the seam, because reading
+    # what a provider said about money needs the provider's own response. The
+    # retry loop sits above it in ``ExecutedLlm``, so every attempt it makes
+    # passes through the charge layer and the attempt that answered is the one
+    # whose figure is carried back.
+    translating = charge_reporting_llm_class(LiteLlm)
     capturing_client = charge_capturing_client_class(LiteLLMClient)
 
-    adapters: dict[TierName, LiteLlm] = {}
+    adapters: dict[TierName, ExecutedLlm] = {}
     # Walked in the vocabulary's order rather than the map's, so the build order
     # does not vary with how a config file happens to list its nodes. Which
     # tiers are bound comes from the config, which is the one reader of that
@@ -410,7 +417,7 @@ def build_tier_adapters(
         _check_output_ceiling(vendor, selection.model, tier_sampling, source)
         _check_native_structured_output(vendor, selection.model, tier_sampling, source)
         require_sdk(selection.vendor)
-        adapters[tier] = retrying(
+        translator = translating(
             model=selection.route,
             # Zero, and not because retry is off: it is one layer up, in
             # ``analysis_service.retry``. This kwarg is what keeps the library's
@@ -448,10 +455,20 @@ def build_tier_adapters(
                 else LiteLLMClient()
             ),
         )
+        # The tier's configuration — the credential, the seed, the reasoning
+        # effort, the request timeout — stays on the translator, which is the
+        # provider side of the seam. What crosses is one call's own request.
+        adapters[tier] = ExecutedLlm(
+            model=selection.route,
+            executor=InProcessExecutor(translator),
+            retry_policy=policy,
+        )
     return adapters
 
 
-def make_resolve_model(adapters: Mapping[TierName, LiteLlm], tiers: ModelTierConfig):
+def make_resolve_model(
+    adapters: Mapping[TierName, ExecutedLlm], tiers: ModelTierConfig
+):
     """Node -> the adapter for its tier, the ``ModelResolver`` the graph wants.
 
     The node -> tier walk stays in the tier config, so this never re-derives it.
@@ -459,7 +476,7 @@ def make_resolve_model(adapters: Mapping[TierName, LiteLlm], tiers: ModelTierCon
     supported-param checks then fire once per tier rather than once per node.
     """
 
-    def resolve_model(node: str) -> LiteLlm:
+    def resolve_model(node: str) -> ExecutedLlm:
         return adapters[tiers.resolve_tier(node)]
 
     return resolve_model

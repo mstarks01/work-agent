@@ -253,6 +253,12 @@ and attached to the adapter itself, so a retry is invisible to the graph and the
 report's `nodes` array is unchanged by one. A per-request timeout turns a hang
 into an error the retry can act on. Three attempts by default.
 
+The retry loop sits **above** the provider seam described below, and the
+translator sits beneath it. That is where the loop's two bounds are
+expressible: one token bucket shared by the whole process, and jitter that
+spreads out lanes which failed at the same instant. Neither is something a
+single call can do for itself.
+
 ## Concurrency and isolation
 
 Concurrent analyses are independent. Each `analyze()` call runs one job in its
@@ -307,6 +313,19 @@ why that is one substrate rather than a swappable adapter. Both run **in the
 service process, with the service's authority**. LiteLLM holds the provider
 credentials, opens the network connections, and is the only code between a
 node's request and a provider's answer.
+
+A **provider seam** sits between the graph and that translator:
+`analysis_service.provider` defines one bounded request that goes out, one
+result that comes back, and a failure as a value rather than as an exception
+object. Everything the service asks of a provider crosses it.
+
+**The seam is not containment and does not claim to be.** There is one
+implementation and it runs the translator in this process, under this
+process's credentials. What the seam buys is that the boundary is written down:
+a request carries no credential and nothing executable, so an implementation
+that ran elsewhere has a contract to meet rather than a dependency's type
+graph to reason about. Containment is the deployment work below, and this
+repository still ships none of it.
 
 **State the consequence plainly: a compromise of that dependency is a compromise
 of this application.** A malicious release, or arbitrary code execution inside
