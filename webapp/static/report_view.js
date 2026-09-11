@@ -689,6 +689,11 @@
       "Boundary crossing: ", code(c.flow_id), " — ",
       code(c.source_zone), " → ", code(c.destination_zone)
     );
+    // A crossing one of whose zones the service inferred says so here. The
+    // assumption itself is listed below with its basis; without this line a
+    // reader has to join the two lists to find out that the crossing rests on
+    // a placement nobody stated.
+    c.assumed_endpoints.forEach(id => d.append(" — assumed zone for ", code(id)));
     $("crossings").append(d);
   });
   R.system_model.assumptions.forEach(a => {

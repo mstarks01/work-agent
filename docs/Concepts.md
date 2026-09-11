@@ -25,7 +25,9 @@ sources. It contains five kinds of elements:
 
 Every selected framework analyzes this same validated model. Boundary crossings
 are calculated in code from the trust zones of a flow's endpoints; the
-extraction model does not supply them.
+extraction model does not supply them. A crossing also names the endpoints whose
+trust zone extraction inferred, so an agent reading the crossing can tell a zone
+the sources stated from one the service placed.
 
 ## Unknown and assumption
 
@@ -34,7 +36,8 @@ does not mean the control is absent.
 
 An **assumption** is an inference made during extraction. The inferred value is
 stored on the element and a separate assumption record identifies the element,
-attribute, and basis. A value left `unknown` is not an assumption.
+attribute, and basis. A value left `unknown` is not an assumption. An assumption
+about a trust zone also reaches every boundary crossing that zone produces.
 
 ## Framework and framework package
 

@@ -137,6 +137,11 @@ class Kind:
     allowlist: Callable[[Path, str], list[str]]
     title: Callable[[Path, str], str]
     closing: Callable[[Path, str], str]
+    #: Whether one diff is a submission of this kind. Every kind answers, with
+    #: no default, because a default is how a kind added tomorrow stays silent
+    #: about the question. :func:`_touches_prefix` is the ordinary answer, for
+    #: a tree nothing but a submission writes.
+    selects: Callable[[Path, Sequence[str]], bool]
     #: The path prefix that identifies this kind in a diff. What
     #: :func:`detect_kind` reads, so CI recognises a submission by the same
     #: table the CLI offers rather than by a second list somebody maintains —
@@ -248,6 +253,14 @@ def _is_derived(rel: str) -> bool:
     return any(
         rel.startswith(kind.prefix) and name in kind.derived for kind in KINDS.values()
     )
+
+
+def _touches_prefix(kind_name: str, root: Path, changed: Sequence[str]) -> bool:
+    """The ordinary rule: a diff under this kind's tree is a submission of it.
+
+    Right for every kind whose tree nothing but a submission writes.
+    """
+    return any(rel.startswith(KINDS[kind_name].prefix) for rel in changed)
 
 
 def base_text(root: Path, rel: str) -> str | None:
@@ -659,6 +672,82 @@ def _baseline_allowlist(root: Path, author: str) -> list[str]:
     return [*changed, "evals/baselines/README.md", ROSTER_FILE]
 
 
+def added_sweeps(root: Path, name: str) -> list[Mapping[str, Any]]:
+    """The manifest entries this diff adds to Baseline ``name``.
+
+    The one reader of what a diff *contributes*, called by the kind's selector
+    and by the stamp check, so "does this PR add a sweep" cannot be answered
+    twice and differently.
+
+    Raises :class:`SubmitError` for every way a manifest can fail to answer —
+    unreadable, unparsable, or not a table of tables. One type because the two
+    callers differ on what to *do* about it and not on which failure it was,
+    and neither may treat an unreadable manifest as an empty one.
+    """
+    manifest_rel = f"{KINDS['baseline'].prefix}{name}/baseline.json"
+    try:
+        raw = json.loads((root / manifest_rel).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SubmitError(f"{manifest_rel}: cannot be read: {exc}") from exc
+    manifest = _sweeps_of(raw, manifest_rel)
+    base_raw = base_text(root, manifest_rel)
+    try:
+        base = json.loads(base_raw) if base_raw else {}
+    except json.JSONDecodeError as exc:
+        raise SubmitError(
+            f"{manifest_rel}: the base copy will not parse: {exc}"
+        ) from exc
+    known = {str(entry.get("artifact")) for entry in _sweeps_of(base, manifest_rel)}
+    return [entry for entry in manifest if str(entry.get("artifact")) not in known]
+
+
+def _sweeps_of(manifest: Any, rel: str) -> list[Mapping[str, Any]]:
+    """One manifest's ``sweeps``, refused rather than filtered when it is not one.
+
+    A hand-edited manifest can hold anything JSON can hold. Dropping the
+    entries that are not tables would let a malformed file hide an added sweep
+    from the selector, so a shape this does not recognise raises.
+    """
+    if not isinstance(manifest, Mapping):
+        raise SubmitError(f"{rel}: is not a table")
+    entries = manifest.get("sweeps", [])
+    if not isinstance(entries, list) or not all(
+        isinstance(entry, Mapping) for entry in entries
+    ):
+        raise SubmitError(f"{rel}: sweeps is not a list of tables")
+    return entries
+
+
+def _baseline_selects(root: Path, changed: Sequence[str]) -> bool:
+    """Whether this diff *contributes* a Baseline, rather than maintaining one.
+
+    A submission adds a sweep. A diff that adds none changes a Baseline that is
+    already merged — a migration catching the archive up to a record change is
+    the case that arrives — and that is an ordinary code change, which has to
+    carry the code beside it. Read as a submission, it fails "nothing outside
+    this kind's allowlist changed" with no diff that could pass, which is the
+    same shape the ``derived`` entry above records for the comparison table.
+
+    **Nothing here weakens the binding.** A PR that adds a sweep still selects
+    the kind, so #320's author stamp, #323's digests and the one-directory rule
+    all run on every contribution. What a maintenance diff loses is the
+    checklist, not a check that was protecting anything: the digests still
+    recompute under the offline suite, and the diff is in the history.
+
+    Fails closed: more than one Baseline directory, or a manifest this cannot
+    read, selects the kind so the checks report it in their own words.
+    """
+    if not any(rel.startswith(KINDS["baseline"].prefix) for rel in changed):
+        return False
+    name = _baseline_dir(root)
+    if name is None:
+        return True
+    try:
+        return bool(added_sweeps(root, name))
+    except SubmitError:
+        return True
+
+
 def _check_baseline_verifies(root: Path, author: str) -> Check:
     """#323's artifact-consistency checks, failed at the contributor's machine."""
     name = _baseline_dir(root)
@@ -675,26 +764,17 @@ def _check_baseline_sweeps_are_yours(root: Path, author: str) -> Check:
     name = _baseline_dir(root)
     if name is None:
         return _check("every added sweep is stamped with your login", [])
-    manifest_rel = f"evals/baselines/{name}/baseline.json"
     problems: list[str] = []
     try:
-        manifest = json.loads((root / manifest_rel).read_text(encoding="utf-8"))
-        base_raw = base_text(root, manifest_rel)
-        known = {
-            str(entry.get("artifact"))
-            for entry in (json.loads(base_raw).get("sweeps", []) if base_raw else [])
-        }
-        for entry in manifest.get("sweeps", []):
-            if str(entry.get("artifact")) in known:
-                continue
+        for entry in added_sweeps(root, name):
             if entry.get("submitted_by") != author:
                 problems.append(
                     f"{entry.get('artifact')}: stamped"
                     f" {entry.get('submitted_by')!r}; you are {author!r}, and"
                     " the label is the disclosure (#323)"
                 )
-    except (OSError, json.JSONDecodeError) as exc:
-        problems.append(f"{manifest_rel}: cannot be read: {exc}")
+    except SubmitError as exc:
+        problems.append(str(exc))
     return _check("every added sweep is stamped with your login", problems)
 
 
@@ -766,6 +846,8 @@ def _baseline_closing(root: Path, author: str) -> str:
 KINDS: dict[str, Kind] = {
     "vote": Kind(
         prefix="evals/review/votes/",
+        # Nothing but a vote submission writes a file under this tree.
+        selects=partial(_touches_prefix, "vote"),
         noun="vote submission",
         preflight=_vote_preflight,
         allowlist=_vote_allowlist,
@@ -780,6 +862,9 @@ KINDS: dict[str, Kind] = {
         # table's shape was read as a Baseline submission and failed its own
         # checks.
         derived=frozenset({"README.md"}),
+        # A Baseline directory outlives the PR that laid it down, so a later
+        # diff may touch it without contributing anything.
+        selects=_baseline_selects,
         noun="baseline submission",
         subject="Baseline",
         preflight=_baseline_preflight,
@@ -888,16 +973,17 @@ def open_pr(root: Path, kind_name: str, author: str) -> str:
 def detect_kind(root: Path) -> str | None:
     """Which kind this diff carries, read off the :data:`KINDS` table.
 
-    ``None`` when the diff touches no kind's tree — an ordinary code PR, or a
-    roster line on its own. Raises when it touches two, because one kind per
-    PR is the rule the forced merge order rests on (#325).
+    ``None`` when no kind claims the diff — an ordinary code PR, a roster line
+    on its own, or a diff that touches a kind's tree without submitting
+    anything to it. Raises when two kinds claim it, because one kind per PR is
+    the rule the forced merge order rests on (#325).
+
+    Each kind answers for itself through :attr:`Kind.selects`, so a kind whose
+    tree is written by something other than a submission says so in the table
+    rather than here.
     """
     changed = changed_paths(root)
-    found = sorted(
-        name
-        for name, kind in KINDS.items()
-        if any(rel.startswith(kind.prefix) for rel in changed)
-    )
+    found = sorted(name for name, kind in KINDS.items() if kind.selects(root, changed))
     if len(found) > 1:
         raise SubmitError(
             f"this PR carries {' and '.join(found)} changes; one kind per PR,"
