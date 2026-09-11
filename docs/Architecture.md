@@ -358,6 +358,22 @@ them would be an SSRF and endpoint-substitution path.
 `tests/test_translator_seam.py` fails if one appears, if a decoding param could
 express one, or if a new value starts crossing the seam.
 
+**No TLS setting crosses it either.** LiteLLM resolves certificate verification
+from a call kwarg, then from `SSL_VERIFY` in the process environment, then from
+its own `litellm.ssl_verify`. The package sets none of the four kwargs that
+reach that resolution, and neither `sampling.toml` nor the env allowlist can
+express one. `tests/test_translator_seam.py` also drives LiteLLM's own
+resolver, because the environment is a path no kwarg lint can see.
+
+**Only a declared credential authenticates a run.** LiteLLM reads a key out of
+the process environment on its own, so a machine that ever ran another tool
+against a provider carries a key this deployment never declared.
+`Vendor.credential_kwargs` reads the `ANALYSIS_*` variable instead and fails the
+build closed when it is absent, so no adapter that could fall back is ever
+built. `tests/test_transport_conformance.py` holds both halves against the
+bytes: the declared key beats an ambient one, and an ambient one alone builds
+nothing.
+
 Dependency versions are pinned exactly (`pyproject.toml`) and hashed at install
 (`uv.lock`), and the installed version of every distribution between a node and
 its provider is inside each run's

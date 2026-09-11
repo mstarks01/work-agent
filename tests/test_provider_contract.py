@@ -37,7 +37,8 @@ the gateway one, and each drives the facts it can actually carry. The injection
 seam differs between them because litellm reaches the two through different
 clients — the OpenAI SDK for one, its own HTTP handler for the other — which is
 a fact about the translator rather than about the vendors, and
-:func:`_inject_transport` raises rather than defaults when it meets a third.
+:func:`tests.factories.inject_transport` raises rather than defaults when it
+meets a third.
 """
 
 from __future__ import annotations
@@ -52,7 +53,6 @@ from google.adk.agents import LlmAgent
 from google.adk.models.llm_request import LlmRequest
 from google.adk.runners import InMemoryRunner
 from google.genai import types
-from openai import AsyncOpenAI
 
 from analysis_service.binding import build_tier_adapters
 from analysis_service.charges import CHARGE_METADATA_KEY, UPSTREAM_METADATA_KEY
@@ -76,7 +76,7 @@ from analysis_service.retry import (
 from analysis_service.sampling import load_sampling
 from analysis_service.system_model import SystemModel
 from analysis_service.vendors import VendorName, vendor_for
-from tests.factories import PROJECT_ROOT, tiers_for, translator_of
+from tests.factories import PROJECT_ROOT, inject_transport, tiers_for
 
 CONFIG = PROJECT_ROOT / "config"
 
@@ -176,72 +176,6 @@ def declining(status: int, headers: Mapping[str, str] | None = None) -> _Provide
     )
 
 
-def _injecting_client_class(client_cls: type, client: Any) -> type:
-    """``client_cls``, handing litellm ``client`` instead of a real connection.
-
-    Takes the class rather than naming one, the way
-    :func:`analysis_service.charges.charge_capturing_client_class` does — the
-    translator under test may be carrying either ADK's own client or the
-    charge-capturing subclass, and this must not care which.
-    """
-
-    class _Injecting(client_cls):
-        async def acompletion(self, model, messages, tools, **kwargs):
-            return await super().acompletion(
-                model, messages, tools, client=client, **kwargs
-            )
-
-    return _Injecting
-
-
-def _inject_transport(adapter: Any, vendor: VendorName, provider: _Provider) -> None:
-    """Point one built adapter's client at ``provider`` instead of a network.
-
-    litellm reaches a vendor through one of two clients, and which one is its
-    decision rather than the registry's: the OpenAI SDK where the provider is
-    OpenAI-compatible and it has an SDK for it, and its own ``AsyncHTTPHandler``
-    where it composes the request itself — which is the path every OpenRouter
-    call takes. The injection therefore has to know which, and a vendor litellm
-    reaches a third way raises here rather than quietly running against nothing.
-
-    The seam is the client ADK already exposes for testability, so nothing in
-    ``src/`` learns that a test is running, and the kwargs the adapter was built
-    with reach litellm unchanged.
-    """
-    # Deferred, and not a style choice: importing ``litellm`` at module level
-    # here would sort above ``analysis_service`` and so could pull the library
-    # in before ``model_gate`` pins its model-cost map to the installed copy.
-    # ``binding`` defers its own ADK import for the same ordering.
-    from litellm.llms.custom_httpx.http_handler import AsyncHTTPHandler
-
-    transport = httpx.MockTransport(provider.handle)
-    connection = httpx.AsyncClient(transport=transport)
-    client: Any
-    if vendor == "openai":
-        client = AsyncOpenAI(api_key="not-a-real-openai-key", http_client=connection)
-    elif vendor == "openrouter":
-        client = AsyncHTTPHandler()
-        client.client = connection
-    else:  # pragma: no cover - a vendor reached through neither of those
-        raise NotImplementedError(
-            f"no transport seam for {vendor!r}: litellm reaches it through a"
-            " client this file has not met, and a call that fell through here"
-            " would reach the real provider"
-        )
-
-    # One layer in: the adapter is an ``ExecutedLlm`` over the seam, and the
-    # translator holding the tier's credential is on the provider side of it.
-    translator = translator_of(adapter)
-    inner = translator.llm_client
-    injecting = _injecting_client_class(type(inner), client)
-    # ADK's own client takes no arguments; the charge-capturing one carries the
-    # vendor and the arrangement its tier declared. Asked of the instance being
-    # replaced rather than decided from the vendor, so the two stay one seam.
-    translator.llm_client = (
-        injecting(inner.vendor, inner.mode) if hasattr(inner, "vendor") else injecting()
-    )
-
-
 def bound(vendor: VendorName, provider: _Provider):
     """The shipped ``base``-tier adapter for one vendor, wired to ``provider``."""
     sampling = load_sampling(CONFIG / "sampling.toml", env={})
@@ -252,7 +186,7 @@ def bound(vendor: VendorName, provider: _Provider):
         env=dict(FAKE_KEYS[vendor]),
     )
     adapter = adapters["base"]
-    _inject_transport(adapter, vendor, provider)
+    inject_transport(adapter, vendor, provider.handle)
     return adapter, sampling.for_tier("base")
 
 

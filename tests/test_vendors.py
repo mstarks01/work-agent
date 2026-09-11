@@ -38,6 +38,7 @@ from analysis_service.vendors import (
     vendor_for,
     vendor_for_route,
 )
+from tests.factories import AMBIENT_KEY_VARS
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -221,19 +222,6 @@ class TestCredentialModes:
         )
         assert kwargs == {"api_key": API_KEY}
 
-    #: The variables litellm reads a key out of on its own, per vendor that
-    #: takes one. Written down rather than derived from the vendor's name,
-    #: because litellm's spelling is not this registry's: Bedrock's bearer
-    #: token is ``AWS_BEARER_TOKEN_BEDROCK``, and the Gemini Developer API
-    #: reads two names. A derived ``{NAME}_API_KEY`` matched none of those.
-    AMBIENT_KEY_VARS: ClassVar[dict[str, tuple[str, ...]]] = {
-        "anthropic": ("ANTHROPIC_API_KEY",),
-        "openai": ("OPENAI_API_KEY",),
-        "bedrock": ("AWS_BEARER_TOKEN_BEDROCK",),
-        "gemini": ("GOOGLE_API_KEY", "GEMINI_API_KEY"),
-        "openrouter": ("OPENROUTER_API_KEY", "OR_API_KEY"),
-    }
-
     # Read from ``VENDORS`` rather than from ``VENDOR_NAMES``: this check runs
     # at collection time, and a vendor added to ``VENDOR_NAMES`` before its
     # ``VENDORS`` row would raise here and stop the whole suite from collecting
@@ -246,7 +234,7 @@ class TestCredentialModes:
             for name, vendor in VENDORS.items()
             if CredentialMode.API_KEY in vendor.credential_modes
         }
-        assert set(self.AMBIENT_KEY_VARS) == takes_a_key
+        assert set(AMBIENT_KEY_VARS) == takes_a_key
 
     @pytest.mark.parametrize(
         ("name", "ambient"),

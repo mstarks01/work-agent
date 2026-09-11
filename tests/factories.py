@@ -21,13 +21,14 @@ provenance defect stay invisible to the eval lane.
 
 import asyncio
 import json
-from collections.abc import AsyncGenerator, Mapping, Sequence
+from collections.abc import AsyncGenerator, Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any, ClassVar
 
+import httpx
 from google.adk.agents.llm_agent import LlmAgent
 from google.adk.models.base_llm import BaseLlm
 from google.adk.models.llm_response import LlmResponse
@@ -708,6 +709,111 @@ def translator_of(model):
         f" translator here to inspect: {type(executor).__name__}"
     )
     return executor.translator
+
+
+#: The key the injected OpenAI SDK client below holds. Deliberately unlike any
+#: credential a test declares: that client composes the ``Authorization`` header
+#: from its own key rather than from the one the adapter resolved, so a test
+#: whose declared key equalled this string would read its own scaffolding back
+#: and call it evidence about the adapter.
+SDK_CLIENT_KEY = "not-a-real-sdk-client-key"
+
+#: The variables litellm reads a key out of on its own, per vendor that takes
+#: one. Written down rather than derived from the vendor's name, because
+#: litellm's spelling is not this registry's: Bedrock's bearer token is
+#: ``AWS_BEARER_TOKEN_BEDROCK``, and the Gemini Developer API reads two names. A
+#: derived ``{NAME}_API_KEY`` matched none of those.
+#:
+#: One table for two readers. ``tests/test_vendors.py`` asks whether the
+#: registry refuses such a variable, and ``tests/test_transport_conformance.py``
+#: asks what one of them puts on the wire. Spelled twice, a renamed variable
+#: would leave one of those two asserting about a name litellm no longer reads.
+AMBIENT_KEY_VARS: Mapping[VendorName, tuple[str, ...]] = MappingProxyType(
+    {
+        "anthropic": ("ANTHROPIC_API_KEY",),
+        "openai": ("OPENAI_API_KEY",),
+        "bedrock": ("AWS_BEARER_TOKEN_BEDROCK",),
+        "gemini": ("GOOGLE_API_KEY", "GEMINI_API_KEY"),
+        "openrouter": ("OPENROUTER_API_KEY", "OR_API_KEY"),
+    }
+)
+
+
+def _injecting_client_class(client_cls: type, client: Any) -> type:
+    """``client_cls``, handing litellm ``client`` instead of a real connection.
+
+    Takes the class rather than naming one, the way
+    :func:`analysis_service.charges.charge_capturing_client_class` does — the
+    translator under test may be carrying either ADK's own client or the
+    charge-capturing subclass, and this must not care which.
+    """
+
+    class _Injecting(client_cls):
+        async def acompletion(self, model, messages, tools, **kwargs):
+            return await super().acompletion(
+                model, messages, tools, client=client, **kwargs
+            )
+
+    return _Injecting
+
+
+def inject_transport(
+    adapter: Any,
+    vendor: VendorName,
+    handle: Callable[[httpx.Request], httpx.Response],
+) -> None:
+    """Point one built adapter's client at ``handle`` instead of a network.
+
+    litellm reaches a vendor through one of two clients, and which one is its
+    decision rather than the registry's: the OpenAI SDK where the provider is
+    OpenAI-compatible and it has an SDK for it, and its own ``AsyncHTTPHandler``
+    where it composes the request itself — which is the path every OpenRouter
+    call takes. The injection therefore has to know which, and a vendor litellm
+    reaches a third way raises here rather than quietly running against nothing.
+
+    The seam is the client ADK already exposes for testability, so nothing in
+    ``src/`` learns that a test is running, and the kwargs the adapter was built
+    with reach litellm unchanged.
+
+    **The two routes do not carry the same evidence about a credential.** On the
+    OpenAI path the SDK client this builds holds a key of its own, and that key
+    is what reaches the header, so nothing there says which key the adapter
+    resolved. On the OpenRouter path litellm composes the request itself from
+    the key it resolved, so the header is evidence. One reader for both, in this
+    file, because two copies of this chain would answer that differently.
+    """
+    # Deferred, and not a style choice: importing ``litellm`` at module level
+    # here would sort above ``analysis_service`` and so could pull the library
+    # in before ``model_gate`` pins its model-cost map to the installed copy.
+    # ``binding`` defers its own ADK import for the same ordering.
+    from litellm.llms.custom_httpx.http_handler import AsyncHTTPHandler
+    from openai import AsyncOpenAI
+
+    connection = httpx.AsyncClient(transport=httpx.MockTransport(handle))
+    client: Any
+    if vendor == "openai":
+        client = AsyncOpenAI(api_key=SDK_CLIENT_KEY, http_client=connection)
+    elif vendor == "openrouter":
+        client = AsyncHTTPHandler()
+        client.client = connection
+    else:  # pragma: no cover - a vendor reached through neither of those
+        raise NotImplementedError(
+            f"no transport seam for {vendor!r}: litellm reaches it through a"
+            " client this file has not met, and a call that fell through here"
+            " would reach the real provider"
+        )
+
+    # One layer in: the adapter is an ``ExecutedLlm`` over the seam, and the
+    # translator holding the tier's credential is on the provider side of it.
+    translator = translator_of(adapter)
+    inner = translator.llm_client
+    injecting = _injecting_client_class(type(inner), client)
+    # ADK's own client takes no arguments; the charge-capturing one carries the
+    # vendor and the arrangement its tier declared. Asked of the instance being
+    # replaced rather than decided from the vendor, so the two stay one seam.
+    translator.llm_client = (
+        injecting(inner.vendor, inner.mode) if hasattr(inner, "vendor") else injecting()
+    )
 
 
 def served_build(requested_route: str) -> str:
