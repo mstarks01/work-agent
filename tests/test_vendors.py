@@ -530,6 +530,25 @@ class TestPinnedFormRule:
         "anthropic.claude-3-5-sonnet-20240620-v1:0",
     )
 
+    @pytest.mark.parametrize("name", sorted(CLAUDE_SPELLING))
+    @pytest.mark.parametrize(
+        "model", sorted(name for name, ok in CLAUDE_VERDICTS.items() if ok)
+    )
+    def test_a_route_pasted_into_the_model_field_is_refused(self, model, name):
+        """The mistake an aggregator makes easy, and it reached no rule.
+
+        ``route`` joins the vendor prefix onto the model, so an operator who
+        copies the whole route into ``model`` gets it joined a second time.
+        While the family read one optional gateway segment,
+        ``openrouter/anthropic/claude-opus-4.7`` matched no Claude rule, passed
+        unpinned through the catch-all, and the job died on node one against
+        ``openrouter/openrouter/anthropic/claude-opus-4.7``.
+        """
+        vendor = vendor_for(name)
+        doubled = f"{vendor.prefix}{CLAUDE_SPELLING[name](model)}"
+        with pytest.raises(ValueError, match="not pinned"):
+            vendor.validate_model(doubled, source="t")
+
     @pytest.mark.parametrize("name", BARE_SPELLING)
     @pytest.mark.parametrize("model", EXTRA_BEDROCK_SPELLINGS)
     def test_a_scoped_bedrock_spelling_is_refused_where_it_is_not_served(

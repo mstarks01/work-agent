@@ -387,9 +387,25 @@ _SCOPE_SEGMENT = r"(?:[a-z][a-z0-9-]*\.)?"
 # identifier, as OpenRouter spells ``anthropic/claude-sonnet-4.6``. Matched as a
 # shape for the same reason the scope segment is, and optional for the same
 # reason too — one family pattern reads the family whoever wrapped it.
-_GATEWAY_NAME = r"[a-z][a-z0-9-]*/"
-_GATEWAY_SEGMENT = rf"(?:{_GATEWAY_NAME})?"
-_GATEWAY_PREFIX = re.compile(rf"^{_GATEWAY_NAME}")
+#
+# The underscore is in the shape because two producers put it there: every
+# ``openrouter/`` key in the pinned map spells its segment
+# ``[a-z][a-z0-9_-]*`` — ``meta-llama``, ``x-ai``, ``black_forest_labs`` — and
+# litellm's own ``vertex_ai/`` prefix is what a route pasted into a model field
+# carries. A shape without it caught the doubled route on five vendors and not
+# on the sixth.
+_GATEWAY_NAME = r"[a-z][a-z0-9_-]*/"
+
+# **Repeated, not optional-once.** One segment is what OpenRouter writes, and
+# more than one is what an operator writes by mistake: ``model =
+# "openrouter/anthropic/claude-opus-4.7"`` is the *route* pasted into the model
+# field, and :meth:`Vendor.route` would build
+# ``openrouter/openrouter/anthropic/claude-opus-4.7`` from it. With a single
+# optional segment that identifier reached no family rule, passed unpinned
+# through the catch-all, and died on node one — the exact failure the shared
+# family exists to catch one segment lower down.
+_GATEWAY_SEGMENT = rf"(?:{_GATEWAY_NAME})*"
+_GATEWAY_PREFIX = re.compile(rf"^(?:{_GATEWAY_NAME})+")
 
 
 # **One family pattern, whatever spells it.** A family rule follows the family,
@@ -554,9 +570,10 @@ def family_identifier(model: str) -> str:
     before the first slash" is exactly the pair of readers that comes to
     disagree, so there is one.
 
-    Only the **leading** segment goes. What remains is what the family patterns
-    read, and for every vendor whose identifiers carry no slash that is the
-    identifier unchanged.
+    Every **leading** segment goes, and not only the first, so this reads the
+    same identifier :data:`_CLAUDE_FAMILY` does. What remains is what the
+    family patterns read, and for a vendor whose identifiers carry no slash
+    that is the identifier unchanged.
     """
     return _GATEWAY_PREFIX.sub("", model, count=1)
 
