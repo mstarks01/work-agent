@@ -55,7 +55,7 @@ import asyncio
 import logging
 import math
 import random
-from collections.abc import AsyncGenerator, Sequence
+from collections.abc import AsyncGenerator, Mapping, Sequence
 from dataclasses import dataclass
 from typing import ClassVar
 
@@ -192,6 +192,34 @@ class RetryBudget:
 _TRANSIENT_CLIENT_STATUS_CODES = frozenset({408, 429})
 _LOWEST_SERVER_STATUS_CODE = 500
 
+#: Whether a stated rate-limit dimension clears on the timescale a retry waits.
+#: **Not every 429 is a moment.** A request-per-minute ceiling is one, and a
+#: spend cap is not: asking again in eight seconds reaches the same refusal,
+#: having spent an attempt, a budget token and the wall-clock of a paid job.
+#:
+#: The pinned translator states the dimension on the exception. Measured on
+#: litellm 1.97.0: every ``RateLimitError`` carries ``category`` (defaulting to
+#: ``vendor_rate_limit``) and ``rate_limit_type``, which is ``None`` unless the
+#: limiter that fired named one. ``litellm.exceptions.RateLimitType`` is the
+#: closed set this keys on.
+#:
+#: **Spelled as strings rather than imported.** This module stays free of the
+#: provider libraries at import time, which is the same reason it reads a status
+#: code off the exception and compares a finish reason as bare text.
+#: ``tests/test_retry.py`` drives the installed enum against this table, so a
+#: dimension added by a library bump fails there rather than defaulting quietly
+#: to "ask again".
+#:
+#: An absent or unrecognised dimension is retried, which is the safe direction:
+#: a genuine throttle must survive a vocabulary this table has not met.
+_RATE_LIMIT_CLEARS_WITH_TIME: Mapping[str, bool] = {
+    "requests": True,  # a requests-per-minute window, which reopens
+    "tokens": True,  # a tokens-per-minute window, the same
+    "concurrent_requests": True,  # clears as this process's own calls finish
+    "budget": False,  # a spend cap; time does not refill money
+    "max_iterations": False,  # a per-session cap, which the session cannot leave
+}
+
 
 def _is_transient(exc: BaseException) -> bool:
     """Whether the provider said something that asking again could fix.
@@ -221,6 +249,9 @@ def _is_transient(exc: BaseException) -> bool:
     object from outside the provider library — this module's own
     :class:`TruncatedCompletionError` among them — says nothing about transport,
     and a missing number is not evidence of one.
+
+    A 429 is read one step further, because the code alone conflates a moment
+    with a ceiling — see :data:`_RATE_LIMIT_CLEARS_WITH_TIME`.
     """
     status = getattr(exc, "status_code", None)
     try:
@@ -231,8 +262,29 @@ def _is_transient(exc: BaseException) -> bool:
         # ``_retry_after_seconds`` makes about an unreadable ``Retry-After``.
         return False
     if code in _TRANSIENT_CLIENT_STATUS_CODES:
-        return True
+        return _clears_with_time(exc)
     return code >= _LOWEST_SERVER_STATUS_CODE
+
+
+def _clears_with_time(exc: BaseException) -> bool:
+    """Whether the limit this error names is one that reopens on its own.
+
+    ``True`` where the provider named no dimension, which is the ordinary case
+    and the safe one: an unstated limit is judged by its status code exactly as
+    before, and a genuine throttle must survive a vocabulary this table has not
+    met.
+
+    The value arrives as an enum member or as its string — litellm ships
+    ``validate_rate_limit_type`` for exactly that duck-typed read — so the
+    member's ``value`` is taken where there is one.
+    """
+    stated = getattr(exc, "rate_limit_type", None)
+    if stated is None:
+        return True
+    dimension = getattr(stated, "value", stated)
+    if not isinstance(dimension, str):
+        return True
+    return _RATE_LIMIT_CLEARS_WITH_TIME.get(dimension, True)
 
 
 def _retry_after_seconds(exc: BaseException) -> float | None:
