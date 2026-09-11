@@ -21,7 +21,10 @@ It is mechanical everywhere, and a human answers the one question code cannot:
    vote ledger. A substance down-vote rejects it and gates. A vote that joins
    the pool marks it real but unlisted. A finding nobody answered is
    ``unvoted``, which is visible, non-gating, and exactly what the review queue
-   serves.
+   serves. A finding whose votes were all cast on an earlier version of the
+   argument is ``stale``, which gates nothing and pools nothing: the fingerprint
+   is blind to what a claim says, so a standing carried across a re-argument
+   would read as a person validating what this run says.
 5. Severity calibration, mechanical. ``derive_severity_level`` is shipped
    arithmetic, and comparing bands needs no vote.
 
@@ -58,9 +61,10 @@ from analysis_service.claims import (
     derive_severity_level,
 )
 from analysis_service.frameworks.stride.record import DraftThreat, StrideCategory
+from evals.harness.content import structural
 from evals.harness.fingerprint import key_claim
 from evals.harness.identity import ClaimPair, Matcher
-from evals.harness.ledger import Ledger
+from evals.harness.ledger import Ledger, Vote
 from evals.harness.reference import GoldenCase, ReferenceThreat
 
 
@@ -140,7 +144,13 @@ class MatchedPair:
 #: gates nor pools.
 #: ``unvoted`` — nobody answered. Non-gating and visible, and exactly the set
 #: the review queue serves.
-Standing = Literal["rejected", "pooled", "open", "unvoted"]
+#: ``stale`` — somebody answered, and the claim has been re-argued since: its
+#: verdict, its grounds or its ratings differ from the ones they judged (ADR
+#: 0029). It gates nothing and pools nothing, because the person judged a
+#: different argument; the vote stands in the ledger and the queue asks its
+#: voter again. This is what stops an identity match reading as a human
+#: validation of what this run says.
+Standing = Literal["rejected", "pooled", "open", "unvoted", "stale"]
 
 
 @dataclass(frozen=True)
@@ -150,6 +160,13 @@ class UnlistedThreat:
     The fingerprint is the join key to the vote ledger and the review queue:
     the standing recorded here is the ledger's answer at scoring time, and the
     same key re-reads the ledger after the next sitting with no re-run.
+
+    A standing is read against the claim this run produced, never against the
+    fingerprint alone. A vote whose structural digest differs from this claim's
+    stands ``stale``: the 2026-09-09 audit replaced every retained case 01 title
+    and explanation with text asserting the opposite of the finding and no key
+    moved, so a standing carried across that would have called a contradiction a
+    human-validated finding.
     """
 
     threat_id: str
@@ -374,7 +391,13 @@ class CaseScore:
         }
 
 
-_STANDINGS: tuple[Standing, ...] = ("rejected", "pooled", "open", "unvoted")
+_STANDINGS: tuple[Standing, ...] = (
+    "rejected",
+    "pooled",
+    "open",
+    "unvoted",
+    "stale",
+)
 
 
 def ratio(numerator: float, denominator: float) -> float:
@@ -667,34 +690,45 @@ def _standing_of_unmatched(
             flows,
             verb=threat.verb,
         )
+        current = [vote for (key, _), vote in votes.current().items() if key == value]
         unlisted.append(
             UnlistedThreat(
                 threat_id=threat.id,
                 category=threat.category,
                 claim=candidate_claim(threat),
                 fingerprint=value,
-                standing=_standing(votes, value),
+                standing=_standing(current, structural(threat)),
             )
         )
     return tuple(unlisted), tuple(foreign)
 
 
-def _standing(votes: Ledger, value: str) -> Standing:
-    """One fingerprint's standing, from the current votes and nothing else.
+def _standing(current: Sequence[Vote], content: str) -> Standing:
+    """One fingerprint's standing against the claim this run produced.
+
+    ``content`` is that claim's structural digest. A vote answers only while its
+    own digest matches: a claim re-argued since the vote was cast is a different
+    argument, and the person judged the earlier one. Those votes fall out first,
+    and what is left decides the standing.
 
     ``rejected`` wins over ``pooled`` when reviewers disagree: a standing that
     hid a substance objection behind a second reviewer's up-vote would let the
     gate pass on the vote most favourable to the tool. The disagreement itself
     is the queue's business to surface for a third opinion.
+
+    ``stale`` is the answer when every vote is on an earlier argument, and it
+    sits apart from ``unvoted`` because the two are different facts: nobody has
+    answered this argument, and somebody answered another one. It gates nothing
+    and pools nothing.
     """
-    current = [vote for (key, _), vote in votes.current().items() if key == value]
-    if any(vote.counts_against_analysis for vote in current):
+    live = [vote for vote in current if vote.answers_for(content)]
+    if any(vote.counts_against_analysis for vote in live):
         return "rejected"
-    if any(vote.joins_the_pool for vote in current):
+    if any(vote.joins_the_pool for vote in live):
         return "pooled"
-    if current:
+    if live:
         return "open"
-    return "unvoted"
+    return "stale" if current else "unvoted"
 
 
 def _severity_confusion(matched: Iterable[MatchedPair]) -> dict[str, int]:
@@ -752,6 +786,12 @@ def unlisted_for_promotion(scores: Sequence[CaseScore]) -> list[dict[str, Any]]:
     someone trying to be exhaustive up front. The fingerprint rides along so
     the blessing pass can retire the vote's pool membership when the claim
     becomes a reference.
+
+    **Only what a person read.** Promotion writes ``entry.claim`` — this run's
+    finding — into the reference set, so a vote cast on a different argument
+    must not offer it. ``pooled`` already means that: :func:`_standing` drops a
+    vote whose structural digest has moved and answers ``stale`` instead, so a
+    re-argued finding leaves this list until somebody answers it again.
     """
     return [
         {

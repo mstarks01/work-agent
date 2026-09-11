@@ -12,9 +12,11 @@ from pathlib import Path
 
 import pytest
 
+from analysis_service.claims import Ground
 from evals.harness.calibration import load_pairs
+from evals.harness.content import structural
 from evals.harness.fingerprint import components_for, version_for
-from evals.harness.ledger import Ledger, cast
+from evals.harness.ledger import Ledger
 from evals.harness.reference import load_case
 from evals.harness.scorer import (
     candidate_claim,
@@ -23,7 +25,7 @@ from evals.harness.scorer import (
     severity_axis_agreement,
     unlisted_for_promotion,
 )
-from tests.eval_factories import ScriptedMatcher, produced_threat, threat_for
+from tests.eval_factories import ScriptedMatcher, cast, produced_threat, threat_for
 
 CORPUS_DIR = Path(__file__).resolve().parents[1] / "evals" / "corpus"
 CONTROL_CASE = CORPUS_DIR / "01-payments-checkout"
@@ -44,8 +46,13 @@ def no_votes():
     return Ledger()
 
 
-def vote_on(case, threat, verdict, reason=None):
-    """One vote on exactly the fingerprint the scorer computes for ``threat``."""
+def vote_on(case, threat, verdict, reason=None, content=None):
+    """One vote on exactly the fingerprint the scorer computes for ``threat``.
+
+    ``content`` defaults to the threat's own words, which is the vote a
+    reviewer cast on what they were shown. Passing another value is how a test
+    says the finding has been rewritten since the vote.
+    """
     flows = {flow.id: (flow.source, flow.destination) for flow in case.model.data_flows}
     components = components_for(
         "stride",
@@ -59,6 +66,7 @@ def vote_on(case, threat, verdict, reason=None):
         case.id,
         verdict,
         voter="test-reviewer",
+        content=content or structural(threat),
         reason=reason,
         version=version_for("stride"),
     )
@@ -161,6 +169,7 @@ def test_an_unvoted_unmatched_threat_is_visible_and_never_gates(case, no_votes):
         "pooled": 0,
         "open": 0,
         "unvoted": 1,
+        "stale": 0,
     }
     assert score.rejected_rate == 0.0
     assert score.unvoted_count == 1
@@ -248,6 +257,114 @@ def test_a_pooled_finding_feeds_promotion(case):
     assert promoted[0]["fingerprint"] == score.unlisted[0].fingerprint
 
 
+class TestAStandingIsAboutTheArgumentAndNotTheKey:
+    """An identity match is never on its own a human-validated finding.
+
+    The 2026-09-09 audit rewrote every retained case 01 finding to assert the
+    opposite of itself and the scorer still returned 12 matches. So a vote holds
+    only against the argument it was cast on (ADR 0029).
+    """
+
+    @staticmethod
+    def _reargued(threat):
+        """The same topic, resting on a different ground."""
+        return threat.model_copy(
+            update={
+                "grounds": [
+                    Ground(
+                        kind="unknown-attribute",
+                        element_id="entity:customer",
+                        attribute="authentication",
+                    )
+                ]
+            }
+        )
+
+    def test_a_vote_on_this_argument_stands(self, case):
+        produced = [produced_threat(1, "spoofing", "A grounded but unlisted claim.")]
+        votes = Ledger([vote_on(case, produced[0], "up")])
+
+        score = score_case(case, produced, ScriptedMatcher(), votes)
+
+        assert score.unlisted[0].standing == "pooled"
+
+    def test_a_vote_on_an_earlier_argument_is_stale(self, case):
+        produced = [produced_threat(1, "spoofing", "A grounded but unlisted claim.")]
+        votes = Ledger(
+            [
+                vote_on(
+                    case,
+                    produced[0],
+                    "up",
+                    content=structural(self._reargued(produced[0])),
+                )
+            ]
+        )
+
+        score = score_case(case, produced, ScriptedMatcher(), votes)
+
+        assert score.unlisted[0].standing == "stale"
+        assert score.standing_counts["stale"] == 1
+
+    def test_a_stale_substance_rejection_does_not_gate(self, case):
+        """It gates nothing, because the person judged another argument."""
+        produced = [produced_threat(1, "spoofing", "A grounded but unlisted claim.")]
+        votes = Ledger(
+            [
+                vote_on(
+                    case,
+                    produced[0],
+                    "down",
+                    reason="not-a-threat",
+                    content=structural(self._reargued(produced[0])),
+                )
+            ]
+        )
+
+        score = score_case(case, produced, ScriptedMatcher(), votes)
+
+        assert score.unlisted[0].standing == "stale"
+        assert score.rejected_rate == 0.0
+
+    def test_a_stale_vote_does_not_feed_promotion(self, case):
+        """Promotion writes this run's finding into the reference set, so a
+        vote on another argument may not offer it."""
+        produced = [produced_threat(1, "spoofing", "A grounded but unlisted claim.")]
+        votes = Ledger(
+            [
+                vote_on(
+                    case,
+                    produced[0],
+                    "up",
+                    content=structural(self._reargued(produced[0])),
+                )
+            ]
+        )
+
+        score = score_case(case, produced, ScriptedMatcher(), votes)
+
+        assert unlisted_for_promotion([score]) == []
+
+    def test_nobody_answering_is_still_unvoted(self, case):
+        """`stale` and `unvoted` are different facts and stay apart."""
+        produced = [produced_threat(1, "spoofing", "A grounded but unlisted claim.")]
+
+        score = score_case(case, produced, ScriptedMatcher(), Ledger())
+
+        assert score.unlisted[0].standing == "unvoted"
+
+    def test_a_rewording_alone_leaves_the_standing_alive(self, case):
+        """Prose moves every run, so binding a substance vote to it would
+        expire every standing on every sweep."""
+        produced = [produced_threat(1, "spoofing", "A grounded but unlisted claim.")]
+        votes = Ledger([vote_on(case, produced[0], "up")])
+        reworded = [produced[0].model_copy(update={"description": "Said again."})]
+
+        score = score_case(case, reworded, ScriptedMatcher(), votes)
+
+        assert score.unlisted[0].standing == "pooled"
+
+
 def test_a_substance_down_vote_is_the_gating_standing(case):
     produced = [produced_threat(1, "spoofing", "An attacker abuses a made-up service.")]
     votes = Ledger(
@@ -291,6 +408,7 @@ def test_a_rejection_wins_over_a_second_reviewers_pool_vote(case):
                 case.id,
                 "down",
                 voter="second-reviewer",
+                content=structural(produced[0]),
                 reason="not-a-threat",
                 version=version_for("stride"),
             ),

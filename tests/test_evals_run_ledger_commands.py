@@ -14,8 +14,10 @@ import json
 
 from evals.harness.bundle import reports_dir
 from evals.harness.fingerprint import Components, version_for
-from evals.harness.ledger import append, cast, load
+from evals.harness.ledger import append, load
 from evals.harness.run import main
+from tests.eval_factories import cast, produced_threat
+from tests.factories import sample_report
 
 
 def seed(path, *, version=1):
@@ -93,15 +95,13 @@ def test_rekey_on_an_empty_ledger_is_not_an_error(tmp_path, capsys):
 
 
 def _claim(title="A finding", category="spoofing"):
-    return {
-        "id": "S-01",
-        "category": category,
-        "title": title,
-        "description": "d",
-        "affected_element_ids": ["entity:shopper"],
-        "verb": "impersonate",
-        "grounds": [{"kind": "quote", "text": "t"}],
-    }
+    """One produced threat, as the record the report actually carries.
+
+    This fixture used to be a hand-built dict with an ``engine_version`` key no
+    report writes. The review app read that key, this wrote it, and the two
+    agreed with each other about a fact the producer never produced.
+    """
+    return produced_threat(1, category, title, element_ids=("entity:customer",))
 
 
 def _sweep(tmp_path, name="artifact.json", claims=None):
@@ -112,19 +112,9 @@ def _sweep(tmp_path, name="artifact.json", claims=None):
     # fixture agree with a review app looking in the wrong place.
     reports = reports_dir(tmp_path / name)
     reports.mkdir()
+    report = sample_report(threats=[_claim()] if claims is None else list(claims))
     (reports / "01-payments-checkout.report.json").write_text(
-        json.dumps(
-            {
-                "engine_version": "test-1.0",
-                "analyses": [
-                    {
-                        "framework": "stride",
-                        "claims": [_claim()] if claims is None else claims,
-                    }
-                ],
-            }
-        ),
-        encoding="utf-8",
+        report.model_dump_json(), encoding="utf-8"
     )
     return artifact
 

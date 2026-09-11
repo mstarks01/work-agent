@@ -29,6 +29,12 @@ from evals.harness.ledger import (
     rekey,
     write_all,
 )
+from tests.eval_factories import (
+    SAMPLE_CONTENT,
+    SAMPLE_PROSE,
+    other_content,
+    other_prose,
+)
 
 #: Every vote below is cast against case ``"01"``, and ``cast`` stamps that as
 #: the components' scope. The helper carries it so a test that recomputes an
@@ -50,43 +56,85 @@ def test_every_reason_has_a_gloss_and_one_home():
 
 def test_a_style_downvote_keeps_the_finding_and_spares_the_score():
     """The whole control for personal preference, as two booleans."""
-    style = cast(components(), "01", "down", "sam", reason="poorly-written")
+    style = cast(
+        components(),
+        "01",
+        "down",
+        "sam",
+        reason="poorly-written",
+        content=SAMPLE_CONTENT,
+        prose=SAMPLE_PROSE,
+    )
     assert style.joins_the_pool
     assert not style.counts_against_analysis
 
 
 def test_a_substance_downvote_does_the_opposite():
-    substance = cast(components(), "01", "down", "sam", reason="not-a-threat")
+    substance = cast(
+        components(),
+        "01",
+        "down",
+        "sam",
+        reason="not-a-threat",
+        content=SAMPLE_CONTENT,
+        prose=SAMPLE_PROSE,
+    )
     assert not substance.joins_the_pool
     assert substance.counts_against_analysis
 
 
 def test_unsure_and_needs_evidence_move_nothing():
     for verdict in ("unsure", "needs-evidence"):
-        vote = cast(components(), "01", verdict, "sam")
+        vote = cast(
+            components(),
+            "01",
+            verdict,
+            "sam",
+            content=SAMPLE_CONTENT,
+            prose=SAMPLE_PROSE,
+        )
         assert not vote.joins_the_pool
         assert not vote.counts_against_analysis
 
 
 def test_an_upvote_joins_the_pool():
-    assert cast(components(), "01", "up", "sam").joins_the_pool
+    assert cast(
+        components(), "01", "up", "sam", content=SAMPLE_CONTENT, prose=SAMPLE_PROSE
+    ).joins_the_pool
 
 
 def test_a_downvote_without_a_reason_is_refused():
     """The reason decides which number moves, so it cannot be optional."""
     with pytest.raises(LedgerError, match="needs a reason"):
-        cast(components(), "01", "down", "sam")
+        cast(
+            components(),
+            "01",
+            "down",
+            "sam",
+            content=SAMPLE_CONTENT,
+            prose=SAMPLE_PROSE,
+        )
 
 
 def test_an_anonymous_vote_is_refused():
     """This file is the supply chain of every published number."""
     with pytest.raises(LedgerError, match="never anonymous"):
-        cast(components(), "01", "up", "   ")
+        cast(
+            components(), "01", "up", "   ", content=SAMPLE_CONTENT, prose=SAMPLE_PROSE
+        )
 
 
 def test_an_invented_reason_is_refused():
     with pytest.raises(LedgerError, match="is not a reason code"):
-        cast(components(), "01", "down", "sam", reason="i-just-dont-like-it")
+        cast(
+            components(),
+            "01",
+            "down",
+            "sam",
+            reason="i-just-dont-like-it",
+            content=SAMPLE_CONTENT,
+            prose=SAMPLE_PROSE,
+        )
 
 
 def test_an_invented_verdict_is_refused():
@@ -99,14 +147,32 @@ def test_an_invented_verdict_is_refused():
             verdict="maybe",
             voter="sam",
             recorded="2026-08-19T00:00:00+00:00",
+            content=SAMPLE_CONTENT,
+            prose=SAMPLE_PROSE,
         )
 
 
 def test_a_correction_is_a_new_event_and_the_old_one_survives(tmp_path):
     """Append-only: history stays reconstructible at any past date."""
     path = tmp_path / "votes"
-    append(cast(components(), "01", "up", "sam"), path)
-    append(cast(components(), "01", "down", "sam", reason="not-a-threat"), path)
+    append(
+        cast(
+            components(), "01", "up", "sam", content=SAMPLE_CONTENT, prose=SAMPLE_PROSE
+        ),
+        path,
+    )
+    append(
+        cast(
+            components(),
+            "01",
+            "down",
+            "sam",
+            reason="not-a-threat",
+            content=SAMPLE_CONTENT,
+            prose=SAMPLE_PROSE,
+        ),
+        path,
+    )
 
     ledger = load(path)
     assert len(ledger) == 2, "the first vote was overwritten"
@@ -118,10 +184,40 @@ def test_a_correction_is_a_new_event_and_the_old_one_survives(tmp_path):
 def test_the_pool_is_derived_from_the_live_verdicts(tmp_path):
     """Never stored, so it cannot disagree with the ledger it came from."""
     path = tmp_path / "votes"
-    append(cast(components("process:a"), "01", "up", "sam"), path)
-    append(cast(components("process:b"), "01", "down", "sam", reason="too-vague"), path)
     append(
-        cast(components("process:c"), "01", "down", "sam", reason="not-a-threat"), path
+        cast(
+            components("process:a"),
+            "01",
+            "up",
+            "sam",
+            content=SAMPLE_CONTENT,
+            prose=SAMPLE_PROSE,
+        ),
+        path,
+    )
+    append(
+        cast(
+            components("process:b"),
+            "01",
+            "down",
+            "sam",
+            reason="too-vague",
+            content=SAMPLE_CONTENT,
+            prose=SAMPLE_PROSE,
+        ),
+        path,
+    )
+    append(
+        cast(
+            components("process:c"),
+            "01",
+            "down",
+            "sam",
+            reason="not-a-threat",
+            content=SAMPLE_CONTENT,
+            prose=SAMPLE_PROSE,
+        ),
+        path,
     )
 
     pool = load(path).pool()
@@ -136,20 +232,65 @@ def test_the_pool_is_derived_from_the_live_verdicts(tmp_path):
 
 def test_a_retracted_upvote_leaves_the_pool(tmp_path):
     path = tmp_path / "votes"
-    append(cast(components(), "01", "up", "sam"), path)
+    append(
+        cast(
+            components(), "01", "up", "sam", content=SAMPLE_CONTENT, prose=SAMPLE_PROSE
+        ),
+        path,
+    )
     assert load(path).pool()
 
-    append(cast(components(), "01", "down", "sam", reason="not-a-threat"), path)
+    append(
+        cast(
+            components(),
+            "01",
+            "down",
+            "sam",
+            reason="not-a-threat",
+            content=SAMPLE_CONTENT,
+            prose=SAMPLE_PROSE,
+        ),
+        path,
+    )
     assert not load(path).pool()
 
 
 def test_double_voted_findings_are_the_agreement_sample(tmp_path):
     path = tmp_path / "votes"
-    append(cast(components("process:a"), "01", "up", "sam"), path)
     append(
-        cast(components("process:a"), "01", "down", "ada", reason="not-a-threat"), path
+        cast(
+            components("process:a"),
+            "01",
+            "up",
+            "sam",
+            content=SAMPLE_CONTENT,
+            prose=SAMPLE_PROSE,
+        ),
+        path,
     )
-    append(cast(components("process:b"), "01", "up", "sam"), path)
+    append(
+        cast(
+            components("process:a"),
+            "01",
+            "down",
+            "ada",
+            reason="not-a-threat",
+            content=SAMPLE_CONTENT,
+            prose=SAMPLE_PROSE,
+        ),
+        path,
+    )
+    append(
+        cast(
+            components("process:b"),
+            "01",
+            "up",
+            "sam",
+            content=SAMPLE_CONTENT,
+            prose=SAMPLE_PROSE,
+        ),
+        path,
+    )
 
     ledger = load(path)
     assert ledger.double_voted() == (
@@ -167,7 +308,18 @@ def test_a_rekey_needs_no_revote(tmp_path):
     rather than a re-vote.
     """
     path = tmp_path / "votes"
-    append(cast(components(), "01", "up", "sam", version=1), path)
+    append(
+        cast(
+            components(),
+            "01",
+            "up",
+            "sam",
+            version=1,
+            content=SAMPLE_CONTENT,
+            prose=SAMPLE_PROSE,
+        ),
+        path,
+    )
     original = load(path)
     assert original.votes[0].fingerprint.startswith("v1:")
 
@@ -194,7 +346,12 @@ def test_a_missing_ledger_is_empty_rather_than_an_error(tmp_path):
 def test_a_malformed_row_fails_closed_and_names_its_line(tmp_path):
     """A row nobody can read is worse than a missing one: it counts in a denominator."""
     path = tmp_path / "votes"
-    append(cast(components(), "01", "up", "sam"), path)
+    append(
+        cast(
+            components(), "01", "up", "sam", content=SAMPLE_CONTENT, prose=SAMPLE_PROSE
+        ),
+        path,
+    )
     with (path / "sam.jsonl").open("a", encoding="utf-8") as handle:
         handle.write('{"fingerprint": "v1:aa"}\n')
 
@@ -213,7 +370,9 @@ def test_a_row_that_is_not_json_names_its_line(tmp_path):
 def test_blank_lines_are_tolerated(tmp_path):
     path = tmp_path / "votes"
     path.mkdir()
-    vote = cast(components(), "01", "up", "sam")
+    vote = cast(
+        components(), "01", "up", "sam", content=SAMPLE_CONTENT, prose=SAMPLE_PROSE
+    )
     (path / "sam.jsonl").write_text(
         "\n" + json.dumps(vote.to_json(), sort_keys=True) + "\n\n", encoding="utf-8"
     )
@@ -224,7 +383,9 @@ def test_a_row_in_the_wrong_voters_file_fails_closed(tmp_path):
     """The filename is the binding: one voter's history lives in one file."""
     path = tmp_path / "votes"
     path.mkdir()
-    vote = cast(components(), "01", "up", "ada")
+    vote = cast(
+        components(), "01", "up", "ada", content=SAMPLE_CONTENT, prose=SAMPLE_PROSE
+    )
     (path / "sam.jsonl").write_text(
         json.dumps(vote.to_json(), sort_keys=True) + "\n", encoding="utf-8"
     )
@@ -235,7 +396,9 @@ def test_a_row_in_the_wrong_voters_file_fails_closed(tmp_path):
 def test_a_single_file_ledger_is_refused(tmp_path):
     """The one-file shape is dropped, and reading it as empty would eat votes."""
     path = tmp_path / "votes.jsonl"
-    vote = cast(components(), "01", "up", "sam")
+    vote = cast(
+        components(), "01", "up", "sam", content=SAMPLE_CONTENT, prose=SAMPLE_PROSE
+    )
     path.write_text(json.dumps(vote.to_json(), sort_keys=True) + "\n", encoding="utf-8")
     with pytest.raises(LedgerError, match="not a shape this loader reads"):
         load(path)
@@ -244,8 +407,18 @@ def test_a_single_file_ledger_is_refused(tmp_path):
 def test_files_load_in_filename_order(tmp_path):
     """Order between voters carries no meaning, so it must at least be stable."""
     path = tmp_path / "votes"
-    append(cast(components(), "01", "up", "sam"), path)
-    append(cast(components(), "01", "up", "ada"), path)
+    append(
+        cast(
+            components(), "01", "up", "sam", content=SAMPLE_CONTENT, prose=SAMPLE_PROSE
+        ),
+        path,
+    )
+    append(
+        cast(
+            components(), "01", "up", "ada", content=SAMPLE_CONTENT, prose=SAMPLE_PROSE
+        ),
+        path,
+    )
     assert [vote.voter for vote in load(path)] == ["ada", "sam"]
 
 
@@ -253,7 +426,14 @@ def test_a_voter_that_is_not_a_login_is_refused():
     """The voter names this voter's file, so a voter must never carry a path."""
     for voter in ("../sam", "sam smith", "sam/", "-sam", "sam--i-am"):
         with pytest.raises(LedgerError, match="is not a GitHub login"):
-            cast(components(), "01", "up", voter)
+            cast(
+                components(),
+                "01",
+                "up",
+                voter,
+                content=SAMPLE_CONTENT,
+                prose=SAMPLE_PROSE,
+            )
 
 
 def test_an_empty_ledger_answers_every_question(tmp_path):
@@ -282,6 +462,8 @@ def test_every_package_keys_its_own_votes(tmp_path):
             "01-payments-checkout",
             "up",
             "ada",
+            content=SAMPLE_CONTENT,
+            prose=SAMPLE_PROSE,
         )
         assert recorded.fingerprint.startswith(f"v{version}:"), (
             f"{framework} keyed under the wrong rule"
@@ -299,8 +481,28 @@ def test_a_rekey_moves_each_row_under_its_own_frameworks_rule(tmp_path):
     """One version for the file stopped being a coherent request when the table
     grew its second row: either value raised on the other package's rows."""
     path = tmp_path / "votes"
-    append(cast(_components_for("stride"), "01", "up", "sam"), path)
-    append(cast(_components_for("asvs"), "01", "up", "sam"), path)
+    append(
+        cast(
+            _components_for("stride"),
+            "01",
+            "up",
+            "sam",
+            content=SAMPLE_CONTENT,
+            prose=SAMPLE_PROSE,
+        ),
+        path,
+    )
+    append(
+        cast(
+            _components_for("asvs"),
+            "01",
+            "up",
+            "sam",
+            content=SAMPLE_CONTENT,
+            prose=SAMPLE_PROSE,
+        ),
+        path,
+    )
 
     moved = rekey(load(path).votes)
 
@@ -319,18 +521,46 @@ class TestTheScopeIsTheCase:
     """
 
     def test_cast_stamps_the_scope_from_the_case(self):
-        recorded = cast(components(scope=""), "03-batch-data-pipeline", "up", "ada")
+        recorded = cast(
+            components(scope=""),
+            "03-batch-data-pipeline",
+            "up",
+            "ada",
+            content=SAMPLE_CONTENT,
+            prose=SAMPLE_PROSE,
+        )
 
         assert recorded.components.scope == "03-batch-data-pipeline"
 
     def test_two_cases_casting_one_place_are_two_findings(self):
-        pipeline = cast(components(scope=""), "03-batch-data-pipeline", "up", "ada")
-        portal = cast(components(scope=""), "12-overclaiming-portal", "up", "ada")
+        pipeline = cast(
+            components(scope=""),
+            "03-batch-data-pipeline",
+            "up",
+            "ada",
+            content=SAMPLE_CONTENT,
+            prose=SAMPLE_PROSE,
+        )
+        portal = cast(
+            components(scope=""),
+            "12-overclaiming-portal",
+            "up",
+            "ada",
+            content=SAMPLE_CONTENT,
+            prose=SAMPLE_PROSE,
+        )
 
         assert pipeline.fingerprint != portal.fingerprint
 
     def test_a_row_scoped_to_another_case_is_refused(self):
-        honest = cast(components(scope=""), "03-batch-data-pipeline", "up", "ada")
+        honest = cast(
+            components(scope=""),
+            "03-batch-data-pipeline",
+            "up",
+            "ada",
+            content=SAMPLE_CONTENT,
+            prose=SAMPLE_PROSE,
+        )
         elsewhere = replace(honest.components, scope="12-overclaiming-portal")
 
         with pytest.raises(LedgerError, match="the scope is the case"):
@@ -358,7 +588,15 @@ class TestTheKeyIsComputedNeverStated:
         theirs = Components(
             "stride", "tampering", ("store:victim",), verb="alter", scope=CASE
         )
-        honest = cast(mine, "01", "down", "ada", reason="not-a-threat")
+        honest = cast(
+            mine,
+            "01",
+            "down",
+            "ada",
+            reason="not-a-threat",
+            content=SAMPLE_CONTENT,
+            prose=SAMPLE_PROSE,
+        )
 
         with pytest.raises(LedgerError, match="computed, never stated"):
             replace(
@@ -366,7 +604,14 @@ class TestTheKeyIsComputedNeverStated:
             )
 
     def test_an_honest_row_is_untouched(self):
-        recorded = cast(_components_for("stride"), "01", "up", "ada")
+        recorded = cast(
+            _components_for("stride"),
+            "01",
+            "up",
+            "ada",
+            content=SAMPLE_CONTENT,
+            prose=SAMPLE_PROSE,
+        )
 
         assert recorded.fingerprint.startswith(f"v{version_for('stride')}:")
 
@@ -381,6 +626,8 @@ class TestTheKeyIsComputedNeverStated:
                 verdict="up",
                 voter="ada",
                 recorded="2026-09-03T00:00:00+00:00",
+                content=SAMPLE_CONTENT,
+                prose=SAMPLE_PROSE,
             )
 
     def test_a_target_that_is_not_a_string_is_refused_at_the_row(self):
@@ -393,4 +640,100 @@ class TestTheKeyIsComputedNeverStated:
                 verdict="up",
                 voter="ada",
                 recorded="2026-09-03T00:00:00+00:00",
+                content=SAMPLE_CONTENT,
+                prose=SAMPLE_PROSE,
             )
+
+
+class TestTheVoteRecordsWhatItJudged:
+    """The fingerprint names the topic; two digests name what was judged.
+
+    The 2026-09-09 audit rewrote every retained case 01 title and explanation to
+    assert the opposite of the finding, and no fingerprint moved. So a row that
+    stored the key alone could not say whether a person had read what it is now
+    attached to. ADR 0029 decided the two values.
+    """
+
+    def _vote(self, **kwargs):
+        kwargs.setdefault("content", SAMPLE_CONTENT)
+        kwargs.setdefault("prose", SAMPLE_PROSE)
+        return cast(components(), CASE, "up", "sam", **kwargs)
+
+    def test_a_substance_vote_answers_for_the_argument_it_judged(self):
+        vote = self._vote()
+
+        assert vote.answers_for(SAMPLE_CONTENT)
+        assert not vote.answers_for(other_content())
+
+    def test_a_style_vote_answers_for_the_words_it_judged(self):
+        vote = self._vote()
+
+        assert vote.reviewed_prose(SAMPLE_PROSE)
+        assert not vote.reviewed_prose(other_prose())
+
+    def test_the_two_questions_stay_apart(self):
+        """A re-argued claim with the same words, and reworded words on the
+        same argument. Folding the two would answer both wrong."""
+        reargued = self._vote(content=other_content())
+        reworded = self._vote(prose=other_prose())
+
+        assert reargued.reviewed_prose(SAMPLE_PROSE)
+        assert not reargued.answers_for(SAMPLE_CONTENT)
+        assert reworded.answers_for(SAMPLE_CONTENT)
+        assert not reworded.reviewed_prose(SAMPLE_PROSE)
+
+    def test_an_empty_digest_reads_live(self):
+        """Recording nothing is truthful, and it is what a row written before
+        the field would say (ADR 0029). No row here carries one."""
+        vote = self._vote(content="", prose="")
+
+        assert vote.answers_for(other_content())
+        assert vote.reviewed_prose(other_prose())
+
+    def test_a_digest_that_is_not_one_is_refused(self):
+        with pytest.raises(LedgerError, match="not a 's' digest"):
+            self._vote(content="v6:0123456789abcdef")
+
+    def test_the_two_digests_cannot_be_swapped(self):
+        """A prose digest in the structural field would read live against every
+        claim, and no eye tells one sixteen-character hash from another."""
+        with pytest.raises(LedgerError, match="not a 's' digest"):
+            self._vote(content=SAMPLE_PROSE)
+        with pytest.raises(LedgerError, match="not a 'p' digest"):
+            self._vote(prose=SAMPLE_CONTENT)
+
+    def test_they_survive_the_round_trip(self):
+        vote = self._vote()
+        back = Vote.from_json(vote.to_json())
+
+        assert (back.content, back.prose) == (SAMPLE_CONTENT, SAMPLE_PROSE)
+
+    def test_a_row_without_the_keys_is_refused_rather_than_defaulted(self):
+        """No shim: a file predating the fields does not load as though it
+        carried them."""
+        raw = self._vote().to_json()
+        del raw["prose"]
+
+        with pytest.raises(LedgerError, match="malformed vote"):
+            Vote.from_json(raw)
+
+    def test_a_rekey_leaves_them_alone(self, tmp_path):
+        """A version move re-keys the topic. What a person judged is not a key
+        and never recomputes."""
+        path = tmp_path / "votes"
+        append(self._vote(), path)
+
+        moved = rekey(load(path))
+
+        assert [(vote.content, vote.prose) for vote in moved] == [
+            (SAMPLE_CONTENT, SAMPLE_PROSE)
+        ]
+
+    def test_a_vote_on_an_earlier_argument_stays_in_the_ledger(self, tmp_path):
+        """Nothing here is retired. It keeps its place in the topic's history
+        and stays readable."""
+        path = tmp_path / "votes"
+        append(self._vote(), path)
+        ledger = load(path)
+
+        assert len(ledger.for_fingerprint(ledger.votes[0].fingerprint)) == 1

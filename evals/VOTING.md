@@ -247,6 +247,24 @@ appends a new vote, and the latest vote for a `(fingerprint, voter)` pair is the
 live one. That is what lets a number computed last month be recomputed to the
 same digit today, by ignoring the events after it.
 
+**A row says what it judged, not only which finding.** Beside the fingerprint it
+carries two digests of the claim the reviewer was shown (ADR 0029):
+
+| key | what it covers | what expires when it moves |
+| --- | --- | --- |
+| `content` | the verdict, the catalogued grounds, the package's ratings | your substance answer: the standing reads `stale` and the queue asks you again |
+| `prose` | the description and the mitigations | your style answer: the writing instrument counts it `carried` |
+
+They are two values because they move at different rates. A model writes new
+prose every run, so a style objection lives about as long as the sitting that
+cast it. The argument a finding rests on survives a rewording, so a substance
+answer carries across runs — over the six case 01 runs of one configuration, a
+prose digest was shared by 0 of 234 pairs and a structural one by 155.
+
+**A re-argued finding comes back to you, and to nobody else.** The queue shows
+it last, with your own earlier answer beside the new version, so you re-read a
+change rather than a paraphrase. Another reviewer's answer is never shown.
+
 Every voter also has a line in `evals/review/voters.toml`, the roster. The
 roster holds each voter's **standing** (`maintainer` or `contributor`), and it
 is the only place a standing lives — a promotion is one roster edit, and it
@@ -357,6 +375,11 @@ from. A rule change is then arithmetic over the ledger's files.
 5. **Commit the ledger with the rule.** Nobody votes again, and no run calls a
    provider.
 
+A re-key moves the fingerprint and leaves both digests alone. They record what a
+past reviewer was shown, so recomputing them would rewrite that record rather
+than move it. Changing a digest rule is therefore not a re-key: it expires the
+older votes' claim on the current claims, and the queue asks again.
+
 ## What a sitting does not tell you
 
 - **The reference sets are agent-authored.** A vote says whether one produced
@@ -365,6 +388,11 @@ from. A rule change is then arithmetic over the ledger's files.
   reads a case's sources and asks what the sets miss.
 - **A vote is one person's judgement**, recorded with their name. Two reviewers
   who disagree are a result to read, not an error to resolve.
+- **A match is not a validation.** The identity rule recognises a topic and is
+  blind to what a claim says: the 2026-09-09 audit rewrote every retained case 01
+  finding to assert the opposite of itself and the scorer still returned 12
+  matches. A standing says a person judged *this* argument only while the
+  `content` digest agrees; otherwise it reads `stale`.
 - **The numbers are relative.** Use them to compare configurations and to track
   movement. Never quote them as absolute scores, and never against another
   tool's published figures.

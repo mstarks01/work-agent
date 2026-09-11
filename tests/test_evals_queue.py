@@ -13,7 +13,7 @@ from __future__ import annotations
 import pytest
 
 from evals.harness.fingerprint import components_for, version_for
-from evals.harness.ledger import Ledger, cast
+from evals.harness.ledger import Ledger
 from evals.harness.queue import (
     PRIORITIES,
     Finding,
@@ -22,6 +22,7 @@ from evals.harness.queue import (
     priority_of,
     summarise,
 )
+from tests.eval_factories import SAMPLE_CONTENT, SAMPLE_PROSE, cast, other_content
 
 FLOWS = {
     "01": {"flow:a-to-b:call": ("process:a", "process:b")},
@@ -35,7 +36,14 @@ def finding(
     seen_in=1,
     runs=1,
     verb="impersonate",
+    content=SAMPLE_CONTENT,
+    prose=SAMPLE_PROSE,
 ):
+    """One produced finding as the queue holds it.
+
+    ``content`` is the structural digest a vote on it records. Passing another
+    value is how a test says the claim has been re-argued since.
+    """
     return Finding(
         case=case,
         framework="stride",
@@ -43,6 +51,8 @@ def finding(
         title=title,
         description="An attacker does the thing.",
         element_ids=(target,),
+        content=content,
+        prose=prose,
         quotes=("the source says so",),
         verb=verb,
         seen_in=seen_in,
@@ -65,7 +75,9 @@ def value_of(item):
 def test_an_answered_finding_never_comes_back():
     """The economic argument for the fingerprint, as one assertion."""
     known = finding()
-    ledger = Ledger(votes=[cast(value_of(known), "01", "up", "sam")])
+    ledger = Ledger(
+        votes=[cast(value_of(known), "01", "up", "sam", content=known.content)]
+    )
 
     assert build([known], FLOWS, ledger) == []
 
@@ -73,7 +85,9 @@ def test_an_answered_finding_never_comes_back():
 def test_naming_a_voter_asks_only_what_that_voter_has_not_answered():
     """What makes a second, independent opinion possible."""
     known = finding()
-    ledger = Ledger(votes=[cast(value_of(known), "01", "up", "sam")])
+    ledger = Ledger(
+        votes=[cast(value_of(known), "01", "up", "sam", content=known.content)]
+    )
 
     assert build([known], FLOWS, ledger, voter="sam") == []
     assert len(build([known], FLOWS, ledger, voter="ada")) == 1
@@ -95,6 +109,8 @@ def test_a_flow_and_its_endpoints_are_one_question():
         description="",
         element_ids=("flow:a-to-b:call",),
         verb="intercept",
+        content=SAMPLE_CONTENT,
+        prose=SAMPLE_PROSE,
     )
     as_ends = Finding(
         case="01",
@@ -104,6 +120,8 @@ def test_a_flow_and_its_endpoints_are_one_question():
         description="",
         element_ids=("process:a", "process:b"),
         verb="intercept",
+        content=SAMPLE_CONTENT,
+        prose=SAMPLE_PROSE,
     )
     assert len(build([as_flow, as_ends], FLOWS, Ledger())) == 1
 
@@ -137,7 +155,9 @@ def test_a_second_voter_is_not_told_how_the_first_one_voted():
     # "01-payments-checkout" against a finding filed under "01", which the key
     # ignored before the scope entered it and which would now quietly make this
     # a test about two unpooled findings.
-    ledger.votes.append(cast(value_of(pooled), pooled.case, "up", "ada"))
+    ledger.votes.append(
+        cast(value_of(pooled), pooled.case, "up", "ada", content=pooled.content)
+    )
 
     items = build([pooled, untouched], FLOWS, ledger, voter="bob")
 
@@ -189,8 +209,17 @@ def test_a_case_with_no_flow_map_still_queues():
 
 
 def test_the_summary_counts_what_a_reviewer_decides_from(tmp_path):
+    elsewhere = finding(target="process:z")
     ledger = Ledger(
-        votes=[cast(value_of(finding(target="process:z")), "01", "up", "sam")]
+        votes=[
+            cast(
+                value_of(elsewhere),
+                "01",
+                "up",
+                "sam",
+                content=elsewhere.content,
+            )
+        ]
     )
     items = build(
         [finding(target="process:a"), finding(case="02", target="process:b")],
@@ -229,6 +258,8 @@ def test_each_framework_is_keyed_by_its_own_rule():
         description="",
         element_ids=("process:a",),
         identifier="V6.2.1",
+        content=SAMPLE_CONTENT,
+        prose=SAMPLE_PROSE,
     )
     items = {
         item.finding.framework: item for item in build([stride, asvs], FLOWS, Ledger())
@@ -250,6 +281,8 @@ def test_two_requirements_in_one_chapter_are_two_questions():
             description="",
             element_ids=("process:a",),
             identifier=identifier,
+            content=SAMPLE_CONTENT,
+            prose=SAMPLE_PROSE,
         )
 
     items = build([ruling("V6.2.1"), ruling("V6.2.2")], FLOWS, Ledger())
@@ -321,6 +354,7 @@ class TestNeedsEvidenceIsNotAnAnswer:
                 item.case,
                 "needs-evidence",
                 "ada",
+                content=item.content,
                 sitting=sitting,
             )
         )
@@ -349,7 +383,16 @@ class TestNeedsEvidenceIsNotAnAnswer:
         """The economics the fingerprint buys: a vote is spent once and kept."""
         answered = finding(title="Judged", target="process:b")
         led = Ledger()
-        led.votes.append(cast(value_of(answered), "01", "up", "ada", sitting="web-1"))
+        led.votes.append(
+            cast(
+                value_of(answered),
+                "01",
+                "up",
+                "ada",
+                content=answered.content,
+                sitting="web-1",
+            )
+        )
 
         assert build([answered], FLOWS, led, voter="ada", sitting="web-2") == []
 
@@ -362,3 +405,104 @@ class TestNeedsEvidenceIsNotAnAnswer:
         queue = build([unanswerable], FLOWS, led, voter="bob", sitting="web-1")
 
         assert [item.finding.title for item in queue] == ["Cannot judge this"]
+
+
+class TestARewrittenFindingIsAskedAgain:
+    """A vote answers words, and the words move between runs.
+
+    The fingerprint is blind to prose on purpose, so an answer on an earlier
+    wording outlives a rewrite of the whole finding. Here the same topic comes
+    back to the person who answered it, and to nobody else.
+    """
+
+    def _ledger(self, item, voter="sam", **kwargs):
+        led = Ledger()
+        led.votes.append(
+            cast(
+                value_of(item),
+                item.case,
+                kwargs.pop("verdict", "up"),
+                voter,
+                content=item.content,
+                prose=item.prose,
+                **kwargs,
+            )
+        )
+        return led
+
+    def test_the_same_argument_stays_answered(self):
+        known = finding()
+        led = self._ledger(known)
+
+        assert build([known], FLOWS, led, voter="sam") == []
+
+    def test_a_re_argued_finding_comes_back_to_its_voter(self):
+        answered_before = finding()
+        led = self._ledger(answered_before)
+        reargued = finding(content=other_content())
+
+        queue = build([reargued], FLOWS, led, voter="sam")
+
+        assert len(queue) == 1
+        assert "re-argued" in queue[0].why
+
+    def test_a_rewording_alone_does_not_come_back(self):
+        """A model writes new prose every run, and re-asking on that would
+        spend a whole sitting on paraphrases."""
+        answered_before = finding()
+        led = self._ledger(answered_before)
+        reworded = finding(title="Said another way", prose="p1:1111111111111111")
+
+        assert build([reworded], FLOWS, led, voter="sam") == []
+
+    def test_the_reader_sees_their_own_earlier_answer(self):
+        """What makes the second look a re-read rather than a fresh question."""
+        answered_before = finding()
+        led = self._ledger(answered_before, verdict="down", reason="too-vague")
+        reargued = finding(content=other_content())
+
+        queue = build([reargued], FLOWS, led, voter="sam")
+
+        assert queue[0].previously == "down (too-vague)"
+
+    def test_a_re_argument_ranks_below_a_finding_nobody_has_answered(self):
+        """The topic already has an answer, which buys less than one nobody
+        has answered at all."""
+        answered_before = finding()
+        led = self._ledger(answered_before)
+        reargued = finding(title="Re-argued since", content=other_content())
+        fresh = finding(target="process:b", title="Never asked")
+
+        queue = build([reargued, fresh], FLOWS, led, voter="sam")
+
+        assert [item.finding.title for item in queue] == [
+            "Never asked",
+            "Re-argued since",
+        ]
+
+    def test_an_unnamed_queue_stays_blind(self):
+        """Re-offering here would tell this reviewer that somebody else had
+        answered the earlier version. That is the leak the deleted `unmatched`
+        row was deleted for."""
+        answered_before = finding()
+        led = self._ledger(answered_before)
+        reargued = finding(content=other_content())
+
+        assert build([reargued], FLOWS, led) == []
+        assert not build([reargued], FLOWS, led, voter="ada")[0].previously
+
+    def test_a_needs_evidence_answer_is_not_a_rewrite(self):
+        """It comes back because the reviewer asked it to, and the reason has
+        to say that rather than blaming the prose."""
+        unanswerable = finding(title="Cannot judge this")
+        led = self._ledger(unanswerable, verdict="needs-evidence", sitting="web-1")
+
+        queue = build([unanswerable], FLOWS, led, voter="sam", sitting="web-2")
+
+        assert len(queue) == 1
+        assert "re-argued" not in queue[0].why
+
+    def test_the_item_carries_the_digests_a_vote_will_record(self):
+        item = build([finding()], FLOWS, Ledger())[0]
+
+        assert (item.content, item.prose) == (SAMPLE_CONTENT, SAMPLE_PROSE)

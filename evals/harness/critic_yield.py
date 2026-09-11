@@ -46,21 +46,28 @@ from analysis_service.frameworks.stride.record import DraftThreat, StrideCategor
 from evals.harness.identity import Matcher
 from evals.harness.ledger import Ledger
 from evals.harness.reference import GoldenCase
-from evals.harness.scorer import CaseScore, candidate_claim, ratio, score_case
+from evals.harness.scorer import (
+    CaseScore,
+    Standing,
+    candidate_claim,
+    ratio,
+    score_case,
+)
 
 # What one produced threat turned out to be, in the pass that scored it. The
-# first two are hits against the reference set, the last four are the ways of
+# first two are hits against the reference set, and the rest are the ways of
 # missing it.
-Disposition = Literal[
-    "matched-must-find",
-    "matched-expected",
-    "lane-error",
-    "rejected",
-    "pooled",
-    "open",
-    "unvoted",
-    "unscored",
-]
+#
+# **Composed from ``Standing`` rather than restating it.** The ways an unmatched
+# finding can stand are the scorer's vocabulary, and a second copy here would
+# disagree with it the first time one was added -- which is what happened when
+# ``stale`` landed: this literal listed four standings and ``_dispositions``
+# assigned a fifth. So the four names below are the ones this module owns, and
+# every standing arrives with the scorer's own type.
+Disposition = (
+    Literal["matched-must-find", "matched-expected", "lane-error", "unscored"]
+    | Standing
+)
 
 
 @dataclass(frozen=True)

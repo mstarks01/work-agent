@@ -55,7 +55,6 @@ The security posture is deliberate throughout, and inherited from
 from __future__ import annotations
 
 import argparse
-import json
 import secrets
 import sys
 from collections.abc import Mapping, Sequence
@@ -73,6 +72,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from analysis_service.frameworks import PACKAGES
+from analysis_service.report import Report
 from evals import verify_corpus
 from evals.harness import bundle
 from evals.harness import queue as review_queue
@@ -198,8 +198,15 @@ class Session:
         rule here, and the copy went stale the day the rule changed: it counted
         a `needs-evidence` answer as answered and dropped, on every serve, the
         finding the queue had just re-offered.
+
+        ``contents`` comes off the held items, so this serve compares a vote
+        against the words this sitting is showing rather than against whatever
+        a later sweep produces.
         """
-        skip = review_queue.answered(ledger, voter=self.voter, sitting=self.sitting)
+        contents = {item.fingerprint: item.content for item in self.items}
+        skip = review_queue.answered(
+            ledger, voter=self.voter, sitting=self.sitting, contents=contents
+        )
         return [item for item in self.items if item.fingerprint not in skip]
 
     def find(self, value: str) -> review_queue.QueueItem:
@@ -341,6 +348,8 @@ def create_app(session: Session) -> FastAPI:
                 verdict=verdict,
                 voter=session.voter,
                 reason=body.reason or None,
+                content=item.content,
+                prose=item.prose,
                 claim_text=item.finding.title,
                 config=session.configs.get(item.finding.case, ""),
                 note=body.note,
@@ -470,6 +479,7 @@ _REVIEW_PAGE = (
   <span id="case" class="meta"></span>
 </div>
 <p id="why" class="why"></p>
+<p id="previously" class="why" hidden></p>
 
 <div id="card">
   <div class="cols">
@@ -561,32 +571,30 @@ def findings_from_artifact(path: Path) -> tuple[list[review_queue.Finding], dict
     findings: list[review_queue.Finding] = []
     configs: dict[str, str] = {}
     for report_path in sorted(reports_dir.glob("*.report.json")):
-        raw = json.loads(report_path.read_text(encoding="utf-8"))
+        # Validated into the record rather than read as raw JSON. A vote stores
+        # digests of the claim it answered, and those are computed from the
+        # package's own record -- so a second reading assembled out of a dict
+        # here would key a vote to a claim the rest of the harness never sees.
+        # `bundle.runs_from_reports` already reads these files this way.
+        report = Report.model_validate_json(report_path.read_text(encoding="utf-8"))
         case = report_path.name.removesuffix(".report.json")
-        configs[case] = str(raw.get("engine_version", ""))
-        for block in raw.get("analyses", []):
-            for claim in block.get("claims", []):
-                findings.append(
-                    review_queue.Finding(
-                        case=case,
-                        framework=block["framework"],
-                        lane=str(claim[lane_field(block["framework"])]),
-                        title=claim.get("title", ""),
-                        description=claim.get("description", ""),
-                        element_ids=tuple(claim.get("affected_element_ids", ())),
-                        # ``None`` for a package that composes none, which is
-                        # what its fingerprint version expects.
-                        verb=claim.get("verb"),
-                        identifier=identifier_of(
-                            block["framework"], claim.get("id", "")
-                        ),
-                        quotes=tuple(
-                            ground["text"]
-                            for ground in claim.get("grounds", [])
-                            if ground.get("text")
-                        ),
-                    )
+        # Empty, and it always has been: this read was ``raw.get`` against an
+        # ``engine_version`` key no report carries, so every vote cast from this
+        # app has recorded an empty configuration. Kept honest rather than
+        # guessed at — the label belongs to the sweep, not to a report.
+        configs[case] = ""
+        for block in report.analyses:
+            findings += [
+                review_queue.from_claim(
+                    case,
+                    claim,
+                    lane=str(getattr(claim, lane_field(block.framework))),
+                    # ``None`` for a package that composes none, which is what
+                    # its fingerprint version expects.
+                    identifier=identifier_of(block.framework, claim.id),
                 )
+                for claim in block.claims
+            ]
     return findings, configs
 
 

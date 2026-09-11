@@ -203,6 +203,7 @@ somewhere else.
 | `harness/identity.py` | Claim identity from the fields a claim carries. `SubsetVerbIdentity` has 14 false splits of 200, 3 false merges of 111 and 3 false merges of 291, with no model call. |
 | `harness/fingerprint.py` | A **Claim**'s identity as a versioned value code computes. No model call. |
 | `harness/ledger.py` | The append-only record of what a **person** decided about a finding. One file per voter, named by the GitHub login. |
+| `harness/content.py` | The two digests a vote records beside the fingerprint: the **structural** one over the verdict, the grounds and the ratings, and the **prose** one over the description and the mitigations. They are what make a vote a judgement of a claim rather than of an identity. No model call. |
 | `harness/envelope.py` | The offline sitting envelope: one reader's answers read back from the standalone page and applied through the same `finish` the app runs. Treats the file as untrusted input and recomputes every digest against this tree. |
 | `harness/roster.py` | Voter → standing, read from `review/voters.toml` — the only place a standing lives. Refuses an unrostered voter rather than defaulting one. |
 | `harness/baseline.py` | A **Baseline**: one directory under `baselines/`, one configuration, up to ten sweeps. Computes the five-part identity and the derived name, assembles the directory, and verifies that everything recomputes — never that a model ran. |

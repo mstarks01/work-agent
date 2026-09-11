@@ -248,6 +248,37 @@ evidence, not a vote. So it moves no number and it is not spent: it holds for
 its own sitting, and a later one asks again over whatever evidence exists by
 then. Every other verdict is spent once and kept for ever.
 
+### A vote also records what it judged
+
+The rule above recognises a **topic**, and is blind to what a claim says. That
+is what makes it an identity, and it is also why a vote would otherwise outlive
+a rewrite of everything the voter read: the 2026-09-09 audit replaced every
+retained case 01 finding with text asserting the opposite of itself, and the
+scorer still returned 12 matches.
+
+So a row carries two digests beside the fingerprint (`evals/harness/content.py`,
+ADR 0029), and each one decides how long one kind of answer lives:
+
+| Digest | What it reads | What expires when it moves |
+|---|---|---|
+| structural | the verdict, the catalogued grounds as kind, place and attribute, and the package's own ratings | the substance answer: the standing reads `stale`, gates nothing and pools nothing |
+| prose | the description and the mitigations | the style answer: `evals/harness/writing.py` counts it `carried` |
+
+Two values, because the two move at different rates. Over the six case 01 runs
+of one configuration there were 234 pairs of runs producing one fingerprint: a
+prose digest was shared by 0 of them and a structural one by 155. A substance
+vote bound to prose would expire on every sweep, and one bound to the identity
+alone would never expire at all.
+
+**Read off the record's fields, never off a framework name.** Both tables name
+shared judgement fields a package's record may declare, so a package that grades
+nothing digests less and a package nobody has written yet digests what it
+declares.
+
+A re-key moves the fingerprint and leaves both digests alone: they say what a
+past reviewer was shown, and recomputing them would rewrite that record rather
+than move it.
+
 ## What this buys, in reviewer minutes
 
 A vote is spent once and kept forever, because it hangs on a fingerprint rather
@@ -315,6 +346,7 @@ one requirement in one place, and one vote answering for both.
 | `evals/harness/fingerprint.py` | `Components`, the versioned hash, and the version read back off the value. |
 | `evals/harness/identity.py` | `endpoint_subset`, `SubsetVerbIdentity`, and the `Matcher` protocol one scoreboard scores every rule through. |
 | `evals/harness/ledger.py` | The append-only vote record, the reason split, the pool, the re-key. |
+| `evals/harness/content.py` | The two digests a vote records of the claim it judged, and the tables that say what each one reads. |
 | `evals/harness/queue.py` | Which findings a reviewer is asked, in what order, blind to the configuration. |
 | `webapp/review.py` | The reviewer's interface. Loopback, no credentials, no engine. |
 
@@ -322,7 +354,8 @@ one requirement in one place, and one vote answering for both.
 
 The rule is the only matcher a scored sweep has. A `match` is a recall hit; a
 `no-match` leaves the finding unmatched, and its fingerprint is looked up in
-the vote ledger — `rejected`, `pooled`, `open` or `unvoted`. Nothing asks a
+the vote ledger — `rejected`, `pooled`, `open`, `unvoted` or `stale`, the last
+being a vote cast on an argument this run has moved past. Nothing asks a
 model. The rule's known error costs are the record above: 14 of 200 labelled
 matches split, 3 of 111 candidate negatives merged, 3 of 291 reference pairs
 merged. A split surfaces as an unvoted finding in the queue rather than

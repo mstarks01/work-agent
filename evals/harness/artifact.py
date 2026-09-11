@@ -47,6 +47,14 @@ CORPUS_DIR = REPO_ROOT / "evals" / "corpus"
 # keys, and promotion will reject the older files by name rather than
 # half-understanding them.
 #
+#
+# #743 added the ``stale`` standing to every unlisted threat's counts and
+# ``carried`` inside every writing row, and bumped nothing: both sit inside a
+# block this version already declares, no reader asks an older artifact for
+# them, and a bump would have made the one merged Baseline unreadable by the
+# commands that exist to read it. The version guards the declared keys below,
+# not every field an instrument adds inside its own block.
+#
 # * Version 5 adds ``series``: which standings each published series reads,
 #   and the scored blocks for every series but the primary one (#326). The
 #   top-level scored keys are the primary series — maintainer votes only —

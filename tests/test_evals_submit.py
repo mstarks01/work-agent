@@ -19,8 +19,8 @@ import pytest
 
 from evals.harness import submit
 from evals.harness.fingerprint import Components
-from evals.harness.ledger import cast
 from evals.harness.run import main
+from tests.eval_factories import cast
 
 ROSTER_BASE = """version = 1
 

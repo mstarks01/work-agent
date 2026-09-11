@@ -22,6 +22,18 @@ It skips what is already answered. A vote is spent once and kept for ever,
 because it hangs on a fingerprint, so the second sitting over a corpus sees only
 what the first did not: new findings from a changed configuration, and
 disagreements. That is the whole economic argument for the fingerprint.
+
+It re-asks what was re-argued, and only of the person who answered it. A vote
+carries the structural digest of the claim it answered (ADR 0029), so a finding
+whose verdict, grounds or ratings have moved since is offered again, last in the
+order, with the reason saying so and with that reviewer's earlier answer beside
+the new claim. A rewording alone does not re-ask: a model writes new prose every
+run, and re-asking on that would spend a whole sitting on paraphrases.
+
+It is limited to the named reviewer's own answers on purpose. In a queue built
+for nobody, re-offering a re-argued finding would tell this reviewer that
+somebody else had answered the earlier version, and that is the leak the deleted
+``unmatched`` row below was deleted for.
 """
 
 from __future__ import annotations
@@ -33,7 +45,8 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
-from analysis_service.claims import FrameworkName
+from analysis_service.claims import Claim, FrameworkName
+from evals.harness import content as digests
 from evals.harness import ledger
 from evals.harness.fingerprint import Components, key_claim
 from evals.harness.identity import FlowMap
@@ -55,6 +68,12 @@ class Finding:
     title: str
     description: str
     element_ids: tuple[str, ...]
+    #: The two digests of the claim this finding shows, from
+    #: :mod:`evals.harness.content`. Carried rather than recomputed here: they
+    #: are read off the package's own record, which a queue item does not hold,
+    #: and :func:`from_claim` is the single place that computes them.
+    content: str
+    prose: str
     quotes: tuple[str, ...] = ()
     verb: str | None = None
     #: The catalog requirement this claim names, for a package whose claims
@@ -79,6 +98,22 @@ class QueueItem:
     finding: Finding
     priority: int
     why: str
+    #: This reviewer's own earlier answer, where the claim has been re-argued
+    #: since they gave it. Empty otherwise, and empty in a queue built for
+    #: nobody — another reviewer's answer is exactly what this queue may not
+    #: show. ADR 0029: the reader re-reads a change rather than a paraphrase,
+    #: and seeing what they said last time is what makes that a re-read.
+    previously: str = ""
+
+    @property
+    def content(self) -> str:
+        """The structural digest a vote on this item records."""
+        return self.finding.content
+
+    @property
+    def prose(self) -> str:
+        """The prose digest a vote on this item records."""
+        return self.finding.prose
 
     @property
     def volatile(self) -> bool:
@@ -104,6 +139,11 @@ class QueueItem:
             "element_ids": list(self.finding.element_ids),
             "quotes": list(self.finding.quotes),
             "why": self.why,
+            # This reviewer's own earlier answer, and empty unless the claim has
+            # been re-argued since they gave it. It is never another reviewer's:
+            # `restated` narrows to the named voter, which is what keeps this
+            # payload blind.
+            "previously": self.previously,
         }
 
 
@@ -132,6 +172,15 @@ PRIORITIES: tuple[tuple[str, int, str], ...] = (
             " until somebody does"
         ),
     ),
+    (
+        "restated",
+        5,
+        (
+            "you answered this finding before and it has been re-argued since —"
+            " its verdict, its grounds or its ratings have moved, so your answer"
+            " no longer says whether this version is right"
+        ),
+    ),
 )
 
 # There was a third row between these two, ``unmatched``, weighing whether the
@@ -152,24 +201,36 @@ PRIORITIES: tuple[tuple[str, int, str], ...] = (
 # question this one's prose claimed; it is not this one.
 
 
-def priority_of(finding: Finding) -> tuple[int, str]:
+def priority_of(finding: Finding, restated: bool = False) -> tuple[int, str]:
     """The first reason that applies, with its weight — never the sum.
 
     Summing would rank a finding that is merely new above a volatile one, and
     volatility is the reason worth a person's click.
+
+    ``restated`` says this reviewer answered this finding when it rested on a
+    different verdict, different grounds or different ratings. It sits below
+    ``new`` because the topic already has an answer, which buys less than a
+    finding nobody has answered at all.
     """
     reasons = {
         "volatile": 0 < finding.seen_in < finding.runs,
-        "new": True,
+        "new": not restated,
+        "restated": restated,
     }
     for name, weight, why in PRIORITIES:
         if reasons[name]:
             return weight, why
-    raise AssertionError("'new' is unconditional, so this cannot be reached")
+    raise AssertionError("'new' and 'restated' partition every finding")
 
 
-def answered(ledger: Ledger, *, voter: str, sitting: str) -> frozenset[str]:
-    """The fingerprints this queue skips, and the one answer that does not count.
+def answered(
+    ledger: Ledger,
+    *,
+    voter: str,
+    sitting: str,
+    contents: Mapping[str, str],
+) -> frozenset[str]:
+    """The fingerprints this queue skips, and the two answers that do not count.
 
     ``needs-evidence`` is not an answer about the finding. The reviewer said
     they could not judge it from what they were shown, and the button says
@@ -182,6 +243,17 @@ def answered(ledger: Ledger, *, voter: str, sitting: str) -> frozenset[str]:
     A later sitting asks again, over whatever evidence exists by then, which is
     what the reviewer was asking for.
 
+    An answer on a **re-argued** claim does not count either, and that is
+    :func:`restated`. ``contents`` maps a fingerprint to the structural digest
+    of what this queue would show for it, and a named reviewer's own vote skips
+    the finding only when the two agree. A fingerprint ``contents`` does not
+    name is not in this queue, so its vote is read on its own terms.
+
+    The re-argued clause reads a **named** reviewer's votes only. In a queue
+    built for nobody, ``voter`` is empty and anybody's answer skips: re-offering
+    the finding there would tell this reviewer that another reviewer had
+    answered the earlier version.
+
     **Public because the app re-asks the same question per request.** It builds
     the queue once and filters it again on every serve, and when that filter was
     a second copy of this rule it was a copy that did not have this paragraph in
@@ -193,7 +265,41 @@ def answered(ledger: Ledger, *, voter: str, sitting: str) -> frozenset[str]:
         for (value, who), vote in ledger.current().items()
         if (not voter or who == voter)
         and (vote.verdict != "needs-evidence" or vote.sitting == sitting)
+        and (not voter or vote.answers_for(contents.get(value, vote.content)))
     )
+
+
+def restated(
+    ledger: Ledger,
+    *,
+    voter: str,
+    contents: Mapping[str, str],
+) -> dict[str, str]:
+    """Each fingerprint this reviewer answered on a claim that has moved since,
+    with what they said.
+
+    What :func:`answered` no longer skips, said positively, so the queue can
+    print the reason beside the item rather than calling a re-argued finding
+    new — and can show the reader their own earlier answer beside the new claim,
+    which is what makes the second look a re-read. Both read
+    :meth:`~evals.harness.ledger.Vote.answers_for` — one rule, one reader — and
+    both narrow to the named reviewer's own votes for the reason
+    :func:`answered` gives.
+
+    Empty for an unnamed queue, which is what keeps that queue blind.
+    """
+    if not voter:
+        return {}
+    return {
+        value: _said(vote)
+        for (value, who), vote in ledger.current().items()
+        if who == voter and value in contents and not vote.answers_for(contents[value])
+    }
+
+
+def _said(vote: ledger.Vote) -> str:
+    """One reviewer's own answer, as a line to show them beside the new claim."""
+    return f"{vote.verdict} ({vote.reason})" if vote.reason else vote.verdict
 
 
 def build(
@@ -215,20 +321,33 @@ def build(
     producing one finding is the normal case and is one question, not two.
     :func:`_keyed` is where a finding gets its fingerprint, under its own
     framework's rule.
+
+    Keyed first and filtered second, because "already answered" now reads the
+    claim this queue would show: :func:`answered` cannot decide a fingerprint
+    until the structural digest beside it exists.
     """
-    skip = answered(ledger, voter=voter, sitting=sitting)
+    keyed = list(_keyed(findings, flows_by_case))
+    # First occurrence wins here for the same reason it wins below: two runs
+    # producing one finding are one question, and the queue shows the first
+    # run's version of it.
+    contents: dict[str, str] = {}
+    for value, _, finding in keyed:
+        contents.setdefault(value, finding.content)
+    skip = answered(ledger, voter=voter, sitting=sitting, contents=contents)
+    reargued = restated(ledger, voter=voter, contents=contents)
 
     items: dict[str, QueueItem] = {}
-    for value, components, finding in _keyed(findings, flows_by_case):
+    for value, components, finding in keyed:
         if value in skip or value in items:
             continue
-        weight, why = priority_of(finding)
+        weight, why = priority_of(finding, restated=value in reargued)
         items[value] = QueueItem(
             fingerprint=value,
             components=components,
             finding=finding,
             priority=weight,
             why=why,
+            previously=reargued.get(value, ""),
         )
 
     # Sorted by weight, then by case and title, so a queue is stable across
@@ -272,6 +391,39 @@ def _keyed(
             identifier=finding.identifier,
         )
         yield value, components, finding
+
+
+def from_claim(
+    case: str,
+    claim: Claim,
+    lane: str,
+    identifier: str | None,
+    seen_in: int = 1,
+    runs: int = 1,
+) -> Finding:
+    """One produced claim as the queue's shape, digests and all.
+
+    The single reader of "what a queue item shows and what a vote on it
+    records". The review app hands whole claims through here rather than
+    composing a :class:`Finding` itself, so the digests a vote stores are always
+    the ones :mod:`evals.harness.content` computes from the package's own
+    record — never a second reading assembled from a report's JSON.
+    """
+    return Finding(
+        case=case,
+        framework=claim.framework,
+        lane=lane,
+        title=claim.title,
+        description=claim.description,
+        element_ids=tuple(claim.affected_element_ids),
+        content=digests.structural(claim),
+        prose=digests.prose(claim),
+        quotes=tuple(ground.text for ground in claim.grounds if ground.text),
+        verb=claim.verb,
+        identifier=identifier,
+        seen_in=seen_in,
+        runs=runs,
+    )
 
 
 def merge_runs(
