@@ -288,6 +288,16 @@ jobs:
             base_model: gemini-2.5-flash
             strong_model: gemini-2.5-pro
             addressing: ""
+          # An aggregator, so the model identifier carries a vendor of its own
+          # and the route becomes `openrouter/anthropic/claude-opus-4.7`. The
+          # pair is the one the pinned cost map carries an `openrouter/` entry
+          # for, so the offline matrix profiles the gateway rather than falling
+          # through to the direct route's entry.
+          - vendor: openrouter
+            secret_name: ANALYSIS_OPENROUTER_API_KEY
+            base_model: anthropic/claude-sonnet-4.6
+            strong_model: anthropic/claude-opus-4.7
+            addressing: ""
 
     env:
       ANALYSIS_MODEL_BASE_VENDOR: ${{ matrix.vendor }}

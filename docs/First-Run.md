@@ -32,6 +32,7 @@ are the reference pairs declared in `analysis_service.conformance.REFERENCE_MODE
 | Bedrock | `anthropic.claude-sonnet-4-6` | `anthropic.claude-opus-5` | `ANALYSIS_BEDROCK_API_KEY`, `ANALYSIS_BEDROCK_REGION` |
 | Gemini | `gemini-2.5-flash` | `gemini-2.5-pro` | `ANALYSIS_GEMINI_API_KEY` |
 | OpenAI | `gpt-4o-2024-08-06` | `gpt-5.6` | `ANALYSIS_OPENAI_API_KEY` |
+| OpenRouter | `anthropic/claude-sonnet-4.6` | `anthropic/claude-opus-4.7` | `ANALYSIS_OPENROUTER_API_KEY` |
 | Vertex AI | `gemini-2.5-flash` | `gemini-2.5-pro` | `ANALYSIS_VERTEX_PROJECT`, `ANALYSIS_VERTEX_LOCATION` |
 
 “Reference pair” means the repository's offline capability check knows these
@@ -109,6 +110,22 @@ Cloud project. Select `vertex` when the platform supplies the identity.
 ```sh
 export ANALYSIS_OPENAI_API_KEY=sk-...
 ```
+
+### OpenRouter
+
+```sh
+export ANALYSIS_OPENROUTER_API_KEY=sk-or-...
+```
+
+OpenRouter is an aggregator: one endpoint in front of many providers' models.
+Its model identifier carries the provider, so a model name has a slash in it —
+`anthropic/claude-opus-4.7`. Write the whole slug as the model, and the code
+builds the route `openrouter/anthropic/claude-opus-4.7`.
+
+OpenRouter may serve one slug from more than one upstream provider. Two runs of
+one configuration can therefore reach different backends. Nothing stops you
+running an analysis that way. A **Baseline** may not be named after an
+OpenRouter route, because a Baseline's value is that its runs are comparable.
 
 ### Vertex AI
 

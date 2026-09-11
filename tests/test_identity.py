@@ -349,6 +349,33 @@ class TestTheTableMatchesWhatTheTranslatorDoes:
             },
             "modelVersion": SERVED,
         },
+        # OpenRouter answers in the OpenAI wire shape, and litellm's config for
+        # it inherits the OpenAI transformation, which reads ``model`` off the
+        # body. What this entry drives is that inheritance.
+        #
+        # It does **not** drive what OpenRouter puts in that field. A gateway
+        # may repeat the slug it was asked for rather than name the upstream
+        # build, and one slug may reach more than one upstream provider. That
+        # is a claim about a third party, so it needs a live call and is
+        # recorded as open on the row rather than asserted here.
+        "openrouter": {
+            "id": "gen-offline",
+            "object": "chat.completion",
+            "created": 1,
+            "model": SERVED,
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": "hi"},
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {
+                "prompt_tokens": 1,
+                "completion_tokens": 1,
+                "total_tokens": 2,
+            },
+        },
     }
 
     def test_every_vendor_has_a_canned_response(self):
