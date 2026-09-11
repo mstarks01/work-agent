@@ -65,7 +65,7 @@ until something runs on it. See
 [Review independence](#review-independence).
 
 ```toml
-version = 7
+version = 8
 review_independence = "shared"
 
 [tiers.base]
@@ -191,6 +191,39 @@ adapter, so an unused `review` tier may name a multi-mode vendor and declare
 nothing. Move a node onto that tier and the loader asks for the declaration at
 that edit, rather than at a first run. Both rules read the same registry table
 the check reads, so neither can drift from it.
+
+### What a vendor charged
+
+Most vendors answer with token counts and nothing else, and the cost of a run is
+those counts multiplied by published rates. OpenRouter answers with the charge
+itself, in a field LiteLLM asks for on every request.
+
+What that figure means depends on an arrangement the response does not state.
+Under a key issued by OpenRouter, the account pays OpenRouter for the whole
+call, and the reported figure is what the call cost. Under a provider key of
+your own, OpenRouter charges a routing fee of about a twentieth of its list
+price and the upstream provider charges you directly — so the figure is the fee,
+and the rest sits with a provider this service never asked.
+
+So a deployment that selects such a vendor declares which arrangement it runs
+under, in a `[charges]` table keyed by vendor:
+
+```toml
+[charges]
+openrouter = "direct"    # or "own_upstream_key"
+```
+
+`ANALYSIS_MODEL_CHARGES_OPENROUTER` sets the same value from the environment and
+wins over the file.
+
+Under `direct`, every node's record carries `reported_charge_usd` beside its
+token counts. Under `own_upstream_key` it carries nothing, because a figure that
+covers a twentieth of a call would read as the cost of the call. The token
+counts are recorded either way.
+
+The rules are the credential table's rules: a key for a vendor that reports no
+charge is an error, a key for a vendor with one arrangement is an error, and a
+missing key is an error only where a **bound** tier selects that vendor.
 
 Under `iam`, Work Agent passes an **empty** `api_key` rather than none at all.
 That is not a detail: LiteLLM reads `AWS_BEARER_TOKEN_BEDROCK` out of the

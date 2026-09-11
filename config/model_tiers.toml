@@ -60,8 +60,8 @@
 # enumerating builds is what keeps the Claude half from repeating that.
 #
 # ENV OVERRIDES are two vars per tier: ANALYSIS_MODEL_{BASE,STRONG}_VENDOR and
-# _MODEL, plus ANALYSIS_MODEL_CREDENTIALS_{VENDOR} for the [credentials] table
-# below. `_MODEL` alone is the ops case (retune on a deployed revision without
+# _MODEL, plus ANALYSIS_MODEL_CREDENTIALS_{VENDOR} and
+# ANALYSIS_MODEL_CHARGES_{VENDOR} for the two vendor tables below. `_MODEL` alone is the ops case (retune on a deployed revision without
 # an image rebuild). `_VENDOR` alone is a build-time error — a cross-vendor pair
 # like anthropic + gemini-2.5-pro passes every downstream check and would die on
 # node one of a paid-for job. Any unrecognised ANALYSIS_MODEL_* var also raises,
@@ -76,7 +76,7 @@
 # picked. Every vendor is reached through one adapter and they differ only in
 # the credential mode each implies; none is cheaper to select than the others.
 
-version = 7
+version = 8
 
 # HOW FAR THE CRITIC MUST SIT FROM THE ANALYSIS IT CHECKS. Required, and there
 # is deliberately no default: inheriting `shared` is how an install that meant
@@ -132,6 +132,28 @@ review_independence = "shared"
 #
 # A key for a vendor that allows a single mode is also an error, because there
 # is nothing to choose.
+#
+# A VENDOR THAT STATES WHAT IT CHARGED declares the arrangement this deployment
+# runs under, here or in ANALYSIS_MODEL_CHARGES_{VENDOR}. OpenRouter is the one
+# that does, and a missing declaration is a load error naming it:
+#
+# [charges]
+# openrouter = "<direct|own_upstream_key>"
+#
+#   "direct"            this account pays OpenRouter for the whole call, so the
+#                       charge it reports is what the call cost, and the report
+#                       records it beside the token counts.
+#   "own_upstream_key"  OpenRouter routes the call under a provider key of the
+#                       operator's own. It charges a routing fee of about a
+#                       twentieth of its list price, the upstream provider
+#                       charges the operator directly, and the reported figure
+#                       is the fee alone. The report records no charge there,
+#                       because a figure that covers a twentieth of a call is
+#                       worse than no figure on a record somebody reads as a
+#                       cost.
+#
+# A key for a vendor that reports no charge is an error, as is one for a vendor
+# with a single arrangement.
 #
 # `review` is NOT required while `review_independence = "shared"` leaves the
 # node map pointing criticism at `strong`, because nothing runs on it and the

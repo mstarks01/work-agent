@@ -134,6 +134,23 @@ Nothing stops you running an analysis that way. A **Baseline** may not be named
 after an OpenRouter route, because a Baseline's value is that its runs are
 comparable.
 
+OpenRouter states what it charged for each call, and what that figure covers
+depends on how your account reaches the upstream provider. So declare the
+arrangement in `config/model_tiers.toml`:
+
+```toml
+[charges]
+openrouter = "direct"    # or "own_upstream_key"
+```
+
+Use `direct` when you pay OpenRouter for the call — a key issued by OpenRouter,
+spending OpenRouter credit. Each node's record then carries the charge beside
+its token counts. Use `own_upstream_key` when OpenRouter routes the call under a
+provider key of your own: it then charges a routing fee and the provider charges
+you for the tokens, so the figure it reports is a fraction of the cost and
+nothing records it. `ANALYSIS_MODEL_CHARGES_OPENROUTER` sets the same value from
+the environment.
+
 An OpenRouter response repeats the slug you asked for rather than naming the
 build that answered, so your report's served model tells you nothing the
 requested model did not. Every other vendor here either names the build or
@@ -163,7 +180,8 @@ vendor a tier the node map binds selects — the shipped map binds `base` and
 criticism onto it, and the loader asks for both at that edit. You may also select models through the matching
 `ANALYSIS_MODEL_BASE_{VENDOR,MODEL}`, `ANALYSIS_MODEL_STRONG_{VENDOR,MODEL}` and
 `ANALYSIS_MODEL_REVIEW_{VENDOR,MODEL}` environment variables, and a credential
-mode through `ANALYSIS_MODEL_CREDENTIALS_{VENDOR}`. See
+mode through `ANALYSIS_MODEL_CREDENTIALS_{VENDOR}` and a charge arrangement
+through `ANALYSIS_MODEL_CHARGES_{VENDOR}`. See
 [Configuration](Configuration.md#model-overrides-deploy-time-no-image-rebuild)
 for the exact override rules.
 

@@ -32,6 +32,7 @@ from google.adk.apps import App
 from google.adk.sessions import BaseSessionService, InMemorySessionService
 from google.genai import types
 
+from analysis_service.charges import CHARGE_METADATA_KEY
 from analysis_service.claims import (
     Claim,
     FrameworkName,
@@ -109,6 +110,13 @@ class _NodeFinish:
 
     ``usage`` is what the provider says the call cost, on the same terms: read
     off the event, ``None`` when the event carries none.
+
+    ``reported_charge_usd`` is what the provider says it *charged*, which is a
+    different fact from what the call spent in tokens and is carried beside it
+    rather than instead of it. ``None`` from every vendor that states no charge,
+    and from a vendor that states one under an arrangement where the figure
+    covers part of a call — :mod:`analysis_service.charges` decides which, and
+    the adapter that never captured a figure stamps none.
     """
 
     node: str
@@ -116,6 +124,7 @@ class _NodeFinish:
     served_model: str | None
     usage: TokenUsage | None = None
     attempts: int = 1
+    reported_charge_usd: float | None = None
 
 
 @dataclass(frozen=True)
@@ -299,6 +308,7 @@ class GraphExecutor:
                             served_model=getattr(event, "model_version", None),
                             usage=_usage_of(event),
                             attempts=_attempts_of(event),
+                            reported_charge_usd=_reported_charge_of(event),
                         )
                     )
                     if on_node is not None:
@@ -364,6 +374,7 @@ class GraphExecutor:
                     duration_ms=max(round((finish.at - ready_at) * 1000), 0),
                     usage=finish.usage,
                     attempts=finish.attempts,
+                    reported_charge_usd=finish.reported_charge_usd,
                 )
             )
             finished_at[finish.node] = finish.at
@@ -451,6 +462,18 @@ def _attempts_of(event) -> int:
     and a model that did not pass through the retry driver made exactly one.
     """
     return (getattr(event, "custom_metadata", None) or {}).get(ATTEMPTS_METADATA_KEY, 1)
+
+
+def _reported_charge_of(event) -> float | None:
+    """What the provider said it charged for this event's call, if it said.
+
+    Read off the same ``custom_metadata`` stamp ``attempts`` travels in, and
+    absent for the same two reasons a stamp is ever absent: the call did not
+    pass through an adapter that captures a charge, or the provider reported
+    none. :mod:`analysis_service.charges` owns both the capture and the rule
+    about which figures may be recorded, so nothing here decides anything.
+    """
+    return (getattr(event, "custom_metadata", None) or {}).get(CHARGE_METADATA_KEY)
 
 
 def _served_route(requested_route: str | None, served_model: str | None) -> str | None:

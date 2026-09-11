@@ -1,0 +1,269 @@
+"""What a provider said it charged, from its response to the record.
+
+Three layers, matching the three seams in :mod:`analysis_service.charges`: the
+shapes a figure can arrive in, the rule that decides whether it may be recorded,
+and the two subclasses that carry it. The rule's other half — which arrangement
+a deployment declares — is tested beside the loader that reads it, in
+``tests/test_model_tiers.py``.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import math
+from types import SimpleNamespace
+
+import pytest
+
+from analysis_service.charges import (
+    CHARGE_METADATA_KEY,
+    charge_capturing_client_class,
+    charge_reporting_llm_class,
+    records_reported_charge,
+    reported_charge_of,
+)
+from analysis_service.vendors import VENDOR_NAMES, ChargeMode, vendor_for
+
+_COST_HEADER = "llm_provider-x-litellm-response-cost"
+
+
+def _response(hidden):
+    """A stand-in for litellm's own response object, carrying ``_hidden_params``."""
+    return SimpleNamespace(_hidden_params=hidden)
+
+
+def _with_charge(value):
+    return _response({"additional_headers": {_COST_HEADER: value}})
+
+
+class TestTheShapesAFigureArrivesIn:
+    """Every shape the path can take, because the producer decides them all.
+
+    litellm's ``_hidden_params`` is a pinned dependency's internal spelling, and
+    the value inside it has been a string in that dictionary's other entries. So
+    each step is read as absent-able rather than asserted, and this class is the
+    list of what "absent" turned out to mean.
+    """
+
+    def test_a_response_without_hidden_params_reports_nothing(self):
+        assert reported_charge_of(SimpleNamespace()) is None
+
+    def test_hidden_params_that_is_not_a_mapping_reports_nothing(self):
+        assert reported_charge_of(_response("charged")) is None
+
+    def test_missing_additional_headers_reports_nothing(self):
+        assert reported_charge_of(_response({})) is None
+
+    def test_additional_headers_that_is_not_a_mapping_reports_nothing(self):
+        assert reported_charge_of(_response({"additional_headers": []})) is None
+
+    def test_a_provider_that_stated_no_charge_reports_nothing(self):
+        assert reported_charge_of(_response({"additional_headers": {}})) is None
+
+    def test_an_explicit_none_reports_nothing(self):
+        assert reported_charge_of(_with_charge(None)) is None
+
+    def test_a_float_is_the_charge(self):
+        assert reported_charge_of(_with_charge(0.00042)) == pytest.approx(0.00042)
+
+    def test_an_integer_is_the_charge(self):
+        assert reported_charge_of(_with_charge(2)) == pytest.approx(2.0)
+
+    def test_a_string_is_read_as_the_number_it_spells(self):
+        """Headers arrive as text, and this one has not always been parsed."""
+        assert reported_charge_of(_with_charge("0.00042")) == pytest.approx(0.00042)
+
+    def test_a_zero_charge_is_kept(self):
+        """A free or fully cached call really can cost nothing.
+
+        Reading it as "unreported" would turn a measurement into a hole.
+        """
+        assert reported_charge_of(_with_charge(0.0)) == 0.0
+
+    @pytest.mark.parametrize("value", ["free", "", [0.1], {"usd": 1}])
+    def test_a_value_that_is_not_a_number_is_refused(self, value):
+        assert reported_charge_of(_with_charge(value)) is None
+
+    @pytest.mark.parametrize("value", [-0.01, math.inf, -math.inf, math.nan])
+    def test_a_value_outside_the_plausible_range_is_refused(self, value):
+        """A cost cannot be negative, and no arithmetic here survives a NaN."""
+        assert reported_charge_of(_with_charge(value)) is None
+
+
+def _every_vendor_and_arrangement():
+    """Every ``(vendor, mode)`` pair, read off the registry rather than listed.
+
+    Each vendor is asked about every arrangement in the vocabulary and about no
+    arrangement at all, so a row added tomorrow is covered here without an edit.
+    """
+    return [
+        pytest.param(name, mode, id=f"{name}-{mode.value if mode else 'undeclared'}")
+        for name in sorted(VENDOR_NAMES)
+        for mode in (None, *ChargeMode)
+    ]
+
+
+class TestWhichFiguresAreRecorded:
+    """The rule, asked for every vendor the registry holds.
+
+    Completeness cannot see a wrong value, so the two OpenRouter answers are
+    asserted for what they are rather than for being present.
+    """
+
+    @pytest.mark.parametrize(("name", "mode"), _every_vendor_and_arrangement())
+    def test_a_vendor_that_reports_no_charge_records_none(self, name, mode):
+        vendor = vendor_for(name)
+        if vendor.reports_charge:
+            pytest.skip(f"{name} reports a charge; the property tests below cover it")
+        assert records_reported_charge(vendor, mode) is False
+
+    def test_the_scan_is_not_vacuously_empty(self):
+        """A registry where nothing reports a charge would pass the class above."""
+        reporting = [name for name in VENDOR_NAMES if vendor_for(name).reports_charge]
+        assert reporting, (
+            "no vendor in the registry reports a charge, so every test in this"
+            " module that means to exercise the recording path is skipping"
+        )
+
+    def test_a_whole_charge_is_recorded(self):
+        """Under this account's own key, what OpenRouter charged is what it cost."""
+        assert records_reported_charge(vendor_for("openrouter"), ChargeMode.DIRECT)
+
+    def test_a_part_of_a_charge_is_not_recorded(self):
+        """Under a key of the operator's own, the figure is the routing fee.
+
+        The upstream provider charges the operator elsewhere, and litellm never
+        reads the field that names that half — so there is no sum to record, and
+        the fee alone would read as the cost of the call.
+        """
+        assert not records_reported_charge(
+            vendor_for("openrouter"), ChargeMode.OWN_UPSTREAM_KEY
+        )
+
+    def test_an_undeclared_arrangement_records_nothing(self):
+        """The loader refuses this state; a hand-built config can still reach it."""
+        assert not records_reported_charge(vendor_for("openrouter"), None)
+
+    @pytest.mark.parametrize("name", sorted(VENDOR_NAMES))
+    def test_every_arrangement_a_vendor_allows_answers_the_question(self, name):
+        """A row that lists an arrangement says what its figure covers.
+
+        The completeness half: a new entry cannot be a key with nothing behind
+        it, because the rule reads the entry and not the key.
+        """
+        vendor = vendor_for(name)
+        for mode in vendor.charge_modes:
+            assert isinstance(vendor.charges[mode].covers_whole_call, bool)
+
+
+class _FakeResponse:
+    """The shape ADK hands back: something with ``custom_metadata``."""
+
+    def __init__(self):
+        self.custom_metadata = None
+
+
+class _FakeClient:
+    """ADK's client seam, answering with whatever charge the test scripts."""
+
+    def __init__(self, charge=None):
+        self.charge = charge
+
+    async def acompletion(self, **kwargs):
+        headers = {} if self.charge is None else {_COST_HEADER: self.charge}
+        return _response({"additional_headers": headers})
+
+
+class _FakeLlm:
+    """ADK's adapter seam: it calls the client, then yields its own response."""
+
+    #: How many responses one call yields. One is what a schema-bound,
+    #: non-streaming call produces; more is what the seam has to survive.
+    responses = 1
+
+    def __init__(self, llm_client):
+        self.llm_client = llm_client
+
+    async def generate_content_async(self, llm_request, stream: bool = False):
+        await self.llm_client.acompletion(model="m", messages=[], tools=[])
+        for _ in range(self.responses):
+            yield _FakeResponse()
+
+
+class _TwoResponseLlm(_FakeLlm):
+    """One call, two responses — the shape that could double a charge."""
+
+    responses = 2
+
+
+_Capturing = charge_capturing_client_class(_FakeClient)
+_Reporting = charge_reporting_llm_class(_FakeLlm)
+
+
+async def _drive(adapter):
+    return [response async for response in adapter.generate_content_async(None)]
+
+
+def _stamp_of(adapter):
+    (response,) = asyncio.run(_drive(adapter))
+    return (response.custom_metadata or {}).get(CHARGE_METADATA_KEY)
+
+
+class TestTheChargeReachesTheRecord:
+    """The two subclasses, composed as ``binding`` composes them.
+
+    The client is the only code that holds litellm's response and the adapter is
+    the only code that holds ADK's, so the figure crosses between them in a
+    context variable. What these tests are really about is that it crosses to
+    the right response and to no other.
+    """
+
+    def test_a_captured_charge_is_stamped_on_the_response(self):
+        assert _stamp_of(_Reporting(_Capturing(charge=0.0031))) == pytest.approx(0.0031)
+
+    def test_a_client_that_captures_nothing_stamps_nothing(self):
+        """An adapter on a vendor that reports no charge keeps ADK's own client."""
+        assert _stamp_of(_Reporting(_FakeClient())) is None
+
+    def test_a_provider_that_reported_no_charge_stamps_nothing(self):
+        assert _stamp_of(_Reporting(_Capturing(charge=None))) is None
+
+    def test_one_adapter_never_stamps_another_adapter_s_figure(self):
+        """Two tiers can run in one task, and the second must not inherit.
+
+        This is what the variable is cleared for. A deployment with OpenRouter
+        on ``strong`` and a direct vendor on ``base`` would otherwise record the
+        gateway's charge against a call the gateway never saw.
+        """
+
+        async def both():
+            first = await _drive(_Reporting(_Capturing(charge=0.5)))
+            second = await _drive(_Reporting(_FakeClient()))
+            return first, second
+
+        (first,), (second,) = asyncio.run(both())
+        assert first.custom_metadata[CHARGE_METADATA_KEY] == pytest.approx(0.5)
+        assert second.custom_metadata is None
+
+    def test_one_call_stamps_its_charge_once(self):
+        """A charge on two responses of one call reads as twice the money."""
+        adapter = charge_reporting_llm_class(_TwoResponseLlm)(_Capturing(charge=0.25))
+        stamped = [
+            (response.custom_metadata or {}).get(CHARGE_METADATA_KEY)
+            for response in asyncio.run(_drive(adapter))
+        ]
+        assert stamped == [pytest.approx(0.25), None]
+
+    def test_concurrent_nodes_each_keep_their_own_figure(self):
+        """Every node on a tier shares one adapter and runs in its own task."""
+        charges = [0.1, 0.2, 0.3]
+
+        async def concurrently():
+            adapters = [_Reporting(_Capturing(charge=charge)) for charge in charges]
+            return await asyncio.gather(*(_drive(adapter) for adapter in adapters))
+
+        stamped = [
+            response.custom_metadata[CHARGE_METADATA_KEY]
+            for (response,) in asyncio.run(concurrently())
+        ]
+        assert stamped == pytest.approx(charges)

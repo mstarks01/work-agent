@@ -378,6 +378,15 @@ class NodeRun(BaseModel):
     also named the build that served it, and refusing to record it would
     discard a real measurement to satisfy a symmetry nobody needs.
 
+    ``reported_charge_usd`` is what the provider said it charged for the call,
+    in USD, and it sits **beside** ``usage`` rather than replacing it. The two
+    answer different questions: the token counts multiplied by published rates
+    are reproducible from this record, and the reported charge is what the
+    account was charged. A row carrying one number could not say which of the
+    two it held. ``None`` is the common answer — most providers state token
+    counts and nothing else — and it is also the answer where a provider states
+    a figure that covers part of a call. See :mod:`analysis_service.charges`.
+
     ``attempts`` is how many provider calls the execution took, counted by the
     retry driver. ``usage`` meters the one that answered; a failed attempt
     reports nothing, so the count is the only trace the prompt bytes it sent
@@ -403,6 +412,7 @@ class NodeRun(BaseModel):
     duration_ms: int = Field(ge=0)
     usage: TokenUsage | None = None
     attempts: int = Field(default=1, ge=1)
+    reported_charge_usd: float | None = Field(default=None, ge=0)
 
     @model_validator(mode="before")
     @classmethod
