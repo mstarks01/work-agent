@@ -38,10 +38,10 @@ import json
 import math
 import re
 import subprocess
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 from analysis_service.model_tiers import TierName
 from analysis_service.vendors import vendor_for_route
@@ -100,37 +100,17 @@ class BaselineIdentity:
         refuses. Pass ``False`` only where the caller says what a refused sweep
         means; a Baseline's answer is that it means nothing it can publish.
 
-        There are two such rules, and both are about whether a later reader can
-        reproduce what was run. A dirty tree means the commit does not describe
-        the prompts. A vendor whose route reaches more than one provider means
-        the models do not describe the weights: two sweeps of one configuration
-        can be served by two backends, and the difference arrives as an
-        unexplained spread inside what claims to be one Baseline.
+        The rules are :data:`BASELINE_RULES`, and both are about whether a
+        later reader can reproduce what was run. This raises on the first one
+        a sweep fails; :func:`configuration_label` appends every failed rule's
+        marker instead, and the two read one table.
         """
-        if not as_baseline:
-            return cls._parts(artifact)
-        if artifact.commit.clean is not True:
-            raise BaselineError(
-                f"{artifact.path}: ran on a tree that did not match its commit;"
-                " a Baseline's identity names a commit so a reader can open the"
-                " prompts behind the numbers, and a dirty sweep cannot"
-            )
         identity = cls._parts(artifact)
-        unnamed = sorted(
-            {
-                vendor.name
-                for _, route in identity.models
-                if not (vendor := vendor_for_route(route)).routes_to_one_provider
-            }
-        )
-        if unnamed:
-            raise BaselineError(
-                f"{artifact.path}: ran on {unnamed}, whose route may be served"
-                " by more than one upstream provider; a Baseline's sweeps have"
-                " to be comparable, so it is not named after a route that does"
-                " not say which weights answered. Run the sweep and read it;"
-                " do not publish it as a Baseline"
-            )
+        if not as_baseline:
+            return identity
+        for rule in BASELINE_RULES:
+            if why := rule.unmet(artifact, identity):
+                raise BaselineError(f"{artifact.path}: {why}")
         return identity
 
     @classmethod
@@ -187,11 +167,65 @@ class BaselineIdentity:
         return f"{self.repo_commit[:7]}-{_slug(strong)}-{self.hash[:8]}"
 
 
-#: What :func:`configuration_label` appends when the sweep ran on a tree that
-#: did not match its commit. The five parts cannot tell two dirty trees at one
-#: commit apart, so the label says the commit does not describe the prompts
-#: rather than implying it does.
-DIRTY_MARKER = "-dirty"
+class _BaselineRule(NamedTuple):
+    """One rule a **Baseline** applies on top of the five identity parts.
+
+    ``unmet`` answers with the sentence a Baseline refuses the sweep with, or
+    with ``""`` where the sweep satisfies the rule. ``marker`` is what a vote's
+    label carries instead, for a sweep that runs anyway.
+    """
+
+    marker: str
+    unmet: Callable[[EvalArtifact, BaselineIdentity], str]
+
+
+def _unmet_clean(artifact: EvalArtifact, identity: BaselineIdentity) -> str:
+    if artifact.commit.clean is True:
+        return ""
+    return (
+        "ran on a tree that did not match its commit; a Baseline's identity"
+        " names a commit so a reader can open the prompts behind the numbers,"
+        " and a dirty sweep cannot"
+    )
+
+
+def _unmet_one_provider(artifact: EvalArtifact, identity: BaselineIdentity) -> str:
+    unnamed = sorted(
+        {
+            vendor.name
+            for _, route in identity.models
+            if not (vendor := vendor_for_route(route)).routes_to_one_provider
+        }
+    )
+    if not unnamed:
+        return ""
+    return (
+        f"ran on {unnamed}, whose route may be served by more than one upstream"
+        " provider; a Baseline's sweeps have to be comparable, so it is not"
+        " named after a route that does not say which weights answered. Run the"
+        " sweep and read it; do not publish it as a Baseline"
+    )
+
+
+#: Every rule a **Baseline** applies beyond the five parts, each with the
+#: marker a vote's configuration label carries when a sweep fails it.
+#:
+#: **One table, two readers that cannot drift.**
+#: :meth:`BaselineIdentity.from_artifact` raises on the first entry that fires
+#: and :func:`configuration_label` appends every firing entry's marker. Each
+#: rule says something the five parts cannot, so each needs a marker of its
+#: own: a dirty tree means the commit does not describe the prompts, and a
+#: route in front of more than one provider means the models do not describe
+#: the weights. The second rule shipped with the refusal and no marker, so a
+#: vote on an aggregator's sweep carried a label that read as reproducible.
+BASELINE_RULES: tuple[_BaselineRule, ...] = (
+    _BaselineRule(marker="-dirty", unmet=_unmet_clean),
+    _BaselineRule(marker="-multiprovider", unmet=_unmet_one_provider),
+)
+
+#: Kept as a name because it reads in a message and in a test. The table above
+#: is what appends it.
+DIRTY_MARKER = BASELINE_RULES[0].marker
 
 
 def configuration_label(artifact: EvalArtifact) -> str:
@@ -203,13 +237,20 @@ def configuration_label(artifact: EvalArtifact) -> str:
     ``webapp/review.py`` would name one sweep two ways, and nothing compares
     the two.
 
-    A dirty sweep is labelled rather than refused. ``evals/TUNING.md`` step 3
-    runs one from an edited tree on purpose, and a reviewer's answer about a
-    finding is worth keeping whatever produced it. What a Baseline may not
-    publish and what a vote may record are different questions.
+    A sweep a Baseline refuses is labelled rather than refused here.
+    ``evals/TUNING.md`` step 3 runs one from an edited tree on purpose, and a
+    reviewer's answer about a finding is worth keeping whatever produced it.
+    What a Baseline may not publish and what a vote may record are different
+    questions.
+
+    Every rule it fails contributes its marker, from :data:`BASELINE_RULES`.
+    A rule with a refusal and no marker would let this label a sweep as if the
+    rule held, which is the reading a marker exists to remove.
     """
     identity = BaselineIdentity.from_artifact(artifact, as_baseline=False)
-    return identity.name + ("" if artifact.commit.clean is True else DIRTY_MARKER)
+    return identity.name + "".join(
+        rule.marker for rule in BASELINE_RULES if rule.unmet(artifact, identity)
+    )
 
 
 def recorded_usd(cost: Any) -> float | None:

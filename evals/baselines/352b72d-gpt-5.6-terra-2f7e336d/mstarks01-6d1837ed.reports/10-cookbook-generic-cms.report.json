@@ -361,7 +361,7 @@
         "protocol": "HTTP",
         "authentication": "unknown",
         "data_description": "Images, stylesheets and downloads",
-        "encryption_in_transit": "none \u2014 readers fetch these over HTTP",
+        "encryption_in_transit": "none — readers fetch these over HTTP",
         "operations": "read"
       },
       {
@@ -411,7 +411,7 @@
           "pii",
           "business-critical-data"
         ],
-        "source_excerpt": "That is an unsecured MySQL connection straight to the box, no TLS on it, and they do it from wherever they happen to be \u2014 there is no jump host.",
+        "source_excerpt": "That is an unsecured MySQL connection straight to the box, no TLS on it, and they do it from wherever they happen to be — there is no jump host.",
         "source_label": "System description",
         "source_speaker": "",
         "notes": "",
@@ -420,7 +420,7 @@
         "protocol": "MySQL",
         "authentication": "unknown",
         "data_description": "Direct database maintenance against pages, accounts and comments, performed outside the CMS",
-        "encryption_in_transit": "none \u2014 an unsecured MySQL connection, no TLS on it",
+        "encryption_in_transit": "none — an unsecured MySQL connection, no TLS on it",
         "operations": "read-write"
       }
     ],
@@ -470,7 +470,7 @@
         "assumption": "The admin connects from outside the hosted network.",
         "element_id": "entity:admin",
         "attribute": "trust_zone",
-        "basis": "\"they do it from wherever they happen to be \u2014 there is no jump host\"."
+        "basis": "\"they do it from wherever they happen to be — there is no jump host\"."
       },
       {
         "assumption": "The CDN and its bucket sit in a separate trust zone from the hosted network.",
@@ -534,7 +534,7 @@
     {
       "framework": "stride",
       "framework_version": "1.0",
-      "disclaimer": "AI-generated STRIDE threat model. Each claim asserts that an attacker action against the named elements is credible against what the submitted text stated \u2014 never that a control is absent, and never that anything not listed here is safe. Not reviewed by a human security analyst.",
+      "disclaimer": "AI-generated STRIDE threat model. Each claim asserts that an attacker action against the named elements is credible against what the submitted text stated — never that a control is absent, and never that anything not listed here is safe. Not reviewed by a human security analyst.",
       "claims": [
         {
           "id": "T-05",
@@ -670,7 +670,7 @@
           "grounds": [
             {
               "kind": "quote",
-              "text": "That is an unsecured MySQL connection straight to the box, no TLS on it, and they do it from wherever they happen to be \u2014 there is no jump host.",
+              "text": "That is an unsecured MySQL connection straight to the box, no TLS on it, and they do it from wherever they happen to be — there is no jump host.",
               "source_label": "System description",
               "element_id": "",
               "attribute": "",

@@ -15,6 +15,7 @@ import pytest
 from analysis_service.claims import (
     FrameworkAnalysis,
     Ground,
+    GroundKind,
     Mitigation,
     Severity,
     UnknownRef,
@@ -31,6 +32,7 @@ from evals.harness.content import (
     STRUCTURAL_VERSION,
     STRUCTURAL_VERSIONS,
     ContentError,
+    _ground_parts,
     prose,
     structural,
     version_of,
@@ -268,3 +270,51 @@ def _is_shared_judgement(annotation) -> bool:
         f"analysis_service.claims.{shared.__name__}" in text
         for shared in (Verdict, Severity, Mitigation)
     )
+
+
+#: One legal ground of every branch, so a branch added tomorrow has to be named
+#: here before this file runs. Built from the required fields the record itself
+#: declares, rather than from a hand-written copy of them.
+GROUNDS: dict[str, Ground] = {
+    "quote": Ground(kind="quote", text="no nonce is checked", source_label="Notes"),
+    "unknown-attribute": Ground(
+        kind="unknown-attribute", element_id="process:api", attribute="authentication"
+    ),
+    "absent-attribute": Ground(
+        kind="absent-attribute", element_id="process:api", attribute="authentication"
+    ),
+    "derived-fact": Ground(kind="derived-fact", flow_id="flow:a-to-b:submit"),
+    "absent-element": Ground(kind="absent-element", term="directory service"),
+}
+
+
+def test_every_ground_branch_is_named_here():
+    """A sixth branch fails this before it can fail the digest quietly."""
+    assert set(GROUNDS) == set(get_args(GroundKind))
+
+
+@pytest.mark.parametrize("kind", sorted(GROUNDS))
+def test_a_ground_digests_the_place_its_own_record_reads(kind: str):
+    """``Ground.place`` is the one reader of "which part of the model is this".
+
+    The digest re-spelled that reader's ``or`` chain and added ``term`` to the
+    end of it. A sixth branch carrying a new place field would have updated
+    ``place`` and left the digest reading an empty string, so two grounds at two
+    places would share a structural digest and a re-argued claim would read
+    live. Reverting to the second chain fails this the moment a branch is added
+    and this table names it.
+    """
+    ground = GROUNDS[kind]
+
+    assert _ground_parts(ground) == (
+        ground.kind,
+        ground.place or ground.term,
+        ground.attribute,
+    )
+
+
+def test_two_grounds_at_two_places_do_not_share_a_digest():
+    """The property the place component exists to hold, for every branch."""
+    digests = {structural(claim(grounds=[ground])) for ground in GROUNDS.values()}
+
+    assert len(digests) == len(GROUNDS)

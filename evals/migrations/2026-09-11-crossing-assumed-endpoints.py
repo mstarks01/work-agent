@@ -88,7 +88,15 @@ def migrate(root: Path, write: bool) -> tuple[int, int]:
         print(f"{path}: {len(derived)} crossings, {marked} with an inferred zone")
         report["boundary_crossings"] = derived
         if write:
-            path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+            # ``ensure_ascii`` off, because the producer writes it off:
+            # ``bundle`` dumps a report through ``model_dump_json``, which
+            # emits UTF-8. The default would rewrite every em-dash in the file
+            # to an escape and re-seal the Baseline over bytes this migration
+            # never meant to touch.
+            path.write_text(
+                json.dumps(report, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
         changed += 1
     return changed, skipped
 
