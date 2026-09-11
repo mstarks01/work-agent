@@ -581,6 +581,57 @@ def test_the_diagnostic_reports_the_client_library_a_vendor_needs():
     assert "analysis-service[bedrock]" in section
 
 
+def test_the_diagnostic_reports_the_vendors_the_build_actually_binds():
+    """The page and the build, tested against each other.
+
+    Each was right about its own question and they were not the same question.
+    ``build_tier_adapters`` walks bound tiers; this section walked every tier,
+    so an unused ``review`` tier naming a second vendor put that vendor on the
+    page with its variables marked NOT SET and its client library named to
+    install — none of which a run needs. The one surface whose value is being
+    right about what is missing was the one telling an operator to set a key
+    for a provider no request reaches.
+
+    The assertion is the agreement rather than either answer, because either
+    answer alone is what each of them already had.
+    """
+    from analysis_service.binding import build_tier_adapters
+    from analysis_service.model_tiers import load_model_tiers
+    from analysis_service.resilience import load_resilience
+    from analysis_service.sampling import load_sampling
+    from webapp.main import _vendor_sections
+
+    env = {
+        "ANALYSIS_MODEL_BASE_VENDOR": "anthropic",
+        "ANALYSIS_MODEL_BASE_MODEL": "claude-sonnet-4-6",
+        "ANALYSIS_MODEL_STRONG_VENDOR": "anthropic",
+        "ANALYSIS_MODEL_STRONG_MODEL": "claude-opus-5",
+        # Bound to nothing by the shipped node map, and deliberately a vendor
+        # the other two tiers do not use.
+        "ANALYSIS_MODEL_REVIEW_VENDOR": "bedrock",
+        "ANALYSIS_MODEL_REVIEW_MODEL": "anthropic.claude-opus-5",
+        "ANALYSIS_ANTHROPIC_API_KEY": "declared",
+    }
+    config = PROJECT_ROOT / "config"
+    tiers = load_model_tiers(config / "model_tiers.toml", env=env)
+
+    # The build is the authority on what this deployment needs: it succeeds
+    # holding no Bedrock credential at all.
+    adapters = build_tier_adapters(
+        tiers,
+        load_sampling(config / "sampling.toml", env={}),
+        load_resilience(config / "resilience.toml", env={}),
+        env=env,
+    )
+    built = {tiers.tiers[tier].vendor for tier in adapters}
+
+    section = _vendor_sections(tiers, env=env)
+    reported = {vendor for vendor in ("anthropic", "bedrock") if vendor in section}
+
+    assert built == reported == {"anthropic"}
+    assert "boto3" not in section
+
+
 def test_the_diagnostic_names_no_library_for_a_vendor_that_needs_none():
     """An empty statement reads as a missing one, so there is no row at all."""
     from analysis_service.model_tiers import load_model_tiers

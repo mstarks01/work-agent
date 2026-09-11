@@ -495,6 +495,49 @@ class TestDeclaredCredentialMode:
         )
         assert tiers.credential_mode("bedrock") is CredentialMode.IAM
 
+    def test_an_unbound_tiers_vendor_needs_no_declaration(self, config_path):
+        """A vendor no adapter is built for needs no identity.
+
+        The rule this class already stated — "a multi-mode vendor nobody calls
+        needs no identity" — while the code read every tier and so demanded one.
+        The shipped node map points nothing at ``review``, so a ``review`` tier
+        naming Bedrock costs no credential, no SDK and no declaration; the
+        loader refused to start without one anyway.
+
+        Both readers are :attr:`ModelTierConfig.bound_vendors` now, so the
+        loader cannot demand what the build does not need.
+        """
+        tiers = load_model_tiers(
+            config_path(
+                config_toml(review_vendor="bedrock", review="anthropic.claude-opus-5")
+            ),
+            env={},
+        )
+
+        assert "bedrock" not in tiers.bound_vendors
+        assert tiers.bound_tiers == frozenset({"base", "strong"})
+
+    def test_a_bound_tiers_vendor_still_must_declare(self, config_path):
+        """The other direction, so the relaxation above cannot go too far.
+
+        Moving a node onto the tier is what makes the declaration necessary, and
+        the loader is what refuses at that edit rather than at a first run.
+        """
+        nodes = {
+            node: "review" if node == "extract" else "strong" for node in LLM_NODES
+        }
+        with pytest.raises(ModelConfigError, match="credentials.bedrock"):
+            load_model_tiers(
+                config_path(
+                    config_toml(
+                        review_vendor="bedrock",
+                        review="anthropic.claude-opus-5",
+                        nodes=nodes,
+                    )
+                ),
+                env={},
+            )
+
     def test_the_environment_wins_over_the_file(self, config_path):
         """One rule, and the environment is the later reader of it.
 

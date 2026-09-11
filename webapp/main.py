@@ -707,13 +707,21 @@ def diagnostic_page(state: Startup) -> RenderedPage:
 def _vendor_sections(
     tiers: ModelTierConfig | None, env: Mapping[str, str] | None = None
 ) -> str:
-    """Each selected vendor's declared mode and required variables, set or unset.
+    """Each bound vendor's declared mode and required variables, set or unset.
 
     ``required_env_vars`` comes from the same registry entry that performs the
     check, so this cannot drift from what actually failed — and it lists the
     vendor's *whole* set, because ``Vendor._require`` raises on the first
     missing one and a reader would otherwise discover them one restart at a
     time.
+
+    **Bound, and it used to be every tier.** A tier no node points at builds no
+    adapter and needs no credential, so a deployment whose unused ``review``
+    tier named a second vendor got that vendor listed here with its variables
+    marked NOT SET and its client library named to install. None of it was
+    needed, and the page is the one surface where being wrong about that costs
+    an operator a detour. ``ModelTierConfig.bound_vendors`` is the reader the
+    build uses, so the two cannot disagree again.
 
     The mode is **reported, never resolved**. Under a mode that passes no
     credential material, the only way to find out whether an identity exists is
@@ -738,7 +746,7 @@ def _vendor_sections(
             "vendor you pick. Resolve the error above first.</p>"
         )
     sections = []
-    for vendor in dict.fromkeys(sel.vendor for sel in tiers.tiers.values()):
+    for vendor in tiers.bound_vendors:
         mode = tiers.credential_mode(vendor)
         items = "\n".join(
             _env_var_item(var, bool(env.get(var, "").strip()))
