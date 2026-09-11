@@ -385,7 +385,7 @@
           "pii",
           "financial"
         ],
-        "source_excerpt": "There is no auth on that gRPC call \u2014 the order service accepts anything that can reach it",
+        "source_excerpt": "There is no auth on that gRPC call — the order service accepts anything that can reach it",
         "source_label": "System description",
         "source_speaker": "",
         "notes": "",
@@ -525,7 +525,7 @@
     {
       "framework": "stride",
       "framework_version": "1.0",
-      "disclaimer": "AI-generated STRIDE threat model. Each claim asserts that an attacker action against the named elements is credible against what the submitted text stated \u2014 never that a control is absent, and never that anything not listed here is safe. Not reviewed by a human security analyst.",
+      "disclaimer": "AI-generated STRIDE threat model. Each claim asserts that an attacker action against the named elements is credible against what the submitted text stated — never that a control is absent, and never that anything not listed here is safe. Not reviewed by a human security analyst.",
       "claims": [
         {
           "id": "D-01",
@@ -679,7 +679,7 @@
           "grounds": [
             {
               "kind": "quote",
-              "text": "There is no auth on that gRPC call \u2014 the order service accepts anything that can reach it, which is meant to be only the storefront API.",
+              "text": "There is no auth on that gRPC call — the order service accepts anything that can reach it, which is meant to be only the storefront API.",
               "source_label": "System description",
               "element_id": "",
               "attribute": "",
@@ -1662,7 +1662,7 @@
           ],
           "verdict": {
             "status": "rejected",
-            "reason": "The claim asserts that \u201cno downstream consumer of `store:orders-db` is modeled to independently validate those rewritten records,\u201d but the model does not state any downstream validation behavior or establish its absence.",
+            "reason": "The claim asserts that “no downstream consumer of `store:orders-db` is modeled to independently validate those rewritten records,” but the model does not state any downstream validation behavior or establish its absence.",
             "related_unknowns": [],
             "rejected_because": "reasoning"
           },

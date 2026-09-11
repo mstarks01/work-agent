@@ -262,7 +262,7 @@
         "source_excerpt": "Customers browse and order through our mobile app; there is no website.",
         "source_label": "System description",
         "source_speaker": "",
-        "notes": "Tagged pii because the app is the only stated route by which a customer's details reach the web API \u2014 the source rules out a website. It is not tagged financial: the source never says where payment details are captured, only that the database holds the card they paid with.",
+        "notes": "Tagged pii because the app is the only stated route by which a customer's details reach the web API — the source rules out a website. It is not tagged financial: the source never says where payment details are captured, only that the database holds the card they paid with.",
         "technology": "mobile app",
         "trust_zone": "boundary:customer-device",
         "exposure": "unknown",
@@ -277,7 +277,7 @@
           "financial",
           "business-critical-data"
         ],
-        "source_excerpt": "The app talks to the web API over HTTP \u2014 not HTTPS, it's on the list.",
+        "source_excerpt": "The app talks to the web API over HTTP — not HTTPS, it's on the list.",
         "source_label": "System description",
         "source_speaker": "",
         "notes": "The source states outright that nobody can say what the API does about authentication, so every flow into it holds authentication unknown rather than absent.",
@@ -361,7 +361,7 @@
         "assets": [
           "pii"
         ],
-        "source_excerpt": "It writes the delivery address into a flat file kept alongside it \u2014 only addresses go in that file, nothing else",
+        "source_excerpt": "It writes the delivery address into a flat file kept alongside it — only addresses go in that file, nothing else",
         "source_label": "System description",
         "source_speaker": "",
         "notes": "",
@@ -398,7 +398,7 @@
         "assets": [
           "pii"
         ],
-        "source_excerpt": "The app talks to the web API over HTTP \u2014 not HTTPS, it's on the list.",
+        "source_excerpt": "The app talks to the web API over HTTP — not HTTPS, it's on the list.",
         "source_label": "System description",
         "source_speaker": "",
         "notes": "",
@@ -407,7 +407,7 @@
         "protocol": "HTTP",
         "authentication": "unknown",
         "data_description": "Order placement traffic carrying customer details",
-        "encryption_in_transit": "none \u2014 the app talks to the web API over HTTP, not HTTPS",
+        "encryption_in_transit": "none — the app talks to the web API over HTTP, not HTTPS",
         "operations": "unknown"
       },
       {
@@ -417,7 +417,7 @@
         "assets": [
           "business-critical-data"
         ],
-        "source_excerpt": "The macros in it send SQL statements straight to the web API to change prices and product copy \u2014 it was a stopgap and it is still here.",
+        "source_excerpt": "The macros in it send SQL statements straight to the web API to change prices and product copy — it was a stopgap and it is still here.",
         "source_label": "System description",
         "source_speaker": "",
         "notes": "",
@@ -517,7 +517,7 @@
         "source_excerpt": "The gateway dials the number stored against the order and nobody checks it arrived at the right place.",
         "source_label": "System description",
         "source_speaker": "",
-        "notes": "The stated absence is destination verification, not authentication in general \u2014 the source says nobody checks the fax arrived at the right place, and says nothing else about how this leg is controlled.",
+        "notes": "The stated absence is destination verification, not authentication in general — the source says nobody checks the fax arrived at the right place, and says nothing else about how this leg is controlled.",
         "source": "process:fax-gateway",
         "destination": "entity:customer",
         "protocol": "fax",
@@ -631,7 +631,7 @@
     {
       "framework": "stride",
       "framework_version": "1.0",
-      "disclaimer": "AI-generated STRIDE threat model. Each claim asserts that an attacker action against the named elements is credible against what the submitted text stated \u2014 never that a control is absent, and never that anything not listed here is safe. Not reviewed by a human security analyst.",
+      "disclaimer": "AI-generated STRIDE threat model. Each claim asserts that an attacker action against the named elements is credible against what the submitted text stated — never that a control is absent, and never that anything not listed here is safe. Not reviewed by a human security analyst.",
       "claims": [
         {
           "id": "S-02",
@@ -701,7 +701,7 @@
           "framework": "stride",
           "framework_version": "1.0",
           "title": "Flooding order requests can exhaust the Web API and stall fulfilment",
-          "description": "An internet attacker can repeatedly submit browse/order traffic through `flow:customer-to-mobile-app:browse-and-order` and the boundary-crossing `flow:mobile-app-to-web-api:api-traffic` to flood `process:web-api`. Authentication on the API flow is unknown, and the model does not establish request-rate, request-size, concurrency, or load-shedding limits. Each accepted order causes `process:web-api` to maintain customer records in `store:user-database` and hand work to `process:sims`, making the attacker\u2019s request cost more than simply delivering the request. Second-order, saturation prevents the sole customer-facing channel from placing legitimate orders, prevents catalogue updates arriving on `flow:catalogue-spreadsheet-to-web-api:sql-statements`, and delays the downstream SIMS address-file and dispatch workflow. This threat is conditional on the unverified authentication and capacity-control posture.",
+          "description": "An internet attacker can repeatedly submit browse/order traffic through `flow:customer-to-mobile-app:browse-and-order` and the boundary-crossing `flow:mobile-app-to-web-api:api-traffic` to flood `process:web-api`. Authentication on the API flow is unknown, and the model does not establish request-rate, request-size, concurrency, or load-shedding limits. Each accepted order causes `process:web-api` to maintain customer records in `store:user-database` and hand work to `process:sims`, making the attacker’s request cost more than simply delivering the request. Second-order, saturation prevents the sole customer-facing channel from placing legitimate orders, prevents catalogue updates arriving on `flow:catalogue-spreadsheet-to-web-api:sql-statements`, and delays the downstream SIMS address-file and dispatch workflow. This threat is conditional on the unverified authentication and capacity-control posture.",
           "affected_element_ids": [
             "process:web-api",
             "flow:mobile-app-to-web-api:api-traffic"
@@ -1576,7 +1576,7 @@
           ],
           "verdict": {
             "status": "rejected",
-            "reason": "The draft asserts that the mobile app has \u201cno authenticated server endpoint to verify,\u201d but `flow:mobile-app-to-web-api:api-traffic` states `authentication` as unknown; absent transport encryption alone does not establish absence of application-level server authentication.",
+            "reason": "The draft asserts that the mobile app has “no authenticated server endpoint to verify,” but `flow:mobile-app-to-web-api:api-traffic` states `authentication` as unknown; absent transport encryption alone does not establish absence of application-level server authentication.",
             "related_unknowns": [],
             "rejected_because": "reasoning"
           },

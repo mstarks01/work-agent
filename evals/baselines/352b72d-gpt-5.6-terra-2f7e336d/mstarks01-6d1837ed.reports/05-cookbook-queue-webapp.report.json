@@ -309,7 +309,7 @@
           "credentials",
           "secrets"
         ],
-        "source_excerpt": "Both of those config stores hold the credentials the process needs \u2014 the web application's queue credentials",
+        "source_excerpt": "Both of those config stores hold the credentials the process needs — the web application's queue credentials",
         "source_label": "System description",
         "source_speaker": "",
         "notes": "",
@@ -532,14 +532,14 @@
     {
       "framework": "stride",
       "framework_version": "1.0",
-      "disclaimer": "AI-generated STRIDE threat model. Each claim asserts that an attacker action against the named elements is credible against what the submitted text stated \u2014 never that a control is absent, and never that anything not listed here is safe. Not reviewed by a human security analyst.",
+      "disclaimer": "AI-generated STRIDE threat model. Each claim asserts that an attacker action against the named elements is credible against what the submitted text stated — never that a control is absent, and never that anything not listed here is safe. Not reviewed by a human security analyst.",
       "claims": [
         {
           "id": "D-01",
           "framework": "stride",
           "framework_version": "1.0",
           "title": "Public job submission can exhaust the shared message queue",
-          "description": "An internet attacker can flood `flow:browser-to-web-application:page-request` to make `process:web-application` enqueue jobs through `flow:web-application-to-message-queue:enqueue-job`, consuming the finite storage and throughput of `store:message-queue` faster than `process:background-worker` can consume them. This is conditional on the `authentication` value for the browser flow, which is unknown, and on unverified request/job-size, per-client quota, and queue-backpressure behavior; if anonymous or cheaply authenticated requests can create jobs without effective bounds, the attacker spends inexpensive HTTP requests while the application accumulates work and worker/database effort. Second-order, queue saturation delays or prevents legitimate background processing, and the worker's reads and writes on `flow:background-worker-to-database:read-write-records`\u2014including application log records\u2014fall behind until the backlog is shed or drained.",
+          "description": "An internet attacker can flood `flow:browser-to-web-application:page-request` to make `process:web-application` enqueue jobs through `flow:web-application-to-message-queue:enqueue-job`, consuming the finite storage and throughput of `store:message-queue` faster than `process:background-worker` can consume them. This is conditional on the `authentication` value for the browser flow, which is unknown, and on unverified request/job-size, per-client quota, and queue-backpressure behavior; if anonymous or cheaply authenticated requests can create jobs without effective bounds, the attacker spends inexpensive HTTP requests while the application accumulates work and worker/database effort. Second-order, queue saturation delays or prevents legitimate background processing, and the worker's reads and writes on `flow:background-worker-to-database:read-write-records`—including application log records—fall behind until the backlog is shed or drained.",
           "affected_element_ids": [
             "flow:browser-to-web-application:page-request",
             "process:web-application",
@@ -653,7 +653,7 @@
           "grounds": [
             {
               "kind": "quote",
-              "text": "Both of those\nconfig stores hold the credentials the process needs \u2014 the web application's\nqueue credentials, and the worker's database credentials.",
+              "text": "Both of those\nconfig stores hold the credentials the process needs — the web application's\nqueue credentials, and the worker's database credentials.",
               "source_label": "System description",
               "element_id": "",
               "attribute": "",
@@ -731,7 +731,7 @@
           "grounds": [
             {
               "kind": "quote",
-              "text": "Both of those\nconfig stores hold the credentials the process needs \u2014 the web application's\nqueue credentials, and the worker's database credentials.",
+              "text": "Both of those\nconfig stores hold the credentials the process needs — the web application's\nqueue credentials, and the worker's database credentials.",
               "source_label": "System description",
               "element_id": "",
               "attribute": "",
@@ -1194,7 +1194,7 @@
           "grounds": [
             {
               "kind": "quote",
-              "text": "Both of those config stores hold the credentials the process needs \u2014 the web application's queue credentials",
+              "text": "Both of those config stores hold the credentials the process needs — the web application's queue credentials",
               "source_label": "System description",
               "element_id": "",
               "attribute": "",

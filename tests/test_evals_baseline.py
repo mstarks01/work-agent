@@ -21,6 +21,7 @@ from analysis_service.vendors import VENDORS, vendor_for
 from evals.harness import baseline, prices
 from evals.harness.artifact import load_artifact
 from evals.harness.baseline import (
+    BASELINE_RULES,
     DIRTY_MARKER,
     BaselineError,
     BaselineIdentity,
@@ -134,6 +135,22 @@ class TestARouteHasToSayWhichWeightsAnswered:
         assert configuration_label(artifact)
 
     @pytest.mark.parametrize("name", AGGREGATED)
+    def test_the_label_says_the_route_names_no_single_backend(self, name, tmp_path):
+        """The marker, for the same reason the dirty one exists.
+
+        The five parts cannot tell two upstream providers apart on one route,
+        so a bare name would claim the models describe the weights. This rule
+        shipped with its refusal and no marker, and every vote cast on an
+        aggregator's sweep carried a label that read as reproducible.
+        """
+        route = f"{vendor_for(name).prefix}some-model"
+        aggregated = load_artifact(
+            write_sweep(tmp_path, sweep_document(strong_model=route), "agg")
+        )
+
+        assert configuration_label(aggregated).endswith("-multiprovider")
+
+    @pytest.mark.parametrize("name", AGGREGATED)
     def test_assemble_refuses_it_too(self, name, tmp_path):
         """The rule has one reader, so both entry points get it."""
         route = f"{vendor_for(name).prefix}some-model"
@@ -173,6 +190,42 @@ class TestTheConfigurationLabel:
             write_sweep(tmp_path, sweep_document(clean=False), "dirty")
         )
         assert configuration_label(dirty) == configuration_label(clean) + DIRTY_MARKER
+
+    def test_every_baseline_rule_carries_a_marker_of_its_own(self):
+        """A refusal with no marker lets a label claim the rule held.
+
+        The table is the one reader of "what does a Baseline require beyond the
+        five parts", and both ``from_artifact`` and ``configuration_label``
+        walk it. A rule added with an empty or a shared marker makes two
+        different sweeps take one label, which is the failure the marker exists
+        to remove.
+        """
+        markers = [rule.marker for rule in BASELINE_RULES]
+
+        assert all(marker.startswith("-") for marker in markers)
+        assert len(set(markers)) == len(markers)
+
+    def test_a_sweep_failing_both_rules_carries_both_markers(self, tmp_path):
+        """The markers compose, so one label never hides the other rule."""
+        name = next(
+            vendor for vendor, row in VENDORS.items() if not row.routes_to_one_provider
+        )
+        route = f"{vendor_for(name).prefix}some-model"
+        one = load_artifact(
+            write_sweep(tmp_path, sweep_document(strong_model=route), "one")
+        )
+        both = load_artifact(
+            write_sweep(
+                tmp_path, sweep_document(clean=False, strong_model=route), "both"
+            )
+        )
+
+        # The same five parts either side, so the only difference is which
+        # markers each label carries, in the order the table lists the rules.
+        parts = BaselineIdentity.from_artifact(one, as_baseline=False).name
+
+        assert configuration_label(one) == f"{parts}-multiprovider"
+        assert configuration_label(both) == f"{parts}{DIRTY_MARKER}-multiprovider"
 
 
 class TestPricing:

@@ -41,7 +41,7 @@ from pydantic import (
 from analysis_service.claims import FrameworkAnalysis, FrameworkName, SharedElementName
 from analysis_service.evidence import ground_issues
 from analysis_service.frameworks import block_type_for
-from analysis_service.sources import MAX_SYSTEM_NAME_CHARS, Source, plain_name
+from analysis_service.sources import Source, clean_system_name
 from analysis_service.system_model import (
     BoundaryCrossing,
     SystemModel,
@@ -643,6 +643,31 @@ class SourceRef(BaseModel):
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
+def _stored_system_name(value: str) -> str:
+    """One stored system name, checked against the rule that wrote it.
+
+    :func:`~analysis_service.sources.clean_system_name` is that rule and this
+    is its third caller, beside the HTTP route and the in-process engine. A
+    stored name has to be a name that rule *produces*, so the check is equality
+    with its answer rather than a repeat of the checks inside it.
+
+    **It refuses and never repairs.** Returning the cleaned value would make a
+    report validate into a model whose ``system_name`` is not the one on disk,
+    and :mod:`analysis_service.attestation` digests the report — so a read,
+    a re-dump and a re-digest would move a sealed value. A record the writer
+    could not have produced is malformed, and saying so is the whole job here.
+    """
+    cleaned = clean_system_name(value)
+    if cleaned is None:
+        raise ValueError("names no system, so no report can carry it as a name")
+    if cleaned != value:
+        raise ValueError(
+            "is not the name clean_system_name writes: it carries leading or"
+            f" trailing whitespace, and the stored name would be {cleaned!r}"
+        )
+    return value
+
+
 class InputRef(BaseModel):
     """Ties the report back to the exact submitted sources."""
 
@@ -650,12 +675,16 @@ class InputRef(BaseModel):
 
     #: Already clean by the time a report is built — both entry points run
     #: :func:`~analysis_service.sources.clean_system_name` before a job exists.
-    #: Stated again here because a report is also *read back*: an artifact or a
-    #: saved report is deserialized into this model, and a stored name is only
-    #: as trustworthy as whatever wrote it.
-    system_name: Annotated[str, AfterValidator(plain_name)] = Field(
-        min_length=1, max_length=MAX_SYSTEM_NAME_CHARS
-    )
+    #: Checked again here because a report is also *read back*: an artifact or
+    #: a saved report is deserialized into this model, and a stored name is
+    #: only as trustworthy as whatever wrote it.
+    #:
+    #: It reads **the writer's own rule**, not a restatement of two of its
+    #: three checks. Stating the bound and the character rule here left the
+    #: trim rule behind, so this accepted ``"   "`` and ``"  Pay  "`` where the
+    #: writer answers "no system named" and ``"Pay"`` — a second reader of the
+    #: one rule #794 exists to give a system name.
+    system_name: Annotated[str, AfterValidator(_stored_system_name)]
     sources: list[SourceRef] = Field(min_length=1)
     # Taken **over the refs**, not over the concatenated text: the refs are in
     # the report, so this stays recomputable from the report alone — which a

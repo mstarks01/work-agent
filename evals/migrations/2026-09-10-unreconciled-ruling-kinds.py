@@ -143,7 +143,15 @@ def migrate(root: Path, write: bool) -> Counts:
         for message in counts.unmatched:
             print(f"  no pattern: {message[:120]}")
         if write and counts.typed:
-            path.write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
+            # ``ensure_ascii`` off, for the reason every writer in this tree
+            # leaves it off: ``bundle`` writes a report through
+            # ``model_dump_json``, which emits UTF-8. The default escapes every
+            # non-ASCII character in the file and makes an archived report no
+            # longer the bytes its producer writes.
+            path.write_text(
+                json.dumps(raw, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
         totals.add(counts)
     return totals
 

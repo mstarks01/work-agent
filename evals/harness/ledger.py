@@ -45,9 +45,11 @@ not: over the six case 01 runs of one configuration a prose digest was shared by
 and every reader takes the one its question needs.
 
 An empty digest is a legal value and reads live against anything. It records
-that nothing was captured, which is the truthful reading of a row written before
-the field — the precedent ``rejected_because`` set for a report read back. No
-row in this repository carries one.
+that nothing was captured, for a caller that holds a claim it cannot digest. It
+is **not** how a row written before the field reads: :meth:`Vote.from_json`
+requires both keys, so such a row raises :class:`LedgerError` rather than
+loading with the question silently open. No row in this repository carries an
+empty digest, and none predates the field.
 
 A vote carries one reason code, from a closed set, and it decides where the vote
 lands. A reviewer who dislikes a finding's writing and a reviewer who says it is

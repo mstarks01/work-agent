@@ -245,7 +245,7 @@
         "assets": [
           "availability-critical"
         ],
-        "source_excerpt": "They are outside our physical control \u2014 a technician can be standing next to one with a laptop.",
+        "source_excerpt": "They are outside our physical control — a technician can be standing next to one with a laptop.",
         "source_label": "System description",
         "source_speaker": "",
         "notes": "",
@@ -607,7 +607,7 @@
     {
       "framework": "stride",
       "framework_version": "1.0",
-      "disclaimer": "AI-generated STRIDE threat model. Each claim asserts that an attacker action against the named elements is credible against what the submitted text stated \u2014 never that a control is absent, and never that anything not listed here is safe. Not reviewed by a human security analyst.",
+      "disclaimer": "AI-generated STRIDE threat model. Each claim asserts that an attacker action against the named elements is credible against what the submitted text stated — never that a control is absent, and never that anything not listed here is safe. Not reviewed by a human security analyst.",
       "claims": [
         {
           "id": "D-01",
@@ -1168,7 +1168,7 @@
             },
             {
               "kind": "quote",
-              "text": "They are outside our physical control \u2014 a technician can be standing next to one with a laptop.",
+              "text": "They are outside our physical control — a technician can be standing next to one with a laptop.",
               "source_label": "System description",
               "element_id": "",
               "attribute": "",
@@ -1604,7 +1604,7 @@
           "framework": "stride",
           "framework_version": "1.0",
           "title": "Flooded accepted telemetry can consume shared telemetry-lake write and query capacity",
-          "description": "A party holding a fleet-wide node key can generate accepted readings that traverse `flow:sensor-node-to-device-gateway:publish-readings`, `flow:device-gateway-to-telemetry-normalizer:forward-readings`, and `flow:telemetry-normalizer-to-telemetry-lake:load-readings`. This turns cheap MQTT publishes into normalization and BigQuery write work at `store:telemetry-lake`. If ingestion throughput, storage budget, or BigQuery quotas are shared rather than bounded per fleet\u2014a control posture not stated in the model\u2014the attacker can consume capacity needed by `process:telemetry-normalizer` and by dashboard queries on `flow:fleet-operator-to-telemetry-lake:query-dashboards`. Second-order, legitimate ingest falls behind and `entity:fleet-operator` loses dashboard availability across the shared lake, which holds business-critical customer telemetry.",
+          "description": "A party holding a fleet-wide node key can generate accepted readings that traverse `flow:sensor-node-to-device-gateway:publish-readings`, `flow:device-gateway-to-telemetry-normalizer:forward-readings`, and `flow:telemetry-normalizer-to-telemetry-lake:load-readings`. This turns cheap MQTT publishes into normalization and BigQuery write work at `store:telemetry-lake`. If ingestion throughput, storage budget, or BigQuery quotas are shared rather than bounded per fleet—a control posture not stated in the model—the attacker can consume capacity needed by `process:telemetry-normalizer` and by dashboard queries on `flow:fleet-operator-to-telemetry-lake:query-dashboards`. Second-order, legitimate ingest falls behind and `entity:fleet-operator` loses dashboard availability across the shared lake, which holds business-critical customer telemetry.",
           "affected_element_ids": [
             "store:telemetry-lake",
             "process:telemetry-normalizer",
@@ -1901,7 +1901,7 @@
           "grounds": [
             {
               "kind": "quote",
-              "text": "They are outside our physical control \u2014 a technician can be standing next to one with a laptop.",
+              "text": "They are outside our physical control — a technician can be standing next to one with a laptop.",
               "source_label": "System description",
               "element_id": "",
               "attribute": "",
