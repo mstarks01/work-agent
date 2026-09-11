@@ -203,12 +203,29 @@ modes need it: LiteLLM's Converse handler resolves credentials through a bare
 `bedrock` refuses to bind without it and names the extra; a deployment that
 never selects `bedrock` never carries it.
 
-Keys are read **only** from these vendor-scoped variables. LiteLLM's ambient
-`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY` and `GEMINI_API_KEY`
-pickup is deliberately unused, so a credential this deployment did not declare
-cannot authenticate a run. Keys are
+Keys are read **only** from these vendor-scoped variables. LiteLLM would
+otherwise pick a credential up from the process environment on its own, and
+that pickup is deliberately unused, so a credential this deployment did not
+declare cannot authenticate a run. The names it reads and this service does
+not are `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`,
+`GEMINI_API_KEY`, `OPENROUTER_API_KEY`, `OR_API_KEY` and
+`AWS_BEARER_TOKEN_BEDROCK`. The last one is the sharpest: AWS tooling sets it
+for its own reasons, and LiteLLM authenticates with it whenever no key is
+passed, skipping SigV4 — so a token nobody chose would sign the run. Keys are
 never logged, never in the report, and never in a fingerprint; errors name the
 variable, never its value.
+
+Two more names are LiteLLM's fallbacks for *addressing* rather than for a
+credential, and the registry declines them too: `AWS_REGION_NAME` and
+`AWS_PROFILE_NAME`. Neither is AWS's own conventional spelling, so a registry
+that read them would honour a name nobody in this deployment chose.
+
+`GOOGLE_APPLICATION_CREDENTIALS` is the one environment credential that **is**
+honoured, and that is the point of `vertex`'s platform-identity mode rather
+than an exception to the rule above. The mode passes no credential material and
+lets ADC resolve whatever the platform supplies — a Workload Identity binding,
+a metadata server, or that variable. The deployment still declares the
+mechanism in config first; only then may the SDK discover the material.
 
 **Pinning** means naming a model specifically enough that it won't quietly
 change under you. The check is per model *family* and deliberately loose: it
