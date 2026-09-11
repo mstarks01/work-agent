@@ -11,6 +11,7 @@ from __future__ import annotations
 import re
 import sys
 import tomllib
+from collections.abc import Callable
 from dataclasses import FrozenInstanceError
 from pathlib import Path
 from typing import ClassVar, get_args
@@ -230,6 +231,7 @@ class TestCredentialModes:
         "openai": ("OPENAI_API_KEY",),
         "bedrock": ("AWS_BEARER_TOKEN_BEDROCK",),
         "gemini": ("GOOGLE_API_KEY", "GEMINI_API_KEY"),
+        "openrouter": ("OPENROUTER_API_KEY", "OR_API_KEY"),
     }
 
     # Read from ``VENDORS`` rather than from ``VENDOR_NAMES``: this check runs
@@ -363,6 +365,43 @@ class TestWhichVariablesAreSecret:
         assert set(entry.secret_env_vars(mode)) <= set(entry.required_env_vars(mode))
 
 
+#: The bare spelling's minor version, which OpenRouter writes with a dot. Used
+#: only to restate a bare identifier in that vendor's spelling, so the
+#: portability property can be asserted against the rule rather than against a
+#: second list of identifiers.
+_MODERN_MINOR = re.compile(r"^(claude-[a-z]+-\d+)-(\d{1,2})$")
+
+
+def _dotted_minor(model: str) -> str:
+    """``claude-sonnet-4-6`` in OpenRouter's spelling; anything else unchanged."""
+    return _MODERN_MINOR.sub(r"\1.\2", model)
+
+
+def _bare(model: str) -> str:
+    """The spelling Anthropic publishes, which three other vendors serve too."""
+    return model
+
+
+#: How each vendor spells one Claude identifier. A **family** rule follows the
+#: family, so which identifiers are legal must differ between two vendors by
+#: exactly this transform and by nothing else — which is the property the tests
+#: below assert in both directions, acceptance and refusal.
+#:
+#: Keyed by vendor and checked against the registry twice: for completeness,
+#: and for agreement with the rule objects the registry actually lists. The
+#: second check is what stops this table from being a second opinion — a vendor
+#: whose row pins a shape this table does not spell would otherwise pass every
+#: assertion below against the wrong string.
+CLAUDE_SPELLING: dict[str, Callable[[str], str]] = {
+    "anthropic": _bare,
+    "gemini": _bare,
+    "openai": _bare,
+    "vertex": _bare,
+    "bedrock": lambda model: f"anthropic.{model}",
+    "openrouter": lambda model: f"anthropic/{_dotted_minor(model)}",
+}
+
+
 class TestPinnedFormRule:
     """An open-world denylist, plus a closed shape for the one family with one."""
 
@@ -439,17 +478,31 @@ class TestPinnedFormRule:
         # API — Google Cloud spells 4.6-and-later identically.
         assert vertex.validate_model("claude-opus-5", source="t")
 
-    #: The vendors that spell the Claude family the bare way. A **family** rule
-    #: follows the family, so moving a tier between any two of these must not
-    #: change which identifiers are legal. The dated and pre-4.6 forms are the
-    #: cases that decide it: they were refused on ``vertex`` and ``anthropic``
-    #: and accepted on ``openai``, because that row listed the catch-all alone.
-    #:
-    #: Derived rather than listed, so a vendor row added tomorrow lands in one
-    #: of the two groups instead of in neither.
+    #: The vendors that spell the Claude family the bare way, derived from the
+    #: table above. The dated and pre-4.6 forms are the cases that decide it:
+    #: they were refused on ``vertex`` and ``anthropic`` and accepted on
+    #: ``openai``, because that row listed the catch-all alone.
     BARE_SPELLING: ClassVar[tuple[str, ...]] = tuple(
-        name for name in VENDOR_NAMES if name != "bedrock"
+        name for name, spell in CLAUDE_SPELLING.items() if spell is _bare
     )
+
+    def test_the_spelling_table_answers_for_every_vendor(self):
+        """A vendor the table does not spell is a vendor nothing below reads."""
+        assert set(CLAUDE_SPELLING) == set(VENDOR_NAMES)
+
+    def test_the_bare_group_is_the_group_the_registry_says_it_is(self):
+        """The table and the registry, checked against each other.
+
+        ``BARE_SPELLING`` used to read "every vendor except bedrock". A third
+        spelling would have joined the bare group silently, and every
+        portability assertion below would have gone on passing against an
+        identifier that vendor does not serve. So the group is derived from the
+        table, and the table is compared with the rule objects the rows list.
+        """
+        from_registry = {
+            name for name in VENDOR_NAMES if _CLAUDE_RULE in VENDORS[name].form_rules
+        }
+        assert set(self.BARE_SPELLING) == from_registry
 
     #: One identifier, one verdict, on every vendor that spells the family this
     #: way.
@@ -470,16 +523,16 @@ class TestPinnedFormRule:
         "claude-3-7-sonnet": False,
     }
 
-    @pytest.mark.parametrize("name", BARE_SPELLING)
-    @pytest.mark.parametrize(
-        "model",
-        [
-            "anthropic.claude-opus-5",
-            "us.anthropic.claude-opus-5",
-            "anthropic.claude-3-5-sonnet-20240620-v1:0",
-        ],
+    #: Bedrock spellings a bare-spelling vendor must refuse, beyond what the
+    #: transform above produces: a region scope, and a dated build tail.
+    EXTRA_BEDROCK_SPELLINGS: ClassVar[tuple[str, ...]] = (
+        "us.anthropic.claude-opus-5",
+        "anthropic.claude-3-5-sonnet-20240620-v1:0",
     )
-    def test_a_bedrock_spelling_is_refused_by_the_vendors_that_do_not_use_it(
+
+    @pytest.mark.parametrize("name", BARE_SPELLING)
+    @pytest.mark.parametrize("model", EXTRA_BEDROCK_SPELLINGS)
+    def test_a_scoped_bedrock_spelling_is_refused_where_it_is_not_served(
         self, name, model
     ):
         """The other half of the copy-paste, and it was open until #603's review.
@@ -513,15 +566,17 @@ class TestPinnedFormRule:
             with pytest.raises(ValueError):
                 vendor.validate_model(model, source="t")
 
+    @pytest.mark.parametrize("name", sorted(CLAUDE_SPELLING))
     @pytest.mark.parametrize(
         "model", sorted(name for name, ok in CLAUDE_VERDICTS.items() if ok)
     )
-    def test_every_pinned_claude_is_pinned_under_the_bedrock_spelling(self, model):
-        """Moving a Claude tier onto Bedrock changes the spelling and nothing else.
+    def test_every_pinned_claude_is_pinned_under_every_spelling(self, model, name):
+        """Moving a Claude tier changes the spelling and nothing else.
 
         The portability property, and the half that must hold both ways: every
-        identifier the bare-spelling vendors pin is pinned there too, once the
-        family segment is in front of it.
+        identifier the bare-spelling vendors pin is pinned on every vendor,
+        once that vendor's own segments are in front of it and its own minor
+        separator is inside it.
 
         The refusals are **not** mirrored, and that is a decision rather than a
         gap. A dated form is refused where the vendor also serves the bare name
@@ -529,9 +584,43 @@ class TestPinnedFormRule:
         serves no such alias, so the same date is a published build there. That
         is a property of the catalogue, and the cases sit below.
         """
-        vendor = vendor_for("bedrock")
-        scoped = f"anthropic.{model}"
-        assert vendor.validate_model(scoped, source="t") == scoped
+        spelled = CLAUDE_SPELLING[name](model)
+        assert vendor_for(name).validate_model(spelled, source="t") == spelled
+
+    @pytest.mark.parametrize(
+        ("name", "other"),
+        sorted(
+            (name, other)
+            for name in CLAUDE_SPELLING
+            for other in CLAUDE_SPELLING
+            if name != other
+        ),
+    )
+    @pytest.mark.parametrize(
+        "model", sorted(name for name, ok in CLAUDE_VERDICTS.items() if ok)
+    )
+    def test_one_vendors_spelling_is_refused_by_every_vendor_that_spells_it_otherwise(
+        self, model, name, other
+    ):
+        """The copy-paste caught in every direction, not only out of Bedrock.
+
+        A tier row moved from one vendor to another keeps the first vendor's
+        spelling. It has to meet the shared family and fail the second
+        vendor's shape with a hint, rather than pass unpinned through the
+        catch-all and die on node one.
+
+        Two vendors that spell one identifier the same way have nothing to
+        refuse, so those pairs assert acceptance instead — which is the
+        portability property above, restated where it would otherwise be
+        skipped.
+        """
+        spelled = CLAUDE_SPELLING[other](model)
+        vendor = vendor_for(name)
+        if spelled == CLAUDE_SPELLING[name](model):
+            assert vendor.validate_model(spelled, source="t") == spelled
+            return
+        with pytest.raises(ValueError, match="not pinned"):
+            vendor.validate_model(spelled, source="t")
 
     @pytest.mark.parametrize(
         "model",

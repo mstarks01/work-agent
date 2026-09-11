@@ -71,7 +71,8 @@ vendor = "anthropic"
 model = "claude-opus-5"
 ```
 
-Supported vendors are `vertex`, `anthropic`, `openai`, `bedrock` and `gemini`.
+Supported vendors are `vertex`, `anthropic`, `openai`, `bedrock`, `gemini`
+and `openrouter`.
 Every one is reached through a single adapter (LiteLLM); there is no per-vendor
 code path, and Gemini reaches Vertex the same way everything else does. The pair above is deliberately
 mixed, because that is an ordinary configuration rather than an advanced one.
@@ -85,6 +86,20 @@ right spelling. Dated forms pass on Bedrock and are refused on `vertex` and
 `anthropic`, and that difference is a property of the catalogues rather than a
 special case: a date is refused where the vendor also serves the bare name as a
 floating alias, and Bedrock serves none.
+
+**An OpenRouter model identifier carries a vendor of its own.** OpenRouter is an
+aggregator, so a model name has a slash in it — `anthropic/claude-opus-4.7` —
+and the route becomes `openrouter/anthropic/claude-opus-4.7`. Write the whole
+slug as the model. Claude there is
+`<vendor>/claude-<name>-<major>[.<minor>]`, with a **dot** before the minor
+version and an optional `:<variant>` tail such as `:thinking`. The bare
+`claude-opus-5` is refused there, and so is the hyphenated
+`anthropic/claude-opus-4-7`; the error names the right spelling.
+
+OpenRouter may serve one slug from more than one upstream provider, so two runs
+of one configuration can reach two backends. That does not stop an analysis. It
+does stop a **Baseline**: `evals/harness/baseline.py` refuses to name one after
+a route that does not say which weights answered.
 
 An ARN is refused for every vendor. It hides which model answers, so a blessed
 fingerprint would go on certifying a target somebody can repoint, and it carries
@@ -120,6 +135,7 @@ like `vertex` + an API key cannot be written down:
 | `bedrock` | `api_key` | `ANALYSIS_BEDROCK_API_KEY`, `ANALYSIS_BEDROCK_REGION` |
 | `bedrock` | `iam` | `ANALYSIS_BEDROCK_REGION` |
 | `gemini` | `api_key` | `ANALYSIS_GEMINI_API_KEY` |
+| `openrouter` | `api_key` | `ANALYSIS_OPENROUTER_API_KEY` |
 
 `api_key` means the deployment passes the key, read only from the variable
 above. `iam` means **the platform supplies the identity**: the deployment passes

@@ -17,6 +17,7 @@ from pathlib import Path
 import pytest
 
 from analysis_service.report import TokenUsage
+from analysis_service.vendors import VENDORS, vendor_for
 from evals.harness import baseline, prices
 from evals.harness.artifact import load_artifact
 from evals.harness.baseline import (
@@ -89,6 +90,56 @@ class TestTheIdentity:
         path = write_sweep(tmp_path, sweep_document(clean=False))
         with pytest.raises(BaselineError, match="did not match its commit"):
             BaselineIdentity.from_artifact(load_artifact(path))
+
+
+class TestARouteHasToSayWhichWeightsAnswered:
+    """A Baseline's sweeps are comparable, or the Baseline says nothing.
+
+    The second of the Baseline's own rules, beside the dirty-tree one. It
+    reads ``Vendor.routes_to_one_provider`` rather than a vendor's name, so a
+    row added tomorrow in front of more than one provider is refused by this
+    without an edit here.
+    """
+
+    #: The registry's own answer, so this suite states the vendors rather than
+    #: restating the field. A row that changes its answer moves these lists.
+    AGGREGATED = sorted(
+        name for name, vendor in VENDORS.items() if not vendor.routes_to_one_provider
+    )
+
+    def test_some_vendor_answers_each_way(self):
+        """A rule no row triggers is a rule nothing below actually exercises."""
+        assert self.AGGREGATED, "no vendor routes to more than one provider"
+        assert set(self.AGGREGATED) != set(VENDORS)
+
+    @pytest.mark.parametrize("name", AGGREGATED)
+    def test_an_aggregated_route_cannot_name_a_baseline(self, name, tmp_path):
+        route = f"{vendor_for(name).prefix}some-model"
+        path = write_sweep(tmp_path, sweep_document(strong_model=route))
+        with pytest.raises(BaselineError, match="more than one upstream"):
+            BaselineIdentity.from_artifact(load_artifact(path))
+
+    @pytest.mark.parametrize("name", AGGREGATED)
+    def test_the_sweep_is_still_a_sweep_with_a_label(self, name, tmp_path):
+        """Nothing refuses to *run* the vendor, and the label proves it.
+
+        ``configuration_label`` reads the same five parts with the Baseline's
+        rules off, so a run on an aggregator is named, comparable to itself,
+        and simply never published as a Baseline.
+        """
+        route = f"{vendor_for(name).prefix}some-model"
+        artifact = load_artifact(
+            write_sweep(tmp_path, sweep_document(strong_model=route))
+        )
+        assert configuration_label(artifact)
+
+    @pytest.mark.parametrize("name", AGGREGATED)
+    def test_assemble_refuses_it_too(self, name, tmp_path):
+        """The rule has one reader, so both entry points get it."""
+        route = f"{vendor_for(name).prefix}some-model"
+        path = write_sweep(tmp_path, sweep_document(strong_model=route))
+        with pytest.raises(BaselineError, match="more than one upstream"):
+            assemble(tmp_path, "someone", [path])
 
 
 class TestTheConfigurationLabel:
