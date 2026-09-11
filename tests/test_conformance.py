@@ -1085,3 +1085,39 @@ def test_the_alias_rule_finds_the_alias_it_was_written_for():
     ]
     # The sub-family is a different model, not a build of this one.
     assert "gpt-4o-mini-2024-07-18" not in dated_builds_of("gpt-4o", litellm.model_cost)
+
+
+def test_the_probe_raises_that_type_and_no_other_across_the_map():
+    """The set ``_probe_param``'s narrowed ``except`` was measured against.
+
+    It reads a raise as ``UNSUPPORTED``, and this module's header calls
+    rendering an unknown as unsupported "inventing a fact" — so the catch may
+    only cover exceptions that really do mean the provider said no. That is
+    safe while ``check_supported`` raises one type, and a library bump is what
+    would change it, so the sweep that measured it is the test.
+    """
+    from litellm import model_cost
+
+    from analysis_service.model_gate import ModelGateError, check_supported
+    from analysis_service.vendors import REASONING_KWARG, VENDORS
+
+    prefixes = {v.litellm_provider: v for v in VENDORS.values()}
+    probes = (("temperature", 0.5), ("seed", 7), (REASONING_KWARG, "low"))
+    seen, raises = set(), 0
+    for key, entry in model_cost.items():
+        if not isinstance(entry, dict):
+            continue
+        vendor = prefixes.get(entry.get("litellm_provider"))
+        if vendor is None:
+            continue
+        for name, value in probes:
+            try:
+                check_supported(vendor, key, {name: value}, source="sweep")
+            except Exception as exc:  # noqa: BLE001 -- the type is the question
+                seen.add(type(exc))
+                raises += 1
+    assert raises, "no pair refused anything, so this sweep asserts nothing"
+    assert seen == {ModelGateError}, (
+        f"check_supported now raises {seen}, so _probe_param's narrowed except"
+        " no longer covers the set it was measured against"
+    )
