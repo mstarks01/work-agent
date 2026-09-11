@@ -229,12 +229,50 @@ class ModelTierConfig(BaseModel):
     #: unusual. :data:`ReviewIndependence` names the three settings.
     review_independence: ReviewIndependence
 
+    @property
+    def bound_tiers(self) -> frozenset[TierName]:
+        """The tiers this deployment runs something on.
+
+        **The one reader of "is this tier bound".** The node map is what says
+        so, and ``set(self.nodes.values())`` was written out in three modules
+        while two more sites answered the same question from ``self.tiers`` and
+        got a wider answer. A tier with a selection that no node points at
+        costs no adapter, no credential and no SDK, so every site that decides
+        what a deployment needs has to mean this set and not that one.
+
+        A frozenset because callers only ask what is in it.
+        """
+        return frozenset(self.nodes.values())
+
+    @property
+    def bound_vendors(self) -> tuple[VendorName, ...]:
+        """Every vendor a bound tier selects, in tier order, without repeats.
+
+        The question "which providers does this deployment actually call", which
+        three callers ask: the credential-mode rule below, the build in
+        :func:`~analysis_service.binding.build_tier_adapters`, and the
+        diagnostic page that tells an operator which variables to set. The page
+        answered it from every tier and listed a vendor whose credentials
+        nothing needs — telling somebody to set a key for a provider no request
+        reaches, on the page whose whole value is being right about that.
+
+        Tier order rather than sorted, so the list reads base-first the way the
+        config file does and does not reorder when a vendor is renamed.
+        """
+        return tuple(
+            dict.fromkeys(
+                self.tiers[tier].vendor
+                for tier in TIER_NAMES
+                if tier in self.bound_tiers and tier in self.tiers
+            )
+        )
+
     @model_validator(mode="after")
     def _check_complete(self) -> Self:
         # The tiers this map runs something on, not all of them. `build_adapters`
         # binds no adapter for an unused tier, so demanding a selection for one
         # asked an operator to choose a model no request reaches.
-        in_use = set(self.nodes.values())
+        in_use = self.bound_tiers
         missing_tiers = [
             tier for tier in TIER_NAMES if tier in in_use and tier not in self.tiers
         ]
@@ -272,11 +310,15 @@ class ModelTierConfig(BaseModel):
         it sit there would let a file state a mode the registry has since
         replaced.
 
-        Only vendors a tier actually selects are required to declare. A
-        multi-mode vendor nobody calls needs no identity.
+        Only vendors a **bound** tier selects are required to declare. A
+        multi-mode vendor nobody calls needs no identity — and that sentence was
+        already here while the code read every tier, so a deployment could not
+        start until it declared a mode for a vendor no adapter was built for.
+        :attr:`bound_vendors` is the reader that makes the rule match its own
+        statement, and the same one the build uses.
         """
         problems = []
-        selected = {selection.vendor for selection in self.tiers.values()}
+        selected = set(self.bound_vendors)
         for vendor, mode in self.credentials.items():
             allowed = vendor_for(vendor).credential_modes
             if len(allowed) == 1:
