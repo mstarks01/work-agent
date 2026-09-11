@@ -39,6 +39,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from analysis_service.claims import (
+    CLAIM_ID_MAX_CHARS,
+    UNNAMED_CLAIM,
+    UNRECONCILED_MESSAGE_MAX_CHARS,
+)
+
 # Each pattern against the kind it names and the group holding the claim ID.
 # Ordered most specific first: a ``duplicate`` rejection and a missing
 # ``rejected_because`` both open "claim 'X' is ...".
@@ -74,9 +80,12 @@ PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"^claim '(?P<id>.*)' is (ruled|rejected)"), "verdict-shape"),
 )
 
-# The bound the field carries, so a migrated sentence validates.
-MESSAGE_MAX_CHARS = 1500
-CLAIM_ID_MAX_CHARS = 300
+# The bounds and the placeholder the record itself carries, imported rather
+# than re-spelled. This script is idempotent and says it is safe to re-run, and
+# a copy would make a re-run after any of the three moved write a value the
+# model then refuses -- the failure a migration is least able to afford,
+# because it runs on the archive rather than on a job. The sibling migration
+# imports ``SystemModel`` and ``_file_digests`` for the same reason.
 
 
 @dataclass
@@ -98,9 +107,9 @@ def _typed(message: str) -> dict[str, str] | None:
         match = pattern.match(message)
         if match:
             return {
-                "claim_id": match.group("id")[:CLAIM_ID_MAX_CHARS] or "(unnamed)",
+                "claim_id": match.group("id")[:CLAIM_ID_MAX_CHARS] or UNNAMED_CLAIM,
                 "kind": kind,
-                "message": message[:MESSAGE_MAX_CHARS],
+                "message": message[:UNRECONCILED_MESSAGE_MAX_CHARS],
             }
     return None
 
