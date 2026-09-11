@@ -125,6 +125,17 @@ def leading_word(value: str, words: Collection[str]) -> str | None:
     return match.group(1).lower() if match else None
 
 
+#: How much of a control attribute's raw text a record keeps.
+#:
+#: **One rule, and two records answer to it.** :class:`UnknownControl` here and
+#: :class:`~analysis_service.basis.StatedControl` are two views of the same
+#: fact — one security-relevant attribute off one ``SystemModel`` element — and
+#: each truncated to 200 and validated at 200 in its own file. Four spellings
+#: of one bound, with nothing tying them, so widening the producer would have
+#: made the records refuse what it writes.
+CONTROL_VALUE_MAX_CHARS = 200
+
+
 class UnknownControl(BaseModel):
     """One security-relevant attribute that the model does not verify.
 
@@ -140,7 +151,7 @@ class UnknownControl(BaseModel):
 
     element_id: str = Field(min_length=1, max_length=300)
     attribute: str = Field(min_length=1, max_length=100)
-    value: str = Field(max_length=200)
+    value: str = Field(max_length=CONTROL_VALUE_MAX_CHARS)
     state: ControlState
 
 
@@ -285,7 +296,7 @@ def unknown_controls(model: SystemModel) -> list[UnknownControl]:
         UnknownControl(
             element_id=element.id,
             attribute=attribute,
-            value=value[:200],
+            value=value[:CONTROL_VALUE_MAX_CHARS],
             state=state,
         )
         for element in model.elements()
