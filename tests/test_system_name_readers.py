@@ -1,9 +1,9 @@
 """The system name rule, and the two entry points held against each other.
 
-``clean_system_name`` is the rule. The HTTP route and the in-process engine are
-its two callers, and this file does the job the parity suites do elsewhere:
-never ask whether a caller agrees with its own expectation, ask whether the two
-callers agree with each other.
+``clean_system_name`` is the rule. The HTTP route, the in-process engine and
+the stored report's own field are its three callers, and this file does the job
+the parity suites do elsewhere: never ask whether a caller agrees with its own
+expectation, ask whether the callers agree with each other.
 
 A door can depart from the rule in two ways, and both are failures here. It can
 admit a name the rule refuses, or refuse one the rule admits. It can also admit
@@ -132,13 +132,63 @@ def test_the_bound_measures_the_trimmed_name() -> None:
         clean_system_name("s" * (MAX_SYSTEM_NAME_CHARS + 1))
 
 
+def _stored_outcome(name: str) -> Outcome:
+    """What the third door — a report read back — does with a stored name."""
+    try:
+        ref = InputRef.of(system_name=name, sources=[Source.description("a web app")])
+    except ValidationError:
+        return (False, None)
+    return (True, ref.system_name)
+
+
+def _stored_rule_outcome(name: str) -> Outcome:
+    """What the rule says about a name a report may *carry*.
+
+    A report always carries a name, so the rule's ``None`` is a refusal here
+    rather than a fallback. And a report stores what was written, so a name the
+    rule would have changed is a name no writer produced.
+    """
+    try:
+        cleaned = clean_system_name(name)
+    except ValueError:
+        return (False, None)
+    if cleaned is None or cleaned != name:
+        return (False, None)
+    return (True, cleaned)
+
+
+@pytest.mark.parametrize("name", NAMES)
+def test_the_stored_report_name_answers_to_the_rule(name: str) -> None:
+    """The read-back field is the third door, and it reads the same rule.
+
+    It stated the bound and the character rule itself and left the trim rule
+    behind, which admitted ``"   "`` and ``"  Orders API  "`` — names the
+    writer turns into "no system named" and ``"Orders API"``. Reverting it to a
+    restatement fails here.
+
+    Every name in the archive is plain ASCII with no padding and well inside
+    the bound, so nothing stored is refused by this: the 308 artifact files
+    carry 14 distinct names and the rule rewrites none of them.
+    """
+    assert _stored_outcome(name) == _stored_rule_outcome(name)
+
+
+@pytest.mark.parametrize("name", ["   ", "  Orders API  "])
+def test_a_stored_name_the_writer_could_not_have_written_is_refused(
+    name: str,
+) -> None:
+    """The two shapes the old restatement let through, named one at a time.
+
+    Refused rather than trimmed. A report validated into a ``system_name`` the
+    file does not hold re-dumps to different bytes, so a read and a re-digest
+    would break an ``attestation`` seal nobody edited.
+    """
+    with pytest.raises(ValidationError):
+        InputRef.of(system_name=name, sources=[Source.description("a web app")])
+
+
 @pytest.mark.parametrize("name", [BIDI_OVERRIDE, ZERO_WIDTH, NEXT_LINE])
 def test_a_stored_report_name_is_read_by_the_same_rule(name: str) -> None:
-    """A report is deserialized too, so its field refuses what the doors refuse.
-
-    Every name in the archive is plain ASCII well inside the bound, so nothing
-    stored is refused by this: the 308 artifact files carry 14 distinct names
-    and the rule rewrites none of them.
-    """
+    """A report is deserialized too, so its field refuses what the doors refuse."""
     with pytest.raises(ValidationError):
         InputRef.of(system_name=name, sources=[Source.description("a web app")])

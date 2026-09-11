@@ -307,7 +307,7 @@
         "assets": [
           "business-critical-data"
         ],
-        "source_excerpt": "I don't believe anything verifies the artifact hasn't been swapped \u2014 we just trust the bucket.",
+        "source_excerpt": "I don't believe anything verifies the artifact hasn't been swapped — we just trust the bucket.",
         "source_label": "System description",
         "source_speaker": "",
         "notes": "",
@@ -454,7 +454,7 @@
         "assets": [
           "business-critical-data"
         ],
-        "source_excerpt": "I'm not sure what governs who can push \u2014 I think it is a shared group account.",
+        "source_excerpt": "I'm not sure what governs who can push — I think it is a shared group account.",
         "source_label": "System description",
         "source_speaker": "",
         "notes": "",
@@ -555,7 +555,7 @@
     {
       "framework": "stride",
       "framework_version": "1.0",
-      "disclaimer": "AI-generated STRIDE threat model. Each claim asserts that an attacker action against the named elements is credible against what the submitted text stated \u2014 never that a control is absent, and never that anything not listed here is safe. Not reviewed by a human security analyst.",
+      "disclaimer": "AI-generated STRIDE threat model. Each claim asserts that an attacker action against the named elements is credible against what the submitted text stated — never that a control is absent, and never that anything not listed here is safe. Not reviewed by a human security analyst.",
       "claims": [
         {
           "id": "D-01",
@@ -642,7 +642,7 @@
           "framework": "stride",
           "framework_version": "1.0",
           "title": "An artifact publisher can gain the model server's feature-store access if model artifacts execute supplied logic",
-          "description": "`process:model-server` loads artifacts from `store:model-registry` without integrity verification. If the artifact format permits executable model code, custom operators, or equivalent supplied logic, a malicious ML engineer\u2014or a party using the unverified publishing authority on `flow:ml-engineer-to-model-registry:publish-artifact`\u2014can plant an artifact that runs as `process:model-server` at startup. The executed artifact inherits the model server's service identity on `flow:model-server-to-model-registry:load-artifact` and its network access to `store:feature-store` through `flow:model-server-to-feature-store:read-features`, which has no authentication. The terminal capability is reading per-customer account-age and spend-band data from the confidential, PII- and financial-tagged feature store. This threat is conditional on whether loaded artifacts can execute logic in the GPU inference runtime; that capability is not stated in the model.",
+          "description": "`process:model-server` loads artifacts from `store:model-registry` without integrity verification. If the artifact format permits executable model code, custom operators, or equivalent supplied logic, a malicious ML engineer—or a party using the unverified publishing authority on `flow:ml-engineer-to-model-registry:publish-artifact`—can plant an artifact that runs as `process:model-server` at startup. The executed artifact inherits the model server's service identity on `flow:model-server-to-model-registry:load-artifact` and its network access to `store:feature-store` through `flow:model-server-to-feature-store:read-features`, which has no authentication. The terminal capability is reading per-customer account-age and spend-band data from the confidential, PII- and financial-tagged feature store. This threat is conditional on whether loaded artifacts can execute logic in the GPU inference runtime; that capability is not stated in the model.",
           "affected_element_ids": [
             "entity:ml-engineer",
             "flow:ml-engineer-to-model-registry:publish-artifact",
@@ -653,7 +653,7 @@
           "grounds": [
             {
               "kind": "quote",
-              "text": "I don't believe anything verifies the artifact hasn't been swapped \u2014 we just trust the bucket.",
+              "text": "I don't believe anything verifies the artifact hasn't been swapped — we just trust the bucket.",
               "source_label": "System description",
               "element_id": "",
               "attribute": "",
@@ -671,7 +671,7 @@
             },
             {
               "kind": "quote",
-              "text": "ML engineers publish new model artifacts to the registry bucket. I'm not sure what governs who can push \u2014 I think it is a shared group account.",
+              "text": "ML engineers publish new model artifacts to the registry bucket. I'm not sure what governs who can push — I think it is a shared group account.",
               "source_label": "System description",
               "element_id": "",
               "attribute": "",
@@ -924,7 +924,7 @@
           "grounds": [
             {
               "kind": "quote",
-              "text": "I'm not sure what governs who can push \u2014 I think it is a shared group account.",
+              "text": "I'm not sure what governs who can push — I think it is a shared group account.",
               "source_label": "System description",
               "element_id": "",
               "attribute": "",
@@ -1044,7 +1044,7 @@
           "grounds": [
             {
               "kind": "quote",
-              "text": "I'm not sure what governs who can push \u2014 I think it is a shared group account.",
+              "text": "I'm not sure what governs who can push — I think it is a shared group account.",
               "source_label": "System description",
               "element_id": "",
               "attribute": "",
@@ -1053,7 +1053,7 @@
             },
             {
               "kind": "quote",
-              "text": "I don't believe anything verifies the artifact hasn't been swapped \u2014 we just trust the bucket.",
+              "text": "I don't believe anything verifies the artifact hasn't been swapped — we just trust the bucket.",
               "source_label": "System description",
               "element_id": "",
               "attribute": "",
@@ -1119,7 +1119,7 @@
           "grounds": [
             {
               "kind": "quote",
-              "text": "I don't believe anything verifies the artifact hasn't been swapped \u2014 we just trust the bucket.",
+              "text": "I don't believe anything verifies the artifact hasn't been swapped — we just trust the bucket.",
               "source_label": "System description",
               "element_id": "",
               "attribute": "",
@@ -1128,7 +1128,7 @@
             },
             {
               "kind": "quote",
-              "text": "I'm not sure what governs who can push \u2014 I think it is a shared group account.",
+              "text": "I'm not sure what governs who can push — I think it is a shared group account.",
               "source_label": "System description",
               "element_id": "",
               "attribute": "",

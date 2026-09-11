@@ -288,7 +288,7 @@
         "source_excerpt": "The portal is a SaaS product.",
         "source_label": "System description",
         "source_speaker": "",
-        "notes": "The datasheet's phrases \u2014 secure by design, enterprise-grade encryption throughout, fully authenticated and audited, fully compliant \u2014 name no technology and state no verifiable control, so none of them set an attribute here.",
+        "notes": "The datasheet's phrases — secure by design, enterprise-grade encryption throughout, fully authenticated and audited, fully compliant — name no technology and state no verifiable control, so none of them set an attribute here.",
         "technology": "unknown",
         "trust_zone": "boundary:vendor-platform",
         "exposure": "internet-facing",
@@ -585,14 +585,14 @@
     {
       "framework": "stride",
       "framework_version": "1.0",
-      "disclaimer": "AI-generated STRIDE threat model. Each claim asserts that an attacker action against the named elements is credible against what the submitted text stated \u2014 never that a control is absent, and never that anything not listed here is safe. Not reviewed by a human security analyst.",
+      "disclaimer": "AI-generated STRIDE threat model. Each claim asserts that an attacker action against the named elements is credible against what the submitted text stated — never that a control is absent, and never that anything not listed here is safe. Not reviewed by a human security analyst.",
       "claims": [
         {
           "id": "E-02",
           "framework": "stride",
           "framework_version": "1.0",
           "title": "An unverified vendor-to-bucket transition could let an attacker borrow the master service's database write authority",
-          "description": "`flow:portal-vendor-to-landing-bucket:push-nightly-extract` leaves the uncontrolled `boundary:vendor-platform` tenant and enters `boundary:cloud-account`, but its authentication is unknown. If the landing bucket does not authenticate and narrowly authorize this upload, a party able to act from the vendor side\u2014or any caller accepted by the unresolved upload control\u2014could place a chosen nightly extract in `store:landing-bucket`. `process:supplier-master-service` then loads that extract through `flow:supplier-master-service-to-landing-bucket:load-extract` and writes supplier records through `flow:supplier-master-service-to-supplier-database:write-supplier-records`; the attacker thereby causes the service to exercise its standing database-write authority. Second-order, this reaches supplier records in `store:supplier-database`, including the nightly supplier data and associated PII, rather than being limited to the landing bucket itself.",
+          "description": "`flow:portal-vendor-to-landing-bucket:push-nightly-extract` leaves the uncontrolled `boundary:vendor-platform` tenant and enters `boundary:cloud-account`, but its authentication is unknown. If the landing bucket does not authenticate and narrowly authorize this upload, a party able to act from the vendor side—or any caller accepted by the unresolved upload control—could place a chosen nightly extract in `store:landing-bucket`. `process:supplier-master-service` then loads that extract through `flow:supplier-master-service-to-landing-bucket:load-extract` and writes supplier records through `flow:supplier-master-service-to-supplier-database:write-supplier-records`; the attacker thereby causes the service to exercise its standing database-write authority. Second-order, this reaches supplier records in `store:supplier-database`, including the nightly supplier data and associated PII, rather than being limited to the landing bucket itself.",
           "affected_element_ids": [
             "flow:portal-vendor-to-landing-bucket:push-nightly-extract",
             "store:landing-bucket"
@@ -918,7 +918,7 @@
           "grounds": [
             {
               "kind": "quote",
-              "text": "Suppliers upload their compliance paperwork through a portal \u2014 insurance certificates, food safety audits, and contact details for their own staff.",
+              "text": "Suppliers upload their compliance paperwork through a portal — insurance certificates, food safety audits, and contact details for their own staff.",
               "source_label": "System description",
               "element_id": "",
               "attribute": "",

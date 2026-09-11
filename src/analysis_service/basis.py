@@ -95,6 +95,13 @@ same thing in other words. Sixteen of the 22 fail that way. So the rule is the
 weak rung, and the strict one is recorded here to say it was measured rather
 than assumed.
 
+**This table supersedes the one in #470, which read 12 of 22 on the strict
+rung.** That figure came from #465's first pass, whose function-word list grew
+after seeing which values failed — fitted to the sample, which is why #470 made
+freezing the list an acceptance criterion. The list here was written from the
+closed-class rule before the run, so four values it does not excuse now fail,
+and 16 is what the strict rung actually costs. The weak rung reads 0 either way.
+
 :func:`~evals.harness.modes.score_extraction` measures the same failure from the
 other side, as ``unverified -> stated``: it asks whether an extraction invented
 a control the blessed model leaves ``unknown``. Neither replaces the other. That
