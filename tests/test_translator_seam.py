@@ -161,17 +161,48 @@ def test_litellm_resolves_tls_verification_on():
     LiteLLM's own answer rather than against a restatement of it here — and a
     release that changed the default fails here rather than on the wire.
 
-    A path is a pass: ``SSL_CERT_FILE`` names a trust store to check against,
-    which is verification and not the absence of it. ``False`` is the failure.
+    It also closes the one path the lints cannot reach at all. They read call
+    kwargs and dict keys, so a module assignment — ``litellm.ssl_verify =
+    False`` somewhere in the package — would pass them. Importing
+    ``analysis_service`` is what runs that assignment, and this test runs after
+    the import.
+
+    **Every falsy answer is a failure, not only ``False``.** ``SSL_VERIFY=""``
+    resolves to ``""``, which is neither a trust store nor a decision anybody
+    made. A non-empty path is a pass: ``SSL_CERT_FILE`` names a store to check
+    against, which is verification rather than the absence of it.
     """
     from litellm.llms.custom_httpx.http_handler import get_ssl_verify
 
     resolved = get_ssl_verify()
 
-    assert resolved is not False, (
-        "LiteLLM would build provider connections without verifying"
-        " certificates. Either SSL_VERIFY is set in this environment or the"
-        " library's default moved."
+    assert resolved, (
+        f"LiteLLM resolves TLS verification to {resolved!r}, so it would build"
+        " provider connections without checking a certificate. Either"
+        " SSL_VERIFY is set in this environment, or the library's default"
+        " moved."
+    )
+
+
+@pytest.mark.parametrize("kwarg", FORBIDDEN_TLS_KWARGS)
+def test_every_forbidden_tls_kwarg_is_one_litellm_reads(kwarg):
+    """The table above, checked against the library it describes.
+
+    A lint over names nobody uses any more passes forever and guards nothing.
+    Each of these is a module attribute LiteLLM defines and reads when it builds
+    a connection, so a release that renames one fails here — which is where the
+    list gets corrected — rather than in the lint, which would go on agreeing
+    with itself.
+
+    ``litellm.__getattr__`` raises for a name it does not define, so this is a
+    real question rather than a default.
+    """
+    import litellm
+
+    assert hasattr(litellm, kwarg), (
+        f"LiteLLM no longer defines {kwarg!r}. Re-read its SSL resolution and"
+        " correct FORBIDDEN_TLS_KWARGS: a lint over a name the library dropped"
+        " protects nothing."
     )
 
 
