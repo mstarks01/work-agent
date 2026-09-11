@@ -24,8 +24,10 @@ Two pages, three data endpoints:
 The reviewer never sees which configuration produced the finding.
 :class:`~evals.harness.queue.QueueItem` enforces that by having no field for it,
 and ``tests/test_evals_queue.py`` asserts it. The configuration is stamped onto
-the :class:`~evals.harness.ledger.Vote` after the answer, from the artifact,
-where the reviewer cannot reach it.
+the :class:`~evals.harness.ledger.Vote` after the answer, where the reviewer
+cannot reach it. It comes from the artifact, through
+:func:`~evals.harness.baseline.configuration_label` -- the reader that also
+names a Baseline, so a vote and a Baseline cannot spell one sweep two ways.
 
 The security posture is deliberate throughout, and inherited from
 ``webapp/main.py`` rather than re-derived:
@@ -74,8 +76,9 @@ if str(REPO_ROOT) not in sys.path:
 from analysis_service.frameworks import PACKAGES
 from analysis_service.report import Report
 from evals import verify_corpus
-from evals.harness import bundle
+from evals.harness import baseline, bundle
 from evals.harness import queue as review_queue
+from evals.harness.artifact import load_artifact
 from evals.harness.fingerprint import FingerprintError, identifier_of, lane_field
 from evals.harness.ledger import (
     DEFAULT_LEDGER_PATH,
@@ -540,23 +543,25 @@ def findings_from_artifacts(
     runs = []
     configs: dict[str, set[str]] = {}
     for path in paths:
-        findings, per_case = findings_from_artifact(path)
+        findings, config = findings_from_artifact(path)
         runs.append(findings)
-        for case, config in per_case.items():
-            configs.setdefault(case, set()).add(config)
-    return runs, {
-        case: ", ".join(sorted(value for value in values if value))
-        for case, values in configs.items()
-    }
+        for finding in findings:
+            configs.setdefault(finding.case, set()).add(config)
+    return runs, {case: ", ".join(sorted(values)) for case, values in configs.items()}
 
 
-def findings_from_artifact(path: Path) -> tuple[list[review_queue.Finding], dict]:
-    """Read one sweep's saved reports into queue findings.
+def findings_from_artifact(path: Path) -> tuple[list[review_queue.Finding], str]:
+    """Read one sweep's saved reports into queue findings, and name its sweep.
 
     Reads the ``.reports/`` directory a ``run --out`` writes beside its
     artifact, because that is where the claims themselves live: the artifact
     holds the aggregates this harness computed, and the reports hold what the
     agents actually said.
+
+    The configuration label comes from the artifact itself, through
+    :func:`~evals.harness.baseline.configuration_label`. It is one label per
+    sweep, not one per report: the models, the sampling and the frameworks are
+    facts about the run, and every case in it shares them.
     """
     # The one definition of the reports directory is the harness's: `bundle`
     # replaces the artifact's suffix, and a name composed here would be a
@@ -568,8 +573,12 @@ def findings_from_artifact(path: Path) -> tuple[list[review_queue.Finding], dict
             " sweep writes beside its artifact, not from the artifact alone"
         )
 
+    # Loaded, not opened: the label is computed from the five parts a
+    # Baseline's identity carries, and the loader is what decides that an
+    # artifact holds them.
+    config = baseline.configuration_label(load_artifact(path))
+
     findings: list[review_queue.Finding] = []
-    configs: dict[str, str] = {}
     for report_path in sorted(reports_dir.glob("*.report.json")):
         # Validated into the record rather than read as raw JSON. A vote stores
         # digests of the claim it answered, and those are computed from the
@@ -578,11 +587,6 @@ def findings_from_artifact(path: Path) -> tuple[list[review_queue.Finding], dict
         # `bundle.runs_from_reports` already reads these files this way.
         report = Report.model_validate_json(report_path.read_text(encoding="utf-8"))
         case = report_path.name.removesuffix(".report.json")
-        # Empty, and it always has been: this read was ``raw.get`` against an
-        # ``engine_version`` key no report carries, so every vote cast from this
-        # app has recorded an empty configuration. Kept honest rather than
-        # guessed at — the label belongs to the sweep, not to a report.
-        configs[case] = ""
         for block in report.analyses:
             findings += [
                 review_queue.from_claim(
@@ -595,7 +599,7 @@ def findings_from_artifact(path: Path) -> tuple[list[review_queue.Finding], dict
                 )
                 for claim in block.claims
             ]
-    return findings, configs
+    return findings, config
 
 
 def main(argv: Sequence[str] | None = None) -> int:
