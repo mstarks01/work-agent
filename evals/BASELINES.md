@@ -54,12 +54,15 @@ not to cap it. [TUNING.md](TUNING.md#the-money-what-run-asks-before-it-spends)
 describes the three labels, the typed acceptance, `--accept-cost` for scripts,
 and what happens when a run outspends what you accepted.
 
-Two things are worth knowing before your first sweep. Today **no merged
-Baseline exists**, so there is nothing to calibrate an estimate from and the
-gate will say so rather than invent a number — you will be accepting `unknown`.
-And once a Baseline is merged, a later contributor sweeping the same
-configuration gets a real recorded figure instead. Your first contribution is
-what turns that guess into a number.
+Which of the three labels you get depends on what `evals/baselines/` already
+holds. A merged Baseline of your exact configuration gives you a `recorded`
+figure: a real number, not a guess. Otherwise the gate borrows another
+Baseline's token counts, reprices them for your models, and labels the result
+`estimated`. It names the lender, and every way the lender differs from your
+run. When there is nothing to borrow, or a tier's model is absent from the
+price map, the gate does not invent a number. It says `unpriced`, and you
+accept that by typing `unknown`. Your sweep is what turns a guess into a
+recorded number for the next contributor.
 
 ## Running and submitting
 
