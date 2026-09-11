@@ -44,6 +44,7 @@ from pathlib import Path
 from typing import Any
 
 from analysis_service.model_tiers import TierName
+from analysis_service.vendors import vendor_for_route
 
 # The tier whose model names a baseline. Spelled, not indexed: this read
 # ``TIER_NAMES[-1]`` until `review` was appended to the vocabulary and every
@@ -90,21 +91,51 @@ class BaselineIdentity:
 
     @classmethod
     def from_artifact(
-        cls, artifact: EvalArtifact, *, require_clean: bool = True
+        cls, artifact: EvalArtifact, *, as_baseline: bool = True
     ) -> BaselineIdentity:
         """The five parts, computed from one sweep.
 
-        ``require_clean`` is the Baseline's own rule rather than the identity's,
-        so :func:`configuration_label` can name a sweep this refuses. Pass
-        ``False`` only where the caller says what a dirty tree means; a
-        Baseline's answer is that it means nothing it can publish.
+        ``as_baseline`` turns on the **Baseline's own rules** rather than the
+        identity's, so :func:`configuration_label` can name a sweep a Baseline
+        refuses. Pass ``False`` only where the caller says what a refused sweep
+        means; a Baseline's answer is that it means nothing it can publish.
+
+        There are two such rules, and both are about whether a later reader can
+        reproduce what was run. A dirty tree means the commit does not describe
+        the prompts. A vendor whose route reaches more than one provider means
+        the models do not describe the weights: two sweeps of one configuration
+        can be served by two backends, and the difference arrives as an
+        unexplained spread inside what claims to be one Baseline.
         """
-        if require_clean and artifact.commit.clean is not True:
+        if not as_baseline:
+            return cls._parts(artifact)
+        if artifact.commit.clean is not True:
             raise BaselineError(
                 f"{artifact.path}: ran on a tree that did not match its commit;"
                 " a Baseline's identity names a commit so a reader can open the"
                 " prompts behind the numbers, and a dirty sweep cannot"
             )
+        identity = cls._parts(artifact)
+        unnamed = sorted(
+            {
+                vendor.name
+                for _, route in identity.models
+                if not (vendor := vendor_for_route(route)).routes_to_one_provider
+            }
+        )
+        if unnamed:
+            raise BaselineError(
+                f"{artifact.path}: ran on {unnamed}, whose route may be served"
+                " by more than one upstream provider; a Baseline's sweeps have"
+                " to be comparable, so it is not named after a route that does"
+                " not say which weights answered. Run the sweep and read it;"
+                " do not publish it as a Baseline"
+            )
+        return identity
+
+    @classmethod
+    def _parts(cls, artifact: EvalArtifact) -> BaselineIdentity:
+        """The five parts and nothing else, with no Baseline rule applied."""
         requested: dict[str, set[str]] = {}
         for execution in artifact.provenance.executions:
             requested.setdefault(execution.tier, set()).add(execution.requested_model)
@@ -177,7 +208,7 @@ def configuration_label(artifact: EvalArtifact) -> str:
     finding is worth keeping whatever produced it. What a Baseline may not
     publish and what a vote may record are different questions.
     """
-    identity = BaselineIdentity.from_artifact(artifact, require_clean=False)
+    identity = BaselineIdentity.from_artifact(artifact, as_baseline=False)
     return identity.name + ("" if artifact.commit.clean is True else DIRTY_MARKER)
 
 

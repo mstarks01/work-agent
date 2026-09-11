@@ -115,6 +115,17 @@ REFERENCE_MODELS: dict[str, tuple[str, ...]] = {
     # alias and this snapshot differ in no key, and the two profile identically.
     # ``test_no_reference_model_is_an_alias_for_a_dated_build`` is the rule.
     "openai": ("gpt-4o-2024-08-06", "gpt-5.6"),
+    # Claude again, and a third spelling of it: OpenRouter carries the vendor
+    # inside the model identifier and writes the minor version with a dot.
+    #
+    # **The pair the OpenRouter half of the pinned map carries**, rather than
+    # the generations the ``anthropic`` row names. ``get_model_info`` falls
+    # back to the underlying vendor's entry for a slug the gateway half does
+    # not hold, so a pair chosen to mirror the ``anthropic`` row would profile
+    # the direct route and report it as the gateway's. These two have
+    # ``openrouter`` entries of their own, so every cell below is about the
+    # route that would actually serve.
+    "openrouter": ("anthropic/claude-sonnet-4.6", "anthropic/claude-opus-4.7"),
     "vertex": ("gemini-2.5-flash", "gemini-2.5-pro"),
 }
 

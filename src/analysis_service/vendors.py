@@ -4,17 +4,18 @@ Every model reaches the graph through ADK's ``LiteLlm``, so what varies per
 provider is not how to call it. It is three facts the adapter cannot supply:
 
 * the router prefix LiteLLM dispatches on — ``vertex_ai/``, ``anthropic/``,
-  ``openai/``, ``bedrock/`` or ``gemini/`` — which is also the vendor half of
-  an **Execution Identity** fingerprint;
+  ``openai/``, ``bedrock/``, ``gemini/`` or ``openrouter/`` — which is also the
+  vendor half of an **Execution Identity** fingerprint;
 * the credential modes a vendor allows, which :attr:`Vendor.credentials` holds
   and a deployment declares from. Vertex admits no raw-API-key path under any
   adapter (``BerriAI/litellm#21036``), so ``vertex + api_key`` is
   unrepresentable rather than validated against;
 * the floating-form rule for model identifiers, which differs by model family
   rather than by vendor. Claude carries a canonical identifier of its own shape,
-  and the vendors that serve it spell that shape two ways — bare, and behind a
-  region scope and a family segment — so the rule is keyed by vendor and the
-  shapes it is built from are written down once;
+  and the vendors that serve it spell that shape three ways — bare, behind a
+  region scope and a family segment, and behind a gateway's own vendor segment
+  with a dotted minor — so the rule is keyed by vendor and the shapes it is
+  built from are written down once;
 * the client library the vendor's provider needs in the image, which
   :attr:`Vendor.sdk` holds. A vendor whose provider signs its own requests
   needs one, and an optional extra is what supplies it (ADR 0023).
@@ -46,13 +47,14 @@ from typing import Literal
 
 from analysis_service.errors import ConfigError
 
-VendorName = Literal["vertex", "anthropic", "openai", "bedrock", "gemini"]
+VendorName = Literal["vertex", "anthropic", "openai", "bedrock", "gemini", "openrouter"]
 VENDOR_NAMES: tuple[VendorName, ...] = (
     "vertex",
     "anthropic",
     "openai",
     "bedrock",
     "gemini",
+    "openrouter",
 )
 
 #: How much a vendor's *served* build identifier is worth as evidence.
@@ -300,6 +302,7 @@ _FLOATING_WORDS: dict[str, str] = {
 #: admitted the three a router document shows them.
 _RESOURCE_ID = re.compile(r"arn:", re.IGNORECASE)
 
+
 # Claude is the family that *does* publish a canonical form, so it gets a closed
 # shape rather than a denylist. From the 4.6 generation on, the identifier is
 # dateless and carries the whole version — and it is a pinned snapshot, not an
@@ -339,8 +342,33 @@ _RESOURCE_ID = re.compile(r"arn:", re.IGNORECASE)
 # before 4.6 and which Bedrock still serves under its own published identifiers.
 # The two orders name their groups apart, so one alternation can carry both and
 # the reader takes whichever matched.
-_CLAUDE_MODERN = r"(?P<name>[a-z]+)-(?P<major>\d+)(?:-(?P<minor>\d{1,2})(?!\d))?"
-_CLAUDE_LEGACY = r"(?P<lmajor>\d+)(?:-(?P<lminor>\d{1,2})(?!\d))?-(?P<lname>[a-z]+)"
+#
+# **The minor separator is the third parameter, and it is a parameter because a
+# gateway spells it differently.** Anthropic, Vertex and Bedrock write
+# ``claude-sonnet-4-6``; OpenRouter writes ``anthropic/claude-sonnet-4.6``. One
+# character apart, and the same two orders either side of it — so the orders are
+# still written down once and each caller states which separator its vendor
+# serves. A pattern that accepted both would accept the OpenRouter spelling on
+# the Anthropic row, which is the cross-vendor copy the pinned form exists to
+# refuse.
+def _claude_modern(separator: str) -> str:
+    """Name-then-generation, as Claude has spelled it from 4.6 on."""
+    return (
+        rf"(?P<name>[a-z]+)-(?P<major>\d+)"
+        rf"(?:{separator}(?P<minor>\d{{1,2}})(?!\d))?"
+    )
+
+
+def _claude_legacy(separator: str) -> str:
+    """Generation-then-name, as Claude was spelled before 4.6."""
+    return (
+        rf"(?P<lmajor>\d+)(?:{separator}(?P<lminor>\d{{1,2}})(?!\d))?"
+        r"-(?P<lname>[a-z]+)"
+    )
+
+
+_CLAUDE_MODERN = _claude_modern("-")
+_CLAUDE_LEGACY = _claude_legacy("-")
 
 # Direct and Vertex: the modern order alone, because in the legacy era the bare
 # name on those vendors *was* a floating alias.
@@ -355,20 +383,48 @@ _CLAUDE_ID = re.compile(rf"claude-{_CLAUDE_MODERN}")
 # check never proved a model exists.
 _SCOPE_SEGMENT = r"(?:[a-z][a-z0-9-]*\.)?"
 
+# A **gateway segment**: the vendor an aggregator names inside its own model
+# identifier, as OpenRouter spells ``anthropic/claude-sonnet-4.6``. Matched as a
+# shape for the same reason the scope segment is, and optional for the same
+# reason too — one family pattern reads the family whoever wrapped it.
+#
+# The underscore is in the shape because two producers put it there: every
+# ``openrouter/`` key in the pinned map spells its segment
+# ``[a-z][a-z0-9_-]*`` — ``meta-llama``, ``x-ai``, ``black_forest_labs`` — and
+# litellm's own ``vertex_ai/`` prefix is what a route pasted into a model field
+# carries. A shape without it caught the doubled route on five vendors and not
+# on the sixth.
+_GATEWAY_NAME = r"[a-z][a-z0-9_-]*/"
+
+# **Repeated, not optional-once.** One segment is what OpenRouter writes, and
+# more than one is what an operator writes by mistake: ``model =
+# "openrouter/anthropic/claude-opus-4.7"`` is the *route* pasted into the model
+# field, and :meth:`Vendor.route` would build
+# ``openrouter/openrouter/anthropic/claude-opus-4.7`` from it. With a single
+# optional segment that identifier reached no family rule, passed unpinned
+# through the catch-all, and died on node one — the exact failure the shared
+# family exists to catch one segment lower down.
+_GATEWAY_SEGMENT = rf"(?:{_GATEWAY_NAME})*"
+_GATEWAY_PREFIX = re.compile(rf"^(?:{_GATEWAY_NAME})+")
+
+
 # **One family pattern, whatever spells it.** A family rule follows the family,
 # so which rule reads an identifier must not depend on which vendor's spelling
 # the identifier happens to carry. This matches a Claude bare, behind a scope,
-# and behind the ``anthropic.`` family segment — every spelling any vendor gives
-# the family — and each vendor's own ``pinned`` decides whether that spelling is
-# the one it serves.
+# behind the ``anthropic.`` family segment, and behind a gateway's own
+# ``anthropic/`` segment — every spelling any vendor gives the family — and each
+# vendor's own ``pinned`` decides whether that spelling is the one it serves.
 #
-# **The split is load-bearing in both directions.** A Bedrock row spelled
-# ``claude-opus-5`` and an ``anthropic`` row spelled ``anthropic.claude-opus-5``
-# are the two halves of one mistake: a tier row copied between vendors. Both
-# reach a rule and fail its shape with a hint naming the right spelling. With a
-# family per spelling, each vendor caught one half and let the other pass
-# unpinned to the catch-all, where the config loads and the job dies on node one.
-_CLAUDE_FAMILY = re.compile(_SCOPE_SEGMENT + r"(?:anthropic\.)?claude-")
+# **The split is load-bearing in every direction.** A Bedrock row spelled
+# ``claude-opus-5``, an ``anthropic`` row spelled ``anthropic.claude-opus-5``
+# and an ``openrouter`` row spelled ``claude-opus-5`` are three halves of one
+# mistake: a tier row copied between vendors. Each reaches a rule and fails its
+# shape with a hint naming the right spelling. With a family per spelling, each
+# vendor caught its own and let the others pass unpinned to the catch-all, where
+# the config loads and the job dies on node one.
+_CLAUDE_FAMILY = re.compile(
+    _GATEWAY_SEGMENT + _SCOPE_SEGMENT + r"(?:anthropic\.)?claude-"
+)
 
 _CLAUDE_RULE = _FormRule(
     family=_CLAUDE_FAMILY,
@@ -446,13 +502,80 @@ _BEDROCK_CLAUDE_RULE = _FormRule(
 # The o-series is a separate case again: it ships no dated form at all.
 _CATCH_ALL = _FormRule(family=re.compile(""), pinned=None, hint="")
 
+# OpenRouter reads Claude under a third spelling: its own vendor segment, and a
+# **dot** where every other vendor writes a hyphen —
+# ``anthropic/claude-sonnet-4.6``. Both orders are pinned, because the pinned
+# cost map carries ``anthropic/claude-3.5-sonnet`` and ``anthropic/claude-3-haiku``
+# beside the modern names, and both are the identifiers OpenRouter publishes.
+#
+# The legacy order takes the dot on its minor and keeps the hyphen before the
+# family name, which is what ``claude-3.5-sonnet`` is. ``claude-3-haiku`` names
+# a generation with no minor and satisfies the same pattern.
+#
+# The gateway segment is **required** here, and that is the half that catches a
+# tier row copied off the ``anthropic`` row: a bare ``claude-opus-5`` reaches
+# this rule through the shared family and fails it with the hint below.
+#
+# The trailing ``:<variant>`` is OpenRouter's own, and it is admitted for the
+# reason the Bedrock build tail is: it is part of the published identifier and
+# marks no alias. ``anthropic/claude-3.7-sonnet:thinking`` and
+# ``z-ai/glm-4.6:exacto`` are two builds a person can ask for by name. The
+# floating-word denylist still runs over the whole string, so a variant that
+# does mean the build may move — ``:preview`` — is refused by
+# :data:`_FLOATING_WORDS` rather than by this shape.
+_OPENROUTER_VARIANT = r"(?::[a-z0-9-]+)?"
+
+#: The minor separator OpenRouter writes, named rather than inlined: the lint
+#: floor forbids a backslash inside an f-string expression.
+_DOT_SEPARATOR = r"\."
+
+_OPENROUTER_CLAUDE_ID = re.compile(
+    _GATEWAY_NAME
+    + rf"claude-(?:{_claude_modern(_DOT_SEPARATOR)}"
+    + rf"|{_claude_legacy(_DOT_SEPARATOR)})"
+    + _OPENROUTER_VARIANT
+)
+
+_OPENROUTER_CLAUDE_RULE = _FormRule(
+    family=_CLAUDE_FAMILY,
+    pinned=_OPENROUTER_CLAUDE_ID,
+    hint=(
+        "an OpenRouter Claude model ID is"
+        " '<vendor>/claude-<name>-<major>[.<minor>]',"
+        " e.g. 'anthropic/claude-opus-4.7' or 'anthropic/claude-sonnet-4.6'"
+    ),
+)
+
 # The parse, composed from the same two atoms as the rules above and reading a
 # Claude wherever one starts a segment. ``(?:^|\.)`` is what earns that: it
 # requires the match to start the identifier or to follow a dot, so a ``claude-``
 # inside a word — ``my-claude-clone-3`` — is not a Claude.
+#
+# The minor separator is the **union** here, and that is the one place it may
+# be: this is a parse rather than a shape gate, so reading ``4.6`` and ``4-6``
+# as one generation costs nothing, while a per-vendor parse would have to key
+# on the vendor the docstring below refuses to key on.
 _CLAUDE_GENERATION = re.compile(
-    rf"(?:^|\.)claude-(?:{_CLAUDE_MODERN}|{_CLAUDE_LEGACY})"
+    rf"(?:^|\.)claude-(?:{_claude_modern('[-.]')}|{_claude_legacy('[-.]')})"
 )
+
+
+def family_identifier(model: str) -> str:
+    """The model identifier inside a gateway slug, or the identifier itself.
+
+    **One reader of one rule.** Two family rules have to see past an
+    aggregator's own vendor segment — :func:`claude_generation` and
+    :func:`openai_reasoning_model` — and both say in their own docstrings that
+    a family rule may not key on the vendor. A second copy of "strip what comes
+    before the first slash" is exactly the pair of readers that comes to
+    disagree, so there is one.
+
+    Every **leading** segment goes, and not only the first, so this reads the
+    same identifier :data:`_CLAUDE_FAMILY` does. What remains is what the
+    family patterns read, and for a vendor whose identifiers carry no slash
+    that is the identifier unchanged.
+    """
+    return _GATEWAY_PREFIX.sub("", model, count=1)
 
 
 def claude_generation(model: str) -> tuple[int, int] | None:
@@ -474,8 +597,14 @@ def claude_generation(model: str) -> tuple[int, int] | None:
 
     A generation decides which params a model accepts, never whether this
     service will run it.
+
+    The identifier is read through :func:`family_identifier`, so an aggregator's
+    own vendor segment does not hide the family behind it. Without that,
+    ``anthropic/claude-opus-4.7`` parsed to nothing, the temperature floor went
+    silent, and a tier that stated a temperature reached a model that rejects
+    the parameter.
     """
-    match = _CLAUDE_GENERATION.search(model)
+    match = _CLAUDE_GENERATION.search(family_identifier(model))
     if match is None:
         return None
     major = match["major"] or match["lmajor"]
@@ -505,10 +634,16 @@ def openai_reasoning_model(model: str) -> bool:
     and a config pinning ``temperature = 0.0`` for it fails the build. That is
     the safe direction to be wrong in: a false positive costs one clear error
     at startup, while a false negative costs node one of a paid-for job.
+
+    Read through :func:`family_identifier` for the same reason
+    :func:`claude_generation` is: ``openai/gpt-5.6`` is the same family behind
+    an aggregator's vendor segment, and a ``fullmatch`` on the whole slug
+    answered ``False`` for it.
     """
-    if _O_SERIES_ID.fullmatch(model):
+    identifier = family_identifier(model)
+    if _O_SERIES_ID.fullmatch(identifier):
         return True
-    match = _GPT_ID.fullmatch(model)
+    match = _GPT_ID.fullmatch(identifier)
     return match is not None and int(match["major"]) >= _REASONING_FROM_GPT_MAJOR
 
 
@@ -549,6 +684,24 @@ class Vendor:
     #: would move for an unrelated reason and the stale entry would stay
     #: invisible.
     served_trust: ServedTrust
+    #: Whether one route on this vendor reaches one upstream provider.
+    #:
+    #: A **separate question from** :attr:`served_trust`, and the two disagree
+    #: on an aggregator. ``served_trust`` says whether the translator read a
+    #: name out of the response body. This says whether that name can only ever
+    #: have come from one place. OpenRouter answers a request that names one
+    #: slug, and may serve it from whichever upstream provider is available, so
+    #: two runs of one configuration can reach two backends.
+    #:
+    #: One reader: ``evals/harness/baseline.py`` refuses to name a **Baseline**
+    #: after such a route, because a Baseline's whole value is that its sweeps
+    #: are comparable and the unexplained spread would land inside one. Nothing
+    #: refuses to *run* the vendor; an analysis is an analysis.
+    #:
+    #: Stated as a property rather than as a vendor's name, so it answers for a
+    #: row nobody has written: any route in front of more than one provider
+    #: says ``False`` here, whoever operates it.
+    routes_to_one_provider: bool
     #: The credential modes this vendor allows, each with what it reads and
     #: states, in the order a deployment sees them listed. A mode absent here
     #: is a mode the vendor does not allow, and :meth:`_source_for` raises on
@@ -782,6 +935,7 @@ VENDORS: dict[VendorName, Vendor] = {
         # transformation. The response body carries ``modelVersion`` and litellm
         # never reads it.
         served_trust="requested_echo",
+        routes_to_one_provider=True,
         # Vertex admits no raw-API-key path under any adapter
         # (``BerriAI/litellm#21036``), so ``vertex + api_key`` is
         # unrepresentable rather than validated against. Under ``IAM`` it
@@ -811,6 +965,7 @@ VENDORS: dict[VendorName, Vendor] = {
         # litellm reads ``completion_response["model"]`` in its Anthropic chat
         # transformation.
         served_trust="provider_reported",
+        routes_to_one_provider=True,
         credentials={CredentialMode.API_KEY: _api_key_source("anthropic")},
         form_rules=(_CLAUDE_RULE, _CATCH_ALL),
         sdk=None,
@@ -821,6 +976,7 @@ VENDORS: dict[VendorName, Vendor] = {
         # litellm reads ``response_object["model"]`` when it converts an
         # OpenAI-shaped response dict.
         served_trust="provider_reported",
+        routes_to_one_provider=True,
         credentials={CredentialMode.API_KEY: _api_key_source("openai")},
         form_rules=(_CLAUDE_RULE, _CATCH_ALL),
         sdk=None,
@@ -834,6 +990,7 @@ VENDORS: dict[VendorName, Vendor] = {
         # A Converse response carries no model identifier at all, so litellm
         # fills ``model_response.model`` from the request.
         served_trust="requested_echo",
+        routes_to_one_provider=True,
         credentials={
             # Under ``API_KEY`` Bedrock passes a bearer token and a region.
             # litellm's ``_sign_request`` reads the bearer off the ``api_key``
@@ -890,6 +1047,7 @@ VENDORS: dict[VendorName, Vendor] = {
         # transformation, which fills ``model_response.model`` from the
         # request and never reads the body's ``modelVersion``.
         served_trust="requested_echo",
+        routes_to_one_provider=True,
         # The Developer API takes a key and nothing else. It is a different
         # provider from ``vertex`` rather than a second mode on it:
         # ``get_llm_provider`` resolves ``gemini/`` and ``vertex_ai/`` to two
@@ -906,6 +1064,50 @@ VENDORS: dict[VendorName, Vendor] = {
         # vendor gives it, and a tier row moved between ``gemini`` and
         # ``vertex`` meets one set of legal identifiers.
         form_rules=(_CLAUDE_RULE, _CATCH_ALL),
+        sdk=None,
+    ),
+    # An aggregator: one endpoint in front of many providers' catalogues. The
+    # row differs from every other one in a way the registry had not had to
+    # express — **its model identifier carries a vendor of its own**.
+    # ``anthropic/claude-opus-4.7`` is one model name with a slash in it, and
+    # the route becomes ``openrouter/anthropic/claude-opus-4.7``. Every other
+    # row names a model whose identifier is a bare string. The gateway segment
+    # is what :data:`_GATEWAY_NAME` and :func:`family_identifier` read, so a
+    # family rule still follows the family rather than the wrapper.
+    #
+    # **What the served build is worth here needs reading twice.** The value
+    # below is ``provider_reported``, and it is right by the field's own
+    # definition: litellm's OpenRouter config inherits the OpenAI
+    # transformation and fills ``model_response.model`` from the response
+    # body's ``model``, which ``tests/test_identity.py`` drives. What nobody
+    # here has measured is whether that body names the upstream build or
+    # repeats the slug that was asked for, and OpenRouter may route one slug to
+    # more than one upstream provider. That is a claim about a third party and
+    # needs a live call to settle (#806).
+    # Until it is settled, a fingerprint over an ``openrouter/`` route carries
+    # less than one over a direct route, and
+    # ``evals/harness/baseline.py`` refuses to name a **Baseline** after one.
+    "openrouter": Vendor(
+        name="openrouter",
+        prefix="openrouter/",
+        # litellm reads ``response_object["model"]`` through the OpenAI-shaped
+        # conversion its OpenRouter config inherits.
+        served_trust="provider_reported",
+        routes_to_one_provider=False,
+        # A bearer token and nothing else. litellm reads ``OPENROUTER_API_KEY``
+        # and then ``OR_API_KEY`` out of the process environment whenever
+        # ``api_key`` is absent; the registry declares neither, and the key is
+        # read from this service's own variable as it is for every key-bearing
+        # vendor. litellm also reads ``OR_SITE_URL`` and ``OR_APP_NAME`` for
+        # the ``HTTP-Referer`` and ``X-Title`` headers it sends, defaulting to
+        # its own project's values. Those are attribution headers rather than
+        # credentials, and this service states no value for either.
+        credentials={CredentialMode.API_KEY: _api_key_source("openrouter")},
+        # Claude under a third spelling, and everything else OpenRouter fronts
+        # — 90-odd families in the pinned map — reaching the catch-all, where
+        # only the shared denylist applies, gateway segment and all.
+        form_rules=(_OPENROUTER_CLAUDE_RULE, _CATCH_ALL),
+        # An HTTPS endpoint with a bearer token. Nothing signs its own request.
         sdk=None,
     ),
 }

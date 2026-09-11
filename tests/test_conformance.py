@@ -541,6 +541,12 @@ class TestTheLiveLanesSweepWhatWasProfiled:
         # weights ``evals-live.yml`` already sweeps. The smoke lane covers
         # this vendor.
         "gemini": None,
+        # No lane, and this one is a decision rather than an absence of
+        # appetite. A sweep names a **Baseline**, and a Baseline may not be
+        # named after a route whose served build has not been shown to name
+        # the weights that answered — see ``evals/harness/baseline.py``. The
+        # smoke lane covers this vendor; the corpus sweep does not.
+        "openrouter": None,
     }
 
     #: The lane every vendor is compared on, whatever authenticates it. One
