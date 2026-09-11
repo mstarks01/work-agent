@@ -13,6 +13,14 @@ deltas, non-200 error bodies, and whether the wrapped shapes reach the retry
 ladder as the ladder expects. Two of them turn out to be about a path this
 service does not take, and that is recorded rather than hidden — a test that
 asserts about unreached machinery reads as coverage and is not.
+
+The retry question closed differently from how it was asked. This vendor read
+differently from the other five because the ladder keyed on the exception class
+litellm chose, and litellm chooses that per provider. The ladder keys on the
+status code now, so there is nothing left here that is true only of an
+aggregator; ``tests/test_retry.py`` asserts the agreement across every
+registered vendor, and this module keeps only the wrapped-envelope half, which
+no other vendor sends.
 """
 
 from __future__ import annotations
@@ -28,38 +36,15 @@ from analysis_service.model_gate import (
     emulates_structured_output,
     supports_structured_output,
 )
-from analysis_service.retry import _retryable_types
-from analysis_service.vendors import VENDOR_NAMES, vendor_for
+from analysis_service.retry import _is_transient
+from analysis_service.vendors import vendor_for
+from tests.test_retry import mapped_provider_exception
 
 VENDOR = "openrouter"
 
 #: The slug this suite drives. The gateway's own vendor segment is the half
 #: that makes this row different from every other one.
 MODEL = "anthropic/claude-opus-4.7"
-
-
-def _mapped_exception(provider: str, model: str, status_code: int) -> Exception:
-    """What litellm turns a provider failure at ``status_code`` into.
-
-    The shape ``convert_to_model_response_object`` raises is a bare
-    ``Exception`` carrying ``status_code`` and ``message``, so this is the real
-    input the mapper sees on the error paths below rather than a stand-in for
-    it.
-    """
-    from litellm.litellm_core_utils.exception_mapping_utils import exception_type
-
-    raw = Exception()
-    raw.status_code = status_code  # type: ignore[attr-defined]
-    raw.message = "the upstream declined"  # type: ignore[attr-defined]
-    with pytest.raises(Exception) as excinfo:
-        exception_type(
-            model=model,
-            custom_llm_provider=provider,
-            original_exception=raw,
-            completion_kwargs={},
-            extra_kwargs={},
-        )
-    return excinfo.value
 
 
 def _error_body(code: int) -> dict[str, Any]:
@@ -138,66 +123,38 @@ class TestAnErrorInsideATwoHundred:
             _transform(200, _error_body(429))
         assert getattr(excinfo.value, "status_code", None) == 429
 
-    @pytest.mark.parametrize("code", [429, 503])
+    @pytest.mark.parametrize("code", [429, 500, 502, 503, 529])
     def test_a_wrapped_transient_code_reaches_the_ladder_as_retryable(self, code):
         """The upstream's own code survives the wrapper, so retry still works.
 
         This is the half of the #174 comment's worry that turns out to be
         unfounded on the pinned library: a wrapped 429 does not read as a 500.
+
+        The 500, 502 and 529 rows are the ones #807 measured as *not* retried.
+        The ladder keyed on litellm's exception class then, and litellm calls
+        this vendor's 500 an ``APIError`` where it calls anthropic's an
+        ``InternalServerError``. It keys on the status code now, so the class
+        the mapper picked stops deciding anything;
+        ``tests/test_retry.py`` holds that across the whole registry.
         """
         raised = _transform_error(code)
-        mapped = _mapped_exception(
+        mapped = mapped_provider_exception(
             vendor_for(VENDOR).litellm_provider,
             MODEL,
             getattr(raised, "status_code", 0),
         )
-        assert isinstance(mapped, _retryable_types())
+        assert _is_transient(mapped)
 
     @pytest.mark.parametrize("code", [400, 401])
     def test_a_wrapped_permanent_code_is_not_retried(self, code):
         """A rejected credential spends no quota reaching the identical answer."""
         raised = _transform_error(code)
-        mapped = _mapped_exception(
+        mapped = mapped_provider_exception(
             vendor_for(VENDOR).litellm_provider,
             MODEL,
             getattr(raised, "status_code", 0),
         )
-        assert not isinstance(mapped, _retryable_types())
-
-
-class TestTheLadderReadsThisVendorDifferently:
-    """A measured difference, pinned because nothing else would show it.
-
-    ``_retryable_types`` names litellm's exception classes, and which class a
-    status code becomes is decided per provider. On ``openrouter`` a 500
-    becomes ``APIError``; on every other vendor this service supports it
-    becomes ``InternalServerError``. Only the second is retryable here.
-
-    **The consequence is a cost, not a wrong answer**: a transient upstream 500
-    fails its node on the first attempt instead of the third. Widening
-    ``_retryable_types`` to ``APIError`` is not the fix — every litellm status
-    exception descends from it, so a rejected credential would retry too. The
-    design question is #807.
-    """
-
-    TRANSIENT = 500
-
-    @pytest.mark.parametrize(
-        "name", sorted(name for name in VENDOR_NAMES if name != VENDOR)
-    )
-    def test_every_other_vendor_retries_a_five_hundred(self, name):
-        mapped = _mapped_exception(
-            vendor_for(name).litellm_provider, "some-model", self.TRANSIENT
-        )
-        assert isinstance(mapped, _retryable_types())
-
-    def test_this_vendor_does_not(self):
-        """Pinned as the measurement it is. A litellm bump that repairs this
-        fails here, which is the signal to close #807 and delete this test."""
-        mapped = _mapped_exception(
-            vendor_for(VENDOR).litellm_provider, MODEL, self.TRANSIENT
-        )
-        assert not isinstance(mapped, _retryable_types())
+        assert not _is_transient(mapped)
 
 
 class TestTheSchemaPathIsNativeHere:
