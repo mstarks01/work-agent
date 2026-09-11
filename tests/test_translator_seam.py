@@ -52,6 +52,23 @@ FORBIDDEN_ENDPOINT_KWARGS = (
     "aws_bedrock_runtime_endpoint",
 )
 
+#: Kwargs that turn TLS verification off, or point it at a trust store of the
+#: caller's choosing. LiteLLM resolves verification from ``ssl_verify``, then
+#: ``SSL_VERIFY``, then ``litellm.ssl_verify``, and builds the SSL context from
+#: ``ssl_certificate``, ``ssl_security_level`` and ``ssl_ecdh_curve``
+#: (``litellm.llms.custom_httpx.http_handler``). **None is set anywhere in
+#: the package**, and that absence is the property: a provider's certificate is
+#: checked against the system trust store, and no configuration can say
+#: otherwise. The process-environment path the same resolver reads is not a
+#: kwarg, so :func:`test_litellm_resolves_tls_verification_on` drives it
+#: instead.
+FORBIDDEN_TLS_KWARGS = (
+    "ssl_verify",
+    "ssl_certificate",
+    "ssl_security_level",
+    "ssl_ecdh_curve",
+)
+
 #: Kwargs that name *which* provider, rather than which address. These are set,
 #: and must be — the build-time capability probe has to tell LiteLLM which
 #: provider it is asking about. What is checked is the value's provenance: it
@@ -65,6 +82,7 @@ REGISTRY_ONLY_KWARGS = ("custom_llm_provider",)
 #: belongs to the vendor's credential table and is checked with it.
 CONFIG_FORBIDDEN_KWARGS = (
     *FORBIDDEN_ENDPOINT_KWARGS,
+    *FORBIDDEN_TLS_KWARGS,
     *REGISTRY_ONLY_KWARGS,
     "vertex_credentials",
 )
@@ -111,8 +129,85 @@ def test_no_module_names_a_provider_endpoint_kwarg(kwarg):
     )
 
 
+@pytest.mark.parametrize("kwarg", FORBIDDEN_TLS_KWARGS)
+def test_no_module_names_a_tls_kwarg(kwarg):
+    """Nothing in the service can weaken the check on a provider's certificate.
+
+    Each of these reaches LiteLLM's own SSL resolution, and the two that take a
+    path redirect the check rather than remove it — which is the same outcome
+    when the path is one an operator did not choose. The property is that the
+    package sets none of them, so a provider connection is verified against the
+    system trust store and no value this service composes can say otherwise.
+    """
+    offenders = [
+        source.relative_to(REPO_ROOT)
+        for source in _package_sources()
+        if kwarg in _assigned_keywords(source)
+    ]
+    assert not offenders, (
+        f"{kwarg!r} is set in {offenders}. TLS verification is what makes the"
+        f" credential in the Authorization header safe to send, so nothing in"
+        f" this package may turn it off or repoint it."
+    )
+
+
+def test_litellm_resolves_tls_verification_on():
+    """The env path, which a kwarg lint cannot see, read through its own reader.
+
+    ``get_ssl_verify`` is what LiteLLM calls before it builds a connection, and
+    it reads three sources in order: the call's kwarg, ``SSL_VERIFY`` in the
+    process environment, and ``litellm.ssl_verify``. The lints above close the
+    first. This drives the resolver itself, so the other two are held against
+    LiteLLM's own answer rather than against a restatement of it here — and a
+    release that changed the default fails here rather than on the wire.
+
+    It also closes the one path the lints cannot reach at all. They read call
+    kwargs and dict keys, so a module assignment — ``litellm.ssl_verify =
+    False`` somewhere in the package — would pass them. Importing
+    ``analysis_service`` is what runs that assignment, and this test runs after
+    the import.
+
+    **Every falsy answer is a failure, not only ``False``.** ``SSL_VERIFY=""``
+    resolves to ``""``, which is neither a trust store nor a decision anybody
+    made. A non-empty path is a pass: ``SSL_CERT_FILE`` names a store to check
+    against, which is verification rather than the absence of it.
+    """
+    from litellm.llms.custom_httpx.http_handler import get_ssl_verify
+
+    resolved = get_ssl_verify()
+
+    assert resolved, (
+        f"LiteLLM resolves TLS verification to {resolved!r}, so it would build"
+        " provider connections without checking a certificate. Either"
+        " SSL_VERIFY is set in this environment, or the library's default"
+        " moved."
+    )
+
+
+@pytest.mark.parametrize("kwarg", FORBIDDEN_TLS_KWARGS)
+def test_every_forbidden_tls_kwarg_is_one_litellm_reads(kwarg):
+    """The table above, checked against the library it describes.
+
+    A lint over names nobody uses any more passes forever and guards nothing.
+    Each of these is a module attribute LiteLLM defines and reads when it builds
+    a connection, so a release that renames one fails here — which is where the
+    list gets corrected — rather than in the lint, which would go on agreeing
+    with itself.
+
+    ``litellm.__getattr__`` raises for a name it does not define, so this is a
+    real question rather than a default.
+    """
+    import litellm
+
+    assert hasattr(litellm, kwarg), (
+        f"LiteLLM no longer defines {kwarg!r}. Re-read its SSL resolution and"
+        " correct FORBIDDEN_TLS_KWARGS: a lint over a name the library dropped"
+        " protects nothing."
+    )
+
+
 @pytest.mark.parametrize("kwarg", CONFIG_FORBIDDEN_KWARGS)
-def test_no_endpoint_kwarg_is_configurable(kwarg):
+def test_no_forbidden_kwarg_is_configurable(kwarg):
     """Not settable from `sampling.toml`, an env override, or a submission.
 
     Two closed sets, checked together because a value only has to be

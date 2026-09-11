@@ -15,6 +15,15 @@ right. A claim about the wire that nothing drives is prose.
 
 Each test here pins a sentence this repository states somewhere else, so the
 sentence fails when it stops being true.
+
+Two of those sentences are about the credential rather than about the request.
+``tests/test_vendors.py`` holds the registry's half — what
+``Vendor.credential_kwargs`` refuses — and :class:`TestWhichKeyAuthenticates`
+below holds what actually authenticates. It runs on the gateway route, because
+the direct route's header comes from the injected SDK client rather than from
+the adapter. The other half of recommendation 4's transport pair, TLS
+verification, sits in ``tests/test_translator_seam.py`` with the kwarg lints it
+belongs beside.
 """
 
 from __future__ import annotations
@@ -25,18 +34,23 @@ from typing import Any
 
 import httpx
 import pytest
-from google.adk.models.lite_llm import LiteLLMClient
 from google.adk.models.llm_request import LlmRequest
 from google.genai import types
-from openai import AsyncOpenAI
 
 from analysis_service.binding import build_tier_adapters
 from analysis_service.conformance import REFERENCE_MODELS
 from analysis_service.resilience import load_resilience
 from analysis_service.sampling import TierSampling, load_sampling
 from analysis_service.system_model import SystemModel
-from analysis_service.vendors import VendorName
-from tests.factories import PROJECT_ROOT, tiers_for, translator_of
+from analysis_service.vendors import ProviderAuthError, VendorName, vendor_for
+from tests.factories import (
+    AMBIENT_KEY_VARS,
+    PROJECT_ROOT,
+    SDK_CLIENT_KEY,
+    inject_transport,
+    tiers_for,
+    translator_of,
+)
 
 CONFIG = PROJECT_ROOT / "config"
 
@@ -45,7 +59,20 @@ CONFIG = PROJECT_ROOT / "config"
 #: transport test that needed a credential would run nowhere.
 FAKE_KEY = "not-a-real-openai-key"
 
-#: One vendor, because this file is about the bytes rather than about coverage.
+#: The gateway route, used by one class below and nowhere else. It is the only
+#: one of the two seams whose ``Authorization`` header is evidence about the
+#: adapter: litellm composes an OpenRouter request itself, from the key it
+#: resolved, while the OpenAI SDK composes one from the key its own client
+#: holds. See :func:`tests.factories.inject_transport`.
+GATEWAY: VendorName = "openrouter"
+
+#: A key the deployment declares, and a key it does not. Different strings,
+#: because the whole question here is which of the two arrives.
+DECLARED_KEY = "not-a-real-declared-openrouter-key"
+UNDECLARED_KEY = "not-a-real-undeclared-openrouter-key"
+
+#: The direct route, which every check but the credential class runs on: this
+#: file is about the bytes rather than about coverage, and
 #: ``tests/test_conformance.py`` is what walks the matrix. The pair comes from
 #: the reference matrix rather than from two strings here, so the build-time
 #: gate that refuses an over-ceiling tier has nothing to refuse — it already
@@ -96,9 +123,8 @@ class _Wire:
 def _adapter(wire: _Wire, base: TierSampling | None = None):
     """The shipped adapter for one tier, wired to ``wire`` instead of a network.
 
-    The injection is in the client, which is the seam ADK already offers for
-    testability, so nothing in ``src/`` learns that a test is running. The
-    kwargs the adapter was built with reach litellm unchanged.
+    The injection is :func:`tests.factories.inject_transport`, one reader for
+    a chain ``tests/test_provider_contract.py`` drives too.
 
     ``base`` substitutes the base tier's sampling **before the adapter is
     built**, because some params ride the constructor rather than the request —
@@ -117,22 +143,8 @@ def _adapter(wire: _Wire, base: TierSampling | None = None):
         load_resilience(CONFIG / "resilience.toml", env={}),
         env={"ANALYSIS_OPENAI_API_KEY": FAKE_KEY},
     )
-    client = AsyncOpenAI(
-        api_key=FAKE_KEY,
-        http_client=httpx.AsyncClient(transport=httpx.MockTransport(wire.handle)),
-    )
-
-    class _Injecting(LiteLLMClient):
-        async def acompletion(self, model, messages, tools, **kwargs):
-            return await super().acompletion(
-                model, messages, tools, client=client, **kwargs
-            )
-
-    # One layer in: the adapter is an ``ExecutedLlm`` over the seam, and the
-    # translator that holds the tier's credential is on the provider side
-    # of it. That is where a transport goes.
     adapter = adapters["base"]
-    translator_of(adapter).llm_client = _Injecting()
+    inject_transport(adapter, VENDOR, wire.handle)
     return adapter, sampling.for_tier("base")
 
 
@@ -243,11 +255,19 @@ def test_the_credential_never_rides_in_the_body(wire):
 
     Nothing in this repository puts it there, and this is the assertion that
     says so about the bytes rather than about the code that composed them.
+
+    Only half of the credential question can be asked on this route. The
+    injected OpenAI SDK client composes the ``Authorization`` header from a key
+    of its own, so what is in that header says nothing about which key the
+    adapter resolved. :class:`TestWhichKeyAuthenticates` asks that on the
+    gateway route, where litellm composes the request itself.
     """
     _send(wire)
+    body = wire.requests[0].content.decode("utf-8")
 
-    assert FAKE_KEY not in wire.requests[0].content.decode("utf-8")
-    assert wire.requests[0].headers.get("authorization") == f"Bearer {FAKE_KEY}"
+    assert FAKE_KEY not in body
+    assert SDK_CLIENT_KEY not in body
+    assert wire.requests[0].headers.get("authorization") == f"Bearer {SDK_CLIENT_KEY}"
 
 
 def test_turning_off_constraint_suppresses_the_schema_on_the_wire(wire):
@@ -265,3 +285,102 @@ def test_turning_off_constraint_suppresses_the_schema_on_the_wire(wire):
     _send(wire, unconstrained)
 
     assert wire.body.get("response_format") is None
+
+
+class TestWhichKeyAuthenticates:
+    """Which credential reaches the provider: the declared one, or an ambient one.
+
+    ``tests/test_vendors.py`` holds the registry half — ``credential_kwargs``
+    refuses a vendor-scoped variable the deployment did not declare. This is the
+    half about the bytes, and it needs the gateway route, because the direct
+    route's header comes from the injected SDK client rather than from the
+    adapter.
+
+    The three checks are one statement in three parts: litellm reads an
+    undeclared key out of the process environment on its own, the declared key
+    beats it when one is passed, and a deployment that declared none never gets
+    an adapter at all.
+    """
+
+    @staticmethod
+    def _send(wire: _Wire, env: dict[str, str], *, drop_credential: bool = False):
+        """Drive one gateway call built under ``env``, and return its request.
+
+        ``drop_credential`` takes the resolved key back off the built translator,
+        which is the shape of a regression that stopped passing one — the point
+        being what litellm then does, rather than how the kwarg went missing.
+        """
+        sampling = load_sampling(CONFIG / "sampling.toml", env={})
+        adapters = build_tier_adapters(
+            tiers_for(GATEWAY),
+            sampling,
+            load_resilience(CONFIG / "resilience.toml", env={}),
+            env=dict(env),
+        )
+        adapter = adapters["base"]
+        if drop_credential:
+            translator_of(adapter)._additional_args.pop("api_key")
+        inject_transport(adapter, GATEWAY, wire.handle)
+
+        async def drive():
+            request = _request(sampling.for_tier("base"))
+            return [r async for r in adapter.generate_content_async(request, False)]
+
+        asyncio.run(drive())
+        return wire.requests[0]
+
+    @pytest.mark.parametrize("ambient", AMBIENT_KEY_VARS[GATEWAY])
+    def test_the_declared_key_is_the_one_on_the_wire(self, wire, monkeypatch, ambient):
+        """The declared credential wins over one sitting in the environment.
+
+        Both are present, which is the realistic shape: a machine that has ever
+        run another tool against this provider carries its variable. Every name
+        litellm reads for this vendor is checked, from the same table the
+        registry's own refusal is checked against.
+        """
+        monkeypatch.setenv(ambient, UNDECLARED_KEY)
+        request = self._send(wire, {vendor_for(GATEWAY).api_key_var: DECLARED_KEY})
+        sent = request.content.decode("utf-8") + str(dict(request.headers))
+
+        assert request.headers.get("authorization") == f"Bearer {DECLARED_KEY}"
+        assert UNDECLARED_KEY not in sent
+
+    @pytest.mark.parametrize("ambient", AMBIENT_KEY_VARS[GATEWAY])
+    def test_an_undeclared_key_authenticates_on_its_own_when_none_is_passed(
+        self, wire, monkeypatch, ambient
+    ):
+        """Why the registry's refusal is load-bearing rather than belt and braces.
+
+        A measurement of the dependency, not a preference of ours: with no
+        ``api_key`` among the kwargs, litellm reads the process environment and
+        authenticates with what it finds. That is the ASI03 inherited-credential
+        path, and it is the reason the registry refuses an undeclared variable
+        instead of leaving the question to the adapter — by the time a request
+        is composed there is nothing left to refuse.
+
+        So this asserts the outcome the service exists to prevent. It fails if
+        litellm stops falling back, which is worth knowing: the refusal above
+        would then be closing a door that is already shut.
+        """
+        monkeypatch.setenv(ambient, UNDECLARED_KEY)
+        request = self._send(
+            wire,
+            {vendor_for(GATEWAY).api_key_var: DECLARED_KEY},
+            drop_credential=True,
+        )
+
+        assert request.headers.get("authorization") == f"Bearer {UNDECLARED_KEY}"
+
+    @pytest.mark.parametrize("ambient", AMBIENT_KEY_VARS[GATEWAY])
+    def test_an_undeclared_key_alone_builds_no_adapter(self, wire, ambient):
+        """The build fails closed, so the fallback above never gets a request.
+
+        The environment is passed whole in a deployment, so an ambient variable
+        really is in the mapping ``build_tier_adapters`` reads. It is not the
+        one the registry asks for, and the failure names the variable a
+        deployment has to declare rather than the value it found.
+        """
+        with pytest.raises(ProviderAuthError, match=vendor_for(GATEWAY).api_key_var):
+            self._send(wire, {ambient: UNDECLARED_KEY})
+
+        assert not wire.requests
