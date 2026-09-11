@@ -57,6 +57,7 @@ from analysis_service.report import (
     NodeLatency,
     NodeRun,
     TokenUsage,
+    charges_by_node,
     latency_by_node,
     usage_by_node,
 )
@@ -350,6 +351,7 @@ async def _run_mode(
             {node for built in pipelines.values() for node in built.node_sampling}
         ),
         usage=usage_by_node(executions),
+        charges=charges_by_node(executions),
         latency=latency_by_node(executions),
         grounds=grounds,
         grounds_failures=grounds_failures,

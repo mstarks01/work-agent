@@ -27,6 +27,7 @@ from evals.harness.baseline import (
     BaselineIdentity,
     artifact_filename,
     assemble,
+    charges_of,
     configuration_label,
     price_sweep,
     verify,
@@ -237,6 +238,40 @@ class TestPricing:
         assert cost.actual_usd > 0
         assert not cost.unpriced
 
+    def test_a_sweep_whose_providers_reported_nothing_has_no_reported_total(
+        self, tmp_path, priced
+    ):
+        """Which is every sweep on a vendor that states token counts alone.
+
+        ``None`` and not 0.0: a sweep charged nothing and a sweep nobody
+        reported a charge for are different facts, and the second is the
+        ordinary one.
+        """
+        artifact = load_artifact(write_sweep(tmp_path, sweep_document()))
+        assert price_sweep(artifact).reported_usd is None
+
+    def test_reported_charges_sum_across_the_nodes_that_reported(
+        self, tmp_path, priced
+    ):
+        """The figure a gateway route has instead of a unit price."""
+        document = sweep_document(charges={"extract": 0.002, "critic": 0.004})
+        artifact = load_artifact(write_sweep(tmp_path, document))
+        assert price_sweep(artifact).reported_usd == pytest.approx(0.006)
+
+    @pytest.mark.parametrize("value", ["0.002", True, float("inf"), -0.1, None])
+    def test_a_node_charge_that_is_not_money_is_dropped(self, tmp_path, priced, value):
+        """One rule for what money looks like, wherever the figure was written.
+
+        A hand-edited artifact is the only way such a value arrives — the block
+        is written from a fold this repository owns — and the reader refuses it
+        for the reason the manifest reader does: a non-finite or negative
+        figure poisons every total it reaches.
+        """
+        document = sweep_document(charges={"extract": value, "critic": 0.004})
+        artifact = load_artifact(write_sweep(tmp_path, document))
+        assert charges_of(artifact) == {"critic": pytest.approx(0.004)}
+        assert price_sweep(artifact).reported_usd == pytest.approx(0.004)
+
     def test_a_model_nobody_prices_is_named_never_zeroed(self, tmp_path, priced):
         # A known vendor, so the fixture can compute a fingerprint; a model
         # identifier no price map carries, which is what the test is about.
@@ -446,6 +481,44 @@ class TestAssembleAndVerify:
         )
         problems = verify(directory, root=tmp_path)
         assert any("recorded unit prices" in problem for problem in problems)
+
+    def test_a_reported_charge_the_artifact_never_recorded_is_refused(
+        self, tmp_path, priced
+    ):
+        """A figure no sweep produced is not a cost.
+
+        The manifest is a contributor's file, and this is the direction the
+        arithmetic check cannot see: ``actual_usd`` still recomputes from the
+        tokens while a second figure beside it claims money nothing charged.
+        """
+        directory = assemble(tmp_path, "ada", [write_sweep(tmp_path, sweep_document())])
+        manifest_path = directory / "baseline.json"
+        manifest = json.loads(manifest_path.read_text("utf-8"))
+        manifest["sweeps"][0]["cost"]["reported_usd"] = 4.0
+        manifest_path.write_text(
+            json.dumps(manifest, indent=2, sort_keys=True), "utf-8"
+        )
+        problems = verify(directory, root=tmp_path)
+        assert any("the artifact records none" in problem for problem in problems)
+
+    def test_a_reported_charge_that_does_not_add_up_is_refused(self, tmp_path, priced):
+        """The other direction: the artifact charged, and the manifest disagrees.
+
+        A reported charge cannot be recomputed from rates the way the actual
+        can, so the re-check is that the manifest repeats what the artifact
+        holds.
+        """
+        document = sweep_document(charges={"extract": 0.25, "critic": 0.75})
+        directory = assemble(tmp_path, "ada", [write_sweep(tmp_path, document)])
+        manifest_path = directory / "baseline.json"
+        manifest = json.loads(manifest_path.read_text("utf-8"))
+        assert manifest["sweeps"][0]["cost"]["reported_usd"] == pytest.approx(1.0)
+        manifest["sweeps"][0]["cost"]["reported_usd"] = 0.5
+        manifest_path.write_text(
+            json.dumps(manifest, indent=2, sort_keys=True), "utf-8"
+        )
+        problems = verify(directory, root=tmp_path)
+        assert any("node charges sum to" in problem for problem in problems)
 
     def test_a_sweep_over_the_cap_is_refused(self, tmp_path, priced, monkeypatch):
         monkeypatch.setattr(baseline, "SWEEP_CAP", 1)

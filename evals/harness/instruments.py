@@ -98,6 +98,12 @@ class ModeRun:
     number comes from — a single job's numbers are one sample of one system —
     so it is folded here rather than left to whoever reads the artifact.
 
+    ``charges`` is what the providers said they charged for those same
+    executions, per node, and it is beside ``usage`` rather than folded into
+    it. Most vendors report no charge, so the map is usually empty; a gateway
+    route is the case it exists for, because there no published rate describes
+    the route and the arithmetic over ``usage`` has nothing to multiply by.
+
     ``latency`` is the same fold over the same executions, in wall-clock. It is
     folded here for the same reason and one more: ``duration_ms`` is recorded
     per node run and read back by nothing, so a sweep that does not fold it
@@ -135,6 +141,7 @@ class ModeRun:
     provenance: RunProvenance
     expected_nodes: list[str]
     usage: dict[str, TokenUsage]
+    charges: dict[str, float]
     latency: dict[str, NodeLatency]
     grounds: list[CaseGrounds]
     grounds_failures: list[GroundsFailure]
@@ -181,6 +188,7 @@ class ModeRun:
             ),
             expected_nodes=[],
             usage={},
+            charges={},
             latency={},
             grounds=[],
             grounds_failures=[],

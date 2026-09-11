@@ -1,5 +1,5 @@
 {
-  "artifact_version": 5,
+  "artifact_version": 6,
   "mode": "analysis",
   "cases": [
     "01-payments-checkout",
@@ -914,6 +914,7 @@
       "total_tokens": 141443
     }
   },
+  "node_charges": {},
   "node_latency": {
     "prepare": {
       "executions": 13,
