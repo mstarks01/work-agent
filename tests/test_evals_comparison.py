@@ -21,7 +21,7 @@ import pytest
 from evals.harness import comparison
 from evals.harness.comparison import NO_VOTES, build, is_stale, read_baseline
 from evals.harness.instruments import INSTRUMENTS
-from tests.test_evals_baseline import payload
+from tests.eval_factories import sweep_document
 
 IDENTITY = {
     "repo_commit": "c" * 40,
@@ -39,7 +39,7 @@ def merged(root, name, *, identity=None, sweeps=1, cost=0.60, scores=None, voted
     entries = []
     for index in range(sweeps):
         stem = f"ada-{index:04d}"
-        raw = payload(seed=index)
+        raw = sweep_document(seed=index)
         raw["scores"] = scores if scores is not None else []
         if voted:
             for score in raw["scores"]:

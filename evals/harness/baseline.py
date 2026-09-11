@@ -89,8 +89,17 @@ class BaselineIdentity:
     frameworks: tuple[str, ...]
 
     @classmethod
-    def from_artifact(cls, artifact: EvalArtifact) -> BaselineIdentity:
-        if artifact.commit.clean is not True:
+    def from_artifact(
+        cls, artifact: EvalArtifact, *, require_clean: bool = True
+    ) -> BaselineIdentity:
+        """The five parts, computed from one sweep.
+
+        ``require_clean`` is the Baseline's own rule rather than the identity's,
+        so :func:`configuration_label` can name a sweep this refuses. Pass
+        ``False`` only where the caller says what a dirty tree means; a
+        Baseline's answer is that it means nothing it can publish.
+        """
+        if require_clean and artifact.commit.clean is not True:
             raise BaselineError(
                 f"{artifact.path}: ran on a tree that did not match its commit;"
                 " a Baseline's identity names a commit so a reader can open the"
@@ -145,6 +154,31 @@ class BaselineIdentity:
         """``<short-commit>-<strong-model-slug>-<hash8>``, e.g. ``7c3a007-gpt-5.6-3f9a1c2e``."""
         strong = dict(self.models).get(_NAMING_TIER, "unknown")
         return f"{self.repo_commit[:7]}-{_slug(strong)}-{self.hash[:8]}"
+
+
+#: What :func:`configuration_label` appends when the sweep ran on a tree that
+#: did not match its commit. The five parts cannot tell two dirty trees at one
+#: commit apart, so the label says the commit does not describe the prompts
+#: rather than implying it does.
+DIRTY_MARKER = "-dirty"
+
+
+def configuration_label(artifact: EvalArtifact) -> str:
+    """Which configuration produced a sweep, as a vote records it.
+
+    A vote's ``config`` and a Baseline's name answer one question -- which
+    models, sampling, frameworks, commit and corpus produced the finding -- so
+    one reader answers it for both (#802). A second spelling composed in
+    ``webapp/review.py`` would name one sweep two ways, and nothing compares
+    the two.
+
+    A dirty sweep is labelled rather than refused. ``evals/TUNING.md`` step 3
+    runs one from an edited tree on purpose, and a reviewer's answer about a
+    finding is worth keeping whatever produced it. What a Baseline may not
+    publish and what a vote may record are different questions.
+    """
+    identity = BaselineIdentity.from_artifact(artifact, require_clean=False)
+    return identity.name + ("" if artifact.commit.clean is True else DIRTY_MARKER)
 
 
 def recorded_usd(cost: Any) -> float | None:

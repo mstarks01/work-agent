@@ -25,8 +25,10 @@ tuning loop that consumes these numbers, read [TUNING.md](TUNING.md).
 ## What you need
 
 - **A finished sweep**, written with `run --out artifact.json`, together with
-  the `artifact.json.reports/` directory beside it. The queue reads the reports,
-  because the reports hold the claims and the artifact holds only the totals.
+  the `artifact.json.reports/` directory beside it. The queue reads both: the
+  reports hold the claims you answer, and the artifact names the configuration
+  that produced them. A file the artifact loader refuses stops the queue, so a
+  vote can always say what it was cast against.
 - **Every sweep of that configuration, if you ran more than one.** Both
   commands below take one artifact per sweep. The counts that follow — which
   findings every run produced, and which only some did — exist only when you
@@ -85,7 +87,11 @@ both, one line tells you why this finding reached you.
 **The page never tells you which configuration produced the finding.** The queue
 item has no field for it, and the app stamps the configuration onto your vote
 after you answer. A reviewer who sees the model can vote about the model instead
-of about the finding.
+of about the finding. The stamp is the **Baseline**'s own name for that sweep —
+the commit, the strong model and a digest of all five identity parts — computed
+by one reader, so a vote and a Baseline cannot spell one configuration two ways.
+A sweep from a tree that did not match its commit takes the same name with
+`-dirty` on the end.
 
 **The question is the framework's own**, because the two do not rule on the
 same thing. A STRIDE finding asks *could this attack happen in this system?* An
