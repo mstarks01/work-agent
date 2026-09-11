@@ -520,17 +520,24 @@
     {
       "flow_id": "flow:colleague-to-scheduling-web-app:view-shifts",
       "source_zone": "boundary:public-internet",
-      "destination_zone": "boundary:internal-network"
+      "destination_zone": "boundary:internal-network",
+      "assumed_endpoints": [
+        "process:scheduling-web-app"
+      ]
     },
     {
       "flow_id": "flow:store-manager-to-scheduling-web-app:build-rota",
       "source_zone": "boundary:public-internet",
-      "destination_zone": "boundary:internal-network"
+      "destination_zone": "boundary:internal-network",
+      "assumed_endpoints": [
+        "process:scheduling-web-app"
+      ]
     },
     {
       "flow_id": "flow:payroll-system-to-file-share:collect-payroll-export",
       "source_zone": "boundary:payroll-team-environment",
-      "destination_zone": "boundary:internal-network"
+      "destination_zone": "boundary:internal-network",
+      "assumed_endpoints": []
     }
   ],
   "shared_element_names": [],
@@ -557,7 +564,7 @@
     {
       "framework": "stride",
       "framework_version": "1.0",
-      "disclaimer": "AI-generated STRIDE threat model. Each claim asserts that an attacker action against the named elements is credible against what the submitted text stated — never that a control is absent, and never that anything not listed here is safe. Not reviewed by a human security analyst.",
+      "disclaimer": "AI-generated STRIDE threat model. Each claim asserts that an attacker action against the named elements is credible against what the submitted text stated \u2014 never that a control is absent, and never that anything not listed here is safe. Not reviewed by a human security analyst.",
       "claims": [
         {
           "id": "S-02",

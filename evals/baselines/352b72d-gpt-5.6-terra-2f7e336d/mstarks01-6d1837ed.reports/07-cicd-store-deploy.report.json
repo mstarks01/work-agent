@@ -284,7 +284,7 @@
       {
         "id": "process:deploy-controller",
         "name": "deploy controller",
-        "description": "Holds one record — which image sha the estate should be on. Set by the build runner, polled by every store server.",
+        "description": "Holds one record \u2014 which image sha the estate should be on. Set by the build runner, polled by every store server.",
         "assets": [
           "business-critical-data"
         ],
@@ -410,14 +410,14 @@
         "name": "resolve dependencies",
         "description": "The runner resolves the lockfile against the public package registry and takes what it downloads as given.",
         "assets": [],
-        "source_excerpt": "Dependency resolution reaches out to the public package registry on the internet, and the lockfile is taken as given — the runner does not verify signatures on what it downloads.",
+        "source_excerpt": "Dependency resolution reaches out to the public package registry on the internet, and the lockfile is taken as given \u2014 the runner does not verify signatures on what it downloads.",
         "source_label": "System description",
         "source_speaker": "",
         "notes": "",
         "source": "process:build-runner",
         "destination": "entity:public-package-registry",
         "protocol": "unknown",
-        "authentication": "none — the runner does not verify signatures on the packages it downloads",
+        "authentication": "none \u2014 the runner does not verify signatures on the packages it downloads",
         "data_description": "dependency packages named by the lockfile, which is taken as given",
         "encryption_in_transit": "unknown",
         "operations": "read"
@@ -575,32 +575,40 @@
     {
       "flow_id": "flow:developer-to-build-runner:manual-rebuild",
       "source_zone": "boundary:corporate-network",
-      "destination_zone": "boundary:build-environment"
+      "destination_zone": "boundary:build-environment",
+      "assumed_endpoints": [
+        "entity:developer"
+      ]
     },
     {
       "flow_id": "flow:build-runner-to-git-server:fetch-source",
       "source_zone": "boundary:build-environment",
-      "destination_zone": "boundary:corporate-network"
+      "destination_zone": "boundary:corporate-network",
+      "assumed_endpoints": []
     },
     {
       "flow_id": "flow:build-runner-to-public-package-registry:resolve-dependencies",
       "source_zone": "boundary:build-environment",
-      "destination_zone": "boundary:internet"
+      "destination_zone": "boundary:internet",
+      "assumed_endpoints": []
     },
     {
       "flow_id": "flow:build-runner-to-deploy-controller:set-current-release",
       "source_zone": "boundary:build-environment",
-      "destination_zone": "boundary:corporate-network"
+      "destination_zone": "boundary:corporate-network",
+      "assumed_endpoints": []
     },
     {
       "flow_id": "flow:store-server-to-deploy-controller:poll-current-release",
       "source_zone": "boundary:store-estate",
-      "destination_zone": "boundary:corporate-network"
+      "destination_zone": "boundary:corporate-network",
+      "assumed_endpoints": []
     },
     {
       "flow_id": "flow:store-server-to-image-registry:pull-image",
       "source_zone": "boundary:store-estate",
-      "destination_zone": "boundary:build-environment"
+      "destination_zone": "boundary:build-environment",
+      "assumed_endpoints": []
     }
   ],
   "shared_element_names": [],
@@ -624,7 +632,7 @@
     {
       "framework": "stride",
       "framework_version": "1.0",
-      "disclaimer": "AI-generated STRIDE threat model. Each claim asserts that an attacker action against the named elements is credible against what the submitted text stated — never that a control is absent, and never that anything not listed here is safe. Not reviewed by a human security analyst.",
+      "disclaimer": "AI-generated STRIDE threat model. Each claim asserts that an attacker action against the named elements is credible against what the submitted text stated \u2014 never that a control is absent, and never that anything not listed here is safe. Not reviewed by a human security analyst.",
       "claims": [
         {
           "id": "E-01",
@@ -1298,7 +1306,7 @@
           "grounds": [
             {
               "kind": "quote",
-              "text": "the lockfile is taken as given — the runner does not verify signatures on what it downloads",
+              "text": "the lockfile is taken as given \u2014 the runner does not verify signatures on what it downloads",
               "source_label": "System description",
               "element_id": "",
               "attribute": "",
@@ -1826,7 +1834,7 @@
           "grounds": [
             {
               "kind": "quote",
-              "text": "the lockfile is taken as given — the runner does not verify signatures on what it downloads.",
+              "text": "the lockfile is taken as given \u2014 the runner does not verify signatures on what it downloads.",
               "source_label": "System description",
               "element_id": "",
               "attribute": "",
