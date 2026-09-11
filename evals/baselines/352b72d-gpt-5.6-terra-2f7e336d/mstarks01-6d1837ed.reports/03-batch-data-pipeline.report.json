@@ -461,7 +461,7 @@
           "pii",
           "health"
         ],
-        "source_excerpt": "they…authenticate with SSO, but the grant is dataset-wide — we have not split member-identifying columns out",
+        "source_excerpt": "they\u2026authenticate with SSO, but the grant is dataset-wide \u2014 we have not split member-identifying columns out",
         "source_label": "System description",
         "source_speaker": "",
         "notes": "",
@@ -528,12 +528,14 @@
     {
       "flow_id": "flow:insurance-partner-to-landing-bucket:push-daily-extract",
       "source_zone": "boundary:partner-network",
-      "destination_zone": "boundary:landing-network"
+      "destination_zone": "boundary:landing-network",
+      "assumed_endpoints": []
     },
     {
       "flow_id": "flow:ingest-scheduler-to-transform-job:trigger-transform",
       "source_zone": "boundary:landing-network",
-      "destination_zone": "boundary:warehouse-network"
+      "destination_zone": "boundary:warehouse-network",
+      "assumed_endpoints": []
     }
   ],
   "shared_element_names": [],
@@ -560,7 +562,7 @@
     {
       "framework": "stride",
       "framework_version": "1.0",
-      "disclaimer": "AI-generated STRIDE threat model. Each claim asserts that an attacker action against the named elements is credible against what the submitted text stated — never that a control is absent, and never that anything not listed here is safe. Not reviewed by a human security analyst.",
+      "disclaimer": "AI-generated STRIDE threat model. Each claim asserts that an attacker action against the named elements is credible against what the submitted text stated \u2014 never that a control is absent, and never that anything not listed here is safe. Not reviewed by a human security analyst.",
       "claims": [
         {
           "id": "I-08",
@@ -577,7 +579,7 @@
           "grounds": [
             {
               "kind": "quote",
-              "text": "Analysts query the warehouse directly. They are on the warehouse network and authenticate with SSO, but the grant is dataset-wide — we have not split member-identifying columns out.",
+              "text": "Analysts query the warehouse directly. They are on the warehouse network and authenticate with SSO, but the grant is dataset-wide \u2014 we have not split member-identifying columns out.",
               "source_label": "System description",
               "element_id": "",
               "attribute": "",

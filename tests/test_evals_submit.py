@@ -656,3 +656,84 @@ def test_the_comparison_table_is_derived_and_selects_no_kind(repo):
     table.write_text("# Merged baselines\n", encoding="utf-8")
 
     assert submit.detect_kind(repo) is None
+
+
+class TestOnlyAnAddedSweepIsABaselineSubmission:
+    """A merged Baseline outlives the PR that laid it down (#468).
+
+    A migration that catches the archive up to a record change rewrites the
+    reports and the manifest digests of a Baseline nobody is contributing. Read
+    as a submission, it fails "nothing outside this kind's allowlist changed"
+    for every code file beside it, with no diff that could pass — the same
+    shape the comparison table's ``derived`` entry records.
+    """
+
+    @staticmethod
+    def merged(repo, sweeps=("mstarks01-aaaaaaaa.json",)):
+        """One Baseline already on origin/main, with the given sweeps."""
+        directory = repo / "evals" / "baselines" / "one"
+        directory.mkdir(parents=True, exist_ok=True)
+        manifest = {
+            "name": "one",
+            "identity": {"repo_commit": "0" * 40},
+            "sweeps": [
+                {"artifact": name, "submitted_by": "mstarks01", "files": {}}
+                for name in sweeps
+            ],
+        }
+        (directory / "baseline.json").write_text(
+            json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
+        )
+        for name in sweeps:
+            (directory / name).write_text("{}\n", encoding="utf-8")
+        return directory
+
+    def test_rewriting_a_merged_baseline_selects_no_kind(self, repo):
+        directory = self.merged(repo)
+        git(repo, "add", "-A")
+        git(repo, "commit", "-m", "the merged Baseline")
+        git(repo, "push", "origin", "main")
+
+        (directory / "mstarks01-aaaaaaaa.json").write_text(
+            '{"migrated": true}\n', encoding="utf-8"
+        )
+        assert submit.detect_kind(repo) is None
+
+    def test_adding_a_sweep_still_selects_the_kind(self, repo):
+        directory = self.merged(repo)
+        git(repo, "add", "-A")
+        git(repo, "commit", "-m", "the merged Baseline")
+        git(repo, "push", "origin", "main")
+
+        manifest = json.loads((directory / "baseline.json").read_text("utf-8"))
+        manifest["sweeps"].append(
+            {"artifact": "ada-bbbbbbbb.json", "submitted_by": "ada", "files": {}}
+        )
+        (directory / "baseline.json").write_text(
+            json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
+        )
+        assert submit.detect_kind(repo) == "baseline"
+
+    def test_a_first_baseline_selects_the_kind(self, repo):
+        """Nothing is on main, so every sweep in the manifest is added."""
+        self.merged(repo)
+        assert submit.detect_kind(repo) == "baseline"
+
+    def test_an_unreadable_manifest_selects_the_kind(self, repo):
+        """Fails closed: the checks say what is wrong in their own words."""
+        directory = self.merged(repo)
+        (directory / "baseline.json").write_text("[]\n", encoding="utf-8")
+        assert submit.detect_kind(repo) == "baseline"
+        check = submit._check_baseline_sweeps_are_yours(repo, "mstarks01")
+        assert not check.passed
+        assert "not a table" in " ".join(check.problems)
+
+    def test_a_kind_cannot_stay_silent_about_how_it_is_selected(self):
+        """``selects`` carries no default, so a kind added tomorrow answers."""
+        with pytest.raises(TypeError, match="selects"):
+            submit.Kind(
+                preflight=lambda root, author: [],
+                allowlist=lambda root, author: [],
+                title=lambda root, author: "",
+                closing=lambda root, author: "",
+            )

@@ -361,7 +361,12 @@ input described as missing as a gap in the description
 A `derived-fact` names the flow and **never copies the zones it crosses**: they
 recompute from `boundary_crossings`, which the report already carries, so a
 renderer resolves them locally and there is no second copy to disagree with the
-first. A `quote`'s `source_label` always names one of the `SourceRef`s in
+first. A crossing there carries `assumed_endpoints` as well as its two zones —
+the endpoints whose `trust_zone` extraction inferred rather than read, empty
+when the input stated both. It is derived from the embedded model's own
+`assumptions` list, so the envelope check that the crossings are the derived
+ones covers it too
+([ADR 0032](adr/0032-a-derived-crossing-names-an-inferred-zone.md)). A `quote`'s `source_label` always names one of the `SourceRef`s in
 `input.sources` — but the report never carries the source *text*, so a quote is
 checkable against its origin only by whoever holds the submission.
 

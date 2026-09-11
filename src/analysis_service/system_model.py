@@ -27,6 +27,12 @@ from analysis_service.references import canonical
 
 UNKNOWN = "unknown"
 
+#: The attribute a :class:`ZonedElement` carries its zone in, and the one an
+#: :class:`Assumption` names when extraction placed that element itself. Named
+#: rather than spelled at each site because two readers of one attribute name
+#: is two chances to spell it differently.
+ZONE_ATTRIBUTE = "trust_zone"
+
 # Controlled asset vocabulary; config-extendable via the validator's
 # extra_asset_tags parameter (see analysis_service.validation).
 CORE_ASSET_TAGS = frozenset(
@@ -336,13 +342,31 @@ class Assumption(BaseModel):
 
 
 class BoundaryCrossing(BaseModel):
-    """Derived fact: a Data Flow whose endpoints sit in different trust zones."""
+    """Derived fact: a Data Flow whose endpoints sit in different trust zones.
+
+    ``assumed_endpoints`` names the endpoints whose zone the service *inferred*
+    rather than read, in source-then-destination order, and is empty for a
+    crossing both of whose zones the input stated. It is derived from the same
+    model as the crossing — an :class:`Assumption` on ``trust_zone`` — so the
+    two cannot disagree.
+
+    **The field is here because this is where the inference lands.** An
+    Assumption sits on the model's top-level list, and a lane agent reading a
+    crossing has to join the two to find out that a zone was inferred. The
+    crossing is the strongest input that agent reads, so a crossing that rests
+    on an inference has to say so at the place it is read.
+
+    It carries element IDs rather than zone names: the zones are already in
+    ``source_zone`` and ``destination_zone``, and what a reader needs is which
+    *end* of this flow was placed by the service.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
     flow_id: str
     source_zone: str
     destination_zone: str
+    assumed_endpoints: list[str] = Field(default_factory=list)
 
 
 class SystemModel(BaseModel):
@@ -382,16 +406,41 @@ class SystemModel(BaseModel):
         """
         return ModelIndex.of(self).get(element_id)
 
+    def assumed_zone_elements(self) -> frozenset[str]:
+        """Every element whose ``trust_zone`` the service inferred rather than read.
+
+        The one reader of that question. A zone is inferred when the model
+        records an :class:`Assumption` naming the element and
+        :data:`ZONE_ATTRIBUTE`; the gate resolves both, so an entry here names
+        an element this model holds and an attribute that holds a value.
+
+        **Every basis, not only a disagreement.** Extraction infers a zone from
+        silence far more often than from two sources that conflict, and both
+        readings put a zone on the record that the input never stated. The rule
+        is a property of the entry rather than of the prose behind it, so it
+        needs no basis parsed to decide.
+        """
+        return frozenset(
+            assumption.element_id
+            for assumption in self.assumptions
+            if assumption.attribute == ZONE_ATTRIBUTE
+        )
+
     def boundary_crossings(self) -> list[BoundaryCrossing]:
         """Derive boundary crossings mechanically. Requires a valid model.
 
         Raises ValueError on a dangling flow endpoint or an endpoint without a
         trust zone — derivation on an invalid model would produce misleading
         STRIDE input, so it fails closed instead of skipping.
+
+        Each crossing also names the endpoints whose zone was inferred, read
+        from :meth:`assumed_zone_elements`. A crossing that both zones state
+        outright names none, which is the ordinary case.
         """
         zone_by_id = {
             element.id: element.trust_zone for element in self.zoned_elements()
         }
+        assumed = self.assumed_zone_elements()
         crossings = []
         for flow in self.data_flows:
             for endpoint in (flow.source, flow.destination):
@@ -408,6 +457,11 @@ class SystemModel(BaseModel):
                         flow_id=flow.id,
                         source_zone=source_zone,
                         destination_zone=destination_zone,
+                        assumed_endpoints=[
+                            endpoint
+                            for endpoint in (flow.source, flow.destination)
+                            if endpoint in assumed
+                        ],
                     )
                 )
         return crossings

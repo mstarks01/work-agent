@@ -274,7 +274,7 @@
         "assets": [
           "pii"
         ],
-        "source_excerpt": "Group membership is not maintained there by hand — it comes from the HR system overnight.",
+        "source_excerpt": "Group membership is not maintained there by hand \u2014 it comes from the HR system overnight.",
         "source_label": "System description",
         "source_speaker": "",
         "notes": "",
@@ -582,22 +582,30 @@
     {
       "flow_id": "flow:colleague-to-identity-broker:sign-in",
       "source_zone": "boundary:outside-corporate-network",
-      "destination_zone": "boundary:corporate-network"
+      "destination_zone": "boundary:corporate-network",
+      "assumed_endpoints": []
     },
     {
       "flow_id": "flow:franchise-identity-provider-to-identity-broker:vouch-for-colleague",
       "source_zone": "boundary:franchise-partner",
-      "destination_zone": "boundary:corporate-network"
+      "destination_zone": "boundary:corporate-network",
+      "assumed_endpoints": [
+        "entity:franchise-identity-provider"
+      ]
     },
     {
       "flow_id": "flow:colleague-to-store-admin-console:change-prices-and-void",
       "source_zone": "boundary:outside-corporate-network",
-      "destination_zone": "boundary:corporate-network"
+      "destination_zone": "boundary:corporate-network",
+      "assumed_endpoints": []
     },
     {
       "flow_id": "flow:identity-broker-to-hr-system:nightly-group-pull",
       "source_zone": "boundary:corporate-network",
-      "destination_zone": "boundary:outside-corporate-network"
+      "destination_zone": "boundary:outside-corporate-network",
+      "assumed_endpoints": [
+        "entity:hr-system"
+      ]
     }
   ],
   "shared_element_names": [],
@@ -624,7 +632,7 @@
     {
       "framework": "stride",
       "framework_version": "1.0",
-      "disclaimer": "AI-generated STRIDE threat model. Each claim asserts that an attacker action against the named elements is credible against what the submitted text stated — never that a control is absent, and never that anything not listed here is safe. Not reviewed by a human security analyst.",
+      "disclaimer": "AI-generated STRIDE threat model. Each claim asserts that an attacker action against the named elements is credible against what the submitted text stated \u2014 never that a control is absent, and never that anything not listed here is safe. Not reviewed by a human security analyst.",
       "claims": [
         {
           "id": "D-01",
@@ -1212,7 +1220,7 @@
           "framework": "stride",
           "framework_version": "1.0",
           "title": "A stolen twelve-hour bearer token can be replayed as a store manager",
-          "description": "An attacker who obtains a colleague token can replay it as `entity:colleague` to `process:store-admin-console` through `flow:colleague-to-store-admin-console:change-prices-and-void`. The console accepts “the token alone,” does not re-check the colleague with `process:identity-broker`, and the token cannot be withdrawn before its twelve-hour expiry. A captured store-manager token therefore remains an accepted store-manager identity for up to twelve hours. Second-order: because the console does not check the colleague's store, the replay reaches price changes and transaction voids against any store.",
+          "description": "An attacker who obtains a colleague token can replay it as `entity:colleague` to `process:store-admin-console` through `flow:colleague-to-store-admin-console:change-prices-and-void`. The console accepts \u201cthe token alone,\u201d does not re-check the colleague with `process:identity-broker`, and the token cannot be withdrawn before its twelve-hour expiry. A captured store-manager token therefore remains an accepted store-manager identity for up to twelve hours. Second-order: because the console does not check the colleague's store, the replay reaches price changes and transaction voids against any store.",
           "affected_element_ids": [
             "entity:colleague",
             "process:store-admin-console",

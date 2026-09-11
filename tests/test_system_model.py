@@ -4,6 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from analysis_service.system_model import (
+    Assumption,
     DataFlow,
     ExternalEntity,
     ModelIndex,
@@ -102,6 +103,81 @@ class TestBoundaryCrossings:
         model.data_flows[0].source = "entity:ghost"
         with pytest.raises(ValueError, match="entity:ghost"):
             model.boundary_crossings()
+
+
+class TestAnAssumedZoneReachesItsCrossing:
+    """#468: the inference has to say so where a lane agent reads it.
+
+    An :class:`Assumption` sits on the model's top-level list, and the crossing
+    it produced carried nothing about it — so an agent reading the strongest
+    input it has could not tell a zone the input stated from one the service
+    placed. Measured on the 13 corpus cases at the time this landed: 9 of 43
+    crossings rest on a zone extraction inferred.
+    """
+
+    @staticmethod
+    def placed(element_id: str, attribute: str = "trust_zone") -> SystemModel:
+        """The shared model, with one attribute recorded as an inference."""
+        model = valid_model()
+        model.assumptions.append(
+            Assumption(
+                assumption="The customer connects from the public internet.",
+                element_id=element_id,
+                attribute=attribute,
+                basis="The source names no other placement for them.",
+            )
+        )
+        return model
+
+    def test_a_stated_zone_marks_nothing(self):
+        assert valid_model().boundary_crossings()[0].assumed_endpoints == []
+
+    def test_an_inferred_source_zone_names_its_endpoint(self):
+        crossing = self.placed("entity:customer").boundary_crossings()[0]
+        assert crossing.assumed_endpoints == ["entity:customer"]
+
+    def test_an_inferred_destination_zone_names_its_endpoint(self):
+        crossing = self.placed("process:web-app").boundary_crossings()[0]
+        assert crossing.assumed_endpoints == ["process:web-app"]
+
+    def test_two_inferred_zones_read_source_then_destination(self):
+        model = self.placed("process:web-app")
+        model.assumptions.append(
+            Assumption(
+                assumption="The customer connects from the public internet.",
+                element_id="entity:customer",
+                attribute="trust_zone",
+                basis="The source names no other placement for them.",
+            )
+        )
+        assert model.boundary_crossings()[0].assumed_endpoints == [
+            "entity:customer",
+            "process:web-app",
+        ]
+
+    def test_an_inference_on_another_attribute_marks_nothing(self):
+        model = self.placed("process:web-app", attribute="exposure")
+        assert model.boundary_crossings()[0].assumed_endpoints == []
+
+    def test_an_inference_off_this_flow_marks_nothing(self):
+        model = self.placed("store:orders-db")
+        assert model.boundary_crossings()[0].assumed_endpoints == []
+
+    def test_the_reader_answers_for_the_whole_model(self):
+        model = self.placed("entity:customer")
+        assert model.assumed_zone_elements() == frozenset({"entity:customer"})
+
+    def test_an_inference_that_removes_a_crossing_is_unmarkable(self):
+        """The known limit, recorded rather than fixed.
+
+        A zone inferred *equal* to its neighbour's yields no crossing, and
+        there is no record to carry a mark. That is why ``extract.md`` keeps
+        preferring the reading that puts the two ends in different zones: the
+        direction it picks is the one a mark can reach.
+        """
+        model = self.placed("entity:customer")
+        model.external_entities[0].trust_zone = "boundary:internal-network"
+        assert model.boundary_crossings() == []
 
 
 class TestSharedNames:

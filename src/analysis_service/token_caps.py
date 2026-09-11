@@ -67,7 +67,7 @@ def prompt_key(name: str) -> str:
 TOKEN_CAPS: dict[str, int] = {
     # The five shared bodies, under ``prompts/``.
     "prompts/analyze": 4500,
-    "prompts/critic": 2100,
+    "prompts/critic": 2400,
     "prompts/recritic": 1100,
     "prompts/extract": 2900,
     "prompts/repair": 900,

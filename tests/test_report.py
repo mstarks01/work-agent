@@ -483,6 +483,26 @@ class TestReportInvariants:
         with pytest.raises(ValidationError, match="boundary_crossings"):
             Report.model_validate(payload)
 
+    def test_a_crossing_that_drops_its_assumed_endpoints_is_rejected(self):
+        """The archive's own failure, kept as the guard (#468).
+
+        A report written before the mark existed carries a crossing with no
+        ``assumed_endpoints``, and the envelope refuses it rather than reading
+        a zone the service placed as one the input stated.
+        """
+        report = sample_report()
+        payload = report.model_dump()
+        payload["system_model"]["assumptions"] = [
+            {
+                "assumption": "The customer connects from the public internet.",
+                "element_id": "entity:customer",
+                "attribute": "trust_zone",
+                "basis": "The source names no other placement for them.",
+            }
+        ]
+        with pytest.raises(ValidationError, match="boundary_crossings"):
+            Report.model_validate(payload)
+
     def test_mismatched_summary_is_rejected(self):
         """Recounted per block, since a report carries one summary per framework."""
         report = sample_report()
