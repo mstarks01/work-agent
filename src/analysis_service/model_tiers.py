@@ -497,8 +497,7 @@ class ModelTierConfig(BaseModel):
             analyze = self.tiers[self.nodes[f"analyze/{name}"]]
             critic = self.tiers[self.nodes[f"critic/{name}"]]
             detail = self._independence_detail(analyze, critic)
-            shared_part = detail is not None
-            if shared_part:
+            if detail is not None:
                 breaches.append(
                     f"review_independence is {self.review_independence!r} but"
                     f" analyze/{name} and critic/{name} are not independent:"

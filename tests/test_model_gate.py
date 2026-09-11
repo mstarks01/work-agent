@@ -180,6 +180,42 @@ class TestAModelThatRefusesTheParameterAtAll:
         """
         assert native_structured_output(vendor_for("bedrock"), self.REFUSING) is False
 
+    def test_the_probe_raises_that_type_and_no_other_across_the_map(self):
+        """The set the narrowed ``except`` was measured against.
+
+        ``library_sends_no_native_schema`` catches ``UnsupportedParamsError``
+        alone, so an exception nobody here has met propagates rather than
+        reading as a refusal. That is only safe while the set stays one type,
+        and a library bump is what would change it — so the sweep that measured
+        it is the test, over every mapped row under a registered prefix plus an
+        unmapped probe per vendor.
+        """
+        from litellm import model_cost
+        from litellm.exceptions import UnsupportedParamsError
+
+        from analysis_service.vendors import VENDORS
+
+        prefixes = {v.litellm_provider: v for v in VENDORS.values()}
+        pairs = [
+            (v, key)
+            for key, entry in model_cost.items()
+            if isinstance(entry, dict)
+            and (v := prefixes.get(entry.get("litellm_provider"))) is not None
+        ]
+        pairs += [(v, "totally-made-up-model-xyz") for v in VENDORS.values()]
+
+        seen = set()
+        for vendor, model in pairs:
+            try:
+                emulates_structured_output(vendor, model)
+            except Exception as exc:  # noqa: BLE001 -- the type is the question
+                seen.add(type(exc))
+        assert seen == {UnsupportedParamsError}, (
+            f"the probe now raises {seen}, so the narrowed except in"
+            " library_sends_no_native_schema no longer covers the set it was"
+            " measured against"
+        )
+
     def test_the_build_gate_refuses_it_rather_than_raising(self):
         """The other reader of the same probe, held against the first.
 
