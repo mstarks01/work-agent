@@ -54,6 +54,7 @@ from analysis_service.vendors import (
     CredentialMode,
     Vendor,
     VendorName,
+    family_identifier,
     vendor_for,
 )
 
@@ -83,10 +84,14 @@ TIER_NAMES: tuple[TierName, ...] = ("base", "strong", "review")
 # * ``shared`` requires nothing. Criticism may run on the very model it checks,
 #   which is the shipped configuration: a critic on one model still catches
 #   inconsistency and unsupported claims, and it costs one tier rather than two.
-# * ``distinct_model`` requires a different ``(vendor, model)`` pair. It removes
-#   a single build's blind spots, and leaves the provider's.
-# * ``distinct_provider`` requires a different vendor. It removes a provider's
-#   blind spots too, at the cost of a second credential and a second quota.
+# * ``distinct_model`` requires a different model. It removes a single build's
+#   blind spots, and leaves the provider's. Compared by the identifier with any
+#   gateway segment stripped, because a slug pins the build whichever route
+#   carries it.
+# * ``distinct_provider`` requires a different serving organisation. It removes
+#   a provider's blind spots too, at the cost of a second credential and a
+#   second quota — and it cannot be satisfied by a gateway route at all, since
+#   an aggregator picks the upstream per call.
 #
 # **None of these makes a review more accurate.** Independence bounds correlated
 # failure; it does not make a second opinion a better one, and a deployment that
@@ -474,23 +479,25 @@ class ModelTierConfig(BaseModel):
         framework: a deployment may run one package's analysis on ``strong`` and
         another's on ``base``, and each one's critic has to be independent of its
         own analysis rather than of some other package's.
+
+        **A label is not the thing it names**, which is what a gateway made
+        true. Both policies used to compare what a deployment *wrote* — the
+        vendor key, and the ``(vendor, model)`` pair — and an aggregator's
+        vendor key says nothing about which provider or which build answered.
+        ``openai`` beside ``openrouter`` is two keys and may be one upstream;
+        ``gpt-5.6`` beside ``openai/gpt-5.6`` is two strings and is one model.
+        So each policy now reads the thing rather than the label, and they read
+        different things because the two facts are knowable to different
+        degrees. See :meth:`_independence_detail`.
         """
         if self.review_independence == "shared":
             return []
-        distinct = "vendor" if self.review_independence == "distinct_provider" else None
         breaches = []
         for name in FRAMEWORK_NAMES:
             analyze = self.tiers[self.nodes[f"analyze/{name}"]]
             critic = self.tiers[self.nodes[f"critic/{name}"]]
-            if distinct == "vendor":
-                shared_part = analyze.vendor == critic.vendor
-                detail = f"both run vendor {analyze.vendor!r}"
-            else:
-                shared_part = (analyze.vendor, analyze.model) == (
-                    critic.vendor,
-                    critic.model,
-                )
-                detail = f"both run {analyze.vendor}/{analyze.model}"
+            detail = self._independence_detail(analyze, critic)
+            shared_part = detail is not None
             if shared_part:
                 breaches.append(
                     f"review_independence is {self.review_independence!r} but"
@@ -500,6 +507,58 @@ class ModelTierConfig(BaseModel):
                     f' to "shared" and accept a same-domain review'
                 )
         return breaches
+
+    def _independence_detail(
+        self, analyze: TierSelection, critic: TierSelection
+    ) -> str | None:
+        """Why these two are not independent under the policy, or ``None``.
+
+        **The model is knowable and the upstream provider is not**, which is why
+        one policy compares and the other refuses.
+
+        ``distinct_model`` compares the model identifiers with any gateway
+        segment stripped, through the one reader of that rule
+        (:func:`~analysis_service.vendors.family_identifier`). A slug pins the
+        model whichever route carries it, so ``openai/gpt-5.6`` through an
+        aggregator and ``gpt-5.6`` direct are one model and a critic on the
+        second removes none of the first's blind spots. The vendor is no longer
+        part of the comparison: this policy is about the build, and two routes
+        to one build share its blind spots however they are keyed.
+
+        The limit is worth stating rather than hiding: a family a vendor spells
+        its own way — Bedrock's ``anthropic.claude-opus-5`` beside
+        ``claude-opus-5`` — still reads as two models here. Closing that needs a
+        cross-vendor identity for a build, which nothing in this repository has,
+        and a comparison that guessed at one would be the label problem again
+        one level down.
+
+        ``distinct_provider`` cannot be satisfied at all where either side is a
+        gateway route. The policy names the *serving organisation*, an
+        aggregator chooses one per call, and which one it chose is not knowable
+        before the call — so a deployment that asked for a distinct provider
+        cannot be told it has one. Refused rather than approximated: unknown
+        routing silently satisfying a strict policy is the failure this whole
+        rule exists to prevent, and it is the one case where the old comparison
+        answered confidently and wrongly.
+
+        Read off ``routes_to_one_provider`` rather than a vendor's name, so the
+        next aggregator is covered the day its row lands.
+        """
+        if self.review_independence == "distinct_provider":
+            for selection in (analyze, critic):
+                if not selection.vendor_entry.routes_to_one_provider:
+                    return (
+                        f"{selection.vendor!r} routes one slug to more than one"
+                        " upstream provider and chooses per call, so nothing"
+                        " here can say the two ran on different providers"
+                    )
+            if analyze.vendor == critic.vendor:
+                return f"both run vendor {analyze.vendor!r}"
+            return None
+        shared_model = family_identifier(analyze.model)
+        if shared_model == family_identifier(critic.model):
+            return f"both run the model {shared_model!r}"
+        return None
 
     def resolve_tier(self, node: str) -> TierName:
         """The tier the named LLM node runs on.
