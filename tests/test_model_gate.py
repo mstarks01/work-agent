@@ -26,6 +26,8 @@ from analysis_service.model_gate import (
     ModelGateError,
     assert_kwarg_supported,
     check_supported,
+    emulates_structured_output,
+    native_structured_output,
     output_ceiling,
 )
 from analysis_service.vendors import vendor_for
@@ -137,6 +139,83 @@ class TestKwargAssertion:
         # revert retry to a single try — the failure retry exists to prevent.
         with pytest.raises(ModelGateError, match="not a litellm parameter"):
             assert_kwarg_supported("num_retrys")
+
+
+class TestAModelThatRefusesTheParameterAtAll:
+    """The third shape a schema probe meets, and the one nobody listed.
+
+    :func:`emulates_structured_output` asks LiteLLM what it would map
+    ``response_format`` to. For a model that does not take the parameter at all
+    LiteLLM maps nothing and raises, so the probe is neither ``True`` nor
+    ``False`` — it is an exception. 33 of the 445 mapped models under a
+    registered vendor prefix behave this way.
+
+    It stayed hidden while ``_probe_structured_output`` asked LiteLLM's
+    capability lookup first and short-circuited on it, so the raising call was
+    never reached for these. Reading the map's own key made it reachable, and a
+    report that raises answers nothing at all.
+    """
+
+    #: A published Bedrock identifier that does not take ``response_format``.
+    #: Region-scoped, which is a shape `validate_model` accepts: the scope there
+    #: is a slash segment rather than the dotted one the Claude rule reads, so
+    #: this reaches the catch-all and is a model an operator can name.
+    REFUSING = "eu-west-3/mistral.mistral-7b-instruct-v0:2"
+
+    def test_the_probe_really_does_raise_for_it(self):
+        """Asserted in its own right, so the tests below cannot pass vacuously.
+
+        If LiteLLM starts mapping the param for this model, the two below go on
+        passing while testing nothing. What they would fail as is the problem —
+        so the property is pinned here and says so in its message.
+        """
+        with pytest.raises(Exception):  # noqa: B017 -- litellm's own param error
+            emulates_structured_output(vendor_for("bedrock"), self.REFUSING)
+
+    def test_the_reader_calls_it_unsupported_rather_than_raising(self):
+        """A definitive no: a schema cannot reach a model that refuses to carry it.
+
+        ``False`` and not ``None``. The map being silent is what ``None`` means,
+        and this is not silence — the provider library refused the parameter.
+        """
+        assert native_structured_output(vendor_for("bedrock"), self.REFUSING) is False
+
+    def test_the_matrix_renders_a_cell_rather_than_failing(self):
+        from analysis_service.conformance import Capability, profile
+
+        entry = profile(vendor_for("bedrock"), self.REFUSING)
+        assert entry.structured_output is Capability.UNSUPPORTED
+        assert "structured_output" not in entry.unknowns
+
+    def test_no_mapped_model_under_any_vendor_prefix_can_crash_the_report(self):
+        """The property, over the whole map rather than over one example.
+
+        The matrix exists to report, and a pair it cannot answer for has to
+        produce a cell saying so. This is the sweep that found the shape: it
+        walks every model the pinned map carries under a registered prefix, so
+        a library bump that makes a new family raise fails here rather than in
+        whatever lane next renders a matrix.
+        """
+        from litellm import model_cost
+
+        from analysis_service.conformance import profile
+        from analysis_service.vendors import VENDORS
+
+        by_prefix = {vendor.prefix: vendor for vendor in VENDORS.values()}
+        probed = 0
+        for key, entry in model_cost.items():
+            if not isinstance(entry, dict):
+                continue
+            prefix, separator, model = key.partition("/")
+            vendor = by_prefix.get(f"{prefix}{separator}")
+            if vendor is None or not model:
+                continue
+            probed += 1
+            profile(vendor, model)
+
+        # A guard against the walk silently matching nothing, which would make
+        # the loop above a test of the `continue` statements.
+        assert probed > 300
 
 
 class TestOutputCeiling:
