@@ -7,12 +7,19 @@ This module asks the same questions for a different purpose, which is to report:
 
     SUPPORTED    the provider accepts it, and the map is what says so
     UNSUPPORTED  the provider rejects it
-    UNKNOWN      nothing here knows — the model is not in the pinned map
+    UNKNOWN      nothing here knows
 
 ``UNKNOWN`` is the whole reason the module exists. A capability matrix that
 renders it as ``UNSUPPORTED`` invents a fact, and one that renders it as
 ``SUPPORTED`` invents a worse one. The honest cell is the one that says the
-question went unanswered. Vendor neutrality is equivalent application behaviour
+question went unanswered.
+
+**A pair can be in the map and a capability still be unanswered.** The map
+carries an entry per model and each entry answers the questions it happens to
+carry, so a mapped pair can be silent about response schemas — 2029 of the
+pinned map's entries are. Coverage is therefore per capability and not per
+entry, which is why :attr:`ProviderProfile.known` is reported beside the cells
+rather than standing in for them. Vendor neutrality is equivalent application behaviour
 given equivalent provider capabilities, and nobody can check that claim without
 being able to see which capabilities differ.
 
@@ -38,10 +45,9 @@ from typing import Any
 # rule in :mod:`analysis_service.model_gate`.
 from analysis_service.model_gate import (
     check_supported,
-    emulates_structured_output,
     model_info,
+    native_structured_output,
     output_ceiling,
-    supports_structured_output,
 )
 from analysis_service.vendors import REASONING_KWARG, Vendor, vendor_for
 
@@ -205,19 +211,30 @@ def _probe_param(vendor: Vendor, model: str, name: str, value: Any) -> Capabilit
 def _probe_structured_output(vendor: Vendor, model: str) -> Capability:
     """Whether schema-constrained output reaches this model *natively*.
 
-    ``UNSUPPORTED`` covers both ways a model fails to get it: the provider
-    library not honouring a schema at all, and honouring it only through
-    LiteLLM's synthesised-tool emulation. They are collapsed deliberately —
-    every LLM node in the graph binds an output schema, so for this application
-    an emulated constraint is not a lesser form of support but a job that dies
-    at output validation, and a matrix that graded it as partial support would
-    invite exactly the deployment the build-time gate exists to refuse.
+    ``UNSUPPORTED`` covers both ways a model is known to fail to get it: the
+    map saying outright that the model does not honour a schema, and LiteLLM
+    satisfying the constraint through its synthesised-tool emulation. They are
+    collapsed deliberately — every LLM node in the graph binds an output schema,
+    so for this application an emulated constraint is not a lesser form of
+    support but a job that dies at output validation, and a matrix that graded
+    it as partial support would invite exactly the deployment the build-time
+    gate exists to refuse.
+
+    **``UNKNOWN`` is the third answer, and leaving it out was a defect in the
+    one module that exists to carry it.** This read LiteLLM's boolean lookup,
+    which returns ``False`` both for a map entry that says no and for one that
+    says nothing. So the matrix printed ``unsupported`` for
+    ``openrouter/anthropic/claude-sonnet-4.6``, whose entry is merely silent and
+    which honours a schema when asked — the module's own header calls rendering
+    an unknown as ``UNSUPPORTED`` "inventing a fact", and it was inventing one.
+
+    :attr:`ProviderProfile.known` could not catch it: that flag is per *entry*,
+    and this pair has an entry. Coverage has to be answered per capability.
     """
-    if not supports_structured_output(vendor, model):
-        return Capability.UNSUPPORTED
-    if emulates_structured_output(vendor, model):
-        return Capability.UNSUPPORTED
-    return Capability.SUPPORTED
+    native = native_structured_output(vendor, model)
+    if native is None:
+        return Capability.UNKNOWN
+    return Capability.SUPPORTED if native else Capability.UNSUPPORTED
 
 
 def profile(vendor: Vendor, model: str) -> ProviderProfile:
@@ -306,7 +323,7 @@ def main() -> None:
         if entry.unknowns
     }
     if unanswered:
-        print("\nUnanswered — not in the pinned model map:\n")
+        print("\nUnanswered — the pinned model map does not say:\n")
         for pair, names in unanswered.items():
             print(f"- `{pair}`: {', '.join(names)}")
 
