@@ -729,6 +729,34 @@ class InputRef(BaseModel):
         )
 
 
+def charges_by_node(nodes: Iterable[NodeRun]) -> dict[str, float]:
+    """What each node's provider said it charged, summed across its executions.
+
+    The same fold as :func:`usage_by_node`, over the other measurement a node
+    run keeps, and it exists for the same reason: a sweep hands over every
+    case's executions at once, so a per-node total means every caller writing
+    the same loop.
+
+    A node whose provider reported nothing is **absent** rather than zero. The
+    distinction is the one the usage fold already draws: a call nobody priced
+    and a call that cost nothing are different facts, and most vendors report no
+    charge at all, so a zeroed entry would read as a free call on every one of
+    them.
+
+    Summed in USD, which is the unit
+    :attr:`NodeRun.reported_charge_usd` is recorded in. Float addition over a
+    few dozen small values is the same arithmetic the token prices already use,
+    and the figure it produces is a record of what was charged rather than an
+    input to a comparison.
+    """
+    totals: dict[str, float] = {}
+    for node in nodes:
+        if node.reported_charge_usd is None:
+            continue
+        totals[node.node] = totals.get(node.node, 0.0) + node.reported_charge_usd
+    return totals
+
+
 def usage_by_node(nodes: Iterable[NodeRun]) -> dict[str, TokenUsage]:
     """Total tokens per node name, summed across that node's executions.
 

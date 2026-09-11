@@ -276,6 +276,31 @@ class TestTheDeclaredKeysAreTheWrittenKeys:
         )
         assert set(artifact) == DECLARED_KEYS
 
+    def test_the_artifact_carries_the_charges_the_run_folded(self):
+        """The value, not just the key: one fold, read once and written once.
+
+        ``node_charges`` is empty on every vendor that reports token counts
+        alone, so a build that dropped the fold would look correct on every
+        sweep this repository has ever run.
+        """
+        from dataclasses import replace
+
+        from analysis_service.certification import CertifyResult
+        from evals.harness.artifact import RepoCommit, build
+
+        run = replace(empty_run(tuple(PACKAGES)), charges={"extract": 0.003})
+        artifact = build(
+            mode="analysis",
+            cases=[],
+            models={},
+            certification=CertifyResult(certified=True),
+            trusted=True,
+            sweep=Sweep(run=run),
+            commit=RepoCommit(commit="0" * 40, clean=True),
+            corpus="0" * 64,
+        )
+        assert artifact["node_charges"] == {"extract": 0.003}
+
 
 class TestASweepReadsEachDerivedValueOnce:
     """The console line and the artifact value come from one computation."""

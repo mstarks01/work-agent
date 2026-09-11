@@ -8,6 +8,7 @@ read off the merged Baseline sweep, which is a tracked file, so the number
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -20,13 +21,29 @@ from evals.harness.reference import flows_by_case, load_corpus
 from evals.harness.verb_pricing import parse_groups, price
 from tests.test_evals_identity import FRONTIER
 
-BASELINE = (
+BASELINE_DIR = (
     Path(__file__).resolve().parents[1]
     / "evals"
     / "baselines"
     / "352b72d-gpt-5.6-terra-2f7e336d"
-    / "mstarks01-6d1837ed.json"
 )
+
+
+def _baseline_sweep() -> Path:
+    """The sweep the manifest names, rather than a filename typed here.
+
+    A sweep is keyed by its own bytes, so its filename moves whenever the
+    archive is migrated — and a test naming the old one fails with a missing
+    file rather than with anything about pricing. The manifest is the record of
+    which file is the sweep, so it is what this reads. Sorted, so a directory
+    that grows a second sweep still picks the same one every run.
+    """
+    manifest = json.loads((BASELINE_DIR / "baseline.json").read_text(encoding="utf-8"))
+    names = sorted(str(entry["artifact"]) for entry in manifest["sweeps"])
+    return BASELINE_DIR / names[0]
+
+
+BASELINE = _baseline_sweep()
 
 
 @pytest.fixture(scope="module")

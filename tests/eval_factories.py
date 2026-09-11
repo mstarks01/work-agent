@@ -59,6 +59,7 @@ def sweep_document(
     usage_nodes: tuple[str, ...] = ("extract", "critic"),
     cases: tuple[str, ...] = ("01-a-case",),
     seed: int = 1,
+    charges: dict[str, float] | None = None,
 ) -> dict:
     """One admissible artifact document; ``seed`` varies the bytes only.
 
@@ -66,6 +67,10 @@ def sweep_document(
     :func:`~evals.harness.artifact.load_artifact` refuses anything less. Shared
     by the Baseline tests and the review app's, which read the same identity
     out of it through one reader.
+
+    ``charges`` is what the providers said they charged, per node. Empty by
+    default, which is what every sweep on a direct vendor records -- those
+    report token counts and nothing else.
     """
     tiers = sweep_sampling(temperature)
     runs = {
@@ -116,6 +121,7 @@ def sweep_document(
         "frameworks": list(frameworks),
         "certification": {"verdict": "uncertified", "seed": seed},
         "node_usage": usage,
+        "node_charges": dict(charges or {}),
         "provenance": provenance.to_json(),
     }
 
