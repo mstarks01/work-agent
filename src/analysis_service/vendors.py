@@ -59,16 +59,19 @@ VENDOR_NAMES: tuple[VendorName, ...] = (
 
 #: How much a vendor's *served* build identifier is worth as evidence.
 #:
-#: ``provider_reported`` means the translator read the build's name out of the
-#: response body, so the provider named what answered. ``requested_echo`` means
-#: the translator filled it from the request, so the served half of an
-#: **Execution Identity** repeats the requested half and adds nothing.
+#: ``provider_reported`` means the value that reaches the fingerprint names
+#: what answered. ``requested_echo`` means it repeats the requested half of an
+#: **Execution Identity** and adds nothing.
 #:
-#: Two values and not three. The reader asks one question — does the served
-#: build add evidence the requested build did not — and an echo answers no
-#: whatever the reason for it. A Gemini response body carries ``modelVersion``
-#: and the pinned translator never reads it; a Bedrock Converse response carries
-#: no model identifier at all. Either way the answer is the same.
+#: **A claim about the value, not about the code path that filled it.** Two
+#: values and not three: the reader asks one question — does the served build
+#: add evidence the requested build did not — and an echo answers no whatever
+#: the reason for it. There are three reasons here and they all answer no. A
+#: Gemini response body carries ``modelVersion`` and the pinned translator
+#: never reads it. A Bedrock Converse response carries no model identifier at
+#: all. And OpenRouter's body carries one that repeats the request, which is
+#: the reason that separates this field from its mechanism: litellm reads that
+#: field faithfully and what it reads is the request (#806).
 ServedTrust = Literal["provider_reported", "requested_echo"]
 
 # The one reasoning knob, uniform across vendors: LiteLLM maps it to adaptive
@@ -686,12 +689,15 @@ class Vendor:
     served_trust: ServedTrust
     #: Whether one route on this vendor reaches one upstream provider.
     #:
-    #: A **separate question from** :attr:`served_trust`, and the two disagree
-    #: on an aggregator. ``served_trust`` says whether the translator read a
-    #: name out of the response body. This says whether that name can only ever
-    #: have come from one place. OpenRouter answers a request that names one
-    #: slug, and may serve it from whichever upstream provider is available, so
-    #: two runs of one configuration can reach two backends.
+    #: A **separate question from** :attr:`served_trust`, and one an aggregator
+    #: answers differently. ``served_trust`` says what the served identifier is
+    #: worth. This says whether that identifier can only ever have come from one
+    #: place. OpenRouter answers a request that names one slug, and may serve it
+    #: from whichever upstream provider is available, so two runs of one
+    #: configuration can reach two backends. Measured 2026-09-11: one
+    #: ``anthropic/claude-opus-4.7`` slug is fronted by 8 endpoints across 5
+    #: providers, and one Llama slug by 12 endpoints whose tags carry differing
+    #: numeric formats. See `docs/research/openrouter-served-model.md`.
     #:
     #: One reader: ``evals/harness/baseline.py`` refuses to name a **Baseline**
     #: after such a route, because a Baseline's whole value is that its sweeps
@@ -1075,28 +1081,29 @@ VENDORS: dict[VendorName, Vendor] = {
     # is what :data:`_GATEWAY_NAME` and :func:`family_identifier` read, so a
     # family rule still follows the family rather than the wrapper.
     #
-    # **What the served build is worth here needs reading twice.** The value
-    # below is ``provider_reported``, and it is right by the field's own
-    # definition: litellm's OpenRouter config inherits the OpenAI
-    # transformation and fills ``model_response.model`` from the response
-    # body's ``model``, which ``tests/test_identity.py`` drives. What nobody
-    # here has measured is whether that body names the upstream build or
-    # repeats the slug that was asked for, and OpenRouter may route one slug to
-    # more than one upstream provider. That is a claim about a third party and
-    # needs a live call to settle (#806).
-    # `docs/research/probe_openrouter_served_model.py` is that call: it reads
-    # `model` off the body beside the requested slug, and reads OpenRouter's own
-    # generation record for which upstream provider served. It needs a key
-    # nobody has provisioned, so it has not run.
-    # Until it is settled, a fingerprint over an ``openrouter/`` route carries
-    # less than one over a direct route, and
-    # ``evals/harness/baseline.py`` refuses to name a **Baseline** after one.
+    # **The first row whose echo is the provider's doing rather than the
+    # translator's.** litellm reads ``model`` out of the response body here, as
+    # it does for ``anthropic`` and ``openai``. OpenRouter puts the requested
+    # slug in that field, so the value read back is the request.
+    #
+    # Measured 2026-09-11 and recorded in
+    # `docs/research/openrouter-served-model.md`: a request for
+    # ``anthropic/claude-opus-4.7`` came back naming that same slug, while the
+    # same response's generation record named the build
+    # ``anthropic/claude-4.7-opus-20260416`` and the upstream ``Claude Platform
+    # on AWS``. The body states the upstream in a ``provider`` field that the
+    # OpenAI-shaped transformation never reads, so the evidence exists and does
+    # not reach the fingerprint.
+    #
+    # So a fingerprint over an ``openrouter/`` route carries less than one over
+    # a direct route, and says so in the payload rather than in this comment.
     "openrouter": Vendor(
         name="openrouter",
         prefix="openrouter/",
         # litellm reads ``response_object["model"]`` through the OpenAI-shaped
-        # conversion its OpenRouter config inherits.
-        served_trust="provider_reported",
+        # conversion its OpenRouter config inherits, and what it reads is the
+        # slug the request named. Measured, not inferred: see above.
+        served_trust="requested_echo",
         routes_to_one_provider=False,
         # A bearer token and nothing else. litellm reads ``OPENROUTER_API_KEY``
         # and then ``OR_API_KEY`` out of the process environment whenever

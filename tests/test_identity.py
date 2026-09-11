@@ -269,8 +269,22 @@ class TestTheTableMatchesWhatTheTranslatorDoes:
 
     So the table is checked against what the installed translator does, rather
     than against a second copy of the same claim. Each vendor's own
-    transformation is driven with a canned response naming a build **different**
-    from the request, offline, with no credential and no network.
+    transformation is driven, offline, with no credential and no network,
+    against a canned response **in the shape that vendor really sends**.
+
+    For four vendors that shape names a build different from the request, and
+    the translator either reads it or does not. Two vendors send neither, and
+    the absence is the fact rather than an omission here: a Bedrock Converse
+    response carries no model identifier at all, and an OpenRouter response
+    carries one that repeats the request (#806, measured in
+    ``docs/research/openrouter-served-model.md``). A body that named a build
+    for either would test a wire shape the provider does not send.
+
+    **The limit that follows, accepted.** Where the body echoes, this cannot
+    tell an echoing provider from a translator that stopped reading. It would
+    keep passing if OpenRouter began naming the build. The research note is the
+    dated record that the body is a measurement; a live call is what would find
+    the change.
     """
 
     REQUESTED = "requested-build"
@@ -280,11 +294,12 @@ class TestTheTableMatchesWhatTheTranslatorDoes:
     #: shape, naming :attr:`SERVED` where that API carries a model name. Keyed
     #: by vendor, so a row cannot be added without answering here.
     #:
-    #: The Bedrock body names it nowhere, and that absence is the fact: a
-    #: Converse response carries no model identifier at all, so there is no
-    #: field a translator could read and the served half can only echo the
-    #: request. A body that invented one would test a wire shape AWS does not
-    #: send.
+    #: Two rows name :attr:`REQUESTED` instead, each for a measured reason.
+    #: The Bedrock body names a model nowhere: a Converse response carries no
+    #: model identifier at all, so there is no field a translator could read.
+    #: The OpenRouter body names one and fills it with the request, which is
+    #: what the gateway was measured to send. A body that invented a build for
+    #: either would test a wire shape the provider does not send.
     BODIES: ClassVar[dict[str, dict]] = {
         "vertex": {
             "candidates": [
@@ -351,21 +366,28 @@ class TestTheTableMatchesWhatTheTranslatorDoes:
         },
         # OpenRouter answers in the OpenAI wire shape, and litellm's config for
         # it inherits the OpenAI transformation, which reads ``model`` off the
-        # body. What this entry drives is that inheritance.
+        # body. That inheritance is not in doubt, and it is not what makes this
+        # row an echo.
         #
-        # It does **not** drive what OpenRouter puts in that field. A gateway
-        # may repeat the slug it was asked for rather than name the upstream
-        # build, and one slug may reach more than one upstream provider. That
-        # is a claim about a third party, so it needs a live call and is
-        # recorded as open on the row rather than asserted here.
-        # `docs/research/probe_openrouter_served_model.py` makes that call. Its
-        # third leg runs this same transformation over the body it received, so
-        # what changes when it runs is the body below, not the mechanism.
+        # **The gateway is what echoes.** Measured 2026-09-11 by
+        # `docs/research/probe_openrouter_served_model.py` and recorded in
+        # `docs/research/openrouter-served-model.md`: a request naming
+        # ``anthropic/claude-opus-4.7`` came back naming that same slug, while
+        # the same response's generation record named the build
+        # ``anthropic/claude-4.7-opus-20260416``. So the body below repeats
+        # :attr:`REQUESTED`, which is the shape OpenRouter really sends.
+        #
+        # ``provider`` is here for the same reason. OpenRouter states which
+        # upstream served — ``Claude Platform on AWS`` on that call, for a
+        # Claude slug — and the OpenAI-shaped transformation never reads the
+        # field. Including it keeps the body honest about evidence this
+        # service receives and discards.
         "openrouter": {
             "id": "gen-offline",
             "object": "chat.completion",
             "created": 1,
-            "model": SERVED,
+            "model": REQUESTED,
+            "provider": "Claude Platform on AWS",
             "choices": [
                 {
                     "index": 0,

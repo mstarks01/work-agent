@@ -25,19 +25,7 @@ same reason, so a lint cannot rewrite an artifact an ADR points at.
 | `asvs-representation.md` + `asvs-l1-subjects.csv` | #160 | 2026-08-12 | — |
 | `system-model-evolution.md` + `probe_model_vocabulary.py` | #483 | 2026-09-04 | repo `8729415`, CycloneDX 1.7 |
 | `repository-evidence.md` | #484 | 2026-09-08 | repo `8085c43`, SARIF 2.1.0 errata 01, GitHub REST 2022-11-28 |
-| `probe_openrouter_served_model.py` | #806 | not run | — |
-
-## The one probe that has not run
-
-`probe_openrouter_served_model.py` carries no result, and it is the only file
-here that does not. It measures what an OpenRouter response names in `model`,
-which decides the `openrouter` row's `served_trust`. That is a claim about a
-third party, so a live call settles it and nothing offline does. Nobody has
-provisioned an OpenRouter key, so the script is the mechanism waiting for one.
-
-Run it, then write the record beside it and close
-[#806](https://github.com/mstarks01/work-agent/issues/806). Do not fold the
-result into this README — an evidence file is what a decision cites.
+| `openrouter-served-model.md` + `probe_openrouter_served_model.py` | #806 | 2026-09-11 | `litellm==1.97.0`, repo `d16a6c4`, OpenRouter live API |
 
 ## The one staleness you must know about
 
