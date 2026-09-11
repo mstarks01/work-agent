@@ -40,6 +40,7 @@ import pytest
 from google.adk.models.base_llm import BaseLlm
 
 from analysis_service.binding import NodeBinding, build_tier_adapters
+from analysis_service.charges import records_reported_charge
 from analysis_service.conformance import (
     PROBED_PARAMS,
     REFERENCE_MODELS,
@@ -414,6 +415,38 @@ class TestModelsCanBeBound:
         assert adapters["base"].model == f"{prefix}{base}"
         assert adapters["strong"].model == f"{prefix}{strong}"
 
+    @pytest.mark.parametrize("vendor", sorted(REFERENCE_MODELS))
+    def test_only_a_reporting_vendor_binds_a_client_that_reads_a_charge(self, vendor):
+        """Which client each tier gets, decided from the registry.
+
+        The adapter that captures a reported charge is installed where that
+        figure is what a call cost, and ADK's own client is used everywhere
+        else. Read off the built adapters rather than off the code that builds
+        them: a wiring test that passes while the deployment binds something
+        else is the failure this suite exists to catch.
+
+        The check is by defining module rather than by class, because both
+        client classes are built per call and no two builds share one object.
+        """
+        adapters = build_tier_adapters(
+            tiers_for(vendor),
+            _shipped_sampling(),
+            load_resilience(CONFIG / "resilience.toml", env={}),
+            env=FAKE_ENV,
+        )
+        tiers = tiers_for(vendor)
+        expected = records_reported_charge(
+            vendor_for(vendor), tiers.charge_mode(vendor)
+        )
+        for tier, adapter in adapters.items():
+            captures = type(adapter.llm_client).__module__ == "analysis_service.charges"
+            assert captures is expected, (
+                f"{vendor} {tier} binds a client that"
+                f" {'captures' if captures else 'ignores'} a reported charge,"
+                f" and the registry says it should"
+                f" {'capture' if expected else 'ignore'} one"
+            )
+
     def test_no_vendor_reaches_its_provider_by_a_different_class(self, tmp_path):
         """One adapter class for all three, which is the no-privileged-path claim.
 
@@ -446,10 +479,19 @@ class TestModelsCanBeBound:
                 load_resilience(CONFIG / "resilience.toml", env={}),
                 env=FAKE_ENV,
             )
-            # [1:] drops the per-call retry subclass; what remains is the route
-            # to the provider, which no vendor may differ on.
+            # This package's own layers are dropped: each is built per call,
+            # so two builds never share one class object. What remains is the
+            # route to the provider, which no vendor may differ on. Dropped by
+            # where a class is defined rather than by counting them, so a third
+            # layer needs no edit here and cannot hide a vendor difference
+            # underneath it either.
             ancestries[vendor] = {
-                tier: type(adapter).__mro__[1:] for tier, adapter in adapters.items()
+                tier: tuple(
+                    ancestor
+                    for ancestor in type(adapter).__mro__
+                    if not ancestor.__module__.startswith("analysis_service.")
+                )
+                for tier, adapter in adapters.items()
             }
             for adapter in adapters.values():
                 assert isinstance(adapter, LiteLlm)

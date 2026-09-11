@@ -36,6 +36,7 @@ from tests.factories import (
     DESCRIPTION_TEXT,
     PROJECT_ROOT,
     STRONG_MODEL,
+    ChargedLlm,
     RetriedLlm,
     SilentLlm,
     SlowLlm,
@@ -180,6 +181,33 @@ def test_usage_is_recorded_even_when_the_served_build_is_not():
     assert extract.execution_fingerprint is None
     assert extract.usage is not None
     assert extract.usage.prompt_tokens == 1100
+
+
+def test_a_node_records_what_its_provider_said_it_charged():
+    """The figure travels beside the token counts, not instead of them.
+
+    A vendor that reports a charge is priced from it; every other vendor is
+    priced from the counts. A record that held one number could not say which
+    of the two it was holding, so both are on the row.
+    """
+    pipeline, _ = scripted_pipeline(happy_replies(), llm_class=ChargedLlm)
+    runs = by_node(drive(pipeline))
+
+    extract = runs[graph.EXTRACT_NODE]
+    assert extract.reported_charge_usd == pytest.approx(ChargedLlm.charge)
+    assert extract.usage is not None
+
+
+def test_a_node_whose_provider_reported_no_charge_records_none():
+    """Most vendors state token counts and nothing else.
+
+    ``None`` rather than zero: a call nobody priced and a call that cost nothing
+    are different facts, and a zero here would read as the second.
+    """
+    pipeline, _ = scripted_pipeline(happy_replies())
+    runs = by_node(drive(pipeline))
+
+    assert runs[graph.EXTRACT_NODE].reported_charge_usd is None
 
 
 def test_a_retried_node_records_how_many_attempts_it_took():

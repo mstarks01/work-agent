@@ -72,6 +72,12 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Self
 
+from analysis_service.charges import (
+    charge_capturing_client_class,
+    charge_reporting_llm_class,
+    records_reported_charge,
+)
+
 # Imported before anything that could pull in ``litellm``: this module's import
 # is what pins the model-cost map to the installed copy. See
 # :func:`analysis_service.model_gate._import_litellm_hermetically`.
@@ -364,7 +370,7 @@ def build_tier_adapters(
     # Deferred so that importing this module never costs the ADK LiteLLM import
     # for callers that only want the helpers; by this point ``model_gate`` has
     # already pinned the cost map, so the ordering guarantee holds either way.
-    from google.adk.models.lite_llm import LiteLlm
+    from google.adk.models.lite_llm import LiteLlm, LiteLLMClient
 
     assert_kwarg_supported(_NUM_RETRIES_KWARG)
 
@@ -374,7 +380,11 @@ def build_tier_adapters(
     # of the process, not of a tier. Capacity is one retry per LLM node in the
     # graph — what a single job may spend from a cold bucket.
     policy = resilience.retry_policy(budget_capacity=len(LLM_NODES))
-    retrying = retrying_llm_class(LiteLlm, policy)
+    # Two subclasses, composed in the order their jobs happen: the retry layer
+    # is outermost, so every attempt it makes passes through the charge layer
+    # and the attempt that answered is the one whose response is stamped.
+    retrying = retrying_llm_class(charge_reporting_llm_class(LiteLlm), policy)
+    capturing_client = charge_capturing_client_class(LiteLLMClient)
 
     adapters: dict[TierName, LiteLlm] = {}
     # Walked in the vocabulary's order rather than the map's, so the build order
@@ -416,6 +426,16 @@ def build_tier_adapters(
             **{_TIMEOUT_KWARG: resilience.request_timeout_seconds()},
             **tier_sampling.constructor_kwargs(),
             **vendor.credential_kwargs(env, tiers.credential_mode(selection.vendor)),
+            # A client that reads what the provider said it charged, on the
+            # tiers where that figure is what a call cost. Every other tier
+            # gets ADK's own client and reports token counts alone, which is
+            # what the cost arithmetic has always run on. Named rather than
+            # spread, so the seam stays a closed set of kwargs.
+            llm_client=(
+                capturing_client()
+                if records_reported_charge(vendor, tiers.charge_mode(selection.vendor))
+                else LiteLLMClient()
+            ),
         )
     return adapters
 
