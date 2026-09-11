@@ -225,6 +225,16 @@ The rules are the credential table's rules: a key for a vendor that reports no
 charge is an error, a key for a vendor with one arrangement is an error, and a
 missing key is an error only where a **bound** tier selects that vendor.
 
+**The provider checks your declaration.** OpenRouter states `is_byok` in the
+same response field it states the charge in. Where that flag disagrees with what
+you declared, the run stops at the node that found out and the message names
+this key. It costs one node's tokens, and it is the only moment the mismatch can
+be seen — nothing before the first call knows which account the key belongs to.
+
+The flag can contradict a declaration and never supplies one. A response that
+states nothing leaves your declaration standing, which is what every vendor but
+this one does.
+
 Under `iam`, Work Agent passes an **empty** `api_key` rather than none at all.
 That is not a detail: LiteLLM reads `AWS_BEARER_TOKEN_BEDROCK` out of the
 process environment whenever no key is passed, authenticates with it and skips

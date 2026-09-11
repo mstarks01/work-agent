@@ -27,7 +27,12 @@ Three things are printed, and each one can fail independently:
 3. **What the record carries.** The ``custom_metadata`` stamp on the response
    ADK builds, which is exactly what ``NodeRun.reported_charge_usd`` is read
    from.
-4. **What OpenRouter's own record says.** ``GET /generation`` on the returned
+4. **Which arrangement the provider says served the call.** ``is_byok`` in the
+   completion body's ``usage`` block, read through the same function the
+   deployment reads it with. A flag that disagrees with the declared
+   arrangement stops a run, so what this leg confirms is that the reader sees
+   what the provider actually sends.
+5. **What OpenRouter's own record says.** ``GET /generation`` on the returned
    id, which is unbilled and states ``is_byok`` and the upstream cost beside
    the total. That is what decides whether the reported figure is the whole
    charge under this account's arrangement, rather than a part of it.
@@ -49,7 +54,11 @@ from google.adk.models.llm_request import LlmRequest
 from google.genai import types
 
 from analysis_service.binding import build_tier_adapters
-from analysis_service.charges import CHARGE_METADATA_KEY, reported_charge_of
+from analysis_service.charges import (
+    CHARGE_METADATA_KEY,
+    reported_charge_of,
+    stated_arrangement_of,
+)
 from analysis_service.model_tiers import load_model_tiers
 from analysis_service.resilience import load_resilience
 from analysis_service.sampling import load_sampling
@@ -154,6 +163,8 @@ def main() -> int:
         hidden = getattr(raw, "_hidden_params", None)
         print(json.dumps(_plain(hidden), indent=2, sort_keys=True, default=str))
         print(f"\nreported_charge_of(...) -> {reported_charge_of(raw)!r}")
+        stated = stated_arrangement_of(raw)
+        print(f"stated_arrangement_of(...) -> {stated.value if stated else None!r}")
 
     print("\n--- what the record carries ---")
     for response in responses:

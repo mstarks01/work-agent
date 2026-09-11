@@ -75,7 +75,6 @@ from typing import TYPE_CHECKING, Self
 from analysis_service.charges import (
     charge_capturing_client_class,
     charge_reporting_llm_class,
-    records_reported_charge,
 )
 
 # Imported before anything that could pull in ``litellm``: this module's import
@@ -426,14 +425,19 @@ def build_tier_adapters(
             **{_TIMEOUT_KWARG: resilience.request_timeout_seconds()},
             **tier_sampling.constructor_kwargs(),
             **vendor.credential_kwargs(env, tiers.credential_mode(selection.vendor)),
-            # A client that reads what the provider said it charged, on the
-            # tiers where that figure is what a call cost. Every other tier
-            # gets ADK's own client and reports token counts alone, which is
-            # what the cost arithmetic has always run on. Named rather than
-            # spread, so the seam stays a closed set of kwargs.
+            # A client that reads what the provider said about money, on every
+            # tier whose vendor says anything. Every other tier gets ADK's own
+            # client and reports token counts alone, which is what the cost
+            # arithmetic has always run on. Named rather than spread, so the
+            # seam stays a closed set of kwargs.
+            #
+            # Installed wherever the vendor reports a charge rather than
+            # wherever the figure is recordable: the client is also what catches
+            # a declared arrangement the provider contradicts, and a deployment
+            # that declared the wrong one records nothing to be caught by.
             llm_client=(
-                capturing_client()
-                if records_reported_charge(vendor, tiers.charge_mode(selection.vendor))
+                capturing_client(vendor, tiers.charge_mode(selection.vendor))
+                if vendor.reports_charge
                 else LiteLLMClient()
             ),
         )
