@@ -153,8 +153,22 @@ def native_structured_output(vendor: Vendor, model: str) -> bool | None:
     here for the same reason :func:`output_ceiling` yields ``None``: nobody
     knows, and saying so is the open-world residual this module reports rather
     than hides.
+
+    **A model that refuses ``response_format`` outright is a third shape, and
+    it raises.** 33 of the 445 mapped models under a registered prefix do —
+    Bedrock's Cohere text models among them — because
+    :func:`emulates_structured_output` asks what LiteLLM would map the param
+    to, and for those it maps nothing and raises ``UnsupportedParamsError``.
+    That is a definitive ``False``: a schema does not reach a model that will
+    not take the parameter carrying it. It is caught here rather than left to
+    the caller, because the caller is a *report* and a matrix that raises
+    answers nothing at all.
     """
-    if emulates_structured_output(vendor, model):
+    try:
+        emulated = emulates_structured_output(vendor, model)
+    except Exception:  # noqa: BLE001 -- litellm raises its own param errors here
+        return False
+    if emulated:
         return False
     info = model_info(vendor, model)
     if info is None:
