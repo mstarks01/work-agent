@@ -56,7 +56,6 @@ import logging
 import random
 from collections.abc import AsyncGenerator, Sequence
 from dataclasses import dataclass
-from functools import cache
 from typing import ClassVar
 
 logger = logging.getLogger(__name__)
@@ -77,7 +76,8 @@ _BACKOFF_CAP_SECONDS = 30.0
 # ``google.genai.types.FinishReason`` and hangs it on every non-streaming
 # response. Compared as a bare string rather than imported, because
 # ``FinishReason`` subclasses ``str`` and this module stays free of the provider
-# libraries at import time — the same reason ``_retryable_types`` is deferred.
+# libraries at import time, which ``_is_transient`` keeps true by reading a
+# status code off the exception rather than naming a litellm class.
 _MAX_TOKENS_FINISH_REASON = "MAX_TOKENS"
 
 # The remedy half of every truncation message, shared with
@@ -109,10 +109,11 @@ class TruncatedCompletionError(RuntimeError):
     absent key — it names the node's model and fires before the partial text
     reaches a validator that will misdescribe it.
 
-    **Deliberately not retryable.** It is not in :func:`_retryable_types` and
-    must not be: the same request against the same cap truncates again, and the
-    second ask is a paid-for identical answer. That is the rule the whole module
-    already applies to a malformed request or a rejected credential.
+    **Deliberately not retryable.** It carries no status code, so
+    :func:`_is_transient` answers no, and it must stay that way: the same
+    request against the same cap truncates again, and the second ask is a
+    paid-for identical answer. That is the rule the whole module already
+    applies to a malformed request or a rejected credential.
     """
 
 
@@ -165,35 +166,59 @@ class RetryBudget:
         return True
 
 
-@cache
-def _retryable_types() -> tuple[type[BaseException], ...]:
-    """The transient failures worth asking again about.
+#: Status codes that mean "ask again" rather than "this request is wrong".
+#: ``408`` and ``429`` are the two client-side codes that describe the moment
+#: rather than the request. Everything from ``500`` up is a server saying it
+#: failed, including the gateway range (``502``, ``504``), Anthropic's overload
+#: code (``529``) and the ``52x`` codes an edge network in front of an
+#: aggregator can emit. ``501`` and ``505`` are permanent in HTTP's own terms
+#: and are still admitted here, because litellm flattens them to ``500`` on four
+#: of the six vendors and a rule that can only be obeyed on two is worse than a
+#: rule that retries a code no model endpoint sends.
+_TRANSIENT_CLIENT_STATUS_CODES = frozenset({408, 429})
+_LOWEST_SERVER_STATUS_CODE = 500
 
-    Imported lazily and memoized: this module is on the import path of callers
-    that never make a request, and ``model_gate`` has to pin the local cost map
-    before anything pulls litellm in.
 
-    Everything absent from this tuple fails on the first attempt, which is the
-    point rather than an omission — a malformed request, a rejected credential
-    or an over-long context is not transient, and retrying it spends quota to
-    reach the identical answer. That is the same reasoning the graph applies to
-    a rejected job: a second identical ask is not a recovery strategy.
+def _is_transient(exc: BaseException) -> bool:
+    """Whether the provider said something that asking again could fix.
+
+    **Keyed on the status code, not on the exception class.** The class is what
+    litellm's mapper chooses, and it chooses differently per provider: on the
+    pinned library an upstream ``500`` becomes ``InternalServerError`` on
+    ``anthropic`` and ``APIError`` on ``openrouter``, and an upstream ``502``
+    becomes ``BadGatewayError`` on both — a class no tuple of transient types
+    ever named. The status code is the one part of the exchange every provider
+    spells the same way, and every litellm exception carries it, including as a
+    constructor default when nothing mapped it (``Timeout`` is ``408``,
+    ``APIConnectionError`` is ``500``).
+
+    So there is no per-vendor retry table and no branch. Keying on the thing
+    that does not vary is what removes the need for one;
+    ``tests/test_retry.py`` drives the installed mapper over every registered
+    vendor and holds that claim.
+
+    Everything else fails on the first attempt, which is the point rather than
+    an omission — a malformed request, a rejected credential or an over-long
+    context is not transient, and retrying it spends quota to reach the
+    identical answer. That is the same reasoning the graph applies to a rejected
+    job: a second identical ask is not a recovery strategy.
+
+    An exception carrying no readable status code is not transient. A raised
+    object from outside the provider library — this module's own
+    :class:`TruncatedCompletionError` among them — says nothing about transport,
+    and a missing number is not evidence of one.
     """
-    from litellm import (
-        APIConnectionError,
-        InternalServerError,
-        RateLimitError,
-        ServiceUnavailableError,
-        Timeout,
-    )
-
-    return (
-        APIConnectionError,
-        InternalServerError,
-        RateLimitError,
-        ServiceUnavailableError,
-        Timeout,
-    )
+    status = getattr(exc, "status_code", None)
+    try:
+        code = int(status)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        # A provider SDK that carries no status, or carries an unparseable one.
+        # An unreadable number is no number, the same call
+        # ``_retry_after_seconds`` makes about an unreadable ``Retry-After``.
+        return False
+    if code in _TRANSIENT_CLIENT_STATUS_CODES:
+        return True
+    return code >= _LOWEST_SERVER_STATUS_CODE
 
 
 def _retry_after_seconds(exc: BaseException) -> float | None:
@@ -266,7 +291,7 @@ class RetryPolicy:
         """
         if attempt >= self.attempts:
             return False
-        if not isinstance(exc, _retryable_types()):
+        if not _is_transient(exc):
             return False
         return self.budget.withdraw()
 
@@ -410,7 +435,7 @@ def retrying_llm_class(litellm_cls: type, policy: RetryPolicy) -> type:
             """
             spent_budget = (
                 attempt < self.retry_policy.attempts
-                and isinstance(exc, _retryable_types())
+                and _is_transient(exc)
                 and self.retry_policy.budget.tokens < 1.0
             )
             if not spent_budget:

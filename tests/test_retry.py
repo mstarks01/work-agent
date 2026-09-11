@@ -10,19 +10,51 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
+from typing import ClassVar
 
+import litellm
 import pytest
 from litellm import APIConnectionError, RateLimitError
 
+# Imported through ``model_gate`` so the model-cost map is pinned before
+# anything here reaches litellm's own tables.
+from analysis_service import model_gate  # noqa: F401
 from analysis_service.retry import (
     RetryBudget,
     RetryBudgetExhausted,
     RetryPolicy,
     TruncatedCompletionError,
     _backoff_seconds,
+    _is_transient,
     _retry_after_seconds,
     retrying_llm_class,
 )
+from analysis_service.vendors import VENDOR_NAMES, vendor_for
+
+
+def mapped_provider_exception(provider: str, model: str, status_code: int):
+    """What the installed litellm turns one provider failure into.
+
+    The shape ``convert_to_model_response_object`` raises is a bare
+    ``Exception`` carrying ``status_code`` and ``message``, so this is the real
+    input the mapper sees rather than a stand-in for it. Defined here, beside
+    the rule that reads the result, and imported by the vendor-specific
+    compatibility suite rather than copied into it.
+    """
+    from litellm.litellm_core_utils.exception_mapping_utils import exception_type
+
+    raw = Exception()
+    raw.status_code = status_code  # type: ignore[attr-defined]
+    raw.message = "the upstream declined"  # type: ignore[attr-defined]
+    with pytest.raises(Exception) as excinfo:
+        exception_type(
+            model=model,
+            custom_llm_provider=provider,
+            original_exception=raw,
+            completion_kwargs={},
+            extra_kwargs={},
+        )
+    return excinfo.value
 
 
 def rate_limited(**headers) -> RateLimitError:
@@ -243,6 +275,128 @@ class TestShouldRetry:
         pol = policy(capacity=1)
         assert pol.should_retry(1, rate_limited())
         assert not pol.should_retry(1, rate_limited())
+
+
+class TestWhatCountsAsTransient:
+    """The rule itself, over every shape a raised object can arrive in.
+
+    ``_is_transient`` reads one attribute off an exception raised by a third
+    party, so the shapes are the producer's, not this suite's: an integer, a
+    string of digits from an SDK that stringifies it, something unparseable,
+    and nothing at all.
+    """
+
+    @pytest.mark.parametrize("code", [408, 429, 500, 502, 503, 504, 529, 522])
+    def test_a_transient_code_earns_another_try(self, code):
+        assert _is_transient(litellm.APIError(code, "declined", "p", "m"))
+
+    @pytest.mark.parametrize("code", [400, 401, 403, 404, 409, 422, 499])
+    def test_a_permanent_code_does_not(self, code):
+        assert not _is_transient(litellm.APIError(code, "declined", "p", "m"))
+
+    def test_a_stringified_status_is_still_read(self):
+        exc = ValueError("declined")
+        exc.status_code = "503"
+        assert _is_transient(exc)
+
+    @pytest.mark.parametrize("status", [None, "gateway", object()])
+    def test_an_unreadable_status_is_not_transient(self, status):
+        """An unreadable number is no number — the call ``_retry_after_seconds``
+        already makes about a date-formatted ``Retry-After``."""
+        exc = ValueError("declined")
+        exc.status_code = status
+        assert not _is_transient(exc)
+
+    def test_an_exception_with_no_status_at_all_is_not_transient(self):
+        assert not _is_transient(ValueError("malformed request"))
+
+    def test_a_truncated_completion_is_not_transient(self):
+        assert not _is_transient(TruncatedCompletionError("stopped at the cap"))
+
+
+class TestTheLadderIsVendorNeutral:
+    """The claim the rule is built to make, driven against litellm's own mapper.
+
+    Which exception *class* a provider failure becomes is decided per provider
+    by litellm, and it differs: an upstream 500 is ``InternalServerError`` on
+    ``anthropic`` and ``APIError`` on ``openrouter``, and an upstream 502 is
+    ``BadGatewayError`` on both. A ladder keyed on the class therefore retried
+    an upstream 500 on five vendors and not on the sixth, and an upstream 502 on
+    none of them.
+
+    Keying on the status code removes the difference rather than tabulating it,
+    so what this asserts is **agreement across the registry**, one row per
+    ``(vendor, upstream status)``. It is a cross-reader test in the sense
+    ``CLAUDE.md`` means: this repository's rule against the installed library's
+    behaviour, never against a remembered list of class names. A litellm bump
+    that re-maps any of it fails here rather than on node one of a paid job.
+    """
+
+    #: Upstream codes litellm passes through with the code intact on every
+    #: registered vendor, beside what the ladder must decide about each.
+    DECIDED: ClassVar[dict[int, bool]] = {
+        400: False,
+        401: False,
+        404: False,
+        408: True,
+        429: True,
+        500: True,
+        502: True,
+        503: True,
+        504: True,
+        529: True,
+    }
+
+    #: Upstream codes litellm does *not* agree on across vendors, recorded
+    #: rather than quietly left out of ``DECIDED``, beside the statuses it
+    #: actually produces. It rewrites each of these to ``APIConnectionError``
+    #: with a 500 on the vendors whose providers it maps that way, so a rejected
+    #: permission is retried on those and refused on the rest.
+    #:
+    #: **That asymmetry is litellm's and predates this rule**, which cannot see
+    #: past the number the library hands it. Keying on the class did not fix it
+    #: either: ``APIConnectionError`` is retryable under both rules. It is
+    #: written down here because a reader who trusts the neutrality claim above
+    #: needs to know exactly how far it reaches.
+    FLATTENED: ClassVar[dict[int, set[int]]] = {
+        403: {403, 500},
+        409: {409, 500},
+        422: {400, 500},
+    }
+
+    @pytest.mark.parametrize("status,retried", sorted(DECIDED.items()))
+    @pytest.mark.parametrize("name", sorted(VENDOR_NAMES))
+    def test_every_vendor_decides_one_upstream_code_the_same_way(
+        self, name, status, retried
+    ):
+        mapped = mapped_provider_exception(
+            vendor_for(name).litellm_provider, "some-model", status
+        )
+        assert _is_transient(mapped) is retried
+
+    @pytest.mark.parametrize("status,rewritten", sorted(FLATTENED.items()))
+    def test_the_flattened_codes_are_the_ones_litellm_does_not_agree_on(
+        self, status, rewritten
+    ):
+        """Pinned so ``DECIDED`` cannot grow a row the library cannot support,
+        and so a bump that repairs the flattening shows up as a failure here."""
+        seen = {
+            getattr(
+                mapped_provider_exception(
+                    vendor_for(name).litellm_provider, "some-model", status
+                ),
+                "status_code",
+                None,
+            )
+            for name in VENDOR_NAMES
+        }
+        assert seen == rewritten
+
+    def test_no_code_is_both_decided_and_flattened(self):
+        """The two tables are one statement split in two, so they must not
+        overlap: a code litellm rewrites per vendor cannot also be one every
+        vendor decides the same way."""
+        assert not set(self.DECIDED) & set(self.FLATTENED)
 
 
 class TestRetryingAdapter:
