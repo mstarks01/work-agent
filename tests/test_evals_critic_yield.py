@@ -16,12 +16,13 @@ import pytest
 
 from analysis_service.claims import Verdict
 from evals.harness import critic_yield
+from evals.harness.content import structural
 from evals.harness.critic_yield import aggregate_yield, score_case_with_yield
 from evals.harness.fingerprint import components_for, version_for
-from evals.harness.ledger import Ledger, cast
+from evals.harness.ledger import Ledger
 from evals.harness.reference import load_case
 from evals.harness.scorer import score_case
-from tests.eval_factories import ScriptedMatcher, draft_threat, promote
+from tests.eval_factories import ScriptedMatcher, cast, draft_threat, promote
 
 CORPUS_DIR = Path(__file__).resolve().parents[1] / "evals" / "corpus"
 CONTROL_CASE = CORPUS_DIR / "01-payments-checkout"
@@ -65,6 +66,7 @@ def _rejecting(case, *drafts):
                 case.id,
                 "down",
                 voter="test-reviewer",
+                content=structural(draft),
                 reason="unsupported-by-the-model",
                 version=version_for("stride"),
             )

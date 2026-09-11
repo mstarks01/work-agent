@@ -16,6 +16,20 @@ set, so this walks whatever blocks the sweep produced and reports one row per
 that carries a catalog identifier are graded on their prose the same way, and a
 package nobody has written yet needs no entry here.
 
+The denominator is what a person answered **about these words**. A style
+objection is a judgement of prose, and ADR 0029 binds it to the prose digest of
+the claim the reviewer read: the description and the mitigations. A vote cast on
+an earlier wording says nothing about the wording in front of the reader now, so
+it is counted as ``carried`` and left out of both halves of the rate.
+
+That makes a style vote short-lived on purpose, and the measurement says how
+short: over the six case 01 runs of one configuration, a prose digest was shared
+by 0 of 234 pairs of runs on one fingerprint. A model writes new prose every run,
+so a style objection lives inside the sitting that cast it. That is the honest
+scope of the vote, and ``carried`` is what keeps the shortness visible instead of
+reading as prose nobody objected to. The vote itself is not lost: it keeps its
+standing on the topic and stays in the ledger.
+
 The denominator is what a person answered, never what the sweep produced. A
 sweep of four hundred findings over a ledger holding nine votes has an objection
 rate over those nine. Dividing by the produced count would report a number that
@@ -37,6 +51,7 @@ from analysis_service.claims import (
     FrameworkName,
 )
 from analysis_service.report import Report
+from evals.harness.content import prose as prose_digest
 from evals.harness.fingerprint import identifier_of, key_claim, lane_field
 from evals.harness.identity import FlowMap
 from evals.harness.ledger import STYLE_REASONS, Ledger
@@ -52,6 +67,10 @@ class CaseWriting:
     produced: int
     answered: int
     objections: int
+    #: Findings whose every live vote was cast on other words. They are not
+    #: answered and not unvoted, and a rate that hid them would fall whenever
+    #: the tool rewrote a finding it had already been judged on.
+    carried: int = 0
     by_reason: dict[str, int] = field(default_factory=dict)
 
     @property
@@ -66,6 +85,7 @@ class CaseWriting:
             "produced": self.produced,
             "answered": self.answered,
             "objections": self.objections,
+            "carried": self.carried,
             "objection_rate": round(self.objection_rate, 3),
             "by_reason": dict(sorted(self.by_reason.items())),
         }
@@ -78,7 +98,7 @@ def measure_case(
     flows: FlowMap,
     votes: Ledger,
 ) -> CaseWriting:
-    """Every claim of one block, looked up in the ledger by its fingerprint.
+    """Every claim of one block, looked up by its fingerprint and its words.
 
     Keyed exactly as :mod:`evals.harness.queue` keys it, from the same
     components under the same per-framework version, so a vote cast from the
@@ -94,6 +114,7 @@ def measure_case(
     produced = 0
     answered = 0
     objections = 0
+    carried = 0
     reasons: Counter[str] = Counter()
 
     for claim in claims:
@@ -110,10 +131,20 @@ def measure_case(
         current = live.get(value, ())
         if not current:
             continue
+        words = prose_digest(claim)
+        # `reviewed_prose` is the ledger's own reader of "this vote judged these
+        # words". Comparing the two strings here would be a second reader of one
+        # rule, and it is the *prose* digest rather than the structural one: a
+        # style objection is about the description and the mitigations, and a
+        # substance vote's liveness is a different question with its own method.
+        on_these_words = [vote for vote in current if vote.reviewed_prose(words)]
+        if not on_these_words:
+            carried += 1
+            continue
         answered += 1
         objected = [
             vote.reason
-            for vote in current
+            for vote in on_these_words
             if vote.verdict == "down" and vote.reason in STYLE_REASONS
         ]
         if objected:
@@ -126,6 +157,7 @@ def measure_case(
         produced=produced,
         answered=answered,
         objections=objections,
+        carried=carried,
         by_reason=dict(reasons),
     )
 
@@ -170,11 +202,13 @@ def aggregate(rows: Sequence[CaseWriting]) -> dict[str, Any]:
     by_framework: dict[str, dict[str, int]] = {}
     for row in rows:
         totals = by_framework.setdefault(
-            row.framework, {"produced": 0, "answered": 0, "objections": 0}
+            row.framework,
+            {"produced": 0, "answered": 0, "objections": 0, "carried": 0},
         )
         totals["produced"] += row.produced
         totals["answered"] += row.answered
         totals["objections"] += row.objections
+        totals["carried"] += row.carried
 
     answered = sum(row.answered for row in rows)
     objections = sum(row.objections for row in rows)
@@ -184,6 +218,7 @@ def aggregate(rows: Sequence[CaseWriting]) -> dict[str, Any]:
     return {
         "answered": answered,
         "objections": objections,
+        "carried": sum(row.carried for row in rows),
         "objection_rate": round(objections / answered, 3) if answered else 0.0,
         "by_framework": dict(sorted(by_framework.items())),
         "by_reason": dict(sorted(reasons.items())),
@@ -201,16 +236,24 @@ def render(rows: Sequence[CaseWriting]) -> None:
         print(
             f"  {row.case_id:<34} {row.framework:<8}"
             f" {row.objections}/{row.answered} answered"
-            f" ({row.objection_rate:.2f}), {row.produced} produced"
+            f" ({row.objection_rate:.2f}), {row.produced} produced,"
+            f" {row.carried} carried"
         )
 
     totals = aggregate(rows)
     if not totals["answered"]:
-        print("  nobody has voted on this sweep's findings yet")
+        if totals["carried"]:
+            print(
+                f"  every vote reaching this sweep ({totals['carried']}) was cast"
+                " on other words, so no rate is computed"
+            )
+        else:
+            print("  nobody has voted on this sweep's findings yet")
         return
     print(
         f"  all: {totals['objections']}/{totals['answered']} answered"
-        f" ({totals['objection_rate']:.2f})"
+        f" ({totals['objection_rate']:.2f}),"
+        f" {totals['carried']} answered on other words"
     )
     for reason, count in totals["by_reason"].items():
         print(f"    {reason:<22} {count}")

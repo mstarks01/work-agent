@@ -11,15 +11,17 @@ Deterministic and free of provider calls, so it gates on every PR.
 
 from __future__ import annotations
 
-import json
-
 import pytest
 from fastapi.testclient import TestClient
 
 from analysis_service.frameworks import PACKAGES
 from evals.harness import bundle
 from evals.harness import queue as review_queue
-from evals.harness.ledger import append, cast, load
+from evals.harness.ledger import append, load
+from tests.eval_factories import SAMPLE_CONTENT, SAMPLE_PROSE, cast, produced_threat
+from tests.factories import sample_report
+from tests.test_asvs import _block as asvs_block
+from tests.test_asvs import sample_asvs_claim
 from webapp.review import (
     QUESTIONS,
     build_session,
@@ -39,6 +41,8 @@ STEADY = review_queue.Finding(
     title="Session replay against the storefront",
     description="An attacker replays a stolen cookie.",
     element_ids=("entity:shopper",),
+    content=SAMPLE_CONTENT,
+    prose=SAMPLE_PROSE,
     verb="replay",
     quotes=("Shoppers sign in with email and password",),
 )
@@ -52,6 +56,8 @@ REQUIREMENT = review_queue.Finding(
     title="Password strength is unstated",
     description="The description never says what a password must be.",
     element_ids=("process:storefront",),
+    content=SAMPLE_CONTENT,
+    prose=SAMPLE_PROSE,
     identifier="6.2.1",
 )
 
@@ -63,6 +69,8 @@ SOMETIMES = review_queue.Finding(
     title="Order price rewritten in the database",
     description="An attacker edits stored prices.",
     element_ids=("store:orders-db",),
+    content=SAMPLE_CONTENT,
+    prose=SAMPLE_PROSE,
     verb="alter",
 )
 
@@ -299,7 +307,15 @@ class TestReadingSeveralSweeps:
     """What the app is handed: one artifact per sweep, kept apart until merged."""
 
     @staticmethod
-    def _sweep(tmp_path, name, claims, engine="engine-1.2.3"):
+    def _sweep(tmp_path, name, report):
+        """One sweep's artifact and the report beside it.
+
+        The report is a real :class:`~analysis_service.report.Report`, dumped.
+        It used to be a hand-built dict, which is how the fixture came to carry
+        an ``engine_version`` key no report has ever written: the app read that
+        key, the test wrote it, and the two agreed with each other about a fact
+        the producer never produced.
+        """
         artifact = tmp_path / name
         artifact.write_text("{}", encoding="utf-8")
         # Named by the harness's own helper rather than composed here. These
@@ -308,33 +324,21 @@ class TestReadingSeveralSweeps:
         reports = bundle.reports_dir(artifact)
         reports.mkdir()
         (reports / "01-payments-checkout.report.json").write_text(
-            json.dumps({"engine_version": engine, "analyses": claims}),
-            encoding="utf-8",
+            report.model_dump_json(), encoding="utf-8"
         )
         return artifact
 
     @staticmethod
     def _stride(title="A finding", category="spoofing"):
-        return {
-            "framework": "stride",
-            "claims": [
-                {
-                    "id": "S-01",
-                    "category": category,
-                    "title": title,
-                    "description": "d",
-                    "affected_element_ids": ["entity:shopper"],
-                    "verb": "impersonate",
-                    "grounds": [{"kind": "quote", "text": "t"}],
-                }
-            ],
-        }
+        return sample_report(
+            threats=[
+                produced_threat(1, category, title, element_ids=("entity:customer",))
+            ]
+        )
 
     def test_each_artifact_becomes_its_own_run(self, tmp_path):
-        first = self._sweep(tmp_path, "one.json", [self._stride()])
-        second = self._sweep(
-            tmp_path, "two.json", [self._stride("Another", "tampering")]
-        )
+        first = self._sweep(tmp_path, "one.json", self._stride())
+        second = self._sweep(tmp_path, "two.json", self._stride("Another", "tampering"))
 
         runs, _ = findings_from_artifacts([first, second])
 
@@ -343,33 +347,28 @@ class TestReadingSeveralSweeps:
 
     def test_an_asvs_claim_takes_its_lane_from_its_own_field(self, tmp_path):
         """A fallback to the framework name keyed every chapter alike."""
-        block = {
-            "framework": "asvs",
-            "claims": [
-                {
-                    "id": "v5.0.0-6.2.1",
-                    "chapter": "authentication",
-                    "title": "No password length policy is stated",
-                    "description": "d",
-                    "affected_element_ids": [],
-                    "grounds": [{"kind": "quote", "text": "t"}],
-                }
-            ],
-        }
-        artifact = self._sweep(tmp_path, "asvs.json", [block])
+        report = sample_report(analyses=[asvs_block(1, [sample_asvs_claim()])])
+        artifact = self._sweep(tmp_path, "asvs.json", report)
 
         runs, _ = findings_from_artifacts([artifact])
 
         assert runs[0][0].lane == "authentication"
 
-    def test_two_configurations_are_both_recorded_on_the_vote(self, tmp_path):
-        """A vote must not name one sweep as though it were the whole input."""
-        first = self._sweep(tmp_path, "one.json", [self._stride()], engine="engine-1")
-        second = self._sweep(tmp_path, "two.json", [self._stride()], engine="engine-2")
+    def test_no_configuration_label_is_recorded_yet(self, tmp_path):
+        """A vote's ``config`` is empty, and this is where that is decided.
+
+        The app read ``engine_version`` off a report, and no report has ever
+        carried one — the key existed in this fixture and nowhere else. So every
+        vote the app has written names no configuration. Recorded here as the
+        truth it is, rather than restored by inventing the key again: the label
+        is a fact about a sweep, and it has to come from the artifact.
+        """
+        first = self._sweep(tmp_path, "one.json", self._stride())
+        second = self._sweep(tmp_path, "two.json", self._stride())
 
         _, configs = findings_from_artifacts([first, second])
 
-        assert configs["01-payments-checkout"] == "engine-1, engine-2"
+        assert configs["01-payments-checkout"] == ""
 
 
 def test_a_rebound_host_is_refused_before_it_can_forge_a_vote(runs, tmp_path):
@@ -514,6 +513,8 @@ def test_a_needs_evidence_finding_comes_back_in_a_later_sitting(runs, tmp_path):
             item.finding.case,
             "needs-evidence",
             "ada",
+            content=item.content,
+            prose=item.prose,
             sitting=first.sitting,
         ),
         ledger_path,
@@ -534,7 +535,17 @@ def test_an_ordinary_answer_is_still_spent(runs, tmp_path):
     ledger_path = tmp_path / "votes"
     first = build_session(runs, voter="ada", ledger_path=ledger_path)
     item = first.remaining(load(ledger_path))[0]
-    append(cast(item.components, item.finding.case, "up", "ada"), ledger_path)
+    append(
+        cast(
+            item.components,
+            item.finding.case,
+            "up",
+            "ada",
+            content=item.content,
+            prose=item.prose,
+        ),
+        ledger_path,
+    )
 
     later = build_session(runs, voter="ada", ledger_path=ledger_path)
 

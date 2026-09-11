@@ -26,6 +26,14 @@
     el("title").textContent = item.title;
     el("description").textContent = item.description;
     el("elements").textContent = "Cited: " + item.element_ids.join(", ");
+    // The reader's own earlier answer, and only where the claim has been
+    // re-argued since they gave it. Never another reviewer's: the server
+    // narrows this to the named voter, and an empty string hides the line.
+    const said = el("previously");
+    said.textContent = item.previously
+      ? "You answered this before, on an earlier version: " + item.previously
+      : "";
+    said.hidden = !item.previously;
 
     const quotes = el("quotes");
     quotes.replaceChildren();

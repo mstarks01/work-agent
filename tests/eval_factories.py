@@ -24,7 +24,9 @@ from analysis_service.frameworks.stride.record import (
     StrideCategory,
     Threat,
 )
+from evals.harness import ledger
 from evals.harness.identity import ClaimPair, ClaimRuling
+from evals.harness.ledger import Vote
 from evals.harness.reference import ReferenceThreat
 
 CATEGORY_LETTERS = {
@@ -165,3 +167,33 @@ def threat_for(reference: ReferenceThreat, sequence: int, title: str) -> Threat:
         likelihood=reference.severity.likelihood,
         impact=reference.severity.impact,
     )
+
+
+#: What a test's vote read, where the test is about something else. A real vote
+#: carries the two digests of what the reviewer was shown (ADR 0029), and the
+#: ledger requires both; a test asking about a reason code or a filename needs
+#: *a* value and not a particular one.
+SAMPLE_CONTENT = "s1:0000000000000000"
+SAMPLE_PROSE = "p1:0000000000000000"
+
+
+def cast(*args: object, **kwargs: object) -> Vote:
+    """:func:`evals.harness.ledger.cast` with the two digests defaulted.
+
+    Shadows the ledger's own name on purpose, so a test that does not care what
+    was voted on reads exactly as it did before the fields existed. A test
+    *about* the digests passes them itself, or calls the ledger directly.
+    """
+    kwargs.setdefault("content", SAMPLE_CONTENT)
+    kwargs.setdefault("prose", SAMPLE_PROSE)
+    return ledger.cast(*args, **kwargs)  # type: ignore[arg-type]
+
+
+def other_content(marker: str = "1") -> str:
+    """A structural digest that is not :data:`SAMPLE_CONTENT`."""
+    return f"s1:{marker * 16}"
+
+
+def other_prose(marker: str = "1") -> str:
+    """A prose digest that is not :data:`SAMPLE_PROSE`."""
+    return f"p1:{marker * 16}"

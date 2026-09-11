@@ -19,9 +19,10 @@ import pytest
 from analysis_service.claims import FrameworkName
 from analysis_service.frameworks.stride.record import StrideCategory
 from evals.harness import writing
+from evals.harness.content import prose as prose_digest
 from evals.harness.fingerprint import key_claim
 from evals.harness.ledger import Ledger, Vote
-from tests.eval_factories import produced_threat
+from tests.eval_factories import SAMPLE_CONTENT, produced_threat
 from tests.factories import sample_report
 from tests.test_asvs import _block as asvs_block
 from tests.test_asvs import sample_asvs_claim
@@ -40,19 +41,44 @@ def vote(
     verb: str | None = "impersonate",
     identifier: str | None = None,
     element_ids: tuple[str, ...] = ("entity:customer",),
+    prose: str | None = None,
 ) -> Vote:
-    """One vote on the finding the same components would key."""
+    """One vote on the finding the same components would key.
+
+    ``prose`` defaults to the words :func:`stride_report` gives that lane's
+    claim, which is what a reviewer would have read. Passing another value is
+    how a test says the finding has been reworded since.
+
+    The structural digest is fixed and not what these tests are about: a style
+    objection binds to the prose digest, and the two are separate values for
+    exactly that reason.
+    """
     value, components = key_claim(
         framework, CASE, lane, element_ids, FLOWS, verb=verb, identifier=identifier
     )
     return Vote(
         fingerprint=value,
         components=components,
+        content=SAMPLE_CONTENT,
+        prose=prose if prose is not None else words(lane),
         case=CASE,
         verdict=verdict,  # type: ignore[arg-type]
         voter=voter,
         recorded="2026-08-20T10:00:00Z",
         reason=reason,
+    )
+
+
+def words(lane: str) -> str:
+    """The prose digest of the claim :func:`stride_report` puts in ``lane``."""
+    index = LANES.index(lane) + 1
+    return prose_digest(
+        produced_threat(
+            index,
+            lane,  # type: ignore[arg-type]
+            f"Order price rewritten {index}",
+            element_ids=("entity:customer",),
+        )
     )
 
 
@@ -182,6 +208,7 @@ class TestEveryPackageIsGradedOnItsProse:
                     verb=None,
                     identifier="V6.2.1",
                     element_ids=(),
+                    prose=prose_digest(sample_asvs_claim()),
                 )
             ]
         )
@@ -213,9 +240,9 @@ class TestTheAggregate:
     @pytest.fixture
     def rows(self):
         return (
-            writing.CaseWriting("01", "stride", 10, 4, 2, {"too-vague": 2}),
-            writing.CaseWriting("02", "stride", 6, 2, 0, {}),
-            writing.CaseWriting("02", "asvs", 8, 2, 1, {"wrong-severity": 1}),
+            writing.CaseWriting("01", "stride", 10, 4, 2, by_reason={"too-vague": 2}),
+            writing.CaseWriting("02", "stride", 6, 2, 0),
+            writing.CaseWriting("02", "asvs", 8, 2, 1, by_reason={"wrong-severity": 1}),
         )
 
     def test_the_rate_is_over_every_answer_in_the_sweep(self, rows):
@@ -231,6 +258,7 @@ class TestTheAggregate:
             "produced": 16,
             "answered": 6,
             "objections": 2,
+            "carried": 0,
         }
         assert by_framework["asvs"]["objections"] == 1
 
@@ -286,9 +314,67 @@ def test_two_asvs_rulings_in_one_chapter_are_not_one_finding():
                 verb=None,
                 identifier="V6.2.1",
                 element_ids=(),
+                prose=prose_digest(sample_asvs_claim("v5.0.0-6.2.1")),
             )
         ]
     )
     row = measure(report, votes)
 
     assert (row.produced, row.answered, row.objections) == (2, 1, 1)
+
+
+class TestAnObjectionIsAboutWordsThatStillExist:
+    """A style vote judges prose. A rewrite leaves it judging nothing.
+
+    The 2026-09-09 audit replaced every retained case 01 title and explanation
+    and no fingerprint moved, so before this the instrument counted a verdict
+    on text that no longer existed.
+    """
+
+    def test_a_vote_on_other_words_is_carried_and_not_answered(self):
+        row = measure(
+            stride_report(),
+            Ledger(
+                [vote("tampering", "down", "poorly-written", prose=words("spoofing"))]
+            ),
+        )
+
+        assert (row.answered, row.objections, row.carried) == (0, 0, 1)
+        assert row.by_reason == {}
+
+    def test_a_carried_vote_leaves_the_rate_uncomputed_rather_than_perfect(self):
+        """Counting it as answered-and-unobjectionable would read as praise."""
+        row = measure(
+            stride_report(),
+            Ledger([vote("tampering", "down", "too-vague", prose=words("spoofing"))]),
+        )
+
+        assert row.objection_rate == 0.0
+        assert row.carried == 1, "the zero has a reason beside it"
+
+    def test_one_voter_on_these_words_and_one_on_older_words(self):
+        votes = Ledger(
+            [
+                vote("tampering", "down", "poorly-written"),
+                vote("tampering", "up", voter="sam", prose=words("spoofing")),
+            ]
+        )
+        row = measure(stride_report(), votes)
+
+        assert (row.answered, row.objections, row.carried) == (1, 1, 0)
+
+    def test_the_aggregate_folds_the_carried_count(self):
+        rows = (
+            writing.CaseWriting("01", "stride", 10, 4, 2, carried=3),
+            writing.CaseWriting("02", "stride", 6, 2, 0, carried=1),
+        )
+
+        totals = writing.aggregate(rows)
+
+        assert totals["carried"] == 4
+        assert totals["by_framework"]["stride"]["carried"] == 4
+
+    def test_a_sweep_answered_only_on_older_words_says_so(self, capsys):
+        writing.render((writing.CaseWriting("01", "stride", 10, 0, 0, carried=2),))
+
+        assert "cast on other words" in capsys.readouterr().out
