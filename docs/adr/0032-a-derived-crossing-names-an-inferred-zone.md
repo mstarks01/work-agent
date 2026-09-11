@@ -126,6 +126,11 @@ What the sentence buys is the critic's ability to weigh a ground it is already
 being shown: without it, `assumed_endpoints` arrives in a fenced JSON block as a
 key nothing explains.
 
+**The crossings block grows 10.7 tokens per case.** Measured over the 13 corpus
+models: 498 tokens to 637 across all of them, which is 27.9% of a small block
+and about 0.2% of one lane's instruction. It is job-varying text and no cap
+reaches it; the number is here so the next reader does not have to re-derive it.
+
 **What was considered and rejected: preserving the uncertainty instead of
 picking a side.** It is what #468 asked about, and it loses the crossing. A flow
 whose endpoints land in one zone derives nothing, so an agent is not told less
