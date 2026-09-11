@@ -365,6 +365,21 @@ class TestRetryAfter:
         """The rule refuses a long wait, not every stated one."""
         assert policy().should_retry(1, rate_limited(**{"retry-after": "5"}))
 
+    def test_a_full_token_window_is_still_retried(self):
+        """What the ceiling was raised for, named as the case rather than as a
+        number: a tokens-per-minute window is 60 seconds wide, so a provider
+        asking for 45 names a limit that really does reopen."""
+        assert policy().should_retry(1, rate_limited(**{"retry-after": "45"}))
+
+    def test_the_ceiling_covers_a_whole_per_minute_window(self):
+        """The reasoning behind the constant, held rather than written down.
+
+        Every limit that sends this header and clears on its own clears within
+        the minute it is measured over. A ceiling under that refuses the
+        commonest real throttle; the value is what makes the rule mean "not
+        soon" rather than "not immediately"."""
+        assert _RETRY_AFTER_CEILING_SECONDS >= 60.0
+
     def test_an_error_with_no_hint_is_judged_as_before(self):
         """An absent header says nothing about when capacity returns."""
         assert policy().should_retry(1, rate_limited())

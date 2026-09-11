@@ -487,8 +487,12 @@ class TestWhatTheRetryDriverReadsOffAnException:
 
     def test_a_hint_inside_the_ceiling_is_still_retried(self):
         """The rule refuses a long wait, not every stated one — and the
-        adapter's own attempt count is what says so."""
-        provider = declining(429, {"retry-after": "2"})
+        adapter's own attempt count is what says so.
+
+        45 seconds rather than a token number: it is a whole tokens-per-minute
+        window, which is the case the ceiling was sized for and the one a
+        30-second ceiling used to refuse."""
+        provider = declining(429, {"retry-after": "45"})
         raised_by("openai", provider)
 
         attempts = load_resilience(CONFIG / "resilience.toml", env={}).attempts

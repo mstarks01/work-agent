@@ -882,9 +882,11 @@ Two things become possible there that could not exist below the adapter:
   on any fixed curve retry together, reconverging on the quota they just
   tripped. Retries use full jitter — a uniform draw across the whole interval,
   not a delay with noise added — and a provider's `Retry-After` overrides the
-  curve whenever one is sent, up to a pinned 30-second ceiling. A provider that
-  asks for longer than that has answered the question a retry exists to ask, so
-  the node fails instead of sleeping on a third party's number.
+  curve whenever one is sent, up to a pinned 60-second ceiling — one whole
+  per-minute window, which is what every limit that sends the header and clears
+  on its own is measured over. A provider that asks for longer than that has
+  answered the question a retry exists to ask, so the node fails instead of
+  sleeping on a third party's number.
 
 Lowering `ANALYSIS_RETRY_ATTEMPTS` still works and is still the blunt instrument.
 The budget is what makes reaching for it rare.
