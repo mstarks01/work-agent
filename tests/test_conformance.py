@@ -543,9 +543,12 @@ class TestTheLiveLanesSweepWhatWasProfiled:
         "gemini": None,
         # No lane, and this one is a decision rather than an absence of
         # appetite. A sweep names a **Baseline**, and a Baseline may not be
-        # named after a route whose served build has not been shown to name
-        # the weights that answered — see ``evals/harness/baseline.py``. The
-        # smoke lane covers this vendor; the corpus sweep does not.
+        # named after a route whose served build does not name the weights
+        # that answered — see ``evals/harness/baseline.py``. Measured on
+        # 2026-09-11 and no longer an open question: the response repeats the
+        # requested slug, and one slug is fronted by many upstream providers
+        # (``docs/research/openrouter-served-model.md``). The smoke lane covers
+        # this vendor; the corpus sweep does not.
         "openrouter": None,
     }
 

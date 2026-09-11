@@ -27,8 +27,14 @@ Both [`Engine.from_config(frameworks, env=...)`](Integration-Guide.md) and the
 
 ### Models and vendors
 
-The code has registry entries for Vertex AI, Anthropic, OpenAI, Bedrock and the
-Gemini Developer API. It reaches all of them through ADK's LiteLLM adapter. `model_tiers.toml` selects **nothing**:
+<!-- every-vendor -->
+
+The code has registry entries for Vertex AI, Anthropic, OpenAI, Bedrock, the
+Gemini Developer API and OpenRouter.
+
+<!-- /every-vendor -->
+
+It reaches all of them through ADK's LiteLLM adapter. `model_tiers.toml` selects **nothing**:
 all three tier tables are absent, so startup fails until `base`, `strong` and
 `review` each name a vendor and a model. `review` is required even though the
 shipped node map points criticism at `strong`, because a tier a file may omit is
@@ -71,8 +77,13 @@ vendor = "anthropic"
 model = "claude-opus-5"
 ```
 
+<!-- every-vendor -->
+
 Supported vendors are `vertex`, `anthropic`, `openai`, `bedrock`, `gemini`
 and `openrouter`.
+
+<!-- /every-vendor -->
+
 Every one is reached through a single adapter (LiteLLM); there is no per-vendor
 code path, and Gemini reaches Vertex the same way everything else does. The pair above is deliberately
 mixed, because that is an ordinary configuration rather than an advanced one.
@@ -127,6 +138,8 @@ turns it off, so the refusal has to happen in the registry or not at all.
 The registry holds which modes each vendor allows, so an unrepresentable pairing
 like `vertex` + an API key cannot be written down:
 
+<!-- every-vendor -->
+
 | Vendor | Credential mode | Required environment |
 | --- | --- | --- |
 | `vertex` | `iam` | `ANALYSIS_VERTEX_PROJECT`, `ANALYSIS_VERTEX_LOCATION` |
@@ -136,6 +149,8 @@ like `vertex` + an API key cannot be written down:
 | `bedrock` | `iam` | `ANALYSIS_BEDROCK_REGION` |
 | `gemini` | `api_key` | `ANALYSIS_GEMINI_API_KEY` |
 | `openrouter` | `api_key` | `ANALYSIS_OPENROUTER_API_KEY` |
+
+<!-- /every-vendor -->
 
 `api_key` means the deployment passes the key, read only from the variable
 above. `iam` means **the platform supplies the identity**: the deployment passes
@@ -217,6 +232,24 @@ yourself is still the clearer choice, because then your config says which build
 you meant. The reference pairs in [First-Run](First-Run.md) name the build for
 that reason, and a check refuses any reference pair that names an alias.
 
+**On OpenRouter that protection is not available, and you should know it before
+you certify anything.** An OpenRouter slug such as `anthropic/claude-opus-4.7`
+floats: it resolved to the build `anthropic/claude-4.7-opus-20260416` when it
+was measured on 2026-09-11. OpenRouter does not offer the dated spelling as a
+model you can select — the pinned cost map carries the floating slug alone — so
+there is no more specific name to write. And the response echoes the slug you
+asked for rather than naming the build, which is why the `openrouter` row reads
+`served_trust = "requested_echo"`.
+
+Put those two together: if OpenRouter repoints that slug at a different build,
+**both halves of the fingerprint stay the same and certification keeps passing.**
+That is the opposite of the OpenAI case above, where a moved alias moves every
+fingerprint and fails closed. Nothing stops you running an analysis on
+OpenRouter. Treat a blessed OpenRouter fingerprint as a weaker claim than the
+same blessing on a direct route, and see
+[`docs/research/openrouter-served-model.md`](../docs/research/openrouter-served-model.md)
+for the measurement.
+
 Claude is the family with a published form:
 
 ```text
@@ -232,8 +265,8 @@ minimum Claude generation. Dated identifiers such as
 name that matches it is allowed to proceed to the capability checks. Passing
 the name check does not prove that the provider still serves the model.
 
-A loose rule is the right one for the rest because it runs against three
-vendors' catalogs at once, and its predecessor — an allowlist of numbered
+A loose rule is the right one for the rest because it runs against every
+registered vendor's catalog at once, and its predecessor — an allowlist of numbered
 Gemini builds — broke outright when Google retired them. Claude's half avoids
 that trap by matching a shape rather than enumerating builds: a model released
 tomorrow already satisfies it. The name check is only a proxy either way.
@@ -309,8 +342,8 @@ loader rejects, never a silent fallback.
 | `seed` | **unset** | Buys consistency, not reproducibility — and Anthropic does not accept it at all. |
 | `thinking` | **unset** | Leaves the model's own preset. |
 
-`thinking` is a uniform `"low"` / `"medium"` / `"high"` enum. It reaches all
-three vendors, which is why there are no longer per-tier legal ranges: LiteLLM
+`thinking` is a uniform `"low"` / `"medium"` / `"high"` enum. It reaches every
+registered vendor, which is why there are no longer per-tier legal ranges: LiteLLM
 maps it to adaptive `thinking` plus `output_config.effort` on Anthropic,
 `thinkingConfig` on Gemini, and passes it through on OpenAI o-series. `"auto"`
 and `"off"` are **not** accepted —
@@ -565,7 +598,7 @@ matrix lists "force all providers to expose identical sampling controls" as an
 explicit non-goal.
 
 The suite behind it is `tests/test_conformance.py`, which runs in the offline
-lane on every pull request for all three vendors equally. It proves what each
+lane on every pull request for every registered vendor equally. It proves what each
 provider *would be asked for*. It is not evidence that any vendor has served a
 request; that is the smoke below.
 

@@ -26,6 +26,8 @@ The shipped [`config/model_tiers.toml`](../config/model_tiers.toml) deliberately
 selects neither tier. Choose a vendor and model for both. The following pairs
 are the reference pairs declared in `analysis_service.conformance.REFERENCE_MODELS`:
 
+<!-- every-vendor -->
+
 | Vendor | `base` | `strong` | Credentials read by the code |
 | --- | --- | --- | --- |
 | Anthropic | `claude-sonnet-4-6` | `claude-opus-5` | `ANALYSIS_ANTHROPIC_API_KEY` |
@@ -34,6 +36,8 @@ are the reference pairs declared in `analysis_service.conformance.REFERENCE_MODE
 | OpenAI | `gpt-4o-2024-08-06` | `gpt-5.6` | `ANALYSIS_OPENAI_API_KEY` |
 | OpenRouter | `anthropic/claude-sonnet-4.6` | `anthropic/claude-opus-4.7` | `ANALYSIS_OPENROUTER_API_KEY` |
 | Vertex AI | `gemini-2.5-flash` | `gemini-2.5-pro` | `ANALYSIS_VERTEX_PROJECT`, `ANALYSIS_VERTEX_LOCATION` |
+
+<!-- /every-vendor -->
 
 “Reference pair” means the repository's offline capability check knows these
 model names. It does not mean CI has successfully called them or that they are
@@ -123,9 +127,19 @@ Its model identifier carries the provider, so a model name has a slash in it —
 builds the route `openrouter/anthropic/claude-opus-4.7`.
 
 OpenRouter may serve one slug from more than one upstream provider. Two runs of
-one configuration can therefore reach different backends. Nothing stops you
-running an analysis that way. A **Baseline** may not be named after an
-OpenRouter route, because a Baseline's value is that its runs are comparable.
+one configuration can therefore reach different backends. Measured on
+2026-09-11: `anthropic/claude-opus-4.7` is fronted by 8 endpoints across 5
+providers, and one Llama slug by 12 endpoints whose numeric formats differ.
+Nothing stops you running an analysis that way. A **Baseline** may not be named
+after an OpenRouter route, because a Baseline's value is that its runs are
+comparable.
+
+An OpenRouter response repeats the slug you asked for rather than naming the
+build that answered, so your report's served model tells you nothing the
+requested model did not. Every other vendor here either names the build or
+carries no build to name. See
+[Configuration](Configuration.md#models-and-vendors) for what that costs a
+blessed fingerprint.
 
 ### Vertex AI
 

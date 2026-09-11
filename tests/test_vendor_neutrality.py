@@ -558,3 +558,101 @@ def test_every_declaration_gives_a_reason(declaration):
     """An entry with no reason excuses nothing and teaches the next reader nothing."""
     thin = sorted(name for name, reason in declaration.items() if len(reason) < 40)
     assert not thin, f"these declarations need a real reason: {thin}"
+
+
+# ---------------------------------------------------------------------------
+# Layer 4: prose. The surface the other three cannot see.
+# ---------------------------------------------------------------------------
+#
+# The module scan above reads Python, and `test_conformance.py` holds the smoke
+# lane to the registry. Between them they cover every table and every workflow.
+# Neither reads a sentence, and a sentence is where the last two rows went
+# missing. `README.md` and `docs/Configuration.md` each listed the vendors and
+# stopped at `gemini`, so `openrouter` shipped undocumented. Three paragraphs
+# said "three vendors" from the day `bedrock` made it four, and went on saying
+# it through two more rows. Nothing failed, and nothing could.
+#
+# Two rules, one per failure, both decidable. A list is fenced and checked
+# against the registry. A tally that stands in for "all of them" is refused
+# outright, because a number that counts the registry is correct on the day it
+# is written and silently wrong afterwards.
+
+#: Prose spans that enumerate the registry, fenced so the check is exact rather
+#: than a guess about which sentence is a list. Fence one like this::
+#:
+#:     <!-- every-vendor -->
+#:     ... prose or a table naming every vendor ...
+#:     <!-- /every-vendor -->
+#:
+#: A vendor is "named" when its registry name appears case-insensitively, which
+#: every natural spelling already satisfies: "Vertex AI" carries ``vertex`` and
+#: "the Gemini Developer API" carries ``gemini``. So no display-name table is
+#: needed, and none is wanted — that would be one more thing keyed by vendor for
+#: somebody to leave short.
+EVERY_VENDOR_SPAN = re.compile(
+    r"<!--\s*every-vendor\s*-->(.*?)<!--\s*/every-vendor\s*-->", re.DOTALL
+)
+
+#: A prose tally standing in for "all of them": three or more, and plural.
+#: That is exactly the shape that failed here, and the bound is what lets this
+#: rule carry no exception list. "one vendor" and "two vendors" are left alone
+#: deliberately — in these documents they are the indefinite article ("native on
+#: one vendor and emulated on another") or a real pair ("a Gemini model has two
+#: vendors"), never a count of the registry. An exception list is what stops a
+#: lint like this from meaning anything, so the rule is drawn to need none.
+VENDOR_TALLY = re.compile(
+    r"\b(?:three|four|five|six|seven|eight|nine|ten|\d+)\s+vendors\b",
+    re.IGNORECASE,
+)
+
+#: What both rules read: everything a new vendor row would have to update, and
+#: nothing frozen. ``docs/research/`` is evidence dated to its own run and
+#: ``.wayfinder/`` is archived history, so both keep whatever was true when they
+#: were written and neither is swept here.
+PROSE = tuple(
+    path
+    for path in [REPO_ROOT / "README.md", REPO_ROOT / "CONTEXT.md"]
+    + sorted((REPO_ROOT / "docs").glob("*.md"))
+    if path.is_file()
+)
+
+
+def _fenced_spans(path: Path) -> list[str]:
+    return EVERY_VENDOR_SPAN.findall(path.read_text(encoding="utf-8"))
+
+
+@pytest.mark.parametrize("path", PROSE, ids=lambda p: p.name)
+def test_a_fenced_list_names_every_vendor(path):
+    """A fenced list answers for the whole registry, including tomorrow's row."""
+    for span in _fenced_spans(path):
+        missing = sorted(name for name in VENDOR_NAMES if name not in span.lower())
+        assert not missing, (
+            f"{path.name}: a span fenced with <!-- every-vendor --> does not name"
+            f" {missing}. Add them, or remove the fence if that span was never"
+            " meant to be the whole registry."
+        )
+
+
+def test_the_fence_scan_is_not_vacuously_empty():
+    """No fences means no checking, and an unfenced list reports success."""
+    fenced = sorted(path.name for path in PROSE if _fenced_spans(path))
+    assert len(fenced) >= 4, (
+        f"only {fenced} fence a vendor list. The enumerations a new row must"
+        " update — in README.md, Configuration.md, First-Run.md and"
+        " Integration-Guide.md — are the point of this layer; fence them or it"
+        " guards nothing."
+    )
+
+
+@pytest.mark.parametrize("path", PROSE, ids=lambda p: p.name)
+def test_no_document_counts_the_registry(path):
+    """Write "every registered vendor". A number is a table entry nobody maintains."""
+    text = path.read_text(encoding="utf-8")
+    offenders = sorted(
+        {match.group(0).lower() for match in VENDOR_TALLY.finditer(text)}
+    )
+    assert not offenders, (
+        f"{path.name} counts vendors: {offenders}. State it as a property —"
+        ' "every registered vendor" — so the sentence cannot go stale when the'
+        " next row lands."
+    )
