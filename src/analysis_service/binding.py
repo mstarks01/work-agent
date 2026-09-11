@@ -90,7 +90,7 @@ from analysis_service.model_gate import (
     ModelGateError,
     assert_kwarg_supported,
     check_supported,
-    emulates_structured_output,
+    native_structured_output,
     output_ceiling,
 )
 from analysis_service.model_tiers import (
@@ -325,17 +325,38 @@ def _check_native_structured_output(
 
     Checked per tier at build time for the same reason as everything else in
     this module — a misconfiguration should cost nothing.
+
+    **It reads the tri-state, which is the reader the matrix reads.**
+    :func:`~analysis_service.model_gate.native_structured_output` answers
+    ``False`` for every way a schema is known not to reach the model natively,
+    ``None`` where the pinned map is silent, and ``True`` where it says yes.
+    This gate refuses the first and binds the other two: a silent entry is not
+    a no, and ``tests/test_openrouter_compatibility.py`` holds that decision.
+
+    Asking ``emulates_structured_output`` here instead left this reader one
+    shape short of the one #821 gave the matrix. That probe raises
+    ``UnsupportedParamsError`` for a model the library will not hand
+    ``response_format`` to at all — 79 of the pinned map's rows under a
+    registered prefix — so a deployment naming one got a library traceback
+    where the answer was a plain refusal.
+
+    Measured across the map before the change: of 618 pairs the old reader
+    could answer for, 606 keep their verdict and 12 move from bind to refuse.
+    All 12 are audio or music rows whose entry states no schema support and
+    which the library does not emulate, so a schema never reached them either.
     """
     if not sampling.constrain_output:
         return
-    if emulates_structured_output(vendor, model):
+    if native_structured_output(vendor, model) is False:
         raise ModelGateError(
             f"{source}: {vendor.name} cannot constrain {model!r} to a schema"
-            " natively, so the provider library would emulate it with a"
+            " natively. Either the provider library would emulate it with a"
             " synthesised tool and send the graph's schema with its $defs"
-            " unresolved. Every LLM node binds an output schema, so this fails"
-            " at output validation mid-job rather than here. Choose a model"
-            " whose provider supports schema-constrained output directly."
+            " unresolved, or the model does not take the parameter that"
+            " carries a schema at all. Every LLM node binds an output schema,"
+            " so this fails at output validation mid-job rather than here."
+            " Choose a model whose provider supports schema-constrained output"
+            " directly."
         )
 
 

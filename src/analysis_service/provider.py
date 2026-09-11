@@ -361,10 +361,14 @@ class ExecutedLlm(BaseLlm):
                 results = await self.executor.generate(request)
             except ProviderCallFailed as failed:
                 last = failed.failure
-                if not self.retry_policy.should_retry(attempt, last):
-                    raise self.retry_policy.give_up(attempt, last, self.model) from (
-                        failed
-                    )
+                # Asked once, and the answer says which rule refused. The
+                # conditions overlap, so a second reader that re-derived it
+                # could name a rule that did not fire.
+                refusal = self.retry_policy.refuse_retry(attempt, last)
+                if refusal is not None:
+                    raise self.retry_policy.give_up(
+                        refusal, attempt, last, self.model
+                    ) from failed
                 self.retry_policy.log_retry(attempt, last, self.model)
                 await self.retry_policy.sleep_before_retry(attempt, last)
             else:
