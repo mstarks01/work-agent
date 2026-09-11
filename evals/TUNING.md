@@ -42,7 +42,7 @@ number is:
 | --- | --- |
 | `recorded` | A merged Baseline ran this exact configuration and cost this. A real number. |
 | `estimated` | Another Baseline's token counts, repriced for your models. A best guess. |
-| `unpriced` | No number exists — a tier's model is absent from the price map, or no merged Baseline exists to calibrate from. Never a zero. |
+| `unpriced` | No number exists — a tier's model is absent from the price map, its vendor is a gateway with no one rate per model, or no merged Baseline exists to calibrate from. Never a zero. |
 
 **Accepting means typing the amount back.** An enter or a `y` never proceeds,
 because a habit should not be able to spend money for you. Where no amount can

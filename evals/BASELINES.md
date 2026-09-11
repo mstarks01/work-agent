@@ -59,8 +59,9 @@ holds. A merged Baseline of your exact configuration gives you a `recorded`
 figure: a real number, not a guess. Otherwise the gate borrows another
 Baseline's token counts, reprices them for your models, and labels the result
 `estimated`. It names the lender, and every way the lender differs from your
-run. When there is nothing to borrow, or a tier's model is absent from the
-price map, the gate does not invent a number. It says `unpriced`, and you
+run. When there is nothing to borrow, when a tier's model is absent from the
+price map, or when its vendor is a gateway that fronts many providers at many
+rates, the gate does not invent a number. It says `unpriced`, and you
 accept that by typing `unknown`. Your sweep is what turns a guess into a
 recorded number for the next contributor.
 
