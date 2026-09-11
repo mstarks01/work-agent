@@ -112,6 +112,13 @@ of one configuration can reach two backends. That does not stop an analysis. It
 does stop a **Baseline**: `evals/harness/baseline.py` refuses to name one after
 a route that does not say which weights answered.
 
+It also stops an estimate. Those backends charge different rates — one slug
+lists 1.0e-07 per input token and reaches an endpoint charging 1.04e-06 — so
+the route has no one rate, and `evals/harness/prices.py` reports it as
+`unpriced` rather than stating the cheapest endpoint as a price. Accept such a
+sweep by typing `unknown`, or pass `--accept-cost unknown`. The measurement is
+[`docs/research/openrouter-pricing.md`](../docs/research/openrouter-pricing.md).
+
 An ARN is refused for every vendor. It hides which model answers, so a blessed
 fingerprint would go on certifying a target somebody can repoint, and it carries
 the account that owns the resource into a fingerprint and a report.

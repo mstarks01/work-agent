@@ -282,13 +282,19 @@ class TestThePrefixFallbackStopsAtOneSegment:
         # relaxed rather than if the map moves.
         assert prices.unit_prices("deepseek-v4-pro") is not None
 
-    def test_an_aggregator_route_the_map_carries_is_priced_from_its_own_entry(self):
-        """The narrowing does not cost a route the map actually answers for."""
-        entry = prices.unit_prices("openrouter/anthropic/claude-sonnet-4.6")
-        assert entry is not None
-        # OpenRouter's own entry, not the direct Anthropic one. Both read
-        # 3e-06 today, so the assertion is on which key answered.
-        assert prices._bare_name("openrouter/anthropic/claude-sonnet-4.6") is None
+    def test_an_aggregator_route_the_map_carries_is_still_unpriced(self):
+        """The map holds a key for this route, and the key is not a price.
+
+        The listed slug rate is the *cheapest* endpoint of the many a slug
+        reaches, so a single rate under-states by however much the routed
+        endpoint costs more — up to 10.4x measured. The key exists, so this
+        fails if the aggregator rule is dropped rather than if the map moves.
+        """
+        from litellm import model_cost
+
+        route = "openrouter/anthropic/claude-sonnet-4.6"
+        assert route in model_cost
+        assert prices.unit_prices(route) is None
 
     @pytest.mark.parametrize(
         ("model", "expected"),
@@ -306,21 +312,63 @@ class TestThePrefixFallbackStopsAtOneSegment:
     def test_the_rule_reads_one_leading_segment(self, model, expected):
         assert prices._bare_name(model) == expected
 
-    def test_every_reference_route_still_prices(self):
+    def test_every_reference_route_on_a_direct_vendor_still_prices(self):
         """The narrowing must not un-price a pair this project profiles.
 
         A vendor whose reference pair went unpriced could not be estimated for
         at all, which would be a worse regression than the one being fixed.
+
+        A gateway is the stated exception and it is read from the registry, so
+        this answers for a row nobody has written: a vendor in front of many
+        providers has no unit price to lose.
         """
         from analysis_service.conformance import REFERENCE_MODELS
 
         unpriced = [
             route
             for vendor, models in REFERENCE_MODELS.items()
+            if vendor_for(vendor).routes_to_one_provider
             for model in models
             if prices.unit_prices(route := vendor_for(vendor).route(model)) is None
         ]
         assert unpriced == []
+
+
+class TestAGatewayRouteCarriesNoUnitPrice:
+    """A slug in front of many endpoints has no one rate, whatever the map says.
+
+    Keyed off ``routes_to_one_provider`` rather than off a vendor's name, so
+    these hold for the next aggregator too. The measurement they rest on is
+    ``docs/research/openrouter-pricing.md``.
+    """
+
+    @pytest.mark.parametrize(
+        "name", [name for name, v in VENDORS.items() if not v.routes_to_one_provider]
+    )
+    def test_no_route_on_a_gateway_vendor_is_priced(self, name):
+        from analysis_service.conformance import REFERENCE_MODELS
+
+        vendor = vendor_for(name)
+        for model in REFERENCE_MODELS[name]:
+            assert prices.unit_prices(vendor.route(model)) is None
+
+    @pytest.mark.parametrize(
+        "name", [name for name, v in VENDORS.items() if v.routes_to_one_provider]
+    )
+    def test_the_rule_refuses_nothing_on_a_direct_vendor(self, name):
+        route = f"{vendor_for(name).prefix}some-model"
+        assert not prices._routes_to_many_providers(route)
+
+    def test_a_string_that_is_not_a_route_is_left_to_the_map(self):
+        """The rule answers for a route, and declines to invent a vendor.
+
+        A bare build identifier and a prefix no vendor claims both reach the
+        map as before. Refusing them here would un-price the fallback that
+        :func:`prices._bare_name` exists to serve.
+        """
+        assert not prices._routes_to_many_providers("gemini-2.5-pro")
+        assert not prices._routes_to_many_providers("deepseek/deepseek-v4-pro")
+        assert prices.unit_prices("gemini-2.5-pro") is not None
 
 
 class TestAssembleAndVerify:

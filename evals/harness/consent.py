@@ -13,9 +13,9 @@ Every amount carries one of three labels, always.
     Price-map arithmetic over another Baseline's token counts, repriced with
     this run's models. It is a best guess.
 ``unpriced``
-    No number exists, either because a tier's model is absent from the price
-    map, or because no merged Baseline exists to calibrate from. It is never a
-    zero.
+    No number exists. A tier's model is absent from the price map, or its
+    vendor is a gateway in front of many providers and so has no one rate, or
+    no merged Baseline exists to calibrate from. It is never a zero.
 
 The estimate says which Baseline it read, and what it does not know. A borrowed
 number rests on somebody else's token counts, so the lender is chosen for what
