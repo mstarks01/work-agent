@@ -22,7 +22,6 @@ from analysis_service.claims import (
     RepairedQuote,
     Severity,
     UnknownRef,
-    UnreconciledRuling,
     UnresolvedEvidence,
     UnresolvedMention,
     UnresolvedReference,
@@ -37,6 +36,7 @@ from analysis_service.frameworks.stride.record import (
 from analysis_service.report import Report
 from analysis_service.sampling import TierSampling
 from analysis_service.system_model import all_attribute_names, attribute_names
+from tests.eval_factories import unreconciled
 from tests.factories import (
     sample_fingerprint,
     sample_report,
@@ -518,11 +518,6 @@ class TestTheBlockAnswersWhichProblemsAReAskInherited:
     A second copy of the join is how the two would come to disagree.
     """
 
-    def _mark(self, claim_id, kind):
-        return UnreconciledRuling.of(
-            claim_id=claim_id, kind=kind, message="the first pass got this wrong"
-        )
-
     def test_a_claim_the_first_pass_ruled_cleanly_answers_empty(self):
         (block,) = sample_report().analyses
 
@@ -533,9 +528,9 @@ class TestTheBlockAnswersWhichProblemsAReAskInherited:
         two problems — and a caller counting kinds wants the set."""
         (block,) = sample_report(
             unreconciled_rulings=[
-                self._mark("S-01", "verdict-shape"),
-                self._mark("S-01", "dropped"),
-                self._mark("S-01", "verdict-shape"),
+                unreconciled("S-01", "verdict-shape"),
+                unreconciled("S-01", "dropped"),
+                unreconciled("S-01", "verdict-shape"),
             ]
         ).analyses
 
@@ -543,7 +538,7 @@ class TestTheBlockAnswersWhichProblemsAReAskInherited:
 
     def test_a_mark_on_another_claim_answers_nothing_here(self):
         (block,) = sample_report(
-            unreconciled_rulings=[self._mark("S-02", "dropped")]
+            unreconciled_rulings=[unreconciled("S-02", "dropped")]
         ).analyses
 
         assert block.re_ask_kinds("S-01") == ()

@@ -18,6 +18,8 @@ from analysis_service.claims import (
     Rating,
     Severity,
     UnknownRef,
+    UnreconciledKind,
+    UnreconciledRuling,
     Verdict,
 )
 from analysis_service.frameworks.stride.record import (
@@ -28,12 +30,13 @@ from analysis_service.frameworks.stride.record import (
 )
 from analysis_service.identity import IDENTITY_VERSION, build_identity
 from analysis_service.sampling import TierSampling
+from evals import verify_corpus
 from evals.harness import ledger
 from evals.harness.artifact import ARTIFACT_VERSION
 from evals.harness.identity import ClaimPair, ClaimRuling
 from evals.harness.ledger import Vote
 from evals.harness.provenance import RunProvenance
-from evals.harness.reference import ReferenceThreat
+from evals.harness.reference import GoldenCase, ReferenceThreat, load_corpus
 from tests.factories import SAMPLE_INSTRUCTIONS, sample_fingerprint
 
 #: The commit and the corpus digest a synthetic sweep names. Neither is real,
@@ -280,6 +283,22 @@ def threat_for(reference: ReferenceThreat, sequence: int, title: str) -> Threat:
 #: *a* value and not a particular one.
 SAMPLE_CONTENT = "s1:0000000000000000"
 SAMPLE_PROSE = "p1:0000000000000000"
+
+
+def corpus_case(case_id: str) -> GoldenCase:
+    """One corpus case by ID, loaded through the shipped corpus verifier."""
+    return next(
+        entry for entry in load_corpus(verify_corpus.CORPUS_DIR) if entry.id == case_id
+    )
+
+
+def unreconciled(
+    claim_id: str, kind: UnreconciledKind = "dropped"
+) -> UnreconciledRuling:
+    """A first-pass mark against one claim, with the message every test uses."""
+    return UnreconciledRuling.of(
+        claim_id=claim_id, kind=kind, message="the first pass got this wrong"
+    )
 
 
 def cast(*args: object, **kwargs: object) -> Vote:

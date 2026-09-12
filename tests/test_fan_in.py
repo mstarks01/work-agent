@@ -9,7 +9,6 @@ from analysis_service.claims import (
     MENTION_MAX_CHARS,
     Ground,
     Mitigation,
-    Severity,
 )
 from analysis_service.fan_in import DraftJoinError, join_drafts, snap_drafts
 from analysis_service.frameworks import schemas_for
@@ -41,12 +40,6 @@ def model():
 
 def mitigation(summary="Set HttpOnly and Secure on cookies"):
     return Mitigation(summary=summary)
-
-
-def severity(likelihood="medium", impact="high"):
-    return Severity(
-        likelihood=likelihood, impact=impact, justification="Stated model fact."
-    )
 
 
 ELEMENT_IDS = frozenset(

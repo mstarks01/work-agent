@@ -97,7 +97,7 @@ TEST_ONLY: dict[str, str] = {
             "Exemplar",
             "LaneVerbs",
             "Undemonstrated",
-            "_proposal_type",
+            "proposal_type",
             "collisions",
             "corpus_undemonstrated",
             "lane_verbs",
