@@ -118,6 +118,17 @@ class TestARow:
         merged(tmp_path, "one", scores=[score_row(unvoted=4)])
         assert "0 of 4 unmatched finding(s) judged" in build(tmp_path)
 
+    def test_an_aggregator_tier_names_the_upstream_that_served_it(self, tmp_path):
+        """The route alone is not the configuration the numbers came from."""
+        identity = dict(IDENTITY, upstreams={"strong": "OpenAI"})
+        merged(tmp_path, "one", identity=identity)
+        text = build(tmp_path)
+        assert "via `OpenAI`" in text
+
+    def test_a_direct_tier_names_no_upstream(self, tmp_path):
+        merged(tmp_path, "one")
+        assert " via " not in build(tmp_path)
+
 
 class TestAnUnvotedBaseline:
     def test_a_vote_dependent_number_reads_no_votes_yet_never_zero(self, tmp_path):
