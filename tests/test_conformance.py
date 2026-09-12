@@ -952,6 +952,9 @@ class TestTheDocumentedPairsAreTheProfiledPairs:
     FIRST_RUN: ClassVar[Path] = PROJECT_ROOT / "docs" / "First-Run.md"
     TIERS_TEMPLATE: ClassVar[Path] = PROJECT_ROOT / "config" / "model_tiers.toml"
     WEB_APP: ClassVar[Path] = PROJECT_ROOT / "docs" / "Web-App.md"
+    ISSUE_TRACKER: ClassVar[Path] = (
+        PROJECT_ROOT / "docs" / "agents" / "issue-tracker.md"
+    )
 
     # One row of the First-Run table: the vendor's display name, the two
     # backticked models, and the credentials cell. The vendor is read from the
@@ -993,6 +996,27 @@ class TestTheDocumentedPairsAreTheProfiledPairs:
         assert profiled <= quoted, (
             f"these profiled models are named nowhere in"
             f" {self.TIERS_TEMPLATE.name}: {sorted(profiled - quoted)}"
+        )
+
+    def test_the_issue_tracker_guide_names_the_bedrock_pair(self):
+        """A fourth file, and the one that had no reader when it drifted.
+
+        The guide states outright which pair the Bedrock rulings settled, and
+        an agent reading it acts on that sentence — so it is a copy of the
+        table and needs holding to it like the other three. It names Bedrock's
+        pair alone, which is what this asserts; a check that demanded every
+        vendor would fail on a guide that never claimed to carry them.
+        """
+        # Newline-excluded, because the guide carries fenced blocks and a
+        # backtick run that crosses one swallows the whole file into one match.
+        quoted = set(
+            re.findall(r"`([^`\n]+)`", self.ISSUE_TRACKER.read_text(encoding="utf-8"))
+        )
+        pair = set(REFERENCE_MODELS["bedrock"])
+
+        assert pair <= quoted, (
+            f"these Bedrock reference models are named nowhere in"
+            f" {self.ISSUE_TRACKER.name}: {sorted(pair - quoted)}"
         )
 
     def test_the_web_app_example_selects_a_profiled_pair(self):
@@ -1120,4 +1144,50 @@ def test_the_probe_raises_that_type_and_no_other_across_the_map():
     assert seen == {ModelGateError}, (
         f"check_supported now raises {seen}, so _probe_param's narrowed except"
         " no longer covers the set it was measured against"
+    )
+
+
+def test_every_bedrock_reference_model_names_an_inference_profile():
+    """A reference pair has to be a pair a request can actually reach.
+
+    **The plain Bedrock identifier prices and does not invoke.** AWS serves
+    recent Claude generations through cross-Region inference profiles, and the
+    two model cards, read on 2026-09-12, put it in an In-Region column:
+    ``anthropic.claude-opus-5`` has In-Region endpoint URL "N/A" and In-Region
+    unsupported in all 32 Regions listed, and ``anthropic.claude-sonnet-4-6``
+    has it supported in eu-west-2 alone. AWS's own sample code for both asks
+    for ``global.anthropic.<name>``. The pinned cost map carries the plain keys
+    and the profile keys alike, so nothing offline separates them and the whole
+    pair would have died on a ValidationException at the first live request —
+    which is the answer
+    [#626](https://github.com/mstarks01/work-agent/issues/626) asked for and
+    could not buy, because nobody has provisioned ``ANALYSIS_BEDROCK_API_KEY``.
+
+    Named for one vendor because the fact is one vendor's, and the property is
+    general: **a vendor may serve a model under an identifier its price table
+    does not distinguish from one it refuses.** Only a call or the vendor's
+    documentation separates those, so a row whose provider publishes such a
+    split needs a check of its own here — and a row whose provider serves every
+    priced identifier needs none, which is why the other five have none.
+
+    ``global.`` rather than ``us.``: it is the one profile spelling that names
+    no geography, so [#496](https://github.com/mstarks01/work-agent/issues/496)
+    still holds and no region enters an Execution Identity.
+    """
+    scopes = {
+        model: model.partition(".")[0]
+        for model in REFERENCE_MODELS["bedrock"]
+        if model.partition(".")[2].startswith("anthropic.")
+    }
+    plain = sorted(set(REFERENCE_MODELS["bedrock"]) - set(scopes))
+
+    assert plain == [], (
+        f"these Bedrock reference models name a foundation model rather than an"
+        f" inference profile: {plain}. AWS refuses on-demand invocation of the"
+        f" plain identifier, so the pair would fail at the first request."
+    )
+    assert set(scopes.values()) == {"global"}, (
+        f"these Bedrock reference models name a geography: {scopes}. A geo"
+        f" profile pins a destination set, and #496 rules that no region enters"
+        f" an Execution Identity."
     )

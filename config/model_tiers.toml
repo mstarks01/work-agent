@@ -181,8 +181,8 @@ review_independence = "shared"
 # profiles (src/analysis_service/conformance.py):
 #
 #   anthropic   base "claude-sonnet-4-6"     strong "claude-opus-5"
-#   bedrock     base "anthropic.claude-sonnet-4-6"
-#               strong "anthropic.claude-opus-5"
+#   bedrock     base "global.anthropic.claude-sonnet-4-6"
+#               strong "global.anthropic.claude-opus-5"
 #   gemini      base "gemini-2.5-flash"      strong "gemini-2.5-pro"
 #   openai      base "gpt-4o-2024-08-06"     strong "gpt-5.6"
 #   openrouter  base "anthropic/claude-sonnet-4.6"
