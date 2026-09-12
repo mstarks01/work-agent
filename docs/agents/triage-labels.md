@@ -25,6 +25,12 @@ never substitute one for a triage label, and never read one as a triage state:
   wayfinding ticket, not its readiness. See `docs/agents/issue-tracker.md`. A wayfinder ticket's
   state is carried by its assignee, its open blockers and whether it is closed; a `wayfinder:*`
   issue does not want a triage label on top.
+- **`needs-sweep`** — the issue's next step is a paid model run: a sweep, a spread of
+  repeated runs, or a replay over an archived artifact. It marks a spend decision, never a
+  readiness state, so it sits beside a triage label rather than in place of one. Apply it the
+  moment a paid run becomes the next step, and remove it when the run lands or the step is
+  ruled out. A run needs explicit approval every time; the label records that the ask is
+  pending, and it authorises nothing.
 - **GitHub's stock set** (`bug`, `enhancement`, `documentation`, `question`, `duplicate`,
   `invalid`, `good first issue`, `help wanted`) — subject-matter labels. `question` is not
   `needs-info`, and `help wanted` is not `ready-for-human`; the pairs mean different things and
