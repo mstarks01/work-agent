@@ -93,7 +93,7 @@ def test_the_two_populations_still_split_where_they_did(swept):
     """35 near misses and 15 with no neighbour. The split is the finding: a near
     miss wants a draft demonstrating the member, and the rest want a draft
     demonstrating the family at all."""
-    near = [entry for entry in swept if entry.near_miss]
+    near = [entry for entry in swept if entry.siblings]
     assert len(near) == 35
     assert len(swept) - len(near) == 15
 

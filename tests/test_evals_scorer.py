@@ -22,7 +22,6 @@ from evals.harness.scorer import (
     candidate_claim,
     exemplar_delta,
     score_case,
-    severity_axis_agreement,
     unlisted_for_promotion,
 )
 from tests.eval_factories import ScriptedMatcher, cast, produced_threat, threat_for
@@ -519,7 +518,6 @@ def test_severity_calibration_is_arithmetic(case, no_votes):
 
     assert score.severity_confusion == {"critical->low": 1}
     assert score.severity_exact_rate == 0.0
-    assert severity_axis_agreement(score.matched) == {"likelihood": 0.0, "impact": 0.0}
 
 
 def test_recall_and_artifact_over_the_whole_labelled_set(

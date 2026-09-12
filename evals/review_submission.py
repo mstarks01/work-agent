@@ -152,24 +152,6 @@ def iter_submissions(root: Path):
         yield path, _read(path)
 
 
-def repository_problems(root: Path) -> list[str]:
-    """Structural errors in merged files, independent of later corpus drift."""
-    problems: list[str] = []
-    try:
-        submissions = list(iter_submissions(root))
-    except ReviewSubmissionError as exc:
-        return [str(exc)]
-    for path, envelope in submissions:
-        if path.name != submission_name(envelope):
-            problems.append(
-                f"{path.relative_to(root)}: expected filename {submission_name(envelope)!r}"
-            )
-        if not envelope.cases:
-            problems.append(f"{path.relative_to(root)}: contains no completed cases")
-    _, ties = _live(_reviews(submissions))
-    return [*problems, *ties]
-
-
 def _live(reviews: list[MergedReview]) -> tuple[list[MergedReview], list[str]]:
     """The live sitting per case and signature, and every tie nothing breaks.
 

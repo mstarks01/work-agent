@@ -200,7 +200,6 @@ class TestArtifactSerialization:
 
         base = loaded.provenance.tier_identities()["base"]
         assert base.served_upstreams == ("DeepInfra", "Together")
-        assert base.upstreams_varied
         assert not base.ambiguous, "one served build, two places it came from"
 
     def test_a_direct_route_reports_no_upstream_and_says_so(self, tmp_path, sampling):
@@ -211,7 +210,6 @@ class TestArtifactSerialization:
 
         base = loaded.provenance.tier_identities()["base"]
         assert base.served_upstreams == ()
-        assert not base.upstreams_varied
 
     def test_the_upstream_survives_a_round_trip_through_the_artifact(
         self, tmp_path, sampling

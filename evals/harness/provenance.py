@@ -197,22 +197,6 @@ class TierIdentity(BaseModel):
         """Whether this tier was answered by more than one served build."""
         return len(self.served_models) > 1
 
-    @property
-    def upstreams_varied(self) -> bool:
-        """Whether more than one organisation answered for this tier.
-
-        Separate from :attr:`ambiguous`, and a weaker statement: a rotation
-        between builds is something an operator has to choose between, and a
-        spread of upstreams is a sweep whose calls did not all reach the same
-        place. A gateway route can vary here while every served identifier
-        stays constant, because the served identifier is the slug that was
-        asked for.
-
-        This is the spread ``evals/harness/baseline.py`` refuses to name a
-        Baseline after, observed rather than assumed.
-        """
-        return len(self.served_upstreams) > 1
-
     def to_json(self) -> dict[str, list[str]]:
         return {
             "requested_models": list(self.requested_models),

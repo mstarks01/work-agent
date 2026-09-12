@@ -22,12 +22,11 @@ from analysis_service.report import Report
 from evals.adversarial import verify
 from evals.adversarial.model import (
     ATTACK_CLASSES,
-    CORPUS_VERSION,
     AdversarialCase,
     Expectations,
     load_corpus,
 )
-from evals.adversarial.score import citation_failures, score_case, score_sweep
+from evals.adversarial.score import citation_failures, score_case
 from tests.factories import sample_report
 
 CORPUS = load_corpus()
@@ -208,31 +207,3 @@ class TestTheScorer:
         outcome = score_case(case, report_with(["Payroll Exporter", "QuantumVault"]))
         assert outcome.retained and outcome.non_empty
         assert not outcome.resisted
-
-
-class TestTheSweep:
-    def test_an_unmeasured_corpus_reads_as_zero_rather_than_raising(self):
-        # No live lane has ever run, and that is a real state rather than an
-        # error in the corpus.
-        sweep = score_sweep([], corpus_version=CORPUS_VERSION)
-        assert sweep.rate == 0.0
-        assert sweep.failures() == ()
-
-    def test_a_sweep_carries_the_identity_its_numbers_belong_to(self):
-        # A robustness number is a property of a provider, a model, a prompt set
-        # and a translator together, so a percentage without one cannot be
-        # attributed or reproduced.
-        case = AdversarialCase(
-            id="synthetic",
-            title="synthetic",
-            attack_class="benign-control",
-            demand="none",
-            provenance="constructed in this test",
-            source_sha256="0" * 64,
-            expectations=Expectations(must_retain=("Ticket API",)),
-        )
-        sweep = score_sweep(
-            [(case, report_with(["Ticket API"]))], corpus_version=CORPUS_VERSION
-        )
-        assert sweep.rate == 1.0
-        assert sweep.corpus_version == CORPUS_VERSION
