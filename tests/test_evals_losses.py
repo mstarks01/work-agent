@@ -352,3 +352,46 @@ class TestADisplacedRow:
         draft = at(reference, 1, other)
         charged = charge(case, flows, [draft], [promote(draft)])
         assert by_index(charged)[0].displaced_draft_id is None
+
+
+class TestAMisfiledMiss:
+    """A finding at the place, with the action, filed in another lane."""
+
+    def test_the_scorer_lane_error_is_charged_as_misfiled(self, case, flows):
+        reference = next(
+            claim for claim in case.stride_claims() if claim.category == "tampering"
+        )
+        index = case.stride_claims().index(reference)
+        other_lane = "spoofing"
+        draft = draft_threat(
+            1,
+            other_lane,
+            "filed in the wrong lane",
+            element_ids=reference.affected_element_ids,
+            verb=reference.verb,
+        )
+        charged = charge(case, flows, [draft], [promote(draft)])
+        loss = by_index(charged)[index]
+
+        assert loss.cause == "misfiled"
+        assert loss.draft_id == draft.id
+        assert loss.draft_verb == reference.verb
+        assert loss.displaced_draft_id is None
+        assert charged.by_cause["misfiled"] == 1
+        assert pooled([charged])["by_cause"]["misfiled"] == 1
+
+    def test_misfiled_outranks_place_and_unled(self, case, flows):
+        """The lane wrote it; that the lead did not take in its own lane is secondary."""
+        reference = next(
+            claim for claim in case.stride_claims() if claim.category == "tampering"
+        )
+        index = case.stride_claims().index(reference)
+        draft = draft_threat(
+            1,
+            "spoofing",
+            "elsewhere",
+            element_ids=reference.affected_element_ids,
+            verb=reference.verb,
+        )
+        charged = charge(case, flows, [draft], [promote(draft)])
+        assert by_index(charged)[index].cause not in ("place", "unled")
