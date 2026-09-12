@@ -193,9 +193,8 @@ from analysis_service.vendors import ServedTrust, vendor_for_route
 # list as strings meets objects, which would be major on its own; it rides
 # 3.0 for the reason every change above does, and because the only way to
 # count a cause before it was a regular expression over prose. Archived runs
-# were typed by
-# ``evals/migrations/2026-09-10-unreconciled-ruling-kinds.py``, which reads
-# the kind out of the sentence once so nothing downstream ever does.
+# carry the kind as a field too, read out of the sentence once so nothing
+# downstream ever does.
 #
 # 3.0 also carries a fifth ``GroundKind``, ``absent-element``: a term no element
 # of the model names, which is the only branch whose referent is the whole model
@@ -232,8 +231,7 @@ from analysis_service.vendors import ServedTrust, vendor_for_route
 # whether it applies at all; it was folded into ``not-applicable`` before,
 # which told a reader the unit was ruled out when the input had never said.
 # Both would be major on their own, and both ride 3.0 because it has never
-# shipped. The archived sweeps under ``evals/runs/`` were migrated by
-# ``evals/migrations/2026-09-07-scope-states.py``.
+# shipped.
 #
 # 3.0 also adds ``model_repair`` to the envelope (#675): what the repair pass
 # was allowed to change and which elements it changed anyway and had put
@@ -243,9 +241,8 @@ from analysis_service.vendors import ServedTrust, vendor_for_route
 # the substitution changed in the claim's own terms (a negation, a number),
 # required and checked on load against the two texts it is computed from; and
 # ``scan_complete``, whether the rung ranked every window, ``None`` where the
-# run predates the field. The 18 archived repairs were filled in by
-# ``evals/migrations/2026-09-07-repaired-quote-moved.py``, which recomputes
-# ``moved`` from the texts and records no ``scan_complete``.
+# run predates the field. An archived repair carries ``moved`` recomputed from
+# the texts and no ``scan_complete``.
 #
 # 3.0 also tightens what two ``coverage[]`` halves count (#675). A control is
 # ``unknown_controls_cited`` only where a draft's attribute ground names that

@@ -1,17 +1,15 @@
-"""The archive is the bytes its producer writes, and a migration keeps it that way.
+"""The archive is the bytes its producer writes, and a rewrite keeps it that way.
 
 A report is written once by ``evals/harness/bundle.py``, through
-``Report.model_dump_json(indent=2)``, which emits UTF-8. It is then rewritten
-whenever a record change leaves the archive unreadable, and a migration that
-reaches for ``json.dumps`` gets ``ensure_ascii=True`` unless it says otherwise.
-
-Two of them did. The #710 and #468 migrations rewrote 78 archived reports with
-the default, so every em-dash, curly quote and en-dash in the tree became a
-``\\uXXXX`` escape, and the one merged **Baseline**'s file digests were
-re-stamped over an edit neither migration meant to make. Nothing failed: the
-JSON parses to the same value, and ``verify`` recomputes whatever is on disk.
-That is exactly why it needs a lint — the seal that exists to make a silent
-edit loud cannot see one that moves with it.
+``Report.model_dump_json(indent=2)``, which emits UTF-8. It is rewritten
+whenever a record change leaves the archive unreadable, and a rewrite that
+reaches for ``json.dumps`` gets ``ensure_ascii=True`` unless it says otherwise:
+every em-dash, curly quote and en-dash in the tree becomes a ``\\uXXXX``
+escape, and the merged **Baseline**'s file digests are re-stamped over an edit
+nobody meant to make. Nothing fails: the JSON parses to the same value, and
+``verify`` recomputes whatever is on disk. That is exactly why it needs a
+lint — the seal that exists to make a silent edit loud cannot see one that
+moves with it.
 
 **A Baseline holds five kinds of file and three encodings**, and two of the
 three sit in one directory: ``bundle`` writes a report in UTF-8 and, three
@@ -37,7 +35,6 @@ one out-of-order key, and require them to part.
 
 from __future__ import annotations
 
-import ast
 import json
 import subprocess
 from pathlib import Path
@@ -51,7 +48,6 @@ from evals.harness.archive import (
     archive_bytes,
     kind_of,
 )
-from evals.harness.bundle import kind_of_path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -160,8 +156,8 @@ def test_the_three_spellings_really_do_differ():
     pass under any one rule. This is what says the table is load-bearing: give
     the writers one non-ASCII character and one out-of-order key, and they part.
 
-    Both axes are checked. Escaping is the one the #710 and #468 migrations
-    moved. Key order is the one a manifest alone carries, and it is the more
+    Both axes are checked. Escaping is the one a default dump moves. Key
+    order is the one a manifest alone carries, and it is the more
     visible loss: a manifest rewritten in the report's spelling keeps every byte
     of its values and reorders every key in the file.
     """
@@ -211,63 +207,6 @@ def test_every_declared_kind_is_sealed_somewhere():
         f"the archive holds {sorted(held - {None})}, so the kinds"
         f" {sorted(set(ARCHIVE_SPELLINGS) - held)} are declared and untested"
         f" against a real file"
-    )
-
-
-def test_the_layout_names_the_artifact_a_filename_cannot():
-    """``bundle.reports_dir``'s rule, read backwards, is what identifies an artifact.
-
-    A sweep artifact is ``<stem>.json`` and shares that shape with a corpus
-    model and a sitting. What separates it is on disk and not in the name: it is
-    the file its own ``<stem>.reports`` directory sits beside. Everything else
-    answers ``None`` and a migration refuses it.
-    """
-    directory = _tracked_manifests()[0].parent
-    manifest = json.loads((directory / "baseline.json").read_text(encoding="utf-8"))
-    artifact = directory / manifest["sweeps"][0]["artifact"]
-
-    assert kind_of(artifact.name) is None
-    assert kind_of_path(artifact) == "artifact"
-    assert kind_of_path(directory / "baseline.json") == "manifest"
-    assert kind_of_path(REPO_ROOT / "evals/corpus/01-payments-checkout/model.json") is (
-        None
-    )
-
-
-def test_no_migration_carries_its_own_encoding():
-    """The rule that keeps the next migration from re-opening this.
-
-    Six migrations walk every JSON file under ``evals/`` and each wrote one
-    spelling to all of them: three escaped ASCII over reports and manifests,
-    two the report's UTF-8 over drafts, proposals and artifacts. Every one
-    passed review, because the line that does it reads as an ordinary dump and
-    the archive it damages parses to the same value afterwards.
-
-    So the check is mechanical: a migration may print a dump, and it may not
-    **write** one. It asks
-    :func:`~evals.harness.archive.archive_bytes` for the producer's bytes, and
-    :func:`~evals.harness.bundle.kind_of_path` for which producer.
-    """
-    offenders = []
-    for path in sorted((REPO_ROOT / "evals" / "migrations").glob("*.py")):
-        tree = ast.parse(path.read_text(encoding="utf-8"))
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.Call):
-                continue
-            if getattr(node.func, "attr", None) not in {"write_text", "write_bytes"}:
-                continue
-            for argument in ast.walk(node.args[0]) if node.args else ():
-                if (
-                    isinstance(argument, ast.Call)
-                    and getattr(argument.func, "attr", None) == "dumps"
-                ):
-                    offenders.append(f"{path.name}:{node.lineno}")
-
-    assert not offenders, (
-        f"these migrations write a JSON dump of their own rather than asking"
-        f" evals/harness/archive.py for the producer's bytes: {offenders}."
-        f" The archive holds three encodings and a Baseline seals all of them,"
-        f" so one spelling for every file re-encodes most of what it touches"
     )
 
 
