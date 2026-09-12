@@ -9,14 +9,14 @@ over-report at once.
 
 ## The measurement, over STRIDE's 18 exemplars and 244 reference claims
 
-49 of 244 reference claims, which is 20%, name a verb no exemplar in their lane
-demonstrates. 25 of those are ``must-find``. All 13 cases carry at least one.
+50 of 244 reference claims, which is 20%, name a verb no exemplar in their lane
+demonstrates. 26 of those are ``must-find``. All 13 cases carry at least one.
 
 They split into two populations, and each wants a different answer:
 
-* 34 near misses. The lane demonstrates the verb's family but not the member, so
+* 35 near misses. The lane demonstrates the verb's family but not the member, so
   the agent has a wrong neighbour to reach for. ``use-credential`` appears
-  eleven times against ``guess-credential``, ``disable`` nine times against
+  twelve times against ``guess-credential``, ``disable`` nine times against
   ``flood``, and ``plant`` six times against ``alter``.
 * 15 with no neighbour. The lane never demonstrates that family at all.
   ``denial-of-service`` holds most of them: its three exemplars all demonstrate

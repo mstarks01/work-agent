@@ -82,18 +82,22 @@ def test_the_shipped_group_carries_its_gain_and_a_repeat_adds_nothing(
     corpus, flows, pairs, produced
 ):
     """`forge` = `inject` = `plant` shipped on 2026-09-10 (#730). The Baseline
-    re-scored under the shipped rule reads five more matched references and
-    five more must-finds than its recorded 113 and 62, and a candidate that
+    re-scored under the shipped rule reads four more matched references and
+    four more must-finds than its recorded 113 and 62, and a candidate that
     names the same group again changes nothing on any axis.
 
-    Four of the five are the merge. The fifth is #730's ruling 2 on case 03's
+    Five of those come from the merge and #730's ruling 2 on case 03's
     reference 0: the attacker holds a key they were not issued, so the
     reference reads `use-credential`, which is the verb the lane wrote and the
-    verb `frameworks/stride/output.md` states."""
+    verb `frameworks/stride/output.md` states. One comes back off, because
+    #799 reads the same rule on case 02's reference 0. The Baseline ran at
+    `352b72d`, seven hours before `frameworks/stride/output.md` gained that
+    rule, so the lane wrote `impersonate` there and the corrected reference no
+    longer matches it. The next sweep runs with the rule in the prompt."""
     shipped = price(None, corpus, flows, pairs, produced)
     again = price(parse_groups(["forge=inject=plant"]), corpus, flows, pairs, produced)
 
-    assert (shipped.matched, shipped.must_find) == (118, 67)
+    assert (shipped.matched, shipped.must_find) == (117, 66)
     assert again.false_splits == shipped.false_splits
     assert again.false_merges == shipped.false_merges
     assert again.reference_merges == shipped.reference_merges
