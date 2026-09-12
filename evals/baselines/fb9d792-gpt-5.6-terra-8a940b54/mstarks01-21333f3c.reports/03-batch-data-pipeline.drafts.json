@@ -1,0 +1,955 @@
+{
+  "stride": [
+    {
+      "id": "S-01",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "A stolen static partner key lets an attacker submit extracts as that partner",
+      "description": "An attacker who obtains a never-rotated key for `entity:insurance-partner` can present it on `flow:insurance-partner-to-landing-bucket:push-daily-extract` and be accepted by `store:landing-bucket` as that partner. The attacker can thereby submit a fabricated daily extract under the partner identity. Second-order: `process:ingest-scheduler` reads landed files and triggers processing, allowing the impostor's extract to reach `process:transform-job` and ultimately the health and PII records loaded into `store:claims-warehouse`.",
+      "affected_element_ids": [
+        "entity:insurance-partner",
+        "store:landing-bucket",
+        "flow:insurance-partner-to-landing-bucket:push-daily-extract"
+      ],
+      "verb": "use-credential",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "Each partner has a static key we issued when they onboarded; the keys have not changed since.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:insurance-partner-to-landing-bucket:push-daily-extract",
+          "term": ""
+        }
+      ],
+      "category": "spoofing",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium: `flow:insurance-partner-to-landing-bucket:push-daily-extract` crosses from the partner network, and the quoted per-partner credential is static and never rotated, so a leaked key remains usable. Impact is high: the accepted extract proceeds through the pipeline toward `store:claims-warehouse`, which is tagged `pii`, `health`, and `business-critical-data` and classified confidential."
+      },
+      "mitigations": [
+        {
+          "summary": "Replace static partner keys with short-lived, individually scoped machine identities",
+          "detail": "Use per-partner workload identities or short-lived, audience-bound credentials for `flow:insurance-partner-to-landing-bucket:push-daily-extract`, and rotate or revoke credentials promptly."
+        },
+        {
+          "summary": "Bind ingestion provenance to the authenticated partner identity",
+          "detail": "Have `store:landing-bucket` and `process:ingest-scheduler` derive the partner identity from the verified SFTP identity and reject uploads or processing requests whose folder or claimed provenance does not match it."
+        }
+      ]
+    },
+    {
+      "id": "S-02",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "A forged transform trigger is possible if cross-boundary scheduler authentication is absent",
+      "description": "`flow:ingest-scheduler-to-transform-job:trigger-transform` crosses from `boundary:landing-network` to `boundary:warehouse-network` with `authentication: unknown`. If that unknown resolves to no verified caller identity, an attacker with a foothold in the landing network can impersonate `process:ingest-scheduler` and submit a run request to `process:transform-job`. Second-order: the transform normalizes the named input and loads records into `store:claims-warehouse`, so a forged scheduler identity can cause processing and warehouse writes under the pipeline's authority. This draft is conditional on the unresolved authentication attribute; it does not assert that authentication is absent.",
+      "affected_element_ids": [
+        "process:ingest-scheduler",
+        "process:transform-job",
+        "flow:ingest-scheduler-to-transform-job:trigger-transform"
+      ],
+      "verb": "impersonate",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "For each file the scheduler triggers a Spark transform job in the warehouse network. The transform normalizes the records and loads them into BigQuery.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:ingest-scheduler-to-transform-job:trigger-transform",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:ingest-scheduler-to-transform-job:trigger-transform",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "spoofing",
+      "severity": {
+        "likelihood": "low",
+        "impact": "high",
+        "level": "medium",
+        "justification": "Likelihood is low and conditional on the unknown authentication value: exploiting the flow requires a prior foothold in `boundary:landing-network`, although the flow is a derived crossing into `boundary:warehouse-network`. Impact is high: `process:transform-job` loads into `store:claims-warehouse`, tagged `pii`, `health`, and `business-critical-data` and classified confidential."
+      },
+      "mitigations": [
+        {
+          "summary": "Verify a distinct scheduler identity on transform requests",
+          "detail": "Make `flow:ingest-scheduler-to-transform-job:trigger-transform` use explicit, verifiable service authentication such as mTLS or a short-lived audience-bound workload token, and authorize only `process:ingest-scheduler` to start transforms."
+        },
+        {
+          "summary": "Bind each transform run to verified input provenance",
+          "detail": "Require `process:transform-job` to accept only files whose source partner and landing location were established from authenticated ingestion metadata rather than the trigger request alone."
+        }
+      ]
+    },
+    {
+      "id": "T-01",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Compromised long-lived partner key can plant falsified claims for ingestion",
+      "description": "An attacker who obtains a partner's never-rotated static SFTP key can use `flow:insurance-partner-to-landing-bucket:push-daily-extract` to plant schema-valid falsified claim records in `store:landing-bucket`. `process:ingest-scheduler` reads whatever is present and does not verify that a file originated from the partner associated with its folder. Second-order, the scheduler triggers `process:transform-job`, which validates only schema and loads the attacker-controlled rows into `store:claims-warehouse` as normalized claims data.",
+      "affected_element_ids": [
+        "entity:insurance-partner",
+        "flow:insurance-partner-to-landing-bucket:push-daily-extract",
+        "store:landing-bucket"
+      ],
+      "verb": "plant",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "Each partner has a static key we issued when they onboarded; the keys have not changed since.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "quote",
+          "text": "It does not check that a file came from the partner whose folder it landed in.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "quote",
+          "text": "Nothing validates the row contents beyond the schema.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:insurance-partner-to-landing-bucket:push-daily-extract",
+          "term": ""
+        }
+      ],
+      "category": "tampering",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium because exploiting the externally crossing `flow:insurance-partner-to-landing-bucket:push-daily-extract` requires obtaining a partner key, but those credentials are static and never rotated. Impact is high because planted records propagate into `store:claims-warehouse`, which is confidential and holds `pii`, `health`, and `business-critical-data`."
+      },
+      "mitigations": [
+        {
+          "summary": "Replace static partner keys with individually managed, rotatable credentials",
+          "detail": "Use per-partner SFTP identities with defined rotation, revocation, and scoped write permissions for `flow:insurance-partner-to-landing-bucket:push-daily-extract`."
+        },
+        {
+          "summary": "Verify file origin and integrity before ingestion",
+          "detail": "Have `process:ingest-scheduler` require a partner-specific signed manifest or signed extract and reject files whose verified signer does not match the intended partner folder; retain the verification result through `process:transform-job`."
+        },
+        {
+          "summary": "Validate claim semantics before loading",
+          "detail": "Extend `process:transform-job` beyond schema-only validation with allowlisted partner identifiers, record-level integrity checks, and reconciliation against expected extract metadata."
+        }
+      ]
+    },
+    {
+      "id": "T-02",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Unverified cross-zone transform trigger can be altered in transit",
+      "description": "`flow:ingest-scheduler-to-transform-job:trigger-transform` crosses from `boundary:landing-network` to `boundary:warehouse-network`, but its protocol, authentication, and `encryption_in_transit` are all unknown. If the unverified transport does not provide authenticated integrity protection, an attacker with a position on that path can alter the run request naming the file to process before it reaches `process:transform-job`, substituting another landed extract or changing the requested work. Second-order, the transform can load records selected through the altered request into `store:claims-warehouse`; this is conditional on the unresolved transport and authentication attributes, not an assertion that protection is absent.",
+      "affected_element_ids": [
+        "process:ingest-scheduler",
+        "flow:ingest-scheduler-to-transform-job:trigger-transform",
+        "process:transform-job"
+      ],
+      "verb": "alter-in-transit",
+      "grounds": [
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:ingest-scheduler-to-transform-job:trigger-transform",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:ingest-scheduler-to-transform-job:trigger-transform",
+          "attribute": "protocol",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:ingest-scheduler-to-transform-job:trigger-transform",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:ingest-scheduler-to-transform-job:trigger-transform",
+          "attribute": "encryption_in_transit",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "tampering",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional on the unknown protocol, authentication, and transport-encryption attributes: an attacker must obtain an on-path position across the `boundary:landing-network` to `boundary:warehouse-network` crossing. Impact is high because altered processing requests can affect data loaded into confidential `store:claims-warehouse`, which contains `pii`, `health`, and `business-critical-data`."
+      },
+      "mitigations": [
+        {
+          "summary": "Establish authenticated encrypted transport for the scheduler trigger",
+          "detail": "Define the protocol for `flow:ingest-scheduler-to-transform-job:trigger-transform` and require mutually authenticated TLS or an equivalent authenticated channel between `process:ingest-scheduler` and `process:transform-job`."
+        },
+        {
+          "summary": "Bind transform requests to verified input artifacts",
+          "detail": "Have `process:transform-job` accept only signed, allowlisted job requests and verify that the requested file belongs to an approved ingestion manifest before loading it."
+        }
+      ]
+    },
+    {
+      "id": "T-03",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Unverified BigQuery write identity may permit alteration of warehouse claims",
+      "description": "`flow:transform-job-to-claims-warehouse:load-records` performs a write into confidential `store:claims-warehouse`, but its `authentication` is unknown. If that unknown resolves to missing or insufficient caller authentication and authorization, an attacker who reaches the warehouse write interface can inject or alter normalized claim rows outside the intended `process:transform-job` path. Second-order, `entity:data-analyst` queries the corrupted warehouse through `flow:data-analyst-to-claims-warehouse:run-queries`, so analyses can treat attacker-modified member and claim data as authoritative. This threat is conditional on the unresolved authentication attribute.",
+      "affected_element_ids": [
+        "process:transform-job",
+        "flow:transform-job-to-claims-warehouse:load-records",
+        "store:claims-warehouse"
+      ],
+      "verb": "alter",
+      "grounds": [
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:transform-job-to-claims-warehouse:load-records",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "tampering",
+      "severity": {
+        "likelihood": "low",
+        "impact": "high",
+        "level": "medium",
+        "justification": "Likelihood is low and conditional on the unknown authentication value because the attacker must first reach the warehouse write path from the internal warehouse environment. Impact is high because unauthorized writes alter confidential `store:claims-warehouse` records tagged `pii`, `health`, and `business-critical-data` and influence direct analyst queries."
+      },
+      "mitigations": [
+        {
+          "summary": "Verify and restrict the warehouse writer identity",
+          "detail": "Resolve the authentication model for `flow:transform-job-to-claims-warehouse:load-records` and require a dedicated workload identity for `process:transform-job` with only the dataset and write operations it requires."
+        },
+        {
+          "summary": "Detect and constrain unauthorized record changes",
+          "detail": "Use append-only or versioned ingestion records, row-level validation, and reconciliation of BigQuery loads against signed transform manifests so out-of-band modifications are rejected or detected."
+        }
+      ]
+    },
+    {
+      "id": "R-01",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Warehouse claim loads may be deniable because no attributable evidence path is described",
+      "description": "An actor with access in `boundary:landing-network` could cause `process:transform-job` to run through `flow:ingest-scheduler-to-transform-job:trigger-transform` and later deny having initiated the load. That flow crosses into the warehouse network with `authentication: unknown`, and the resulting write on `flow:transform-job-to-claims-warehouse:load-records` also has `authentication: unknown`. If those unknowns do not bind and retain the originating principal, the model contains no dedicated audit log or audit flow that records who initiated the run, which file was processed, the warehouse write outcome, and a timestamp. The actor can therefore dispute responsibility for altered or loaded records in `store:claims-warehouse`; accountability for the health, PII, and business-critical claim corpus collapses, not merely for the triggering request.",
+      "affected_element_ids": [
+        "process:ingest-scheduler",
+        "process:transform-job",
+        "flow:ingest-scheduler-to-transform-job:trigger-transform",
+        "flow:transform-job-to-claims-warehouse:load-records"
+      ],
+      "verb": "unattributable",
+      "grounds": [
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:ingest-scheduler-to-transform-job:trigger-transform",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:ingest-scheduler-to-transform-job:trigger-transform",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:transform-job-to-claims-warehouse:load-records",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "absent-element",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": "audit log"
+        }
+      ],
+      "category": "repudiation",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional on the unknown authentication on `flow:ingest-scheduler-to-transform-job:trigger-transform` and `flow:transform-job-to-claims-warehouse:load-records`; an actor needs a foothold in the internal landing path, but the trigger crosses into `boundary:warehouse-network` without a stated identity-binding control. Impact is high because the resulting writes reach `store:claims-warehouse`, which holds `pii`, `health`, and `business-critical-data`."
+      },
+      "mitigations": [
+        {
+          "summary": "Record attributable transform and warehouse-write events",
+          "detail": "Have `process:ingest-scheduler` and `process:transform-job` emit structured audit events to a dedicated audit flow recording the verified originating principal, run ID, source file, target dataset, timestamp, and success or failure for each warehouse load."
+        },
+        {
+          "summary": "Bind the original caller across the scheduler-to-transform hop",
+          "detail": "Establish authentication for `flow:ingest-scheduler-to-transform-job:trigger-transform` and propagate a verified initiating identity through `process:transform-job` so the `flow:transform-job-to-claims-warehouse:load-records` evidence records both the caller and service identity."
+        }
+      ]
+    },
+    {
+      "id": "R-02",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Reads of partner keys may be deniable under the scheduler identity",
+      "description": "A person with a foothold in the landing environment could read connection strings and partner SFTP keys through `flow:ingest-scheduler-to-airflow-metadata-db:read-connections` and deny having done so if its `authentication: unknown` does not bind activity to an individual or durable workload identity. The model describes no audit log for these accesses, so the evidence available after a dispute may identify at most `process:ingest-scheduler`, not the actor who used or controlled it. This affects `store:airflow-metadata-db`, whose credentials and secrets can in turn be used against the partner ingestion path and leave subsequent disputed extract activity without a reliable accountable origin.",
+      "affected_element_ids": [
+        "process:ingest-scheduler",
+        "flow:ingest-scheduler-to-airflow-metadata-db:read-connections",
+        "store:airflow-metadata-db"
+      ],
+      "verb": "unattributable",
+      "grounds": [
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:ingest-scheduler-to-airflow-metadata-db:read-connections",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "absent-element",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": "audit log"
+        }
+      ],
+      "category": "repudiation",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional on the unknown authentication on `flow:ingest-scheduler-to-airflow-metadata-db:read-connections`; exploitation requires an internal foothold, but no stated control establishes an attributable caller on that read path. Impact is high because `store:airflow-metadata-db` is tagged `credentials` and `secrets`, and its partner SFTP keys can affect the broader ingestion chain."
+      },
+      "mitigations": [
+        {
+          "summary": "Audit every metadata-database credential read",
+          "detail": "Require an authenticated workload identity for `flow:ingest-scheduler-to-airflow-metadata-db:read-connections` and retain immutable events containing the verified principal, requested secret or connection identifier, timestamp, and outcome."
+        },
+        {
+          "summary": "Use distinct, accountable workload identities",
+          "detail": "Give `process:ingest-scheduler` a least-privilege, non-shared identity for only the required metadata entries, and forward any human operator identity for administrative or manually initiated reads."
+        }
+      ]
+    },
+    {
+      "id": "I-01",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Unverified at-rest encryption could expose landing-bucket health extracts",
+      "description": "`store:landing-bucket` is a confidential store holding PII and health claim extracts, but its `encryption_at_rest` attribute is unknown. If storage encryption is not enabled, an attacker or over-privileged operator who obtains an operational copy of the bucket, such as a storage-layer export or decommissioned media, can read member names and dates of birth without using the SFTP access path. The exposed extracts can then be correlated with the downstream normalized records loaded toward `store:claims-warehouse`. This is conditional on verifying the at-rest encryption posture; it does not assert that encryption is absent.",
+      "affected_element_ids": [
+        "store:landing-bucket"
+      ],
+      "verb": "read",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "The extracts contain claim records\nwith member names and dates of birth.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "store:landing-bucket",
+          "attribute": "encryption_at_rest",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "information-disclosure",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional because `unknown:store:landing-bucket:encryption_at_rest` leaves storage-layer protection unverified, while obtaining a raw operational copy requires access beyond the normal SFTP path. Impact is high because `store:landing-bucket` is confidential and holds health and PII claim extracts containing member names and dates of birth."
+      },
+      "mitigations": [
+        {
+          "summary": "Verify and enforce encryption for the landing bucket and its copies",
+          "detail": "Establish the `encryption_at_rest` setting for `store:landing-bucket`, then require managed-key encryption for the bucket and any backup, export, snapshot, or replica containing its extracts; restrict export and key-use permissions."
+        },
+        {
+          "summary": "Limit sensitive extract retention",
+          "detail": "Delete or securely archive landed extracts after successful normalization so a storage-layer exposure yields fewer daily claim files."
+        }
+      ]
+    },
+    {
+      "id": "I-02",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Unverified metadata-database encryption could disclose partner access keys",
+      "description": "`store:airflow-metadata-db` is confidential and stores connection strings and partner SFTP keys, while `encryption_at_rest` is unknown. If the database is not encrypted at rest, a party obtaining a database volume, backup, or snapshot can recover those credentials directly rather than authenticating through `process:ingest-scheduler`. Second-order, recovered partner keys can be used against `flow:insurance-partner-to-landing-bucket:push-daily-extract` to reach the landing path and its health-data extracts. This is conditional on the unknown encryption setting, not an assertion that the PostgreSQL storage is cleartext.",
+      "affected_element_ids": [
+        "store:airflow-metadata-db"
+      ],
+      "verb": "recover-credential",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "Airflow keeps its connection\nstrings and the partner keys in its own metadata database.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "quote",
+          "text": "I don't know how the landing bucket is encrypted or whether the Airflow\nmetadata database is encrypted at rest.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "store:airflow-metadata-db",
+          "attribute": "encryption_at_rest",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "information-disclosure",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional because `unknown:store:airflow-metadata-db:encryption_at_rest` leaves the storage-layer control unverified, although obtaining a raw database copy requires storage or backup access. Impact is high because the confidential store is tagged `credentials` and `secrets`, and the recovered SFTP keys extend access to partner claim-data ingestion."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt the metadata database and all operational copies",
+          "detail": "Verify `store:airflow-metadata-db` encryption at rest, enforce KMS-backed encryption for its volumes and backups, and restrict database export, snapshot, and decrypt permissions."
+        },
+        {
+          "summary": "Replace long-lived partner keys with managed short-lived credentials",
+          "detail": "Move partner credentials from Airflow metadata where feasible to a dedicated secret store, issue scoped and rotatable credentials, and rotate every existing static partner key."
+        }
+      ]
+    },
+    {
+      "id": "I-03",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Unverified warehouse encryption could expose normalized health records from storage copies",
+      "description": "`store:claims-warehouse` is classified confidential, contains PII and health data, and has `encryption_at_rest: unknown`. If the warehouse's storage layer or an operational copy is unencrypted, an attacker with access to an exported copy, snapshot, or underlying storage can read normalized member claim records without passing through the SSO-protected analyst query path. The resulting member identifiers and dates of birth can be correlated with the partner extracts that enter through `store:landing-bucket`. This finding is conditional on resolving the unverified at-rest encryption attribute.",
+      "affected_element_ids": [
+        "store:claims-warehouse"
+      ],
+      "verb": "read",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "The transform normalizes the records and loads them into BigQuery.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "quote",
+          "text": "Analysts query the warehouse directly.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "store:claims-warehouse",
+          "attribute": "encryption_at_rest",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "information-disclosure",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional because `unknown:store:claims-warehouse:encryption_at_rest` means a storage-layer control may be absent, while acquiring a warehouse copy requires storage, export, or backup access. Impact is high because `store:claims-warehouse` is confidential and tagged `pii` and `health`, so one copy can disclose normalized claim records in bulk."
+      },
+      "mitigations": [
+        {
+          "summary": "Verify encryption at rest for the warehouse and exported copies",
+          "detail": "Establish the encryption configuration for `store:claims-warehouse`; require managed-key encryption and access controls for the dataset, snapshots, exports, and any downstream copies."
+        },
+        {
+          "summary": "Protect sensitive fields independently",
+          "detail": "Apply field-level protection or tokenization to member-identifying columns so a raw warehouse copy does not directly reveal names and dates of birth."
+        }
+      ]
+    },
+    {
+      "id": "I-04",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Unverified internal transport could expose partner claim extracts to on-path observers",
+      "description": "`flow:ingest-scheduler-to-landing-bucket:list-and-read-files` reads partner extract files containing health and PII from `store:landing-bucket`, but its `encryption_in_transit` attribute is unknown. If that object-storage API segment is not transport-protected, a compromised workload or network observer in `boundary:landing-network` can intercept the files as `process:ingest-scheduler` reads them. The captured names and dates of birth can be correlated with normalized records subsequently loaded through `flow:transform-job-to-claims-warehouse:load-records`. This is conditional on confirming the unknown transport setting.",
+      "affected_element_ids": [
+        "flow:ingest-scheduler-to-landing-bucket:list-and-read-files",
+        "process:ingest-scheduler",
+        "store:landing-bucket"
+      ],
+      "verb": "intercept",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "An Airflow scheduler running in the landing network wakes up at 02:00, lists\nthe bucket, and reads whatever is there.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "quote",
+          "text": "The extracts contain claim records\nwith member names and dates of birth.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:ingest-scheduler-to-landing-bucket:list-and-read-files",
+          "attribute": "encryption_in_transit",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "information-disclosure",
+      "severity": {
+        "likelihood": "low",
+        "impact": "high",
+        "level": "medium",
+        "justification": "Likelihood is low and conditional because `unknown:flow:ingest-scheduler-to-landing-bucket:list-and-read-files:encryption_in_transit` leaves protection unverified, but interception of an internal landing-network segment requires a prior on-path foothold. Impact is high because the flow carries the landing bucket's PII and health claim extracts, including names and dates of birth."
+      },
+      "mitigations": [
+        {
+          "summary": "Require authenticated TLS for the bucket read path",
+          "detail": "Configure TLS for `flow:ingest-scheduler-to-landing-bucket:list-and-read-files`, validate the storage endpoint certificate, and use workload identity or mTLS where supported."
+        },
+        {
+          "summary": "Minimize readable extract content",
+          "detail": "Encrypt especially sensitive fields before landing or replace direct identifiers with opaque references where the scheduler does not need plaintext values."
+        }
+      ]
+    },
+    {
+      "id": "I-05",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Unverified metadata-database transport could expose Airflow connection strings and partner keys",
+      "description": "`flow:ingest-scheduler-to-airflow-metadata-db:read-connections` carries connection strings and partner SFTP keys from `store:airflow-metadata-db` to `process:ingest-scheduler`, but both its authentication and `encryption_in_transit` are unknown. If the database wire segment lacks transport protection, an attacker with an on-path position in `boundary:landing-network` can intercept the credentials while the scheduler reads them. Second-order, the recovered partner keys can be used on `flow:insurance-partner-to-landing-bucket:push-daily-extract` to access the partner ingestion path and its claim extracts. This is conditional on the unverified transport control, rather than a claim that PostgreSQL traffic is plaintext.",
+      "affected_element_ids": [
+        "flow:ingest-scheduler-to-airflow-metadata-db:read-connections",
+        "process:ingest-scheduler",
+        "store:airflow-metadata-db"
+      ],
+      "verb": "intercept",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "Airflow keeps its connection\nstrings and the partner keys in its own metadata database.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:ingest-scheduler-to-airflow-metadata-db:read-connections",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:ingest-scheduler-to-airflow-metadata-db:read-connections",
+          "attribute": "encryption_in_transit",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "information-disclosure",
+      "severity": {
+        "likelihood": "low",
+        "impact": "high",
+        "level": "medium",
+        "justification": "Likelihood is low and conditional because the two controls on `flow:ingest-scheduler-to-airflow-metadata-db:read-connections` are unknown, but an attacker must first gain an on-path position in the internal landing network. Impact is high because the flow carries credentials and secrets whose recovery enables access to the partner claim-data ingestion path."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt and authenticate the metadata database connection",
+          "detail": "Require TLS with certificate validation for `flow:ingest-scheduler-to-airflow-metadata-db:read-connections` and use distinct workload credentials for the scheduler rather than relying on network location."
+        },
+        {
+          "summary": "Remove static partner keys from routine database reads",
+          "detail": "Store partner credentials in a dedicated secrets service with short-lived retrieval credentials, audit secret reads, and rotate the existing onboarding keys."
+        }
+      ]
+    },
+    {
+      "id": "I-06",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Unverified transform-to-warehouse transport could expose normalized health claims",
+      "description": "`flow:transform-job-to-claims-warehouse:load-records` sends normalized claim records from `process:transform-job` to `store:claims-warehouse` with `encryption_in_transit: unknown`. If the BigQuery API connection is not transport-protected, an on-path attacker in `boundary:warehouse-network` can intercept health and PII records while they are loaded. Captured identifiers can then be used to target specific people through the analyst-accessible warehouse corpus. This is conditional on the unknown transport state; it does not claim that the API lacks encryption.",
+      "affected_element_ids": [
+        "flow:transform-job-to-claims-warehouse:load-records",
+        "process:transform-job",
+        "store:claims-warehouse"
+      ],
+      "verb": "intercept",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "The transform normalizes the records and loads them into BigQuery.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:transform-job-to-claims-warehouse:load-records",
+          "attribute": "encryption_in_transit",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "information-disclosure",
+      "severity": {
+        "likelihood": "low",
+        "impact": "high",
+        "level": "medium",
+        "justification": "Likelihood is low and conditional because `unknown:flow:transform-job-to-claims-warehouse:load-records:encryption_in_transit` leaves the control unverified, but observing a warehouse-network segment requires a prior internal foothold. Impact is high because the flow transfers normalized records that the model tags `pii` and `health` into a confidential warehouse."
+      },
+      "mitigations": [
+        {
+          "summary": "Enforce TLS for warehouse loads",
+          "detail": "Require verified TLS for `flow:transform-job-to-claims-warehouse:load-records`, reject non-TLS endpoints, and use workload-bound service authentication for the transform job."
+        },
+        {
+          "summary": "Constrain network observation opportunities",
+          "detail": "Segment the transform and warehouse workloads and restrict routing, proxying, and packet-capture privileges on the warehouse network."
+        }
+      ]
+    },
+    {
+      "id": "I-07",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Unverified analyst-query transport could expose returned member claim records",
+      "description": "`flow:data-analyst-to-claims-warehouse:run-queries` carries claim records including member identifiers between `entity:data-analyst` and `store:claims-warehouse`, with `encryption_in_transit: unknown`. If query and response traffic is not encrypted, a party able to observe the warehouse-network path can intercept the analyst's returned health and PII records. The disclosure can include the same member-identifying columns available under the dataset-wide grant, enabling later targeting of individuals without separately querying the warehouse. This finding is conditional on resolving the transport-protection setting.",
+      "affected_element_ids": [
+        "flow:data-analyst-to-claims-warehouse:run-queries",
+        "entity:data-analyst",
+        "store:claims-warehouse"
+      ],
+      "verb": "intercept",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "Analysts query the warehouse directly. They are on the warehouse network and\nauthenticate with SSO, but the grant is dataset-wide \u2014 we have not split\nmember-identifying columns out.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:data-analyst-to-claims-warehouse:run-queries",
+          "attribute": "encryption_in_transit",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "information-disclosure",
+      "severity": {
+        "likelihood": "low",
+        "impact": "high",
+        "level": "medium",
+        "justification": "Likelihood is low and conditional because `unknown:flow:data-analyst-to-claims-warehouse:run-queries:encryption_in_transit` does not verify channel protection and an attacker needs an on-path warehouse-network position. Impact is high because the confidential warehouse holds PII and health data, and the query path includes member identifiers."
+      },
+      "mitigations": [
+        {
+          "summary": "Require encrypted analyst-to-warehouse connections",
+          "detail": "Configure `flow:data-analyst-to-claims-warehouse:run-queries` to require TLS with endpoint validation and prevent client fallback to unencrypted connections."
+        },
+        {
+          "summary": "Reduce sensitive query results",
+          "detail": "Tokenize or mask member-identifying fields for analytical use so intercepted result sets reveal less direct personal data."
+        }
+      ]
+    },
+    {
+      "id": "I-08",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Dataset-wide analyst access permits bulk reading of member-identifying claim data",
+      "description": "An honest-but-curious or compromised `entity:data-analyst` can use `flow:data-analyst-to-claims-warehouse:run-queries` to read from `store:claims-warehouse` under a dataset-wide grant with no column-level restriction. The analyst's SSO login does not limit direct access to member-identifying columns, so one valid internal account can enumerate health claim records beyond a task requiring only de-identified analytics. Second-order, names and dates of birth extracted from the warehouse enable targeted fraud, phishing, or correlation with partner extracts, though those later actions are outside this disclosure threat.",
+      "affected_element_ids": [
+        "entity:data-analyst",
+        "flow:data-analyst-to-claims-warehouse:run-queries",
+        "store:claims-warehouse"
+      ],
+      "verb": "read",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "Analysts query the warehouse directly. They are on the warehouse network and\nauthenticate with SSO, but the grant is dataset-wide \u2014 we have not split\nmember-identifying columns out.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "information-disclosure",
+      "severity": {
+        "likelihood": "high",
+        "impact": "high",
+        "level": "critical",
+        "justification": "Likelihood is high because `entity:data-analyst` already has company SSO and a stated dataset-wide grant on `flow:data-analyst-to-claims-warehouse:run-queries`, so bulk reads require no additional technical bypass. Impact is high because `store:claims-warehouse` is confidential and tagged `pii` and `health`, with member-identifying claim records available directly."
+      },
+      "mitigations": [
+        {
+          "summary": "Replace the dataset-wide grant with least-privilege access",
+          "detail": "Create separate reader principals and grant analysts only the tables, rows, and columns needed for their assigned analysis; enforce column-level restrictions server-side."
+        },
+        {
+          "summary": "Provide a de-identified analytics view",
+          "detail": "Expose tokenized or aggregated warehouse views by default, retaining direct member identifiers only for tightly approved workflows."
+        },
+        {
+          "summary": "Detect enumeration-shaped warehouse reads",
+          "detail": "Audit analyst queries and alert on bulk exports, full-table scans, or access to identifying columns inconsistent with the analyst's assigned purpose."
+        }
+      ]
+    },
+    {
+      "id": "D-01",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Partner file flooding triggers unbounded transform work and disrupts nightly ingest",
+      "description": "A malicious or compromised `entity:insurance-partner` with its issued SFTP key can flood `flow:insurance-partner-to-landing-bucket:push-daily-extract` with many schema-valid files. `process:ingest-scheduler` lists and reads every file in `store:landing-bucket` and starts one `process:transform-job` run per file, so the attacker spends uploads while the system consumes object-storage capacity, scheduler capacity, and Spark execution capacity per file. No file-count, size, or per-partner work quota is stated. Second-order, saturating the scheduler or transform capacity delays or prevents processing of all partners' nightly extracts and stalls loads over `flow:transform-job-to-claims-warehouse:load-records` into `store:claims-warehouse`.",
+      "affected_element_ids": [
+        "store:landing-bucket",
+        "flow:insurance-partner-to-landing-bucket:push-daily-extract"
+      ],
+      "verb": "flood",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "An Airflow scheduler running in the landing network wakes up at 02:00, lists the bucket, and reads whatever is there.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "quote",
+          "text": "For each file the scheduler triggers a Spark transform job in the warehouse network.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:insurance-partner-to-landing-bucket:push-daily-extract",
+          "term": ""
+        }
+      ],
+      "category": "denial-of-service",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium: `flow:insurance-partner-to-landing-bucket:push-daily-extract` crosses from the externally controlled `boundary:partner-network`, but exploitation requires a partner's static SFTP key or a compromised partner. Impact is medium: exhausting `process:ingest-scheduler` or `process:transform-job` interrupts nightly processing for all three partners and delays availability of the confidential health and PII claim records in `store:claims-warehouse`, but the stated pipeline is batch-oriented and the outage is recoverable."
+      },
+      "mitigations": [
+        {
+          "summary": "Bound partner upload volume and landing-bucket growth",
+          "detail": "Apply per-partner file-count, object-size, and storage quotas on `flow:insurance-partner-to-landing-bucket:push-daily-extract`, with retention/TTL and fill-rate alerts for `store:landing-bucket`."
+        },
+        {
+          "summary": "Bound and meter per-file transform admission",
+          "detail": "Make `process:ingest-scheduler` validate file size and batch limits before triggering `process:transform-job`; cap queued and concurrent runs per partner and shed excess work rather than launching one unbounded job per uploaded file."
+        }
+      ]
+    },
+    {
+      "id": "E-01",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Unauthenticated transform triggering could let a landing-network foothold invoke warehouse authority",
+      "description": "`flow:ingest-scheduler-to-transform-job:trigger-transform` crosses from `boundary:landing-network` into `boundary:warehouse-network` and terminates at `process:transform-job`, but its `authentication` is unknown. If that unknown resolves to no receiving-side authentication and authorization of the scheduler, an attacker with a foothold in the landing network could submit transform run requests naming landed files and cause the warehouse-side process to act using authority the attacker does not hold. Second-order, `process:transform-job` loads normalized records through `flow:transform-job-to-claims-warehouse:load-records` into `store:claims-warehouse`, so this crosses from a landing-tier position into a process that can affect confidential health and member-identifying claim data. This is conditional on the unstated authentication control for the crossing flow, not an assertion that it is absent.",
+      "affected_element_ids": [
+        "process:ingest-scheduler",
+        "flow:ingest-scheduler-to-transform-job:trigger-transform",
+        "process:transform-job"
+      ],
+      "verb": "escalate",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "The transform normalizes the records and loads them into BigQuery.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:ingest-scheduler-to-transform-job:trigger-transform",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:ingest-scheduler-to-transform-job:trigger-transform",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "elevation-of-privilege",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional on `unknown:flow:ingest-scheduler-to-transform-job:trigger-transform:authentication`: exploiting it requires a foothold in `boundary:landing-network`, but a missing receiver-side check would make invoking the crossing straightforward. Impact is high because `process:transform-job` loads member claim records into `store:claims-warehouse`, which holds confidential data tagged `pii`, `health`, and `business-critical-data`."
+      },
+      "mitigations": [
+        {
+          "summary": "Authenticate and authorize every transform-trigger request",
+          "detail": "Require `process:transform-job` to authenticate `process:ingest-scheduler` on `flow:ingest-scheduler-to-transform-job:trigger-transform` with a narrowly scoped workload identity, and authorize only scheduler-originated requests for expected landed files."
+        },
+        {
+          "summary": "Constrain landing-to-warehouse reachability",
+          "detail": "Restrict network ingress to `process:transform-job` to the scheduler identity and route, so a position in `boundary:landing-network` cannot obtain warehouse execution authority merely through network access."
+        }
+      ]
+    }
+  ]
+}
