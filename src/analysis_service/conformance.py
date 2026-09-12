@@ -108,9 +108,39 @@ REFERENCE_MODELS: dict[str, tuple[str, ...]] = {
     # Claude in its Bedrock spelling, and only Claude: Nova and Llama get
     # *emulated* structured output there, which
     # :func:`~analysis_service.binding._check_native_structured_output` refuses,
-    # so neither could bind a tier of this graph. The plain identifier rather
-    # than a region-scoped one, because no region enters an Execution Identity.
-    "bedrock": ("anthropic.claude-sonnet-4-6", "anthropic.claude-opus-5"),
+    # so neither could bind a tier of this graph.
+    #
+    # **The ``global.`` inference profile, because the plain identifier does not
+    # invoke.** AWS serves recent Claude generations through cross-Region
+    # inference profiles, and a profile ID is a model identifier rather than a
+    # region field — so this names which build is addressed and leaves
+    # [#496](https://github.com/mstarks01/work-agent/issues/496) intact. A
+    # ``global.`` profile is the one spelling that carries no geography at all:
+    # ``us.``, ``eu.``, ``au.`` and ``jp.`` each pin a destination set.
+    #
+    # Read from the AWS model cards on 2026-09-12, which is documentation and
+    # not a call — nobody has provisioned ``ANALYSIS_BEDROCK_API_KEY``, and
+    # [#626](https://github.com/mstarks01/work-agent/issues/626) asked for the
+    # live answer this substitutes for. Both cards carry an "Availability using
+    # the ``bedrock-runtime`` endpoint" table with an In-Region column:
+    #
+    #     anthropic.claude-opus-5      In-Region endpoint URL "N/A";
+    #                                  In-Region unsupported in all 32 Regions
+    #     anthropic.claude-sonnet-4-6  In-Region supported in eu-west-2 alone,
+    #                                  of 31 Regions
+    #
+    # and AWS's own sample code for both asks for ``global.anthropic.<name>``.
+    # So the plain pair would have raised a ValidationException on the first
+    # live request from the smoke leg, and on the first run of an operator
+    # following ``docs/First-Run.md``.
+    #
+    #   https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-anthropic-claude-opus-5.html
+    #   https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-anthropic-claude-sonnet-4-6.html
+    #
+    # The pinned cost map prices the profile keys and the plain keys alike, and
+    # all six spellings profile identically, so this moves what a request can
+    # reach and no cell of the matrix.
+    "bedrock": ("global.anthropic.claude-sonnet-4-6", "global.anthropic.claude-opus-5"),
     # The weights the ``vertex`` pair names, behind the Developer API. The
     # same identifiers on purpose: the matrix is where the two routes to one
     # family show their one difference, and a different pair would hide it.
