@@ -173,6 +173,47 @@ REFERENCE_MODELS: dict[str, tuple[str, ...]] = {
     # ``openrouter`` entries of their own, so every cell below is about the
     # route that would actually serve.
     "openrouter": ("anthropic/claude-sonnet-4.6", "anthropic/claude-opus-4.7"),
+    # The same identifiers as the ``gemini`` row, behind a location the
+    # operator supplies. On Vertex the endpoint is a location and never a
+    # segment of the model name, so nothing about the endpoint reaches this
+    # pair, and [#496](https://github.com/mstarks01/work-agent/issues/496)
+    # keeps every region out of the Execution Identity whatever the operator
+    # sets.
+    #
+    # **The two tiers do not serve the same set of locations.** Read from
+    # Google's model endpoint locations table on 2026-09-12, which is
+    # documentation and not a call — nobody has provisioned a Vertex project,
+    # and [#843](https://github.com/mstarks01/work-agent/issues/843) asked
+    # whether the global endpoint is required:
+    #
+    #     both tiers  global, us-central1, us-east1, us-east4, us-east5,
+    #                 us-south1, us-west1, us-west4, northamerica-northeast1,
+    #                 europe-west1, europe-west4, europe-west8, europe-west9,
+    #                 europe-central2, europe-north1, europe-southwest1,
+    #                 asia-northeast1
+    #     base alone  asia-northeast3, asia-south1, asia-southeast1,
+    #                 australia-southeast1, europe-west2, europe-west3,
+    #                 southamerica-east1
+    #     neither     the ``us`` and ``eu`` multi-region endpoints
+    #
+    # The pinned translator reaches all three shapes:
+    # ``vertex_ai.common_utils.get_vertex_base_url`` sends ``global`` to
+    # ``aiplatform.googleapis.com``, a multi-region to
+    # ``aiplatform.{geo}.rep.googleapis.com`` and a region to
+    # ``{region}-aiplatform.googleapis.com``. So a multi-region value builds a
+    # valid host and then fails on the model, which is the shape that needs the
+    # table above rather than a URL check.
+    #
+    # The global endpoint is one option and never a requirement, and
+    # ``us-central1`` — the location ``docs/First-Run.md`` writes — serves both
+    # tiers. A location from the second row binds ``base`` and then fails
+    # ``strong`` on its first request. That consequence is written in
+    # ``docs/First-Run.md`` rather than guarded here: the location is the
+    # operator's value, Google adds regions to its own table, and a set frozen
+    # in this module would reject a valid location the day after Google
+    # widens it.
+    #
+    #   https://docs.cloud.google.com/vertex-ai/generative-ai/docs/learn/locations
     "vertex": ("gemini-2.5-flash", "gemini-2.5-pro"),
 }
 
