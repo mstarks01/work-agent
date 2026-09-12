@@ -29,6 +29,14 @@ Five causes, decided in this order for one missed reference:
 * ``unled``: no rule fired on the reference's elements and no draft cites
   them. Nothing sent the lane there.
 
+A ``place`` or ``unled`` row also says whether the lane wrote *near* the
+reference: ``displaced_draft_id`` names a surviving claim in the lane that
+shares at least one endpoint-resolved element with the reference without
+either set containing the other. The second Baseline moved nine verb losses
+into these two causes and nothing said whether the lane had gone silent or
+had written the finding one element over; those are two different fixes, and
+the row now tells them apart.
+
 Every fact read here is one the harness already holds in a closed form: the
 scorer's element relation, the identity rule's own answer to whether two verbs
 name one action, the trigger instrument's rule IDs. Whether two verbs are one
@@ -51,7 +59,7 @@ from typing import Any, Literal
 
 from analysis_service.claims import FrameworkAnalysis
 from analysis_service.frameworks.stride.record import DraftThreat
-from evals.harness.identity import FlowMap, endpoint_subset
+from evals.harness.identity import FlowMap, endpoint_form, endpoint_subset
 from evals.harness.reference import GoldenCase
 from evals.harness.scorer import CaseScore
 from evals.harness.triggers import case_trigger_recall
@@ -84,6 +92,13 @@ class Loss:
     #: arrived after a repair is priced against the first pass and ``recritic``.
     #: A ``place`` or ``unled`` row names no draft, so it is always empty there.
     re_ask: tuple[str, ...] = ()
+    #: For a ``place`` or ``unled`` row, the surviving claim in the lane whose
+    #: cited place overlaps the reference's without containing it or being
+    #: contained by it — the lane wrote the finding one element over. Absent
+    #: where no surviving claim in the lane shares an element with the
+    #: reference: the lane went silent there. Always absent on the other three
+    #: causes, which already name the draft at the place.
+    displaced_draft_id: str | None = None
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -95,6 +110,7 @@ class Loss:
             "draft_id": self.draft_id,
             "draft_verb": self.draft_verb,
             "re_ask": list(self.re_ask),
+            "displaced_draft_id": self.displaced_draft_id,
         }
 
 
@@ -114,11 +130,20 @@ class CaseLosses:
         counts = Counter(loss.cause for loss in self.losses if loss.re_ask)
         return {cause: counts[cause] for cause in CAUSES}
 
+    @property
+    def displaced_by_cause(self) -> dict[str, int]:
+        """The subset of the ``place`` and ``unled`` rows the lane wrote near."""
+        counts = Counter(
+            loss.cause for loss in self.losses if loss.displaced_draft_id is not None
+        )
+        return {cause: counts[cause] for cause in CAUSES}
+
     def to_json(self) -> dict[str, Any]:
         return {
             "case": self.case,
             "by_cause": self.by_cause,
             "re_asked_by_cause": self.re_asked_by_cause,
+            "displaced_by_cause": self.displaced_by_cause,
             "losses": [loss.to_json() for loss in self.losses],
         }
 
@@ -132,6 +157,24 @@ def _at_place(
         for draft in drafts
         if endpoint_subset(reference_ids, draft.affected_element_ids, flows)
     ]
+
+
+def _nearby(
+    reference_ids: Sequence[str], drafts: Sequence[DraftThreat], flows: FlowMap
+) -> DraftThreat | None:
+    """The first draft sharing an endpoint-resolved element with the reference.
+
+    Read through :func:`~evals.harness.identity.endpoint_form`, the same
+    resolution the element half of the identity rule applies, so a flow cited
+    on one side and its endpoint on the other count as one shared place.
+    Called only for drafts the containment test already refused, so a hit here
+    is an overlap and never a match.
+    """
+    place = endpoint_form(reference_ids, flows)
+    for draft in drafts:
+        if place & endpoint_form(draft.affected_element_ids, flows):
+            return draft
+    return None
 
 
 def attribute_case(
@@ -212,7 +255,17 @@ def attribute_case(
             )
             continue
         cause: Cause = "place" if hits[index].rule_ids else "unled"
-        losses.append(Loss(index, lane, index in must_find, cause, verb))
+        nearby = _nearby(reference.affected_element_ids, in_lane, flows)
+        losses.append(
+            Loss(
+                index,
+                lane,
+                index in must_find,
+                cause,
+                verb,
+                displaced_draft_id=nearby.id if nearby is not None else None,
+            )
+        )
     return CaseLosses(case=case.id, losses=tuple(losses))
 
 
@@ -221,6 +274,7 @@ def pooled(rows: Sequence[CaseLosses]) -> dict[str, Any]:
     totals: Counter[str] = Counter()
     must_find: Counter[str] = Counter()
     re_asked: Counter[str] = Counter()
+    displaced: Counter[str] = Counter()
     kinds: Counter[str] = Counter()
     pairs: Counter[tuple[str, str]] = Counter()
     pairs_must_find: Counter[tuple[str, str]] = Counter()
@@ -231,6 +285,8 @@ def pooled(rows: Sequence[CaseLosses]) -> dict[str, Any]:
             if loss.re_ask:
                 re_asked[loss.cause] += 1
                 kinds.update(loss.re_ask)
+            if loss.displaced_draft_id is not None:
+                displaced[loss.cause] += 1
             if loss.cause == "verb" and loss.draft_verb is not None:
                 pair = (loss.reference_verb, loss.draft_verb)
                 pairs[pair] += 1
@@ -246,6 +302,12 @@ def pooled(rows: Sequence[CaseLosses]) -> dict[str, Any]:
         # than one kind, so the kinds do not add up to the misses.
         "re_asked_by_cause": {cause: re_asked[cause] for cause in CAUSES},
         "re_asked": sum(re_asked.values()),
+        # The ``place`` and ``unled`` rows the lane wrote near rather than
+        # skipped. Per cause, because the fix differs: a displaced ``place``
+        # row is a lead the lane took to the wrong element, and a displaced
+        # ``unled`` row is a finding the lane reached with no lead at all.
+        "displaced_by_cause": {cause: displaced[cause] for cause in CAUSES},
+        "displaced": sum(displaced.values()),
         "by_re_ask_kind": dict(sorted(kinds.items())),
         # Reference verb first, then what the lane wrote, most frequent first.
         "verb_pairs": [
@@ -294,6 +356,17 @@ def render(rows: Sequence[CaseLosses]) -> None:
             + ", ".join(
                 f"{kind} {count}" for kind, count in totals["by_re_ask_kind"].items()
             )
+        )
+    if totals["displaced"]:
+        silent = sum(totals["by_cause"][cause] for cause in ("place", "unled"))
+        print(
+            f"  of the place and unled rows, {totals['displaced']} have a"
+            " surviving draft one element over ("
+            + ", ".join(
+                f"{cause} {totals['displaced_by_cause'][cause]}"
+                for cause in ("place", "unled")
+            )
+            + f") and {silent - totals['displaced']} have none in the lane nearby"
         )
     for pair in totals["verb_pairs"][:8]:
         print(
