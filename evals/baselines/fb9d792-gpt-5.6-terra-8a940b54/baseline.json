@@ -1,0 +1,142 @@
+{
+  "identity": {
+    "corpus_digest": "b09805c6726d4241003f5d172c5d806021b3a3e09e83e5d35a71e86a35034038",
+    "frameworks": [
+      "stride"
+    ],
+    "models": {
+      "strong": "openrouter/openai/gpt-5.6-terra"
+    },
+    "repo_commit": "fb9d7925584e3edaa23188706ee6f2cf8cea696e",
+    "sampling": {
+      "base": {
+        "candidate_count": 1,
+        "constrain_output": true,
+        "frequency_penalty": null,
+        "max_output_tokens": 16384,
+        "presence_penalty": null,
+        "seed": null,
+        "temperature": null,
+        "thinking": null,
+        "top_p": null
+      },
+      "review": {
+        "candidate_count": 1,
+        "constrain_output": true,
+        "frequency_penalty": null,
+        "max_output_tokens": 64000,
+        "presence_penalty": null,
+        "seed": null,
+        "temperature": null,
+        "thinking": null,
+        "top_p": null
+      },
+      "strong": {
+        "candidate_count": 1,
+        "constrain_output": true,
+        "frequency_penalty": null,
+        "max_output_tokens": 64000,
+        "presence_penalty": null,
+        "seed": null,
+        "temperature": null,
+        "thinking": null,
+        "top_p": null
+      }
+    },
+    "upstreams": {
+      "strong": "OpenAI"
+    }
+  },
+  "name": "fb9d792-gpt-5.6-terra-8a940b54",
+  "sweeps": [
+    {
+      "artifact": "mstarks01-21333f3c.json",
+      "certification": {
+        "certified": false,
+        "uncertified_nodes": [
+          {
+            "fingerprint": "3486c552c7be01ffb6f0017a439dc76c77a9e094bf33d7f86ff6a355310f1cf9",
+            "node": "analyze_stride_denial_of_service"
+          },
+          {
+            "fingerprint": "3486c552c7be01ffb6f0017a439dc76c77a9e094bf33d7f86ff6a355310f1cf9",
+            "node": "analyze_stride_elevation_of_privilege"
+          },
+          {
+            "fingerprint": "3486c552c7be01ffb6f0017a439dc76c77a9e094bf33d7f86ff6a355310f1cf9",
+            "node": "analyze_stride_information_disclosure"
+          },
+          {
+            "fingerprint": "3486c552c7be01ffb6f0017a439dc76c77a9e094bf33d7f86ff6a355310f1cf9",
+            "node": "analyze_stride_repudiation"
+          },
+          {
+            "fingerprint": "3486c552c7be01ffb6f0017a439dc76c77a9e094bf33d7f86ff6a355310f1cf9",
+            "node": "analyze_stride_spoofing"
+          },
+          {
+            "fingerprint": "3486c552c7be01ffb6f0017a439dc76c77a9e094bf33d7f86ff6a355310f1cf9",
+            "node": "analyze_stride_tampering"
+          },
+          {
+            "fingerprint": "3486c552c7be01ffb6f0017a439dc76c77a9e094bf33d7f86ff6a355310f1cf9",
+            "node": "critic_stride"
+          }
+        ],
+        "unexercised_tiers": []
+      },
+      "cost": {
+        "actual_usd": 0.0,
+        "fallbacks": {},
+        "reported_usd": 3.09790035,
+        "unit_prices": [],
+        "unpriced": [
+          "openrouter/openai/gpt-5.6-terra"
+        ]
+      },
+      "files": {
+        "mstarks01-21333f3c.json": "21333f3c69c2d7a33de9a70ed0b8181e4daeab41f6337ab864492e3716507de7",
+        "mstarks01-21333f3c.reports/01-payments-checkout.drafts.json": "a81fc543479939fc884c65d27a6925c1465c3f3bb8314e630b71c625b31a787b",
+        "mstarks01-21333f3c.reports/01-payments-checkout.proposals.json": "3408c65c5ee71c68055d687479091d3ca828d9a456e0674d111f310a1dd070ee",
+        "mstarks01-21333f3c.reports/01-payments-checkout.report.json": "55fdf9ad1f01579fadd21d0a8549245e81fccc13e493a4f326de76949fe555f5",
+        "mstarks01-21333f3c.reports/02-iot-fleet-telemetry.drafts.json": "0b13534eccef6a2d285e87c9ff7bb6d4a8806e07acde3607ffe5b9c20912a329",
+        "mstarks01-21333f3c.reports/02-iot-fleet-telemetry.proposals.json": "c1f833c098c210152c7c268e7ff092e30616dc32e7cd08cd780f0690d74e2925",
+        "mstarks01-21333f3c.reports/02-iot-fleet-telemetry.report.json": "b90151525bbcd617ef490171c936d43c138c82ceb130014984efd082dc34f3be",
+        "mstarks01-21333f3c.reports/03-batch-data-pipeline.drafts.json": "2bf8502ad5f3642e06d5f633d0f2272a2ca9f5e3601f751b029eebbc642b7442",
+        "mstarks01-21333f3c.reports/03-batch-data-pipeline.proposals.json": "93edcc855dae8202976f065cef47c8d68299e6da5c56b685bcc32a34331a2761",
+        "mstarks01-21333f3c.reports/03-batch-data-pipeline.report.json": "246ff63240dfa437b939f98928b6dc722de558b6b7a9e5bfe69ef9be722a9c0e",
+        "mstarks01-21333f3c.reports/04-ml-inference-service.drafts.json": "65f9d122be59bd453e0532e85d5547e24cf369cec79654fb5dd041614887ee8e",
+        "mstarks01-21333f3c.reports/04-ml-inference-service.proposals.json": "52aca5581867d759b1841c03764fd22869c18f312674a8fe80f2bf6d7226045c",
+        "mstarks01-21333f3c.reports/04-ml-inference-service.report.json": "f8d35d9addce45a276a01b6c6ee2953cad5b669edf30707e6accf59588a0c2ae",
+        "mstarks01-21333f3c.reports/05-cookbook-queue-webapp.drafts.json": "76c5bf96255aab44c891d2fb960f72ac481a95d40267351d1329edf28f01ea8c",
+        "mstarks01-21333f3c.reports/05-cookbook-queue-webapp.proposals.json": "e8bb7ad7abaae8f14e8bd8d0c59035f7354cde04400850446d079170595599c5",
+        "mstarks01-21333f3c.reports/05-cookbook-queue-webapp.report.json": "aa054eaad949a0aca8a7fab7c036823f85b0f23ddce08021e0ceea624e4e1912",
+        "mstarks01-21333f3c.reports/06-cookbook-online-game.drafts.json": "1821c6dce3617956c21b400b81e6424116d9792ae639d4299dcb032751635441",
+        "mstarks01-21333f3c.reports/06-cookbook-online-game.proposals.json": "633582d6632bc671f3cdfc1111c06560674053a46404b891f889d74b9246a835",
+        "mstarks01-21333f3c.reports/06-cookbook-online-game.report.json": "ad0d3168e8849fb1698a2351b6948738bea74429d7ad69606e4c00aade087285",
+        "mstarks01-21333f3c.reports/07-cicd-store-deploy.drafts.json": "dd517b2d25a989245455ff42947565ad7f80d6bde806511cc9c77c5ac706ba96",
+        "mstarks01-21333f3c.reports/07-cicd-store-deploy.proposals.json": "07007980ab12b32c9acb0dea79814e8d51e1d5956ef9cfbea449862a0b3debf4",
+        "mstarks01-21333f3c.reports/07-cicd-store-deploy.report.json": "1d95c5d6035409655401c2c0e34625a8b5a5efadb9de9d6b831c28d07f9e0f65",
+        "mstarks01-21333f3c.reports/08-sso-identity-broker.drafts.json": "8e0d0efbec68ccf3a8b6c810d226f0002d1f8b4258b648bc533f917bb773b2fc",
+        "mstarks01-21333f3c.reports/08-sso-identity-broker.proposals.json": "e412f235280d7132862fbaebbb64307bc62a9470b6248cf9a0c41223d1f94b10",
+        "mstarks01-21333f3c.reports/08-sso-identity-broker.report.json": "9f7f7c378bb187aafe177b268754fb8cb9b876bfeb539bee4514f081d0f89307",
+        "mstarks01-21333f3c.reports/09-cookbook-sokify-retail.drafts.json": "af00a8c16281eba6e114542e7955c9b378f3a7e019364322c16f12eb259e36d9",
+        "mstarks01-21333f3c.reports/09-cookbook-sokify-retail.proposals.json": "5c68aaab79ae50a88edb1d9764d201d3aa2d9803ee2e87d24127491c609f8739",
+        "mstarks01-21333f3c.reports/09-cookbook-sokify-retail.report.json": "22a3fd86fa0858b57b8580cf67659715ba577e16f7bcc3651f3c5b290eb3cd19",
+        "mstarks01-21333f3c.reports/10-cookbook-generic-cms.drafts.json": "079f54d5f97cdba8cf872bc401cc7600683cc811ef704e812e6554643f71f432",
+        "mstarks01-21333f3c.reports/10-cookbook-generic-cms.proposals.json": "94262382911c684ca8174569a2ecbe8a633b84584f9438bf1be0b42b4270c7ff",
+        "mstarks01-21333f3c.reports/10-cookbook-generic-cms.report.json": "4dd86ca94a2e0ace96bc9e583b7e20723b3b6e7004eccccc1e3ef34cf9cebe69",
+        "mstarks01-21333f3c.reports/11-sparse-shift-scheduling.drafts.json": "6cef8d052f0a4c34e4afbd1d098f4bb2c7c4aa3f9ae2820c93109404fe55e114",
+        "mstarks01-21333f3c.reports/11-sparse-shift-scheduling.proposals.json": "20944e94e3daa90406007168baff06cad5ad909b0f3ba5ff98c6fade851e5e8d",
+        "mstarks01-21333f3c.reports/11-sparse-shift-scheduling.report.json": "83397025fe5a760e129fbf7a56a1dea785b2396910b27058cff8e317a34bf69f",
+        "mstarks01-21333f3c.reports/12-overclaiming-supplier-portal.drafts.json": "3efc11c5b47847176c60de95565997a1791d6687d6886f6ff4ad2271f596d02b",
+        "mstarks01-21333f3c.reports/12-overclaiming-supplier-portal.proposals.json": "8d279e0e889298e5b965ee34cd3ea2085a24f3c518e1fcd449a147595ad8c384",
+        "mstarks01-21333f3c.reports/12-overclaiming-supplier-portal.report.json": "98f20657500a6893213dd240f82196a4c1b63fee77db5a6e99877beb8affa50a",
+        "mstarks01-21333f3c.reports/13-dispatch-control-plane.drafts.json": "2bef22a3ae525db03ac4a3ac0906f17f4e8743e82fe85abb5e0a58b4bb02b736",
+        "mstarks01-21333f3c.reports/13-dispatch-control-plane.proposals.json": "9a7ba7f6a8ee5aa4aedde996e4b27688fe669f0ae387dc1070c4b126aa779ff3",
+        "mstarks01-21333f3c.reports/13-dispatch-control-plane.report.json": "591f888f2f74fdd27c0c8050b73984eb39154ca5e497f2dee5a7f26f21777f4d"
+      },
+      "submitted_by": "mstarks01"
+    }
+  ]
+}

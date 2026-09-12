@@ -1,0 +1,675 @@
+{
+  "stride": [
+    {
+      "id": "S-01",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Unauthenticated browser requests could let an attacker act as a legitimate caller",
+      "description": "`flow:browser-to-web-application:page-request` crosses from `boundary:public-internet` to `boundary:web-tier`, but its `authentication` is `unknown`. If that unknown resolves to no verified caller identity, any internet attacker can send requests that `process:web-application` accepts as originating from `entity:browser`, impersonating a legitimate browser-originated caller. Second-order: `process:web-application` can enqueue work through `flow:web-application-to-message-queue:enqueue-job`, allowing accepted requests to reach backend job processing. This draft is conditional on the unverified `authentication` attribute and does not assert that authentication is absent.",
+      "affected_element_ids": [
+        "entity:browser",
+        "process:web-application",
+        "flow:browser-to-web-application:page-request"
+      ],
+      "verb": "impersonate",
+      "grounds": [
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:browser-to-web-application:page-request",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:browser-to-web-application:page-request",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "spoofing",
+      "severity": {
+        "likelihood": "high",
+        "impact": "medium",
+        "level": "high",
+        "justification": "Likelihood is high, conditional on `unknown:flow:browser-to-web-application:page-request:authentication`, because `crossing:flow:browser-to-web-application:page-request` permits requests from the public-internet source zone to the internet-facing `process:web-application`. Impact is medium because a successful impersonation reaches `process:web-application` and can trigger its backend job-enqueue path toward the business-critical queue."
+      },
+      "mitigations": [
+        {
+          "summary": "Require and document verified caller authentication on the browser flow",
+          "detail": "Establish the intended identity model for `flow:browser-to-web-application:page-request` and set explicit, verifiable authentication such as OIDC/OAuth session authentication for actions that require a user identity."
+        },
+        {
+          "summary": "Bind queued work to verified request identity",
+          "detail": "Have `process:web-application` enqueue only work authorized for the verified caller, carrying an integrity-protected identity or authorization context rather than accepting a caller-supplied identity."
+        }
+      ]
+    },
+    {
+      "id": "S-02",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "A web-tier foothold could impersonate the web application to enqueue backend jobs",
+      "description": "`flow:web-application-to-message-queue:enqueue-job` crosses from `boundary:web-tier` into `boundary:backend-tier` with `authentication: unknown`. If the queue does not verify a workload identity on that flow, an attacker who gains a foothold in the web tier can impersonate `process:web-application` and enqueue fabricated jobs into `store:message-queue`. Second-order: `process:background-worker` consumes those jobs through `flow:background-worker-to-message-queue:consume-job` and then reads and writes application and log records through `flow:background-worker-to-database:read-write-records`, extending the forged workload identity into backend processing. This draft is conditional on the unverified authentication attribute; it does not claim the queue currently accepts unauthenticated producers.",
+      "affected_element_ids": [
+        "process:web-application",
+        "store:message-queue",
+        "flow:web-application-to-message-queue:enqueue-job"
+      ],
+      "verb": "impersonate",
+      "grounds": [
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:web-application-to-message-queue:enqueue-job",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:web-application-to-message-queue:enqueue-job",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "spoofing",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional on `unknown:flow:web-application-to-message-queue:enqueue-job:authentication`: the flow crosses trust zones, but exploiting it requires a prior foothold in `boundary:web-tier`. Impact is medium because forged jobs reach `store:message-queue` and are processed by `process:background-worker`, which has read-write access to the application and log records through `flow:background-worker-to-database:read-write-records`."
+      },
+      "mitigations": [
+        {
+          "summary": "Authenticate each queue producer with a workload identity",
+          "detail": "Configure `flow:web-application-to-message-queue:enqueue-job` to use an explicit, verifiable per-workload identity, such as mTLS workload certificates or short-lived audience-bound service tokens, and authorize only `process:web-application` to enqueue its permitted job types."
+        },
+        {
+          "summary": "Validate job provenance before backend execution",
+          "detail": "Require `process:background-worker` to accept only integrity-protected jobs from the authorized queue producer and constrain job types and payloads before performing database operations."
+        }
+      ]
+    },
+    {
+      "id": "T-01",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "On-path alteration of queue jobs if web-to-backend transport is not integrity-protected",
+      "description": "`flow:web-application-to-message-queue:enqueue-job` crosses from the web tier to the backend tier, but its `encryption_in_transit` and protocol are unknown. If the unverified transport lacks authenticated encryption or equivalent message integrity protection, an attacker able to occupy or redirect this cross-zone path can alter a job message before it reaches `store:message-queue`. `process:background-worker` subsequently consumes the altered job and performs work against `store:database`, allowing the injected changes to propagate into application records. This is conditional on the unresolved transport-protection attributes, not an assertion that the flow is plaintext.",
+      "affected_element_ids": [
+        "flow:web-application-to-message-queue:enqueue-job",
+        "store:message-queue"
+      ],
+      "verb": "alter-in-transit",
+      "grounds": [
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:web-application-to-message-queue:enqueue-job",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:web-application-to-message-queue:enqueue-job",
+          "attribute": "protocol",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:web-application-to-message-queue:enqueue-job",
+          "attribute": "encryption_in_transit",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "tampering",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because `flow:web-application-to-message-queue:enqueue-job` crosses into the backend tier, so exploitation requires an on-path or routing position, while `encryption_in_transit` is unverified. Impact is medium because the altered `business-critical-data` job is consumed by `process:background-worker`, which performs work against `store:database`."
+      },
+      "mitigations": [
+        {
+          "summary": "Verify and enforce authenticated transport for queue submission",
+          "detail": "Set `flow:web-application-to-message-queue:enqueue-job` to use mutually authenticated TLS or another authenticated-encryption mechanism so an on-path party cannot modify job messages."
+        },
+        {
+          "summary": "Authenticate job payloads at the worker",
+          "detail": "Have `process:web-application` sign or MAC each job and require `process:background-worker` to verify it before acting, protecting job integrity even if transport terminates before the queue."
+        }
+      ]
+    },
+    {
+      "id": "T-02",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Fabricated jobs can be planted in the queue if writer authentication is absent",
+      "description": "`flow:web-application-to-message-queue:enqueue-job` writes job messages to `store:message-queue`, but its `authentication` attribute is unknown. If that unknown resolves to no authenticated and authorized producer control, an attacker who can reach the queue write interface can plant fabricated or modified jobs as though they originated from `process:web-application`. The queue is trusted by `process:background-worker`; the worker consumes the planted work item and performs it against `store:database`, turning queue poisoning into corruption of application records. This is conditional on the unresolved authentication control.",
+      "affected_element_ids": [
+        "flow:web-application-to-message-queue:enqueue-job",
+        "store:message-queue"
+      ],
+      "verb": "plant",
+      "grounds": [
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:web-application-to-message-queue:enqueue-job",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:web-application-to-message-queue:enqueue-job",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "tampering",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional on the unknown authentication value: the write path crosses from `boundary:web-tier` to `boundary:backend-tier`, and an attacker must be able to reach the queue interface. Impact is medium because `store:message-queue` carries `business-critical-data` jobs that `process:background-worker` acts on before writing application records to `store:database`."
+      },
+      "mitigations": [
+        {
+          "summary": "Require authenticated, authorized queue producers",
+          "detail": "Configure `store:message-queue` to deny anonymous writes and authorize only the workload identity for `process:web-application` to publish to the required job destination."
+        },
+        {
+          "summary": "Validate jobs before execution",
+          "detail": "Have `process:background-worker` enforce a strict job schema, allowlisted operation types, and origin/integrity verification before performing database work."
+        }
+      ]
+    },
+    {
+      "id": "T-03",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Application records can be rewritten if database-writer authentication is absent",
+      "description": "`flow:background-worker-to-database:read-write-records` has `operations: read-write` for application and log records, while its `authentication` attribute is unknown. If the database accepts unauthenticated or insufficiently authorized writers on this path, an attacker who reaches the database interface can alter application records in `store:database` outside the normal work performed by `process:background-worker`. The model also places log records in the same store, so write separation and integrity protections for both application data and logs need confirmation; this threat concerns alteration of application records, while audit-record falsification is a repudiation concern. This is conditional on the unresolved authentication attribute.",
+      "affected_element_ids": [
+        "flow:background-worker-to-database:read-write-records",
+        "store:database"
+      ],
+      "verb": "alter",
+      "grounds": [
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:background-worker-to-database:read-write-records",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "tampering",
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low and conditional because the database path is entirely within `boundary:backend-tier`, so an attacker needs prior network reach into that tier in addition to the unresolved authentication control. Impact is medium because the flow has read-write access to application records in `store:database`, an asset tagged `business-critical-data`."
+      },
+      "mitigations": [
+        {
+          "summary": "Require least-privilege database workload authentication",
+          "detail": "Require a dedicated authenticated identity for `process:background-worker` on `flow:background-worker-to-database:read-write-records`, deny unauthenticated access, and grant only the tables and write operations required for its jobs."
+        },
+        {
+          "summary": "Separate and protect log-record writes",
+          "detail": "Use a distinct, append-oriented logging path or separate database permissions so the worker's application-record authority cannot silently rewrite log records."
+        }
+      ]
+    },
+    {
+      "id": "R-01",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "A worker-side actor may be able to rewrite database audit evidence and deny record changes",
+      "description": "`store:database` holds the application's log records as well as application records, while `process:background-worker` reads and writes it through `flow:background-worker-to-database:read-write-records`. The model does not establish that this write path uses a separate append-only audit principal or prevents amendment and deletion of log records; its `authentication` is `unknown`. If a malicious insider or an actor who obtains control of the worker can modify the same database-held evidence for an application-record change, they can remove or alter the corroborating log entry and plausibly deny the action. This is conditional on the unresolved write permissions and audit-record immutability, not an assertion that the worker can already delete logs. Second-order, altered evidence in `store:database` prevents reliable investigation of business-critical work performed by `process:background-worker`.",
+      "affected_element_ids": [
+        "process:background-worker",
+        "store:database",
+        "flow:background-worker-to-database:read-write-records"
+      ],
+      "verb": "unattributable",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "The background worker reads and writes the database. The database is also where\nwe keep the application's log records.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:background-worker-to-database:read-write-records",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "repudiation",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional: exploiting or abusing `process:background-worker` requires an internal foothold, but the authentication on `flow:background-worker-to-database:read-write-records` is unverified. Impact is medium because `store:database` and `process:background-worker` handle `business-critical-data`, and loss of its log evidence affects accountability for those records."
+      },
+      "mitigations": [
+        {
+          "summary": "Separate immutable audit evidence from worker-writable records",
+          "detail": "Send structured audit events for database-changing actions to an append-only or WORM audit store in a separate trust zone, using a write principal that `process:background-worker` cannot use to amend or delete retained events."
+        },
+        {
+          "summary": "Verify and constrain database write identity",
+          "detail": "Establish authentication for `flow:background-worker-to-database:read-write-records`, use a dedicated least-privilege worker identity, and verify that it cannot update or delete audit records; record the originating actor, action, target, timestamp, and outcome for each business-record change."
+        }
+      ]
+    },
+    {
+      "id": "I-01",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Unverified encryption at rest could expose service credentials from configuration stores",
+      "description": "`store:web-application-config` and `store:worker-config` hold the web application's message-queue credentials and the worker's database credentials, while each has `encryption_at_rest: unknown`. If either store's storage layer or an operational copy is not encrypted, an attacker who obtains its volume, snapshot, or decommissioned media can recover the corresponding credential without using the normal configuration-read flow. Second-order, the recovered queue credential can be used against `store:message-queue`, while the database credential can enable access to `store:database`; this draft is conditional on resolving the two at-rest encryption attributes.",
+      "affected_element_ids": [
+        "store:web-application-config",
+        "store:worker-config"
+      ],
+      "verb": "recover-credential",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "Both of those config stores hold the credentials the process needs \u2014 the web application's queue credentials, and the worker's database credentials.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "store:web-application-config",
+          "attribute": "encryption_at_rest",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "store:worker-config",
+          "attribute": "encryption_at_rest",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "information-disclosure",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional because `store:web-application-config` and `store:worker-config` both have unverified `encryption_at_rest`, so storage-layer or copied-media exposure may be possible but is not established. Impact is high because both stores are tagged `credentials` and `secrets`, and either recovered credential extends the attacker to the queue or database."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt configuration stores and their operational copies",
+          "detail": "Establish and record encryption at rest for both configuration stores, using KMS-managed keys that also cover backups, snapshots, replicas, and decommissioned media."
+        },
+        {
+          "summary": "Move standing credentials out of application configuration",
+          "detail": "Use a dedicated secret store with workload-bound, short-lived credential issuance and rotate the queue and database credentials if their historical storage protection cannot be verified."
+        }
+      ]
+    },
+    {
+      "id": "I-02",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Configuration credentials may be readable on unverified internal transport paths",
+      "description": "`flow:web-application-to-web-application-config:read-configuration` carries message-queue credentials and `flow:background-worker-to-worker-config:read-configuration` carries database credentials, but `encryption_in_transit` is unknown for both. If transport protection is absent on either internal path, an attacker with an on-path position in `boundary:web-tier` or `boundary:backend-tier` can intercept the credential while its process reads configuration. Second-order, the queue credential can extend access to `store:message-queue` and the database credential can extend access to `store:database`; this is conditional on verification of each flow's transport protection.",
+      "affected_element_ids": [
+        "flow:web-application-to-web-application-config:read-configuration",
+        "store:web-application-config",
+        "flow:background-worker-to-worker-config:read-configuration",
+        "store:worker-config"
+      ],
+      "verb": "intercept",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "Both of those config stores hold the credentials the process needs \u2014 the web application's queue credentials, and the worker's database credentials.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:web-application-to-web-application-config:read-configuration",
+          "attribute": "encryption_in_transit",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:background-worker-to-worker-config:read-configuration",
+          "attribute": "encryption_in_transit",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "information-disclosure",
+      "severity": {
+        "likelihood": "low",
+        "impact": "high",
+        "level": "medium",
+        "justification": "Likelihood is low and conditional: both configuration-read flows are internal to their tiers, so interception requires an on-path foothold, although their `encryption_in_transit` attributes are unverified. Impact is high because the flows carry credentials that can be reused to reach the queue or database."
+      },
+      "mitigations": [
+        {
+          "summary": "Require mutually authenticated encryption for configuration reads",
+          "detail": "Set verified TLS or mTLS on `flow:web-application-to-web-application-config:read-configuration` and `flow:background-worker-to-worker-config:read-configuration`, including the internal network segments."
+        },
+        {
+          "summary": "Avoid transmitting reusable standing credentials",
+          "detail": "Use workload identity or short-lived secrets fetched over authenticated channels so an intercepted value has limited scope and lifetime."
+        }
+      ]
+    },
+    {
+      "id": "I-03",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Queued business jobs may be observable across the web-to-backend boundary",
+      "description": "`flow:web-application-to-message-queue:enqueue-job` crosses from `boundary:web-tier` to `boundary:backend-tier`, carries business-critical job messages, and has `encryption_in_transit: unknown`. If the unknown resolves to an unprotected transport segment, an attacker able to observe that cross-tier path can intercept queued work details without authenticating to `store:message-queue`. Second-order, the captured job content reveals the work `process:background-worker` will perform and can help an attacker target the application records and log records it later accesses in `store:database`.",
+      "affected_element_ids": [
+        "flow:web-application-to-message-queue:enqueue-job",
+        "process:web-application",
+        "store:message-queue"
+      ],
+      "verb": "intercept",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "The web application does not do the heavy work itself. It puts jobs onto a message queue, and a background worker process picks them up and does the work.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:web-application-to-message-queue:enqueue-job",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:web-application-to-message-queue:enqueue-job",
+          "attribute": "encryption_in_transit",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "information-disclosure",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because `flow:web-application-to-message-queue:enqueue-job` crosses the web-to-backend boundary and has unverified transport encryption, making an on-path position the principal prerequisite. Impact is medium because the flow is tagged `business-critical-data`, but the model does not establish that the job messages contain regulated personal, financial, health, credential, or secret data."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt and authenticate the web-to-queue connection",
+          "detail": "Require TLS 1.2+ and preferably mTLS on `flow:web-application-to-message-queue:enqueue-job`, and verify the queue endpoint identity from the web application."
+        },
+        {
+          "summary": "Minimize sensitive job payloads",
+          "detail": "Place opaque job references on the queue where feasible, so the worker retrieves only the required record data after establishing its authenticated backend connection."
+        }
+      ]
+    },
+    {
+      "id": "I-04",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Unverified at-rest protection could expose queued jobs and database records through storage copies",
+      "description": "`store:message-queue` and `store:database` each have `encryption_at_rest: unknown` and hold business-critical data. If either unknown resolves to unencrypted storage, a storage-layer attacker who obtains a disk, snapshot, backup, or decommissioned copy can read queued jobs or the database's application and log records without passing through `process:background-worker`. Second-order, job content can expose pending application operations, and database or log records can reveal application activity useful for targeting the worker's read-write path; this threat is conditional and does not assert that either store is unencrypted.",
+      "affected_element_ids": [
+        "store:message-queue",
+        "store:database"
+      ],
+      "verb": "read",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "The background worker reads and writes the database. The database is also where we keep the application's log records.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "store:message-queue",
+          "attribute": "encryption_at_rest",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "store:database",
+          "attribute": "encryption_at_rest",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "information-disclosure",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because both stores have unverified `encryption_at_rest`, so storage-copy exposure is possible if protection is absent, though it requires access to the storage layer. Impact is medium because both are tagged `business-critical-data`, while their data classifications are unknown and the model does not establish higher-sensitivity asset tags."
+      },
+      "mitigations": [
+        {
+          "summary": "Verify and enforce encryption at rest for the queue and database",
+          "detail": "Record the at-rest encryption state for `store:message-queue` and `store:database`, then enforce KMS-managed encryption on primary storage and every backup, snapshot, replica, and export."
+        },
+        {
+          "summary": "Restrict and audit storage-copy access",
+          "detail": "Use separate, least-privilege principals for backup and snapshot operations, restrict export permissions, and audit reads of operational copies."
+        }
+      ]
+    },
+    {
+      "id": "D-01",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Public request flooding can overwhelm job admission and backlog the queue",
+      "description": "An internet attacker can drive `flow:browser-to-web-application:page-request` into `process:web-application` across the public-internet boundary. Authentication on that flow is `unknown`; if requests are admitted without an effective identity-bound rate or cost limit, cheap repeated HTTP/S requests make `process:web-application` enqueue jobs on `flow:web-application-to-message-queue:enqueue-job`. The attacker need not perform the deferred work: they can outpace `process:background-worker`, consuming message-queue storage or throughput and delaying legitimate jobs. Second-order, the worker cannot perform its read/write work against `store:database` while the backlog persists, so application processing and associated log-record writes are delayed; this is conditional on the unverified admission, queue-quota, and backpressure posture.",
+      "affected_element_ids": [
+        "process:web-application",
+        "flow:browser-to-web-application:page-request"
+      ],
+      "verb": "flood",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "It puts jobs onto a\nmessage queue, and a background worker process picks them up and does the work.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:browser-to-web-application:page-request",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:browser-to-web-application:page-request",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "denial-of-service",
+      "severity": {
+        "likelihood": "high",
+        "impact": "medium",
+        "level": "high",
+        "justification": "Likelihood is high conditional on the unknown authentication and admission-control posture of `flow:browser-to-web-application:page-request`: it crosses from `boundary:public-internet` to internet-facing `process:web-application`, so any internet attacker can attempt request flooding. Impact is medium because the flood can delay all queued background work through `store:message-queue` and `process:background-worker`, which handles `business-critical-data`, but the model does not establish an availability-critical asset or irreversible outage."
+      },
+      "mitigations": [
+        {
+          "summary": "Apply identity-bound admission controls before job enqueueing",
+          "detail": "Authenticate requests where feasible and enforce per-source or per-verified-principal rate, concurrency, request-size, and cost limits at `process:web-application` before it writes to `flow:web-application-to-message-queue:enqueue-job`."
+        },
+        {
+          "summary": "Bound queue growth and shed excess work",
+          "detail": "Configure finite queue retention and per-producer quotas on `store:message-queue`, with explicit backpressure and fail-fast responses from `process:web-application` when worker capacity cannot keep up."
+        },
+        {
+          "summary": "Isolate worker capacity from backlog pressure",
+          "detail": "Set bounded worker concurrency and database-operation timeouts in `process:background-worker` so a queue surge cannot indefinitely monopolize processing or propagate load to `store:database`."
+        }
+      ]
+    },
+    {
+      "id": "E-01",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "A compromised web application can misuse its queue grant to reach backend work",
+      "description": "An internet attacker who compromises `process:web-application` through the public boundary on `flow:browser-to-web-application:page-request` inherits the message-queue credentials that the process reads from `store:web-application-config` over `flow:web-application-to-web-application-config:read-configuration`. The application uses `flow:web-application-to-message-queue:enqueue-job` to place jobs in `store:message-queue` across the web-to-backend boundary. If the unstated authentication and authorization on that queue flow permits the application credential to enqueue without constraining the job to an authenticated caller's authority, the attacker can abuse that standing grant to submit work as the application. `process:background-worker` consumes those jobs and uses `flow:background-worker-to-database:read-write-records` to read and write `store:database`; thus the terminal capability is backend processing that can affect application and log records, rather than merely access to the exposed web tier.",
+      "affected_element_ids": [
+        "process:web-application",
+        "flow:web-application-to-message-queue:enqueue-job",
+        "store:message-queue"
+      ],
+      "verb": "abuse-grant",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "It puts jobs onto a message queue, and a background worker process picks them up and does the work.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "quote",
+          "text": "Both of those config stores hold the credentials the process needs \u2014 the web application's queue credentials, and the worker's database credentials.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:browser-to-web-application:page-request",
+          "term": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:web-application-to-message-queue:enqueue-job",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:web-application-to-message-queue:enqueue-job",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "elevation-of-privilege",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium: `process:web-application` is internet-facing and `flow:browser-to-web-application:page-request` crosses into the web tier, but exploitation first requires compromise of that process and the queue flow's authentication is unknown. Impact is medium: the inherited enqueue capability reaches `process:background-worker`, which has read-write access to `store:database`, and both the queue and database carry `business-critical-data` assets."
+      },
+      "mitigations": [
+        {
+          "summary": "Constrain queue publishing to caller-authorized work",
+          "detail": "Require `process:web-application` to authenticate to `store:message-queue` with a narrowly scoped workload identity and attach an authenticated subject plus an authorization-checked job type to every message."
+        },
+        {
+          "summary": "Treat queued work as an authorization boundary",
+          "detail": "Have `process:background-worker` validate the job issuer, subject, and permitted operation before processing, and use a database credential scoped only to the records and operations required for each job type."
+        }
+      ]
+    }
+  ]
+}

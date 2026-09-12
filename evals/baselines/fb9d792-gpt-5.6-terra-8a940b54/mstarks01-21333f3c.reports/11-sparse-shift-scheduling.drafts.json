@@ -1,0 +1,1288 @@
+{
+  "stride": [
+    {
+      "id": "S-01",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Impersonation of a colleague could expose shift and contact information",
+      "description": "`flow:colleague-to-scheduling-web-app:view-shifts` is a derived crossing from `boundary:public-internet` to `boundary:internal-network`; the crossing identifies `process:scheduling-web-app` as an assumed endpoint because its internal placement was inferred. Its `authentication` is unknown. If that attribute resolves to no verified caller identity, an internet attacker can impersonate `entity:colleague` to `process:scheduling-web-app` and request that colleague's shifts. Second-order: the web app's rota requests reach `process:scheduling-service`, which reads rota entries and colleague names, contact details, and availability from `store:rota-database`. This is conditional on the undocumented authentication control, not an assertion that authentication is absent.",
+      "affected_element_ids": [
+        "entity:colleague",
+        "process:scheduling-web-app",
+        "flow:colleague-to-scheduling-web-app:view-shifts"
+      ],
+      "verb": "impersonate",
+      "grounds": [
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:colleague-to-scheduling-web-app:view-shifts",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:colleague-to-scheduling-web-app:view-shifts",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "spoofing",
+      "severity": {
+        "likelihood": "high",
+        "impact": "medium",
+        "level": "high",
+        "justification": "Likelihood is high and conditional: `flow:colleague-to-scheduling-web-app:view-shifts` crosses from `boundary:public-internet` and its `authentication` is unknown, so anyone can attempt impersonation if no verification exists. Impact is medium because the flow and `process:scheduling-web-app` handle PII, and the reachable `store:rota-database` holds colleague contact details and availability."
+      },
+      "mitigations": [
+        {
+          "summary": "Document and enforce verified colleague authentication",
+          "detail": "Establish the authentication mechanism for `flow:colleague-to-scheduling-web-app:view-shifts`; require a verifiable, user-specific identity on the flow and ensure `process:scheduling-web-app` derives the requested colleague identity from that verified identity rather than a caller-supplied value."
+        },
+        {
+          "summary": "Use phishing-resistant user authentication",
+          "detail": "Use WebAuthn/passkeys or equivalent phishing-resistant MFA for colleagues accessing rota and PII data through `process:scheduling-web-app`."
+        }
+      ]
+    },
+    {
+      "id": "S-02",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Impersonation of a store manager could permit unauthorized rota changes",
+      "description": "`flow:store-manager-to-scheduling-web-app:build-rota` crosses from `boundary:public-internet` into the inferred internal placement of `process:scheduling-web-app`, but its `authentication` is unknown. If the undocumented mechanism does not verify a manager-specific identity, an internet attacker can impersonate `entity:store-manager` to `process:scheduling-web-app` and submit rota changes as that manager. Second-order: `flow:scheduling-web-app-to-scheduling-service:rota-requests` carries rota reads and writes to `process:scheduling-service`, which writes rota and colleague-detail records in `store:rota-database`; the spoofed manager identity therefore becomes a route to altering business-critical scheduling data and associated PII. This is conditional on the unknown authentication attribute.",
+      "affected_element_ids": [
+        "entity:store-manager",
+        "process:scheduling-web-app",
+        "flow:store-manager-to-scheduling-web-app:build-rota"
+      ],
+      "verb": "impersonate",
+      "grounds": [
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:store-manager-to-scheduling-web-app:build-rota",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:store-manager-to-scheduling-web-app:build-rota",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:scheduling-web-app-to-scheduling-service:rota-requests",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "spoofing",
+      "severity": {
+        "likelihood": "high",
+        "impact": "medium",
+        "level": "high",
+        "justification": "Likelihood is high and conditional because `flow:store-manager-to-scheduling-web-app:build-rota` is a crossing from `boundary:public-internet` and its `authentication` is unknown. Impact is medium because successful impersonation can write rota entries through `process:scheduling-service` to `store:rota-database`, which holds PII and business-critical data."
+      },
+      "mitigations": [
+        {
+          "summary": "Require verified, manager-specific authentication for rota changes",
+          "detail": "Make `flow:store-manager-to-scheduling-web-app:build-rota` use a documented, verifiable identity mechanism and enforce that `process:scheduling-web-app` accepts rota-write requests only from authenticated manager identities."
+        },
+        {
+          "summary": "Bind rota authority to the verified manager identity",
+          "detail": "Have `process:scheduling-web-app` and `process:scheduling-service` derive the manager and store scope from verified credentials rather than client-supplied identifiers, and authenticate the web app to the scheduling service."
+        }
+      ]
+    },
+    {
+      "id": "S-03",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "An internal foothold could impersonate the scheduling web app to the scheduling service",
+      "description": "`flow:scheduling-web-app-to-scheduling-service:rota-requests` connects `process:scheduling-web-app` and `process:scheduling-service` within `boundary:internal-network`, and its `authentication` is unknown. If the undocumented control does not authenticate the calling workload, an attacker who first gains a foothold on that internal network can impersonate `process:scheduling-web-app` and send rota read/write requests to `process:scheduling-service`. Second-order: the service reads and writes colleague names, contact details, availability, and rota entries in `store:rota-database`, so the false service identity reaches both PII and business-critical scheduling data. This is conditional on the unknown authentication state rather than a claim that internal callers are currently trusted without verification.",
+      "affected_element_ids": [
+        "process:scheduling-web-app",
+        "process:scheduling-service",
+        "flow:scheduling-web-app-to-scheduling-service:rota-requests"
+      ],
+      "verb": "impersonate",
+      "grounds": [
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:scheduling-web-app-to-scheduling-service:rota-requests",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "spoofing",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional: `flow:scheduling-web-app-to-scheduling-service:rota-requests` has unknown authentication, but exploitation also requires an attacker foothold in `boundary:internal-network`. Impact is high because `process:scheduling-service` can perform rota reads and writes against `store:rota-database`, which contains PII and business-critical data."
+      },
+      "mitigations": [
+        {
+          "summary": "Authenticate workload identity between the web app and service",
+          "detail": "Require mTLS or workload-identity tokens on `flow:scheduling-web-app-to-scheduling-service:rota-requests`, and have `process:scheduling-service` verify the caller as `process:scheduling-web-app` regardless of network location."
+        },
+        {
+          "summary": "Apply least privilege to the service identity",
+          "detail": "Constrain the identity accepted by `process:scheduling-service` to only the rota operations required by the web app and separately authorize manager and colleague actions using the end-user identity."
+        }
+      ]
+    },
+    {
+      "id": "S-04",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "A false payroll-system identity could collect the payroll export",
+      "description": "`flow:payroll-system-to-file-share:collect-payroll-export` crosses from tenant boundary `boundary:payroll-team-environment` into `boundary:internal-network`, but its `authentication` is unknown. If the file-share access path does not verify a tenant- and system-specific payroll identity, an attacker able to originate requests from that external environment can impersonate `entity:payroll-system` and collect the weekly payroll export from `store:file-share`. The export carries PII, so the impersonation gives the attacker access to payroll information rather than merely access to an endpoint. This is conditional on the undocumented authentication control and on whether the verified identity, if present, is scoped to the payroll-team tenant.",
+      "affected_element_ids": [
+        "entity:payroll-system",
+        "store:file-share",
+        "flow:payroll-system-to-file-share:collect-payroll-export"
+      ],
+      "verb": "impersonate",
+      "grounds": [
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:payroll-system-to-file-share:collect-payroll-export",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:payroll-system-to-file-share:collect-payroll-export",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "spoofing",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because `flow:payroll-system-to-file-share:collect-payroll-export` crosses from the separate `boundary:payroll-team-environment` and has unknown authentication, while the attacker must be able to originate requests in that environment. Impact is medium because the collected export and `store:file-share` are tagged PII."
+      },
+      "mitigations": [
+        {
+          "summary": "Authenticate the payroll collector with a distinct workload identity",
+          "detail": "Document and enforce mTLS or short-lived audience-bound workload tokens on `flow:payroll-system-to-file-share:collect-payroll-export`, with `store:file-share` verifying a unique identity for `entity:payroll-system`."
+        },
+        {
+          "summary": "Scope the payroll identity to its tenant and export",
+          "detail": "Bind the verified credential to `boundary:payroll-team-environment` and restrict it to read only the intended payroll export, rather than accepting a network location or caller-supplied tenant value as identity."
+        }
+      ]
+    },
+    {
+      "id": "T-01",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Conditional on-path alteration of manager rota updates",
+      "description": "If `encryption_in_transit` is not providing authenticated integrity protection on `flow:store-manager-to-scheduling-web-app:build-rota`, an attacker positioned between the public-internet manager and `process:scheduling-web-app` can alter rota entries in transit before the web app processes them. The flow crosses into the internal network and carries rota changes; second-order, the altered request can be forwarded through `flow:scheduling-web-app-to-scheduling-service:rota-requests` and persisted by `process:scheduling-service` in `store:rota-database` as a legitimate rota update. This is conditional on the unverified transport-protection attribute, not an assertion that the flow is plaintext.",
+      "affected_element_ids": [
+        "flow:store-manager-to-scheduling-web-app:build-rota",
+        "process:scheduling-web-app"
+      ],
+      "verb": "alter-in-transit",
+      "grounds": [
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:store-manager-to-scheduling-web-app:build-rota",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:store-manager-to-scheduling-web-app:build-rota",
+          "attribute": "encryption_in_transit",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:store-manager-to-scheduling-web-app:build-rota",
+          "attribute": "protocol",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "tampering",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional on `unknown:flow:store-manager-to-scheduling-web-app:build-rota:encryption_in_transit`: the boundary crossing makes the path attacker-reachable, but an attacker must obtain an on-path position. Impact is medium because the flow carries rota changes and the affected scheduling path is tagged `business-critical-data`."
+      },
+      "mitigations": [
+        {
+          "summary": "Provide authenticated transport protection for rota updates",
+          "detail": "Use TLS 1.2+ with certificate validation on `flow:store-manager-to-scheduling-web-app:build-rota` and document the protocol and transport-integrity configuration."
+        },
+        {
+          "summary": "Validate rota changes at the receiving application",
+          "detail": "Have `process:scheduling-web-app` enforce server-side authorization and validation of submitted rota entries before forwarding requests to the scheduling service."
+        }
+      ]
+    },
+    {
+      "id": "T-02",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Conditional on-path alteration of colleagues' displayed shifts",
+      "description": "If `flow:colleague-to-scheduling-web-app:view-shifts` lacks authenticated transport integrity, an on-path attacker can modify the shifts returned during the same interaction to `entity:colleague`, causing a colleague to act on a false rota. The attack lands on the public-internet-to-internal-network interaction at `process:scheduling-web-app`; it changes what the colleague treats as their assigned schedule rather than merely observing it. This threat is conditional because the protocol and `encryption_in_transit` attributes are unverified.",
+      "affected_element_ids": [
+        "flow:colleague-to-scheduling-web-app:view-shifts",
+        "process:scheduling-web-app",
+        "entity:colleague"
+      ],
+      "verb": "alter-in-transit",
+      "grounds": [
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:colleague-to-scheduling-web-app:view-shifts",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:colleague-to-scheduling-web-app:view-shifts",
+          "attribute": "encryption_in_transit",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:colleague-to-scheduling-web-app:view-shifts",
+          "attribute": "protocol",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "tampering",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "low",
+        "level": "low",
+        "justification": "Likelihood is medium and conditional on `unknown:flow:colleague-to-scheduling-web-app:view-shifts:encryption_in_transit`: the interaction crosses from the public internet, although an attacker still needs a path position. Impact is low because the stated consequence is an altered view of an individual colleague's shifts, despite the flow carrying `pii`."
+      },
+      "mitigations": [
+        {
+          "summary": "Protect the colleague-facing session with TLS",
+          "detail": "Use TLS 1.2+ with strict certificate validation and authenticated encryption for `flow:colleague-to-scheduling-web-app:view-shifts`."
+        },
+        {
+          "summary": "Document and verify transport configuration",
+          "detail": "Record the protocol and `encryption_in_transit` settings for the colleague interaction, including where TLS terminates."
+        }
+      ]
+    },
+    {
+      "id": "T-03",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Conditional on-path alteration of collected payroll exports",
+      "description": "If the unverified transport protection on `flow:payroll-system-to-file-share:collect-payroll-export` does not authenticate the returned content, an attacker on the path between `entity:payroll-system` and `store:file-share` can alter the weekly payroll export while it is collected. The payroll system can then process manipulated export data as though it came from the file share. This is conditional on the flow's unknown protocol and `encryption_in_transit` settings, rather than a claim that its collection channel is unencrypted.",
+      "affected_element_ids": [
+        "flow:payroll-system-to-file-share:collect-payroll-export",
+        "store:file-share",
+        "entity:payroll-system"
+      ],
+      "verb": "alter-in-transit",
+      "grounds": [
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:payroll-system-to-file-share:collect-payroll-export",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:payroll-system-to-file-share:collect-payroll-export",
+          "attribute": "encryption_in_transit",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:payroll-system-to-file-share:collect-payroll-export",
+          "attribute": "protocol",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "tampering",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional on `unknown:flow:payroll-system-to-file-share:collect-payroll-export:encryption_in_transit`: the collection crosses from another team's environment into the internal network, but exploitation requires an on-path position. Impact is medium because the altered artifact is a weekly payroll export carrying `pii` and is consumed by the payroll system."
+      },
+      "mitigations": [
+        {
+          "summary": "Use mutually authenticated TLS for payroll-export collection",
+          "detail": "Protect `flow:payroll-system-to-file-share:collect-payroll-export` with TLS 1.2+ and authenticate both the payroll system and file-share endpoint."
+        },
+        {
+          "summary": "Add export integrity verification",
+          "detail": "Have `process:scheduling-service` sign each payroll export and require `entity:payroll-system` to verify the signature and expected version before processing it."
+        }
+      ]
+    },
+    {
+      "id": "T-04",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Conditional direct rewriting of rota records through an unverified database write path",
+      "description": "If `authentication` on `flow:scheduling-service-to-rota-database:read-write-rotas` resolves to absent or inadequate write control, an attacker with access to that internal path can alter rota entries, colleague contact details, or stated availability directly in `store:rota-database`, bypassing validation in `process:scheduling-service`. Second-order, the scheduling service reads the corrupted records for later rota operations and uses them to produce the weekly payroll export through `flow:scheduling-service-to-file-share:write-payroll-export`. This is conditional on the database flow's unverified caller identity; it does not assert that the database currently accepts anonymous writes.",
+      "affected_element_ids": [
+        "flow:scheduling-service-to-rota-database:read-write-rotas",
+        "store:rota-database",
+        "process:scheduling-service"
+      ],
+      "verb": "alter",
+      "grounds": [
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:scheduling-service-to-rota-database:read-write-rotas",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "tampering",
+      "severity": {
+        "likelihood": "low",
+        "impact": "high",
+        "level": "medium",
+        "justification": "Likelihood is low and conditional on `unknown:flow:scheduling-service-to-rota-database:read-write-rotas:authentication`: an attacker needs an internal-path foothold and the unknown control must be inadequate. Impact is high because a direct write can corrupt the rota database's `pii` and `business-critical-data` across the scheduling and payroll-export workflow."
+      },
+      "mitigations": [
+        {
+          "summary": "Require an authenticated least-privilege database writer",
+          "detail": "Configure `flow:scheduling-service-to-rota-database:read-write-rotas` to use a dedicated authenticated service identity with only the row and statement permissions required by `process:scheduling-service`."
+        },
+        {
+          "summary": "Add integrity controls for rota changes",
+          "detail": "Use server-side owner and store-scope checks, versioned updates, and reconciliation of material rota changes so unauthorized direct changes can be prevented or detected."
+        }
+      ]
+    },
+    {
+      "id": "T-05",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Conditional rewriting of payroll exports on the file share",
+      "description": "If `authentication` on `flow:scheduling-service-to-file-share:write-payroll-export` resolves to absent or insufficient write authorization, an attacker who reaches the file-share write interface can replace or modify the weekly payroll export in `store:file-share`. The second-order target is `entity:payroll-system`, which collects the altered file through `flow:payroll-system-to-file-share:collect-payroll-export` and may process it as the authoritative export. This is conditional on unverified authentication for the write flow, not a claim that the file share currently permits unauthenticated modification.",
+      "affected_element_ids": [
+        "flow:scheduling-service-to-file-share:write-payroll-export",
+        "store:file-share",
+        "process:scheduling-service"
+      ],
+      "verb": "alter",
+      "grounds": [
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:scheduling-service-to-file-share:write-payroll-export",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "tampering",
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low and conditional on `unknown:flow:scheduling-service-to-file-share:write-payroll-export:authentication`: exploitation requires access to an internal write path and inadequate authentication. Impact is medium because the file share holds a weekly payroll export carrying `pii` that is subsequently collected by `entity:payroll-system`."
+      },
+      "mitigations": [
+        {
+          "summary": "Restrict file-share writes to the scheduling service identity",
+          "detail": "Require a dedicated authenticated writer identity for `process:scheduling-service`, deny all other writes by default, and grant the payroll system read-only access."
+        },
+        {
+          "summary": "Make payroll exports immutable and verifiable",
+          "detail": "Write versioned, immutable export objects and have the payroll system verify a signature or checksum produced by `process:scheduling-service` before accepting an export."
+        }
+      ]
+    },
+    {
+      "id": "R-01",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Rota changes may be deniable because manager identity and audit evidence are unverified",
+      "description": "A store manager using `entity:store-manager` can submit weekly rota changes through `flow:store-manager-to-scheduling-web-app:build-rota` to `process:scheduling-web-app`, which then forwards rota writes through `flow:scheduling-web-app-to-scheduling-service:rota-requests` to `process:scheduling-service` and ultimately `store:rota-database`. The inbound manager authentication is unknown, as is the web-app-to-service authentication, and the model contains no audit element or audit flow recording an authenticated manager identity, action, target, timestamp, and outcome. If those unknowns resolve without individual identity binding and retained audit records, a manager can deny having created or changed a rota entry and the operator cannot rebut the dispute. Second-order: the disputed change affects the `business-critical-data` rota held in `store:rota-database`, including decisions that govern colleagues' scheduled work.",
+      "affected_element_ids": [
+        "entity:store-manager",
+        "flow:store-manager-to-scheduling-web-app:build-rota",
+        "process:scheduling-web-app",
+        "process:scheduling-service"
+      ],
+      "verb": "unattributable",
+      "grounds": [
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:store-manager-to-scheduling-web-app:build-rota",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:store-manager-to-scheduling-web-app:build-rota",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:scheduling-web-app-to-scheduling-service:rota-requests",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "absent-element",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": "audit"
+        }
+      ],
+      "category": "repudiation",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional on the unknown authentication attributes of `flow:store-manager-to-scheduling-web-app:build-rota` and `flow:scheduling-web-app-to-scheduling-service:rota-requests`; the manager flow crosses from `boundary:public-internet`, but individual identity controls may exist. Impact is medium because the disputed writes reach `store:rota-database`, which holds `business-critical-data` as well as colleague PII."
+      },
+      "mitigations": [
+        {
+          "summary": "Record attributable rota-change events",
+          "detail": "Have `process:scheduling-web-app` and `process:scheduling-service` emit retained security audit events for every rota write, including the verified manager subject, action, affected rota entry, timestamp, before/after values, and outcome."
+        },
+        {
+          "summary": "Preserve the manager identity across the service hop",
+          "detail": "Establish individual authentication on `flow:store-manager-to-scheduling-web-app:build-rota` and propagate the verified subject through `flow:scheduling-web-app-to-scheduling-service:rota-requests`, recording both the originating manager and service identity with each write."
+        }
+      ]
+    },
+    {
+      "id": "R-02",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Payroll-export collection may be deniable by the external payroll system",
+      "description": "`entity:payroll-system` initiates collection of the weekly payroll export through `flow:payroll-system-to-file-share:collect-payroll-export`, crossing from `boundary:payroll-team-environment` to `store:file-share` on the internal network. Authentication on that collection flow is unknown, and the model contains no audit element or audit flow that could retain a verifiable identity, signed request, collection timestamp, and result. If the unknown authentication is not a signed, individually attributable integration identity with retained evidence, the payroll team can dispute that it collected a particular export, while the operator cannot reliably prove the collection occurred. Second-order: disputes concern the weekly export containing PII in `store:file-share` and can disrupt payroll reconciliation between the two teams.",
+      "affected_element_ids": [
+        "entity:payroll-system",
+        "flow:payroll-system-to-file-share:collect-payroll-export",
+        "store:file-share"
+      ],
+      "verb": "unattributable",
+      "grounds": [
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:payroll-system-to-file-share:collect-payroll-export",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:payroll-system-to-file-share:collect-payroll-export",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "absent-element",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": "audit"
+        }
+      ],
+      "category": "repudiation",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional on the unknown authentication of `flow:payroll-system-to-file-share:collect-payroll-export`; the flow crosses the separate `boundary:payroll-team-environment`, but an unstated integration control may authenticate it. Impact is medium because the disputed weekly export held in `store:file-share` contains PII and is needed for payroll processing."
+      },
+      "mitigations": [
+        {
+          "summary": "Use signed, attributable payroll collection requests",
+          "detail": "Establish a dedicated payroll-system identity on `flow:payroll-system-to-file-share:collect-payroll-export` and require signed requests with timestamps and nonces, rather than relying on an unverified caller."
+        },
+        {
+          "summary": "Retain immutable collection evidence",
+          "detail": "Record successful and failed collection attempts with the verified payroll-system identity, export identifier, timestamp, request signature or digest, and outcome in append-only audit storage separated from `store:file-share`."
+        }
+      ]
+    },
+    {
+      "id": "I-01",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Colleague shift details may be intercepted between personal phones and the scheduling web app",
+      "description": "`flow:colleague-to-scheduling-web-app:view-shifts` crosses from `boundary:public-internet` to `process:scheduling-web-app` in `boundary:internal-network` and carries a colleague's own shifts, but `encryption_in_transit` is unknown. If transport encryption is absent or terminates before the whole path is protected, an on-path attacker on the public or intervening network can intercept those shift details. The disclosed schedules can enable targeted social engineering of colleagues and reveal their work patterns. This is conditional on verifying the transport protection.",
+      "affected_element_ids": [
+        "flow:colleague-to-scheduling-web-app:view-shifts",
+        "entity:colleague",
+        "process:scheduling-web-app"
+      ],
+      "verb": "intercept",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "Colleagues reach the app from their own phones.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "quote",
+          "text": "whether any of it is encrypted.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:colleague-to-scheduling-web-app:view-shifts",
+          "attribute": "encryption_in_transit",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:colleague-to-scheduling-web-app:view-shifts",
+          "term": ""
+        }
+      ],
+      "category": "information-disclosure",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional: `flow:colleague-to-scheduling-web-app:view-shifts` crosses from the public internet and its transport encryption is unknown, but interception still requires an on-path position. Impact is medium because the flow carries a colleague's shifts and is tagged `pii`."
+      },
+      "mitigations": [
+        {
+          "summary": "Enforce end-to-end TLS for colleague sessions",
+          "detail": "Set and verify TLS 1.2+ for `flow:colleague-to-scheduling-web-app:view-shifts`, including every termination-to-application hop, and redirect or reject plaintext requests."
+        }
+      ]
+    },
+    {
+      "id": "I-02",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Store rota data may be intercepted on the manager-to-web-app connection",
+      "description": "`flow:store-manager-to-scheduling-web-app:build-rota` crosses from `boundary:public-internet` to `process:scheduling-web-app` and carries rota entries for a store, yet its `encryption_in_transit` is unknown. If the unverified transport is not encrypted end to end, a party able to observe the path can intercept rota and personal-data details while a manager builds or changes schedules. That intelligence can reveal staffing patterns and support follow-on targeting of the store and its colleagues. This is conditional on the unresolved encryption state.",
+      "affected_element_ids": [
+        "flow:store-manager-to-scheduling-web-app:build-rota",
+        "entity:store-manager",
+        "process:scheduling-web-app"
+      ],
+      "verb": "intercept",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "Store managers use a scheduling web app to build the weekly rota for their store.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "quote",
+          "text": "whether any of it is encrypted.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:store-manager-to-scheduling-web-app:build-rota",
+          "attribute": "encryption_in_transit",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:store-manager-to-scheduling-web-app:build-rota",
+          "term": ""
+        }
+      ],
+      "category": "information-disclosure",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because the flow crosses the public-internet boundary and `encryption_in_transit` is unknown, although the attacker needs an on-path position. Impact is medium because the flow carries store rota entries and is tagged `pii` and `business-critical-data`."
+      },
+      "mitigations": [
+        {
+          "summary": "Protect manager rota traffic with TLS",
+          "detail": "Require TLS 1.2+ from manager clients through to `process:scheduling-web-app`; validate certificates and ensure any reverse-proxy-to-app segment is also encrypted."
+        }
+      ]
+    },
+    {
+      "id": "I-03",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Rota requests may be readable on the unverified web-app-to-service hop",
+      "description": "`flow:scheduling-web-app-to-scheduling-service:rota-requests` carries rota reads and writes between `process:scheduling-web-app` and `process:scheduling-service`, but `encryption_in_transit` is unknown. If this internal hop is plaintext, an attacker with a foothold able to observe the internal-network path can intercept rota and PII-bearing requests and responses. The captured information can then be used to target records subsequently read from `store:rota-database`. This is a conditional transport-protection finding, not an assertion that the internal network is plaintext.",
+      "affected_element_ids": [
+        "flow:scheduling-web-app-to-scheduling-service:rota-requests",
+        "process:scheduling-web-app",
+        "process:scheduling-service"
+      ],
+      "verb": "intercept",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "The web app talks to a scheduling service. The scheduling service is what actually reads and writes the rotas",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "quote",
+          "text": "whether any of it is encrypted.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:scheduling-web-app-to-scheduling-service:rota-requests",
+          "attribute": "encryption_in_transit",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "information-disclosure",
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low and conditional: `encryption_in_transit` for the internal `flow:scheduling-web-app-to-scheduling-service:rota-requests` is unknown, but an attacker needs a prior internal on-path foothold. Impact is medium because the flow is tagged `pii` and `business-critical-data` and carries rota reads and writes."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt and mutually authenticate the service hop",
+          "detail": "Set `encryption_in_transit` on `flow:scheduling-web-app-to-scheduling-service:rota-requests` to mTLS so internal observers cannot read rota payloads and each service verifies its peer."
+        }
+      ]
+    },
+    {
+      "id": "I-04",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Rota database traffic may expose colleague contact and availability data",
+      "description": "`flow:scheduling-service-to-rota-database:read-write-rotas` carries rota entries, colleague names, contact details, and availability from `process:scheduling-service` to `store:rota-database`, while `encryption_in_transit` is unknown. If the database connection lacks verified encryption, an internal on-path attacker can intercept the full sensitive payload rather than needing to query the store. The collected contact and availability data enables targeted phishing and reveals the data later served through the scheduling application. This is conditional on the unverified transport state.",
+      "affected_element_ids": [
+        "flow:scheduling-service-to-rota-database:read-write-rotas",
+        "process:scheduling-service",
+        "store:rota-database"
+      ],
+      "verb": "intercept",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "Colleague names, contact details and stated availability are held in that database.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "quote",
+          "text": "whether any of it is encrypted.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:scheduling-service-to-rota-database:read-write-rotas",
+          "attribute": "encryption_in_transit",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "information-disclosure",
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low and conditional because `flow:scheduling-service-to-rota-database:read-write-rotas` is internal and requires an on-path foothold, although its transport encryption is unknown. Impact is medium because the flow carries colleague names, contact details, availability, and rota data tagged `pii`."
+      },
+      "mitigations": [
+        {
+          "summary": "Require encrypted database connections",
+          "detail": "Configure `flow:scheduling-service-to-rota-database:read-write-rotas` to require TLS with certificate validation, preferably mTLS or a workload-bound database identity, and reject non-TLS connections."
+        }
+      ]
+    },
+    {
+      "id": "I-05",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Payroll export may be intercepted while written to the file share",
+      "description": "`flow:scheduling-service-to-file-share:write-payroll-export` transfers the weekly payroll export from `process:scheduling-service` to `store:file-share`, but its `encryption_in_transit` is unknown. If this internal transfer is unencrypted, an attacker able to observe that network segment can intercept the export's PII before it reaches the share. The obtained payroll data can be used to target colleagues or to compromise subsequent payroll-processing activity. This claim is conditional on confirming that the flow is not protected in transit.",
+      "affected_element_ids": [
+        "flow:scheduling-service-to-file-share:write-payroll-export",
+        "process:scheduling-service",
+        "store:file-share"
+      ],
+      "verb": "intercept",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "Once a week the scheduling service writes a payroll export onto a file share.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "quote",
+          "text": "whether any of it is encrypted.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:scheduling-service-to-file-share:write-payroll-export",
+          "attribute": "encryption_in_transit",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "information-disclosure",
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low and conditional because interception of the internal write flow requires a prior on-path position and `encryption_in_transit` is unknown. Impact is medium because the weekly payroll export flow is tagged `pii` and exposes personnel-related data."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt the payroll-export write path",
+          "detail": "Require TLS or an authenticated encrypted file-transfer protocol for `flow:scheduling-service-to-file-share:write-payroll-export`, including the final hop to `store:file-share`."
+        }
+      ]
+    },
+    {
+      "id": "I-06",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Payroll export may be intercepted during collection by the external payroll system",
+      "description": "`flow:payroll-system-to-file-share:collect-payroll-export` crosses from `boundary:payroll-team-environment` to `store:file-share` in `boundary:internal-network` and carries the weekly payroll export, but `encryption_in_transit` is unknown. If transport encryption is absent or incomplete, an on-path observer between the separately run payroll environment and the file share can intercept the PII-bearing export. The disclosure supplies personnel and payroll-related information that can be used for targeted fraud or social engineering. This is conditional on the unknown encryption attribute.",
+      "affected_element_ids": [
+        "flow:payroll-system-to-file-share:collect-payroll-export",
+        "entity:payroll-system",
+        "store:file-share"
+      ],
+      "verb": "intercept",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "The payroll system, which is run by another team, collects the export from the file share.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "quote",
+          "text": "whether any of it is encrypted.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:payroll-system-to-file-share:collect-payroll-export",
+          "attribute": "encryption_in_transit",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:payroll-system-to-file-share:collect-payroll-export",
+          "term": ""
+        }
+      ],
+      "category": "information-disclosure",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional: the collection flow crosses from `boundary:payroll-team-environment` into the internal network and has unknown transport encryption, though an attacker must obtain an on-path position. Impact is medium because the weekly payroll export is tagged `pii`."
+      },
+      "mitigations": [
+        {
+          "summary": "Use mutually authenticated encrypted payroll collection",
+          "detail": "Protect `flow:payroll-system-to-file-share:collect-payroll-export` with TLS 1.2+ and mTLS or an authenticated managed-transfer channel, and verify encryption through the complete cross-team route."
+        }
+      ]
+    },
+    {
+      "id": "I-07",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "A storage-layer copy of the rota database could disclose colleague records",
+      "description": "`store:rota-database` holds rotas plus colleague names, contact details, and stated availability, and its `encryption_at_rest` attribute is unknown. If that unknown resolves to unencrypted storage, an attacker or over-privileged operator who obtains a disk, snapshot, backup, or other operational copy can read the records without using `process:scheduling-service` or its normal access path. The resulting PII can enable targeted attacks against colleagues and expose all rota records present in the copied store. This is conditional on verifying the at-rest encryption posture; it does not assert that encryption is absent.",
+      "affected_element_ids": [
+        "store:rota-database"
+      ],
+      "verb": "read",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "Colleague names, contact details and stated availability are held in that database.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "quote",
+          "text": "whether any of it is encrypted.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "store:rota-database",
+          "attribute": "encryption_at_rest",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "information-disclosure",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional on the unknown `encryption_at_rest` value: a copied storage artifact avoids the application's normal read path, although the encryption control may be present. Impact is medium because `store:rota-database` holds contact details, availability, and rota data tagged `pii`."
+      },
+      "mitigations": [
+        {
+          "summary": "Verify and enforce encryption on rota-database copies",
+          "detail": "Establish the at-rest posture of `store:rota-database`, then require managed-key encryption for the primary data, backups, snapshots, and replicas, with export and key-use permissions restricted separately."
+        }
+      ]
+    },
+    {
+      "id": "I-08",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "An unencrypted file-share copy could disclose the weekly payroll export",
+      "description": "`store:file-share` holds the weekly payroll export and has `encryption_at_rest: unknown`. If the file share or its operational copies are unencrypted, someone obtaining the underlying media, backup, or snapshot can read the export outside the normal payroll collection path. The exposed PII can support targeted payroll fraud and social engineering of colleagues. This finding is conditional on the unresolved at-rest encryption state and does not claim that the share is currently unencrypted.",
+      "affected_element_ids": [
+        "store:file-share"
+      ],
+      "verb": "read",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "Once a week the scheduling service writes a payroll export onto a file share.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "quote",
+          "text": "whether any of it is encrypted.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "store:file-share",
+          "attribute": "encryption_at_rest",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "information-disclosure",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional because `store:file-share` has unknown at-rest encryption and a storage-layer copy bypasses the application's normal access path. Impact is medium because the share contains the weekly payroll export and is tagged `pii`."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt the file share and all export copies at rest",
+          "detail": "Confirm and enforce encryption at rest for `store:file-share`, its backups, snapshots, and replicas; use managed keys with narrowly scoped decrypt and export permissions."
+        },
+        {
+          "summary": "Constrain payroll-export retention and access",
+          "detail": "Limit read access to a dedicated payroll principal, remove exports after the required collection window, and audit access to stored export artifacts."
+        }
+      ]
+    },
+    {
+      "id": "D-01",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Flooding public rota requests can exhaust scheduling capacity",
+      "description": "An attacker starting from `boundary:public-internet` can flood `process:scheduling-web-app` through `flow:colleague-to-scheduling-web-app:view-shifts` and `flow:store-manager-to-scheduling-web-app:build-rota`. Authentication on both inbound flows is `unknown`; if sign-in and any request metering do not prevent sustained automated use, each cheap view or rota-build request causes the web app to invoke `process:scheduling-service` over `flow:scheduling-web-app-to-scheduling-service:rota-requests`, which reads or writes rota data. The attacker can therefore consume web-app worker capacity and downstream service/database throughput faster than legitimate colleagues and managers can obtain shifts or maintain the weekly rota. Second-order, saturation of `process:scheduling-service` prevents both rota reads and writes and can delay the weekly payroll export path to `store:file-share`. This is conditional on the undocumented inbound authentication and load-control posture; it does not assert those controls are absent.",
+      "affected_element_ids": [
+        "process:scheduling-web-app",
+        "flow:colleague-to-scheduling-web-app:view-shifts",
+        "flow:store-manager-to-scheduling-web-app:build-rota"
+      ],
+      "verb": "flood",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "The web app talks to a scheduling service. The scheduling service is what actually reads and writes the rotas",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "quote",
+          "text": "Nobody has documented how colleagues or managers sign in",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:colleague-to-scheduling-web-app:view-shifts",
+          "term": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:store-manager-to-scheduling-web-app:build-rota",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:colleague-to-scheduling-web-app:view-shifts",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:store-manager-to-scheduling-web-app:build-rota",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "denial-of-service",
+      "severity": {
+        "likelihood": "high",
+        "impact": "medium",
+        "level": "high",
+        "justification": "Likelihood is high, conditional on the unknown authentication posture of both public-boundary flows `flow:colleague-to-scheduling-web-app:view-shifts` and `flow:store-manager-to-scheduling-web-app:build-rota`: colleagues and managers reach the internet-facing app from `boundary:public-internet`, so a capable attacker can attempt automated requests without a network foothold. Impact is medium: exhaustion disrupts the shared rota read/write function carried by `process:scheduling-service`, affecting colleagues and managers and delaying a business-critical operational workflow, but the model does not tag an affected element as `availability-critical` or establish an irreversible outage."
+      },
+      "mitigations": [
+        {
+          "summary": "Rate-limit and shed load on public rota operations",
+          "detail": "Apply per-verified-user and per-source request/concurrency limits with bounded queues at `process:scheduling-web-app`, returning overload responses before requests are propagated over `flow:scheduling-web-app-to-scheduling-service:rota-requests`."
+        },
+        {
+          "summary": "Bound downstream rota work",
+          "detail": "Set request deadlines, concurrency ceilings, and database-operation timeouts for work initiated through `process:scheduling-service`, so bursts on either public flow cannot monopolize capacity needed by legitimate rota users."
+        }
+      ]
+    },
+    {
+      "id": "E-01",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "A colleague could access another colleague's shifts if the app does not enforce per-record ownership",
+      "description": "`process:scheduling-web-app` is internet-facing and receives requests from `entity:colleague` over the boundary-crossing `flow:colleague-to-scheduling-web-app:view-shifts`. The source limits this interaction to a colleague's own assigned shifts, but the model leaves authentication on that flow unknown and does not state that the app derives the requested rota record from a verified subject. If a legitimately authenticated colleague can substitute another colleague's record identifier and `process:scheduling-web-app` lacks a server-side ownership check, they escalate from their own rota access to reading other colleagues' schedules and associated PII. Second-order, the app sends rota read requests to `process:scheduling-service` through `flow:scheduling-web-app-to-scheduling-service:rota-requests`, whose service-side authorization is also undocumented.",
+      "affected_element_ids": [
+        "entity:colleague",
+        "process:scheduling-web-app",
+        "flow:colleague-to-scheduling-web-app:view-shifts"
+      ],
+      "verb": "escalate",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "Colleagues use the same app to look at the shifts they have been given.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:colleague-to-scheduling-web-app:view-shifts",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:colleague-to-scheduling-web-app:view-shifts",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:scheduling-web-app-to-scheduling-service:rota-requests",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "elevation-of-privilege",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional: `flow:colleague-to-scheduling-web-app:view-shifts` crosses from `boundary:public-internet`, so colleagues can reach the surface, but exploitation requires a valid colleague position and an unstated ownership check to be absent. Impact is medium because `process:scheduling-web-app` and the flow carry `pii`, and a successful check bypass exposes other colleagues' rota information."
+      },
+      "mitigations": [
+        {
+          "summary": "Enforce ownership checks for every colleague rota read",
+          "detail": "Have `process:scheduling-web-app` derive the colleague identity from a verified credential and enforce that the requested rota record belongs to that subject before forwarding a read over `flow:scheduling-web-app-to-scheduling-service:rota-requests`."
+        },
+        {
+          "summary": "Re-authorize rota requests in the scheduling service",
+          "detail": "Propagate a verified caller identity to `process:scheduling-service` and require it to enforce the same record-level ownership constraint rather than trusting identifiers supplied by the web app."
+        }
+      ]
+    },
+    {
+      "id": "E-02",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "A store manager could alter another store's rota if store scope is not enforced server-side",
+      "description": "`process:scheduling-web-app` accepts manager write requests over the boundary-crossing `flow:store-manager-to-scheduling-web-app:build-rota`, described as changes to the manager's own store rota. Authentication on that public-facing flow is unknown, and the model does not state that `process:scheduling-web-app` or `process:scheduling-service` binds a requested store to the verified manager's authorized store. If that server-side authorization is missing, a legitimately authenticated `entity:store-manager` can submit another store's identifier and escalate from managing their own rota to altering another store's rota. Second-order, `process:scheduling-service` forwards rota writes to `store:rota-database` over `flow:scheduling-service-to-rota-database:read-write-rotas`, and those altered records can subsequently feed the weekly payroll export written through `flow:scheduling-service-to-file-share:write-payroll-export`.",
+      "affected_element_ids": [
+        "entity:store-manager",
+        "process:scheduling-web-app",
+        "flow:store-manager-to-scheduling-web-app:build-rota"
+      ],
+      "verb": "escalate",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "Store managers use a scheduling web app to build the weekly rota for their\nstore.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:store-manager-to-scheduling-web-app:build-rota",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:store-manager-to-scheduling-web-app:build-rota",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:scheduling-web-app-to-scheduling-service:rota-requests",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:scheduling-service-to-rota-database:read-write-rotas",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "elevation-of-privilege",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional: `flow:store-manager-to-scheduling-web-app:build-rota` crosses from `boundary:public-internet`, but the attacker needs a manager position and the undocumented store-scope check to be absent. Impact is high because the write path reaches `store:rota-database`, whose rota data is tagged `business-critical-data` and `pii`, and the scheduling service uses those records to produce the payroll export."
+      },
+      "mitigations": [
+        {
+          "summary": "Bind each rota write to the manager's authorized store",
+          "detail": "At `process:scheduling-web-app`, derive the manager and permitted store scope from a verified credential, ignore caller-supplied scope unless it matches that grant, and deny requests outside it."
+        },
+        {
+          "summary": "Enforce store authorization at the service and data layer",
+          "detail": "Propagate the verified manager scope on `flow:scheduling-web-app-to-scheduling-service:rota-requests`; require `process:scheduling-service` to re-check it for every read and write, with mandatory store predicates on operations sent over `flow:scheduling-service-to-rota-database:read-write-rotas`."
+        }
+      ]
+    }
+  ]
+}
