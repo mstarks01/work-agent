@@ -39,7 +39,6 @@ fallback and no compatibility shim for other schema versions.
 from __future__ import annotations
 
 import os
-import re
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Literal, Self
@@ -50,6 +49,7 @@ from analysis_service.claims import FRAMEWORK_NAMES
 from analysis_service.config_files import read_toml
 from analysis_service.errors import ConfigError
 from analysis_service.vendors import (
+    UPSTREAM_SLUG,
     VENDOR_NAMES,
     ChargeMode,
     CredentialMode,
@@ -163,11 +163,6 @@ _MODEL_FIELD = "MODEL"
 _CREDENTIALS_STEM = f"{_ENV_PREFIX}CREDENTIALS"
 _CHARGES_STEM = f"{_ENV_PREFIX}CHARGES"
 _UPSTREAMS_STEM = f"{_ENV_PREFIX}UPSTREAMS"
-
-#: One upstream provider slug as a gateway spells it: ``openai``, ``azure``,
-#: ``amazon-bedrock/us-east-1``, ``openai/flex``. Lowercase segments joined by
-#: a slash, and nothing a request body would read as structure.
-_UPSTREAM_SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)?$")
 
 
 class ModelConfigError(ConfigError):
@@ -489,7 +484,7 @@ class ModelTierConfig(BaseModel):
                 problems += [
                     f"upstreams.{vendor} entry {name!r} is not a provider slug"
                     for name in names
-                    if not _UPSTREAM_SLUG.fullmatch(name)
+                    if not UPSTREAM_SLUG.fullmatch(name)
                 ]
         return problems
 

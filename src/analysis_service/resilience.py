@@ -98,16 +98,17 @@ reverting a node to never-retry, no-timeout behaviour.
 from __future__ import annotations
 
 import os
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
-from typing import TypeVar
+from typing import Self, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.config_files import read_toml
 from analysis_service.retry import RetryBudget, RetryPolicy
 from analysis_service.sources import SourceLimits
+from analysis_service.vendors import UPSTREAM_SLUG
 
 # The only schema version this loader accepts. The version check fires before
 # shape validation, so a file on another schema is named as such rather than
@@ -116,7 +117,13 @@ from analysis_service.sources import SourceLimits
 # none carries a default, for the reason ``max_active_jobs`` carries none: a
 # budget nobody has chosen is version 5's behaviour, and it is the defect this
 # version exists to end.
-SUPPORTED_VERSION = 6
+# Version 7 adds ``[timeout_ms_by_upstream]``: a per-request timeout keyed by the
+# upstream slug a gateway request is pinned to, read where a tier's pin names
+# one. OpenAI's flex tier serves the same weights slower and its guide asks for
+# a timeout above ten minutes, so the shipped row states fifteen. Hard cutover
+# like the versions before it: the table is required, and a deployment that
+# wants no per-upstream timeout writes an empty one and means it.
+SUPPORTED_VERSION = 7
 
 _ENV_PREFIX = "ANALYSIS_"
 
@@ -159,6 +166,12 @@ class ResilienceConfig(BaseModel):
     version: int = Field(ge=1)
     attempts: int = Field(ge=1)
     timeout_ms: int = Field(gt=0)
+    #: The per-request timeout for a request pinned to a named upstream, in
+    #: milliseconds, keyed by the gateway's slug for it. Read by
+    #: :meth:`request_timeout_seconds` where a tier's ``[upstreams]`` pin names
+    #: a key here; ``timeout_ms`` stands for every other request. Required and
+    #: empty-able rather than defaulted, so a file states whether it has one.
+    timeout_ms_by_upstream: dict[str, int]
     max_source_bytes: int = Field(gt=0)
     max_sources: int = Field(ge=1)
     job_deadline_ms: int = Field(gt=0)
@@ -168,6 +181,26 @@ class ResilienceConfig(BaseModel):
     max_jobs_per_window: int = Field(ge=1)
     max_tokens_per_window: int = Field(ge=1)
     global_max_tokens_per_window: int = Field(ge=1)
+
+    @model_validator(mode="after")
+    def _check_upstream_timeouts(self) -> Self:
+        bad_keys = [
+            key
+            for key in self.timeout_ms_by_upstream
+            if not UPSTREAM_SLUG.fullmatch(key)
+        ]
+        if bad_keys:
+            raise ValueError(
+                f"timeout_ms_by_upstream keys {bad_keys} are not provider slugs"
+            )
+        bad_values = [
+            key for key, value in self.timeout_ms_by_upstream.items() if value <= 0
+        ]
+        if bad_values:
+            raise ValueError(
+                f"timeout_ms_by_upstream values for {bad_values} must be positive"
+            )
+        return self
 
     def retry_policy(self, budget_capacity: float) -> RetryPolicy:
         """The retry loop this deployment runs, with its shared budget.
@@ -210,8 +243,15 @@ class ResilienceConfig(BaseModel):
             max_total_bytes=self.max_source_bytes, max_sources=self.max_sources
         )
 
-    def request_timeout_seconds(self) -> float:
+    def request_timeout_seconds(self, upstreams: Iterable[str] = ()) -> float:
         """The per-request timeout as LiteLLM wants it: seconds, not milliseconds.
+
+        ``upstreams`` is what the tier's request is pinned to, from the tiers
+        file's ``[upstreams]`` table. Where any of them has a row in
+        :attr:`timeout_ms_by_upstream`, the largest such row is the bound,
+        because the slowest upstream a request may land on is the one the
+        timeout has to fit. Where none has a row, ``timeout_ms`` stands, and a
+        direct vendor pins nothing so it always reads that.
 
         The sibling of :meth:`deadline_seconds`, and it exists for the reason
         that one gives: the file states every duration in milliseconds, so the
@@ -234,7 +274,12 @@ class ResilienceConfig(BaseModel):
         what LiteLLM receives, rather than asserting this number against a
         second copy of itself.
         """
-        return self.timeout_ms / 1000
+        pinned = [
+            self.timeout_ms_by_upstream[name]
+            for name in upstreams
+            if name in self.timeout_ms_by_upstream
+        ]
+        return max(pinned, default=self.timeout_ms) / 1000
 
 
 def _override(
@@ -274,7 +319,8 @@ def load_resilience(
             " 'timeout_ms', 'max_source_bytes', 'max_sources',"
             " 'job_deadline_ms', 'retry_budget_ratio', 'max_active_jobs',"
             " 'budget_window_seconds', 'max_jobs_per_window',"
-            " 'max_tokens_per_window' and 'global_max_tokens_per_window'"
+            " 'max_tokens_per_window', 'global_max_tokens_per_window' and the"
+            " 'timeout_ms_by_upstream' table"
         )
 
     overrides = {
