@@ -38,8 +38,12 @@ One pass cannot see that, so the scan iterates: it drops what it has already
 proved dead and asks again, until the answer stops changing. A chain of any
 length falls in that many passes.
 
-A name is used if anything reaches it, tests included: a helper exercised only
-by a test is covered, not dead.
+A name is used if anything reaches it, tests included. The second lint asks the
+narrower question: which names does nothing but a test reach? Such a name is
+not dead, but nothing ships it either, and each one is a decision -- an
+instrument the tests pin so a figure cannot rot, or a floor a rule is priced
+against. :data:`TEST_ONLY` holds every one with its reason, and a name that
+gains a reader outside the tests, or leaves the tree, fails the table.
 """
 
 from __future__ import annotations
@@ -59,6 +63,50 @@ SCOPES: tuple[tuple[str, bool], ...] = (
     ("evals", False),
     ("webapp", False),
 )
+
+#: Where a use counts for the second lint: every searched root but the tests.
+PRODUCTION = tuple(root for root in SEARCHED if root != "tests")
+
+_PINNED = (
+    "a measurement the tests pin, so the figure in the module docstring is"
+    " regenerated on every pull request rather than asserted in prose"
+)
+
+#: Names only a test reaches, kept on purpose, one reason each. State the reason
+#: as a property of the name, never as a ticket number. Delete the name and its
+#: tests instead when the reason is only that the tests exist.
+TEST_ONLY: dict[str, str] = {
+    "measure_direction": (
+        "the one aggregation ADR 0031 pins its direction numbers with, and the"
+        " instrument a later candidate rule is priced through"
+    ),
+    "DirectionResult": "what measure_direction returns",
+    "is_stale": (
+        "backs the gate that holds evals/baselines/README.md to the merged Baselines"
+    ),
+    "MechanicalIdentity": (
+        "version 1 of the identity rule, the floor docs/agents/claim-identity.md"
+        " prices the frontier against"
+    ),
+    "corpus_recall": f"{_PINNED}: trigger recall over the whole corpus",
+    # evals/harness/exemplar_verbs.py, whole: the verbs the exemplars demonstrate
+    # against the verbs the corpus grades, which both move often.
+    **dict.fromkeys(
+        (
+            "Collision",
+            "Exemplar",
+            "LaneVerbs",
+            "Undemonstrated",
+            "_proposal_type",
+            "collisions",
+            "corpus_undemonstrated",
+            "lane_verbs",
+            "undemonstrated",
+            "verb_keyed_frameworks",
+        ),
+        _PINNED,
+    ),
+}
 
 _DEFINITIONS = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
 
@@ -84,8 +132,10 @@ def _definitions() -> dict[str, str]:
     return found
 
 
-def _used_names(ignoring: frozenset[str]) -> set[str]:
-    """Every identifier the repository reads, calls, decorates with or imports.
+def _used_names(
+    ignoring: frozenset[str], roots: tuple[str, ...] = SEARCHED
+) -> set[str]:
+    """Every identifier the files under ``roots`` read, call, decorate with or import.
 
     A definition contributes nothing: ``ast.FunctionDef`` carries its name as a
     plain string rather than an ``ast.Name``, so a helper that only defines
@@ -109,7 +159,7 @@ def _used_names(ignoring: frozenset[str]) -> set[str]:
                 used.update(alias.asname or alias.name for alias in child.names)
             walk(child)
 
-    for path in source_files(*SEARCHED):
+    for path in source_files(*roots):
         walk(parse(path))
     return used
 
@@ -126,6 +176,24 @@ def unreachable() -> dict[str, str]:
         dead = found
 
 
+def test_only() -> dict[str, str]:
+    """The names only a test reaches, to a fixed point.
+
+    What :func:`unreachable` reports is left out, so each name is reported by
+    one lint. A name reached only by a test-only name is test-only too: the
+    ``Sweep`` class that only ``score_sweep`` built fell with it.
+    """
+    definitions = _definitions()
+    dead = frozenset(unreachable())
+    found = dead
+    while True:
+        used = _used_names(ignoring=found, roots=PRODUCTION)
+        unshipped = frozenset(name for name in definitions if name not in used)
+        if unshipped == found:
+            return {name: definitions[name] for name in sorted(unshipped - dead)}
+        found = unshipped
+
+
 def test_no_module_level_name_is_unreachable():
     """The lint itself: every name it judges has something that reaches it."""
     dead = unreachable()
@@ -137,6 +205,42 @@ def test_no_module_level_name_is_unreachable():
         " reaches by string, give it a caller a reader can follow. If it is"
         " public API outside the service, it belongs behind a scope in SCOPES."
     )
+
+
+def test_a_name_only_a_test_reaches_is_declared():
+    """The second lint: a name nothing ships needs a stated reason to stay."""
+    undeclared = {
+        name: location
+        for name, location in test_only().items()
+        if name not in TEST_ONLY
+    }
+
+    assert not undeclared, (
+        "only a test reaches these names: "
+        f"{[f'{location} {name}' for name, location in undeclared.items()]}."
+        " Give each one a reader outside tests/, or delete it with its tests, or"
+        " add it to TEST_ONLY with the reason it stays."
+    )
+
+
+def test_no_kept_name_outlives_its_reason():
+    """An entry whose name gained a reader, or left the tree, is a stale reason."""
+    stale = sorted(set(TEST_ONLY) - set(test_only()))
+
+    assert not stale, (
+        f"{stale} are in TEST_ONLY but something outside tests/ now reaches them,"
+        " or they are gone; drop the entries"
+    )
+
+
+def test_a_use_in_a_test_is_not_a_production_use():
+    """Positive control on the roots: a name only this file calls is seen by the
+    full walk and not by the production walk."""
+    everywhere = _used_names(ignoring=frozenset())
+    shipped = _used_names(ignoring=frozenset(), roots=PRODUCTION)
+
+    assert shipped <= everywhere
+    assert "unreachable" in everywhere and "unreachable" not in shipped
 
 
 def test_the_lint_covers_a_real_population():
