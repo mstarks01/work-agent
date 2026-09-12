@@ -10,6 +10,8 @@ All three facts are catalogued — two `absent:` rows and the crossing — so th
 
 Keep the lane straight. Speaking *as* the web API is spoofing; altering the message an honest caller sent is yours. Both can be true of one path — write only the modification here, and score it on the integrity loss.
 
+Two shapes, one test: what does the fix protect? This draft is `alter-in-transit` because the fix is transport protection on that flow, and the attacker is a third party between the two ends. The third draft below starts from the same kind of trigger, an unverified attribute on a flow, and takes `forge`, because the fix there is a check the consumer makes on what it was handed and the attacker publishes as a party the consumer accepts. A modified client, a package the runner resolves, an image left in a bucket, a file on a share and a credential the sender holds are all attacks at an end: transport protection stops none of them, and their verbs are `plant`, `forge`, `inject` and `alter`.
+
 ```json
 {
   "sequence": 1,
