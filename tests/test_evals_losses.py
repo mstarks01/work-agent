@@ -15,7 +15,7 @@ import pytest
 
 from analysis_service.system_model import ModelIndex
 from evals.harness import losses
-from evals.harness.identity import SubsetVerbIdentity, endpoint_subset
+from evals.harness.identity import SubsetVerbIdentity, endpoint_form, endpoint_subset
 from evals.harness.ledger import Ledger
 from evals.harness.losses import CAUSES, attribute_case, pooled
 from evals.harness.reference import load_case
@@ -299,3 +299,56 @@ class TestAKillDuringARepairIsChargedApartFromOneTheCriticArgued:
         out = capsys.readouterr().out
         assert "first critic pass fumbled" in out
         assert "dropped 1" in out
+
+
+class TestADisplacedRow:
+    """A ``place`` or ``unled`` row says whether the lane wrote one element over."""
+
+    def test_a_draft_sharing_one_element_but_not_the_place_is_named(self, case, flows):
+        references = case.stride_claims()
+        index, reference = next(
+            (i, claim)
+            for i, claim in enumerate(references)
+            if len(endpoint_form(claim.affected_element_ids, flows)) >= 2
+        )
+        place = sorted(endpoint_form(reference.affected_element_ids, flows))
+        # One resolved element the reference names plus one it does not, so the
+        # draft's place overlaps the reference's and neither contains the other.
+        stranger = next(
+            element.id
+            for element in case.model.elements()
+            if element.id not in place
+            and not element.id.startswith(("boundary:", "flow:"))
+        )
+        draft = draft_threat(
+            1,
+            reference.category,
+            "one element over",
+            element_ids=[place[0], stranger],
+            verb=reference.verb,
+        )
+        assert not endpoint_subset(
+            reference.affected_element_ids, draft.affected_element_ids, flows
+        )
+        charged = charge(case, flows, [draft], [promote(draft)])
+        loss = by_index(charged)[index]
+
+        assert loss.cause in ("place", "unled")
+        assert loss.displaced_draft_id == draft.id
+        assert charged.displaced_by_cause[loss.cause] >= 1
+        assert pooled([charged])["displaced"] >= 1
+
+    def test_a_lane_that_wrote_nothing_nearby_names_no_draft(self, case, flows):
+        charged = charge(case, flows, [], [])
+        assert all(loss.displaced_draft_id is None for loss in charged.losses)
+        assert pooled([charged])["displaced"] == 0
+        assert all(
+            value == 0 for value in pooled([charged])["displaced_by_cause"].values()
+        )
+
+    def test_the_other_causes_never_carry_the_field(self, case, flows):
+        reference = case.stride_claims()[0]
+        other = "guess-credential" if reference.verb != "guess-credential" else "replay"
+        draft = at(reference, 1, other)
+        charged = charge(case, flows, [draft], [promote(draft)])
+        assert by_index(charged)[0].displaced_draft_id is None

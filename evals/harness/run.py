@@ -65,6 +65,7 @@ from evals.harness import (
     comparison,
     consent,
     envelope,
+    extraction_losses,
     instruction,
     instruction_delta,
     ledger,
@@ -1081,6 +1082,45 @@ def command_stability(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_extraction_losses(args: argparse.Namespace) -> int:
+    """Give every reference its fate across an end-to-end run and the analysis-mode run beside it.
+
+    Credential-free, like ``stability``: the two artifacts hold every reference
+    each run matched, the end-to-end bundle holds the model its lanes read, and
+    the corpus holds the blessed one. Nothing here gates.
+    """
+    try:
+        end_to_end, analysis = load_runs([args.end_to_end, args.analysis])
+        extraction_losses.refuse_unpaired(end_to_end, analysis)
+        corpus = {case.id: case for case in load_corpus(args.corpus)}
+        models = {}
+        for framework, case_id in sorted(end_to_end.cases & analysis.cases):
+            if extraction_losses.names_elements(framework) and case_id in corpus:
+                models[case_id] = extraction_losses.extracted_model(
+                    args.end_to_end, case_id
+                )
+        rows = extraction_losses.attribute_handoff(end_to_end, analysis, corpus, models)
+    except (ProvenanceError, CorpusError, ValueError) as error:
+        print(f"cannot attribute: {error}", file=sys.stderr)
+        return 1
+    warnings = extraction_losses.warnings_for(end_to_end, analysis)
+    extraction_losses.render(rows, warnings)
+    if args.out:
+        report = {
+            "runs": {
+                "end_to_end": {
+                    "artifact": end_to_end.label,
+                    "models": end_to_end.models,
+                },
+                "analysis": {"artifact": analysis.label, "models": analysis.models},
+            },
+            **extraction_losses.artifact(rows, warnings),
+        }
+        Path(args.out).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+        print(f"extraction-loss report written to {args.out}")
+    return 0
+
+
 def _print_stability(
     runs: Sequence[ScoredRun], stability: Sequence[CaseStability]
 ) -> None:
@@ -1450,6 +1490,23 @@ def _review_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def _extraction_losses_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "end_to_end",
+        help="a scored end-to-end run artifact, with its .reports/ dir beside it",
+    )
+    parser.add_argument(
+        "analysis",
+        help="a scored analysis-mode run artifact of the same corpus",
+    )
+    parser.add_argument(
+        "--corpus",
+        default=str(DEFAULT_CORPUS_DIR),
+        help="corpus root, for the reference sets and the blessed models",
+    )
+    parser.add_argument("--out", help="where to write the extraction-loss report")
+
+
 def _stability_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "artifact",
@@ -1563,6 +1620,12 @@ COMMANDS: dict[str, Command] = {
         help="compare finished sweeps for run-to-run stability (no credentials)",
         run=command_stability,
         arguments=_stability_arguments,
+    ),
+    "extraction-losses": Command(
+        help="what an end-to-end run lost before its lanes ran, against the"
+        " analysis-mode run beside it (no credentials)",
+        run=command_extraction_losses,
+        arguments=_extraction_losses_arguments,
     ),
     "compare": Command(
         help="what a prompt edit did: instruction delta beside score delta"

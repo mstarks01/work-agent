@@ -202,7 +202,7 @@ def compare_runs(runs: Sequence[ScoredRun]) -> list[CaseStability]:
     """
     if len(runs) < 2:
         raise ValueError("stability needs at least two scored runs")
-    _refuse_incomparable(runs)
+    refuse_incomparable(runs)
     shared = frozenset.intersection(*(run.cases for run in runs))
     if not shared:
         raise ValueError("the runs share no scored case, so nothing is comparable")
@@ -236,7 +236,7 @@ def compare_runs(runs: Sequence[ScoredRun]) -> list[CaseStability]:
     return stability
 
 
-def _refuse_incomparable(runs: Sequence[ScoredRun]) -> None:
+def refuse_incomparable(runs: Sequence[ScoredRun]) -> None:
     """The differences no warning can caveat: refused before any set is read.
 
     The same artifact named twice is one measurement counted as two, and it
