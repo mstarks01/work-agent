@@ -160,7 +160,8 @@ REFERENCE_MODELS: dict[str, tuple[str, ...]] = {
     # ``gpt-4o-2024-08-06``, which a live call confirmed the alias resolves to
     # (see ``vendors._CATCH_ALL``).
     #
-    # ``reference_models_fronted_by`` is the rule, and it reads both shapes.
+    # ``test_no_reference_model_fronts_a_build`` is the rule, and its
+    # ``builds_fronted_by`` helper reads both shapes.
     "openai": ("gpt-4o-2024-08-06", "gpt-5.6-sol"),
     # Claude again, and a third spelling of it: OpenRouter carries the vendor
     # inside the model identifier and writes the minor version with a dot.

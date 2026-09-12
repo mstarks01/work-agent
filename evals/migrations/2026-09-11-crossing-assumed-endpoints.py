@@ -46,7 +46,15 @@ import json
 import sys
 from pathlib import Path
 
+# A migration runs as a script, so ``sys.path[0]`` is this directory and the
+# repository root is not on the path. The editable install puts
+# ``analysis_service`` there; ``evals`` is a namespace package in the tree and
+# has to be pointed at.
+REPO_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO_ROOT))
+
 from analysis_service.system_model import SystemModel
+from evals.harness.archive import archive_bytes
 from evals.harness.baseline import _file_digests
 
 
@@ -88,15 +96,11 @@ def migrate(root: Path, write: bool) -> tuple[int, int]:
         print(f"{path}: {len(derived)} crossings, {marked} with an inferred zone")
         report["boundary_crossings"] = derived
         if write:
-            # ``ensure_ascii`` off, because the producer writes it off:
-            # ``bundle`` dumps a report through ``model_dump_json``, which
-            # emits UTF-8. The default would rewrite every em-dash in the file
-            # to an escape and re-seal the Baseline over bytes this migration
-            # never meant to touch.
-            path.write_text(
-                json.dumps(report, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            # The producer's own spelling, from the one table that holds it.
+            # A report is UTF-8 and the drafts written beside it are not, so a
+            # migration that picks an encoding rather than asking for one
+            # re-seals the Baseline over bytes it never meant to touch.
+            path.write_text(archive_bytes("report", report), encoding="utf-8")
         changed += 1
     return changed, skipped
 
@@ -121,9 +125,7 @@ def refresh_manifests(root: Path, write: bool) -> int:
             # The spelling ``assemble`` writes, so a refreshed manifest and a
             # freshly assembled one are the same bytes.
             manifest_path.write_text(
-                json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True)
-                + "\n",
-                encoding="utf-8",
+                archive_bytes("manifest", manifest), encoding="utf-8"
             )
         changed += 1
     return changed
