@@ -155,6 +155,11 @@ through `ANALYSIS_MODEL_UPSTREAMS_OPENROUTER`:
 openrouter = ["openai"]
 ```
 
+Pin `openai/flex` for the same weights at half the price and slower responses.
+A request pinned there reads the fifteen-minute row in
+`config/resilience.toml`, and the job deadline stays at fifteen minutes unless
+you raise `ANALYSIS_JOB_DEADLINE_MS` beside it.
+
 OpenRouter states what it charged for each call, and what that figure covers
 depends on how your account reaches the upstream provider. So declare the
 arrangement in `config/model_tiers.toml`:

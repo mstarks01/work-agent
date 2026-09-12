@@ -177,6 +177,14 @@ class _ReportedCharge:
     covers_whole_call: bool
 
 
+#: One upstream provider slug as a gateway spells it: ``openai``, ``azure``,
+#: ``amazon-bedrock/us-east-1``, ``openai/flex``. Lowercase segments joined by
+#: a slash, and nothing a request body would read as structure. Two tables key
+#: on it — the tiers file's ``[upstreams]`` and the resilience file's
+#: ``[timeout_ms_by_upstream]`` — and both read this one shape.
+UPSTREAM_SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)?$")
+
+
 @dataclass(frozen=True)
 class _UpstreamPin:
     """How a gateway's request names the upstream providers it may reach.

@@ -10,6 +10,7 @@ submission is accepted at all, never which answer it gets.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -44,6 +45,8 @@ VALID = (
     "max_jobs_per_window = 30\n"
     "max_tokens_per_window = 20000000\n"
     "global_max_tokens_per_window = 100000000\n"
+    "[timeout_ms_by_upstream]\n"
+    '"openai/flex" = 900000\n'
 )
 
 
@@ -53,8 +56,8 @@ def write(tmp_path: Path, body: str) -> Path:
     return path
 
 
-def config(**kwargs) -> ResilienceConfig:
-    fields = {
+def config(**kwargs: Any) -> ResilienceConfig:
+    fields: dict[str, Any] = {
         "version": SUPPORTED_VERSION,
         "attempts": 3,
         "timeout_ms": 300000,
@@ -67,6 +70,7 @@ def config(**kwargs) -> ResilienceConfig:
         "max_jobs_per_window": 30,
         "max_tokens_per_window": 20000000,
         "global_max_tokens_per_window": 100000000,
+        "timeout_ms_by_upstream": {"openai/flex": 900000},
     }
     return ResilienceConfig(**(fields | kwargs))
 
@@ -148,6 +152,58 @@ def test_the_request_timeout_converts_like_the_deadline_does():
     loaded = config()
     assert loaded.request_timeout_seconds() == 300.0
     assert loaded.deadline_seconds() == 900.0
+
+
+class TestATimeoutKeyedByUpstream:
+    """A request pinned to a slow upstream reads that upstream's own bound."""
+
+    def test_the_shipped_file_states_fifteen_minutes_for_openai_flex(self):
+        loaded = load_resilience(CONFIG_PATH, env={})
+        assert loaded.timeout_ms_by_upstream == {"openai/flex": 900000}
+        assert loaded.request_timeout_seconds(("openai/flex",)) == 900.0
+
+    def test_an_unpinned_request_reads_the_base_timeout(self):
+        assert config().request_timeout_seconds() == 300.0
+        assert config().request_timeout_seconds(()) == 300.0
+
+    def test_a_pin_with_no_row_reads_the_base_timeout(self):
+        assert config().request_timeout_seconds(("openai",)) == 300.0
+
+    def test_the_slowest_pinned_upstream_bounds_the_request(self):
+        loaded = config(timeout_ms_by_upstream={"openai/flex": 900000, "azure": 400000})
+        assert loaded.request_timeout_seconds(("azure", "openai/flex")) == 900.0
+        assert loaded.request_timeout_seconds(("azure",)) == 400.0
+
+    def test_a_row_may_sit_below_the_base_and_wins_anyway(self):
+        """Configurable means the row is the answer, not a floor over the base."""
+        loaded = config(timeout_ms_by_upstream={"openai/flex": 120000})
+        assert loaded.request_timeout_seconds(("openai/flex",)) == 120.0
+
+    def test_the_base_override_never_touches_a_row(self, tmp_path):
+        loaded = load_resilience(write(tmp_path, VALID), env={TIMEOUT_MS_VAR: "60000"})
+        assert loaded.request_timeout_seconds() == 60.0
+        assert loaded.request_timeout_seconds(("openai/flex",)) == 900.0
+
+    def test_the_table_is_required_rather_than_defaulted(self, tmp_path):
+        without = VALID.replace(
+            '[timeout_ms_by_upstream]\n"openai/flex" = 900000\n', ""
+        )
+        with pytest.raises(ResilienceConfigError, match="timeout_ms_by_upstream"):
+            load_resilience(write(tmp_path, without), env={})
+
+    def test_an_empty_table_is_a_stated_choice(self, tmp_path):
+        without = VALID.replace('"openai/flex" = 900000\n', "")
+        loaded = load_resilience(write(tmp_path, without), env={})
+        assert loaded.request_timeout_seconds(("openai/flex",)) == 300.0
+
+    @pytest.mark.parametrize("key", ["OpenAI/Flex", "openai/", "a b"])
+    def test_a_key_that_is_not_a_slug_is_refused(self, key):
+        with pytest.raises(ValueError, match="not provider slugs"):
+            config(timeout_ms_by_upstream={key: 1000})
+
+    def test_a_non_positive_row_is_refused(self):
+        with pytest.raises(ValueError, match="must be positive"):
+            config(timeout_ms_by_upstream={"openai/flex": 0})
 
 
 def test_a_sub_second_timeout_survives_the_conversion():
@@ -350,7 +406,8 @@ def test_a_missing_file_fails_closed(tmp_path):
 
 
 def test_an_unknown_key_fails_closed(tmp_path):
-    path = write(tmp_path, VALID + "budget = 9\n")
+    # Before the table header, because a key after one belongs to the table.
+    path = write(tmp_path, VALID.replace("[timeout_ms", "budget = 9\n[timeout_ms", 1))
     with pytest.raises(ResilienceConfigError):
         load_resilience(path, env={})
 

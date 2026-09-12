@@ -449,7 +449,11 @@ def build_tier_adapters(
             # adapter rather than on each node's ``generate_content_config``,
             # because the value is one number for the whole deployment and this
             # is the one seam where its unit is LiteLLM's own.
-            **{_TIMEOUT_KWARG: resilience.request_timeout_seconds()},
+            **{
+                _TIMEOUT_KWARG: resilience.request_timeout_seconds(
+                    tiers.upstreams_for(selection.vendor)
+                )
+            },
             **tier_sampling.constructor_kwargs(),
             **vendor.credential_kwargs(env, tiers.credential_mode(selection.vendor)),
             # The upstream pin, where the deployment declared one. It rides the

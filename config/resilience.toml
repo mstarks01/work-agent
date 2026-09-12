@@ -59,7 +59,7 @@
 # down still works and is still the blunt instrument; the budget is what makes
 # reaching for it rare.
 
-version = 6
+version = 7
 attempts = 3
 timeout_ms = 300000
 
@@ -233,3 +233,21 @@ max_tokens_per_window = 20000000
 # answers with the same generic 429 it uses for a rate refusal, and the figure
 # goes to the operator's log.
 global_max_tokens_per_window = 100000000
+
+# A PER-REQUEST TIMEOUT FOR A PINNED UPSTREAM, keyed by the gateway's slug for
+# it. LAST IN THE FILE ON PURPOSE: a TOML table header claims every key after
+# it, so a bare key written below this line would land inside the table.
+#
+# Read only where a tier's [upstreams] pin in model_tiers.toml names a key
+# here; every other request reads `timeout_ms`. Where a pin names several
+# upstreams with rows, the largest row is the bound, because the slowest place
+# a request may land is the one the timeout has to fit.
+#
+# OpenAI's flex tier serves the same weights at half the price, slower, and its
+# guide asks for a timeout above the ten-minute default and uses fifteen
+# minutes in its own example (read 2026-09-12). Edit the row to choose another
+# bound, or add a row for another slow upstream. ANALYSIS_TIMEOUT_MS sets
+# `timeout_ms` alone and never a row here. Version 7 requires the table; a file
+# that wants no per-upstream bound writes it empty.
+[timeout_ms_by_upstream]
+"openai/flex" = 900000

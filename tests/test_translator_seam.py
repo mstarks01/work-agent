@@ -258,7 +258,7 @@ def test_every_adapter_kwarg_comes_from_a_closed_set():
     assert "**tier_sampling.constructor_kwargs()" in body
     assert "**vendor.credential_kwargs(env, tiers.credential_mode(" in body
     assert "**vendor.upstream_kwargs(tiers.upstreams_for(selection.vendor))" in body
-    assert "**{_TIMEOUT_KWARG: resilience.request_timeout_seconds()}" in body
+    assert "_TIMEOUT_KWARG: resilience.request_timeout_seconds(" in body
     assert "llm_client=(" in body
     assert "capturing_client(vendor, tiers.charge_mode(" in body
     assert "if vendor.reports_charge or not vendor.routes_to_one_provider" in body
