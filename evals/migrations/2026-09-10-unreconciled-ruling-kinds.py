@@ -39,11 +39,20 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+# A migration runs as a script, so ``sys.path[0]`` is this directory and the
+# repository root is not on the path. The editable install puts
+# ``analysis_service`` there; ``evals`` is a namespace package in the tree and
+# has to be pointed at.
+REPO_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO_ROOT))
+
 from analysis_service.claims import (
     CLAIM_ID_MAX_CHARS,
     UNNAMED_CLAIM,
     UNRECONCILED_MESSAGE_MAX_CHARS,
 )
+from evals.harness.archive import archive_bytes
+from evals.harness.bundle import kind_of_path
 
 # Each pattern against the kind it names and the group holding the claim ID.
 # Ordered most specific first: a ``duplicate`` rejection and a missing
@@ -152,15 +161,22 @@ def migrate(root: Path, write: bool) -> Counts:
         for message in counts.unmatched:
             print(f"  no pattern: {message[:120]}")
         if write and counts.typed:
-            # ``ensure_ascii`` off, for the reason every writer in this tree
-            # leaves it off: ``bundle`` writes a report through
-            # ``model_dump_json``, which emits UTF-8. The default escapes every
-            # non-ASCII character in the file and makes an archived report no
-            # longer the bytes its producer writes.
-            path.write_text(
-                json.dumps(raw, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            # The producer's own spelling, asked for by kind rather than
+            # assumed. This walk reaches four of the five kinds a Baseline
+            # holds and they do not share an encoding: a report is UTF-8, the
+            # drafts written three lines after it in ``bundle`` are escaped
+            # ASCII, and a manifest sorts its keys. One spelling for all of
+            # them re-encodes three kinds out of four and re-stamps the
+            # digests the Baseline seals over an edit nobody meant.
+            kind = kind_of_path(path)
+            if kind is None:
+                # Refuse rather than guess. A corpus model, a sitting and a
+                # sweep artifact are all ``*.json`` and their producers write
+                # three different encodings; picking one re-encodes two of
+                # them under a seal that recomputes itself over the edit.
+                print(f"  {path}: no declared producer for this file, left alone")
+                continue
+            path.write_text(archive_bytes(kind, raw), encoding="utf-8")
         totals.add(counts)
     return totals
 

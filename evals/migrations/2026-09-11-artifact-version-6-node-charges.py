@@ -53,6 +53,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
 
 from evals.harness import baseline
+from evals.harness.archive import archive_bytes
 from evals.harness.artifact import ARTIFACT_VERSION, load_artifact
 
 #: The version this migration reads. A file on any other version is not this
@@ -152,10 +153,7 @@ def _reseal(directory: Path, write: bool, planned: dict[Path, bytes]) -> list[st
         )
     if write:
         manifest["sweeps"] = entries
-        manifest_path.write_text(
-            json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
-        )
+        manifest_path.write_text(archive_bytes("manifest", manifest), encoding="utf-8")
     return notes
 
 

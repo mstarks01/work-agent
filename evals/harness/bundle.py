@@ -26,6 +26,7 @@ from analysis_service.frameworks import PACKAGES
 from analysis_service.frameworks.stride.record import Threat
 from analysis_service.report import Report
 from evals.harness import modes
+from evals.harness.archive import archive_bytes, kind_of
 from evals.harness.reference import GoldenCase
 
 
@@ -90,6 +91,27 @@ def reports_dir(out: str | Path) -> Path:
     return Path(out).with_suffix(REPORTS_SUFFIX)
 
 
+def kind_of_path(path: Path) -> str | None:
+    """Which archive kind the file at ``path`` is, or ``None`` if nothing says.
+
+    :func:`~evals.harness.archive.kind_of` answers from the filename, which
+    covers four of the five kinds. A sweep artifact is the fifth and is named
+    ``<stem>.json``, so only the layout can identify one: it is the file whose
+    own reports directory sits beside it, which is :func:`reports_dir`'s rule
+    read backwards and the only fact on disk that says so.
+
+    **For a migration that walks a tree rather than a known file.** ``None``
+    means refuse: a corpus model, a sitting and an artifact are all spelled
+    ``*.json``, and the encodings that separate them are not guessable. A
+    migration that picked one anyway is how 78 archived reports were re-encoded
+    under a seal that recomputed itself over the edit.
+    """
+    named = kind_of(path.name)
+    if named is not None:
+        return named
+    return "artifact" if path.suffix == ".json" and reports_dir(path).is_dir() else None
+
+
 def write_reports(out: str, mode: str, runs: Mapping[str, modes.AnalysisRun]) -> None:
     """Persist every finished case's whole report beside the artifact.
 
@@ -124,21 +146,20 @@ def write_reports(out: str, mode: str, runs: Mapping[str, modes.AnalysisRun]) ->
         # that re-scores some of a sweep is worse than one that refuses.
         drafts = directory / f"{case_id}.drafts.json"
         drafts.write_text(
-            json.dumps(
+            archive_bytes(
+                "drafts",
                 {
                     framework: [claim.model_dump(mode="json") for claim in claims]
                     for framework, claims in run.drafts.items()
                 },
-                indent=2,
-            )
-            + "\n",
+            ),
             "utf-8",
         )
         # The lanes' own emissions, before the fan-in routed anything away.
         # ``score`` does not read them: they exist so a reader can ask what a
         # lane answered, which the drafts no longer say.
         proposals = directory / f"{case_id}.proposals.json"
-        proposals.write_text(json.dumps(dict(run.proposals), indent=2) + "\n", "utf-8")
+        proposals.write_text(archive_bytes("proposals", dict(run.proposals)), "utf-8")
         total_bytes += path.stat().st_size + drafts.stat().st_size
     print(f"{len(runs)} report(s) written to {directory} ({total_bytes / 1024:.0f} KB)")
 

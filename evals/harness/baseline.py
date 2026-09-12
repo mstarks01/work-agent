@@ -52,6 +52,7 @@ from analysis_service.vendors import vendor_for_route
 # vocabulary is not a fact about which tier does the analysis.
 _NAMING_TIER: TierName = "strong"
 from analysis_service.report import TokenUsage
+from evals.harness.archive import archive_bytes
 from evals.harness.artifact import (
     REPO_ROOT,
     EvalArtifact,
@@ -593,10 +594,7 @@ def assemble(root: Path, author: str, artifact_paths: list[Path]) -> Path:
         }
 
     manifest["sweeps"] = list(entries.values())
-    manifest_path.write_text(
-        json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
+    manifest_path.write_text(archive_bytes("manifest", manifest), encoding="utf-8")
     return directory
 
 

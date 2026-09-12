@@ -78,6 +78,7 @@ from evals.harness import (
     verb_pricing,
     writing,
 )
+from evals.harness.archive import archive_bytes
 from evals.harness.artifact import (
     REPO_ROOT,
     EvalArtifact,
@@ -714,7 +715,7 @@ def command_run(args: argparse.Namespace) -> int:
         series=_series_record(by_series) if by_series else None,
     )
     if args.out:
-        Path(args.out).write_text(json.dumps(artifact, indent=2) + "\n", "utf-8")
+        Path(args.out).write_text(archive_bytes("artifact", artifact), "utf-8")
         print(f"artifact written to {args.out}")
         write_reports(args.out, args.mode, mode_run.runs)
 
@@ -932,7 +933,7 @@ def command_score(args: argparse.Namespace) -> int:
     raw |= _scored_keys(sweep)
     raw["series"] = _series_record(by_series)
 
-    out.write_text(json.dumps(raw, indent=2) + "\n", "utf-8")
+    out.write_text(archive_bytes("artifact", raw), "utf-8")
     print(f"\n{len(votes)} vote(s) read from {args.ledger}")
     print(f"{out} rewritten" if out == path else f"scored artifact written to {out}")
     return 0
