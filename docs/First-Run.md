@@ -33,7 +33,7 @@ are the reference pairs declared in `analysis_service.conformance.REFERENCE_MODE
 | Anthropic | `claude-sonnet-4-6` | `claude-opus-5` | `ANALYSIS_ANTHROPIC_API_KEY` |
 | Bedrock | `global.anthropic.claude-sonnet-4-6` | `global.anthropic.claude-opus-5` | `ANALYSIS_BEDROCK_API_KEY`, `ANALYSIS_BEDROCK_REGION` |
 | Gemini | `gemini-2.5-flash` | `gemini-2.5-pro` | `ANALYSIS_GEMINI_API_KEY` |
-| OpenAI | `gpt-4o-2024-08-06` | `gpt-5.6` | `ANALYSIS_OPENAI_API_KEY` |
+| OpenAI | `gpt-4o-2024-08-06` | `gpt-5.6-sol` | `ANALYSIS_OPENAI_API_KEY` |
 | OpenRouter | `anthropic/claude-sonnet-4.6` | `anthropic/claude-opus-4.7` | `ANALYSIS_OPENROUTER_API_KEY` |
 | Vertex AI | `gemini-2.5-flash` | `gemini-2.5-pro` | `ANALYSIS_VERTEX_PROJECT`, `ANALYSIS_VERTEX_LOCATION` |
 

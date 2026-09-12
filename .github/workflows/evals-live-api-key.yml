@@ -143,7 +143,7 @@ jobs:
           - vendor: openai
             secret_name: ANALYSIS_OPENAI_API_KEY
             base_model: gpt-4o-2024-08-06
-            strong_model: gpt-5.6
+            strong_model: gpt-5.6-sol
 
     # There is no job-level `if:` here comparing against `matrix.vendor`,
     # deliberately -- the `matrix` context is not available to a job's own
