@@ -103,8 +103,8 @@ an invisible missing threat" — now holds for zones as well as for components.
 **The archive needed a migration, and a merged Baseline's digests needed a
 refresh.** 24 of the 78 archived reports embed a model with a `trust_zone`
 assumption, and their stored crossings no longer matched the derived ones, so
-`run.py score` was dead on them. `evals/migrations/2026-09-11-crossing-assumed-endpoints.py`
-recomputes `boundary_crossings` from the model in the same file — nothing is
+`run.py score` was dead on them. A one-time migration script
+recomputed `boundary_crossings` from the model in the same file — nothing is
 inferred, because the value is derived — and refreshes the file digests in the
 one merged Baseline's manifest through the same reader `verify` uses. The
 migration rewrites all 78 so the archive holds one shape.
