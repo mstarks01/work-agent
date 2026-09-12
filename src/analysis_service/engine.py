@@ -160,7 +160,7 @@ class Engine:
         return cls(
             deployment.runner([selection.name for selection in selections]),
             limits=deployment.resilience.source_limits(),
-            deadline_seconds=deployment.resilience.deadline_seconds(),
+            deadline_seconds=deployment.job_deadline_seconds(),
             frameworks=selections,
         )
 

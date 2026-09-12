@@ -219,6 +219,16 @@ class Deployment:
         default_factory=dict, init=False, repr=False, compare=False
     )
 
+    def job_deadline_seconds(self) -> float:
+        """The deadline one job of this deployment runs under.
+
+        The one reader for the engine and the HTTP app, because the answer
+        joins two files: the deadline rows in ``resilience.toml`` and the
+        upstreams the tiers file pins. Two callers composing that join would be
+        two readers of one rule.
+        """
+        return self.resilience.deadline_seconds(self.tiers.pinned_upstreams())
+
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> Self:
         """Read and validate this deployment's configuration, or fail closed.
