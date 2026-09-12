@@ -301,8 +301,10 @@ it as a number: must-finds of 129.
 
 **Read the archived misses.** Every scored sweep carries two blocks that charge
 each miss to what lost it. `losses` is STRIDE's: the verb (the lane cited the
-place and wrote another action), `merged`, the critic, the place (a rule led
-there and nothing was drafted), or `unled`. `attribution` is ASVS's, by stage.
+place and wrote another action), `merged`, `misfiled` (the finding sits in
+another lane), the critic, the place (a rule led there and nothing was
+drafted), or `unled`. A `place` or `unled` row also says whether a surviving
+draft sits one element over. `attribution` is ASVS's, by stage.
 
 Both split a critic charge in two. A row carrying a non-empty `re_ask` names a
 claim the *first* critic pass got wrong, so the ruling that lost it came out of
