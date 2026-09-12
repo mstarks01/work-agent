@@ -395,3 +395,90 @@ class TestAMisfiledMiss:
         )
         charged = charge(case, flows, [draft], [promote(draft)])
         assert by_index(charged)[index].cause not in ("place", "unled")
+
+
+class TestHowTheTwoPlacesRelate:
+    """A verb row says whether the two claims cite one place or nest.
+
+    The element half of the identity rule accepts containment either way, so a
+    draft citing one process sits at the place of any reference resolving to a
+    set that holds it — whatever the two claims say. Three of the third
+    Baseline's five ``abuse-grant`` against ``escalate`` rows were exactly that,
+    and each named a draft answering a different question (#871). The row now
+    says which kind it is, so a ceiling can be priced on the equal rows.
+    """
+
+    def test_one_place_spelled_the_same_way_is_equal(self, case, flows):
+        reference = case.stride_claims()[0]
+        other = "guess-credential" if reference.verb != "guess-credential" else "replay"
+        draft = at(reference, 1, other)
+        charged = charge(case, flows, [draft], [promote(draft)])
+        loss = by_index(charged)[0]
+
+        assert loss.cause == "verb"
+        assert loss.place_relation == "equal"
+
+    def test_a_draft_inside_the_reference_says_the_reference_contains_it(
+        self, case, flows
+    ):
+        references = case.stride_claims()
+        index, reference = next(
+            (i, claim)
+            for i, claim in enumerate(references)
+            if len(endpoint_form(claim.affected_element_ids, flows)) >= 2
+        )
+        inside = sorted(endpoint_form(reference.affected_element_ids, flows))[:1]
+        other = "guess-credential" if reference.verb != "guess-credential" else "replay"
+        draft = draft_threat(
+            1, reference.category, "narrower", element_ids=inside, verb=other
+        )
+        charged = charge(case, flows, [draft], [promote(draft)])
+        loss = by_index(charged)[index]
+
+        assert loss.cause == "verb"
+        assert loss.place_relation == "reference-contains"
+
+    def test_a_draft_around_the_reference_says_the_draft_contains_it(self, case, flows):
+        reference = case.stride_claims()[0]
+        place = sorted(endpoint_form(reference.affected_element_ids, flows))
+        wider = next(
+            element.id
+            for element in case.model.elements()
+            if element.id not in place
+            and not element.id.startswith(("boundary:", "flow:"))
+        )
+        other = "guess-credential" if reference.verb != "guess-credential" else "replay"
+        draft = draft_threat(
+            1, reference.category, "wider", element_ids=[*place, wider], verb=other
+        )
+        charged = charge(case, flows, [draft], [promote(draft)])
+        loss = by_index(charged)[0]
+
+        assert loss.cause == "verb"
+        assert loss.place_relation == "draft-contains"
+
+    def test_a_row_naming_no_draft_carries_no_relation(self, case, flows):
+        charged = charge(case, flows, [], [])
+        assert all(loss.place_relation is None for loss in charged.losses)
+
+    def test_the_fold_counts_the_verb_rows_by_relation(self, case, flows):
+        reference = case.stride_claims()[0]
+        other = "guess-credential" if reference.verb != "guess-credential" else "replay"
+        draft = at(reference, 1, other)
+        charged = charge(case, flows, [draft], [promote(draft)])
+        totals = pooled([charged])
+
+        assert totals["verb_by_relation"]["equal"] == 1
+        assert sum(totals["verb_by_relation"].values()) == totals["by_cause"]["verb"]
+        assert (
+            totals["verb_must_find_by_relation"]["equal"]
+            <= totals["must_find_by_cause"]["verb"]
+        )
+
+    def test_the_render_says_how_the_verb_rows_split(self, case, flows, capsys):
+        reference = case.stride_claims()[0]
+        other = "guess-credential" if reference.verb != "guess-credential" else "replay"
+        draft = at(reference, 1, other)
+        losses.render([charge(case, flows, [draft], [promote(draft)])])
+
+        assert "1 equal" in capsys.readouterr().out

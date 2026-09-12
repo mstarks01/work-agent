@@ -16,7 +16,11 @@ Five causes, decided in this order for one missed reference:
   one endpoint-resolved element set contains the other, the identity rule's
   own element half — and names another action. The lane found the finding and
   wrote a different verb. The pair of verbs rides on the row, because which
-  side is wrong is a decision this module does not make.
+  side is wrong is a decision this module does not make. So does
+  :data:`Relation`, which says whether the two places are the same one or
+  whether one nests inside the other: containment is how a draft answering
+  another question lands on this cause, and a ceiling is priced on the equal
+  rows.
 * ``merged``: a surviving claim cites the place with the reference's own
   action, read through the equivalence table the identity rule reads, and the
   scorer assigned it to a sibling reference. Two references at
@@ -73,6 +77,25 @@ from evals.harness.verbs import same_action
 Cause = Literal["verb", "merged", "misfiled", "critic", "place", "unled"]
 CAUSES: tuple[Cause, ...] = ("verb", "merged", "misfiled", "critic", "place", "unled")
 
+#: How a named draft's endpoint-resolved place stands to the reference's. The
+#: element half of the identity rule accepts containment either way, so a draft
+#: citing one process sits "at the place" of any reference that resolves to a
+#: set holding it — whatever the two claims say. On the third Baseline three of
+#: the five ``abuse-grant`` against ``escalate`` rows were that, and each named
+#: a draft answering a different question (#871).
+#:
+#: Nothing here judges whether two claims are one finding; a rule cannot, and
+#: the model judge is retired. This says only how the two places relate, which
+#: is already computed and was thrown away, so a reader can sort a verb reading
+#: list by strength and a ceiling can be stated over the ``equal`` rows alone.
+Relation = Literal["equal", "reference-contains", "draft-contains", "overlap"]
+RELATIONS: tuple[Relation, ...] = (
+    "equal",
+    "reference-contains",
+    "draft-contains",
+    "overlap",
+)
+
 
 @dataclass(frozen=True)
 class Loss:
@@ -96,6 +119,14 @@ class Loss:
     #: arrived after a repair is priced against the first pass and ``recritic``.
     #: A ``place`` or ``unled`` row names no draft, so it is always empty there.
     re_ask: tuple[str, ...] = ()
+    #: How ``draft_id``'s place stands to the reference's, once both are
+    #: endpoint-resolved: ``equal`` is the strongest reading, and a containment
+    #: says the two claims are written at different grain — which is what lets
+    #: a draft about something else share a place. ``None`` where the row names
+    #: no draft, and where the two sets share nothing, which only a
+    #: ``misfiled`` row can be: its draft comes from the scorer's lane error
+    #: rather than from the containment test.
+    place_relation: Relation | None = None
     #: For a ``place`` or ``unled`` row, the surviving claim in the lane whose
     #: cited place overlaps the reference's without containing it or being
     #: contained by it — the lane wrote the finding one element over. Absent
@@ -113,6 +144,7 @@ class Loss:
             "reference_verb": self.reference_verb,
             "draft_id": self.draft_id,
             "draft_verb": self.draft_verb,
+            "place_relation": self.place_relation,
             "re_ask": list(self.re_ask),
             "displaced_draft_id": self.displaced_draft_id,
         }
@@ -161,6 +193,26 @@ def _at_place(
         for draft in drafts
         if endpoint_subset(reference_ids, draft.affected_element_ids, flows)
     ]
+
+
+def _relation(
+    reference_ids: Sequence[str], draft_ids: Sequence[str], flows: FlowMap
+) -> Relation | None:
+    """How two cited places stand to each other, once endpoint-resolved.
+
+    One reader for every row that names a draft, so the four causes cannot
+    disagree about what "the same place" was. ``None`` where the two share no
+    element: not a relation, and the row says so rather than picking one.
+    """
+    place = endpoint_form(reference_ids, flows)
+    drafted = endpoint_form(draft_ids, flows)
+    if place == drafted and place:
+        return "equal"
+    if place > drafted and drafted:
+        return "reference-contains"
+    if drafted > place and place:
+        return "draft-contains"
+    return "overlap" if place & drafted else None
 
 
 def _nearby(
@@ -236,6 +288,11 @@ def attribute_case(
                     verb,
                     draft_id=claim.id,
                     draft_verb=claim.verb,
+                    place_relation=_relation(
+                        reference.affected_element_ids,
+                        claim.affected_element_ids,
+                        flows,
+                    ),
                     re_ask=block.re_ask_kinds(claim.id),
                 )
             )
@@ -251,6 +308,11 @@ def attribute_case(
                     verb,
                     draft_id=error.threat_id,
                     draft_verb=by_id[error.threat_id].verb,
+                    place_relation=_relation(
+                        reference.affected_element_ids,
+                        by_id[error.threat_id].affected_element_ids,
+                        flows,
+                    ),
                     re_ask=block.re_ask_kinds(error.threat_id),
                 )
             )
@@ -274,6 +336,11 @@ def attribute_case(
                     verb,
                     draft_id=draft.id,
                     draft_verb=draft.verb,
+                    place_relation=_relation(
+                        reference.affected_element_ids,
+                        draft.affected_element_ids,
+                        flows,
+                    ),
                     re_ask=block.re_ask_kinds(draft.id),
                 )
             )
@@ -302,6 +369,8 @@ def pooled(rows: Sequence[CaseLosses]) -> dict[str, Any]:
     kinds: Counter[str] = Counter()
     pairs: Counter[tuple[str, str]] = Counter()
     pairs_must_find: Counter[tuple[str, str]] = Counter()
+    relations: Counter[str] = Counter()
+    relations_must_find: Counter[str] = Counter()
     for row in rows:
         for loss in row.losses:
             totals[loss.cause] += 1
@@ -315,6 +384,9 @@ def pooled(rows: Sequence[CaseLosses]) -> dict[str, Any]:
                 pair = (loss.reference_verb, loss.draft_verb)
                 pairs[pair] += 1
                 pairs_must_find[pair] += loss.must_find
+                if loss.place_relation is not None:
+                    relations[loss.place_relation] += 1
+                    relations_must_find[loss.place_relation] += loss.must_find
     return {
         "cases": len(rows),
         "losses": sum(totals.values()),
@@ -333,6 +405,15 @@ def pooled(rows: Sequence[CaseLosses]) -> dict[str, Any]:
         "displaced_by_cause": {cause: displaced[cause] for cause in CAUSES},
         "displaced": sum(displaced.values()),
         "by_re_ask_kind": dict(sorted(kinds.items())),
+        # The verb rows by how the two places relate. An ``equal`` row is the
+        # strongest verb claim there is: one place, spelled the same way, two
+        # actions. A containment says the two claims are written at different
+        # grain, and that is where a draft answering another question lands.
+        # Price an exemplar edit on the ``equal`` rows and read the rest.
+        "verb_by_relation": {relation: relations[relation] for relation in RELATIONS},
+        "verb_must_find_by_relation": {
+            relation: relations_must_find[relation] for relation in RELATIONS
+        },
         # Reference verb first, then what the lane wrote, most frequent first.
         "verb_pairs": [
             {
@@ -391,6 +472,17 @@ def render(rows: Sequence[CaseLosses]) -> None:
                 for cause in ("place", "unled")
             )
             + f") and {silent - totals['displaced']} have none in the lane nearby"
+        )
+    if totals["by_cause"]["verb"]:
+        print(
+            "  of the verb rows, "
+            + ", ".join(
+                f"{totals['verb_by_relation'][relation]} {relation}"
+                f" (must-find {totals['verb_must_find_by_relation'][relation]})"
+                for relation in RELATIONS
+            )
+            + " — an equal place is the strongest verb claim, and a"
+            " containment is where a draft about something else lands"
         )
     for pair in totals["verb_pairs"][:8]:
         print(
