@@ -192,6 +192,17 @@ export ANALYSIS_VERTEX_PROJECT=your-gcp-project
 export ANALYSIS_VERTEX_LOCATION=us-central1
 ```
 
+`us-central1` serves both models in the table above. Check Google's [model
+endpoint locations](https://docs.cloud.google.com/vertex-ai/generative-ai/docs/learn/locations)
+table before you name a different one: `gemini-2.5-pro` serves fewer locations
+than `gemini-2.5-flash`, so a location can bind `base` and then fail `strong` on
+its first request. Read on 2026-09-12, `asia-northeast3`, `asia-south1`,
+`asia-southeast1`, `australia-southeast1`, `europe-west2`, `europe-west3` and
+`southamerica-east1` serve the base model alone, and the `us` and `eu`
+multi-region endpoints serve neither model. Set `global` to serve both from
+anywhere; Google states that the global endpoint carries its own quota and
+supports no data residency requirement.
+
 The Vertex identity needs `roles/aiplatform.user`. Work Agent passes no
 credential to Vertex: it passes the project and the location, and Google's own
 Application Default Credentials chain resolves the identity. The `gcloud`
