@@ -1,0 +1,883 @@
+{
+  "stride": [
+    {
+      "id": "S-01",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Unverified matchmaking identity could let an attacker pose as another player",
+      "description": "An attacker operating a client from the uncontrolled player-local environment could impersonate another player to `process:lobby` over `flow:game-client-to-lobby:matchmaking` if that flow's `authentication: unknown` resolves to no verified player identity. The flow crosses from the player-local trust zone into production, so the lobby could accept a connection or claimed player identity without establishing who originated it. Second-order, `process:lobby` uses player records through `flow:lobby-to-player-database:read-players` to form matches and hands matches to `process:game-servers`; spoofed player identity can therefore affect matchmaking and match assignment beyond the initial connection. This is conditional on recording and verifying authentication for the flow, not a claim that authentication is absent.",
+      "affected_element_ids": [
+        "process:game-client",
+        "process:lobby",
+        "flow:game-client-to-lobby:matchmaking"
+      ],
+      "verb": "impersonate",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "Players run our game client on their own machines. We do not control those\nmachines.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "quote",
+          "text": "Both of those have to be reachable from wherever a player is, so they are exposed.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:game-client-to-lobby:matchmaking",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:game-client-to-lobby:matchmaking",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "spoofing",
+      "severity": {
+        "likelihood": "high",
+        "impact": "medium",
+        "level": "high",
+        "justification": "Likelihood is high, conditional on the unknown authentication value: `flow:game-client-to-lobby:matchmaking` is a derived crossing from player-controlled hardware, and the source states the lobby is exposed wherever a player is. Impact is medium because a successful spoof reaches `process:lobby`, tagged `availability-critical`, and can influence match formation and downstream handoff to `process:game-servers`."
+      },
+      "mitigations": [
+        {
+          "summary": "Authenticate each matchmaking connection as a player",
+          "detail": "Record the authentication mechanism for `flow:game-client-to-lobby:matchmaking` and require a short-lived, audience-bound player token or equivalent verified session before `process:lobby` accepts matchmaking requests."
+        },
+        {
+          "summary": "Bind match assignments to the verified identity",
+          "detail": "Have `process:lobby` derive player identity from the validated credential rather than from client-supplied connection or request fields, and reject assignments that do not match that identity."
+        }
+      ]
+    },
+    {
+      "id": "S-02",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Unverified gameplay connections could let an attacker act as another player",
+      "description": "An attacker from the player-local environment could impersonate a player to `process:game-servers` over `flow:game-client-to-game-servers:gameplay-traffic` if its `authentication: unknown` resolves to no verified player identity. This is a boundary-crossing direct client connection into an internet-facing game service; a fake client could submit gameplay actions and state updates that the server attributes to another player. Second-order, `process:game-servers` records match statistics through `flow:game-servers-to-stats-database:read-write-stats` and writes player progression and match results through `flow:game-servers-to-player-database:update-players`, so the impersonation can affect business-critical match outcomes and player records. This draft is conditional on the unknown authentication attribute rather than asserting it is absent.",
+      "affected_element_ids": [
+        "process:game-client",
+        "process:game-servers",
+        "flow:game-client-to-game-servers:gameplay-traffic"
+      ],
+      "verb": "impersonate",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "Players run our game client on their own machines. We do not control those\nmachines.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "quote",
+          "text": "The game servers read and write the stats database during\nand after a match, and they also write back to the player database.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:game-client-to-game-servers:gameplay-traffic",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:game-client-to-game-servers:gameplay-traffic",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "spoofing",
+      "severity": {
+        "likelihood": "high",
+        "impact": "high",
+        "level": "critical",
+        "justification": "Likelihood is high, conditional on the unknown authentication value: `flow:game-client-to-game-servers:gameplay-traffic` crosses from uncontrolled player-local hardware into production and the source says the game servers are exposed wherever players are. Impact is high because the impersonated gameplay identity reaches `process:game-servers`, tagged `availability-critical` and `business-critical-data`, and results in writes to both player and statistics records."
+      },
+      "mitigations": [
+        {
+          "summary": "Require verified, short-lived identity on gameplay traffic",
+          "detail": "Document and enforce authentication on `flow:game-client-to-game-servers:gameplay-traffic` using short-lived audience-bound player/session tokens, with server-side validation before accepting gameplay messages."
+        },
+        {
+          "summary": "Bind each gameplay session to its authenticated player and match",
+          "detail": "At `process:game-servers`, derive the acting player and authorized match from the verified session rather than any client-provided identity, and reject messages outside that binding."
+        }
+      ]
+    },
+    {
+      "id": "S-03",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Unverified support login could let a corporate-network attacker impersonate support staff",
+      "description": "An attacker who obtains a foothold in `boundary:corp-network` could impersonate `entity:customer-support` to `process:moderation-website` over `flow:customer-support-to-moderation-website:moderate-accounts` if that crossing's `authentication: unknown` resolves to no verified staff identity. The moderation website would then accept account-review and moderation actions as if they originated from support staff. Second-order, `process:moderation-website` directly reads and writes player records through `flow:moderation-website-to-player-database:read-write-players`, allowing the impostor to act on player accounts and reach player PII. This is conditional on the unrecorded authentication control; it does not assert that the website currently permits unauthenticated access.",
+      "affected_element_ids": [
+        "entity:customer-support",
+        "process:moderation-website",
+        "flow:customer-support-to-moderation-website:moderate-accounts"
+      ],
+      "verb": "impersonate",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "our customer support staff work from the corporate network and use\na moderation website to look at and act on player accounts. That website reads\nand writes the player database directly.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:customer-support-to-moderation-website:moderate-accounts",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:customer-support-to-moderation-website:moderate-accounts",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "spoofing",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional on the unknown authentication value: `flow:customer-support-to-moderation-website:moderate-accounts` crosses from the corporate network into production, but exploitation requires a prior corporate-network foothold. Impact is medium because `process:moderation-website` is tagged `pii` and directly reads and writes player accounts in `store:player-database`."
+      },
+      "mitigations": [
+        {
+          "summary": "Enforce phishing-resistant staff authentication",
+          "detail": "Record the authentication on `flow:customer-support-to-moderation-website:moderate-accounts` and require centrally validated staff identity with WebAuthn/passkeys and short-lived sessions before `process:moderation-website` accepts moderation actions."
+        },
+        {
+          "summary": "Authorize and audit moderation actions per staff identity",
+          "detail": "Bind each account action at `process:moderation-website` to the verified support identity and enforce role and account scope before using `flow:moderation-website-to-player-database:read-write-players`."
+        }
+      ]
+    },
+    {
+      "id": "T-01",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "On-path alteration of gameplay traffic can corrupt recorded match outcomes",
+      "description": "If `encryption_in_transit: unknown` on `flow:game-client-to-game-servers:gameplay-traffic` resolves to missing integrity protection, an attacker positioned between a player-controlled machine and `process:game-servers` can alter gameplay actions or state updates in transit before the internet-facing server processes them. The altered messages can change the match outcome the server records. Second-order, `process:game-servers` writes match statistics to `store:stats-database` and player progression and match results to `store:player-database`, making the falsified outcome persistent business data.",
+      "affected_element_ids": [
+        "flow:game-client-to-game-servers:gameplay-traffic",
+        "process:game-servers"
+      ],
+      "verb": "alter-in-transit",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "The game servers read and write the stats database during and after a match, and they also write back to the player database.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:game-client-to-game-servers:gameplay-traffic",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:game-client-to-game-servers:gameplay-traffic",
+          "attribute": "encryption_in_transit",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "tampering",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional on `unknown:flow:game-client-to-game-servers:gameplay-traffic:encryption_in_transit`: the flow crosses from the player-controlled boundary into production and `process:game-servers` is internet-facing, but exploitation still requires an on-path position. Impact is high because `process:game-servers` is tagged `business-critical-data` and persists altered results into `store:stats-database` and `store:player-database`."
+      },
+      "mitigations": [
+        {
+          "summary": "Add authenticated transport protection to gameplay traffic",
+          "detail": "Require TLS or another mutually authenticated, integrity-protecting transport on `flow:game-client-to-game-servers:gameplay-traffic`, rather than relying on the TCP port alone."
+        },
+        {
+          "summary": "Authenticate critical gameplay messages at the server",
+          "detail": "Have `process:game-servers` verify session-bound message authentication and enforce server-side validity checks before recording match outcomes."
+        }
+      ]
+    },
+    {
+      "id": "T-02",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "On-path modification of support moderation actions can alter player accounts",
+      "description": "If `encryption_in_transit: unknown` on the cross-zone `flow:customer-support-to-moderation-website:moderate-accounts` means the channel lacks authenticated integrity protection, an attacker on the corporate-to-production path can modify a legitimate support request before `process:moderation-website` acts on it. The attacker can change the moderation action or targeted player account. Second-order, the moderation website directly writes the resulting altered account and moderation state to `store:player-database`, where it can affect later use of player records.",
+      "affected_element_ids": [
+        "flow:customer-support-to-moderation-website:moderate-accounts",
+        "process:moderation-website"
+      ],
+      "verb": "alter-in-transit",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "That website reads and writes the player database directly.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:customer-support-to-moderation-website:moderate-accounts",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:customer-support-to-moderation-website:moderate-accounts",
+          "attribute": "encryption_in_transit",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "tampering",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional on `unknown:flow:customer-support-to-moderation-website:moderate-accounts:encryption_in_transit`: an attacker needs a position on the corporate-to-production crossing, but the model verifies no transport protection. Impact is medium because the altered action persists in `store:player-database`, which holds `pii` and `business-critical-data`."
+      },
+      "mitigations": [
+        {
+          "summary": "Use mutually authenticated TLS for moderation traffic",
+          "detail": "Protect `flow:customer-support-to-moderation-website:moderate-accounts` with authenticated encryption and validate the moderation website certificate from corporate clients."
+        },
+        {
+          "summary": "Bind and validate moderation requests at the receiving process",
+          "detail": "Have `process:moderation-website` verify a session-bound request integrity token and enforce server-side authorization, target-account checks, and confirmation for consequential moderation actions."
+        }
+      ]
+    },
+    {
+      "id": "T-03",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Unverified writer identities may permit direct corruption of player records",
+      "description": "`flow:game-servers-to-player-database:update-players` and `flow:moderation-website-to-player-database:read-write-players` both carry `authentication: unknown` while writing `store:player-database`. If either unknown resolves to missing or ineffective caller authentication and an attacker gains network reach to the production store interface, they can alter player progression, match results, account records, or moderation state directly rather than through the intended process. Second-order, `process:lobby` reads player records through `flow:lobby-to-player-database:read-players`, so corrupted records can influence later matchmaking decisions.",
+      "affected_element_ids": [
+        "store:player-database",
+        "flow:game-servers-to-player-database:update-players",
+        "flow:moderation-website-to-player-database:read-write-players"
+      ],
+      "verb": "alter",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "The diagram doesn't record what authentication is on any of these links, or how any of the stores are protected.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:game-servers-to-player-database:update-players",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:moderation-website-to-player-database:read-write-players",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "tampering",
+      "severity": {
+        "likelihood": "low",
+        "impact": "medium",
+        "level": "low",
+        "justification": "Likelihood is low and conditional on both cited unknown authentication attributes: the attacker must first obtain reachability to a production-network store interface, and the unverified writer control must be absent or ineffective. Impact is medium because `store:player-database` holds `pii` and `business-critical-data`, and its corrupted records are consumed by `process:lobby`."
+      },
+      "mitigations": [
+        {
+          "summary": "Establish distinct authenticated store identities",
+          "detail": "Require `process:game-servers` and `process:moderation-website` to authenticate separately to `store:player-database` using short-lived workload identities."
+        },
+        {
+          "summary": "Constrain player-database write grants",
+          "detail": "Apply deny-by-default store policies and least-privilege write permissions so each process can change only the player fields and records required for its function."
+        },
+        {
+          "summary": "Protect and detect record integrity",
+          "detail": "Use versioned updates, server-side ownership and state-transition checks, and reconciliation for player progression and moderation-state changes."
+        }
+      ]
+    },
+    {
+      "id": "R-01",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "A player may deny gameplay actions and resulting match outcomes",
+      "description": "A player operating the uncontrolled `process:game-client` can dispute gameplay actions sent over `flow:game-client-to-game-servers:gameplay-traffic` to the internet-facing `process:game-servers`. That flow crosses from `boundary:player-local-machine` and has `authentication: unknown`; the model also does not identify an audit record that binds an authenticated player identity, action, timestamp, and outcome to the resulting match record. If the unknown authentication does not uniquely bind the player and such a record is not retained, the player can deny cheating, match participation, or an outcome that `process:game-servers` records. Second-order: the disputed actions feed match statistics and player progression through `flow:game-servers-to-stats-database:read-write-stats` and `flow:game-servers-to-player-database:update-players`, leaving the operator unable to defend the integrity of `business-critical-data` in both stores.",
+      "affected_element_ids": [
+        "process:game-client",
+        "process:game-servers",
+        "flow:game-client-to-game-servers:gameplay-traffic"
+      ],
+      "verb": "unattributable",
+      "grounds": [
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:game-client-to-game-servers:gameplay-traffic",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:game-client-to-game-servers:gameplay-traffic",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:game-servers-to-stats-database:read-write-stats",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:game-servers-to-player-database:update-players",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "absent-element",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": "audit"
+        }
+      ],
+      "category": "repudiation",
+      "severity": {
+        "likelihood": "high",
+        "impact": "medium",
+        "level": "high",
+        "justification": "Likelihood is high and conditional on the unknown authentication: `flow:game-client-to-game-servers:gameplay-traffic` is a trust-boundary crossing from the player-controlled `boundary:player-local-machine` to internet-facing `process:game-servers`, so ordinary players can generate the disputed actions. Impact is medium because the resulting writes reach `store:stats-database` and `store:player-database`, both holding `business-critical-data`, but the described dispute concerns match records rather than credentials or secrets."
+      },
+      "mitigations": [
+        {
+          "summary": "Create attributable gameplay audit records",
+          "detail": "Have `process:game-servers` retain structured, tamper-evident security and match-event records containing the verified player identity, match identifier, action, timestamp, outcome, and request or trace identifier before writing results to the stores."
+        },
+        {
+          "summary": "Use and propagate an individual player identity",
+          "detail": "Establish the authentication on `flow:game-client-to-game-servers:gameplay-traffic` and ensure each accepted gameplay action is bound to a unique authenticated player identity rather than a client-supplied identifier."
+        }
+      ]
+    },
+    {
+      "id": "R-02",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Support staff may deny moderation changes to player accounts",
+      "description": "A customer-support staff member can perform account actions through `flow:customer-support-to-moderation-website:moderate-accounts`, then `process:moderation-website` directly reads and writes `store:player-database` through `flow:moderation-website-to-player-database:read-write-players`. The staff-to-site flow crosses from `boundary:corp-network` into production, while authentication on both the staff action and database write paths is unknown, and the model identifies no audit record for the acting support principal or the before-and-after moderation change. If those unknowns resolve without unique identity propagation and immutable change history, a staff member can deny suspending, restoring, or otherwise altering a player account. Second-order: because `store:player-database` holds `pii` and `business-critical-data`, the operator cannot reliably resolve player complaints or establish which staff action changed moderation state.",
+      "affected_element_ids": [
+        "entity:customer-support",
+        "process:moderation-website",
+        "store:player-database",
+        "flow:customer-support-to-moderation-website:moderate-accounts"
+      ],
+      "verb": "unattributable",
+      "grounds": [
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:customer-support-to-moderation-website:moderate-accounts",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:customer-support-to-moderation-website:moderate-accounts",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:moderation-website-to-player-database:read-write-players",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "absent-element",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": "audit"
+        }
+      ],
+      "category": "repudiation",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional on the unknown authentication values: exploiting the gap requires access from `boundary:corp-network` or a compromised support session, but `flow:customer-support-to-moderation-website:moderate-accounts` crosses into production and no stated identity binding exists. Impact is medium because direct account changes reach `store:player-database`, which contains `pii` and `business-critical-data`, although the modeled consequence is an account-level moderation dispute."
+      },
+      "mitigations": [
+        {
+          "summary": "Audit each moderation action with the verified staff identity",
+          "detail": "Require individual authentication on `flow:customer-support-to-moderation-website:moderate-accounts`, and have `process:moderation-website` record the verified staff subject, player-account target, action, before/after state, timestamp, outcome, and request identifier."
+        },
+        {
+          "summary": "Preserve an independent immutable account-change history",
+          "detail": "Send moderation events to a dedicated append-only audit store using a separate write principal and retention lock; retain correction actions as new entries rather than allowing history to be overwritten in `store:player-database`."
+        },
+        {
+          "summary": "Propagate support identity to database-related records",
+          "detail": "Ensure records generated for `flow:moderation-website-to-player-database:read-write-players` preserve the original authenticated support identity alongside the service identity, rather than attributing changes only to the moderation service."
+        }
+      ]
+    },
+    {
+      "id": "I-01",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Gameplay traffic may be readable between player machines and game servers",
+      "description": "`flow:game-client-to-game-servers:gameplay-traffic` crosses from the player-controlled `boundary:player-local-machine` to `process:game-servers` in `boundary:prod-network`, but its `encryption_in_transit` value is `unknown`. If that unknown resolves to no effective transport encryption, an attacker able to observe a player's network path, such as on a hostile local network, can intercept gameplay actions and state updates for that match. The disclosed live state enables real-time competitive intelligence and profiling of player behavior; it also exposes information processed by the business-critical game-server service. This is conditional on verification of transport protection, not an assertion that the TCP flow is plaintext.",
+      "affected_element_ids": [
+        "flow:game-client-to-game-servers:gameplay-traffic",
+        "process:game-client",
+        "process:game-servers"
+      ],
+      "verb": "intercept",
+      "grounds": [
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:game-client-to-game-servers:gameplay-traffic",
+          "attribute": "encryption_in_transit",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:game-client-to-game-servers:gameplay-traffic",
+          "term": ""
+        }
+      ],
+      "category": "information-disclosure",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional on `unknown:flow:game-client-to-game-servers:gameplay-traffic:encryption_in_transit`: the flow crosses a player-controlled boundary, so attackers can seek an on-path position, although they must observe a target connection. Impact is medium because the intercepted flow exposes live gameplay state handled by `process:game-servers`, which is tagged `business-critical-data`."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt and authenticate the gameplay transport",
+          "detail": "Use TLS or another mutually authenticated encrypted transport on `flow:game-client-to-game-servers:gameplay-traffic`, and record the verified `encryption_in_transit` posture rather than leaving it unknown."
+        },
+        {
+          "summary": "Minimize sensitive state sent to clients",
+          "detail": "Send only the gameplay state each client requires and avoid exposing unnecessary opponent or server-side state in updates."
+        }
+      ]
+    },
+    {
+      "id": "I-02",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Player-account moderation traffic may be exposed across the corporate-to-production boundary",
+      "description": "`flow:customer-support-to-moderation-website:moderate-accounts` carries PII-bearing moderation actions from `boundary:corp-network` to `process:moderation-website` in `boundary:prod-network`. The flow is a derived boundary crossing and its `encryption_in_transit` value is `unknown`. If the channel lacks effective encryption, an attacker with a position on the corporate network path can intercept account-related moderation traffic and learn player-account information or support activity. That information enables targeted social engineering and more precise attacks against the player-account workflows exposed through `process:moderation-website`. This threat is conditional on resolving the transport-protection gap.",
+      "affected_element_ids": [
+        "flow:customer-support-to-moderation-website:moderate-accounts",
+        "entity:customer-support",
+        "process:moderation-website"
+      ],
+      "verb": "intercept",
+      "grounds": [
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:customer-support-to-moderation-website:moderate-accounts",
+          "attribute": "encryption_in_transit",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:customer-support-to-moderation-website:moderate-accounts",
+          "term": ""
+        }
+      ],
+      "category": "information-disclosure",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Likelihood is medium and conditional on `unknown:flow:customer-support-to-moderation-website:moderate-accounts:encryption_in_transit`: an attacker needs a corporate-network on-path position, but the flow crosses into production and has no verified transport protection. Impact is medium because the flow is tagged `pii` and exposes player-account moderation activity."
+      },
+      "mitigations": [
+        {
+          "summary": "Require encrypted authenticated transport for support access",
+          "detail": "Protect `flow:customer-support-to-moderation-website:moderate-accounts` with TLS and, where feasible, mutual authentication; explicitly set and verify `encryption_in_transit`."
+        },
+        {
+          "summary": "Restrict and monitor corporate network access",
+          "detail": "Segment support workstations from untrusted corporate-network populations and detect unexpected interception-capable routing, proxying, or certificate issuance."
+        }
+      ]
+    },
+    {
+      "id": "I-03",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Unverified internal transport can expose player records to a production-network observer",
+      "description": "`flow:lobby-to-player-database:read-players` and `flow:moderation-website-to-player-database:read-write-players` read player-account records from `store:player-database`, whose assets include PII, while both flows have `encryption_in_transit: unknown`. If either internal database channel is unencrypted, an attacker who first obtains a foothold or packet-observation position in `boundary:prod-network` can intercept player records in transit without using the intended application read path. Continued observation of the lobby read path can accumulate a broad account dataset; the disclosed records then enable targeted attacks against player-account and moderation workflows. This is conditional on verification of the two internal transport controls.",
+      "affected_element_ids": [
+        "store:player-database",
+        "flow:lobby-to-player-database:read-players",
+        "flow:moderation-website-to-player-database:read-write-players"
+      ],
+      "verb": "intercept",
+      "grounds": [
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:lobby-to-player-database:read-players",
+          "attribute": "encryption_in_transit",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:moderation-website-to-player-database:read-write-players",
+          "attribute": "encryption_in_transit",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "information-disclosure",
+      "severity": {
+        "likelihood": "low",
+        "impact": "high",
+        "level": "medium",
+        "justification": "Likelihood is low and conditional on the two unknown transport attributes because an attacker must first obtain an observation position inside `boundary:prod-network`. Impact is high because both flows carry player account records to or from `store:player-database`, which is tagged `pii`, and sustained interception can disclose records beyond one player."
+      },
+      "mitigations": [
+        {
+          "summary": "Encrypt all player-database connections",
+          "detail": "Require TLS with service authentication on `flow:lobby-to-player-database:read-players` and `flow:moderation-website-to-player-database:read-write-players`, including the production-network segments."
+        },
+        {
+          "summary": "Constrain database-reader identities",
+          "detail": "Use separate least-privilege identities for the lobby and moderation website, limiting each principal to the rows and fields needed for its task."
+        }
+      ]
+    },
+    {
+      "id": "I-04",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "A storage-layer copy could disclose player records if at-rest encryption is absent",
+      "description": "`store:player-database` holds PII and business-critical player-account data, but its `encryption_at_rest` attribute is `unknown`. If that unknown resolves to unencrypted storage, an attacker or over-privileged operator who obtains a database volume, operational snapshot, backup, or decommissioned media can read the stored player records directly without authenticating through `process:lobby` or `process:moderation-website`. A raw copy can expose the player corpus at once and enables targeting of players and account workflows with the disclosed information. This claim is conditional on the unknown at-rest encryption state and does not assert that the database is currently unencrypted.",
+      "affected_element_ids": [
+        "store:player-database"
+      ],
+      "verb": "read",
+      "grounds": [
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "store:player-database",
+          "attribute": "encryption_at_rest",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "information-disclosure",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Likelihood is medium and conditional on `unknown:store:player-database:encryption_at_rest`: obtaining an operational storage copy requires storage-layer access, but backups, snapshots, and media handling can bypass the live application path if encryption is absent. Impact is high because `store:player-database` is tagged `pii` and `business-critical-data`, so one copied artifact can disclose many player records irreversibly."
+      },
+      "mitigations": [
+        {
+          "summary": "Verify and enforce encryption at rest for player data",
+          "detail": "Establish the current value of `encryption_at_rest` for `store:player-database` and require KMS-managed envelope encryption for the primary store and all backups, snapshots, replicas, and exported copies."
+        },
+        {
+          "summary": "Limit access to data copies and keys",
+          "detail": "Restrict snapshot, backup, restore, export, and key-use permissions to separate least-privilege principals, and audit bulk-copy operations."
+        }
+      ]
+    },
+    {
+      "id": "D-01",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Flooding matchmaking can exhaust the lobby and block match formation",
+      "description": "An attacker operating `process:game-client` on an uncontrolled player machine can send sustained or connection-holding traffic over `flow:game-client-to-lobby:matchmaking` to `process:lobby`. The flow crosses from `boundary:player-local-machine` into production, its `authentication` is unknown, and request-size, connection, rate, and timeout bounds are unstated. If matchmaking requests cause player-record reads and match handoff work, attacker traffic can consume the lobby's TCP connections, workers, or database-query capacity more cheaply than the service performs matching work. Second-order, the lobby cannot read `store:player-database` or hand matches to `process:game-servers`, preventing legitimate players from being placed into matches. This is conditional on the unverified authentication and load-control posture, not an assertion that those controls are absent.",
+      "affected_element_ids": [
+        "process:lobby",
+        "flow:game-client-to-lobby:matchmaking"
+      ],
+      "verb": "flood",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "Both of those have to be reachable\nfrom wherever a player is, so they are exposed.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:game-client-to-lobby:matchmaking",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:game-client-to-lobby:matchmaking",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "denial-of-service",
+      "severity": {
+        "likelihood": "high",
+        "impact": "high",
+        "level": "critical",
+        "justification": "Likelihood is high conditionally: `flow:game-client-to-lobby:matchmaking` crosses from the player-controlled boundary and its `authentication` is unknown, while the source states the lobby is reachable wherever a player is. Impact is high because `process:lobby` is tagged `availability-critical` and loss of its player-database read and match-handoff paths prevents match formation for legitimate players."
+      },
+      "mitigations": [
+        {
+          "summary": "Authenticate and meter matchmaking before match work",
+          "detail": "Establish authentication on `flow:game-client-to-lobby:matchmaking`, then apply per-verified-player and per-source connection, request, and rate limits before `process:lobby` performs player-record reads or match construction."
+        },
+        {
+          "summary": "Bound lobby resource consumption",
+          "detail": "Set short TCP idle/read timeouts, bounded request queues and concurrency limits in `process:lobby`, and shed excess matchmaking work rather than allowing requests to accumulate or hold workers indefinitely."
+        }
+      ]
+    },
+    {
+      "id": "D-02",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Gameplay traffic can exhaust game-server capacity and cascade to game services",
+      "description": "A player-controlled `process:game-client` can sustain high-volume or long-lived gameplay traffic directly to `process:game-servers` through `flow:game-client-to-game-servers:gameplay-traffic`. This is a crossing from the uncontrolled player boundary, the flow's `authentication` is unknown, and the model does not state connection limits, packet/action rate limits, input bounds, or timeout behavior. An attacker can therefore attempt to consume game-server TCP connections, CPU, memory, or per-match worker capacity with traffic that costs less to generate than to parse, simulate, and distribute. Second-order, overloaded servers cannot record match statistics in `store:stats-database` or update player outcomes in `store:player-database`; the latter is also read by `process:lobby` and written by `process:moderation-website`, so saturation can delay match completion, player progression, matchmaking, and support operations. This threat is conditional on the unknown authentication and unstated load-control posture.",
+      "affected_element_ids": [
+        "process:game-servers",
+        "flow:game-client-to-game-servers:gameplay-traffic"
+      ],
+      "verb": "flood",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "once a match starts it talks directly to the game servers on TCP 1235. Both of those have to be reachable\nfrom wherever a player is, so they are exposed.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:game-client-to-game-servers:gameplay-traffic",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:game-client-to-game-servers:gameplay-traffic",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "denial-of-service",
+      "severity": {
+        "likelihood": "high",
+        "impact": "high",
+        "level": "critical",
+        "justification": "Likelihood is high conditionally because `flow:game-client-to-game-servers:gameplay-traffic` is a player-boundary crossing, reaches the game servers directly, and has `authentication: unknown`. Impact is high because `process:game-servers` is tagged `availability-critical`, and its outage blocks gameplay while also interrupting writes to both `store:stats-database` and the shared `store:player-database`."
+      },
+      "mitigations": [
+        {
+          "summary": "Limit abusive gameplay connections and action rates",
+          "detail": "Require and verify player identity on `flow:game-client-to-game-servers:gameplay-traffic`, enforce per-player and per-source connection and gameplay-action budgets, and disconnect clients exceeding bounded protocol, message-size, or idle-time limits."
+        },
+        {
+          "summary": "Isolate match capacity from persistence pressure",
+          "detail": "Use bounded per-match resource allocations and load shedding in `process:game-servers`, with timeouts and backpressure on writes to `store:stats-database` and `store:player-database` so slow persistence cannot pin gameplay workers."
+        }
+      ]
+    },
+    {
+      "id": "E-01",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "A player-controlled client may submit gameplay actions with another player's authority",
+      "description": "A player starts on `process:game-client` in `boundary:player-local-machine` and directly reaches the internet-facing `process:game-servers` over `flow:game-client-to-game-servers:gameplay-traffic`, which crosses into `boundary:prod-network` and has `authentication: unknown`. If the game server does not authenticate the client and bind every gameplay action to the player and match it is authorized for, a player can submit well-formed actions or state updates targeting another player's match or account, gaining authority beyond their own player role. Second-order, `process:game-servers` records match statistics through `flow:game-servers-to-stats-database:read-write-stats` and writes progression and match results to `store:player-database` through `flow:game-servers-to-player-database:update-players`, so the gained authority can alter other players' business-critical records. This is conditional on the unverified authentication and per-action authorization binding on the client-facing flow.",
+      "affected_element_ids": [
+        "process:game-client",
+        "flow:game-client-to-game-servers:gameplay-traffic",
+        "process:game-servers"
+      ],
+      "verb": "escalate",
+      "grounds": [
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:game-client-to-game-servers:gameplay-traffic",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:game-client-to-game-servers:gameplay-traffic",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "elevation-of-privilege",
+      "severity": {
+        "likelihood": "high",
+        "impact": "high",
+        "level": "critical",
+        "justification": "Likelihood is high conditional on `unknown:flow:game-client-to-game-servers:gameplay-traffic:authentication`: arbitrary player-controlled clients directly cross into the internet-facing `process:game-servers`, so an absent identity or match-authorization binding is directly reachable. Impact is high because `process:game-servers` writes match statistics and player progression through `flow:game-servers-to-stats-database:read-write-stats` and `flow:game-servers-to-player-database:update-players`, affecting `business-critical-data` and player records."
+      },
+      "mitigations": [
+        {
+          "summary": "Authenticate each game client and authorize every match action",
+          "detail": "Have `process:game-servers` verify a server-issued, short-lived player session and match assignment for `flow:game-client-to-game-servers:gameplay-traffic`, and reject actions whose player, match, or controlled game object is not bound to that verified identity."
+        },
+        {
+          "summary": "Make outcome writes server-authoritative",
+          "detail": "Derive player progression and match outcomes from server-maintained match state rather than client-supplied identifiers or claimed results before writing through `flow:game-servers-to-player-database:update-players` and `flow:game-servers-to-stats-database:read-write-stats`."
+        }
+      ]
+    }
+  ]
+}

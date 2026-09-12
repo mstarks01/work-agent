@@ -1,0 +1,793 @@
+{
+  "stride": {
+    "spoofing": {
+      "claims": [
+        {
+          "title": "A fleet pre-shared key lets a compromised node authenticate as any node in its fleet",
+          "description": "An attacker who extracts the fleet-wide pre-shared key from a deployed `entity:sensor-node` can present it over `flow:sensor-node-to-device-gateway:publish-readings` to authenticate to the internet-facing `process:device-gateway` as an apparently genuine fleet node. Because the same non-rotated key identifies a fleet rather than an individual device, the gateway cannot distinguish the impostor from any legitimate holder. Second-order: accepted readings are forwarded by `flow:device-gateway-to-telemetry-normalizer:forward-readings` and loaded into `store:telemetry-lake`, allowing fabricated device-originated readings to enter customer site and occupancy telemetry.",
+          "affected_element_ids": [
+            "entity:sensor-node",
+            "process:device-gateway",
+            "flow:sensor-node-to-device-gateway:publish-readings"
+          ],
+          "verb": "use-credential",
+          "evidence_refs": [
+            "crossing:flow:sensor-node-to-device-gateway:publish-readings"
+          ],
+          "quotes": [
+            {
+              "text": "They are outside our physical control \u2014 a technician can be standing next to one with a laptop.",
+              "source_label": "System description"
+            },
+            {
+              "text": "The key is per fleet, not per device. Nobody has rotated it since deployment.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 1,
+          "severity": {
+            "likelihood": "high",
+            "impact": "high",
+            "level": "critical",
+            "justification": "Likelihood is high because `flow:sensor-node-to-device-gateway:publish-readings` crosses from the field network to the internet-facing `process:device-gateway`, while every deployed node uses the same non-rotated fleet key and is outside the operator's physical control. Impact is high because a successful impostor can submit accepted readings that reach `store:telemetry-lake`, which is tagged `pii` and `business-critical-data` and contains customer site addresses and occupancy patterns."
+          },
+          "mitigations": [
+            {
+              "summary": "Issue a distinct workload identity for every sensor node",
+              "detail": "Replace the fleet-wide pre-shared key on `flow:sensor-node-to-device-gateway:publish-readings` with per-device certificates or short-lived device-bound credentials, bound in `store:device-registry` to the individual device and customer."
+            },
+            {
+              "summary": "Rotate and revoke compromised device credentials",
+              "detail": "Support credential rotation and per-device revocation at `process:device-gateway` so compromise of one deployed node does not permit continued fleet-wide impersonation."
+            }
+          ]
+        },
+        {
+          "title": "An attacker in the ingest tier could impersonate the gateway to the telemetry normalizer if Pub/Sub caller authentication is absent",
+          "description": "`flow:device-gateway-to-telemetry-normalizer:forward-readings` crosses from `boundary:ingest-edge` to `boundary:analytics-core` with `authentication: unknown`. If the unknown authentication state resolves to no verifiable workload identity or publisher authorization, an attacker who gains a foothold in the ingest tier can publish as `process:device-gateway` to `process:telemetry-normalizer`. The normalizer would then treat fabricated messages as gateway-accepted readings. Second-order: `process:telemetry-normalizer` loads those readings through `flow:telemetry-normalizer-to-telemetry-lake:load-readings` into `store:telemetry-lake`, affecting customer site and occupancy telemetry. This is conditional on the undocumented authentication attribute, not an assertion that authentication is absent.",
+          "affected_element_ids": [
+            "process:device-gateway",
+            "process:telemetry-normalizer",
+            "flow:device-gateway-to-telemetry-normalizer:forward-readings"
+          ],
+          "verb": "impersonate",
+          "evidence_refs": [
+            "crossing:flow:device-gateway-to-telemetry-normalizer:forward-readings",
+            "unknown:flow:device-gateway-to-telemetry-normalizer:forward-readings:authentication"
+          ],
+          "quotes": [],
+          "absent_elements": [],
+          "sequence": 2,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional: the crossing into `boundary:analytics-core` has undocumented authentication, but exploitation requires an attacker foothold in `boundary:ingest-edge`. Impact is high because successful gateway impersonation reaches `store:telemetry-lake`, tagged `pii` and `business-critical-data`, through `process:telemetry-normalizer`."
+          },
+          "mitigations": [
+            {
+              "summary": "Authenticate and authorize the gateway workload on Pub/Sub",
+              "detail": "Make `flow:device-gateway-to-telemetry-normalizer:forward-readings` use an explicit, verifiable per-workload identity and restrict publishing rights so only `process:device-gateway` can publish the accepted-readings stream."
+            },
+            {
+              "summary": "Bind accepted-reading provenance to the gateway identity",
+              "detail": "Have `process:telemetry-normalizer` verify the authenticated publisher identity before processing messages, rather than trusting a reachable Pub/Sub path as proof that a message came from the gateway."
+            }
+          ]
+        },
+        {
+          "title": "A fake firmware endpoint could impersonate the public bucket if node transport or artifact authenticity is not verified",
+          "description": "`entity:sensor-node` polls the publicly readable `store:firmware-bucket` through `flow:sensor-node-to-firmware-bucket:poll-firmware` and installs the image it receives. The crossing has `encryption_in_transit: unknown`, and firmware-signature verification is undocumented. If nodes do not validate the HTTPS server certificate or do not verify a signed firmware artifact, an on-path attacker or attacker able to redirect the lookup can impersonate the firmware source and supply an image presented as an update from `store:firmware-bucket`. Second-order: compromise of installed firmware can disrupt the `availability-critical` sensor fleet and let affected nodes submit attacker-controlled readings to `process:device-gateway`. This is conditional on the unknown transport and artifact-verification controls.",
+          "affected_element_ids": [
+            "entity:sensor-node",
+            "store:firmware-bucket",
+            "flow:sensor-node-to-firmware-bucket:poll-firmware"
+          ],
+          "verb": "impersonate",
+          "evidence_refs": [
+            "crossing:flow:sensor-node-to-firmware-bucket:poll-firmware",
+            "unknown:flow:sensor-node-to-firmware-bucket:poll-firmware:encryption_in_transit"
+          ],
+          "quotes": [
+            {
+              "text": "The bucket is public read, because making the nodes authenticate to it was awkward. I do not know whether the nodes check a signature on the image before installing it.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 3,
+          "severity": {
+            "likelihood": "low",
+            "impact": "high",
+            "level": "medium",
+            "justification": "Likelihood is low and conditional because an attacker needs a network-positioning or name-resolution prerequisite and `encryption_in_transit` is undocumented rather than stated absent. Impact is high because `entity:sensor-node` is tagged `availability-critical`, installs the obtained image, and compromised nodes can affect the fleet's telemetry path through `process:device-gateway`."
+          },
+          "mitigations": [
+            {
+              "summary": "Require authenticated TLS for firmware retrieval",
+              "detail": "Make `flow:sensor-node-to-firmware-bucket:poll-firmware` explicitly use TLS 1.2+ with full certificate-chain validation and constrain the accepted issuer or service identity for `store:firmware-bucket`."
+            },
+            {
+              "summary": "Verify signed firmware before installation",
+              "detail": "Require `entity:sensor-node` to verify a vendor firmware signature and version metadata before installing an image, so authenticity does not depend solely on the retrieval endpoint."
+            }
+          ]
+        },
+        {
+          "title": "A local attacker could pose as a field technician if the serial console has no authentication",
+          "description": "`flow:field-technician-to-sensor-node:local-service-session` has `authentication: unknown` while `entity:sensor-node` is deployed outside the operator's physical control and exposes a local serial console for device configuration and diagnostics. If that unknown resolves to no effective console authentication, an attacker with physical access at a customer site can impersonate `entity:field-technician` to `entity:sensor-node` and obtain the console's read-write service session. Second-order: the attacker can act through the node's configuration interface, potentially disrupting an `availability-critical` node and its telemetry publication path. This claim is conditional on the undocumented console authentication state.",
+          "affected_element_ids": [
+            "entity:field-technician",
+            "entity:sensor-node",
+            "flow:field-technician-to-sensor-node:local-service-session"
+          ],
+          "verb": "impersonate",
+          "evidence_refs": [
+            "unknown:flow:field-technician-to-sensor-node:local-service-session:authentication"
+          ],
+          "quotes": [
+            {
+              "text": "They are outside our physical control \u2014 a technician can be standing next to one with a laptop.",
+              "source_label": "System description"
+            },
+            {
+              "text": "I don't know what authentication that console has, if any.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 4,
+          "severity": {
+            "likelihood": "low",
+            "impact": "medium",
+            "level": "low",
+            "justification": "Likelihood is low and conditional because exploiting the undocumented console authentication requires physical access to a deployed customer-site node. Impact is medium because the affected `entity:sensor-node` is tagged `availability-critical` and the documented serial session permits read-write access to device configuration and diagnostics, but the model describes a session to one node rather than confirmed fleet-wide reach."
+          },
+          "mitigations": [
+            {
+              "summary": "Require per-technician authentication on the serial console",
+              "detail": "Make `flow:field-technician-to-sensor-node:local-service-session` use explicit, individual technician authentication with authorization for only required service actions."
+            },
+            {
+              "summary": "Constrain and audit local maintenance sessions",
+              "detail": "Require a time-limited physical service mode, record technician identity and actions, and disable or lock the console outside approved maintenance windows."
+            }
+          ]
+        }
+      ],
+      "invalid": []
+    },
+    "tampering": {
+      "claims": [
+        {
+          "title": "On-path attacker can conditionally alter sensor readings before gateway acceptance",
+          "description": "`flow:sensor-node-to-device-gateway:publish-readings` crosses from `boundary:field-network` to `boundary:ingest-edge` with `encryption_in_transit: unknown`. If that attribute resolves to transport without authenticated integrity protection, an attacker positioned on the customer-site-to-gateway path can alter readings or their device identifiers before `process:device-gateway` accepts them. Second-order, accepted altered readings traverse `flow:device-gateway-to-telemetry-normalizer:forward-readings` and `flow:telemetry-normalizer-to-telemetry-lake:load-readings`, causing `store:telemetry-lake` to retain corrupted telemetry as legitimate customer data.",
+          "affected_element_ids": [
+            "flow:sensor-node-to-device-gateway:publish-readings",
+            "process:device-gateway"
+          ],
+          "verb": "alter-in-transit",
+          "evidence_refs": [
+            "crossing:flow:sensor-node-to-device-gateway:publish-readings",
+            "unknown:flow:sensor-node-to-device-gateway:publish-readings:encryption_in_transit"
+          ],
+          "quotes": [],
+          "absent_elements": [],
+          "sequence": 1,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium and conditional on the unknown transport-protection attribute: the flow crosses from the customer-controlled `boundary:field-network` to the internet-exposed `process:device-gateway`, but an attacker still needs an on-path position. Impact is medium because altered readings are persisted in `store:telemetry-lake`, which contains customer site addresses and occupancy patterns and is tagged `pii` and `business-critical-data`."
+          },
+          "mitigations": [
+            {
+              "summary": "Require authenticated transport for MQTT publishing",
+              "detail": "Configure `flow:sensor-node-to-device-gateway:publish-readings` to use mutually authenticated TLS or equivalent authenticated message protection, and reject connections lacking valid integrity protection."
+            },
+            {
+              "summary": "Bind accepted readings to the authenticated device",
+              "detail": "Have `process:device-gateway` derive the device identity from the authenticated connection and reject payload identifiers that do not match it."
+            }
+          ]
+        },
+        {
+          "title": "A fleet-wide device key can be used to forge telemetry accepted by the gateway",
+          "description": "An attacker who extracts the fleet-wide pre-shared key from a node under customer-site physical control can submit fabricated readings through `flow:sensor-node-to-device-gateway:publish-readings` to the internet-exposed `process:device-gateway`. Because the same key is shared by every device in the fleet and is not rotated, the gateway cannot use that key alone to distinguish a compromised node from another fleet node. Second-order, `process:device-gateway` forwards accepted fabricated readings through `flow:device-gateway-to-telemetry-normalizer:forward-readings`; `process:telemetry-normalizer` then loads them into `store:telemetry-lake`, where fleet dashboards can present the attacker-controlled telemetry as genuine.",
+          "affected_element_ids": [
+            "flow:sensor-node-to-device-gateway:publish-readings",
+            "process:device-gateway"
+          ],
+          "verb": "forge",
+          "evidence_refs": [
+            "crossing:flow:sensor-node-to-device-gateway:publish-readings"
+          ],
+          "quotes": [
+            {
+              "text": "Nodes authenticate to the broker with a pre-shared key. The\nkey is per fleet, not per device. Nobody has rotated it since deployment.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 2,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium because a few thousand nodes are deployed outside operator physical control, the gateway is internet-facing, and one unrotated fleet key can be reused after extraction; obtaining that key remains a prerequisite. Impact is medium because fabricated data reaches `store:telemetry-lake`, which is tagged `pii` and `business-critical-data`, and is used for fleet dashboards."
+          },
+          "mitigations": [
+            {
+              "summary": "Issue distinct, rotatable credentials per device",
+              "detail": "Replace the fleet-wide pre-shared key on `flow:sensor-node-to-device-gateway:publish-readings` with per-device credentials that `process:device-gateway` validates against `store:device-registry`, with revocation and rotation support."
+            },
+            {
+              "summary": "Authenticate the telemetry payload identity",
+              "detail": "Require readings to carry a device-bound signature or be accepted only when their device identifier matches the authenticated connection identity."
+            }
+          ]
+        },
+        {
+          "title": "Unverified Pub/Sub producer authorization may allow poisoned telemetry messages",
+          "description": "`flow:device-gateway-to-telemetry-normalizer:forward-readings` crosses from `boundary:ingest-edge` into `boundary:analytics-core` with `authentication: unknown`. If this unknown resolves to no producer authorization, an attacker who gains access to the ingest-side messaging path can inject crafted readings into the channel consumed by `process:telemetry-normalizer`, bypassing the acceptance checks at `process:device-gateway`. Second-order, the normalizer treats the injected messages as gateway telemetry and writes the corrupted readings through `flow:telemetry-normalizer-to-telemetry-lake:load-readings` into `store:telemetry-lake`.",
+          "affected_element_ids": [
+            "flow:device-gateway-to-telemetry-normalizer:forward-readings",
+            "process:device-gateway",
+            "process:telemetry-normalizer"
+          ],
+          "verb": "inject",
+          "evidence_refs": [
+            "crossing:flow:device-gateway-to-telemetry-normalizer:forward-readings",
+            "unknown:flow:device-gateway-to-telemetry-normalizer:forward-readings:authentication"
+          ],
+          "quotes": [],
+          "absent_elements": [],
+          "sequence": 3,
+          "severity": {
+            "likelihood": "low",
+            "impact": "medium",
+            "level": "low",
+            "justification": "Likelihood is low and conditional on the unknown authentication attribute because exploiting the internal messaging path requires access in `boundary:ingest-edge` as well as absent producer authorization. Impact is medium because poisoned messages are loaded into `store:telemetry-lake`, which holds customer data and is tagged `pii` and `business-critical-data`."
+          },
+          "mitigations": [
+            {
+              "summary": "Enforce per-producer Pub/Sub authorization",
+              "detail": "Configure `flow:device-gateway-to-telemetry-normalizer:forward-readings` so only the workload identity of `process:device-gateway` may publish to the telemetry topic, and only `process:telemetry-normalizer` may consume it."
+            },
+            {
+              "summary": "Validate telemetry again at the consumer",
+              "detail": "Make `process:telemetry-normalizer` validate message schema, source identity, and device identity before loading readings into the lake."
+            }
+          ]
+        },
+        {
+          "title": "Unverified lake write authentication may permit direct alteration of customer telemetry",
+          "description": "`flow:telemetry-normalizer-to-telemetry-lake:load-readings` is a write path to `store:telemetry-lake` with `authentication: unknown`. If that attribute resolves to missing or insufficient caller authentication and authorization, an attacker with access to the analytics-side BigQuery API can alter site addresses, occupancy patterns, or readings directly, bypassing normalization and ingestion checks in `process:telemetry-normalizer`. Second-order, `flow:fleet-operator-to-telemetry-lake:query-dashboards` exposes the tampered customer telemetry to fleet operators as dashboard data.",
+          "affected_element_ids": [
+            "flow:telemetry-normalizer-to-telemetry-lake:load-readings",
+            "process:telemetry-normalizer",
+            "store:telemetry-lake"
+          ],
+          "verb": "alter",
+          "evidence_refs": [
+            "unknown:flow:telemetry-normalizer-to-telemetry-lake:load-readings:authentication"
+          ],
+          "quotes": [],
+          "absent_elements": [],
+          "sequence": 4,
+          "severity": {
+            "likelihood": "low",
+            "impact": "medium",
+            "level": "low",
+            "justification": "Likelihood is low and conditional on the unknown authentication value because an attacker must first reach the internal analytics write path. Impact is medium because `store:telemetry-lake` contains customer site addresses and occupancy patterns, is tagged `pii` and `business-critical-data`, and supplies fleet dashboards."
+          },
+          "mitigations": [
+            {
+              "summary": "Use a dedicated least-privilege workload identity for lake writes",
+              "detail": "Require `process:telemetry-normalizer` to authenticate to `store:telemetry-lake` with a dedicated workload identity limited to the required append or partition-scoped write operations."
+            },
+            {
+              "summary": "Protect telemetry records from unauthorized overwrite",
+              "detail": "Apply dataset policies and controlled write interfaces that prevent arbitrary updates or deletes, and retain versioned or auditable ingestion records for reconciliation."
+            }
+          ]
+        },
+        {
+          "title": "Firmware responses can be conditionally modified before nodes install them",
+          "description": "`flow:sensor-node-to-firmware-bucket:poll-firmware` crosses from `boundary:field-network` to `boundary:ingest-edge` and has `encryption_in_transit: unknown`. If this transport lacks authenticated integrity protection, and nodes do not verify a firmware signature, an attacker positioned between a node and `store:firmware-bucket` can alter the firmware image response. The node installs what it receives, so the modified image changes behavior on the deployed `entity:sensor-node`; second-order, compromised firmware can falsify future readings sent to `process:device-gateway` or impair availability across the affected fleet.",
+          "affected_element_ids": [
+            "flow:sensor-node-to-firmware-bucket:poll-firmware",
+            "entity:sensor-node",
+            "store:firmware-bucket"
+          ],
+          "verb": "alter-in-transit",
+          "evidence_refs": [
+            "crossing:flow:sensor-node-to-firmware-bucket:poll-firmware",
+            "unknown:flow:sensor-node-to-firmware-bucket:poll-firmware:encryption_in_transit"
+          ],
+          "quotes": [
+            {
+              "text": "I do not know whether the\nnodes check a signature on the image before installing it.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 5,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional on the unknown transport protection and unverified signature check: the firmware flow crosses from customer sites outside physical control, though the attacker still needs an on-path position or equivalent response-control capability. Impact is high because every affected `entity:sensor-node` self-installs the image and is tagged `availability-critical`, allowing persistent modification of fleet behavior."
+          },
+          "mitigations": [
+            {
+              "summary": "Require signed firmware and verify before installation",
+              "detail": "Sign each firmware artifact with an offline-controlled release key and require `entity:sensor-node` to verify the signature, signer identity, version, and rollback policy before installing it."
+            },
+            {
+              "summary": "Verify end-to-end transport integrity for firmware retrieval",
+              "detail": "Ensure `flow:sensor-node-to-firmware-bucket:poll-firmware` uses validated TLS with certificate checking; retain signature verification because transport protection alone does not protect a malicious artifact at rest."
+            }
+          ]
+        }
+      ],
+      "invalid": []
+    },
+    "repudiation": {
+      "claims": [
+        {
+          "title": "Fleet telemetry readings cannot be attributed to an individual sensor node",
+          "description": "Any party holding the fleet-wide key can publish a reading over `flow:sensor-node-to-device-gateway:publish-readings` to `process:device-gateway` while plausibly denying that a particular `entity:sensor-node` originated it. The stated credential is shared by every device rather than bound to a node, so records based on that authentication can at best identify the fleet credential holder population, not a specific device. This crosses from `boundary:field-network` into `boundary:ingest-edge`; accepted readings then traverse `flow:device-gateway-to-telemetry-normalizer:forward-readings` and are loaded into `store:telemetry-lake`, making the evidentiary gap apply to customer site and occupancy readings retained downstream. A customer can dispute a reading, fault indication, or operational conclusion without the platform having credential-backed evidence tying it to their node.",
+          "affected_element_ids": [
+            "entity:sensor-node",
+            "process:device-gateway",
+            "flow:sensor-node-to-device-gateway:publish-readings"
+          ],
+          "verb": "unattributable",
+          "evidence_refs": [
+            "crossing:flow:sensor-node-to-device-gateway:publish-readings"
+          ],
+          "quotes": [
+            {
+              "text": "The key is per fleet, not per device.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 1,
+          "severity": {
+            "likelihood": "high",
+            "impact": "medium",
+            "level": "high",
+            "justification": "Likelihood is high because every deployed node uses the same credential on the boundary-crossing `flow:sensor-node-to-device-gateway:publish-readings`, so an ordinary holder of that key can create the attribution dispute. Impact is medium because the resulting evidentiary failure extends to readings ultimately retained in `store:telemetry-lake`, which holds `pii` and `business-critical-data`, but this threat does not itself expose or alter those records."
+          },
+          "mitigations": [
+            {
+              "summary": "Use a unique credential for every sensor node",
+              "detail": "Replace the fleet-wide pre-shared key on `flow:sensor-node-to-device-gateway:publish-readings` with per-device credentials that are revocable and rotated independently."
+            },
+            {
+              "summary": "Record the verified device identity with each accepted reading",
+              "detail": "Have `process:device-gateway` bind the credential-verified node identity, receipt time, message identifier, and acceptance outcome to each forwarded reading so downstream records in `store:telemetry-lake` retain defensible provenance."
+            }
+          ]
+        },
+        {
+          "title": "A field technician may be able to deny local configuration changes to a sensor node",
+          "description": "`entity:field-technician` can perform read-write service actions through `flow:field-technician-to-sensor-node:local-service-session` against `entity:sensor-node`, but the flow's `authentication` is unknown and the model contains no audit element showing an independently retained record of technician identity or console changes. If the unknown console authentication does not provide an individual verified identity and corresponding immutable event record, a technician who changes device configuration or diagnostics can deny doing so after a field incident. This is conditional on the unresolved console-authentication and audit-record details; it does not assert that the console is unauthenticated. Second-order: disputed changes can impede investigation of availability failures affecting the deployed sensor fleet.",
+          "affected_element_ids": [
+            "entity:field-technician",
+            "entity:sensor-node",
+            "flow:field-technician-to-sensor-node:local-service-session"
+          ],
+          "verb": "unattributable",
+          "evidence_refs": [
+            "unknown:flow:field-technician-to-sensor-node:local-service-session:authentication"
+          ],
+          "quotes": [
+            {
+              "text": "a technician can be standing next to one with a laptop.",
+              "source_label": "System description"
+            },
+            {
+              "text": "I don't know what authentication that console has, if any.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [
+            "audit"
+          ],
+          "sequence": 2,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium and conditional on the unknown `authentication` value of `flow:field-technician-to-sensor-node:local-service-session`: a technician needs local access, but the model states that such access occurs at customer sites. Impact is medium because `entity:sensor-node` is tagged `availability-critical`; an unresolvable dispute over its configuration can materially hinder response to an operational failure, although the described action is limited to a serviced node."
+          },
+          "mitigations": [
+            {
+              "summary": "Require individually attributable console authentication",
+              "detail": "Require each field technician to authenticate with a unique, managed identity before `flow:field-technician-to-sensor-node:local-service-session` permits diagnostic or configuration writes."
+            },
+            {
+              "summary": "Retain tamper-resistant service-change records",
+              "detail": "Emit structured records for console authentication, configuration changes, firmware-service actions, timestamps, device identity, and outcomes to an audit target separate from the node and technician-controlled session."
+            }
+          ]
+        }
+      ],
+      "invalid": []
+    },
+    "information-disclosure": {
+      "claims": [
+        {
+          "title": "Sensor readings may be intercepted between customer sites and the gateway",
+          "description": "`flow:sensor-node-to-device-gateway:publish-readings` crosses from `boundary:field-network` to `boundary:ingest-edge` and carries PII-tagged sensor readings with a device identifier, but its `encryption_in_transit` is `unknown`. If that attribute resolves to no effective transport encryption, an attacker on a customer-site network or otherwise observing the boundary-crossing MQTT path can intercept readings and associate them with devices. Second-order, the collected identifiers and usage data help an attacker target specific deployed nodes and customers through `process:device-gateway`. This is conditional on the unverified transport-control state, not an assertion that MQTT traffic is plaintext.",
+          "affected_element_ids": [
+            "flow:sensor-node-to-device-gateway:publish-readings",
+            "entity:sensor-node",
+            "process:device-gateway"
+          ],
+          "verb": "intercept",
+          "evidence_refs": [
+            "unknown:flow:sensor-node-to-device-gateway:publish-readings:encryption_in_transit",
+            "crossing:flow:sensor-node-to-device-gateway:publish-readings"
+          ],
+          "quotes": [],
+          "absent_elements": [],
+          "sequence": 1,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium and conditional on `unknown:flow:sensor-node-to-device-gateway:publish-readings:encryption_in_transit`: the flow crosses from `boundary:field-network` to `boundary:ingest-edge`, making an on-path position plausible, but it still requires access to that path. Impact is medium because the flow is tagged `pii` and exposes sensor readings and device identifiers."
+          },
+          "mitigations": [
+            {
+              "summary": "Encrypt and mutually authenticate MQTT traffic",
+              "detail": "Require TLS 1.2+ or preferably mTLS for `flow:sensor-node-to-device-gateway:publish-readings`, and record the verified `encryption_in_transit` posture."
+            },
+            {
+              "summary": "Reduce long-lived shared device identity exposure",
+              "detail": "Replace the fleet-wide pre-shared key with per-device credentials so captured traffic and device identifiers do not support broad targeting of the fleet."
+            }
+          ]
+        },
+        {
+          "title": "Device-registry key material may be recovered from an unverified internal transport",
+          "description": "`flow:device-gateway-to-device-registry:look-up-device` carries device identifiers, key material, and customer assignments between `process:device-gateway` and `store:device-registry`, while `encryption_in_transit` is `unknown`. If transport protection is absent or terminates before this segment, an attacker with a foothold able to observe the ingest-edge path can recover credential material from the lookup traffic. Second-order, recovered fleet authentication material can be presented to `process:device-gateway` as a node credential, enabling further access attempts against the ingest path. This is conditional on the unresolved transport-encryption attribute.",
+          "affected_element_ids": [
+            "flow:device-gateway-to-device-registry:look-up-device",
+            "process:device-gateway",
+            "store:device-registry"
+          ],
+          "verb": "recover-credential",
+          "evidence_refs": [
+            "unknown:flow:device-gateway-to-device-registry:look-up-device:encryption_in_transit"
+          ],
+          "quotes": [],
+          "absent_elements": [],
+          "sequence": 2,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional on `unknown:flow:device-gateway-to-device-registry:look-up-device:encryption_in_transit`: observing this intra-zone service path requires an ingest-edge foothold, but no verified transport protection is stated. Impact is high because the flow and `store:device-registry` carry `credentials`, and a recovered fleet key can be used against `process:device-gateway`."
+          },
+          "mitigations": [
+            {
+              "summary": "Protect registry lookups with authenticated encryption",
+              "detail": "Require TLS/mTLS on `flow:device-gateway-to-device-registry:look-up-device` and verify that encryption remains in place for the complete gateway-to-Firestore segment."
+            },
+            {
+              "summary": "Eliminate fleet-wide reusable keys",
+              "detail": "Issue distinct, rotatable device credentials and scope registry access so interception of one lookup cannot yield a credential usable by the entire fleet."
+            }
+          ]
+        },
+        {
+          "title": "Readings forwarded from the public ingest tier may be intercepted before normalization",
+          "description": "`flow:device-gateway-to-telemetry-normalizer:forward-readings` crosses from `boundary:ingest-edge` into `boundary:analytics-core`, carries PII-tagged normalized sensor readings, and has `encryption_in_transit: unknown`. If the Pub/Sub path is not effectively encrypted end to end, an attacker able to observe the edge-to-core segment can intercept accepted customer readings before `process:telemetry-normalizer` loads them into the analytics environment. Second-order, the intercepted telemetry can be correlated with the customer-site data later held by `store:telemetry-lake`, enabling profiling of customer activity. This is a conditional finding about the unverified transport state.",
+          "affected_element_ids": [
+            "flow:device-gateway-to-telemetry-normalizer:forward-readings",
+            "process:device-gateway",
+            "process:telemetry-normalizer"
+          ],
+          "verb": "intercept",
+          "evidence_refs": [
+            "unknown:flow:device-gateway-to-telemetry-normalizer:forward-readings:encryption_in_transit",
+            "crossing:flow:device-gateway-to-telemetry-normalizer:forward-readings"
+          ],
+          "quotes": [],
+          "absent_elements": [],
+          "sequence": 3,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "medium",
+            "level": "medium",
+            "justification": "Likelihood is medium and conditional on `unknown:flow:device-gateway-to-telemetry-normalizer:forward-readings:encryption_in_transit`: the flow crosses the ingest-edge to analytics-core boundary, although observing it requires a position on that path. Impact is medium because the flow is tagged `pii` and exposes customer telemetry."
+          },
+          "mitigations": [
+            {
+              "summary": "Enforce encrypted service-to-service Pub/Sub transport",
+              "detail": "Verify and require TLS for `flow:device-gateway-to-telemetry-normalizer:forward-readings`; use authenticated workload identities or mTLS where the deployment topology permits."
+            },
+            {
+              "summary": "Minimize telemetry fields before publication",
+              "detail": "Avoid forwarding stable device identifiers or other unnecessary correlators in the Pub/Sub payload when the normalizer does not need them."
+            }
+          ]
+        },
+        {
+          "title": "Telemetry-lake ingestion may expose customer location and occupancy data on the internal path",
+          "description": "`flow:telemetry-normalizer-to-telemetry-lake:load-readings` transfers site addresses, occupancy patterns, and readings to `store:telemetry-lake`, but `encryption_in_transit` is `unknown`. If the internal BigQuery API segment lacks effective encryption, an attacker with an analytics-core network or workload foothold can intercept these customer records in transit. Second-order, the captured information reveals where customers operate and when sites are occupied, and can be correlated with the data subsequently queried from `store:telemetry-lake`. This is conditional on verification of the unknown transport attribute.",
+          "affected_element_ids": [
+            "flow:telemetry-normalizer-to-telemetry-lake:load-readings",
+            "process:telemetry-normalizer",
+            "store:telemetry-lake"
+          ],
+          "verb": "intercept",
+          "evidence_refs": [
+            "unknown:flow:telemetry-normalizer-to-telemetry-lake:load-readings:encryption_in_transit"
+          ],
+          "quotes": [],
+          "absent_elements": [],
+          "sequence": 4,
+          "severity": {
+            "likelihood": "low",
+            "impact": "high",
+            "level": "medium",
+            "justification": "Likelihood is low and conditional on `unknown:flow:telemetry-normalizer-to-telemetry-lake:load-readings:encryption_in_transit`: this is an internal analytics-core path, so an attacker needs a prior network or workload foothold. Impact is high because `store:telemetry-lake` contains PII, business-critical data, site addresses, and occupancy patterns."
+          },
+          "mitigations": [
+            {
+              "summary": "Verify and enforce encrypted lake ingestion",
+              "detail": "Require TLS for `flow:telemetry-normalizer-to-telemetry-lake:load-readings` and use authenticated workload identities for the normalizer-to-BigQuery connection."
+            },
+            {
+              "summary": "Limit data carried by the ingestion flow",
+              "detail": "Tokenize or separate direct site-address fields before transport where the lake-loading operation does not require them in clear form."
+            }
+          ]
+        },
+        {
+          "title": "Fleet dashboard traffic may expose raw customer telemetry to corporate-network observers",
+          "description": "`flow:fleet-operator-to-telemetry-lake:query-dashboards` crosses from `boundary:corporate-network` to `boundary:analytics-core` and returns aggregated and raw customer readings from `store:telemetry-lake`, but its `encryption_in_transit` is `unknown`. If this dashboard query path is not protected in transit, a malicious corporate-network insider or an attacker positioned on that crossing can intercept operators' results, including PII and business-sensitive customer telemetry. Second-order, raw results reveal site addresses and occupancy patterns from `store:telemetry-lake`, enabling surveillance or targeted physical and social-engineering attacks against affected customers. This is conditional on the unverified encryption state.",
+          "affected_element_ids": [
+            "flow:fleet-operator-to-telemetry-lake:query-dashboards",
+            "entity:fleet-operator",
+            "store:telemetry-lake"
+          ],
+          "verb": "intercept",
+          "evidence_refs": [
+            "unknown:flow:fleet-operator-to-telemetry-lake:query-dashboards:encryption_in_transit",
+            "crossing:flow:fleet-operator-to-telemetry-lake:query-dashboards"
+          ],
+          "quotes": [],
+          "absent_elements": [],
+          "sequence": 5,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional on `unknown:flow:fleet-operator-to-telemetry-lake:query-dashboards:encryption_in_transit`: the corporate-to-core boundary gives an insider or compromised corporate host a plausible observation point. Impact is high because the query returns raw and aggregated customer readings from a store tagged `pii` and `business-critical-data`."
+          },
+          "mitigations": [
+            {
+              "summary": "Require TLS for dashboard queries",
+              "detail": "Verify end-to-end TLS for `flow:fleet-operator-to-telemetry-lake:query-dashboards`, including any internal proxy or query-service segment."
+            },
+            {
+              "summary": "Constrain dashboard responses",
+              "detail": "Authorize and minimize dashboard fields server-side so operators receive only the aggregate or customer scope needed for their role."
+            }
+          ]
+        },
+        {
+          "title": "A raw copy of the device registry may reveal fleet credentials if at-rest encryption is absent",
+          "description": "`store:device-registry` is classified confidential, contains credentials, and has `encryption_at_rest: unknown`. If that unknown resolves to unencrypted storage, an attacker who obtains a storage-layer copy, such as an operational export, snapshot, or decommissioned storage artifact associated with the registry, can read fleet key checks and customer assignments without using the gateway's normal read path. Second-order, recovered fleet key material can be used against `process:device-gateway` to attempt authentication as deployed nodes. This claim is conditional on the unknown at-rest encryption attribute and does not assert that the Firestore data is unencrypted.",
+          "affected_element_ids": [
+            "store:device-registry"
+          ],
+          "verb": "recover-credential",
+          "evidence_refs": [
+            "unknown:store:device-registry:encryption_at_rest"
+          ],
+          "quotes": [],
+          "absent_elements": [],
+          "sequence": 6,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional on `unknown:store:device-registry:encryption_at_rest`: acquiring a storage-layer copy requires access to an operational artifact, but the at-rest control is unverified. Impact is high because `store:device-registry` is confidential and tagged `credentials`, whose disclosure can enable access attempts through `process:device-gateway`."
+          },
+          "mitigations": [
+            {
+              "summary": "Verify and enforce encryption for registry data and copies",
+              "detail": "Establish the at-rest posture of `store:device-registry`; require managed-key encryption covering exports, backups, snapshots, and other operational copies, with tightly scoped key use."
+            },
+            {
+              "summary": "Replace reusable fleet credentials",
+              "detail": "Move from a fleet-wide pre-shared key to unique, short-lived or rotatable per-device credentials so one recovered registry artifact does not expose the fleet."
+            }
+          ]
+        },
+        {
+          "title": "A telemetry-lake export may disclose customer site and occupancy records if storage is unencrypted",
+          "description": "`store:telemetry-lake` holds customer data including site addresses and occupancy patterns, is tagged `pii` and `business-critical-data`, and has `encryption_at_rest: unknown`. If the unresolved attribute means the lake or its operational copies are not encrypted at rest, a party obtaining a storage-layer export, snapshot, backup, or decommissioned artifact can read the dataset without authenticating through the dashboard flow. Second-order, the disclosure supports customer surveillance and targeting using location and occupancy information and exposes records that fleet operators otherwise access through `flow:fleet-operator-to-telemetry-lake:query-dashboards`. This is conditional on the unknown encryption-at-rest state.",
+          "affected_element_ids": [
+            "store:telemetry-lake"
+          ],
+          "verb": "read",
+          "evidence_refs": [
+            "unknown:store:telemetry-lake:encryption_at_rest"
+          ],
+          "quotes": [],
+          "absent_elements": [],
+          "sequence": 7,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium and conditional on `unknown:store:telemetry-lake:encryption_at_rest`: obtaining a storage-layer copy requires access to an operational artifact, but no verified at-rest protection is stated. Impact is high because `store:telemetry-lake` contains customer site addresses and occupancy patterns and is tagged `pii` and `business-critical-data`."
+          },
+          "mitigations": [
+            {
+              "summary": "Encrypt the lake and every operational copy at rest",
+              "detail": "Verify the posture of `store:telemetry-lake` and enforce managed-key encryption for the dataset, backups, snapshots, exports, and replicas; restrict export and key-use permissions."
+            },
+            {
+              "summary": "Reduce sensitivity of retained analytics data",
+              "detail": "Apply field-level protection or tokenization to site-address data and retain occupancy detail only for the minimum period and audience required."
+            }
+          ]
+        }
+      ],
+      "invalid": []
+    },
+    "denial-of-service": {
+      "claims": [
+        {
+          "title": "Flooding with a fleet-wide node key can exhaust the device gateway",
+          "description": "An attacker who obtains the fleet-wide pre-shared key from one deployed node can flood `process:device-gateway` with high-rate MQTT publishes over `flow:sensor-node-to-device-gateway:publish-readings`. The gateway is internet-facing and must authenticate each attempted publish by consulting `store:device-registry`; the attacker spends cheap repeated MQTT messages while consuming broker connection, authentication, and registry-read capacity. The model does not state rate limits, per-device quotas, connection limits, or load shedding, so their presence is unverified. Second-order, saturation prevents legitimate sensor ingest and also stalls accepted-reading delivery toward `process:telemetry-normalizer` through `flow:device-gateway-to-telemetry-normalizer:forward-readings`, delaying loads into `store:telemetry-lake` for the fleet.",
+          "affected_element_ids": [
+            "process:device-gateway",
+            "flow:sensor-node-to-device-gateway:publish-readings"
+          ],
+          "verb": "flood",
+          "evidence_refs": [
+            "crossing:flow:sensor-node-to-device-gateway:publish-readings"
+          ],
+          "quotes": [
+            {
+              "text": "The key is per fleet, not per device. Nobody has rotated it since deployment.",
+              "source_label": "System description"
+            },
+            {
+              "text": "an MQTT broker we run on GKE and expose to the internet because the nodes dial in from anywhere",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 1,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium: `flow:sensor-node-to-device-gateway:publish-readings` crosses from `boundary:field-network` into the internet-facing `process:device-gateway`, but the attacker must first obtain the shared fleet key. Impact is high: `process:device-gateway` is tagged `availability-critical`, and its saturation blocks fleet-wide reading ingestion and the downstream normalizer and lake pipeline."
+          },
+          "mitigations": [
+            {
+              "summary": "Replace the fleet-wide key with individually revocable node identities",
+              "detail": "Use a unique credential or certificate per `entity:sensor-node`, rotate credentials, and revoke a compromised node without enabling fleet-wide publishing."
+            },
+            {
+              "summary": "Bound ingest work before registry and downstream processing",
+              "detail": "Apply per-device and per-source MQTT connection, message-rate, payload-size, and in-flight-message limits at `process:device-gateway`; shed excess load before repeated registry lookups and Pub/Sub publication."
+            },
+            {
+              "summary": "Protect downstream dependencies from ingest bursts",
+              "detail": "Set bounded queues and consumer concurrency between `process:device-gateway` and `process:telemetry-normalizer` so a broker flood cannot create unbounded processing and BigQuery-load work."
+            }
+          ]
+        },
+        {
+          "title": "Anonymous firmware polling can exhaust public bucket service for deployed nodes",
+          "description": "Because `flow:sensor-node-to-firmware-bucket:poll-firmware` explicitly permits unauthenticated reads and crosses from `boundary:field-network` to `store:firmware-bucket`, any internet attacker can repeatedly request firmware images without a credential. Repeated large-object reads can consume the bucket's serving bandwidth, request quota, or metered budget at lower attacker cost than the aggregate delivery cost to the platform. The model does not state request throttling, caching, quota isolation, or budget limits, so those protections are unverified. Second-order, legitimate `entity:sensor-node` instances cannot reliably poll `store:firmware-bucket` for updates while it is saturated, delaying fleet remediation and operational updates.",
+          "affected_element_ids": [
+            "store:firmware-bucket",
+            "flow:sensor-node-to-firmware-bucket:poll-firmware"
+          ],
+          "verb": "flood",
+          "evidence_refs": [
+            "absent:flow:sensor-node-to-firmware-bucket:poll-firmware:authentication",
+            "crossing:flow:sensor-node-to-firmware-bucket:poll-firmware"
+          ],
+          "quotes": [
+            {
+              "text": "The bucket is public read, because making the nodes authenticate to it was awkward.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 2,
+          "severity": {
+            "likelihood": "high",
+            "impact": "medium",
+            "level": "high",
+            "justification": "Likelihood is high: `flow:sensor-node-to-firmware-bucket:poll-firmware` crosses a trust boundary and its authentication is stated absent, so any internet attacker can issue requests without prerequisites. Impact is medium: `store:firmware-bucket` contains `business-critical-data` and saturation disrupts update delivery to the deployed sensor fleet, but the model does not establish an immediate irreversible outage."
+          },
+          "mitigations": [
+            {
+              "summary": "Introduce authenticated and rate-limited firmware delivery",
+              "detail": "Give each `entity:sensor-node` a device-specific delivery identity or signed time-limited retrieval authorization, then enforce per-identity and per-source request and bandwidth limits for `store:firmware-bucket`."
+            },
+            {
+              "summary": "Bound firmware-object delivery costs",
+              "detail": "Set request, egress, and budget quotas with alerts for `store:firmware-bucket`, and use cacheable versioned firmware objects so normal polling does not repeatedly trigger expensive origin delivery."
+            },
+            {
+              "summary": "Make nodes tolerate a temporarily unavailable update source",
+              "detail": "Have `entity:sensor-node` use exponential-backoff polling and retain the last verified firmware image so an update-delivery outage does not cause retry amplification or interrupt normal sensing."
+            }
+          ]
+        }
+      ],
+      "invalid": []
+    },
+    "elevation-of-privilege": {
+      "claims": [
+        {
+          "title": "A compromised internet-facing gateway can pivot into the analytics core",
+          "description": "An attacker who compromises `process:device-gateway` gains the gateway's ability to publish on `flow:device-gateway-to-telemetry-normalizer:forward-readings`, which crosses from the ingest edge into the analytics core. Authentication on that internal flow is unverified; if `process:telemetry-normalizer` does not authenticate and authorize the gateway's publishing identity and constrain what it may submit, a foothold in the internet-facing gateway can reach the core normalizer and make it process attacker-controlled readings. Second-order, `process:telemetry-normalizer` loads those readings through `flow:telemetry-normalizer-to-telemetry-lake:load-readings` into `store:telemetry-lake`, allowing the attacker to exercise the normalizer's trusted write path against customer telemetry. This is conditional on the unstated authentication and authorization controls for the gateway-to-normalizer flow, not an assertion that they are absent.",
+          "affected_element_ids": [
+            "process:device-gateway",
+            "flow:device-gateway-to-telemetry-normalizer:forward-readings",
+            "process:telemetry-normalizer"
+          ],
+          "verb": "escalate",
+          "evidence_refs": [
+            "crossing:flow:device-gateway-to-telemetry-normalizer:forward-readings",
+            "unknown:flow:device-gateway-to-telemetry-normalizer:forward-readings:authentication",
+            "unknown:flow:telemetry-normalizer-to-telemetry-lake:load-readings:authentication"
+          ],
+          "quotes": [
+            {
+              "text": "the device gateway, which is an MQTT broker we run on GKE and expose to the internet because the nodes dial in from anywhere.",
+              "source_label": "System description"
+            },
+            {
+              "text": "Readings the gateway accepts are forwarded onto Pub/Sub and picked up by the telemetry normalizer, a Python consumer in our analytics network, which writes them into the telemetry lake in BigQuery.",
+              "source_label": "System description"
+            }
+          ],
+          "absent_elements": [],
+          "sequence": 1,
+          "severity": {
+            "likelihood": "medium",
+            "impact": "high",
+            "level": "high",
+            "justification": "Likelihood is medium: `process:device-gateway` is exposed to the internet, but exploitation requires compromising that process and is conditional on the unverified authentication of `flow:device-gateway-to-telemetry-normalizer:forward-readings`. Impact is high: the resulting core-side processing path reaches `store:telemetry-lake`, which contains PII and business-critical customer telemetry including site addresses and occupancy patterns."
+          },
+          "mitigations": [
+            {
+              "summary": "Authenticate and scope the gateway-to-normalizer publish path",
+              "detail": "Configure `flow:device-gateway-to-telemetry-normalizer:forward-readings` to use a distinct workload identity with only the required Pub/Sub publish permission, and have `process:telemetry-normalizer` accept messages only from that authenticated producer."
+            },
+            {
+              "summary": "Authorize and validate ingestion at the analytics boundary",
+              "detail": "Have `process:telemetry-normalizer` validate message provenance, device/customer binding, and permitted message structure before using its BigQuery write authority on `flow:telemetry-normalizer-to-telemetry-lake:load-readings`."
+            },
+            {
+              "summary": "Contain a gateway compromise",
+              "detail": "Restrict `process:device-gateway` egress to the narrowly required Pub/Sub destination and use per-destination, short-lived credentials so an edge-process foothold cannot obtain broader analytics-core reach."
+            }
+          ]
+        }
+      ],
+      "invalid": []
+    }
+  }
+}
