@@ -178,6 +178,23 @@ class _ReportedCharge:
 
 
 @dataclass(frozen=True)
+class _UpstreamPin:
+    """How a gateway's request names the upstream providers it may reach.
+
+    Three field names in the request body, because a gateway spells them its
+    own way: ``field`` is the routing object, ``only`` its allowlist, and
+    ``fallbacks`` the flag that would let the gateway leave the list when every
+    named upstream is busy. :meth:`Vendor.upstream_kwargs` is the one reader,
+    and it always sets the flag off: a pin the gateway may abandon is not a
+    pin, and the served upstream is what a **Baseline** is named after.
+    """
+
+    field: str
+    only: str
+    fallbacks: str
+
+
+@dataclass(frozen=True)
 class _CredentialVar:
     """One environment variable a ``(vendor, mode)`` pair reads.
 
@@ -790,6 +807,22 @@ class Vendor:
     #: row nobody has written: any route in front of more than one provider
     #: says ``False`` here, whoever operates it.
     routes_to_one_provider: bool
+    #: How a deployment pins which upstream providers a request may reach, or
+    #: ``None`` where there is nothing to pin.
+    #:
+    #: The request-side half of :attr:`routes_to_one_provider`. A vendor that
+    #: routes to one provider has no upstream to choose, so it answers
+    #: ``None``, and a ``[upstreams]`` key for it is a load error. An
+    #: aggregator answers with the body fields that carry the allowlist.
+    #: OpenRouter takes ``provider.only`` with ``provider.allow_fallbacks``
+    #: (its provider routing reference, read 2026-09-12), and litellm merges an
+    #: ``extra_body`` kwarg into the request body it sends there — measured on
+    #: 1.97.0 by ``tests/test_model_gate.py``.
+    #:
+    #: Stated per vendor rather than assumed from the flag, because two
+    #: gateways would spell the fields two ways, and a row that names none
+    #: must say so rather than inherit a shape.
+    upstream_pin: _UpstreamPin | None
     #: What this vendor reports about the charge it made, keyed by the
     #: arrangement a deployment can run under.
     #:
@@ -901,6 +934,26 @@ class Vendor:
                 " so the deployment declares which one; ask the tier config"
             )
         return modes[0]
+
+    def upstream_kwargs(self, upstreams: tuple[str, ...]) -> dict[str, object]:
+        """The adapter kwarg that pins a request to ``upstreams``, or nothing.
+
+        Empty where the deployment declared no upstreams, so a direct vendor
+        and an unpinned gateway both build the adapter they always did. Raises
+        where upstreams were declared for a vendor with nothing to pin, which
+        the loader refuses first; this is the second reader saying the same
+        thing rather than a silent kwarg the gateway would ignore.
+        """
+        if not upstreams:
+            return {}
+        if self.upstream_pin is None:
+            raise ValueError(
+                f"{self.name!r} routes to one provider, so there is no upstream to pin"
+            )
+        pin = self.upstream_pin
+        return {
+            "extra_body": {pin.field: {pin.only: list(upstreams), pin.fallbacks: False}}
+        }
 
     @property
     def charge_modes(self) -> tuple[ChargeMode, ...]:
@@ -1091,6 +1144,7 @@ VENDORS: dict[VendorName, Vendor] = {
         # never reads it.
         served_trust="requested_echo",
         routes_to_one_provider=True,
+        upstream_pin=None,
         # Vertex admits no raw-API-key path under any adapter
         # (``BerriAI/litellm#21036``), so ``vertex + api_key`` is
         # unrepresentable rather than validated against. Under ``IAM`` it
@@ -1123,6 +1177,7 @@ VENDORS: dict[VendorName, Vendor] = {
         # transformation.
         served_trust="provider_reported",
         routes_to_one_provider=True,
+        upstream_pin=None,
         credentials={CredentialMode.API_KEY: _api_key_source("anthropic")},
         form_rules=(_CLAUDE_RULE, _CATCH_ALL),
         sdk=None,
@@ -1136,6 +1191,7 @@ VENDORS: dict[VendorName, Vendor] = {
         # OpenAI-shaped response dict.
         served_trust="provider_reported",
         routes_to_one_provider=True,
+        upstream_pin=None,
         credentials={CredentialMode.API_KEY: _api_key_source("openai")},
         form_rules=(_CLAUDE_RULE, _CATCH_ALL),
         sdk=None,
@@ -1153,6 +1209,7 @@ VENDORS: dict[VendorName, Vendor] = {
         # fills ``model_response.model`` from the request.
         served_trust="requested_echo",
         routes_to_one_provider=True,
+        upstream_pin=None,
         credentials={
             # Under ``API_KEY`` Bedrock passes a bearer token and a region.
             # litellm's ``_sign_request`` reads the bearer off the ``api_key``
@@ -1212,6 +1269,7 @@ VENDORS: dict[VendorName, Vendor] = {
         # request and never reads the body's ``modelVersion``.
         served_trust="requested_echo",
         routes_to_one_provider=True,
+        upstream_pin=None,
         # The Developer API takes a key and nothing else. It is a different
         # provider from ``vertex`` rather than a second mode on it:
         # ``get_llm_provider`` resolves ``gemini/`` and ``vertex_ai/`` to two
@@ -1293,6 +1351,12 @@ VENDORS: dict[VendorName, Vendor] = {
         # slug the request named. Measured, not inferred: see above.
         served_trust="requested_echo",
         routes_to_one_provider=False,
+        # OpenRouter's provider routing object. ``only`` is the allowlist of
+        # provider slugs, and ``allow_fallbacks`` off keeps the gateway inside
+        # it. Endpoint variants take the slug with a tag: ``openai/flex``.
+        upstream_pin=_UpstreamPin(
+            field="provider", only="only", fallbacks="allow_fallbacks"
+        ),
         # A bearer token and nothing else. litellm reads ``OPENROUTER_API_KEY``
         # and then ``OR_API_KEY`` out of the process environment whenever
         # ``api_key`` is absent; the registry declares neither, and the key is

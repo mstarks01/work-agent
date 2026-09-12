@@ -337,6 +337,42 @@ def test_the_pipeline_binds_retry_and_timeout():
     )
 
 
+OPENROUTER_ENV = {
+    tier: "openrouter"
+    for tier in (
+        "ANALYSIS_MODEL_BASE_VENDOR",
+        "ANALYSIS_MODEL_STRONG_VENDOR",
+        "ANALYSIS_MODEL_REVIEW_VENDOR",
+    )
+} | {
+    "ANALYSIS_MODEL_BASE_MODEL": "anthropic/claude-sonnet-4.6",
+    "ANALYSIS_MODEL_STRONG_MODEL": "anthropic/claude-opus-4.7",
+    "ANALYSIS_MODEL_REVIEW_MODEL": "anthropic/claude-opus-4.7",
+    "ANALYSIS_MODEL_CHARGES_OPENROUTER": "direct",
+    "ANALYSIS_OPENROUTER_API_KEY": "sk-or-test",
+}
+
+
+def test_a_declared_upstream_rides_the_adapter_as_the_request_body_pin():
+    """The pin crosses the seam as ``extra_body``, which litellm merges into the body."""
+    env = OPENROUTER_ENV | {"ANALYSIS_MODEL_UPSTREAMS_OPENROUTER": "openai"}
+    pipeline = Deployment.from_env(env=env).pipeline(DEFAULT_FRAMEWORKS)
+    nodes = {node.name: node for node in pipeline.workflow.graph.nodes}
+
+    assert translator_of(nodes[CRITIC_NODE].model)._additional_args["extra_body"] == {
+        "provider": {"only": ["openai"], "allow_fallbacks": False}
+    }
+
+
+def test_an_unpinned_gateway_and_a_direct_vendor_send_no_pin():
+    for env in (OPENROUTER_ENV, VERTEX_ENV):
+        pipeline = Deployment.from_env(env=env).pipeline(DEFAULT_FRAMEWORKS)
+        nodes = {node.name: node for node in pipeline.workflow.graph.nodes}
+        assert (
+            "extra_body" not in translator_of(nodes[CRITIC_NODE].model)._additional_args
+        )
+
+
 def test_drop_params_is_never_set_so_litellm_stays_fail_closed():
     """The sampling fingerprint's honesty depends on it (map Notes, #8)."""
     pipeline = Deployment.from_env(env=VERTEX_ENV).pipeline(DEFAULT_FRAMEWORKS)

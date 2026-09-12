@@ -515,6 +515,82 @@ class TestDeclaredChargeMode:
             )
 
 
+class TestDeclaredUpstreams:
+    """A deployment may pin which upstreams a gateway request reaches.
+
+    Optional where the credential and charge tables are required: an analysis
+    is an analysis whichever upstream answers, and what a pin buys is a
+    Baseline. Both halves read ``Vendor.upstream_pin``, so the rule follows the
+    registry.
+    """
+
+    CHARGES = '\n[charges]\nopenrouter = "direct"\n'
+
+    def test_no_declaration_pins_nothing(self, config_path):
+        tiers = load_model_tiers(config_path(_openrouter_toml() + self.CHARGES), env={})
+        assert tiers.upstreams == {}
+        assert tiers.upstreams_for("openrouter") == ()
+
+    def test_the_file_declares_the_upstreams(self, config_path):
+        path = config_path(
+            _openrouter_toml()
+            + self.CHARGES
+            + '\n[upstreams]\nopenrouter = ["openai"]\n'
+        )
+        assert load_model_tiers(path, env={}).upstreams_for("openrouter") == ("openai",)
+
+    def test_the_environment_declares_them_as_a_comma_separated_list(self, config_path):
+        tiers = load_model_tiers(
+            config_path(config_toml()),
+            env={
+                "ANALYSIS_MODEL_BASE_VENDOR": "openrouter",
+                "ANALYSIS_MODEL_BASE_MODEL": "anthropic/claude-sonnet-4.6",
+                "ANALYSIS_MODEL_CHARGES_OPENROUTER": "direct",
+                "ANALYSIS_MODEL_UPSTREAMS_OPENROUTER": "openai/flex, azure",
+            },
+        )
+        assert tiers.upstreams_for("openrouter") == ("openai/flex", "azure")
+
+    def test_an_empty_environment_declaration_is_an_error(self, config_path):
+        with pytest.raises(ModelConfigError, match="set but empty"):
+            load_model_tiers(
+                config_path(config_toml()),
+                env={"ANALYSIS_MODEL_UPSTREAMS_OPENROUTER": " "},
+            )
+
+    def test_an_empty_list_is_an_error(self, config_path):
+        path = config_path(
+            _openrouter_toml() + self.CHARGES + "\n[upstreams]\nopenrouter = []\n"
+        )
+        with pytest.raises(ModelConfigError, match="names no upstream"):
+            load_model_tiers(path, env={})
+
+    @pytest.mark.parametrize("bad", ["OpenAI", "openai/", "a b", "openai/flex/x"])
+    def test_a_string_that_is_not_a_slug_is_an_error(self, config_path, bad):
+        path = config_path(
+            _openrouter_toml()
+            + self.CHARGES
+            + f'\n[upstreams]\nopenrouter = ["{bad}"]\n'
+        )
+        with pytest.raises(ModelConfigError, match="not a provider slug"):
+            load_model_tiers(path, env={})
+
+    @pytest.mark.parametrize(
+        "name", [name for name, v in VENDORS.items() if v.upstream_pin is None]
+    )
+    def test_pinning_a_vendor_with_nothing_to_pin_is_an_error(self, config_path, name):
+        path = config_path(config_toml() + f'\n[upstreams]\n{name} = ["openai"]\n')
+        with pytest.raises(ModelConfigError, match="no upstream to pin"):
+            load_model_tiers(path, env={})
+
+    def test_every_vendor_that_can_be_pinned_routes_to_more_than_one_provider(self):
+        """The two registry answers are one fact seen from two sides."""
+        for name, vendor in VENDORS.items():
+            assert (vendor.upstream_pin is not None) == (
+                not vendor.routes_to_one_provider
+            ), name
+
+
 class TestDeclaredCredentialMode:
     """A deployment declares a mode only where the vendor gives it a choice.
 
