@@ -54,6 +54,16 @@ import sys
 from pathlib import Path
 from typing import Any
 
+# A migration runs as a script, so ``sys.path[0]`` is this directory and the
+# repository root is not on the path. The editable install puts
+# ``analysis_service`` there; ``evals`` is a namespace package in the tree and
+# has to be pointed at.
+REPO_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO_ROOT))
+
+from evals.harness.archive import archive_bytes
+from evals.harness.bundle import kind_of_path
+
 #: The key the node record no longer holds. Not a path: an archived artifact
 #: carries node executions in more than one place, and the rule is a property
 #: of the key rather than of where it sits.
@@ -144,7 +154,15 @@ def migrate(root: Path, corpus: Path, write: bool) -> Counts:
             f" {path.relative_to(root.parent)}"
         )
         if write:
-            path.write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
+            kind = kind_of_path(path)
+            if kind is None:
+                # Refuse rather than guess. A corpus model, a sitting and a
+                # sweep artifact are all ``*.json`` and their producers write
+                # three different encodings; picking one re-encodes two of
+                # them under a seal that recomputes itself over the edit.
+                print(f"  {path}: no declared producer for this file, left alone")
+                continue
+            path.write_text(archive_bytes(kind, raw), encoding="utf-8")
     verb = "filled" if write else "would fill"
     print(
         f"\n{verb} {totals.filled} attribute(s)"

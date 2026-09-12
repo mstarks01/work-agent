@@ -38,6 +38,16 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+# A migration runs as a script, so ``sys.path[0]`` is this directory and the
+# repository root is not on the path. The editable install puts
+# ``analysis_service`` there; ``evals`` is a namespace package in the tree and
+# has to be pointed at.
+REPO_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO_ROOT))
+
+from evals.harness.archive import archive_bytes
+from evals.harness.bundle import kind_of_path
+
 RENAMED = {"applicable": "not-raised"}
 UNDECIDABLE_PREFIX = "the input never says whether"
 
@@ -89,7 +99,15 @@ def migrate(root: Path, write: bool) -> Counts:
             f" {counts.undecidable} not-applicable -> undecidable"
         )
         if write:
-            path.write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
+            kind = kind_of_path(path)
+            if kind is None:
+                # Refuse rather than guess. A corpus model, a sitting and a
+                # sweep artifact are all ``*.json`` and their producers write
+                # three different encodings; picking one re-encodes two of
+                # them under a seal that recomputes itself over the edit.
+                print(f"  {path}: no declared producer for this file, left alone")
+                continue
+            path.write_text(archive_bytes(kind, raw), encoding="utf-8")
         totals.add(counts)
     return totals
 

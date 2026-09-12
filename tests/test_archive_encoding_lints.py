@@ -13,28 +13,31 @@ JSON parses to the same value, and ``verify`` recomputes whatever is on disk.
 That is exactly why it needs a lint — the seal that exists to make a silent
 edit loud cannot see one that moves with it.
 
-**The check is the producer's own spelling, not a preference.**
-``json.dumps(value, ensure_ascii=False, indent=2) + "\\n"`` reproduces
-``model_dump_json(indent=2) + "\\n"`` byte for byte, which is the fact the lint
-below asserts first — so a report that fails the second assertion was rewritten
-by something that is not the producer.
+**A Baseline holds five kinds of file and three encodings**, and two of the
+three sit in one directory: ``bundle`` writes a report in UTF-8 and, three
+lines later, the drafts beside it in escaped ASCII. So "the archive is UTF-8"
+is a rule a reader learns from whichever writer they happened to open, and it
+is wrong for three of the five kinds. :mod:`evals.harness.archive` is the one
+table that answers, every producer writes through it, and this file holds the
+committed bytes against it.
 
-**A sweep artifact has the other producer, and the two spellings are opposite.**
-``evals/harness/run.py`` writes an artifact with ``json.dumps(document,
-indent=2) + "\\n"`` and the default ``ensure_ascii=True``. So the rule is not
-"UTF-8 everywhere" — it is "the bytes the producer writes", and which producer
-depends on the file. A migration written from the wrong sibling script escapes
-one archive or unescapes the other, and both re-stamp a **Baseline**'s digests
-over an edit nobody meant.
+**Driven by the manifest, not by a glob.** ``baseline.json`` records a digest
+for every file its sweep owns, so its ``files`` map is the list of exactly what
+a Baseline seals. Reading the file set from there means a sixth kind added to
+``bundle`` tomorrow arrives here as a file with no declared producer, and fails,
+rather than being quietly unread the way ``*.drafts.json`` and
+``*.proposals.json`` were.
 
-Held here because it is currently unobservable: no committed artifact carries a
-non-ASCII byte, so the two encodings agree on every file in the tree today. The
-first sweep that records an em-dash is what separates them, and by then the
-migration is already written.
+The encodings are currently indistinguishable on the tree's own contents: every
+committed file is ASCII and every manifest is already key-sorted, so all three
+spellings agree on all 42 files today. The premise tests below are what keep
+this from passing vacuously — they give the writers one non-ASCII character and
+one out-of-order key, and require them to part.
 """
 
 from __future__ import annotations
 
+import ast
 import json
 import subprocess
 from pathlib import Path
@@ -42,12 +45,19 @@ from pathlib import Path
 import pytest
 
 from analysis_service.report import Report
+from evals.harness.archive import (
+    ARCHIVE_SPELLINGS,
+    UnknownArchiveKind,
+    archive_bytes,
+    kind_of,
+)
+from evals.harness.bundle import kind_of_path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
-def _tracked_reports() -> list[Path]:
-    """Every archived report **git holds**, which is what "the archive" means.
+def _tracked_manifests() -> list[Path]:
+    """Every Baseline manifest **git holds**, which is what "the archive" means.
 
     Read from the index rather than from a walk of the tree. ``evals/runs/`` is
     gitignored working output, so a walk would assert over whatever sweeps this
@@ -56,7 +66,7 @@ def _tracked_reports() -> list[Path]:
     the tracked ones.
     """
     found = subprocess.run(
-        ["git", "ls-files", "-z", "--", "*.report.json"],
+        ["git", "ls-files", "-z", "--", "evals/baselines/*/baseline.json"],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
@@ -65,116 +75,220 @@ def _tracked_reports() -> list[Path]:
     return sorted(REPO_ROOT / rel for rel in found.stdout.split("\0") if rel)
 
 
-def _tracked_artifacts() -> list[Path]:
-    """Every archived sweep artifact git holds.
+def _sealed_files() -> list[tuple[Path, str | None]]:
+    """Every file a Baseline seals, paired with the kind its producer declared.
 
-    A Baseline directory holds its artifacts beside ``baseline.json``, which is
-    the manifest rather than a sweep, and the per-case reports sit under a
-    ``.reports`` directory the pattern above already claims.
+    The manifest names the sweep artifact outright in its ``artifact`` field,
+    which is the only place that fact is written down: an artifact is
+    ``<stem>.json`` and no suffix separates it from any other JSON file. Every
+    other file answers to :func:`~evals.harness.archive.kind_of`, and a file
+    that answers to neither is carried here as ``None`` so the completeness test
+    below can name it.
     """
-    found = subprocess.run(
-        ["git", "ls-files", "-z", "--", "evals/baselines/*.json"],
-        cwd=REPO_ROOT,
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    return sorted(
-        REPO_ROOT / rel
-        for rel in found.stdout.split("\0")
-        if rel and Path(rel).name != "baseline.json" and ".reports/" not in rel
-    )
+    sealed: list[tuple[Path, str | None]] = []
+    for manifest in _tracked_manifests():
+        sealed.append((manifest, "manifest"))
+        directory = manifest.parent
+        document = json.loads(manifest.read_text(encoding="utf-8"))
+        for sweep in document.get("sweeps", []):
+            artifact = sweep.get("artifact")
+            for relative in sweep.get("files", {}):
+                name = Path(relative).name
+                kind = "artifact" if name == artifact else kind_of(name)
+                sealed.append((directory / relative, kind))
+    return sorted(set(sealed))
 
 
 #: Sorted so a failure names the same file on every machine.
-REPORTS = _tracked_reports()
-ARTIFACTS = _tracked_artifacts()
+SEALED = _sealed_files()
 
 
-def producer_bytes(value: object) -> str:
-    """One JSON value in the encoding ``bundle`` writes a report in."""
-    return json.dumps(value, ensure_ascii=False, indent=2) + "\n"
-
-
-def test_some_report_is_archived():
+def test_a_baseline_is_archived():
     """A lint over an empty list passes and protects nothing."""
-    assert REPORTS
+    assert _tracked_manifests()
+    assert SEALED
 
 
-def test_the_producer_and_this_lint_spell_one_encoding():
+def test_every_sealed_file_has_a_declared_producer():
+    """The completeness half, and the one that was missing.
+
+    ``*.drafts.json`` and ``*.proposals.json`` are 26 of the 42 files a Baseline
+    seals, and the lint that held the archive to its producer's bytes read
+    neither of them — it read ``*.report.json`` and the artifact, and its own
+    comment asserted that the report pattern claimed the whole ``.reports``
+    directory. It claims a third of it.
+
+    Driven off the manifest, so this cannot happen again by omission: a file
+    kind a Baseline seals and nobody declared a producer for arrives here as
+    ``None`` and fails, naming the file.
+    """
+    undeclared = sorted(
+        str(path.relative_to(REPO_ROOT)) for path, kind in SEALED if kind is None
+    )
+
+    assert not undeclared, (
+        f"a Baseline seals these files and no producer is declared for them:"
+        f" {undeclared}. Add the kind to evals/harness/archive.py, which is"
+        f" where the archive's encodings are decided, and make the writer ask"
+        f" for it by name"
+    )
+
+
+def test_the_pydantic_producer_and_this_table_spell_one_encoding():
     """Held against ``model_dump_json`` rather than against an expectation.
 
     This is the pair-of-readers check the repository asks for wherever a second
-    reader is unavoidable: ``bundle`` writes through pydantic and this lint
-    writes through :mod:`json`, so the two are compared to each other. A
-    pydantic release that changed its indent or its escaping would fail here
-    rather than turn the lint below into noise.
+    reader is unavoidable: ``bundle`` writes a report through pydantic and
+    :mod:`evals.harness.archive` writes through :mod:`json`, so the two are
+    compared to each other. A pydantic release that changed its indent or its
+    escaping would fail here rather than turn the lints below into noise.
     """
-    report = Report.model_validate_json(REPORTS[0].read_text(encoding="utf-8"))
+    reports = [path for path, kind in SEALED if kind == "report"]
+    assert reports, "no archived report to compare the two writers on"
+    report = Report.model_validate_json(reports[0].read_text(encoding="utf-8"))
 
-    assert producer_bytes(json.loads(report.model_dump_json())) == (
+    assert archive_bytes("report", json.loads(report.model_dump_json())) == (
         report.model_dump_json(indent=2) + "\n"
     )
 
 
-@pytest.mark.parametrize("path", REPORTS, ids=lambda path: path.name)
-def test_an_archived_report_holds_the_bytes_its_producer_writes(path: Path):
-    """A migration that escapes the archive fails here, on every file it touched.
+def test_the_three_spellings_really_do_differ():
+    """The premise, asserted so the lints below cannot pass vacuously.
 
-    The repair is ``ensure_ascii=False`` in the migration and a re-run, not an
-    edit to this file: the bytes on disk are what a reader diffs a fresh sweep
-    against, and what a Baseline's digests are cut over.
+    Every committed file is ASCII and every manifest is already key-sorted, so
+    the three encodings agree on all 42 of them and the parametrised test would
+    pass under any one rule. This is what says the table is load-bearing: give
+    the writers one non-ASCII character and one out-of-order key, and they part.
+
+    Both axes are checked. Escaping is the one the #710 and #468 migrations
+    moved. Key order is the one a manifest alone carries, and it is the more
+    visible loss: a manifest rewritten in the report's spelling keeps every byte
+    of its values and reorders every key in the file.
     """
-    text = path.read_text(encoding="utf-8")
+    value = {"note": "an em-dash — here", "artifact": "a.json"}
 
-    assert text == producer_bytes(json.loads(text)), (
-        f"{path.relative_to(REPO_ROOT)} is not in the encoding bundle.py writes;"
-        " re-run evals/migrations/2026-09-11-restore-archive-encoding.py"
+    assert "\\u2014" in archive_bytes("drafts", value)
+    assert "—" in archive_bytes("report", value)
+    assert archive_bytes("drafts", value) != archive_bytes("report", value)
+
+    assert archive_bytes("manifest", value) != archive_bytes("report", value)
+    assert list(json.loads(archive_bytes("manifest", value))) == sorted(value)
+
+
+def test_a_kind_nobody_declared_refuses_rather_than_guessing():
+    """The table raises on a miss, which is what makes it self-completing.
+
+    A writer that added a sixth kind and inherited whichever spelling sat
+    nearest is how the archive got two encodings in one directory. This is the
+    guard against the next one.
+    """
+    with pytest.raises(UnknownArchiveKind, match="no producer is declared"):
+        archive_bytes("summary", {})
+
+    # And a reader gets a plain ``None`` rather than a raise, because a name it
+    # cannot place is an ordinary answer: an artifact is ``<stem>.json``.
+    assert kind_of("mstarks01-0ebfcca1.json") is None
+    assert kind_of("01-payments-checkout.drafts.json") == "drafts"
+
+    # A manifest is matched on its whole name. Under a suffix match this read
+    # as one, and the migration that walks every JSON file under ``evals/``
+    # would have sorted every key in it.
+    assert kind_of("baseline.json") == "manifest"
+    assert kind_of("my-baseline.json") is None
+
+
+def test_every_declared_kind_is_sealed_somewhere():
+    """The other direction: a kind in the table that no Baseline holds.
+
+    Not an error — a kind may be declared before the first sweep writes one —
+    so this reports rather than fails, and it is here because the table and the
+    archive are the two halves that have to be compared to each other.
+    """
+    held = {kind for _, kind in SEALED}
+
+    assert held <= set(ARCHIVE_SPELLINGS) | {None}
+    assert held >= {"manifest", "artifact", "report", "drafts", "proposals"}, (
+        f"the archive holds {sorted(held - {None})}, so the kinds"
+        f" {sorted(set(ARCHIVE_SPELLINGS) - held)} are declared and untested"
+        f" against a real file"
     )
 
 
-def artifact_bytes(value: object) -> str:
-    """One JSON value in the encoding ``run.py`` writes a sweep artifact in.
+def test_the_layout_names_the_artifact_a_filename_cannot():
+    """``bundle.reports_dir``'s rule, read backwards, is what identifies an artifact.
 
-    The **opposite** call from :func:`producer_bytes`, deliberately, and the
-    reason this pair of functions sits in one file: a reader who sees only one
-    of them learns the wrong rule. What the archive holds is whatever its
-    producer wrote, and the two producers disagree.
+    A sweep artifact is ``<stem>.json`` and shares that shape with a corpus
+    model and a sitting. What separates it is on disk and not in the name: it is
+    the file its own ``<stem>.reports`` directory sits beside. Everything else
+    answers ``None`` and a migration refuses it.
     """
-    return json.dumps(value, indent=2) + "\n"
+    directory = _tracked_manifests()[0].parent
+    manifest = json.loads((directory / "baseline.json").read_text(encoding="utf-8"))
+    artifact = directory / manifest["sweeps"][0]["artifact"]
+
+    assert kind_of(artifact.name) is None
+    assert kind_of_path(artifact) == "artifact"
+    assert kind_of_path(directory / "baseline.json") == "manifest"
+    assert kind_of_path(REPO_ROOT / "evals/corpus/01-payments-checkout/model.json") is (
+        None
+    )
 
 
-def test_some_artifact_is_archived():
-    """A lint over an empty list passes and protects nothing."""
-    assert ARTIFACTS
+def test_no_migration_carries_its_own_encoding():
+    """The rule that keeps the next migration from re-opening this.
 
+    Six migrations walk every JSON file under ``evals/`` and each wrote one
+    spelling to all of them: three escaped ASCII over reports and manifests,
+    two the report's UTF-8 over drafts, proposals and artifacts. Every one
+    passed review, because the line that does it reads as an ordinary dump and
+    the archive it damages parses to the same value afterwards.
 
-def test_the_two_producers_really_do_spell_it_differently():
-    """The premise, asserted so the lint below cannot pass vacuously.
-
-    Every committed artifact is ASCII today, so the two encodings agree on all
-    of them and the parametrised test would pass under either rule. This is
-    what says the rule is load-bearing: give the writers one non-ASCII
-    character and they part.
+    So the check is mechanical: a migration may print a dump, and it may not
+    **write** one. It asks
+    :func:`~evals.harness.archive.archive_bytes` for the producer's bytes, and
+    :func:`~evals.harness.bundle.kind_of_path` for which producer.
     """
-    value = {"note": "an em-dash \u2014 here"}
+    offenders = []
+    for path in sorted((REPO_ROOT / "evals" / "migrations").glob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            if getattr(node.func, "attr", None) not in {"write_text", "write_bytes"}:
+                continue
+            for argument in ast.walk(node.args[0]) if node.args else ():
+                if (
+                    isinstance(argument, ast.Call)
+                    and getattr(argument.func, "attr", None) == "dumps"
+                ):
+                    offenders.append(f"{path.name}:{node.lineno}")
 
-    assert artifact_bytes(value) != producer_bytes(value)
-    assert "\\u2014" in artifact_bytes(value)
+    assert not offenders, (
+        f"these migrations write a JSON dump of their own rather than asking"
+        f" evals/harness/archive.py for the producer's bytes: {offenders}."
+        f" The archive holds three encodings and a Baseline seals all of them,"
+        f" so one spelling for every file re-encodes most of what it touches"
+    )
 
 
-@pytest.mark.parametrize("path", ARTIFACTS, ids=lambda path: path.name)
-def test_an_archived_artifact_holds_the_bytes_its_producer_writes(path: Path):
-    """A migration that re-encodes an artifact fails here, on every file it touched.
+@pytest.mark.parametrize(
+    ("path", "kind"),
+    [(path, kind) for path, kind in SEALED if kind is not None],
+    ids=lambda value: value if isinstance(value, str) else Path(value).name,
+)
+def test_a_sealed_file_holds_the_bytes_its_producer_writes(path: Path, kind: str):
+    """A migration that re-encodes the archive fails here, on every file it touched.
 
-    The repair is to match ``run.py`` in the migration and re-run it, not to
-    edit this file. An artifact's own filename is a digest of its bytes, so a
-    re-encoding renames the file and re-seals the Baseline over an edit the
+    The repair is to ask :mod:`evals.harness.archive` for the spelling in the
+    migration and re-run it, not to edit this file. A Baseline's digests are cut
+    over these bytes and an artifact's own filename is a digest of its contents,
+    so a re-encoding renames the file and re-seals the Baseline over an edit the
     migration never meant to make.
     """
     text = path.read_text(encoding="utf-8")
 
-    assert text == artifact_bytes(json.loads(text)), (
-        f"{path.relative_to(REPO_ROOT)} is not in the encoding run.py writes;"
-        " a migration that rewrote it used the report spelling instead"
+    assert text == archive_bytes(kind, json.loads(text)), (
+        f"{path.relative_to(REPO_ROOT)} is not in the encoding its producer"
+        f" writes for a {kind!r}; a migration that rewrote it picked an"
+        f" encoding instead of asking evals/harness/archive.py for one"
     )

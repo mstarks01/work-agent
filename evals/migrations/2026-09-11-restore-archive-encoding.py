@@ -45,7 +45,16 @@ import subprocess
 import sys
 from pathlib import Path
 
+# A migration runs as a script, so ``sys.path[0]`` is this directory and the
+# repository root is not on the path. The editable install puts
+# ``analysis_service`` there; ``evals`` is a namespace package in the tree and
+# has to be pointed at.
+REPO_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO_ROOT))
+
+from evals.harness.archive import archive_bytes
 from evals.harness.baseline import _file_digests
+from evals.harness.bundle import kind_of_path
 
 #: The tag whose trees predate the two migrations that escaped the archive. A
 #: file that already held an escape there holds one because its producer writes
@@ -66,10 +75,16 @@ def _escaped_at(ref: str, rel: str) -> bool | None:
     return "\\u" in found.stdout
 
 
-def _restored(text: str) -> str | None:
-    """``text`` in the producer's encoding, or None where it is already there."""
+def _restored(text: str, kind: str) -> str | None:
+    """``text`` in its producer's encoding, or None where it is already there.
+
+    ``kind`` rather than one spelling: this walk reaches every kind a Baseline
+    holds, and the drafts written three lines after a report in ``bundle`` are
+    escaped ASCII on purpose. Restoring them to the report's spelling would be
+    the same defect this script repairs, pointed the other way.
+    """
     value = json.loads(text)
-    rewritten = json.dumps(value, ensure_ascii=False, indent=2) + "\n"
+    rewritten = archive_bytes(kind, value)
     if rewritten == text:
         return None
     # The content is the thing that must not move. A dump that parses to
@@ -87,7 +102,11 @@ def migrate(root: Path, write: bool) -> int:
             continue
         if _escaped_at(BEFORE_REF, str(path)) is not False:
             continue
-        rewritten = _restored(text)
+        kind = kind_of_path(path)
+        if kind is None:
+            print(f"  {path}: no declared producer for this file, left alone")
+            continue
+        rewritten = _restored(text, kind)
         if rewritten is None:
             continue
         print(f"{path}: re-encoded in the producer's spelling")
@@ -117,9 +136,7 @@ def refresh_manifests(root: Path, write: bool) -> int:
             # The spelling ``assemble`` writes, so a refreshed manifest and a
             # freshly assembled one are the same bytes.
             manifest_path.write_text(
-                json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True)
-                + "\n",
-                encoding="utf-8",
+                archive_bytes("manifest", manifest), encoding="utf-8"
             )
         changed += 1
     return changed
