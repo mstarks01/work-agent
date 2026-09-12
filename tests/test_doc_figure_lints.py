@@ -53,6 +53,9 @@ sentence around it draws the right conclusion.
 
 from __future__ import annotations
 
+import json
+import subprocess
+import sys
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -431,36 +434,50 @@ def test_the_prose_states_the_current_figure(figure, document, template, count):
     )
 
 
-#: Readers a figure may not be computed from, and why. A merged **Case
-#: Sitting** arrives as one JSON file through a GitHub link the app builds, and
-#: a maintainer commits it straight to the base branch, so nothing runs that
-#: could move a sentence with it. A figure these produce therefore goes stale
-#: on merge, and the guides state no such number.
-SITTING_READERS = frozenset({"unreviewed_cases", "current_reviews", "declared"})
+@pytest.fixture(scope="module")
+def figure_reads():
+    """What each figure actually read, from ``tests/audit_figure_reads.py``.
 
-
-def _reads(compute: Callable[[], Mapping[str, object]]) -> set[str]:
-    """Every global ``compute`` names, and every global the helpers it calls do.
-
-    One level deep, which is every figure here: each computes inline or calls
-    one private helper in this module. A third level would need ``ast`` over
-    the source, and a figure written that way is the signal to add it.
+    One subprocess for the whole module: the script installs an audit hook, and
+    a hook cannot be removed once added.
     """
-    seen = set(compute.__code__.co_names)
-    for name in tuple(seen):
-        helper = globals().get(name)
-        if callable(helper) and getattr(helper, "__module__", None) == __name__:
-            seen |= set(helper.__code__.co_names)
-    return seen
+    script = Path(__file__).with_name("audit_figure_reads.py")
+    done = subprocess.run(
+        [sys.executable, str(script)],
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
+        check=False,
+    )
+    assert done.returncode == 0, (
+        f"{script.name} failed with {done.returncode}. Its stderr:\n{done.stderr}"
+    )
+    return json.loads(done.stdout)
+
+
+def test_the_read_audit_observes_something(figure_reads):
+    """Guards the guard below, which is silent when the hook sees nothing.
+
+    A broken audit hook reports every figure clean, and that reads exactly like
+    a clean tree. So the script runs
+    :func:`evals.review_submission.unreviewed_cases` as a control, which reads
+    the submissions by construction, and an empty control means the observation
+    failed rather than that nothing was observed.
+    """
+    assert figure_reads["control"], (
+        "the read audit observed no submission read even from"
+        " unreviewed_cases, so it observed nothing at all. Every result below"
+        " is vacuous until audit_figure_reads.py reports the control."
+    )
 
 
 @pytest.mark.parametrize("figure", FIGURES, ids=lambda figure: figure.name)
-def test_no_figure_is_computed_from_the_merged_sittings(figure):
+def test_no_figure_moves_when_a_sitting_merges(figure, figure_reads):
     """A figure one merge moves cannot be stated in prose, so none is here.
 
     The rule this encodes cost two commits per sitting before it existed. The
-    unread-case count was stated in ``CONTRIBUTING.md`` and ``evals/BLESSING.md``
-    and checked above, while
+    unread-case count was stated in ``CONTRIBUTING.md`` and
+    ``evals/BLESSING.md`` and checked above, while
     :func:`evals.review_submission.verify_pull_request` refuses a review pull
     request that changes anything but its one JSON file. Both rules are right
     and together they had no green path: the sitting landed alone and left the
@@ -469,14 +486,26 @@ def test_no_figure_is_computed_from_the_merged_sittings(figure):
     The count did not stop being worth reading. It stopped being worth
     *writing*: ``webapp/sitting.py --list`` prints it from the same reader the
     gate uses, and the guides point at that.
-    """
-    forbidden = sorted(_reads(figure.compute) & SITTING_READERS)
 
-    assert not forbidden, (
-        f"{figure.name} is computed from {forbidden}, so a merged sitting moves"
-        " it and the prose stating it goes stale on merge. A sitting carries"
-        " one JSON file and no commit that could restate a guide. Print this"
-        " figure from a reader instead of writing it into a sentence."
+    **Observed rather than named.** This asked which readers a ``compute``
+    mentioned until 2026-09-12, and a name is the wrong question: an alias
+    import, a helper three deep, a direct ``glob`` of the directory and a
+    ``functools.partial`` all pass a name check. A sitting adds one file under
+    ``evals/review/submissions/``, so a figure that never reads that directory
+    cannot move when one merges, whatever it is written like.
+    """
+    read = figure_reads["figures"].get(figure.name)
+
+    assert read is not None, (
+        f"{figure.name} is not in the read audit's output. Its figures are"
+        f" {sorted(figure_reads['figures'])}, so the script and this table"
+        " disagree about which figures exist."
+    )
+    assert not read, (
+        f"{figure.name} reads {read}, so a merged sitting moves it and the"
+        " prose stating it goes stale on merge. A sitting carries one JSON file"
+        " and no commit that could restate a guide. Print this figure from a"
+        " reader instead of writing it into a sentence."
     )
 
 
