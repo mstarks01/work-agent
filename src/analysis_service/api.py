@@ -653,6 +653,10 @@ def create_app(
             system_name=submission.system_name,
             reserved_tokens=budgets.estimate(submission.sources, selection),
         )
+        # The runner is looked up before the reservation. A graph is built on
+        # first use per selection, and a build that raised after the reservation
+        # would leave a slot held that no task ever releases.
+        runner = request.app.state.runner_for(record.selection())
         budget = request.app.state.budget
         admission = await store.reserve(record, ceiling=ceiling, budget=budget)
         if admission.outcome in _REFUSALS:
@@ -677,16 +681,19 @@ def create_app(
             raise HTTPException(
                 status_code=429, detail=_REFUSALS[admission.outcome](admission, ceiling)
             )
-        if admission.outcome == "duplicate":
-            # The API mints the id, so a collision is this service's defect and
-            # not something the caller can act on or provoke. It gets the same
-            # opaque 500 every unhandled error gets, and the id goes to the log.
-            logger.error("job id %s was already held by the store", record.id)
+        if admission.outcome != "admitted":
+            # A duplicate id, or an outcome the table above does not answer, is
+            # this service's defect and not something the caller can act on or
+            # provoke: the API mints the id, and the store's outcomes are held
+            # to the table by test. It gets the same opaque 500 every unhandled
+            # error gets, and the outcome goes to the log. Fails closed: only
+            # an admission starts a job.
+            logger.error("job %s was not admitted: %s", record.id, admission.outcome)
             raise HTTPException(status_code=500, detail="an internal error occurred")
         background_tasks.add_task(
             execute_job,
             store,
-            request.app.state.runner_for(record.selection()),
+            runner,
             record.id,
             deadline_seconds=request.app.state.job_deadline_seconds,
         )
