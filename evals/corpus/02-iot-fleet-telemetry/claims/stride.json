@@ -11,8 +11,8 @@
       "likelihood": "high",
       "impact": "high"
     },
-    "notes": "The defining finding of this case: one shared, never-rotated key across physically exposed devices.",
-    "verb": "impersonate"
+    "notes": "The defining finding of this case: one shared, never-rotated key across physically exposed devices. The attacker holds a key they were not issued, which is use-credential rather than impersonate.",
+    "verb": "use-credential"
   },
   {
     "category": "spoofing",
