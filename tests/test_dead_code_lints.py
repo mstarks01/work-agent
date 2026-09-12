@@ -87,6 +87,10 @@ TEST_ONLY: dict[str, str] = {
         " prices the frontier against"
     ),
     "corpus_recall": f"{_PINNED}: trigger recall over the whole corpus",
+    "kind_of": (
+        "the reader the archive encoding lint classifies every sealed file"
+        " with, so a committed file whose producer nobody declared fails there"
+    ),
     # evals/harness/exemplar_verbs.py, whole: the verbs the exemplars demonstrate
     # against the verbs the corpus grades, which both move often.
     **dict.fromkeys(

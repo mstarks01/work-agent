@@ -24,12 +24,12 @@ three of the five files.
 every file a sweep owns, the artifact's own filename is a digest of its
 contents, and ``verify`` recomputes whatever is on disk — so a rewrite in the
 wrong spelling parses to the same value, re-stamps the seal, and reports
-nothing. The #710 and #468 migrations did exactly that to 78 reports.
+nothing.
 
 Every writer here calls :func:`archive_bytes`, so the table is the rule and no
-site carries a second copy of it. A migration reads :func:`kind_of` to ask what
-it is holding, and refuses a file whose producer nobody has declared rather
-than guessing one.
+site carries a second copy of it. A script that walks the archive reads
+:func:`kind_of` to ask what it is holding, and refuses a file whose producer
+nobody has declared rather than guessing one.
 """
 
 from __future__ import annotations
