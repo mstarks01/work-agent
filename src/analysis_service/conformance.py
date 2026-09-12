@@ -145,13 +145,23 @@ REFERENCE_MODELS: dict[str, tuple[str, ...]] = {
     # same identifiers on purpose: the matrix is where the two routes to one
     # family show their one difference, and a different pair would hide it.
     "gemini": ("gemini-2.5-flash", "gemini-2.5-pro"),
-    # The dated snapshot rather than the ``gpt-4o`` alias it resolves to.
-    # OpenAI fronts its dated builds with a bare name and moves which build that
-    # name means; the matrix is a claim about what was profiled, so it names the
-    # build. Nothing else moves with it: the pinned cost map's entries for the
-    # alias and this snapshot differ in no key, and the two profile identically.
-    # ``test_no_reference_model_is_an_alias_for_a_dated_build`` is the rule.
-    "openai": ("gpt-4o-2024-08-06", "gpt-5.6"),
+    # A build in each tier, never a name pointing at one. OpenAI fronts its
+    # builds with a bare name and chooses which build that name means, so a
+    # matrix naming the bare name would be a claim about whichever build OpenAI
+    # points it at next, and nothing offline would say the claim had moved.
+    #
+    # **Both tiers were the bare name once, and the family spells an alias two
+    # ways.** ``gpt-4o`` fronts a date. ``gpt-5.6`` fronts a capability tier:
+    # OpenAI's model page for it documents "The ``gpt-5.6`` alias routes
+    # requests to GPT-5.6 Sol", and its model list carries ``gpt-5.6-sol``,
+    # ``-terra``, ``-luna`` and ``-cyber`` with no bare entry among them (read
+    # 2026-09-12). The pinned map agrees in the way it can: ``gpt-5.6`` and
+    # ``gpt-5.6-sol`` differ in no key, and the two profile identically. So does
+    # ``gpt-4o-2024-08-06``, which a live call confirmed the alias resolves to
+    # (see ``vendors._CATCH_ALL``).
+    #
+    # ``reference_models_fronted_by`` is the rule, and it reads both shapes.
+    "openai": ("gpt-4o-2024-08-06", "gpt-5.6-sol"),
     # Claude again, and a third spelling of it: OpenRouter carries the vendor
     # inside the model identifier and writes the minor version with a dot.
     #

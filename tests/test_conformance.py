@@ -31,10 +31,10 @@ requires the live lanes, and they remain unprovisioned — see
 from __future__ import annotations
 
 import re
-from collections.abc import Collection
+from collections.abc import Mapping
 from dataclasses import FrozenInstanceError
 from pathlib import Path
-from typing import ClassVar
+from typing import Any, ClassVar
 
 import pytest
 from google.adk.models.base_llm import BaseLlm
@@ -1045,25 +1045,63 @@ class TestTheDocumentedPairsAreTheProfiledPairs:
 _DATED_BUILD = re.compile(r"^(20\d{6}|20\d\d-\d\d-\d\d)$")
 
 
-def dated_builds_of(model: str, catalogue: Collection[str]) -> list[str]:
-    """Every identifier in ``catalogue`` that is ``model`` plus a date."""
-    return sorted(
-        key
-        for key in catalogue
-        if key.startswith(f"{model}-") and _DATED_BUILD.match(key[len(model) + 1 :])
-    )
+def catalogue_key(vendor: str, model: str, catalogue: Mapping[str, Any]) -> str | None:
+    """Where ``catalogue`` holds this pair, under either spelling it may use.
+
+    A direct vendor's model is a key on its own and a gateway's is not:
+    ``gpt-5.6`` is in the map while ``anthropic/claude-sonnet-4.6`` reaches it
+    only as ``openrouter/anthropic/claude-sonnet-4.6``. Neither spelling alone
+    answers for all six rows, and a lookup that tried one silently returned
+    nothing for the rows spelled the other way — which reads exactly like a
+    clean pair.
+    """
+    route = vendor_for(vendor).route(model)
+    if model in catalogue:
+        return model
+    return route if route in catalogue else None
 
 
-def test_no_reference_model_is_an_alias_for_a_dated_build():
+def builds_fronted_by(key: str, catalogue: Mapping[str, Any]) -> dict[str, str]:
+    """Every identifier in ``catalogue`` that is a build of ``key``, and why.
+
+    **Two shapes, because a provider spells an alias more than one way.** A
+    date is the shape OpenAI used for ``gpt-4o``. An entry identical in every
+    key is the shape it used for ``gpt-5.6``, whose tail is a capability tier
+    rather than a date — the map cannot price an alias apart from the build it
+    resolves to, so it does not, and that equality is the signal.
+
+    The second shape does not fire on a sub-family, which is what a rule keyed
+    on the tail's spelling could not promise: ``gemini-2.5-flash`` has nine
+    extensions in the map and ``gemini-2.5-pro`` one, and every one of them
+    prices differently because every one is a different model.
+
+    Which build an alias names is not decidable here — ``gpt-4o`` fronts three
+    dated builds and the map does not say which one answers. That is the
+    provider's word or a live call, and it is why this reports the candidates
+    rather than the resolution.
+    """
+    entry = catalogue[key]
+    fronted = {}
+    for other, value in catalogue.items():
+        if not other.startswith(f"{key}-"):
+            continue
+        if _DATED_BUILD.match(other[len(key) + 1 :]):
+            fronted[other] = "a dated build"
+        elif isinstance(value, dict) and value == entry:
+            fronted[other] = "an entry identical in every key"
+    return dict(sorted(fronted.items()))
+
+
+def test_no_reference_model_fronts_a_build():
     """A reference model names a build, never a name pointing at one.
 
     **The matrix is a claim about what was profiled**, so the identifier it
-    carries has to mean one build. OpenAI publishes dated builds and fronts them
-    with a bare name, and it chooses which build that name means: ``gpt-4o``
-    resolved to ``gpt-4o-2024-08-06``, which is neither the newest of its three
-    nor a choice this repository makes. Naming the alias would make the matrix a
-    claim about whichever build OpenAI points it at next, and nothing offline
-    would say the claim had moved.
+    carries has to mean one build. OpenAI fronts its builds with a bare name and
+    chooses which build that name means: ``gpt-4o`` resolved to
+    ``gpt-4o-2024-08-06``, which is neither the newest of its three nor a choice
+    this repository makes, and ``gpt-5.6`` routes to ``gpt-5.6-sol``. Naming
+    either would make the matrix a claim about whichever build OpenAI points it
+    at next, and nothing offline would say the claim had moved.
 
     A live run fails closed on its own — ``openai`` is ``provider_reported``, so
     a moved alias moves every Execution Identity — which is why the *form rule*
@@ -1072,43 +1110,64 @@ def test_no_reference_model_is_an_alias_for_a_dated_build():
     decidable offline against the pinned cost map, with no credential.
 
     Stated as a property rather than as a list of names, so it answers for a
-    vendor row nobody has written: any future pair that names an alias fails
-    here, whichever vendor serves it.
+    vendor row nobody has written: any future pair that fronts a build fails
+    here, whichever vendor serves it and whichever way that vendor spells it.
     """
     import litellm
 
-    aliases = {
+    missing = {
+        f"{vendor}/{model}"
+        for vendor, models in REFERENCE_MODELS.items()
+        for model in models
+        if catalogue_key(vendor, model, litellm.model_cost) is None
+    }
+    assert not missing, (
+        f"the pinned map holds no entry for {sorted(missing)} under either"
+        f" spelling, so this rule would pass them without looking"
+    )
+
+    fronting = {
         f"{vendor}/{model}": builds
         for vendor, models in REFERENCE_MODELS.items()
         for model in models
-        if (builds := dated_builds_of(model, litellm.model_cost))
+        if (key := catalogue_key(vendor, model, litellm.model_cost))
+        and (builds := builds_fronted_by(key, litellm.model_cost))
     }
 
-    assert not aliases, (
-        f"these reference models front dated builds rather than naming one:"
-        f" {aliases}. Pin the build the alias resolves to — the matrix says"
+    assert not fronting, (
+        f"these reference models front a build rather than naming one:"
+        f" {fronting}. Pin the build the alias resolves to — the matrix says"
         f" which build was profiled, and an alias is one the provider moves."
     )
 
 
-def test_the_alias_rule_finds_the_alias_it_was_written_for():
-    """Guards the guard. A rule that matches nothing passes vacuously, and this
-    one would have, had the tail anchor been a prefix test: ``gpt-5.6`` and
-    every Claude pair front no dated build, so the check above is all-clear on
-    an empty catalogue too.
+def test_the_alias_rule_finds_both_aliases_it_was_written_for():
+    """Guards the guard, once per shape. A rule that matches nothing passes
+    vacuously, and half of this one did: while the tail had to be a date,
+    ``gpt-5.6`` was all-clear in the table for as long as it sat there.
 
-    ``gpt-4o`` is the identifier that motivated the rule, and it still fronts
-    three dated builds in the pinned map.
+    ``gpt-4o`` is the identifier that motivated the rule and still fronts three
+    dated builds. ``gpt-5.6`` is the one that escaped it, and the map prices it
+    and ``gpt-5.6-sol`` identically — which is what OpenAI's own model page
+    says in words: "The ``gpt-5.6`` alias routes requests to GPT-5.6 Sol".
     """
     import litellm
 
-    assert dated_builds_of("gpt-4o", litellm.model_cost) == [
-        "gpt-4o-2024-05-13",
-        "gpt-4o-2024-08-06",
-        "gpt-4o-2024-11-20",
-    ]
-    # The sub-family is a different model, not a build of this one.
-    assert "gpt-4o-mini-2024-07-18" not in dated_builds_of("gpt-4o", litellm.model_cost)
+    assert builds_fronted_by("gpt-4o", litellm.model_cost) == {
+        "gpt-4o-2024-05-13": "a dated build",
+        "gpt-4o-2024-08-06": "a dated build",
+        "gpt-4o-2024-11-20": "a dated build",
+    }
+    assert builds_fronted_by("gpt-5.6", litellm.model_cost) == {
+        "gpt-5.6-sol": "an entry identical in every key"
+    }
+
+    # The sub-family is a different model, not a build of this one, and neither
+    # shape may read it as one.
+    assert "gpt-4o-mini-2024-07-18" not in builds_fronted_by(
+        "gpt-4o", litellm.model_cost
+    )
+    assert builds_fronted_by("gemini-2.5-flash", litellm.model_cost) == {}
 
 
 def test_the_probe_raises_that_type_and_no_other_across_the_map():
