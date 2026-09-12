@@ -69,7 +69,12 @@ TOKEN_CAPS: dict[str, int] = {
     "prompts/analyze": 4500,
     "prompts/critic": 2400,
     "prompts/recritic": 1100,
-    "prompts/extract": 2900,
+    # Raised from 2900 for the naming rule in rule 3. The extraction sweep of
+    # 2026-09-12 lost 98 blessed elements by ID, 59 of them to a name the model
+    # chose differently — a plural, an expanded abbreviation, a qualifier the
+    # text never attached — and 38 of the 39 lost flows ran between an endpoint
+    # that had itself drifted.
+    "prompts/extract": 3000,
     "prompts/repair": 900,
     # One package's own text, under ``frameworks/<name>/``.
     f"package/{CRITIC_DOC}": 1200,
