@@ -8,7 +8,9 @@ Three drafts against the exemplar system, showing the shape and the reasoning. F
 
 Lane contrast: being accepted *as* the web API is spoofing. Directing an honest, over-privileged service to use authority the caller does not have is yours.
 
-Two verbs, two places. `abuse-grant` is a deputy's standing authority misused, and it is cited where that authority is exercised: the deputy, the flow it exercises it over, and the store at the end. `escalate` is a position reaching a zone or an authority it does not carry, and it is cited at the crossing it reaches through: the caller, the flow that crosses, and the process it reaches. One draft cites one place. A draft that cites both the crossing and the store is two findings with one verb, and the scorer counts it as neither.
+Two verbs, and the fix decides between them: narrow a grant and it is `abuse-grant`, a permission wider than its purpose, used by its holder or by whoever has taken the holder's place; stop a position reaching and it is `escalate`. A credential found on the way is the stepping stone, never the finding: a compromised web tier using its queue credential to reach the backend is `escalate`, and the same tier holding one unscoped database account is `abuse-grant`.
+
+`abuse-grant` is cited where the grant is exercised: the holder, the flow, and the store or process at the end. `escalate` is cited at the crossing: the caller, the flow that crosses, and the process it reaches. One draft cites one place. A draft that cites both the crossing and the store is two findings with one verb, and the scorer counts it as neither.
 
 ```json
 {
@@ -48,7 +50,7 @@ Two verbs, two places. `abuse-grant` is a deputy's standing authority misused, a
 
 ## Second-order, in system B: a tenant boundary the attacker fills in
 
-Written against exemplar system B. Escalation does not need a privilege bug when the system asks the caller which privileges to apply. Here the tenant — the only thing separating one customer's data from another's — is a field in untrusted input, and the identity that acts on it holds authority over all of them.
+Written against exemplar system B. Elevation does not need a privilege bug when the system asks the caller which privileges to apply. Here the tenant — the only thing separating one customer's data from another's — is a field in untrusted input, and the identity that acts on it holds authority over all of them. The verb is `abuse-grant`: the fix narrows the writing account to one tenant.
 
 ```json
 {
@@ -62,7 +64,7 @@ Written against exemplar system B. Escalation does not need a privilege bug when
     "flow:stream-processor-to-telemetry-store:write-readings",
     "store:telemetry-store"
   ],
-  "verb": "escalate",
+  "verb": "abuse-grant",
   "evidence_refs": [
     "crossing:flow:sensor-gateway-to-mqtt-broker:publish-telemetry"
   ],
