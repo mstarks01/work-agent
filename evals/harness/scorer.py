@@ -667,9 +667,9 @@ def _standing_of_unmatched(
     The fingerprint is computed exactly the way the review queue computes it,
     because it is the same call: :func:`~evals.harness.fingerprint.key_claim`
     is the one spelling of which version keys a package and which components
-    that version reads. This function used to compose the parts itself — read
-    the version, build the components, hash them — which was a second reader of
-    one rule, and the two would have disagreed the first time either moved.
+    that version reads. Composing the parts here — read the version, build the
+    components, hash them — would be a second reader of one rule, and the two
+    would disagree the first time either moved.
     """
     unlisted: list[UnlistedThreat] = []
     foreign: list[str] = []

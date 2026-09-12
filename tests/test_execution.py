@@ -666,9 +666,9 @@ class TestAGraphThatRaisesCarriesWhatRan:
 class TestTheRunCompletesItself:
     """One reader turns a Graph Run into a Report, for the service and the harness.
 
-    Each driver used to read the final state, stamp the re-ask count and call
-    ``into_report`` itself, so a fix to one reached the other by hand (#709).
-    The harness also read the graph's state keys raw. Both now ask the run.
+    A driver that read the final state, stamped the re-ask count and called
+    ``into_report`` itself would need every fix copied by hand (#709). Both
+    drivers ask the run.
     """
 
     @staticmethod

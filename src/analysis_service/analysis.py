@@ -167,10 +167,9 @@ def control_state(value: str) -> ControlState:
     with one of the two sentinels or with the mechanism.
 
     **A blank value is a control nobody stated, so it reads as ``unverified``.**
-    It used to read as ``stated``, on the reasoning that no validated model
-    carries one — and nothing enforced that, because the free-text control
-    fields carry a maximum length and no minimum. An empty ``authentication``
-    therefore passed :func:`~analysis_service.validation.validate` and then made
+    Nothing upstream rules a blank out: the free-text control fields carry a
+    maximum length and no minimum, so an empty ``authentication`` passes
+    :func:`~analysis_service.validation.validate`. Read as ``stated`` it would make
     :func:`is_unverified` false, which suppressed every candidate rule that asks
     about a missing control and the evidence row beside it. The gate now reports
     a blank field to the repair pass as well (``blank-control``), and this is
@@ -197,8 +196,7 @@ def states_a_protocol(protocol: str) -> bool:
     A protocol nobody filled in is the same fact as one nobody knew, and
     :func:`control_state` answers that directly: a blank value is
     ``unverified`` there, so this needs no separate empty-string test of its
-    own. It used to carry one, because ``control_state`` read a blank as
-    ``stated``.
+    own.
 
     One reader for two callers: the ASVS precondition, which holds its answer
     open on a silent protocol, and the extraction scorer, which checks that a

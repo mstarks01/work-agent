@@ -98,9 +98,7 @@ class TestRecordingWritesNothingIntoTheTree:
 
     The reason the working tree stays untouched: a submission carries one JSON
     file and nothing else, so anything written under a case would either fail
-    the scope check or have to be undone before the press. It used to be both —
-    :func:`~evals.harness.sitting.finish` wrote three files and the app deleted
-    them again on a successful contribution.
+    the scope check or have to be undone before the press.
     """
 
     def test_finish_leaves_every_byte_under_the_case(self, store):

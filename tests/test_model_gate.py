@@ -451,9 +451,8 @@ def test_every_documented_vendor_passes_the_gate_on_shipped_sampling(
 ):
     """What the docs offer is what the gate accepts — for every vendor, not one.
 
-    The predecessor asserted this of the *shipped selection*, which worked only
-    while a selection shipped. Now that none does, the equivalent guarantee has
-    to be made of every pair `docs/First-Run.md` step 2 tells a reader to write
+    No selection ships, so the guarantee has to be made of every pair
+    `docs/First-Run.md` step 2 tells a reader to write
     down: shipped sampling has to survive whichever of them they pick, and a
     param one vendor rejects must not reach a reader as a working example.
 

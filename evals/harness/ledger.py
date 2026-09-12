@@ -608,7 +608,7 @@ def write_all(votes: Sequence[Vote], path: Path | str) -> None:
     A re-key under a new fingerprint version rewrites every row from its
     stored components. That is the one legitimate whole-ledger write. Every
     line serialises before the first byte lands, so a row that cannot
-    serialise raises while the old files are still whole; each file then goes
+    serialise raises while the files on disk are still whole; each file then goes
     through a temporary sibling and a rename, so an interruption between two
     files leaves every file whole — old or new — and git covers that window.
     """

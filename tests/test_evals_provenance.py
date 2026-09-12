@@ -673,10 +673,10 @@ def test_the_record_and_the_stop_read_one_checkout(tmp_path, monkeypatch):
     """`tree_identity` records the tree and `repo_commit` stops a sweep on it.
 
     **One command is not one checkout.** Both call `checkout_state`, and this
-    is what pins the directory they ask about: the record used to read the
-    process working directory and the stop used to read `REPO_ROOT`, so a
-    sweep launched from another clone wrote that clone's HEAD into the
-    artifact beside this checkout's commit, and nothing compared the two.
+    is what pins the directory they ask about. If the record read the process
+    working directory and the stop read `REPO_ROOT`, a sweep launched from
+    another clone would write that clone's HEAD into the artifact beside this
+    checkout's commit, and nothing would compare the two.
 
     The working directory is moved away from the repository here, which is
     what a sweep run from anywhere else does.

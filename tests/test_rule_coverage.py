@@ -123,10 +123,9 @@ def test_every_exempted_rule_is_a_rule_some_package_declares(models):
 #: package gate holds that the document exists and its rule IDs resolve, and
 #: ``test_knowledge_lints`` holds that a rule has material — and neither asks
 #: whether the material is ever *selected*.
-#: The two STRIDE worked cases that used to sit here are reachable now. They
-#: were never less relevant — over the whole corpus every selection was a tie at
-#: one matched rule, and declaration order sent all 39 to the first-declared
-#: document. The tie-break reads what the job has already sent, so a lane that
+#: Over the whole corpus every selection is a tie at one matched rule, and
+#: declaration order alone would send all 39 to the first-declared document.
+#: The tie-break reads what the job has already sent, so a lane that
 #: ties spends its slot on material the job has not.
 UNSELECTED: dict[str, str] = {
     "asvs:real-time-media-and-signalling": (

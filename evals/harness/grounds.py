@@ -251,8 +251,7 @@ class CaseGrounds:
 class GroundMisShape(RuntimeError):
     """A ``Ground`` this service assembled wrongly. Never an agent's doing.
 
-    THE OTHER #91 RATE USED TO LIVE HERE, AND ITS EXPECTED VALUE IS NOW ZERO.
-    No model writes a ``Ground``: a category agent selects catalog entries and
+    THE EXPECTED RATE OF THIS IS ZERO. No model writes a ``Ground``: a category agent selects catalog entries and
     proposes quotes, and :func:`~analysis_service.evidence.resolve_proposals`
     builds the record out of the entry it looked up. So a mis-shape is this
     service mis-assembling its own data structure, and there is no agent

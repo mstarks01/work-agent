@@ -641,10 +641,9 @@ def test_exemplar_file_within_token_cap(framework, lane):
 def test_no_stray_prompt_files():
     """The shared root is the five bodies and nothing else.
 
-    Tighter than before the cutover, not looser: the exemplars used to sit here
-    too, and every one of them was STRIDE's. What is left is the text that
-    genuinely serves every registered framework, which is what makes the shared
-    root shared rather than merely first.
+    No exemplar sits here, because every exemplar is one package's. What is
+    here is the text that genuinely serves every registered framework, which is
+    what makes the shared root shared rather than merely first.
     """
     assert set(loader.names()) == set(PROMPT_BODY_NAMES)
 

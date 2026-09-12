@@ -875,10 +875,10 @@ class TestReviewIndependence:
     def test_a_gateway_route_cannot_satisfy_a_distinct_provider(self, config_path):
         """An aggregator chooses the upstream per call, so nothing here knows it.
 
-        The case the old comparison answered confidently and wrongly: two
-        vendor keys, one of them a gateway that may route to the other's
-        provider. A deployment that asked for a distinct provider was told it
-        had one.
+        The case a comparison of written keys answers confidently and wrongly:
+        two vendor keys, one of them a gateway that may route to the other's
+        provider. A deployment that asked for a distinct provider would be told
+        it had one.
         """
         text = self.critic_on(
             "review",

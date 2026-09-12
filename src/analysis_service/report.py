@@ -115,9 +115,9 @@ from analysis_service.vendors import ServedTrust, vendor_for_route
 # marks: evidence references a threat cited that its job's catalog did not
 # hold. Additive by the same rule as the four mark lists before it.
 #
-# What moved beside it is a *behaviour*, not a field. Such a reference used to
-# fail the whole job; it is now dropped and marked, and only a threat left with
-# no grounds at all still fails (#138). No existing field changes meaning or
+# What sits beside it is a *behaviour*, not a field. Such a reference is
+# dropped and marked, and only a threat left with no grounds at all fails
+# (#138). No existing field changes meaning or
 # spelling, so this stays minor — but a consumer that treated a returned report
 # as "every citation resolved" was relying on an absence rather than on a
 # field, and this list is where that guarantee now lives.
@@ -147,7 +147,7 @@ from analysis_service.vendors import ServedTrust, vendor_for_route
 # **There is no version gate and none is needed.** ``Report`` keeps
 # ``extra="forbid"``, so a 2.10 payload carrying ``threats`` at the top level is
 # refused by this model, and a 3.0 payload carrying ``analyses`` is refused by
-# the old one. The no-shim behaviour falls out of the shapes rather than out of
+# a 2.10 model. The no-shim behaviour falls out of the shapes rather than out of
 # anything reading ``schema_version``.
 #
 # 3.0 also carries a fourth ``GroundKind``, ``absent-attribute`` (#171), which
@@ -163,10 +163,10 @@ from analysis_service.vendors import ServedTrust, vendor_for_route
 # does not hold. It rides 3.0 for the same reason ``absent-attribute`` does —
 # 3.0 has never shipped — and it would have been additive and minor on its own.
 #
-# What moves beside it is again a *behaviour*. Such a claim used to reach the
-# report and cite the standard's version-safe reference format for a
-# requirement the standard does not contain; it is now dropped and marked, on
-# the rule 2.9 already set for a citation that resolves to nothing. Only a
+# What sits beside it is again a *behaviour*. Such a claim is dropped and
+# marked rather than reaching the report with a version-safe citation of a
+# requirement the standard does not contain, on the rule 2.9 already set for a
+# citation that resolves to nothing. Only a
 # framework carrying a catalog it did not author can produce one, so the list
 # is empty for STRIDE by construction rather than by accident.
 #
@@ -226,7 +226,7 @@ from analysis_service.vendors import ServedTrust, vendor_for_route
 # name: **a framework may need a fact the system model has no slot for.**
 #
 # 3.0 also respells one ``scope[].state`` value and adds a fourth (#659).
-# ``applicable`` is now ``not-raised``: the old word read as a verdict that
+# ``not-raised`` replaces ``applicable``, a word that read as a verdict that
 # the unit applies, where the fact is only that no lane raised a claim on it.
 # ``undecidable`` is new, for a framework whose precondition could not tell
 # whether it applies at all; it was folded into ``not-applicable`` before,
@@ -249,11 +249,11 @@ from analysis_service.vendors import ServedTrust, vendor_for_route
 #
 # 3.0 also tightens what two ``coverage[]`` halves count (#675). A control is
 # ``unknown_controls_cited`` only where a draft's attribute ground names that
-# element *and* that attribute, where it used to be credited for every control
-# on any element a draft cited; a candidate is ``candidates_cited`` only where
-# one draft cites every element it names, where a union across the lane's
-# drafts used to do. Both are a meaning change to an existing field and would
-# be major on their own. Archived rows carry the old, larger numbers.
+# element *and* that attribute, never for every control on any element a draft
+# cited; a candidate is ``candidates_cited`` only where one draft cites every
+# element it names, never by a union across the lane's drafts. Both are a
+# meaning change to an existing field and would be major on their own.
+# Archived rows written under 2.x carry larger numbers.
 SCHEMA_VERSION = "3.0"
 
 # The envelope's disclaimer, which is about the *service* rather than about any

@@ -1,9 +1,8 @@
 """Ruff has no rule for a name nobody calls, so this is that rule.
 
-The two functions this lint was written for -- ``candidates._control_fact`` and
-``analysis._zone_by_id`` -- passed ruff and mypy for their whole life in the
-tree. Both were private, so nothing outside the package could reach them, and
-both were uncalled, so nothing inside it did either. That leaves a name-level
+A private uncalled function passes ruff and mypy for its whole life in the
+tree: nothing outside the package can reach it, and nothing inside it does
+either. That leaves a name-level
 scan as the only thing that finds them.
 
 A text scan is not enough and a dependency is not wanted, matching
@@ -21,9 +20,8 @@ and wide in three others.
 called -- and that is the false-positive class above. Nothing here can tell one
 from a genuinely dead method.
 
-**Subpackages are in scope.** The scan reads the package recursively. It used to
-glob one directory, so every private name under ``frameworks/`` was unscanned,
-which is where a package's own helpers live.
+**Subpackages are in scope.** The scan reads the package recursively, because
+``frameworks/`` is where a package's own helpers live.
 
 **Public names are in scope outside the service.** A public name in
 ``src/analysis_service`` is API: ``__init__`` exports 102 of them and whether an
@@ -254,7 +252,7 @@ def test_the_lint_covers_a_real_population():
 
 
 def test_the_scan_recurses_into_a_subpackage():
-    """It used to glob one directory, so `frameworks/` was unscanned."""
+    """A scan over one directory would leave every name under `frameworks/` unread."""
     scanned = {location.rsplit(":", 1)[0] for location in _definitions().values()}
 
     assert any("frameworks/" in path for path in scanned), (
@@ -265,9 +263,8 @@ def test_the_scan_recurses_into_a_subpackage():
 def test_a_cluster_dies_together():
     """A name reached only by an already-dead name is dead too.
 
-    The case this was written for: ``asvs.catalog.chapter_for`` was uncalled,
-    and it was the only reader of ``_BY_CHAPTER``. One pass clears the map,
-    because the dead function references it.
+    The shape: an uncalled function that is the only reader of a map. One
+    pass clears the map, because the dead function references it.
     """
     module = ast.parse("def _only_reader():\n    return _only_read\n_only_read = 1\n")
     live = _used_names(ignoring=frozenset())

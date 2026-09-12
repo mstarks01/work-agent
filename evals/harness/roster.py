@@ -7,10 +7,10 @@ classification into history. A roster edit re-classes a voter's whole series at
 once, which is what makes a promotion one diff (#326). Any past number stays
 recomputable from the ledger plus the roster at that commit.
 
-A renamed account keeps one series. Old rows stay under the old login in
-``evals/review/votes/``, the roster line gains the old login in ``aliases``, and
-:meth:`Roster.resolve` folds the history back onto the current name. No row is
-ever rewritten.
+A renamed account keeps one series. Rows written under a former login stay
+under it in ``evals/review/votes/``, the roster line lists that login in
+``aliases``, and :meth:`Roster.resolve` folds the history back onto the current
+name. No row is ever rewritten.
 
 On security: the roster decides which standing series a vote lands in, so the
 loader fails closed on anything it does not recognise (A10). That covers an

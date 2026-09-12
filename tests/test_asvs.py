@@ -139,7 +139,7 @@ def test_the_engine_refuses_a_selection_missing_an_option_it_needs():
     """The rung the HTTP route already applied, applied to every other caller.
 
     Refused before the graph rather than after it: the block a job cannot build
-    would otherwise fail once every node had been paid for.
+    would otherwise fail after the provider billed every node.
     """
     with pytest.raises(EngineInputError) as caught:
         Engine(
@@ -326,8 +326,8 @@ def _shingles(text: str, length: int = 8) -> set[str]:
 def test_no_corpus_document_restates_the_catalog(kind, name):
     """A note teaches how to rule. It does not carry a second roster.
 
-    This is the reason ASVS shipped no corpus for as long as it did, kept as a
-    check now that it ships one. Its lane skills already state every requirement
+    This is the reason an ASVS corpus is small, kept as a check on the one it
+    ships. Its lane skills already state every requirement
     of their chapter verbatim, so a note repeating one would put the standard in
     a second place — and the copy nobody generates is the copy that drifts.
 
@@ -532,8 +532,8 @@ def test_the_precondition_answers_the_corpus_as_measured(case_id, expected):
     The split moved when the precondition stopped answering "is this a web
     application?" from a **Data Flow**'s ``protocol``
     ([#219](https://github.com/mstarks01/work-agent/issues/219)). Four cases
-    whose prose names a web application had been refused for saying nothing
-    about transport, which was the wrong question asked of the wrong field.
+    whose prose names a web application would be refused for saying nothing
+    about transport, which is the wrong question asked of the wrong field.
     """
     assert run_precondition(ASVS, corpus_model(case_id)) == expected
 
@@ -551,8 +551,9 @@ def test_the_precondition_answers_the_corpus_as_measured(case_id, expected):
 def test_the_processes_decide_whatever_the_flows_leave_unsaid(kinds, expected):
     """One process presenting the web is enough; one silent one holds it open.
 
-    Every flow here states no protocol at all, which is the shape that used to
-    force ``undecidable`` however plainly the processes were described.
+    Every flow here states no protocol at all, which is the shape a protocol
+    reading would force to ``undecidable`` however plainly the processes were
+    described.
     """
     model = valid_model()
     template = model.processes[0]
@@ -1113,7 +1114,7 @@ class TestNothingIsRuledOutByVocabulary:
         assert DraftRequirementRuling.ruled_out.__func__ is Claim.ruled_out.__func__
 
     def test_every_requirement_still_appears_exactly_once(self):
-        """The block's own rule, which the exclusions used to satisfy."""
+        """The block's own rule, with no exclusions to satisfy it."""
         block = _block(1)
 
         assert len(block.scope) == 70
@@ -1210,8 +1211,8 @@ class TestABlockWrittenBeforeTheCauseWasReadStillLoads:
                 )
             }
         )
-        # Built as the old scope builder built it: the evidence cause covers
-        # the requirement, so no entry lists it.
+        # Built with the evidence cause covering the requirement, so no entry
+        # lists it.
         entries = AsvsAnalysis.scope_entries(
             lanes=list(LANES),
             claims=[as_evidence],
@@ -1299,7 +1300,7 @@ class TestTheScopeLineNamesTheUnitsAtTheLevel:
 
 
 class TestAnUndecidedPreconditionIsItsOwnScopeState:
-    """#659: the refusal used to reach the scope as not-applicable either way."""
+    """#659: the refusal reaches the scope as its own state, never as not-applicable."""
 
     def test_every_requirement_reads_undecidable_with_the_reason(self):
         entries = AsvsAnalysis.scope_entries(

@@ -481,10 +481,10 @@ class TestPinnedFormRule:
     def test_the_bare_group_is_the_group_the_registry_says_it_is(self):
         """The table and the registry, checked against each other.
 
-        ``BARE_SPELLING`` used to read "every vendor except bedrock". A third
-        spelling would have joined the bare group silently, and every
-        portability assertion below would have gone on passing against an
-        identifier that vendor does not serve. So the group is derived from the
+        A ``BARE_SPELLING`` that read "every vendor except bedrock" would let a
+        third spelling join the bare group silently, and every portability
+        assertion below would go on passing against an identifier that vendor
+        does not serve. So the group is derived from the
         table, and the table is compared with the rule objects the rows list.
         """
         from_registry = {
@@ -506,7 +506,7 @@ class TestPinnedFormRule:
         "claude-opus-4-20250514": False,
         "claude-sonnet-4-5-20250929": False,
         "claude-haiku-4-5@20251001": False,
-        # The old name-after-version order.
+        # The name-after-version order.
         "claude-3-5-sonnet-20241022": False,
         "claude-3-7-sonnet": False,
     }
@@ -784,7 +784,7 @@ class TestPinnedFormRule:
             # The pre-4.6 dated forms, direct and on Vertex.
             "claude-sonnet-4-5-20250929",
             "claude-haiku-4-5@20251001",
-            # The old name-after-version scheme, and the alias that fronted it.
+            # The name-after-version scheme, and the alias that fronts it.
             "claude-3-7-sonnet-20250219",
             "claude-3-opus",
         ],

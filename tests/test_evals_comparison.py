@@ -158,10 +158,10 @@ class TestGroupingAndSort:
         assert "2 baseline(s)" in text
 
     def test_the_table_reads_nothing_from_git(self, tmp_path, monkeypatch):
-        """The merge date used to come from ``git log`` at build time, and a
-        depth-one checkout answered with its boundary commit's date, so the
-        committed table read as stale on any pull request dated after the
-        Baseline landed. The table is a function of the Baseline files alone."""
+        """A merge date read from ``git log`` at build time answers, on a
+        depth-one checkout, with the boundary commit's date, so the committed
+        table would read as stale on any pull request dated after the Baseline
+        landed. The table is a function of the Baseline files alone."""
         import subprocess
 
         def refuse(*args, **kwargs):

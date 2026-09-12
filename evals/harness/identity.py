@@ -197,8 +197,8 @@ def endpoint_subset(
     different claim.
 
     **A side that resolves to nothing is not a subset of anything here.** The
-    empty set is a subset of every set, so a claim citing only a
-    :func:`comparable_elements` drops — a Trust Boundary — used to match every
+    empty set is a subset of every set, so a claim citing only what
+    :func:`comparable_elements` drops — a Trust Boundary — would match every
     target set in its lane that shared its verb. That is not a claim written at
     a looser grain; it is a claim that names no place, and the rule has nothing
     to compare it against. Refusing it is the same answer

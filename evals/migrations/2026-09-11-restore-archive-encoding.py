@@ -1,6 +1,6 @@
 """Write the archive back in the encoding its producer uses.
 
-The two migrations before this one dumped every report they touched with
+Two earlier migrations dumped every report they touched with
 ``json.dumps(..., indent=2)`` and the default ``ensure_ascii=True``. The
 producer does not: ``evals/harness/bundle.py`` writes a report through
 ``Report.model_dump_json``, which emits UTF-8. So 78 archived reports had every

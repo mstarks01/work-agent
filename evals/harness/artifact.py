@@ -2,11 +2,11 @@
 
 ## Why this is a module
 
-``command_run`` used to build the artifact as a dict literal and
-:mod:`evals.harness.stability` used to read it back with ``raw.get("scores")``.
-Two hand-kept halves, agreeing only by habit — and a key the writer stopped
-producing read as a sweep that measured nothing, which is a plausible number
-rather than an error.
+If ``command_run`` built the artifact as a dict literal and
+:mod:`evals.harness.stability` read it back with ``raw.get("scores")``, the two
+hand-kept halves would agree only by habit — and a key the writer stopped
+producing would read as a sweep that measured nothing, which is a plausible
+number rather than an error.
 
 The keys are now declared: the envelope's here, and every instrument's on its
 own entry in :data:`~evals.harness.instruments.INSTRUMENTS`. :func:`build`
@@ -262,10 +262,10 @@ def load_artifact(path: Path | str) -> EvalArtifact:
         )
 
     if "identity_version" not in block:
-        # Written before the identity carried a version. The field has no
-        # default on purpose: an artifact that omitted it used to claim the
-        # version it was about to be checked against, so it failed later with
-        # "the recorded fingerprint does not follow from ..." — the wrong error,
+        # An artifact with no identity version. The field has no default on
+        # purpose: a default would claim the version the artifact is about to
+        # be checked against, and the check would then fail later with "the
+        # recorded fingerprint does not follow from ..." — the wrong error,
         # naming the wrong cause.
         raise ProvenanceError(
             f"{path}: the provenance block records no identity_version, so it"

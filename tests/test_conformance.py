@@ -219,10 +219,10 @@ class TestTheMatrixItself:
         nothing. Failing here is the signal to re-pin the model or the library,
         not to relax the test.
 
-        **Two facts, and they used to be one assertion.** While every probe
-        returned a boolean, ``unknowns`` could only be non-empty when the map
-        had no entry at all — so "the library carries this pair" and "every
-        capability is answered" were the same check. They are not: a carried
+        **Two facts, asserted apart.** While every probe returns a boolean,
+        ``unknowns`` can only be non-empty when the map has no entry at all —
+        which would make "the library carries this pair" and "every capability
+        is answered" the same check. They are not: a carried
         entry can be silent about one capability, and reporting that silence as
         a refusal is the defect this module exists to avoid. So the first half
         stays exactly as strict, and the second is checked against the record
@@ -751,10 +751,8 @@ class TestTheLiveLanesSweepWhatWasProfiled:
         """The mode-coverage property, restated against the vendor table.
 
         A mode no swept vendor declares is a deployment class no live lane
-        exercises. That was worth knowing while the lane was keyed by mode,
-        and it is still worth knowing now the key is the vendor — but it is a
-        statement about coverage, so it is asserted rather than used to
-        choose a file.
+        exercises. That is worth knowing, but it is a statement about
+        coverage, so it is asserted rather than read to choose a file.
         """
         exercised = {
             mode

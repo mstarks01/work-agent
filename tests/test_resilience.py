@@ -104,7 +104,7 @@ def test_the_deadline_bounds_what_the_per_call_knobs_cannot():
     """The arithmetic the deadline exists for, pinned so it stays visible.
 
     ``timeout_ms`` bounds one request; ``attempts`` of them may be made per node
-    now that the library's retry layer is off; five LLM stages run in series on
+    with the library's retry layer off; five LLM stages run in series on
     the graph's longest path. The deadline has to be well under that product or
     it is not a bound at all — and the product moves whenever any factor does,
     which is why the deadline states the answer directly instead.
@@ -151,7 +151,7 @@ def test_the_request_timeout_converts_like_the_deadline_does():
 
 
 def test_a_sub_second_timeout_survives_the_conversion():
-    """The shape the old carrier could not hold.
+    """The shape an ``int`` carrier cannot hold.
 
     ``types.HttpOptions.timeout`` is typed ``int``, so converting there turned
     any ``timeout_ms`` below 1000 into a validation error at graph build time

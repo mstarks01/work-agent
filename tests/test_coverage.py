@@ -140,7 +140,7 @@ def test_crossings_and_unknown_controls_are_counted_against_citations(
 def test_citing_an_element_credits_none_of_its_controls(model, candidates):
     """The pair a draft rests on is the pair its ground names, and only that.
 
-    #675 D20: one citation of a store used to credit every unstated control it
+    #675 D20: one citation of a store credits none of the unstated controls it
     holds. A draft that cites the store and grounds on a quote says nothing
     about which control it was about, so it credits none.
     """

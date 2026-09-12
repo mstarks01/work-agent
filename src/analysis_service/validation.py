@@ -211,10 +211,10 @@ def _blank_control_issues(element: Element) -> list[ValidationIssue]:
     """Every control attribute this element leaves blank, addressed to repair.
 
     The free-text control fields carry a maximum length and no minimum, so an
-    empty ``authentication`` used to reach analysis intact: it passed this gate,
-    and :func:`~analysis_service.analysis.control_state` then called it
-    ``stated``, which suppressed the candidate rules that ask about a missing
-    control and the evidence row beside them. A model whose gate said *ready*
+    empty ``authentication`` passes the shape gate. Read as ``stated`` by
+    :func:`~analysis_service.analysis.control_state`, it would suppress the
+    candidate rules that ask about a missing control and the evidence row
+    beside them. A model whose gate said *ready*
     was quietly asserting a control nobody described.
 
     ``unknown`` is the value ``prompts/extract.md`` asks for, and it is not the
@@ -385,7 +385,7 @@ def _citation_issues(
     span actually *in* that source — is the same question
     :mod:`analysis_service.grounding` answers for a threat's ``quote`` ground,
     asked here of the excerpt that ties an element to the words it came from.
-    The two were never different questions; only one of them used to be asked.
+    The two are one question, asked of both.
     That ladder was calibrated on exactly this data — "the 12 corpus cases' 206
     element excerpts" — at **0 false rejections in 206**, so turning it on here
     is the one rung in this repo whose cost was measured before it was spent.

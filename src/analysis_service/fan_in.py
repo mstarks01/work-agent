@@ -694,7 +694,7 @@ def join_drafts(
     """
     # One index for the whole fan-in. Each check below asks the model who
     # carries an ID and what a flow runs between, once per claim and once per
-    # grounds entry within it, and each used to walk the model to answer.
+    # grounds entry within it.
     index = ModelIndex.of(system_model)
     known_ids = index.elements.keys()
     snapped = snap_drafts(

@@ -168,7 +168,7 @@ def test_the_lint_reads_a_real_population():
     ],
 )
 def test_the_check_catches_a_flag_a_command_does_not_accept(invocation, caught):
-    """The lint's own teeth, led by the flag whose removal it was written for.
+    """The lint's own teeth, led by a flag no command accepts.
 
     Asserted on the check rather than on the tree, so it still means something
     once the tree is clean -- which is the state a passing lint leaves it in.

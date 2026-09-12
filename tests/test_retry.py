@@ -498,9 +498,9 @@ class TestRefuseRetry:
     def test_a_long_wait_is_named_as_such_even_on_an_empty_budget(self):
         """The regression: four conditions overlap, and only one fired.
 
-        ``give_up`` used to re-derive why the loop stopped, from ``attempt``,
-        ``retryable`` and ``budget.tokens``. All three hold here while the
-        rule that actually refused is the ``Retry-After``, so it raised
+        A ``give_up`` that re-derived why the loop stopped, from ``attempt``,
+        ``retryable`` and ``budget.tokens``, would find all three holding here
+        while the rule that actually refused is the ``Retry-After``, and raise
         ``RetryBudgetExhausted`` in place of the provider's own exception and
         logged that the service was failing. The refusal is one value now.
         """
@@ -703,10 +703,10 @@ class TestRetryingAdapter:
     def test_a_streaming_call_is_refused_rather_than_passed_through(self):
         """A change of behaviour, and a deliberate one.
 
-        The old adapter passed a streamed call straight down to the translator:
-        no retry, because a replayed half-stream is worse than no retry at all,
-        and no truncation check, because a chunk carries no finish reason until
-        the caller has already seen the text. It now crosses no seam either,
+        A streamed call gets no retry, because a replayed half-stream is worse
+        than no retry at all, and no truncation check, because a chunk carries
+        no finish reason until the caller has already seen the text. It crosses
+        no seam either,
         which is one silent skip too many. Every node here binds an output
         schema and so never streams, so this branch was untravelled under both
         rules — and an untravelled branch that refuses is found by whoever
@@ -719,7 +719,7 @@ class TestRetryingAdapter:
 
 
 class TestTruncationIsRefused:
-    """The vendor difference that used to reach a validator as a parse error.
+    """The vendor difference that would otherwise reach a validator as a parse error.
 
     A provider that returns its partial output at ``max_output_tokens`` produces
     a response nothing downstream can tell from a complete one — the text is
@@ -831,7 +831,7 @@ class TestTheStormItself:
     """The property the whole change is for.
 
     Six category agents hitting a provider that is refusing everything is the shape
-    that used to become thirty requests. What bounds it is that the budget is
+    that becomes thirty requests unbounded. What bounds it is that the budget is
     *shared*: a per-node allowance gives every node its full count regardless
     of what the others are seeing, which is exactly the wrong response to a
     failure that is by definition correlated.

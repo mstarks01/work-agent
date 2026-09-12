@@ -184,7 +184,7 @@ class TestAssembleThreats:
 
         A framework ruling on requirements asks most of its questions about a
         codebase rather than about an element, and the system model holds no
-        field for one. Before this spelling existed, the only legal answer was
+        field for one. Without this spelling, the only legal answer would be
         to point at whichever attribute resolved on whichever element was
         nearest — an entry that passes the check and tells a reader nothing.
         """

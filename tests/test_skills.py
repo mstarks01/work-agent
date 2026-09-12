@@ -128,7 +128,7 @@ class TestSectionParsing:
         assert sections["Guardrails"] == "Guardrails body."
 
     def test_a_heading_reads_the_same_here_as_it_does_at_the_gate(self):
-        """This test used to pin the disagreement.
+        """Two readers of a heading, held to one answer.
 
         It asserted `split_sections` keeps a trailing space, while the package
         gate's `_heading_issues` compared `line[3:].strip()`. So `## Scope `

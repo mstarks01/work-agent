@@ -308,9 +308,9 @@ class StallingRunner:
 
 
 def test_a_wedged_run_is_stopped_by_the_deployments_deadline():
-    # The bound the in-process path did not used to have: ``execute_job`` wraps
-    # the job route in ``asyncio.timeout`` while ``analyze`` handed straight to
-    # the runner, so the first-run app and every library embedder ran unbounded.
+    # The in-process path's own bound: ``execute_job`` wraps the job route in
+    # ``asyncio.timeout``, and ``analyze`` carries the same deadline, so the
+    # first-run app and every library embedder run bounded too.
     engine = Engine(
         StallingRunner(),
         limits=TEST_LIMITS,

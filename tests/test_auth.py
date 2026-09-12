@@ -186,8 +186,7 @@ class TestSigningAlgorithms:
         } | extra
 
     def test_the_default_is_unchanged_when_nothing_is_configured(self):
-        # A deployment that sets nothing must verify exactly what it verified
-        # before this knob existed.
+        # A deployment that sets nothing verifies the one default algorithm.
         loaded = OidcSettings.from_env(self._env(), prefix="ANALYSIS_OIDC")
         assert loaded.algorithms == DEFAULT_ALGORITHMS == ("RS256",)
 

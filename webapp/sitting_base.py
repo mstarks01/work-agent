@@ -431,7 +431,7 @@ def held_draft(session: Session, case_id: str) -> sittings.Draft | None:
     arrives unmarked, and every other mark is still the reader's answer; a key
     that names no finding any more is dropped here, because the record refuses
     it. The digests are pinned to the files as they are now, because a record
-    carrying the old ones would be refused the day it merged.
+    carrying digests of earlier bytes would be refused the day it merged.
 
     The resumed draft is written to the store the first time it is asked for,
     because every later request — the sets, a save, the record — asks the

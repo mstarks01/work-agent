@@ -126,8 +126,8 @@ EVAL_MODEL = "vertex_ai/fake-pro-001"
 # The shipped config selects no vendor, so a test that needs a resolvable tier
 # config has to choose one. Deliberately **mixed**: the two tiers select
 # independently, and a same-vendor pair on both sides would leave that path
-# untested everywhere but here — which is exactly what the old Vertex-on-both
-# default did. Nothing downstream of this reaches a network; the vendors are
+# untested everywhere but here. Nothing downstream of this reaches a network;
+# the vendors are
 # named so the binding and the gate see a realistic pair, not so a model runs.
 TEST_TIER_ENV: dict[str, str] = {
     "ANALYSIS_MODEL_BASE_VENDOR": "openai",

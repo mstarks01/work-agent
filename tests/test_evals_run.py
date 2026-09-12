@@ -84,8 +84,8 @@ def test_an_incomplete_and_uncertified_run_reports_both(capsys):
 class TestWhatAnExtractionSweepPrints:
     """The attribute numbers are printed, and printed as an instrument.
 
-    An extraction sweep used to print nothing about what it extracted, so the
-    only reader of its numbers was whoever opened the JSON. These pin the two
+    An extraction sweep that printed nothing about what it extracted would
+    leave its numbers to whoever opened the JSON. These pin the two
     properties that make the measurement useful at the terminal: the split by
     attribute is there, and nothing on the line reads as a gate
     ([#195](https://github.com/mstarks01/work-agent/issues/195)).
@@ -133,8 +133,8 @@ class TestTheArtifactCanActuallyBeWritten:
 
     That combination is why a plain type error survived here unseen: no offline
     test builds the artifact, and the one code path that does needs provider
-    credentials. A live run then failed *after* every case had been paid for,
-    with the numbers already computed and nowhere to put them.
+    credentials. A live run would then fail *after* the provider billed every
+    case, with the numbers already computed and nowhere to put them.
 
     So the pieces the artifact assembles are checked for encodability here,
     where it costs nothing.

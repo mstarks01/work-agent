@@ -12,7 +12,7 @@ Two merged changes moved the record under the archive, and both of them make
     `#521 <https://github.com/mstarks01/work-agent/pull/521>`_ replaced the
     narrow ``sha256(served route, tier sampling)`` with the whole **Execution
     Identity**, and the record forbids an extra key. Every archived node
-    carries the old one.
+    carries the narrow one.
 
 So ``run.py score`` and ``run.py review`` are dead on both live sweeps: the
 2026-08-23 STRIDE sweep and the 2026-08-30 ASVS sweep.

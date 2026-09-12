@@ -476,7 +476,7 @@ class TestTheChargeReachesTheRecord:
             asyncio.run(_drive(adapter))
 
     def test_a_streamed_call_records_nothing_and_raises_nothing(self):
-        """The shape the reader was written for but never met.
+        """The shape the reader handles but never meets live.
 
         A stream wrapper carries no usage block and no hidden params, so every
         read answers "nothing said" rather than failing. Nothing is recorded,

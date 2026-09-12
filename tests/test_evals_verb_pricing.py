@@ -33,7 +33,7 @@ def _baseline_sweep() -> Path:
     """The sweep the manifest names, rather than a filename typed here.
 
     A sweep is keyed by its own bytes, so its filename moves whenever the
-    archive is migrated — and a test naming the old one fails with a missing
+    archive is migrated — and a test naming a filename fails with a missing
     file rather than with anything about pricing. The manifest is the record of
     which file is the sweep, so it is what this reads. Sorted, so a directory
     that grows a second sweep still picks the same one every run.

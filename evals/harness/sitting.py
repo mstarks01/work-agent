@@ -815,10 +815,10 @@ def check_every_finding_marked(
 ) -> None:
     """Refuse a sitting that judges none of the findings it read.
 
-    **The bar is a judgement, not an open file.** A submission used to clear a
-    case on the digests alone, so a reader could open every set, write ten
-    characters of own list, and record nothing about any **Claim** — and CI
-    counted that case as read. The one defect a sitting exists to catch is a
+    **The bar is a judgement, not an open file.** Cleared on the digests alone,
+    a reader could open every set, write ten characters of own list, and record
+    nothing about any **Claim** — and CI would count that case as read. The one
+    defect a sitting exists to catch is a
     claim asserting a fact its own **System Model** does not hold, and a reader
     records that as a ``reject``. A case with no marks holds no such answer.
 

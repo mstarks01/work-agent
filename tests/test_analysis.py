@@ -130,7 +130,7 @@ class TestControlState:
         assert control_state(value) == expected
 
     def test_a_blank_control_is_unverified_and_never_stated(self):
-        """The audit's reproduced defect: silence used to read as a control.
+        """The audit's reproduced defect: silence read as a control.
 
         A model whose ``authentication`` was an empty string passed the validity
         gate, and ``is_unverified`` then said the flow carried a verified

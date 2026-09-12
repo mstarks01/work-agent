@@ -1,9 +1,9 @@
 """The one page render every local app shares.
 
-The three apps used to keep their own copies of this: three policy strings,
+Three apps with their own copies of this would hold three policy strings,
 three ``_escape``/``_page``/``_html`` triples, and two spellings of the escape a
-value needs inside a ``<script>`` block. The copies are what these tests
-replace — proving the rule once is what makes it true of every page.
+value needs inside a ``<script>`` block. Proving the rule once is what makes it
+true of every page.
 """
 
 from __future__ import annotations

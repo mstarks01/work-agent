@@ -83,8 +83,7 @@ STRIDE_CATEGORIES: tuple[StrideCategory, ...] = get_args(StrideCategory)
 # One lane's ID prefix. Threat IDs are <category letter>-<per-lane sequence>,
 # e.g. "S-01", and the service composes them from this table plus the package's
 # ``id_format``. **Data, never code**: under one neutral resolver a composed ID
-# cannot carry the wrong letter, so the check that used to enforce the pairing
-# has nothing left to check and is gone.
+# cannot carry the wrong letter, so no check of the pairing is needed.
 CATEGORY_LETTERS: dict[StrideCategory, str] = {
     "spoofing": "S",
     "tampering": "T",
@@ -351,8 +350,8 @@ class ThreatProposals(ProposalBatch):
     :class:`~analysis_service.claims.ProposalBatch`'s, for the schema-compiler
     reasons that class documents. All this adds is the element type.
 
-    **The field used to be spelled ``threats``**, because the prompt spelled it
-    that way and the prompt was STRIDE's. It is not any more: one shared
+    **The field is ``claims``, not ``threats``**, whatever the package calls
+    its findings: one shared
     ``analyze.md`` asks every registered framework's lane agents for the same
     object, and a second framework filing "threats" would be answering in a word
     its own claims are not. The rename costs one line in that prompt and is
@@ -377,7 +376,7 @@ class ThreatRuling(Ruling):
     the critic's severity-calibration step changed a rating. ``None`` — the
     common case — keeps the agent's rating and justification as written.
     Present, it replaces both together, which is what stops a corrected rating
-    from sitting beside a justification that argues for the old one. It is a
+    from sitting beside a justification that argues for the one it replaced. It is a
     whole :class:`~analysis_service.claims.Severity` rather than loose scalars so
     a partial override cannot be expressed.
     """

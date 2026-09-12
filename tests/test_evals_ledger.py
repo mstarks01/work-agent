@@ -631,7 +631,7 @@ class TestTheKeyIsComputedNeverStated:
             )
 
     def test_a_target_that_is_not_a_string_is_refused_at_the_row(self):
-        """`"abc"` used to split per character into ('a','b','c')."""
+        """A string in place of a list would split per character into ('a','b','c')."""
         with pytest.raises(LedgerError):
             Vote(
                 fingerprint="v2:0000000000000000",

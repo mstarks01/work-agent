@@ -139,9 +139,9 @@ SUPPORTED_VERSIONS = (1, 2, 3, 4, 5, 6)
 #: Which component each version reads on top of the framework, lane and targets
 #: every version hashes. ``None`` says this version reads those three alone.
 #:
-#: **Keyed, never branched.** This fact used to be an ``if version == 2`` beside
-#: an ``if version == 3`` at every site that composed a claim, which is three
-#: copies of one table and a fourth version that would have to find all of them.
+#: **Keyed, never branched.** An ``if version == 2`` beside an ``if version ==
+#: 3`` at every site that composed a claim would be three copies of one table,
+#: and a fourth version would have to find all of them.
 #: :func:`key_claim` reads this instead, so a caller offers everything its claim
 #: carries and the version decides what is kept.
 #:

@@ -3,8 +3,8 @@
 ## The gap this closes
 
 The executor reads five things off an ADK event and the retry driver reads four
-off a response or an exception. Nine facts, and until now every offline test
-supplied them **itself**: ``tests/factories.ScriptedLlm`` constructs an
+off a response or an exception. Nine facts, and every other offline test
+supplies them **itself**: ``tests/factories.ScriptedLlm`` constructs an
 ``LlmResponse`` with a ``model_version`` and a ``usage_metadata`` written by
 hand, and ``tests/test_retry.py`` builds a ``RateLimitError`` with the headers
 it wants to read back. Each reader was therefore held against a shape the test
@@ -426,8 +426,8 @@ class TestWhatTheRetryDriverReadsOffAnException:
         adapter's own attempt count is what says so.
 
         45 seconds rather than a token number: it is a whole tokens-per-minute
-        window, which is the case the ceiling was sized for and the one a
-        30-second ceiling used to refuse."""
+        window, which is the case the ceiling is sized for and the one a
+        30-second ceiling would refuse."""
         provider = declining(429, {"retry-after": "45"})
         raised_by("openai", provider)
 

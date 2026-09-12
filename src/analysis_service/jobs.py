@@ -658,10 +658,10 @@ async def execute_job(
     ``deadline_seconds`` bounds the whole run rather than any one call, which is
     the only place the bound can hold: the per-request timeout is multiplied by
     the retry count, and again by the number of LLM stages on the graph's
-    longest path, so a job's tail was previously a product of numbers nobody
+    longest path, so without it a job's tail is a product of numbers nobody
     chose. It is a required keyword rather than a defaulted one — a default here
-    would be a deployment inheriting a deadline it never picked, which is the
-    state ``job_deadline_ms`` was added to ``config/resilience.toml`` to end.
+    would be a deployment inheriting a deadline it never picked, which is what
+    ``job_deadline_ms`` in ``config/resilience.toml`` exists to prevent.
 
     Expiry cancels the graph, so the in-flight provider calls are dropped rather
     than left to finish into a job nobody is waiting on. What the run had

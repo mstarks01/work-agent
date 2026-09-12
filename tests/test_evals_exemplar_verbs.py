@@ -118,10 +118,11 @@ def test_a_swept_package_disagrees_with_its_own_corpus_and_no_other(corpus):
 def test_the_exemplars_hold_no_collision():
     """No place carries two actions inside one lane's shipped drafts.
 
-    The elevation lane used to: its canonical `abuse-grant` and its conditional
-    `escalate` keyed one element set, which is the identity rule's own split
-    condition sitting in the prompt, and the lane followed the canonical verb
-    four times in five on case 01 (#426). Each now cites its own place. Pinned
+    Two drafts keying one element set under two verbs — the elevation lane's
+    canonical `abuse-grant` beside its conditional `escalate` — is the identity
+    rule's own split condition sitting in the prompt, and a lane shown that
+    follows the canonical verb four times in five on case 01 (#426). Each draft
+    cites its own place. Pinned
     at zero because a new pair would mean a prompt edit re-introduced one, the
     failure this whole module measures arriving from the side nobody grades.
     """

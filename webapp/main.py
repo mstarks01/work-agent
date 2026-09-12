@@ -715,10 +715,10 @@ def _vendor_sections(
     missing one and a reader would otherwise discover them one restart at a
     time.
 
-    **Bound, and it used to be every tier.** A tier no node points at builds no
-    adapter and needs no credential, so a deployment whose unused ``review``
-    tier named a second vendor got that vendor listed here with its variables
-    marked NOT SET and its client library named to install. None of it was
+    **Bound to the tiers a node points at.** A tier no node points at builds no
+    adapter and needs no credential, so listing every tier would show a
+    deployment whose unused ``review`` tier names a second vendor that vendor's
+    variables marked NOT SET and its client library to install. None of it is
     needed, and the page is the one surface where being wrong about that costs
     an operator a detour. ``ModelTierConfig.bound_vendors`` is the reader the
     build uses, so the two cannot disagree again.

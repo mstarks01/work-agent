@@ -76,8 +76,7 @@ class GraphFailed(Exception):
     the spend, never the spend, and it is what the caller has: a sweep prices
     a failed case from it, and the job route keeps its reservation rather than
     settling to a figure it knows is short.
-    ``cause`` is the exception the caller classifies, exactly the one it would
-    have caught before this wrapper existed.
+    ``cause`` is the exception the caller classifies, unwrapped.
     """
 
     def __init__(self, cause: Exception, node_runs: Sequence[NodeRun]) -> None:
@@ -148,10 +147,10 @@ class GraphRun:
         """This run as the report a driver returns, or the rejection it parked.
 
         **One reader for both drivers.** The service over a job and the eval
-        harness over a corpus case each used to read the final state, decide
-        which terminal shape it held, stamp the re-ask count and call
-        :meth:`~analysis_service.graph.Analysis.into_report` themselves, and a
-        fix to one reader reached the other only by hand. What differs between
+        harness over a corpus case both need the final state read, its terminal
+        shape decided, the re-ask count stamped and
+        :meth:`~analysis_service.graph.Analysis.into_report` called, and two
+        copies of that would drift while each stayed green. What differs between
         the two is what they *do* with a rejection, so that is what each keeps.
 
         ``job`` carries the identity only a driver knows. Its ``revise_rounds``

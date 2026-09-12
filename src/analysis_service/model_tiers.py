@@ -119,10 +119,10 @@ ReviewIndependence = Literal["shared", "distinct_model", "distinct_provider"]
 #
 # ``recritic/<name>`` is the bounded critic re-ask: a distinct node so it is
 # pinned in its own right, and the loader requires it to resolve to the same
-# tier as its own ``critic/<name>``. That pairing used to be a comment in the
-# config file; at two keys a comment holds, and at 2N keys it drifts, so it is a
-# check. A re-ask on a cheaper model than the pass it corrects is the failure
-# the comment warned about.
+# tier as its own ``critic/<name>``. That pairing is a check rather than a
+# comment in the config file: at two keys a comment holds, and at 2N keys it
+# drifts. A re-ask on a cheaper model than the pass it corrects is the failure
+# the check exists to catch.
 def _framework_nodes() -> tuple[str, ...]:
     return tuple(
         f"{role}/{name}"
@@ -480,10 +480,10 @@ class ModelTierConfig(BaseModel):
         another's on ``base``, and each one's critic has to be independent of its
         own analysis rather than of some other package's.
 
-        **A label is not the thing it names**, which is what a gateway made
-        true. Both policies used to compare what a deployment *wrote* — the
-        vendor key, and the ``(vendor, model)`` pair — and an aggregator's
-        vendor key says nothing about which provider or which build answered.
+        **A label is not the thing it names**, which is what a gateway makes
+        true. Neither policy compares what a deployment *wrote* — the vendor
+        key, and the ``(vendor, model)`` pair — because an aggregator's vendor
+        key says nothing about which provider or which build answered.
         ``openai`` beside ``openrouter`` is two keys and may be one upstream;
         ``gpt-5.6`` beside ``openai/gpt-5.6`` is two strings and is one model.
         So each policy now reads the thing rather than the label, and they read
@@ -537,8 +537,8 @@ class ModelTierConfig(BaseModel):
         before the call — so a deployment that asked for a distinct provider
         cannot be told it has one. Refused rather than approximated: unknown
         routing silently satisfying a strict policy is the failure this whole
-        rule exists to prevent, and it is the one case where the old comparison
-        answered confidently and wrongly.
+        rule exists to prevent, and it is the one case a comparison of written
+        keys answers confidently and wrongly.
 
         Read off ``routes_to_one_provider`` rather than a vendor's name, so the
         next aggregator is covered the day its row lands.

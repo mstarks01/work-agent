@@ -7,7 +7,7 @@ A number in a guide is one of two things, and they must never be checked alike.
 A **recomputable figure** is a property of the repository as it stands: the
 corpus holds 13 cases, the widest fan-out is 23 lanes, the identity rule agrees
 with 295 of 315 readable labels. Change the thing and the number changes with
-it, so prose that still states the old one is simply wrong. Every figure below
+it, so prose that still states the earlier one is simply wrong. Every figure below
 is of this kind, and every one is computed offline with no provider call.
 
 **A module docstring is prose too.** `fingerprint.py` and `verbs.py` argue for

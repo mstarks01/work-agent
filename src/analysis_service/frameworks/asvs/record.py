@@ -555,8 +555,8 @@ class AsvsAnalysis(FrameworkAnalysis):
         Worth checking rather than trusting, because a report payload is
         validated from outside this build too: the package's own comment says
         the chapter appears in the ID, in the lane and in the record "from one
-        call, so the three cannot disagree", and until now nothing read that
-        back. A claim whose ID says chapter 11 and whose record says
+        call, so the three cannot disagree", and this is what reads that back.
+        A claim whose ID says chapter 11 and whose record says
         ``authentication`` files a cryptography ruling under the wrong lane's
         summary and the wrong chapter's coverage.
 

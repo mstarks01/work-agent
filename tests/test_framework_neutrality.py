@@ -77,10 +77,10 @@ SEARCHED = ("src", "evals", "webapp")
 #: matched — ``analysis_service`` is this distribution's name, not a package
 #: selection, and ``frameworks.stride.record`` is a module.
 #:
-#: **The name may sit anywhere inside the string, and in any case.** The pattern
-#: used to be ``"(?:stride|asvs)"`` — the exact quoted token — which is a
-#: framework selection and nothing else. That read past every framework name
-#: embedded in a sentence, and one of them was served:
+#: **The name may sit anywhere inside the string, and in any case.** A pattern
+#: of ``"(?:stride|asvs)"`` — the exact quoted token — matches a framework
+#: selection and nothing else. That reads past every framework name embedded in
+#: a sentence, and one of them is served:
 #: ``FastAPI(title="STRIDE Threat-Modeling Service")`` put a package's name in
 #: the OpenAPI document every caller reads, on an install carrying two. This is
 #: the third blind spot in this scan, after the two #284 found, and each one was
