@@ -14,10 +14,20 @@ over ``scores[].matched[].reference_index``, and needs no re-scoring, no
 provider and no credentials. It reads finished artifacts, the way ``promote``
 does.
 
-What it cannot see: two runs agreeing on a reference is not two runs producing
-the same threat. The same reference can be matched by threats that differ in
-severity, elements and wording. Stability here is stability of recall, which is
-the number the corpus grades and the one worth defending.
+Two runs agreeing on a reference is not two runs producing the same threat.
+The same reference can be matched by threats that differ in severity, elements
+and wording, so beside recall this reads two more things where the record
+holds them. **Cause stability**: for a reference every run missed, whether the
+loss instrument charged it to one cause each time or to several — a fix is
+priced on a cause, and a cause that moves between runs is a ceiling that moves
+with it. **Content stability**: for a reference two or more runs matched,
+whether the matching claims kept one severity band and one resolved place
+across the runs. Five case 01 runs matched reference 17 every time and rated
+it high four times and critical once; recall called that stable. Both read
+what an artifact and its report bundle already hold, and each says
+``unread`` where a run predates the block it needs rather than reporting a
+zero. Wording is not compared: it moves every run, and comparing it as prose
+would measure the tokenizer.
 
 It does not gate, like the rest of the instruments. The spread this reports is
 the input to any future threshold rather than a threshold itself.
@@ -35,13 +45,19 @@ and would have produced a spread — or a negative ``never`` — out of nothing.
 from __future__ import annotations
 
 import itertools
+import json
+from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from analysis_service.claims import FrameworkName
+from analysis_service.system_model import ModelIndex, SystemModel
 from evals.harness.artifact import EvalArtifact, load_artifact
+from evals.harness.bundle import reports_dir
+from evals.harness.fingerprint import IDENTIFIER_OF
+from evals.harness.identity import endpoint_form
 from evals.harness.provenance import ProvenanceError
 from evals.harness.scorer import ratio
 
@@ -71,6 +87,15 @@ class ScoredRun:
     matched: dict[Scope, frozenset[str]]
     references: dict[Scope, int]
     recall: dict[Scope, float]
+    #: Each missed reference's charged cause, per scope, off the ``losses``
+    #: block. ``None`` where the artifact carries no such block, which every
+    #: sweep before the instrument existed does: an absent record is not a run
+    #: whose causes all agreed.
+    causes: dict[Scope, dict[str, str]] | None = None
+    #: Each matched reference's content, per scope: the matching claim's
+    #: severity band and its endpoint-resolved place, off the report bundle.
+    #: ``None`` where no bundle sits beside the artifact.
+    content: dict[Scope, dict[str, tuple[str, frozenset[str]]]] | None = None
 
     @property
     def cases(self) -> frozenset[Scope]:
@@ -97,6 +122,19 @@ class CaseStability:
     sometimes: int
     never: int
     mean_jaccard: float
+    #: Of the references every run missed, how many were charged to one cause
+    #: in every run and how many to more than one. ``None`` for both where any
+    #: run carries no loss rows, because an absent cause is not an agreeing one.
+    cause_stable: int | None = None
+    cause_moving: int | None = None
+    #: Of the references two or more runs matched, how many kept one severity
+    #: band across every run that matched them, and how many kept one
+    #: resolved place. ``None`` where any run has no report bundle to read, or
+    #: where the package's references name no place.
+    severity_held: int | None = None
+    severity_moved: int | None = None
+    place_held: int | None = None
+    place_moved: int | None = None
 
     @property
     def recall_spread(self) -> float:
@@ -119,6 +157,12 @@ class CaseStability:
             "never_matched": self.never,
             "volatile_rate": round(self.volatile_rate, 3),
             "mean_jaccard": round(self.mean_jaccard, 3),
+            "cause_stable": self.cause_stable,
+            "cause_moving": self.cause_moving,
+            "severity_held": self.severity_held,
+            "severity_moved": self.severity_moved,
+            "place_held": self.place_held,
+            "place_moved": self.place_moved,
         }
 
 
@@ -171,7 +215,77 @@ def read_run(artifact: EvalArtifact) -> ScoredRun:
         matched=matched,
         references=references,
         recall=recall,
+        causes=_causes(artifact),
+        content=_content(artifact, matched),
     )
+
+
+def _causes(artifact: EvalArtifact) -> dict[Scope, dict[str, str]] | None:
+    """Each missed reference's charged cause, off the ``losses`` block, or ``None`` without one."""
+    try:
+        rows = artifact.block("losses")
+    except KeyError:
+        return None
+    if rows is None:
+        return None
+    try:
+        return {
+            ("stride", str(row["case"])): {
+                str(loss["reference_index"]): str(loss["cause"])
+                for loss in row["losses"]
+            }
+            for row in rows
+        }
+    except (KeyError, TypeError) as exc:
+        raise ProvenanceError(
+            f"{artifact.path}: malformed losses block: {exc}"
+        ) from exc
+
+
+def _content(
+    artifact: EvalArtifact, matched: Mapping[Scope, frozenset[str]]
+) -> dict[Scope, dict[str, tuple[str, frozenset[str]]]] | None:
+    """Each matched reference's severity band and resolved place, off the report bundle.
+
+    Read only for a package that composes its identity from an action and a
+    place, by its own declaration: its scorer records which claim matched
+    each reference, and its claims carry a severity. A catalog-identified
+    package records matched identifiers alone, so there is nothing here to
+    read for it. ``None`` where the bundle is absent, which is the shape of a
+    sweep copied without its reports.
+    """
+    directory = reports_dir(artifact.path)
+    if not directory.is_dir():
+        return None
+    content: dict[Scope, dict[str, tuple[str, frozenset[str]]]] = {}
+    try:
+        for score in artifact.block("scores"):
+            scope: Scope = ("stride", str(score["case"]))
+            if IDENTIFIER_OF[scope[0]] is not None:
+                continue
+            path = directory / f"{scope[1]}.report.json"
+            if not path.is_file():
+                return None
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            flows = ModelIndex.of(
+                SystemModel.model_validate(raw["system_model"])
+            ).flow_endpoints
+            block = next(b for b in raw["analyses"] if b["framework"] == scope[0])
+            claims = {claim["id"]: claim for claim in block["claims"]}
+            content[scope] = {
+                str(pair["reference_index"]): (
+                    str(claims[pair["threat_id"]]["severity"]["level"]),
+                    endpoint_form(
+                        claims[pair["threat_id"]]["affected_element_ids"], flows
+                    ),
+                )
+                for pair in score["matched"]
+            }
+    except (OSError, KeyError, TypeError, ValueError, StopIteration) as exc:
+        raise ProvenanceError(
+            f"{artifact.path}: cannot read matched content off its reports: {exc}"
+        ) from exc
+    return content
 
 
 def load_runs(paths: Iterable[Path | str]) -> list[ScoredRun]:
@@ -231,9 +345,78 @@ def compare_runs(runs: Sequence[ScoredRun]) -> list[CaseStability]:
                 sometimes=ever - always,
                 never=references - ever,
                 mean_jaccard=_mean_jaccard(sets),
+                **_cause_stability(runs, scope, references, sets),
+                **_content_stability(runs, scope, sets),
             )
         )
     return stability
+
+
+def _cause_stability(
+    runs: Sequence[ScoredRun],
+    scope: Scope,
+    references: int,
+    sets: Sequence[frozenset[str]],
+) -> dict[str, int | None]:
+    """Over the references every run missed: one cause each time, or several."""
+    if any(run.causes is None for run in runs):
+        return {"cause_stable": None, "cause_moving": None}
+    never = {str(index) for index in range(references)} - frozenset.union(*sets)
+    stable = 0
+    for reference in never:
+        causes = set()
+        for run in runs:
+            assert run.causes is not None
+            charged = run.causes.get(scope, {}).get(reference)
+            if charged is None:
+                raise ValueError(
+                    f"{scope[0]}/{scope[1]}: {run.label} missed reference"
+                    f" {reference} and its losses block charges it to nothing"
+                )
+            causes.add(charged)
+        stable += len(causes) == 1
+    return {"cause_stable": stable, "cause_moving": len(never) - stable}
+
+
+def _content_stability(
+    runs: Sequence[ScoredRun], scope: Scope, sets: Sequence[frozenset[str]]
+) -> dict[str, int | None]:
+    """Over the references two or more runs matched: one band and one place, or not."""
+    unread: dict[str, int | None] = {
+        "severity_held": None,
+        "severity_moved": None,
+        "place_held": None,
+        "place_moved": None,
+    }
+    if IDENTIFIER_OF[scope[0]] is not None or any(run.content is None for run in runs):
+        return unread
+    counts = Counter(reference for matched in sets for reference in matched)
+    severity_held = severity_moved = place_held = place_moved = 0
+    for reference, seen in counts.items():
+        if seen < 2:
+            continue
+        bands = set()
+        places = set()
+        for run in runs:
+            assert run.content is not None
+            entry = run.content.get(scope, {}).get(reference)
+            if entry is not None:
+                bands.add(entry[0])
+                places.add(entry[1])
+        if len(bands) == 1:
+            severity_held += 1
+        else:
+            severity_moved += 1
+        if len(places) == 1:
+            place_held += 1
+        else:
+            place_moved += 1
+    return {
+        "severity_held": severity_held,
+        "severity_moved": severity_moved,
+        "place_held": place_held,
+        "place_moved": place_moved,
+    }
 
 
 def refuse_incomparable(runs: Sequence[ScoredRun]) -> None:
@@ -284,8 +467,20 @@ def aggregate_stability(stability: Sequence[CaseStability]) -> dict[str, Any]:
     references = sum(entry.references for entry in stability)
     always = sum(entry.always for entry in stability)
     sometimes = sum(entry.sometimes for entry in stability)
+
+    def pooled(field: str) -> int | None:
+        """A sum that stays ``None`` if any case could not read the field."""
+        values = [getattr(entry, field) for entry in stability]
+        return None if any(value is None for value in values) else sum(values)
+
     return {
         "cases": len(stability),
+        "cause_stable": pooled("cause_stable"),
+        "cause_moving": pooled("cause_moving"),
+        "severity_held": pooled("severity_held"),
+        "severity_moved": pooled("severity_moved"),
+        "place_held": pooled("place_held"),
+        "place_moved": pooled("place_moved"),
         "runs": max((entry.runs for entry in stability), default=0),
         "references": references,
         "always_matched": always,

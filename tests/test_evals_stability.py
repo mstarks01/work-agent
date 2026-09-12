@@ -283,3 +283,221 @@ def test_a_malformed_score_block_is_refused_by_name(tmp_path, sampling):  # noqa
 
     with pytest.raises(ProvenanceError, match="malformed score block"):
         load_runs([path])
+
+
+def losses_block(case: str, causes: dict[int, str]) -> list[dict]:
+    """A ``losses`` block charging each index to the cause given."""
+    return [
+        {
+            "case": case,
+            "losses": [
+                {"reference_index": index, "cause": cause}
+                for index, cause in causes.items()
+            ],
+        }
+    ]
+
+
+def write_reports(
+    path: Path, case: str, claims: dict[int, tuple[str, list[str]]]
+) -> None:
+    """One report beside ``path``: the corpus model of case 01 and one claim per matched index."""
+    from evals.harness.bundle import reports_dir
+    from evals.harness.reference import load_case
+
+    model = load_case(
+        Path(__file__).resolve().parents[1] / "evals" / "corpus" / case
+    ).model
+    directory = reports_dir(path)
+    directory.mkdir(exist_ok=True)
+    (directory / f"{case}.report.json").write_text(
+        json.dumps(
+            {
+                "system_model": model.model_dump(mode="json"),
+                "analyses": [
+                    {
+                        "framework": "stride",
+                        "claims": [
+                            {
+                                "id": f"T-{index}",
+                                "severity": {"level": level},
+                                "affected_element_ids": elements,
+                            }
+                            for index, (level, elements) in claims.items()
+                        ],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+class TestCauseStability:
+    """A reference every run missed: charged to one cause each time, or to several."""
+
+    CASE = "01-payments-checkout"
+
+    def test_a_cause_that_holds_and_one_that_moves_are_counted_apart(
+        self,
+        tmp_path,
+        sampling,  # noqa: F811
+    ):
+        record = provenance(sampling)
+        a = write_run(
+            tmp_path,
+            "a.json",
+            record,
+            [score(self.CASE, 4, [0])],
+            losses=losses_block(self.CASE, {1: "verb", 2: "place", 3: "unled"}),
+        )
+        b = write_run(
+            tmp_path,
+            "b.json",
+            record,
+            [score(self.CASE, 4, [0])],
+            losses=losses_block(self.CASE, {1: "verb", 2: "unled", 3: "unled"}),
+        )
+        entry = compare_runs(load_runs([a, b]))[0]
+
+        assert (entry.cause_stable, entry.cause_moving) == (2, 1)
+        assert aggregate_stability([entry])["cause_stable"] == 2
+
+    def test_a_reference_missed_in_one_run_only_has_no_cause_to_compare(
+        self,
+        tmp_path,
+        sampling,  # noqa: F811
+    ):
+        record = provenance(sampling)
+        a = write_run(
+            tmp_path,
+            "a.json",
+            record,
+            [score(self.CASE, 3, [0, 1])],
+            losses=losses_block(self.CASE, {2: "verb"}),
+        )
+        b = write_run(
+            tmp_path,
+            "b.json",
+            record,
+            [score(self.CASE, 3, [0])],
+            losses=losses_block(self.CASE, {1: "place", 2: "verb"}),
+        )
+        entry = compare_runs(load_runs([a, b]))[0]
+
+        assert (entry.cause_stable, entry.cause_moving) == (1, 0)
+        assert entry.sometimes == 1
+
+    def test_a_run_with_no_loss_rows_reads_unread_rather_than_agreeing(
+        self,
+        tmp_path,
+        sampling,  # noqa: F811
+    ):
+        record = provenance(sampling)
+        a = write_run(
+            tmp_path,
+            "a.json",
+            record,
+            [score(self.CASE, 2, [0])],
+            losses=losses_block(self.CASE, {1: "verb"}),
+        )
+        b = write_run(tmp_path, "b.json", record, [score(self.CASE, 2, [0])])
+        entry = compare_runs(load_runs([a, b]))[0]
+
+        assert entry.cause_stable is None and entry.cause_moving is None
+        assert aggregate_stability([entry])["cause_stable"] is None
+
+    def test_a_miss_the_losses_block_does_not_charge_is_refused(
+        self,
+        tmp_path,
+        sampling,  # noqa: F811
+    ):
+        record = provenance(sampling)
+        a = write_run(
+            tmp_path,
+            "a.json",
+            record,
+            [score(self.CASE, 2, [0])],
+            losses=losses_block(self.CASE, {}),
+        )
+        b = write_run(
+            tmp_path,
+            "b.json",
+            record,
+            [score(self.CASE, 2, [0])],
+            losses=losses_block(self.CASE, {1: "verb"}),
+        )
+        with pytest.raises(ValueError, match="charges it to nothing"):
+            compare_runs(load_runs([a, b]))
+
+
+class TestContentStability:
+    """A reference two runs matched: one severity band and one place, or not."""
+
+    CASE = "01-payments-checkout"
+
+    def test_a_band_and_a_place_that_hold_and_ones_that_move(
+        self,
+        tmp_path,
+        sampling,  # noqa: F811
+    ):
+        record = provenance(sampling)
+        scores = [score(self.CASE, 3, [0, 1, 2])]
+        a = write_run(tmp_path, "a.json", record, scores)
+        b = write_run(tmp_path, "b.json", record, scores)
+        write_reports(
+            a,
+            self.CASE,
+            {
+                0: ("high", ["process:storefront-api"]),
+                1: ("high", ["process:storefront-api"]),
+                2: ("medium", ["store:orders-db"]),
+            },
+        )
+        write_reports(
+            b,
+            self.CASE,
+            {
+                0: ("high", ["process:storefront-api"]),
+                # A flow cited on one side and its endpoints on the other is one
+                # place, by the same resolution the identity rule applies.
+                1: ("critical", ["flow:shopper-to-storefront-api:place-order"]),
+                2: ("medium", ["process:order-service"]),
+            },
+        )
+        entry = compare_runs(load_runs([a, b]))[0]
+
+        assert (entry.severity_held, entry.severity_moved) == (2, 1)
+        assert (entry.place_held, entry.place_moved) == (1, 2)
+
+    def test_a_reference_one_run_matched_is_not_compared(self, tmp_path, sampling):  # noqa: F811
+        record = provenance(sampling)
+        a = write_run(tmp_path, "a.json", record, [score(self.CASE, 2, [0, 1])])
+        b = write_run(tmp_path, "b.json", record, [score(self.CASE, 2, [0])])
+        write_reports(a, self.CASE, {0: ("high", []), 1: ("low", [])})
+        write_reports(b, self.CASE, {0: ("high", [])})
+        entry = compare_runs(load_runs([a, b]))[0]
+
+        assert (entry.severity_held, entry.severity_moved) == (1, 0)
+        assert (entry.place_held, entry.place_moved) == (1, 0)
+
+    def test_a_run_without_its_bundle_reads_unread(self, tmp_path, sampling):  # noqa: F811
+        record = provenance(sampling)
+        a = write_run(tmp_path, "a.json", record, [score(self.CASE, 2, [0])])
+        b = write_run(tmp_path, "b.json", record, [score(self.CASE, 2, [0])])
+        write_reports(a, self.CASE, {0: ("high", [])})
+        entry = compare_runs(load_runs([a, b]))[0]
+
+        assert entry.severity_held is None and entry.place_held is None
+        assert aggregate_stability([entry])["place_held"] is None
+
+    def test_a_bundle_missing_a_matched_claim_is_refused_by_name(
+        self,
+        tmp_path,
+        sampling,  # noqa: F811
+    ):
+        record = provenance(sampling)
+        a = write_run(tmp_path, "a.json", record, [score(self.CASE, 2, [0, 1])])
+        write_reports(a, self.CASE, {0: ("high", [])})
+        with pytest.raises(ProvenanceError, match="matched content"):
+            load_runs([a])

@@ -43,12 +43,24 @@ def case():
     return load_case(CASE_DIR)
 
 
-def write_report_model(artifact: Path, case_id: str, model: SystemModel) -> None:
-    """The one block the instrument reads off an end-to-end report."""
+def write_report_model(
+    artifact: Path, case_id: str, model: SystemModel, matched: tuple[int, ...] = ()
+) -> None:
+    """The two blocks a reader takes off a report: its model, and one claim per matched index."""
     directory = reports_dir(artifact)
     directory.mkdir(exist_ok=True)
+    claims = [
+        {"id": f"T-{index}", "severity": {"level": "high"}, "affected_element_ids": []}
+        for index in matched
+    ]
     (directory / f"{case_id}.report.json").write_text(
-        json.dumps({"system_model": model.model_dump(mode="json")}), encoding="utf-8"
+        json.dumps(
+            {
+                "system_model": model.model_dump(mode="json"),
+                "analyses": [{"framework": "stride", "claims": claims}],
+            }
+        ),
+        encoding="utf-8",
     )
 
 
@@ -102,7 +114,7 @@ class TestTheFourFates:
             analysis_matched=[0, 1],
             references=n,
         )
-        write_report_model(end, CASE, case.model)
+        write_report_model(end, CASE, case.model, matched=(0, 2))
         runs = load_runs([end, analysis])
         rows = attribute_handoff(
             runs[0], runs[1], {CASE: case}, {CASE: extracted_model(end, CASE)}

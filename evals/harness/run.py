@@ -407,7 +407,7 @@ def _score_runs(
             continue
         drafts = runs[case.id].merged_drafts
         produced = stride_threats(runs[case.id].report)
-        entry = score_case_with_yield(case, drafts, produced, matcher, votes)
+        entry = score_case_with_yield(case, drafts, produced, matcher, votes, block)
         scored.append(entry)
         # The third reading off the same pass: what lost each miss, from the
         # score's own misses, the two sides the yield already compares, and the
@@ -1134,13 +1134,24 @@ def _print_stability(
         print(f"WARNING: {warning}")
     print(f"stability over {len(runs)} runs: {', '.join(run.label for run in runs)}")
     header = f"  {'framework':10} {'case':26} {'recalls':>22}"
-    print(f"{header} {'spread':>8} {'always':>16} {'jaccard':>9}")
+    print(
+        f"{header} {'spread':>8} {'always':>16} {'jaccard':>9}"
+        f" {'cause':>10} {'severity':>10} {'place':>10}"
+    )
+
+    def held(kept: int | None, moved: int | None) -> str:
+        """``kept/compared``, or ``-`` where a run predates the record it needs."""
+        return "-" if kept is None or moved is None else f"{kept}/{kept + moved}"
+
     for entry in stability:
         recalls = " ".join(f"{recall:.2f}" for recall in entry.recalls)
         always = f"{entry.always}/{entry.references} (±{entry.sometimes})"
         print(
             f"  {entry.framework:10} {entry.case_id:26} {recalls:>22}"
             f" {entry.recall_spread:8.2f} {always:>16} {entry.mean_jaccard:9.2f}"
+            f" {held(entry.cause_stable, entry.cause_moving):>10}"
+            f" {held(entry.severity_held, entry.severity_moved):>10}"
+            f" {held(entry.place_held, entry.place_moved):>10}"
         )
     totals = aggregate_stability(stability)
     print(
@@ -1150,6 +1161,11 @@ def _print_stability(
         f" mean jaccard {totals['mean_jaccard']:.2f},"
         f" worst case recall spread {totals['worst_case_recall_spread']:.2f}"
         " (instrument, non-gating)"
+    )
+    print(
+        "  the cause column is references every run missed that kept one cause;"
+        " severity and place are references two or more runs matched that kept"
+        " one band and one resolved place; - means a run predates the record"
     )
 
 
