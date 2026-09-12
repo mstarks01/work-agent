@@ -241,7 +241,7 @@ def _parse_algorithms(raw: str) -> tuple[str, ...] | None:
     that matches nothing is passed through unchanged so the validator can name
     it in the error — silently dropping an unrecognised entry would let
     ``HS256`` be configured and then quietly ignored, which reads to whoever
-    wrote it as though it had been accepted.
+    wrote it as an accepted setting.
 
     Empty entries from a trailing comma are dropped; a variable that is *set*
     but names nothing usable reaches the validator as an empty tuple and is

@@ -542,9 +542,9 @@ class TestTheMarks:
     def test_a_sitting_that_judges_nothing_is_refused(self, client):
         """The bar is a judgement, not an open file.
 
-        A submission used to clear a case on the digests alone, so a reader
-        could open every set and record nothing about any claim — and CI
-        counted that case as read. The one defect a sitting exists to catch is
+        Cleared on the digests alone, a reader could open every set and record
+        nothing about any claim — and CI would count that case as read. The one
+        defect a sitting exists to catch is
         a claim asserting a fact its own model does not hold, and a reader
         records that as a ``reject``.
         """
@@ -2052,9 +2052,9 @@ class TestThePageParses:
 class TestTheLayoutCoversTheCase:
     """The page lays the case out, and neither half may outgrow the other.
 
-    The flat text the page used to print could not lose a part of a case: a
-    block the layout did not know about still arrived as its own words. Markup
-    can, so both halves are checked against what the corpus actually holds.
+    Flat text cannot lose a part of a case: a block the layout does not know
+    about still arrives as its own words. Markup can, so both halves are checked
+    against what the corpus actually holds.
     """
 
     def kinds(self) -> set[str]:
@@ -2202,14 +2202,14 @@ class TestAFrameworkArrivingOnAReadCase:
     """A **Framework Package** a case gains after a sitting merged.
 
     Nobody judges a set that did not exist when they read, so the case needs
-    that set judged and nothing else. What used to happen instead: the whole
-    case reverted to ``to do``, the reader was told a file had *changed* under
-    them when it was simply new, the unmarked count spanned both frameworks and
-    named neither, and the own list came back empty.
+    that set judged and nothing else. The wrong answers, each refused below:
+    the whole case reverting to ``to do``, the reader told a file *changed*
+    under them when it is simply new, an unmarked count spanning both
+    frameworks and naming neither, and an own list coming back empty.
 
     That last one is not a cost, it is a corruption. The method's one rule is
     that the list is written before the sets open. A reader who has already
-    read the old sets cannot write a blind list a second time, so a fresh box
+    read the earlier sets cannot write a blind list a second time, so a fresh box
     asks them for evidence of an order that did not happen.
     """
 
@@ -2360,9 +2360,9 @@ class TestACorpusEditUnderAMergedSitting:
     """A file a merged sitting read moves, and the reader keeps their marks.
 
     The gate is right to drop the sitting: a digest that no longer matches says
-    the record signed bytes the tree no longer holds. The launcher used to ask
-    the gate's reader when it seeded a draft, so the same edit opened the case
-    empty and the reader marked every finding again. A mark is keyed by the
+    the record signed bytes the tree no longer holds. A launcher that asked
+    the gate's reader when it seeded a draft would open the case empty on the
+    same edit, and the reader would mark every finding again. A mark is keyed by the
     finding's fingerprint, so an added claim is the only one without an answer,
     and a claim whose identity changed is the only one whose old mark is gone.
     """

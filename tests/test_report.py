@@ -175,8 +175,8 @@ class TestVerdictShapes:
 class TestProposedVerdictCarriesNoRuleBetweenFields:
     """What the critic emits accepts everything the report's shape refuses.
 
-    The whole of the fix: each of the three combinations below used to raise
-    inside ``ThreatRulings`` on the way into session state, which kills the
+    Each of the three combinations below would, as a validator on
+    ``ThreatRulings``, raise on the way into session state, which kills the
     critic node — one pass over every draft in the job — and with it the run.
     They are faults, and they are reported by ``review_issues`` and fixed by
     the bounded re-ask, which is the machinery that already existed for exactly

@@ -110,9 +110,9 @@ def estimate(
     tokenizer meters it near one token per byte, so only a byte count
     over-counts every text a caller can send.
     **It under-counts, and the direction was measured rather than reasoned.**
-    The claim here used to be that assuming every call sees the whole input
-    pulls the number up harder than ignoring instruction text pulls it down.
-    That is false wherever the submission is small, which is the ordinary case:
+    Assuming every call sees the whole input does not pull the number up harder
+    than ignoring instruction text pulls it down, wherever the submission is
+    small, which is the ordinary case:
     a 133-byte submission naming both frameworks reserves 3,857 tokens against
     1,225,788 bytes of real prompt, 318 times short, because 986,348 of those
     bytes are instruction text the inputs cannot predict. At the largest

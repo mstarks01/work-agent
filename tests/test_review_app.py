@@ -328,9 +328,9 @@ class TestReadingSeveralSweeps:
         with each other about a fact no producer produces.
         """
         artifact = write_sweep_document(tmp_path / name, document)
-        # Named by the harness's own helper rather than composed here. These
-        # fixtures used to append the suffix, which is what let the app and the
-        # harness disagree about the directory without a test noticing.
+        # Named by the harness's own helper rather than composed here, so the
+        # app and the harness cannot disagree about the directory without a
+        # test noticing.
         reports = bundle.reports_dir(artifact)
         reports.mkdir()
         (reports / "01-payments-checkout.report.json").write_text(
@@ -536,10 +536,10 @@ def test_the_page_carries_the_token_the_vote_needs(runs, tmp_path):
 def test_a_needs_evidence_finding_comes_back_in_a_later_sitting(runs, tmp_path):
     """The end of the path #554 only fixed the start of.
 
-    `queue.build` re-offers it, and `Session.remaining()` used to drop it again
-    with a second copy of the rule that had not been changed. Every serving path
-    goes through `remaining()`, so the app never showed what the queue re-offered
-    and `Vote.sitting` reached no reader that decided anything.
+    `queue.build` re-offers it, and a second copy of the rule in
+    `Session.remaining()` would drop it again. Every serving path goes through
+    `remaining()`, so with two copies the app would never show what the queue
+    re-offered and `Vote.sitting` would reach no reader that decided anything.
     """
     ledger_path = tmp_path / "votes"
     first = build_session(runs, voter="ada", ledger_path=ledger_path)

@@ -49,7 +49,7 @@ def test_standings_by_login(tmp_path):
 
 
 def test_a_rename_keeps_one_series(tmp_path):
-    """Old rows stay under the old login; the roster folds them back."""
+    """Rows stay under the former login; the roster folds them back."""
     roster = load(write(tmp_path, GOOD))
     assert roster.resolve("ada-prior") == "ada"
     assert roster.standing_of("ada-prior") == "contributor"

@@ -274,9 +274,9 @@ class TestGroundReferences:
     def test_a_pointer_spelled_attribute_resolves(self, model):
         """A field name arriving as ``/exposure`` is the field ``exposure``.
 
-        The spelling is the provider's, not the prompt's, and it used to kill
-        the job here — six lanes of drafts thrown away over a leading slash on
-        a name whose element really does carry the field.
+        The spelling is the provider's, not the prompt's, and refusing it here
+        would kill the job — six lanes of drafts thrown away over a leading
+        slash on a name whose element really does carry the field.
         """
         drafts = {
             "spoofing": [

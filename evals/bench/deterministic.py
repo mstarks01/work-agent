@@ -137,7 +137,7 @@ def trailing_junk(span: str) -> str:
     the shape the timings recorded in PR #628 were taken against**, and the
     timing case below uses it for that reason: a benchmark whose numbers cannot
     be compared with the ones already written down is a new baseline pretending
-    to be the old one.
+    to be the recorded one.
     """
     return f"{span} zzzqqq"
 

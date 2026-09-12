@@ -410,9 +410,9 @@ def test_no_vendor_field_has_a_default():
     default would quietly restore the constant.
 
     The rule covers every record a row nests, not `Vendor` alone: the
-    credential sources, their variables, the form rules and the SDK entry are
-    where the facts the old module tables held now live, and a default on any
-    of them is the same constant one level down.
+    credential sources, their variables, the form rules and the SDK entry hold
+    the facts, and a default on any of them is the same constant one level
+    down.
     """
     defaulted = [
         f"{record.__name__}.{field.name}"

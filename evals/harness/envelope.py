@@ -1,7 +1,7 @@
 """The offline sitting envelope: one file out, one file back.
 
-A **Case Sitting** needs no credentials and no network, but until now it needed
-a clone and a command line. A reader whose own policy stops them taking part
+A **Case Sitting** needs no credentials, no network, no clone and no command
+line. A reader whose own policy stops them taking part
 under their name is often a reader who cannot install a toolchain either, and
 the two together shut them out of a method that is otherwise free.
 

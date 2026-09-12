@@ -28,10 +28,9 @@ data for the extraction prompt, and never concatenates them into an instruction.
 The engine adds no new trust surface. It re-asserts, for the in-process path,
 the bounds the HTTP layer already enforces, from the same deployment config and
 in the same order: what one submission may carry, and how long one run may take.
-Both halves matter, and only the first used to be here. ``execute_job`` bounded
-the job route's duration while :meth:`Engine.analyze` handed straight to the
-runner, so the first-run app and every library embedder ran with no time budget
-at all. That is the state ``job_deadline_ms`` exists to end.
+Both halves matter. ``execute_job`` bounds the job route's duration, and
+``job_deadline_ms`` bounds :meth:`Engine.analyze` the same way, so the first-run
+app and every library embedder run under a time budget too.
 """
 
 from __future__ import annotations
@@ -110,7 +109,7 @@ class Engine:
         # (:meth:`~analysis_service.deployment.Deployment.selection`). A
         # package's options model declares no default, so a selection missing
         # a value it needs is refused here rather than reaching a block that
-        # cannot be built — which would fail after every node had been paid for.
+        # cannot be built — which would fail after the provider billed every node.
         try:
             self._frameworks = resolve_selection(list(PACKAGES), frameworks)
         except SelectionError as exc:

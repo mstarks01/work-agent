@@ -433,7 +433,7 @@ def test_an_unsure_vote_leaves_the_finding_open(case):
 def test_needs_info_threats_are_keyed_like_any_other(case, no_votes):
     """A conditional finding can be wrong too, so a person gets to say so.
 
-    The verdict used to exempt it from the vote lookup, which left most of a
+    Exempting it from the vote lookup by verdict would leave most of a
     report's unmatched output outside every number: 100 of 116 in the first
     Baseline.
     """

@@ -49,7 +49,7 @@ def _stride_claims(case):
 
 
 def test_every_reference_claim_carries_a_verb():
-    """The end state of the gap this file used to count.
+    """Every reference claim carries a verb, and a gap is named by claim.
 
     A case with an unassigned claim is named, with the claim, because "12 of 13"
     tells nobody which sentence to go and read.

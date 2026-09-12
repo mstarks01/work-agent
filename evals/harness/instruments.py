@@ -542,10 +542,9 @@ def score_blocks(
 class CaseMeasurement:
     """Every reading one finished case offers, before any of it is pooled.
 
-    One value rather than four appends into four accumulators. The sweep loop
-    used to hold the whole of this inline, which meant an instrument that
-    measures a case grew the loop; now it grows this function and the table,
-    and the loop stays "run the case, measure it, keep the result".
+    One value rather than four appends into four accumulators. An instrument
+    that measures a case grows this function and the table, and the sweep loop
+    stays "run the case, measure it, keep the result".
 
     ``rows`` is keyed by instrument name, the way :func:`score_blocks` returns
     it, so a package that earns a per-case scorer needs nothing here either.

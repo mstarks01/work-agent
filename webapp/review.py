@@ -197,10 +197,10 @@ class Session:
         serve a finding the first already answered.
 
         Asked of :func:`~evals.harness.queue.answered`, which is the same
-        function the queue was built with. It used to be a second copy of that
-        rule here, and the copy went stale the day the rule changed: it counted
-        a `needs-evidence` answer as answered and dropped, on every serve, the
-        finding the queue had just re-offered.
+        function the queue was built with. A second copy of that rule here would
+        go stale the day the rule changed, and count a `needs-evidence` answer as
+        answered, dropping on every serve the finding the queue had just
+        re-offered.
 
         ``contents`` comes off the held items, so this serve compares a vote
         against the words this sitting is showing rather than against whatever

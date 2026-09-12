@@ -415,9 +415,8 @@ class TestWhatARescoreTouches:
 
 class TestItWritesNothingInsideAMergedBaseline:
     """A Baseline's files are digest-sealed, so a score in place breaks the
-    seal and the repo-wide verify with it (#745). The guide used to name that
-    command. The command now refuses any target under the Baselines root and
-    names ``--out``."""
+    seal and the repo-wide verify with it (#745). The command refuses any
+    target under the Baselines root and names ``--out``."""
 
     def test_in_place_is_refused_and_the_artifact_is_untouched(
         self, swept, tmp_path, monkeypatch, capsys

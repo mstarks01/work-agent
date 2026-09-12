@@ -273,7 +273,7 @@ class SecurityHeaders:
     ``no-store`` says that nothing a local app serves belongs in a cache. A
     page carries the process's own token and its client script inline, so a
     cached copy is a page from a dead process: a reader who restarts the app
-    after an upgrade reloads and reads the old code, with a token the new
+    after an upgrade reloads and reads the dead process's code, with a token the new
     process refuses. The responses beside it hold one reader's draft answers,
     which have no business on disk in a browser cache either.
 

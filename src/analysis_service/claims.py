@@ -1126,9 +1126,8 @@ class Ruling(BaseModel):
     bought nothing and cost the run's largest block of output tokens. It also
     cost correctness: re-emitting a description is a chance to alter it, and
     a critic told "do not rewrite descriptions" could still do so silently.
-    Under this schema it cannot. That is why the element-reference check the
-    review seam used to run is gone — a ruling carries no element references
-    to break.
+    Under this schema it cannot, and a ruling carries no element references to
+    check.
 
     A package's own subclass may add one more thing: a draft field the ruling
     is allowed to *replace*. STRIDE's severity override is the only one today.
@@ -1299,8 +1298,8 @@ class UnresolvedMention(BaseModel):
     structural claim about what it acts on, and one that does not resolve is
     dropped and marked at :func:`~analysis_service.fan_in.join_drafts`. This is the softer
     thing beside it — an ID written into the argument, which the analyze prompt
-    asks for ("cite element and flow IDs inline") and which nothing checked
-    until now. The description is the part a reader actually reads, so an ID in
+    asks for ("cite element and flow IDs inline"). The description is the part
+    a reader actually reads, so an ID in
     it that names nothing is a claim about a system this report does not
     describe.
 

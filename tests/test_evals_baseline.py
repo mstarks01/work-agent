@@ -313,7 +313,7 @@ class TestThePrefixFallbackStopsAtOneSegment:
         """
         route = "openrouter/deepseek/deepseek-v4-pro"
         assert prices.unit_prices(route) is None
-        # The key it used to reach is still there, so this fails if the rule is
+        # The bare key is still there, so this fails if the rule is
         # relaxed rather than if the map moves.
         assert prices.unit_prices("deepseek-v4-pro") is not None
 

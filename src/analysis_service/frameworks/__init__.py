@@ -641,8 +641,8 @@ def _declaration_issues(package: FrameworkPackage) -> list[str]:
         issues.append(f"lanes are not slugs: {', '.join(map(repr, malformed))}")
 
     declared = set(package.lanes)
-    # Under packages a rule's lane is a plain string, so this check replaces the
-    # typed field that used to make a mis-filed rule unrepresentable.
+    # A rule's lane is a plain string, so this check is what makes a mis-filed
+    # rule fail.
     stray = sorted({rule.lane for rule in package.rules} - declared)
     if stray:
         issues.append(f"rules name undeclared lanes: {', '.join(stray)}")

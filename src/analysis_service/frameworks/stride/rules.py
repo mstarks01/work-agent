@@ -153,10 +153,10 @@ def _unverified_write_to_store(model: SystemModel) -> Iterator[Match]:
     """A store an unverified caller may write, by the flow's own ``operations``.
 
     A :class:`~analysis_service.system_model.DataFlow`'s direction is who
-    initiates, so a service that only *reads* a database used to arrive here
-    exactly as one that writes it — and the lead told an agent a read-only path
-    could be tampered with. ``operations`` is the field that separates them, and
-    a flow stating ``read`` is skipped.
+    initiates, so by direction alone a service that only *reads* a database
+    looks exactly like one that writes it — and the lead would tell an agent a
+    read-only path can be tampered with. ``operations`` is the field that
+    separates them, and a flow stating ``read`` is skipped.
 
     ``unknown`` still fires, and that is the point of raising a lead rather than
     a finding: nobody said what the connection carries, so a write cannot be
@@ -168,8 +168,8 @@ def _unverified_write_to_store(model: SystemModel) -> Iterator[Match]:
     three are the same shape: a store the model shows only being *read* — case
     02's device registry, case 03's Airflow metadata database, case 04's feature
     store — where the reference is about an attacker writing it over a path
-    nobody drew. The old credit came from reading a read as a write, so the lead
-    was right by accident about a fact this rule cannot see.
+    nobody drew. Reading a read as a write would credit the lead by accident,
+    for a fact this rule cannot see.
 
     What those references actually rest on is that the store is unauthenticated
     *at all*, so anyone who reaches the network writes it. That is authority

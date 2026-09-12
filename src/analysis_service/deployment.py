@@ -118,13 +118,11 @@ DEFAULT_RESILIENCE_PATH = _default_config_path("resilience.toml")
 DEFAULT_BLESSED_FINGERPRINTS_PATH = _default_config_path("blessed-fingerprints.toml")
 DEFAULT_FRAMEWORKS_PATH = _default_config_path("frameworks.toml")
 
-# The three text roots. ``ANALYSIS_KNOWLEDGE_DIR`` is gone rather than renamed: a
-# **Reference Note** and a **Worked Case** are selected by one package's own
-# fired rules, so they moved under that package's root and the service-wide
-# corpus they used to sit in has no remaining reader. ``ANALYSIS_SKILLS_DIR``
-# became ``ANALYSIS_DOMAINS_DIR`` for the mirror-image reason — what stayed shared
-# is exactly the **Domain Pack**s, whose key is the System Model rather than any
-# framework.
+# The three text roots. There is no ``ANALYSIS_KNOWLEDGE_DIR``: a **Reference
+# Note** and a **Worked Case** are selected by one package's own fired rules, so
+# they sit under that package's root, and no service-wide corpus has a reader.
+# ``ANALYSIS_DOMAINS_DIR`` holds what is shared — exactly the **Domain Pack**s,
+# whose key is the System Model rather than any framework.
 PROMPTS_DIR_VAR = "ANALYSIS_PROMPTS_DIR"
 DOMAINS_DIR_VAR = "ANALYSIS_DOMAINS_DIR"
 FRAMEWORKS_DIR_VAR = "ANALYSIS_FRAMEWORKS_DIR"
@@ -202,7 +200,7 @@ class Deployment:
     resilience: ResilienceConfig
     manifest: BlessedManifest
     #: The frameworks this install carries, in ``config/frameworks.toml`` order.
-    #: Every one of them passed the package gate before this object existed. A
+    #: Every one of them passed the package gate at load. A
     #: job selects from this set; it is not itself a selection, and it is never
     #: used as a default for one.
     frameworks: tuple[FrameworkName, ...]
@@ -216,7 +214,7 @@ class Deployment:
     env: Mapping[str, str] = field(default_factory=dict, repr=False, compare=False)
     # The runner cache. ``init=False`` so a ``replace`` starts a fresh one: a
     # deployment with a different sampling builds different adapters, and a
-    # copied cache would hand it the old graph.
+    # copied cache would hand it a graph built for another sampling.
     _runners: dict[tuple[FrameworkName, ...], AdkPipelineRunner] = field(
         default_factory=dict, init=False, repr=False, compare=False
     )

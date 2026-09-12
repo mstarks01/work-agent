@@ -16,7 +16,7 @@ they already say.
 **A sweep is keyed by its own bytes, so the file is renamed.** The stem of an
 artifact in a Baseline is ``sha256`` of its contents, and editing the contents
 moves it. `verify` checks the digests listed in ``baseline.json`` and does not
-recompute the stem, so leaving the old name would pass CI while the filename
+recompute the stem, so leaving the name in place would pass CI while the filename
 claimed a digest the file no longer has — which is the one thing the seal
 exists to prevent. The manifest entry, its recorded digests and its cost are
 re-stamped through the harness's own readers rather than edited by hand.

@@ -99,10 +99,10 @@ def _calls_of(executions: Sequence[NodeRun]) -> list[tuple[str, str, TokenUsage]
 
     **A retried node bills more than its usage says**, and this asks
     :func:`~analysis_service.budgets.retried_prompt_tokens` rather than
-    answering for itself. It used to answer for itself by not asking at all:
-    the failed attempts were priced at nothing while `measured_tokens` charged
-    them, so a sweep offered a contributor $9.75 against a $25.35 bill at the
-    shipped `attempts = 3`. The number a person types back to accept has to be
+    answering for itself. Pricing the failed attempts at nothing while
+    `measured_tokens` charges them would offer a contributor $9.75 against a
+    $25.35 bill at the shipped `attempts = 3`. The number a person types back to
+    accept has to be
     the number they pay.
 
     The retried prompt is a second call at the same model's prompt rate, with no
