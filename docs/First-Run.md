@@ -31,7 +31,7 @@ are the reference pairs declared in `analysis_service.conformance.REFERENCE_MODE
 | Vendor | `base` | `strong` | Credentials read by the code |
 | --- | --- | --- | --- |
 | Anthropic | `claude-sonnet-4-6` | `claude-opus-5` | `ANALYSIS_ANTHROPIC_API_KEY` |
-| Bedrock | `anthropic.claude-sonnet-4-6` | `anthropic.claude-opus-5` | `ANALYSIS_BEDROCK_API_KEY`, `ANALYSIS_BEDROCK_REGION` |
+| Bedrock | `global.anthropic.claude-sonnet-4-6` | `global.anthropic.claude-opus-5` | `ANALYSIS_BEDROCK_API_KEY`, `ANALYSIS_BEDROCK_REGION` |
 | Gemini | `gemini-2.5-flash` | `gemini-2.5-pro` | `ANALYSIS_GEMINI_API_KEY` |
 | OpenAI | `gpt-4o-2024-08-06` | `gpt-5.6` | `ANALYSIS_OPENAI_API_KEY` |
 | OpenRouter | `anthropic/claude-sonnet-4.6` | `anthropic/claude-opus-4.7` | `ANALYSIS_OPENROUTER_API_KEY` |
@@ -96,8 +96,21 @@ export ANALYSIS_BEDROCK_REGION=us-east-1
 ```
 
 Work Agent then passes no credential, and boto3's own chain resolves the
-identity — an attached role, `AWS_PROFILE`, or SSO. The identity needs
-`bedrock:InvokeModel` on the models you selected.
+identity — an attached role, `AWS_PROFILE`, or SSO.
+
+Both reference models carry a `global.` prefix. That names a cross-Region
+inference profile, which is how AWS serves recent Claude generations: the plain
+`anthropic.claude-opus-5` has no on-demand endpoint at all, and
+`anthropic.claude-sonnet-4-6` has one in eu-west-2 alone. A `global.` profile
+routes to commercial Regions only. Pick `us.`, `eu.`, `au.` or `jp.` instead
+when data residency binds you to one geography, and in GovCloud pick a profile
+the model publishes there.
+
+Under `iam`, the identity needs `bedrock:InvokeModel` on the inference profile
+**and** on the underlying foundation model in every Region the profile routes
+to. AWS states the second half outright: "When you specify an inference profile
+in the `Resource` field in the first statement, you must also specify the
+foundation model in each Region associated with it."
 
 ### Gemini
 

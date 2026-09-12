@@ -276,8 +276,8 @@ jobs:
           # naming its own variable, and nothing proves AWS serves it.
           - vendor: bedrock
             secret_name: ANALYSIS_BEDROCK_API_KEY
-            base_model: anthropic.claude-sonnet-4-6
-            strong_model: anthropic.claude-opus-5
+            base_model: global.anthropic.claude-sonnet-4-6
+            strong_model: global.anthropic.claude-opus-5
             addressing: ANALYSIS_BEDROCK_REGION
           # The same models the vertex job above pins, behind an API key. Two
           # legs for one set of weights is the point: the vertex job holds an
