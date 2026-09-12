@@ -191,8 +191,8 @@ on either of them. That is the finding this sitting exists for.
 **1.** An attacker who extracts the fleet-wide pre-shared key from any one node publishes readings to the gateway as any other device in the fleet.
 
 - `flow:sensor-node-to-device-gateway:publish-readings`, `entity:sensor-node`
-- severity: high/high · verb: `impersonate`
-- The defining finding of this case: one shared, never-rotated key across physically exposed devices.
+- severity: high/high · verb: `use-credential`
+- The defining finding of this case: one shared, never-rotated key across physically exposed devices. The attacker holds a key they were not issued, which is use-credential rather than impersonate.
 
 > mark:
 
@@ -394,7 +394,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "fc745e273aff8be740a814f0a9b4a45d6f3c6fe39dc7c8efa2b879d4f270ac74",
       "model.json": "72cd6e017da3a53ea67530013be257ea4ed360932f86a0e9419be6273c4588eb",
       "claims/asvs.json": "a3158156ef12c655c2547b56e9e802bdee30d183d7b3d44ce7a2a838f003a468",
-      "claims/stride.json": "39a3252c4363877aae9fd96d47759363dcc76f5ed9349beb81eed55c4ac9db5f"
+      "claims/stride.json": "bde9c43b971a6a77370e399214b273d8b005ef4a01e2fe7ca99b62a47c35729e"
       }
     }
   }
