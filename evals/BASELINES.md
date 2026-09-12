@@ -21,7 +21,10 @@ configuration**, with the full report from every case in every sweep. A
 
 Its identity is computed from the sweeps, never typed: the clean repository
 commit, the corpus digest, the requested model per tier, the resolved sampling
-per tier, and the framework selection. Two sweeps that agree on all five belong
+per tier, and the framework selection. A tier on an aggregator route such as
+OpenRouter adds the one upstream provider the record names for it, because the
+route alone does not say which weights answered; a sweep whose record names no
+upstream or more than one is refused. Two sweeps that agree on every part belong
 to one Baseline, so if somebody else has already measured your configuration,
 your sweep joins their directory instead of starting a second one. The
 directory's name is derived from that identity too, which is what makes the

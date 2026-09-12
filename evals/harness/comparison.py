@@ -272,8 +272,12 @@ def _inline(value: object) -> str:
 
 
 def _render_row(row: Row) -> str:
+    # A tier on an aggregator route names the upstream that served it, because
+    # the route alone is not the configuration the numbers came from.
+    upstreams = row.identity.get("upstreams", {})
     models = ", ".join(
         f"`{_inline(tier)}`: `{_inline(model)}`"
+        + (f" via `{_inline(upstreams[tier])}`" if tier in upstreams else "")
         for tier, model in sorted(row.identity.get("models", {}).items())
     )
     frameworks = (

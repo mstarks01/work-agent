@@ -10,6 +10,16 @@ observation about a sweep rather than part of the identity, so fingerprints that
 drift inside one Baseline are a finding about the provider rather than a second
 Baseline.
 
+A tier on an aggregator route carries a sixth part: the upstream provider the
+record says served it. A direct vendor is its own upstream, so the part is
+absent on a direct route and the identity of every merged Baseline on one is
+unchanged. An aggregator picks the upstream per call, and its route alone does
+not say which weights answered; the record does, because every node execution
+keeps the ``served_upstream`` the gateway named. The Baseline rule reads that
+record rather than the vendor's flag: a sweep whose nodes on the tier name one
+upstream is named after route and upstream together, and a sweep that names
+none or more than one is refused.
+
 The directory name is derived, from the short commit, the strong-tier model
 slug, and an 8-hex prefix of the identity hash. Two contributors who sweep one
 configuration therefore collide at one directory, and the filesystem enforces
@@ -82,19 +92,26 @@ def _slug(model: str) -> str:
 
 @dataclass(frozen=True)
 class BaselineIdentity:
-    """The five computed parts. Equality is Baseline membership."""
+    """The computed parts. Equality is Baseline membership.
+
+    ``upstreams`` is the sixth part, per tier on an aggregator route: the one
+    upstream provider the record names for it. Empty on a direct route, and
+    empty for an aggregator tier the record cannot settle, which
+    :data:`BASELINE_RULES` refuses and :func:`configuration_label` marks.
+    """
 
     repo_commit: str
     corpus_digest: str
     models: tuple[tuple[str, str], ...]
     sampling: str
     frameworks: tuple[str, ...]
+    upstreams: tuple[tuple[str, str], ...]
 
     @classmethod
     def from_artifact(
         cls, artifact: EvalArtifact, *, as_baseline: bool = True
     ) -> BaselineIdentity:
-        """The five parts, computed from one sweep.
+        """The parts, computed from one sweep.
 
         ``as_baseline`` turns on the **Baseline's own rules** rather than the
         identity's, so :func:`configuration_label` can name a sweep a Baseline
@@ -116,7 +133,7 @@ class BaselineIdentity:
 
     @classmethod
     def _parts(cls, artifact: EvalArtifact) -> BaselineIdentity:
-        """The five parts and nothing else, with no Baseline rule applied."""
+        """The parts and nothing else, with no Baseline rule applied."""
         requested: dict[str, set[str]] = {}
         for execution in artifact.provenance.executions:
             requested.setdefault(execution.tier, set()).add(execution.requested_model)
@@ -134,26 +151,42 @@ class BaselineIdentity:
             },
             sort_keys=True,
         )
+        models = tuple(
+            sorted((tier, models.pop()) for tier, models in requested.items())
+        )
         return cls(
             repo_commit=artifact.commit.commit,
             corpus_digest=artifact.corpus_digest,
-            models=tuple(
-                sorted((tier, models.pop()) for tier, models in requested.items())
-            ),
+            models=models,
             sampling=sampling,
             frameworks=tuple(
                 sorted(_framework_name(name) for name in artifact.block("frameworks"))
             ),
+            upstreams=tuple(
+                (tier, named[0])
+                for tier, named in recorded_upstreams(artifact, models).items()
+                if len(named) == 1
+            ),
         )
 
     def to_json(self) -> dict[str, Any]:
-        return {
+        """The identity as the manifest stores it and :func:`verify` recomputes.
+
+        ``upstreams`` is written only where a tier carries one. A direct route
+        carries none, and a key that was always present would move the hash,
+        the name and the directory of every merged Baseline on a direct route
+        to say nothing new.
+        """
+        parts = {
             "repo_commit": self.repo_commit,
             "corpus_digest": self.corpus_digest,
             "models": dict(self.models),
             "sampling": json.loads(self.sampling),
             "frameworks": list(self.frameworks),
         }
+        if self.upstreams:
+            parts["upstreams"] = dict(self.upstreams)
+        return parts
 
     @property
     def hash(self) -> str:
@@ -190,34 +223,62 @@ def _unmet_clean(artifact: EvalArtifact, identity: BaselineIdentity) -> str:
     )
 
 
+def recorded_upstreams(
+    artifact: EvalArtifact, models: tuple[tuple[str, str], ...]
+) -> dict[str, tuple[str, ...]]:
+    """Every upstream the record names, per tier on an aggregator route.
+
+    The one reader of the question "which provider served this tier", for the
+    identity and for the rule that refuses a tier it cannot answer. Keyed only
+    by the tiers whose vendor does not route to one provider: a direct vendor
+    is its own upstream, names none in its responses, and has nothing here to
+    read. An aggregator tier whose executions name no upstream maps to an
+    empty tuple rather than being absent, so the rule can tell "the record is
+    silent" from "the route is direct".
+    """
+    by_tier: dict[str, set[str]] = {
+        tier: set()
+        for tier, route in models
+        if not vendor_for_route(route).routes_to_one_provider
+    }
+    for execution in artifact.provenance.executions:
+        if execution.tier in by_tier and execution.served_upstream:
+            by_tier[execution.tier].add(execution.served_upstream)
+    return {tier: tuple(sorted(named)) for tier, named in by_tier.items()}
+
+
 def _unmet_one_provider(artifact: EvalArtifact, identity: BaselineIdentity) -> str:
-    unnamed = sorted(
-        {
-            vendor.name
-            for _, route in identity.models
-            if not (vendor := vendor_for_route(route)).routes_to_one_provider
-        }
-    )
-    if not unnamed:
+    unsettled = {
+        tier: named
+        for tier, named in recorded_upstreams(artifact, identity.models).items()
+        if len(named) != 1
+    }
+    if not unsettled:
         return ""
+    described = "; ".join(
+        f"tier {tier!r} was served by {list(named)}"
+        if named
+        else f"tier {tier!r} records no upstream"
+        for tier, named in sorted(unsettled.items())
+    )
     return (
-        f"ran on {unnamed}, whose route may be served by more than one upstream"
-        " provider; a Baseline's sweeps have to be comparable, so it is not"
-        " named after a route that does not say which weights answered. Run the"
-        " sweep and read it; do not publish it as a Baseline"
+        "ran on an aggregator route and the record does not say which one"
+        f" upstream provider answered: {described}. A Baseline's sweeps have to"
+        " be comparable, so it is named after route and upstream together or"
+        " not at all. Run the sweep and read it; do not publish it as a Baseline"
     )
 
 
-#: Every rule a **Baseline** applies beyond the five parts, each with the
+#: Every rule a **Baseline** applies beyond the identity parts, each with the
 #: marker a vote's configuration label carries when a sweep fails it.
 #:
 #: **One table, two readers that cannot drift.**
 #: :meth:`BaselineIdentity.from_artifact` raises on the first entry that fires
 #: and :func:`configuration_label` appends every firing entry's marker. Each
-#: rule says something the five parts cannot, so each needs a marker of its
-#: own: a dirty tree means the commit does not describe the prompts, and a
-#: route in front of more than one provider means the models do not describe
-#: the weights. The second rule shipped with the refusal and no marker, so a
+#: rule says something the identity parts cannot, so each needs a marker of
+#: its own: a dirty tree means the commit does not describe the prompts, and
+#: an aggregator route whose record names no single upstream means the models
+#: do not describe the weights. The second rule shipped with the refusal and no marker, so a
 #: vote on an aggregator's sweep carried a label that read as reproducible.
 BASELINE_RULES: tuple[_BaselineRule, ...] = (
     _BaselineRule(marker="-dirty", unmet=_unmet_clean),
