@@ -65,7 +65,7 @@ until something runs on it. See
 [Review independence](#review-independence).
 
 ```toml
-version = 8
+version = 9
 review_independence = "shared"
 
 [tiers.base]
@@ -240,6 +240,28 @@ be seen — nothing before the first call knows which account the key belongs to
 The flag can contradict a declaration and never supplies one. A response that
 states nothing leaves your declaration standing, which is what every vendor but
 this one does.
+
+### Which upstream serves a gateway route
+
+A gateway picks the upstream per call. A deployment may pin the ones a request
+may reach, in an `[upstreams]` table keyed by vendor:
+
+```toml
+[upstreams]
+openrouter = ["openai"]
+```
+
+`ANALYSIS_MODEL_UPSTREAMS_OPENROUTER` sets the same list from the environment as
+comma-separated slugs, and wins over the file. The slugs are the gateway's own:
+`openai`, `azure`, `amazon-bedrock/us-east-1`, and an endpoint variant takes a
+tag, `openai/flex`. The request then carries the list with fallbacks off, so a
+call the named upstreams cannot serve fails rather than landing elsewhere.
+
+The table is optional. An analysis is an analysis whichever upstream answers.
+What a pin buys is a **Baseline**: one is named after the single upstream the
+record says served every node on the tier, so a sweep meant to be published
+pins one. A key for a vendor that routes to one provider is an error, because
+there is nothing to pin.
 
 Under `iam`, Work Agent passes an **empty** `api_key` rather than none at all.
 That is not a detail: LiteLLM reads `AWS_BEARER_TOKEN_BEDROCK` out of the

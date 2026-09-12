@@ -39,6 +39,7 @@ fallback and no compatibility shim for other schema versions.
 from __future__ import annotations
 
 import os
+import re
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Literal, Self
@@ -72,7 +73,13 @@ from analysis_service.vendors import (
 # a different arrangement, so a deployment declares which one it runs under.
 # OpenRouter is the vendor that has the choice, so a file selecting it names an
 # arrangement there or in ``ANALYSIS_MODEL_CHARGES_OPENROUTER``.
-SUPPORTED_VERSION = 8
+#
+# Version 9 adds the ``[upstreams]`` table: a deployment on an aggregator names
+# the upstream providers a request may reach, and the request carries the pin.
+# It is optional, because an analysis needs no pin; a **Baseline** does, since
+# it is named after the upstream the record says served it. A key for a vendor
+# that routes to one provider is an error, because there is nothing to pin.
+SUPPORTED_VERSION = 9
 
 TierName = Literal["base", "strong", "review"]
 TIER_NAMES: tuple[TierName, ...] = ("base", "strong", "review")
@@ -155,6 +162,12 @@ _VENDOR_FIELD = "VENDOR"
 _MODEL_FIELD = "MODEL"
 _CREDENTIALS_STEM = f"{_ENV_PREFIX}CREDENTIALS"
 _CHARGES_STEM = f"{_ENV_PREFIX}CHARGES"
+_UPSTREAMS_STEM = f"{_ENV_PREFIX}UPSTREAMS"
+
+#: One upstream provider slug as a gateway spells it: ``openai``, ``azure``,
+#: ``amazon-bedrock/us-east-1``, ``openai/flex``. Lowercase segments joined by
+#: a slash, and nothing a request body would read as structure.
+_UPSTREAM_SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)?$")
 
 
 class ModelConfigError(ConfigError):
@@ -181,6 +194,15 @@ def credentials_env_var_for(vendor: VendorName) -> str:
     carries.
     """
     return f"{_CREDENTIALS_STEM}_{vendor.upper()}"
+
+
+def upstreams_env_var_for(vendor: VendorName) -> str:
+    """The variable that names one vendor's allowed upstreams from the environment.
+
+    Keyed by vendor, as the ``[upstreams]`` table is, and holding a
+    comma-separated list, because one deployment pins one set per gateway.
+    """
+    return f"{_UPSTREAMS_STEM}_{vendor.upper()}"
 
 
 def charges_env_var_for(vendor: VendorName) -> str:
@@ -262,6 +284,17 @@ class ModelTierConfig(BaseModel):
     #: :func:`charges_env_var_for` names the variable that fills it from the
     #: environment.
     charges: dict[VendorName, ChargeMode] = Field(default_factory=dict)
+    #: Which upstream providers a request on each gateway vendor may reach.
+    #: Keyed by vendor for the same reason :attr:`charges` is. Optional where
+    #: the other two tables are required, because an analysis is an analysis
+    #: whichever upstream answers; what a pin buys is a **Baseline**, which is
+    #: named after the one upstream the record says served it, and a run that
+    #: may land on two upstreams cannot be one. A key for a vendor whose
+    #: :attr:`~analysis_service.vendors.Vendor.upstream_pin` is ``None`` is an
+    #: error, because there is nothing to pin.
+    #: :func:`upstreams_env_var_for` names the variable that fills it from the
+    #: environment.
+    upstreams: dict[VendorName, tuple[str, ...]] = Field(default_factory=dict)
     #: How far each framework's criticism must sit from its own analysis. No
     #: default: a deployment states it, because inheriting ``shared`` is how a
     #: high-assurance install ends up reviewing itself and reporting nothing
@@ -337,6 +370,7 @@ class ModelTierConfig(BaseModel):
         problems += self.independence_breaches()
         problems += self._credential_mode_problems()
         problems += self._charge_mode_problems()
+        problems += self._upstream_problems()
         if problems:
             raise ValueError("; ".join(problems))
         return self
@@ -430,6 +464,43 @@ class ModelTierConfig(BaseModel):
                     " runs under"
                 )
         return problems
+
+    def _upstream_problems(self) -> list[str]:
+        """Every declared upstream list that names nothing, or pins a direct vendor.
+
+        Reads :attr:`~analysis_service.vendors.Vendor.upstream_pin` so the
+        rule follows the registry: a vendor that routes to one provider has
+        nothing to pin, and a key for it describes nothing. Absence is never a
+        problem here, because a pin is optional.
+        """
+        problems = []
+        for vendor, names in self.upstreams.items():
+            if vendor_for(vendor).upstream_pin is None:
+                problems.append(
+                    f"upstreams.{vendor} is set, but {vendor!r} routes to one"
+                    " provider, so there is no upstream to pin; remove the key"
+                )
+            elif not names:
+                problems.append(
+                    f"upstreams.{vendor} names no upstream; list at least one, or"
+                    " remove the key"
+                )
+            else:
+                problems += [
+                    f"upstreams.{vendor} entry {name!r} is not a provider slug"
+                    for name in names
+                    if not _UPSTREAM_SLUG.fullmatch(name)
+                ]
+        return problems
+
+    def upstreams_for(self, vendor: VendorName) -> tuple[str, ...]:
+        """The upstreams a request on one vendor may reach, or ``()`` unpinned.
+
+        The one reader of the declaration. Empty means the gateway chooses,
+        which is what every direct vendor also reads, because it has no
+        choice to make.
+        """
+        return self.upstreams.get(vendor, ())
 
     def charge_mode(self, vendor: VendorName) -> ChargeMode | None:
         """The charge arrangement this deployment runs under for one vendor.
@@ -607,6 +678,7 @@ def _apply_env_overrides(raw: dict[str, object], env: Mapping[str, str]) -> None
     known = {var for tier in TIER_NAMES for var in env_vars_for(tier)}
     known |= {credentials_env_var_for(vendor) for vendor in VENDOR_NAMES}
     known |= {charges_env_var_for(vendor) for vendor in VENDOR_NAMES}
+    known |= {upstreams_env_var_for(vendor) for vendor in VENDOR_NAMES}
     unknown = sorted(
         var for var in env if var.startswith(_ENV_PREFIX) and var not in known
     )
@@ -618,6 +690,7 @@ def _apply_env_overrides(raw: dict[str, object], env: Mapping[str, str]) -> None
 
     _apply_credential_overrides(raw, env)
     _apply_charge_overrides(raw, env)
+    _apply_upstream_overrides(raw, env)
 
     tiers_raw = raw.setdefault("tiers", {})
     if not isinstance(tiers_raw, dict):
@@ -700,6 +773,29 @@ def _apply_charge_overrides(raw: dict[str, object], env: Mapping[str, str]) -> N
         if not mode.strip():
             raise ModelConfigError(f"{charges_env_var_for(vendor)} is set but empty")
         table[vendor] = mode.strip()
+
+
+def _apply_upstream_overrides(raw: dict[str, object], env: Mapping[str, str]) -> None:
+    """Fold ``ANALYSIS_MODEL_UPSTREAMS_{VENDOR}`` into the raw table.
+
+    A comma-separated list, split and stripped here and judged nowhere else:
+    :meth:`ModelTierConfig._upstream_problems` rejects an empty list, a slug
+    that is not one, and a vendor with nothing to pin.
+    """
+    declared = {
+        vendor: env[var]
+        for vendor in VENDOR_NAMES
+        if (var := upstreams_env_var_for(vendor)) in env
+    }
+    if not declared:
+        return
+    table = raw.setdefault("upstreams", {})
+    if not isinstance(table, dict):
+        raise ModelConfigError("upstreams: not a table")
+    for vendor, listed in declared.items():
+        if not listed.strip():
+            raise ModelConfigError(f"{upstreams_env_var_for(vendor)} is set but empty")
+        table[vendor] = [name.strip() for name in listed.split(",") if name.strip()]
 
 
 def tiers_in_use(nodes_raw: object) -> set[str]:

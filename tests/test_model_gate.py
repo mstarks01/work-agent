@@ -30,7 +30,7 @@ from analysis_service.model_gate import (
     native_structured_output,
     output_ceiling,
 )
-from analysis_service.vendors import vendor_for
+from analysis_service.vendors import VENDORS, vendor_for
 
 GEMINI = "gemini-2.5-pro"
 VERTEX_CLAUDE = "claude-sonnet-4-6"
@@ -105,6 +105,60 @@ class TestWhatTheGateCannotDo:
         # Falls back to the provider's base config rather than raising: the
         # gate is not a build-time existence check.
         gate("vertex", "gemini-9.9-imaginary", temperature=0.0)
+
+
+class TestAnUpstreamPinReachesTheRequestBody:
+    """What litellm does with the pin kwarg, driven rather than restated.
+
+    ``extra_body`` is not in ``all_litellm_params``, so
+    :func:`assert_kwarg_supported` cannot vouch for it. This drives the pinned
+    translator instead: the kwarg through ``get_optional_params`` and the
+    vendor's own request transformation, and the body that would go on the
+    wire carries the pin. Parametrised over every vendor that declares one, so
+    a second gateway is measured on arrival.
+    """
+
+    PINNED = tuple(name for name, vendor in VENDORS.items() if vendor.upstream_pin)
+
+    def test_some_vendor_declares_a_pin(self):
+        assert self.PINNED
+
+    @pytest.mark.parametrize("name", PINNED)
+    def test_the_pin_lands_in_the_request_body_with_fallbacks_off(self, name):
+        import litellm
+        from litellm.utils import get_optional_params
+
+        vendor = vendor_for(name)
+        provider = vendor.prefix.rstrip("/")
+        model = vendor.route("some/model").removeprefix(vendor.prefix)
+        kwargs = vendor.upstream_kwargs(("openai", "azure/us"))
+        params = get_optional_params(
+            model=model, custom_llm_provider=provider, max_tokens=5, **kwargs
+        )
+        config = litellm.ProviderConfigManager.get_provider_chat_config(
+            model=model, provider=litellm.LlmProviders(provider)
+        )
+        body = config.transform_request(
+            model=model,
+            messages=[{"role": "user", "content": "hi"}],
+            optional_params=dict(params),
+            litellm_params={},
+            headers={},
+        )
+        pin = vendor.upstream_pin
+
+        assert body[pin.field] == {
+            pin.only: ["openai", "azure/us"],
+            pin.fallbacks: False,
+        }
+
+    @pytest.mark.parametrize(
+        "name", [name for name, vendor in VENDORS.items() if not vendor.upstream_pin]
+    )
+    def test_a_vendor_with_nothing_to_pin_contributes_no_kwarg(self, name):
+        assert vendor_for(name).upstream_kwargs(()) == {}
+        with pytest.raises(ValueError, match="no upstream to pin"):
+            vendor_for(name).upstream_kwargs(("openai",))
 
 
 class TestReasoningReachesEveryVendor:

@@ -146,8 +146,14 @@ providers, and one Llama slug by 12 endpoints whose numeric formats differ.
 Nothing stops you running an analysis that way. A **Baseline** is named after
 the route and the one upstream the record says served it, because a Baseline's
 value is that its runs are comparable. A sweep whose nodes were served from two
-upstreams, or whose record names none, is refused. Restrict the upstreams in
-your OpenRouter account before a sweep you mean to publish.
+upstreams, or whose record names none, is refused. Pin the upstream before a
+sweep you mean to publish, in the `[upstreams]` table of the tiers file or
+through `ANALYSIS_MODEL_UPSTREAMS_OPENROUTER`:
+
+```toml
+[upstreams]
+openrouter = ["openai"]
+```
 
 OpenRouter states what it charged for each call, and what that figure covers
 depends on how your account reaches the upstream provider. So declare the
