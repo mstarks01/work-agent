@@ -4,13 +4,15 @@ import asyncio
 import json
 import logging
 from collections.abc import Sequence
-from typing import ClassVar
+from dataclasses import replace
+from typing import ClassVar, get_args
 
 import pytest
 from fastapi.testclient import TestClient
 
 from analysis_service.api import (
     _BODY_SLACK,
+    _REFUSALS,
     MAX_RENDERED_ERRORS,
     BodyLimitMiddleware,
     create_app,
@@ -21,6 +23,7 @@ from analysis_service.claims import FrameworkName
 from analysis_service.deployment import Deployment
 from analysis_service.errors import ConfigError
 from analysis_service.jobs import (
+    AdmissionOutcome,
     InMemoryJobStore,
     JobRecord,
     JobStatus,
@@ -94,6 +97,7 @@ def make_client(
     max_active_jobs: int = TEST_MAX_ACTIVE_JOBS,
     budget: BudgetPolicy = SEEDING_BUDGET,
     frameworks: Sequence[FrameworkName] = DEFAULT_FRAMEWORKS,
+    raise_server_exceptions: bool = True,
 ) -> tuple[TestClient, InMemoryJobStore]:
     store = store if store is not None else InMemoryJobStore()
     app = create_app(
@@ -106,7 +110,7 @@ def make_client(
         budget=budget,
         frameworks=frameworks,
     )
-    return TestClient(app), store
+    return TestClient(app, raise_server_exceptions=raise_server_exceptions), store
 
 
 def one_source(text: str = "a web app storing orders", **kwargs) -> list[dict]:
@@ -691,6 +695,58 @@ def seed(store: InMemoryJobStore, subject: str, status: JobStatus) -> JobRecord:
         record.transition(status)
     asyncio.run(admit(store, record))
     return record
+
+
+class TestAdmissionOutcomes:
+    """Every outcome the store can answer has one answer here, and only one starts a job."""
+
+    def test_the_table_and_the_literal_agree(self):
+        """A new outcome is placed on purpose: a 429 with its message, or a defect.
+
+        Without this, a seventh outcome would fall through the refusal table.
+        The route fails closed on anything that is not an admission, so the
+        fall-through is a 500 rather than a started job, but a refusal that
+        deserves its 429 would still be answered as a defect.
+        """
+        answered = set(_REFUSALS) | {"admitted", "duplicate"}
+
+        assert answered == set(get_args(AdmissionOutcome))
+
+    def test_an_outcome_the_table_does_not_know_starts_no_job(self, caplog):
+        client, store = make_client(raise_server_exceptions=False)
+        real = store.reserve
+
+        async def forged(record, *, ceiling, budget):
+            admission = await real(record, ceiling=ceiling, budget=budget)
+            return replace(admission, outcome="unforeseen")
+
+        store.reserve = forged
+        with caplog.at_level(logging.ERROR):
+            response = client.post("/v1/jobs", json=submission(), headers=auth())
+
+        assert response.status_code == 500
+        assert response.json()["detail"] == "an internal error occurred"
+        assert "was not admitted: unforeseen" in caplog.text
+        # No task ran: a scheduled one completes before the client returns and
+        # leaves the record terminal, so the reserved record is still queued.
+        assert [record.status for record in store._records.values()] == ["queued"]
+
+    def test_a_runner_that_cannot_be_built_holds_no_reservation(self):
+        """The lookup runs before the reservation, so a raise holds no slot."""
+        client, _ = make_client(max_active_jobs=1, raise_server_exceptions=False)
+        working = client.app.state.runner_for
+
+        def broken(selection):
+            raise RuntimeError("no graph for this selection")
+
+        client.app.state.runner_for = broken
+        refused = client.post("/v1/jobs", json=submission(), headers=auth())
+        client.app.state.runner_for = working
+        admitted = client.post("/v1/jobs", json=submission(), headers=auth())
+
+        assert refused.status_code == 500
+        # With a ceiling of one, a held slot would answer this with a 429.
+        assert admitted.status_code == 201
 
 
 class TestConcurrencyCeiling:
