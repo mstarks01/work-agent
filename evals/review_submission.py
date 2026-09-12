@@ -285,8 +285,8 @@ def rail_signatures(root: Path) -> tuple[dict[str, str], dict[str, str]]:
     surface, so the rail, the printed count and a future reader agree about
     what "partly read" is.
 
-    One :func:`current_reviews` serves both. A rail refresh used to read every
-    merged submission once per case per map.
+    One :func:`current_reviews` serves both, so a rail refresh reads every
+    merged submission once.
     """
     covered = current_reviews(root)
     signed: dict[str, str] = {}

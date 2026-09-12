@@ -197,7 +197,7 @@ def pipeline(
 # own state keys rather than taking them as parameters. That is not a style
 # choice: ADK binds a FunctionNode's parameters by name, and a name derived per
 # framework — ``drafts_stride``, ``reviewed_stride`` — cannot be spelled in a
-# signature. So a test that used to pass drafts and rulings parks them first.
+# signature. So a test that seeds drafts and rulings parks them first.
 #
 # One helper per node rather than seeding inline, so each test below still
 # states only the artifacts it is about, and so "what this node reads" is
@@ -479,10 +479,10 @@ def test_a_node_config_carries_sampling_and_no_http_options(
 ):
     """The node config is the tier's decoding params and nothing else.
 
-    ``http_options`` used to carry the per-request timeout here, and that
-    carrier changed the unit: ADK forwards ``types.HttpOptions.timeout`` to
-    LiteLLM unchanged, the field is milliseconds and LiteLLM reads seconds. The
-    timeout is a LiteLLM kwarg on the adapter now, so a node config that grew
+    ``http_options`` is the wrong carrier for the per-request timeout, because
+    it changes the unit: ADK forwards ``types.HttpOptions.timeout`` to LiteLLM
+    unchanged, the field is milliseconds and LiteLLM reads seconds. The timeout
+    is a LiteLLM kwarg on the adapter, so a node config that grew
     one back would be re-opening the defect — see
     ``test_resilience.py::test_the_timeout_reaching_litellm_is_the_one_the_file_states``.
     """
@@ -721,8 +721,8 @@ class TestSessionState:
     """The two key families, and the rule that keeps them from drifting.
 
     A rendered key holds bytes a model reads and Python does not. Keeping the
-    two copies of an artifact honest used to rest on a comment; it now rests on
-    there being no operation that reads a rendered key back.
+    two copies of an artifact honest rests on there being no operation that
+    reads a rendered key back.
     """
 
     def state(self) -> tuple[FakeContext, graph.SessionState]:
@@ -1346,9 +1346,9 @@ def test_the_first_pass_problems_are_recorded_on_the_marks():
     )
 
     marks = AnalysisMarks.model_validate(ctx.state[NODES.key("marks")])
-    # The claim and the kind are read off the record. Counting a cause used to
-    # mean a regular expression over the sentence, and one ruling writes more
-    # than one sentence, so the count was not recoverable at all.
+    # The claim and the kind are read off the record, never by a regular
+    # expression over the sentence: one ruling writes more than one sentence,
+    # so a count over prose is not recoverable at all.
     assert [(m.claim_id, m.kind) for m in marks.unreconciled_rulings] == [
         ("T-01", "dropped")
     ]
@@ -2610,8 +2610,8 @@ class TestIntoReport:
     """The one mapping from an :class:`~analysis_service.graph.Analysis` to a report.
 
     Both drivers — the service over a job, the eval harness over a corpus case
-    — reach the report through this method, so what these tests hold is what
-    used to be held by two field lists agreeing with each other.
+    — reach the report through this method, so these tests hold the shape
+    for both.
     """
 
     def analysis(self) -> graph.Analysis:

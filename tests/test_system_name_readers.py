@@ -177,7 +177,7 @@ def test_the_stored_report_name_answers_to_the_rule(name: str) -> None:
 def test_a_stored_name_the_writer_could_not_have_written_is_refused(
     name: str,
 ) -> None:
-    """The two shapes the old restatement let through, named one at a time.
+    """The two shapes a restatement lets through, named one at a time.
 
     Refused rather than trimmed. A report validated into a ``system_name`` the
     file does not hold re-dumps to different bytes, so a read and a re-digest

@@ -60,10 +60,10 @@ answer it gets. These are therefore the knobs to turn down during an incident,
 without a redeploy.
 
 ``attempts`` is a total count. With the library's retry layer switched off it is
-literally the request count per node. It did not used to be. LiteLLM's
+literally the request count per node. With it on it would not be: LiteLLM's
 ``num_retries`` counts retries after the first try, and it also sets the
 provider SDK's own ``max_retries`` from that same value on the way to the
-client. The first attempt therefore carried its own SDK-level retries
+client. The first attempt would therefore carry its own SDK-level retries
 underneath, and the worst case per node was ``2 * attempts - 1`` requests: five
 at the shipped three, and five times the fan-out in the seconds the lane agents
 go out together. Against a per-minute quota, that burst is what turns one 429

@@ -165,11 +165,11 @@ def _attribute_entry(element: Element, attribute: str) -> tuple[str, Ground] | N
     """One attribute's catalog entry, or ``None`` where it states a control.
 
     The classifier is :func:`~analysis_service.analysis.control_state`, the same
-    one the candidate rules read, which is the whole of this function's point:
-    the catalog used to test exact equality with the ``unknown`` sentinel while
-    the analysis layer read the leading token, so a control the input *hedged*
-    (``"unknown; possibly a shared group account"``) and a control the input
-    said is *not there* (``"none; accepted by network position"``) were both
+    one the candidate rules read, which is the whole of this function's point.
+    A catalog that tested exact equality with the ``unknown`` sentinel while
+    the analysis layer read the leading token would take a control the input
+    *hedged* (``"unknown; possibly a shared group account"``) and a control the
+    input said is *not there* (``"none; accepted by network position"``) both
     facts a rule could fire on and no agent could cite (#171).
 
     **The two halves cover different attribute sets, and the asymmetry is the

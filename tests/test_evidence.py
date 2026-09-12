@@ -76,10 +76,10 @@ class TestEvidenceCatalog:
     def test_a_control_the_input_states_is_absent_is_enumerated(self):
         """The gap #171 was filed for.
 
-        The catalog used to test exact equality with the ``unknown`` sentinel,
-        so a control the submitter said is *not there* — which 11 of the 12
-        candidate rules fire on, through ``is_unverified`` — was a fact no
-        agent could cite. It has its own entry and its own kind, because
+        A catalog testing exact equality with the ``unknown`` sentinel would
+        make a control the submitter said is *not there* — which 11 of the 12
+        candidate rules fire on, through ``is_unverified`` — a fact no agent
+        could cite. It has its own entry and its own kind, because
         "nobody said" and "somebody said no" carry different threats.
         """
         model = valid_model()
@@ -583,10 +583,10 @@ class TestTheMisShapeIsUnreachable:
     def test_an_agent_cannot_name_a_lane_or_a_threat_id_at_all(self):
         """The category-letter mismatch, gone the way the mis-shape went.
 
-        An agent used to restate its own category and compose an ID whose
-        letter had to agree with it — two spellings of a constant the graph
-        fills in at build time, and a disagreement between them failed the node
-        and cancelled the five sibling lanes.
+        An agent that restated its own category and composed an ID whose
+        letter had to agree with it would hold two spellings of a constant the
+        graph fills in at build time, and a disagreement between them would fail
+        the node and cancel the five sibling lanes.
         """
         assert "id" not in ThreatProposal.model_fields
         assert "category" not in ThreatProposal.model_fields

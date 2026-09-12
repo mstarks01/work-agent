@@ -796,7 +796,7 @@ def test_the_runner_is_built_once():
 
 def test_a_replaced_deployment_starts_with_an_empty_runner_cache():
     """The eval path swaps the sampling in with ``replace``; a copied cache
-    would hand the new deployment the graph the old adapters built."""
+    would hand the new deployment a graph built by other adapters."""
     from dataclasses import replace
 
     deployment = Deployment.from_env(env=VERTEX_ENV)

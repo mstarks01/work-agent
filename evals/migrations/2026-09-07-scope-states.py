@@ -1,14 +1,14 @@
 """Respell the archived scope states, so the archive reads under the four-state vocabulary.
 
 #659 changed what a **Scope Entry** may say. ``applicable`` became
-``not-raised``: the old word read as a verdict that the unit applies, where
+``not-raised``: the earlier word read as a verdict that the unit applies, where
 the fact is only that no lane filed a claim on it. ``undecidable`` is new, for
 a framework whose **Precondition** could not tell whether it applies at all;
 that case was written as ``not-applicable`` with a reason saying the input
 never said, which told a reader the unit was ruled out.
 
 ``ScopeEntry.state`` is a closed literal, so every archived report carrying
-the old spelling fails ``Report.model_validate`` and ``run.py score`` is dead
+the earlier spelling fails ``Report.model_validate`` and ``run.py score`` is dead
 on it. This script rewrites both:
 
 * every scope entry whose ``state`` is ``applicable`` becomes ``not-raised``;

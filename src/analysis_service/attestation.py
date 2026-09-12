@@ -208,7 +208,7 @@ def signed_payload(
     under a different canonicalization, re-attributed to another key, or moved
     in time to predate a retirement. Signing the report bytes alone would leave
     all four open. The signing time stays a claim by whoever held the key, but
-    it is now that signer's claim and nobody else's.
+    it is that signer's claim and nobody else's.
 
     A free function as well as a method, because :func:`sign` needs it before an
     :class:`Attestation` exists: the signature is one of that model's required

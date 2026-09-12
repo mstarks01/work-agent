@@ -243,9 +243,9 @@ def _unresolved_unknown_ref_issues(
     The ``attribute`` half is the element type's security-relevant fields —
     :func:`~analysis_service.system_model.attribute_names`, the list the
     evidence catalog walks — so ``name``, ``notes`` and ``description`` are
-    refused here exactly as no catalog entry is ever written for them. This
-    reader used to accept every pydantic field on the element, and the live
-    critic answered with a needs-info on ``notes`` in 14 of the 38 reports
+    refused here exactly as no catalog entry is ever written for them. A reader
+    that accepted every pydantic field on the element would let the critic
+    answer with a needs-info on ``notes``, which it did in 14 of the 38 reports
     archived under ``evals/runs/``: a question about a sentence, pointed at a
     field that happened to resolve. The check stops at the attribute's
     existence. Requiring the named attribute to actually *hold* the ``unknown``

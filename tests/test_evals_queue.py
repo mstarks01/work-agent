@@ -141,7 +141,7 @@ def test_a_volatile_finding_outranks_an_unmatched_one():
 
 
 def test_a_second_voter_is_not_told_how_the_first_one_voted():
-    """The queue used to rank by the reference pool, which is built from votes.
+    """The queue does not rank by the reference pool, which is built from votes.
 
     A finding this voter has not answered can only be in that pool because
     somebody else put it there, so the weight, the position and the printed
@@ -348,9 +348,9 @@ class TestNeedsEvidenceIsNotAnAnswer:
         led.votes.append(
             cast(
                 value_of(item),
-                # The finding's own case. It read "01-payments-checkout" while
-                # the finding said "01", which cost nothing while the key
-                # ignored the case and mis-keys the vote now that it does not.
+                # The finding's own case. The key reads the case, so a vote
+                # cast under "01-payments-checkout" against a finding that says
+                # "01" is mis-keyed.
                 item.case,
                 "needs-evidence",
                 "ada",

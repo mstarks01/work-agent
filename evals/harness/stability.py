@@ -264,9 +264,9 @@ def _one_reference_count(runs: Sequence[ScoredRun], scope: Scope) -> int:
     """The case's reference count, which every run must agree on.
 
     One corpus digest should make this unanimous, and the check is here because
-    "should" is what the ``never`` bucket used to rest on: it read the first
-    run's count against a union over every run, and two counts produced a
-    negative number where the numbers were simply about different lists.
+    "should" is not enough for the ``never`` bucket: reading the first run's
+    count against a union over every run produces a negative number when the
+    two counts are simply about different lists.
     """
     counts = sorted({run.references[scope] for run in runs})
     if len(counts) > 1:

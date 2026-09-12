@@ -1,8 +1,8 @@
 """A finished sweep keeps its reports, not only the numbers it thought to take.
 
-The harness used to build a full :class:`~analysis_service.report.Report` per
-case, read four things off it and drop it. So a plain question — show me one of
-the reports — was unanswerable on a sweep that had already been paid for, and
+A harness that built a full :class:`~analysis_service.report.Report` per
+case, read four things off it and dropped it would leave a plain question — show
+me one of the reports — unanswerable on a sweep the provider billed, and
 nothing about a sweep is deterministic enough for a re-run to answer it
 ([#180](https://github.com/mstarks01/work-agent/issues/180)).
 

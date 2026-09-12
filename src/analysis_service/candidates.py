@@ -62,8 +62,7 @@ class Candidate(BaseModel):
     submitter said is not there, and the two produce different findings.
 
     ``lane`` is a plain string rather than a typed enum, because the legal set
-    is whatever package declared the rule. The typing that used to make a
-    mis-filed rule unrepresentable is now the package gate's check that every
+    is whatever package declared the rule. The package gate checks that every
     rule names a lane its package declares.
     """
 

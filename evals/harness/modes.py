@@ -84,12 +84,11 @@ class CaseFailure(GraphFailed):
     which case every node was billed (#707). Or a node raised inside the graph,
     in which case every node that finished before it was billed and the
     executor hands those out as :class:`~analysis_service.execution.GraphFailed`
-    (#711). Either way the provider billed what ran whatever came next, and the
-    sweep used to read a case's node runs off its finished report, so a failed
-    case contributed nothing to the usage the artifact prices and a run that
-    cost a dollar read as free. ``cause`` is the exception the caller
-    classifies, exactly the one it would have caught before this wrapper
-    existed.
+    (#711). Either way the provider billed what ran whatever came next, and a
+    sweep that read a case's node runs off its finished report alone would let
+    a failed case contribute nothing to the usage the artifact prices, so a run
+    that cost a dollar would read as free. ``cause`` is the exception the caller
+    classifies, unwrapped.
     """
 
 
@@ -500,8 +499,7 @@ def select_frameworks(
     for. So a narrowed sweep and a full one measure the same cases the same way
     — the narrowed one just measures fewer frameworks per case.
 
-    Empty ``only`` means every framework the case declares, which is what every
-    sweep did before this existed.
+    Empty ``only`` means every framework the case declares.
 
     **Why it exists is capacity, not preference.** One job fans out one
     ``strong``-tier request per lane of every framework it names, all at the

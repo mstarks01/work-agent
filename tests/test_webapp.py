@@ -332,8 +332,8 @@ def test_the_block_order_is_the_installs_order_not_the_pages(client):
 def test_a_framework_named_twice_is_refused(client):
     """As the HTTP route refuses it, through the one reader both share.
 
-    It used to run once. Collapsing a repeat answers a submission with a
-    selection nobody made, and the route already said so; the page never
+    Collapsing a repeat answers a submission with a selection nobody made,
+    and the route already says so; the page never
     sends a repeat, so nothing legitimate is affected.
     """
     body = posted("A web app talks to a database.", frameworks=["asvs", "asvs"])
@@ -1092,7 +1092,7 @@ def form_javascript() -> str:
 
 @pytest.mark.parametrize("sink", HTML_STRING_SINKS)
 def test_the_form_page_has_no_html_string_sink(sink):
-    """``fail()`` used to write ``innerHTML``, and submitter bytes reach it.
+    """``fail()`` writes no ``innerHTML``, because submitter bytes reach it.
 
     A source label travels label → ``LimitBreach.message`` → the ``failed``
     event → the page, and a validator message travels the ``rejected`` event
@@ -1316,9 +1316,8 @@ def test_a_page_template_carries_no_script_body(source):
     """A page's code lives in ``webapp/static``, never in a Python string.
 
     A script inside a template is readable only as a string, so the only
-    assertion available over one is how it is spelled — which is what every
-    lint in this file used to do. In a file it is JavaScript that a linter can
-    parse and ``node`` can run.
+    assertion available over one is how it is spelled. In a file it is
+    JavaScript that a linter can parse and ``node`` can run.
 
     Two block shapes stay legal, and both are stated as shapes rather than as
     a list of names. A block of nothing but ``const NAME = <!--field-->;``

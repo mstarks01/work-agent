@@ -174,7 +174,7 @@ _REPAIR_WIDTH_SLACK = 2
 MAX_REPAIR_QUOTE_CHARS = 400
 
 
-#: **Five bounds failed before this one, and all five priced the comparison.**
+#: **A bound on the operands does not price the comparison.**
 #: `difflib` recurses on the matching blocks it finds, so its cost is not a
 #: function of the operands: 156,976 matching character pairs ran in 0.015 s
 #: while 332,002 ran in 6.5 s, a 200x spread on the only cheap statistic that

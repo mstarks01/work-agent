@@ -298,9 +298,8 @@ class Lane:
 
     The graph runs one of these per ``(framework, lane)`` pair, in parallel, and
     every per-lane name is derived here. That is the point: the write and the
-    substitution used to be spelled in three places — a key function, the
-    ``prepare`` write, the instruction's replace chain — held together by a
-    lint. A lane now hands out both from one declaration.
+    substitution come from one declaration, so the key function, the ``prepare``
+    write and the instruction's replace chain cannot disagree.
 
     **The framework is part of every name.** Two packages may legitimately
     declare a lane of the same name, and a graph carrying both would otherwise
@@ -807,8 +806,8 @@ class SilentNodeError(RuntimeError):
     Absence is deliberately **not** read as emptiness. An agent that finds no
     threats in its lane emits ``{"threats": []}`` and its key is written; a
     truncated one writes nothing. The two look identical once a missing key is
-    defaulted to an empty list, which is how a silently dropped lane
-    used to reach a finished report.
+    defaulted to an empty list, which is how a silently dropped lane would
+    reach a finished report.
 
     Ours to own rather than the input's, so it fails the job rather than
     rejecting it — the same split :func:`fail_review` makes, and the reason this
@@ -841,10 +840,10 @@ class Analysis:
     :meth:`into_report`.
 
     **This class owns the report's shape.** The graph has two drivers — the
-    service over a job, the eval harness over a corpus case — and each used to
-    copy every field across itself. The copies had to agree and nothing checked
-    that they did, so a field added here and missed in one driver produced a
-    report with a block silently absent. :meth:`into_report` is the one place
+    service over a job, the eval harness over a corpus case — and neither copies
+    a field across itself. Two copies would have to agree with nothing checking
+    that they did, and a field added here and missed in one driver would produce
+    a report with a block silently absent. :meth:`into_report` is the one place
     that mapping lives; a driver hands over the four things the graph cannot
     know and reads nothing out of this object itself.
 
@@ -1655,8 +1654,8 @@ def route_review(
     **Both of this framework's keys are read from state rather than bound as
     parameters**, and that is what makes N critics expressible at all: ADK binds
     a FunctionNode's parameters by name, and a name derived per framework cannot
-    be spelled in a signature. Reading them keeps the absence handling that
-    binding used to provide, and keeps it honest — **an LLM node that emits no
+    be spelled in a signature. Reading them keeps the absence handling
+    honest — **an LLM node that emits no
     text does not write its output key at all**, so a silent critic arrives here
     as ``None`` rather than as a parameter-binding ``ValueError`` naming this
     function, which would read as a graph defect rather than as what it is. A
@@ -1934,8 +1933,8 @@ class MissingFrameworkOptions(ValueError):
     Named and raised early rather than left to fail inside a block's own
     construction. Without this, a driver that forgot the key got a raw Pydantic
     error out of a scope helper, naming a model rather than the framework, the
-    option or the key to seed — and it arrived after every node had been paid
-    for either way.
+    option or the key to seed — and it arrived after the provider billed every
+    node either way.
     """
 
 
@@ -2722,8 +2721,7 @@ def result_of(final_state: Mapping[str, Any]) -> GraphResult:
     """What a finished drive left behind, as one of the graph's two outcomes.
 
     The graph has two drivers — the service over a job, the eval harness over a
-    corpus case — and each used to read the terminal keys itself: the same two
-    membership tests and the same two parses, spelled twice. What differs
+    corpus case — and neither reads the terminal keys itself. What differs
     between them is only what they *do* with a rejection, so that is what they
     keep; how a final state is read is here.
     """

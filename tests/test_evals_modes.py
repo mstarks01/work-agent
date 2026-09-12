@@ -725,7 +725,7 @@ class TestNarrowingASweepToOneFramework:
     """
 
     def test_no_narrowing_runs_every_declared_framework(self):
-        """The default is what every sweep did before this existed."""
+        """The default is every framework the case declares."""
         case = load_case(CORPUS / "01-payments-checkout")
 
         assert modes.select_frameworks(case) == modes.case_frameworks(case)
@@ -1048,9 +1048,9 @@ class TestASweepSurvivesARefusedModel:
 
 
 def test_a_node_that_raises_mid_graph_still_hands_the_sweep_what_ran(case, monkeypatch):
-    """A raised lane used to leave the case priced at zero (#711).
+    """A raised lane leaves the case priced for what ran (#711).
 
-    The executor now carries the finishes before the fault out as
+    The executor carries the finishes before the fault out as
     ``GraphFailed``, and ``run_graph`` turns that into the one failure type the
     sweep prices from, so a case that fails inside a lane joins the usage block
     the same way a case that fails at report validation does (#707). The fault

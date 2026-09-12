@@ -252,9 +252,9 @@ def test_a_description_citing_a_missing_element_is_marked_on_the_report():
 def test_a_composed_evidence_reference_is_marked_rather_than_fatal():
     """The policy #138 narrowed, end to end.
 
-    A reference the catalog does not hold used to fail the whole job, and
+    A reference the catalog does not hold does not fail the job, because
     agents compose well-formed ones — 2 of 12 jobs on a live sweep. The threat
-    now stands on whatever else it cited, and the reader is told what was
+    stands on whatever else it cited, and the reader is told what was
     dropped. What still fails is a threat left with no grounds at all, which is
     covered where resolution decides it.
     """
@@ -627,9 +627,9 @@ def test_a_malformed_critic_output_is_re_asked_once_and_then_assembled():
 def test_a_mis_shaped_verdict_is_re_asked_rather_than_killing_the_job():
     """The regression this seam exists for, end to end.
 
-    A ``needs-info`` that names no unknown is a fault, and it used to be a
-    *fatal* one: the rule lived in ``Verdict``'s validator, which ADK runs on
-    the way into session state, so the critic node raised and took the whole
+    A ``needs-info`` that names no unknown is a fault, and not a *fatal* one.
+    A rule in ``Verdict``'s validator, which ADK runs on the way into session
+    state, would make the critic node raise and take the whole
     run — six lanes of drafting and the single most expensive call in the graph
     — with it. The re-ask that exists for exactly this never got to run.
     """
@@ -662,10 +662,10 @@ def test_a_mis_shaped_verdict_is_re_asked_rather_than_killing_the_job():
 
 
 def test_a_mistyped_ruling_id_is_re_asked_rather_than_killing_the_job():
-    """End to end, the third node-boundary raise removed from the critic.
+    """End to end, a malformed ID is reconciled rather than raised at the node.
 
-    ``"S-1"`` used to fail ``ThreatRuling``'s pattern inside the node's
-    output_schema, ending the run. It now reconciles as a drop plus an
+    ``"S-1"`` fails ``ThreatRuling``'s pattern, and inside the node's
+    output_schema that would end the run. It reconciles as a drop plus an
     invention — two problems the re-ask is already told how to fix, with no
     prompt change needed for the new fault.
     """
@@ -915,8 +915,8 @@ def test_one_framework_finishing_first_does_not_fail_the_other(first, held, wind
     ``held`` until ``first``'s ``assemble`` has run puts the early run in the
     window where ``held``'s drafts are parked and its rulings are absent, or
     where its ``reviewed`` key still holds the malformed first ruling its
-    re-ask is replacing. Either window used to raise ``CriticOutputError`` for
-    every draft and fail the job. The last run carries both blocks.
+    re-ask is replacing. Neither window raises ``CriticOutputError``. The last
+    run carries both blocks.
 
     The pairs come from ``PACKAGES`` and the answers from
     ``SCRIPTED_FRAMEWORKS``, so a new package runs here once it has a fixture.

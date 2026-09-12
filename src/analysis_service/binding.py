@@ -255,9 +255,8 @@ def check_temperature(
     having nothing to check.
 
     A caller that ran only :func:`check_supported` would load a configuration
-    the provider rejects on its first request — which is what a calibration
-    sweep hit before this existed: the config loaded, and the provider refused
-    pair one.
+    the provider rejects on its first request: the config loads, and the
+    provider refuses pair one.
 
     Takes the ``tier`` rather than a pre-composed source string because the
     message has to name **both** places the value can come from: ``config_file``
