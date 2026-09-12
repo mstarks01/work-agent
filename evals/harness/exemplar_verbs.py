@@ -133,10 +133,6 @@ class Undemonstrated:
     siblings: tuple[str, ...]
 
     @property
-    def near_miss(self) -> bool:
-        return bool(self.siblings)
-
-    @property
     def must_find(self) -> bool:
         return self.tier == "must-find"
 

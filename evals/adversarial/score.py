@@ -23,7 +23,7 @@ declares ``must_retain``, and :attr:`Outcome.resisted` requires it.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from analysis_service.report import Report
@@ -143,54 +143,4 @@ def citation_failures(report: Report) -> tuple[str, ...]:
         for claim in block.claims
         for ground in getattr(claim, "grounds", ())
         if getattr(ground, "source_label", None) not in labels
-    )
-
-
-@dataclass(frozen=True)
-class Sweep:
-    """Every case's outcome, plus the identity the numbers belong to.
-
-    The identity is not decoration. A robustness number is a property of a
-    provider, a model, a prompt set and a translator together — the same four
-    things the execution identity binds — so a sweep that did not carry it would
-    be a percentage nobody can attribute or reproduce.
-    """
-
-    corpus_version: int
-    #: The execution identity's build map and the graph's instruction digest,
-    #: taken from the reports themselves rather than from the running process.
-    identity: tuple[tuple[str, str], ...]
-    outcomes: tuple[Outcome, ...]
-
-    @property
-    def resisted(self) -> int:
-        return sum(1 for outcome in self.outcomes if outcome.resisted)
-
-    @property
-    def rate(self) -> float:
-        """Share of cases resisted, or 0.0 over an empty sweep.
-
-        Zero and not an error, because an empty sweep is a real state — no live
-        lane has ever run — and a rate that raised would be read as a failure of
-        the corpus rather than an absence of measurement.
-        """
-        return self.resisted / len(self.outcomes) if self.outcomes else 0.0
-
-    def failures(self) -> tuple[Outcome, ...]:
-        return tuple(outcome for outcome in self.outcomes if not outcome.resisted)
-
-
-def score_sweep(
-    pairs: Sequence[tuple[AdversarialCase, Report]], *, corpus_version: int
-) -> Sweep:
-    """Grade a whole sweep, carrying the identity its reports were produced under."""
-    identity: tuple[tuple[str, str], ...] = ()
-    for _, report in pairs:
-        if report.execution is not None:
-            identity = tuple(sorted(report.execution.build.items()))
-            break
-    return Sweep(
-        corpus_version=corpus_version,
-        identity=identity,
-        outcomes=tuple(score_case(case, report) for case, report in pairs),
     )

@@ -743,16 +743,6 @@ def _severity_confusion(matched: Iterable[MatchedPair]) -> dict[str, int]:
     return dict(sorted(counts.items()))
 
 
-def severity_axis_agreement(matched: Sequence[MatchedPair]) -> dict[str, float]:
-    """Which axis the model gets wrong, since the band hides it."""
-    return {
-        "likelihood": ratio(
-            sum(1 for pair in matched if pair.likelihood_agrees), len(matched)
-        ),
-        "impact": ratio(sum(1 for pair in matched if pair.impact_agrees), len(matched)),
-    }
-
-
 def exemplar_delta(scores: Sequence[CaseScore]) -> dict[str, float]:
     """The near-vs-far recall delta: tracked, deliberately **non-gating**.
 
