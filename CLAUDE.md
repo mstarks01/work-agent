@@ -37,7 +37,8 @@ is not re-raised as a new one. See `docs/agents/code-review.md`.
 
 The five canonical roles, each label string equal to its name: `needs-triage`, `needs-info`,
 `ready-for-agent`, `ready-for-human`, `wontfix`. The `wayfinder:*` and GitHub stock labels are
-orthogonal to these. See `docs/agents/triage-labels.md`.
+orthogonal to these. So is `needs-sweep`: apply it whenever an issue's next step is a paid model
+run, and keep the triage label beside it. See `docs/agents/triage-labels.md`.
 
 ### Framework parity
 
