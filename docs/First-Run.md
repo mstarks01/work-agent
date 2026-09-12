@@ -156,9 +156,9 @@ openrouter = ["openai"]
 ```
 
 Pin `openai/flex` for the same weights at half the price and slower responses.
-A request pinned there reads the fifteen-minute row in
-`config/resilience.toml`, and the job deadline stays at fifteen minutes unless
-you raise `ANALYSIS_JOB_DEADLINE_MS` beside it.
+A request pinned there reads the flex row in `config/resilience.toml`: a
+thirty-minute request timeout and a thirty-minute job deadline, in place of the
+five and fifteen every other request and job reads.
 
 OpenRouter states what it charged for each call, and what that figure covers
 depends on how your account reaches the upstream provider. So declare the
