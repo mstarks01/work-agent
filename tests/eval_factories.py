@@ -63,6 +63,7 @@ def sweep_document(
     cases: tuple[str, ...] = ("01-a-case",),
     seed: int = 1,
     charges: dict[str, float] | None = None,
+    served_upstreams: tuple[str, ...] = (),
 ) -> dict:
     """One admissible artifact document; ``seed`` varies the bytes only.
 
@@ -74,12 +75,17 @@ def sweep_document(
     ``charges`` is what the providers said they charged, per node. Empty by
     default, which is what every sweep on a direct vendor records -- those
     report token counts and nothing else.
+
+    ``served_upstreams`` is what a gateway said about who answered the strong
+    node, one execution per entry, so two entries are one node served twice
+    from two places. Empty by default, which is what a direct vendor records.
     """
     tiers = sweep_sampling(temperature)
     runs = {
         "extract": ("base", "openai/gpt-base", "gpt-base-001"),
         "critic": ("strong", strong_model, served_strong),
     }
+    upstreams_of = {"critic": served_upstreams or (None,)}
     node_runs = {
         node: [
             {
@@ -91,7 +97,9 @@ def sweep_document(
                 "generation_fingerprint": sample_fingerprint(
                     served, tiers[tier], requested=requested
                 ),
+                "served_upstream": upstream,
             }
+            for upstream in upstreams_of.get(node, (None,))
         ]
         for node, (tier, requested, served) in runs.items()
     }

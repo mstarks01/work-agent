@@ -108,9 +108,11 @@ version and an optional `:<variant>` tail such as `:thinking`. The bare
 `anthropic/claude-opus-4-7`; the error names the right spelling.
 
 OpenRouter may serve one slug from more than one upstream provider, so two runs
-of one configuration can reach two backends. That does not stop an analysis. It
-does stop a **Baseline**: `evals/harness/baseline.py` refuses to name one after
-a route that does not say which weights answered.
+of one configuration can reach two backends. That does not stop an analysis. A
+**Baseline** reads the upstream the record names for every node on the route
+and carries it as a part of its identity: `evals/harness/baseline.py` refuses a
+sweep whose record names no upstream or more than one, and names the Baseline
+after route and upstream together otherwise.
 
 It also stops an estimate. Those backends charge different rates — one slug
 lists 1.0e-07 per input token and reaches an endpoint charging 1.04e-06 — so

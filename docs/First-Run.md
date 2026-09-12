@@ -143,9 +143,11 @@ OpenRouter may serve one slug from more than one upstream provider. Two runs of
 one configuration can therefore reach different backends. Measured on
 2026-09-11: `anthropic/claude-opus-4.7` is fronted by 8 endpoints across 5
 providers, and one Llama slug by 12 endpoints whose numeric formats differ.
-Nothing stops you running an analysis that way. A **Baseline** may not be named
-after an OpenRouter route, because a Baseline's value is that its runs are
-comparable.
+Nothing stops you running an analysis that way. A **Baseline** is named after
+the route and the one upstream the record says served it, because a Baseline's
+value is that its runs are comparable. A sweep whose nodes were served from two
+upstreams, or whose record names none, is refused. Restrict the upstreams in
+your OpenRouter account before a sweep you mean to publish.
 
 OpenRouter states what it charged for each call, and what that figure covers
 depends on how your account reaches the upstream provider. So declare the

@@ -851,8 +851,10 @@ def _baseline_closing(root: Path, author: str) -> str:
     # Escaped for the reason `comparison._inline` gives: these come out of the
     # contributor's own artifact, and this text is the review aid a maintainer
     # reads before merging it.
+    upstreams = identity.get("upstreams", {})
     models = ", ".join(
         f"{comparison._inline(tier)}: {comparison._inline(model)}"
+        + (f" via {comparison._inline(upstreams[tier])}" if tier in upstreams else "")
         for tier, model in sorted(identity.get("models", {}).items())
     )
     # A cost that is not a table is not money and names nothing unpriced; the

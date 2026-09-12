@@ -98,9 +98,9 @@ class TestARouteHasToSayWhichWeightsAnswered:
     """A Baseline's sweeps are comparable, or the Baseline says nothing.
 
     The second of the Baseline's own rules, beside the dirty-tree one. It
-    reads ``Vendor.routes_to_one_provider`` rather than a vendor's name, so a
-    row added tomorrow in front of more than one provider is refused by this
-    without an edit here.
+    reads ``Vendor.routes_to_one_provider`` to know which tiers to ask, and the
+    record's ``served_upstream`` to answer, so a row added tomorrow in front of
+    more than one provider is covered by this without an edit here.
     """
 
     #: The registry's own answer, so this suite states the vendors rather than
@@ -115,19 +115,92 @@ class TestARouteHasToSayWhichWeightsAnswered:
         assert set(self.AGGREGATED) != set(VENDORS)
 
     @pytest.mark.parametrize("name", AGGREGATED)
-    def test_an_aggregated_route_cannot_name_a_baseline(self, name, tmp_path):
+    def test_a_record_that_names_no_upstream_cannot_name_a_baseline(
+        self, name, tmp_path
+    ):
         route = f"{vendor_for(name).prefix}some-model"
         path = write_sweep(tmp_path, sweep_document(strong_model=route))
-        with pytest.raises(BaselineError, match="more than one upstream"):
+        with pytest.raises(BaselineError, match="records no upstream"):
             BaselineIdentity.from_artifact(load_artifact(path))
+
+    @pytest.mark.parametrize("name", AGGREGATED)
+    def test_a_record_that_names_two_upstreams_cannot_either(self, name, tmp_path):
+        """One node served twice from two places is the spread the rule exists for."""
+        route = f"{vendor_for(name).prefix}some-model"
+        path = write_sweep(
+            tmp_path,
+            sweep_document(strong_model=route, served_upstreams=("Azure", "OpenAI")),
+        )
+        with pytest.raises(BaselineError, match=r"served by \['Azure', 'OpenAI'\]"):
+            BaselineIdentity.from_artifact(load_artifact(path))
+
+    @pytest.mark.parametrize("name", AGGREGATED)
+    def test_a_record_that_names_one_upstream_is_named_after_it(self, name, tmp_path):
+        """The sixth part: route and upstream together are the identity."""
+        route = f"{vendor_for(name).prefix}some-model"
+        openai = load_artifact(
+            write_sweep(
+                tmp_path,
+                sweep_document(strong_model=route, served_upstreams=("OpenAI",)),
+                "openai",
+            )
+        )
+        azure = load_artifact(
+            write_sweep(
+                tmp_path,
+                sweep_document(strong_model=route, served_upstreams=("Azure",)),
+                "azure",
+            )
+        )
+        identity = BaselineIdentity.from_artifact(openai)
+
+        assert identity.upstreams == (("strong", "OpenAI"),)
+        assert identity.to_json()["upstreams"] == {"strong": "OpenAI"}
+        assert identity != BaselineIdentity.from_artifact(azure)
+        assert identity.name != BaselineIdentity.from_artifact(azure).name
+        assert configuration_label(openai) == identity.name
+
+    @pytest.mark.parametrize("name", AGGREGATED)
+    def test_two_sweeps_on_one_upstream_are_one_baseline(self, name, tmp_path):
+        route = f"{vendor_for(name).prefix}some-model"
+        paths = [
+            write_sweep(
+                tmp_path,
+                sweep_document(
+                    strong_model=route, served_upstreams=("OpenAI",), seed=seed
+                ),
+                f"run{seed}",
+            )
+            for seed in (1, 2)
+        ]
+        directory = assemble(tmp_path, "someone", paths)
+        manifest = json.loads((directory / "baseline.json").read_text())
+
+        assert manifest["identity"]["upstreams"] == {"strong": "OpenAI"}
+        assert len(manifest["sweeps"]) == 2
+
+    def test_a_direct_route_writes_no_upstreams_key(self, tmp_path):
+        """A key that was always present would re-seal every merged Baseline."""
+        artifact = load_artifact(write_sweep(tmp_path, sweep_document()))
+        identity = BaselineIdentity.from_artifact(artifact)
+
+        assert identity.upstreams == ()
+        assert "upstreams" not in identity.to_json()
+
+    def test_a_direct_route_ignores_an_upstream_it_did_not_ask_for(self, tmp_path):
+        """A direct vendor is its own upstream, whatever a response says."""
+        artifact = load_artifact(
+            write_sweep(tmp_path, sweep_document(served_upstreams=("Somewhere",)))
+        )
+        assert "upstreams" not in BaselineIdentity.from_artifact(artifact).to_json()
 
     @pytest.mark.parametrize("name", AGGREGATED)
     def test_the_sweep_is_still_a_sweep_with_a_label(self, name, tmp_path):
         """Nothing refuses to *run* the vendor, and the label proves it.
 
-        ``configuration_label`` reads the same five parts with the Baseline's
-        rules off, so a run on an aggregator is named, comparable to itself,
-        and simply never published as a Baseline.
+        ``configuration_label`` reads the same parts with the Baseline's rules
+        off, so a run on an aggregator whose record settles nothing is named,
+        comparable to itself, and simply never published as a Baseline.
         """
         route = f"{vendor_for(name).prefix}some-model"
         artifact = load_artifact(
@@ -139,10 +212,9 @@ class TestARouteHasToSayWhichWeightsAnswered:
     def test_the_label_says_the_route_names_no_single_backend(self, name, tmp_path):
         """The marker, for the same reason the dirty one exists.
 
-        The five parts cannot tell two upstream providers apart on one route,
-        so a bare name would claim the models describe the weights. This rule
-        shipped with its refusal and no marker, and every vote cast on an
-        aggregator's sweep carried a label that read as reproducible.
+        The route alone cannot tell two upstream providers apart, so a bare
+        name on a record that settles nothing would claim the models describe
+        the weights.
         """
         route = f"{vendor_for(name).prefix}some-model"
         aggregated = load_artifact(
@@ -156,7 +228,7 @@ class TestARouteHasToSayWhichWeightsAnswered:
         """The rule has one reader, so both entry points get it."""
         route = f"{vendor_for(name).prefix}some-model"
         path = write_sweep(tmp_path, sweep_document(strong_model=route))
-        with pytest.raises(BaselineError, match="more than one upstream"):
+        with pytest.raises(BaselineError, match="records no upstream"):
             assemble(tmp_path, "someone", [path])
 
 

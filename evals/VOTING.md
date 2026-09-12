@@ -88,7 +88,7 @@ both, one line tells you why this finding reached you.
 item has no field for it, and the app stamps the configuration onto your vote
 after you answer. A reviewer who sees the model can vote about the model instead
 of about the finding. The stamp is the **Baseline**'s own name for that sweep —
-the commit, the strong model and a digest of all five identity parts — computed
+the commit, the strong model and a digest of every identity part — computed
 by one reader, so a vote and a Baseline cannot spell one configuration two ways.
 A sweep from a tree that did not match its commit takes the same name with
 `-dirty` on the end.
