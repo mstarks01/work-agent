@@ -21,8 +21,9 @@ is any good. Two kinds:
   request included. It records as one JSON file and needs no write access;
   [`evals/BLESSING.md`](evals/BLESSING.md) step 6 explains the method, and
   `webapp/offline_sitting.py` writes the same sitting as one standalone page
-  for a reader who cannot clone at all. 11 of the 13 cases are still waiting
-  for one.
+  for a reader who cannot clone at all. Run
+  `uv run python webapp/sitting.py --list` for the cases that still wait for
+  one.
 
 Both are **free and offline**, and neither needs a provider key. A golden case
 carries its own sources, model and reference sets, so a Case Sitting is open

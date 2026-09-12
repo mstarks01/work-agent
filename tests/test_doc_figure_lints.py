@@ -15,6 +15,19 @@ version 2 from these numbers, and they went stale the moment the fixtures grew
 because nothing here read a `.py` file. A claim names any path in the
 repository; the extension decides nothing.
 
+A **figure one act moves** is the third kind, and prose must not state it at
+all. The unread-case count was stated in two guides and checked here, and the
+pair deadlocked: ``verify_pull_request`` refuses a review pull request that
+changes anything but its one JSON file, and this module refuses prose stating a
+figure the tree no longer derives. Neither rule is wrong. The sitting app hands
+a reader a GitHub link that carries one file, and a maintainer commits it
+straight to the base branch, so no pull-request check can reach the prose on
+the path that most sittings take — and every sitting left the base branch red
+until a second commit moved a sentence. `unreviewed_cases` derives the count,
+`webapp/sitting.py --list` prints it, and the guides now point at that rather
+than spelling a number a merge invalidates. A figure a single act moves belongs
+in a reader, never in a sentence.
+
 A **recorded observation** is what a run once produced: luna's 3.4%
 unverified-quote rate, the 231 of 243 claims a mechanical check fired on,
 the 30 labels sitting 01 read. Those stay true when the code moves, because
@@ -57,7 +70,6 @@ from evals.harness.calibration import (
 )
 from evals.harness.identity import MechanicalIdentity, SubsetVerbIdentity
 from evals.harness.reference import flows_by_case, load_corpus
-from evals.review_submission import unreviewed_cases
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -210,22 +222,6 @@ def _corpus() -> Mapping[str, object]:
     return {"value": count, "word": WORDS.get(count, str(count))}
 
 
-def _unreviewed() -> Mapping[str, object]:
-    """Cases nobody has sat with, beside the corpus size the prose pairs it to.
-
-    Both halves in one figure because both sentences state the pair, and a
-    guide saying "12 of the 13" goes wrong when either number moves. This is
-    the figure the contribution path exists to change: every merged sitting
-    PR clears a line, so it is the most likely of all of them to go stale.
-    """
-    count = len(unreviewed_cases(REPO_ROOT))
-    return {
-        "value": count,
-        "word": WORDS.get(count, str(count)),
-        "corpus": len(verify_corpus.case_dirs()),
-    }
-
-
 FIGURES: tuple[Figure, ...] = (
     Figure(
         name="the widest framework fan-out",
@@ -238,14 +234,6 @@ FIGURES: tuple[Figure, ...] = (
         claims=(
             ("evals/README.md", "{word} cases", 1),
             ("evals/BLESSING.md", "All {value} cases", 1),
-        ),
-    ),
-    Figure(
-        name="the cases nobody has sat with",
-        compute=_unreviewed,
-        claims=(
-            ("CONTRIBUTING.md", "{value} of the {corpus} cases", 1),
-            ("evals/BLESSING.md", "{word} of the {corpus} cases", 1),
         ),
     ),
     Figure(
@@ -440,6 +428,55 @@ def test_the_prose_states_the_current_figure(figure, document, template, count):
         f" declares {count}. The computed values for {figure.name} are"
         f" {dict(values)}. Either a mention went stale while its twin stayed"
         " current, or a new mention landed and the count needs raising."
+    )
+
+
+#: Readers a figure may not be computed from, and why. A merged **Case
+#: Sitting** arrives as one JSON file through a GitHub link the app builds, and
+#: a maintainer commits it straight to the base branch, so nothing runs that
+#: could move a sentence with it. A figure these produce therefore goes stale
+#: on merge, and the guides state no such number.
+SITTING_READERS = frozenset({"unreviewed_cases", "current_reviews", "declared"})
+
+
+def _reads(compute: Callable[[], Mapping[str, object]]) -> set[str]:
+    """Every global ``compute`` names, and every global the helpers it calls do.
+
+    One level deep, which is every figure here: each computes inline or calls
+    one private helper in this module. A third level would need ``ast`` over
+    the source, and a figure written that way is the signal to add it.
+    """
+    seen = set(compute.__code__.co_names)
+    for name in tuple(seen):
+        helper = globals().get(name)
+        if callable(helper) and getattr(helper, "__module__", None) == __name__:
+            seen |= set(helper.__code__.co_names)
+    return seen
+
+
+@pytest.mark.parametrize("figure", FIGURES, ids=lambda figure: figure.name)
+def test_no_figure_is_computed_from_the_merged_sittings(figure):
+    """A figure one merge moves cannot be stated in prose, so none is here.
+
+    The rule this encodes cost two commits per sitting before it existed. The
+    unread-case count was stated in ``CONTRIBUTING.md`` and ``evals/BLESSING.md``
+    and checked above, while
+    :func:`evals.review_submission.verify_pull_request` refuses a review pull
+    request that changes anything but its one JSON file. Both rules are right
+    and together they had no green path: the sitting landed alone and left the
+    base branch failing this module until a second commit moved a sentence.
+
+    The count did not stop being worth reading. It stopped being worth
+    *writing*: ``webapp/sitting.py --list`` prints it from the same reader the
+    gate uses, and the guides point at that.
+    """
+    forbidden = sorted(_reads(figure.compute) & SITTING_READERS)
+
+    assert not forbidden, (
+        f"{figure.name} is computed from {forbidden}, so a merged sitting moves"
+        " it and the prose stating it goes stale on merge. A sitting carries"
+        " one JSON file and no commit that could restate a guide. Print this"
+        " figure from a reader instead of writing it into a sentence."
     )
 
 
