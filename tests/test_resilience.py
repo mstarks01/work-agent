@@ -10,6 +10,7 @@ submission is accepted at all, never which answer it gets.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -55,8 +56,8 @@ def write(tmp_path: Path, body: str) -> Path:
     return path
 
 
-def config(**kwargs) -> ResilienceConfig:
-    fields = {
+def config(**kwargs: Any) -> ResilienceConfig:
+    fields: dict[str, Any] = {
         "version": SUPPORTED_VERSION,
         "attempts": 3,
         "timeout_ms": 300000,
