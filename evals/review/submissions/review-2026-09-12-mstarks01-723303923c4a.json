@@ -1,0 +1,55 @@
+{
+  "envelope": 1,
+  "submitted_by": "mstarks01",
+  "submitted_for": "mstarks01",
+  "generated": "2026-09-12",
+  "cases": {
+    "02-iot-fleet-telemetry": {
+      "own_list": [
+        "- Lack of remote connectivity to the sensor nodes makes them unlikely to be able to be patched.",
+        "- No mention of MQTT transport-layer encryption.",
+        "- Pre-shared key if intercepted puts all other nodes within the same fleet at risk.",
+        "- No stated key revocation process, ciphers, or other robust PKI controls.",
+        "- The telemetry lake has customer data yet it is not clear how it is protected.",
+        "- The cloud storage bucket being public read can enable someone to reverse engineer the firmware and find potential vulnerabilities.",
+        "- The nodes have no way to verify that the firmware they are installing is legitimate, so a MITM attack might serve up malicious firmware.",
+        "- The serial console may not have any authentication, so anyone with local access may be able to modify the firmware -- especially since it is not signed."
+      ],
+      "marks": {
+        "v5:2880c399dd627f82": "agree",
+        "v5:38b9d1b36b5c158e": "agree",
+        "v5:775c0a48610aed0a": "agree",
+        "v5:d6aa4840c9e3ba6e": "agree",
+        "v5:d92406fd53f35a7a": "agree",
+        "v6:d041bd25284bf965": "agree",
+        "v6:42f80f7d317211ec": "agree",
+        "v6:c37d7965fcc09777": "agree",
+        "v6:b9b959ed14a8b53e": "agree",
+        "v6:1a78a7a1cb5636a7": "agree",
+        "v6:363cf8486e5b4bc5": "agree",
+        "v6:7dfd9a96db0441ea": "agree",
+        "v6:3d03ea6a3780ec23": "agree",
+        "v6:15c2c9c3dbffe47d": "agree",
+        "v6:797eadf9d6adaed0": "agree",
+        "v6:4c5209d60cca8bf2": "agree",
+        "v6:63553d316b2001bf": "agree",
+        "v6:de67ac27ad23c71e": "agree",
+        "v6:43be5c187123cedc": "agree",
+        "v6:da58eb2490bc62ef": "agree",
+        "v6:d173653622c711d2": "agree",
+        "v6:311cc5047981ca3f": "agree",
+        "v6:88b18f6f8e8df806": "agree"
+      },
+      "missing": [
+        "- Lack of remote connectivity to the sensor nodes makes them unlikely to be able to be patched."
+      ],
+      "notes": "A second sitting of this case, for the one finding #799 re-keyed. Reference 0's verb moved from impersonate to use-credential in PR #846, which is the rule frameworks/stride/output.md states for a credential the attacker holds. The claim sentence, the elements and the severity did not move, so the finding is the one I read on 2026-09-09 and the mark is the same. The list I wrote blind and the other 22 marks ride forward from that sitting.",
+      "opened_digests": {
+        "source.md": "fc745e273aff8be740a814f0a9b4a45d6f3c6fe39dc7c8efa2b879d4f270ac74",
+        "model.json": "72cd6e017da3a53ea67530013be257ea4ed360932f86a0e9419be6273c4588eb",
+        "claims/asvs.json": "a3158156ef12c655c2547b56e9e802bdee30d183d7b3d44ce7a2a838f003a468",
+        "claims/stride.json": "bde9c43b971a6a77370e399214b273d8b005ef4a01e2fe7ca99b62a47c35729e"
+      }
+    }
+  }
+}
