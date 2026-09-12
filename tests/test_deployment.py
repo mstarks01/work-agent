@@ -364,6 +364,23 @@ def test_a_declared_upstream_rides_the_adapter_as_the_request_body_pin():
     }
 
 
+def test_a_pin_on_a_slow_upstream_reads_that_upstream_timeout():
+    """The flex row in ``config/resilience.toml``, read through the pin."""
+    env = OPENROUTER_ENV | {"ANALYSIS_MODEL_UPSTREAMS_OPENROUTER": "openai/flex"}
+    pipeline = Deployment.from_env(env=env).pipeline(DEFAULT_FRAMEWORKS)
+    nodes = {node.name: node for node in pipeline.workflow.graph.nodes}
+
+    assert translator_of(nodes[CRITIC_NODE].model)._additional_args["timeout"] == 900.0
+
+
+def test_a_pin_on_an_upstream_with_no_row_reads_the_base_timeout():
+    env = OPENROUTER_ENV | {"ANALYSIS_MODEL_UPSTREAMS_OPENROUTER": "openai"}
+    pipeline = Deployment.from_env(env=env).pipeline(DEFAULT_FRAMEWORKS)
+    nodes = {node.name: node for node in pipeline.workflow.graph.nodes}
+
+    assert translator_of(nodes[CRITIC_NODE].model)._additional_args["timeout"] == 300.0
+
+
 def test_an_unpinned_gateway_and_a_direct_vendor_send_no_pin():
     for env in (OPENROUTER_ENV, VERTEX_ENV):
         pipeline = Deployment.from_env(env=env).pipeline(DEFAULT_FRAMEWORKS)
