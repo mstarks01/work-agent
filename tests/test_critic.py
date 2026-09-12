@@ -23,7 +23,7 @@ from analysis_service.frameworks import schemas_for
 from analysis_service.frameworks.stride import STRIDE
 from analysis_service.sources import DEFAULT_DESCRIPTION_LABEL
 from analysis_service.system_model import mentioned_ids
-from tests.factories import sample_draft, sample_ruling, valid_model
+from tests.factories import sample_draft, sample_ruling, severity, valid_model
 
 #: The five model-facing shapes STRIDE's own nodes speak in. ``assemble_claims``
 #: needs the ruled record to build; the package itself carries the draft.
@@ -43,12 +43,6 @@ def model():
 
 def mitigation(summary="Set HttpOnly and Secure on cookies"):
     return Mitigation(summary=summary)
-
-
-def severity(likelihood="medium", impact="high"):
-    return Severity(
-        likelihood=likelihood, impact=impact, justification="Stated model fact."
-    )
 
 
 class TestMentionedIds:

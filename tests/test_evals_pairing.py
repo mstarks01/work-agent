@@ -12,7 +12,6 @@ from pathlib import Path
 import pytest
 
 from analysis_service.frameworks.asvs.catalog import requirements_for
-from evals import verify_corpus
 from evals.harness.applicability import declared_level, score_applicability
 from evals.harness.pairing import (
     ATTRIBUTION,
@@ -22,14 +21,13 @@ from evals.harness.pairing import (
     refuse_path_inside_repo,
     render_html,
 )
-from evals.harness.reference import load_corpus
+from tests.eval_factories import corpus_case
 from tests.test_evals_applicability import CASE_ID, Block, Scoped, ruling
 
 
 @pytest.fixture(scope="module")
 def case():
-    corpus = load_corpus(verify_corpus.CORPUS_DIR)
-    return next(entry for entry in corpus if entry.id == CASE_ID)
+    return corpus_case(CASE_ID)
 
 
 @pytest.fixture

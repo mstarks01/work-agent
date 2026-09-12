@@ -55,7 +55,7 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from analysis_service.system_model import SystemModel
 from evals.harness.archive import archive_bytes
-from evals.harness.baseline import _file_digests
+from evals.harness.baseline import refresh_manifests
 
 
 def _derived(report: dict) -> list[dict] | None:
@@ -103,32 +103,6 @@ def migrate(root: Path, write: bool) -> tuple[int, int]:
             path.write_text(archive_bytes("report", report), encoding="utf-8")
         changed += 1
     return changed, skipped
-
-
-def refresh_manifests(root: Path, write: bool) -> int:
-    """Recompute the file digests every Baseline manifest under ``root`` records."""
-    changed = 0
-    for manifest_path in sorted(root.rglob("baseline.json")):
-        directory = manifest_path.parent
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        moved = False
-        for entry in manifest.get("sweeps", []):
-            stem = str(entry.get("artifact", "")).removesuffix(".json")
-            recomputed = _file_digests(directory, stem)
-            if entry.get("files") != recomputed:
-                entry["files"] = recomputed
-                moved = True
-        if not moved:
-            continue
-        print(f"{manifest_path}: file digests recomputed")
-        if write:
-            # The spelling ``assemble`` writes, so a refreshed manifest and a
-            # freshly assembled one are the same bytes.
-            manifest_path.write_text(
-                archive_bytes("manifest", manifest), encoding="utf-8"
-            )
-        changed += 1
-    return changed
 
 
 def main() -> int:

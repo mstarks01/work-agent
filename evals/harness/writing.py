@@ -51,6 +51,7 @@ from analysis_service.claims import (
     FrameworkName,
 )
 from analysis_service.report import Report
+from analysis_service.system_model import ModelIndex
 from evals.harness.content import prose as prose_digest
 from evals.harness.fingerprint import identifier_of, key_claim, lane_field
 from evals.harness.identity import FlowMap
@@ -178,9 +179,7 @@ def measure(
         report = reports.get(case.id)
         if report is None:
             continue
-        flows = {
-            flow.id: (flow.source, flow.destination) for flow in case.model.data_flows
-        }
+        flows = ModelIndex.of(case.model).flow_endpoints
         rows += [
             measure_case(case.id, block.framework, block.claims, flows, votes)
             for block in report.analyses

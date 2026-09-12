@@ -61,6 +61,7 @@ from analysis_service.claims import (
     derive_severity_level,
 )
 from analysis_service.frameworks.stride.record import DraftThreat, StrideCategory
+from analysis_service.system_model import ModelIndex
 from evals.harness.content import structural
 from evals.harness.fingerprint import key_claim
 from evals.harness.identity import ClaimPair, Matcher
@@ -672,7 +673,7 @@ def _standing_of_unmatched(
     """
     unlisted: list[UnlistedThreat] = []
     foreign: list[str] = []
-    flows = {flow.id: (flow.source, flow.destination) for flow in case.model.data_flows}
+    flows = ModelIndex.of(case.model).flow_endpoints
     blessed_ids = {element.id for element in case.model.elements()}
 
     for position in unmatched_positions:

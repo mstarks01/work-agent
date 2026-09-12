@@ -14,7 +14,6 @@ import pytest
 
 from analysis_service.claims import ScopeEntry, UnreconciledRuling
 from analysis_service.sources import CARRIED_EVIDENCE_KINDS
-from evals import verify_corpus
 from evals.harness.applicability import (
     EVIDENCE_FOR_DISPOSITION,
     Observation,
@@ -29,7 +28,7 @@ from evals.harness.attribution import (
     attribute_case,
     pooled,
 )
-from evals.harness.reference import load_corpus
+from tests.eval_factories import corpus_case
 from tests.test_evals_applicability import Block, Scoped, deferred, ruling
 
 CASE_ID = "01-payments-checkout"
@@ -37,8 +36,7 @@ CASE_ID = "01-payments-checkout"
 
 @pytest.fixture(scope="module")
 def case():
-    corpus = load_corpus(verify_corpus.CORPUS_DIR)
-    return next(entry for entry in corpus if entry.id == CASE_ID)
+    return corpus_case(CASE_ID)
 
 
 def attribute(case, block):

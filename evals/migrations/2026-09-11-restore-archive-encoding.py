@@ -53,7 +53,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
 
 from evals.harness.archive import archive_bytes
-from evals.harness.baseline import _file_digests
+from evals.harness.baseline import refresh_manifests
 from evals.harness.bundle import kind_of_path
 
 #: The tag whose trees predate the two migrations that escaped the archive. A
@@ -112,32 +112,6 @@ def migrate(root: Path, write: bool) -> int:
         print(f"{path}: re-encoded in the producer's spelling")
         if write:
             path.write_text(rewritten, encoding="utf-8")
-        changed += 1
-    return changed
-
-
-def refresh_manifests(root: Path, write: bool) -> int:
-    """Recompute the file digests every Baseline manifest under ``root`` records."""
-    changed = 0
-    for manifest_path in sorted(root.rglob("baseline.json")):
-        directory = manifest_path.parent
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        moved = False
-        for entry in manifest.get("sweeps", []):
-            stem = str(entry.get("artifact", "")).removesuffix(".json")
-            recomputed = _file_digests(directory, stem)
-            if entry.get("files") != recomputed:
-                entry["files"] = recomputed
-                moved = True
-        if not moved:
-            continue
-        print(f"{manifest_path}: file digests recomputed")
-        if write:
-            # The spelling ``assemble`` writes, so a refreshed manifest and a
-            # freshly assembled one are the same bytes.
-            manifest_path.write_text(
-                archive_bytes("manifest", manifest), encoding="utf-8"
-            )
         changed += 1
     return changed
 
