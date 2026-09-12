@@ -396,6 +396,7 @@ def test_the_walk_reaches_the_records_a_row_nests():
         "_CredentialVar",
         "_FormRule",
         "_ReportedCharge",
+        "_UpstreamPin",
         "VendorSdk",
     } <= reached
 

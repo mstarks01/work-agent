@@ -452,6 +452,11 @@ def build_tier_adapters(
             **{_TIMEOUT_KWARG: resilience.request_timeout_seconds()},
             **tier_sampling.constructor_kwargs(),
             **vendor.credential_kwargs(env, tiers.credential_mode(selection.vendor)),
+            # The upstream pin, where the deployment declared one. It rides the
+            # request body under litellm's ``extra_body``, which the OpenRouter
+            # transformation merges into what it sends; a direct vendor and an
+            # unpinned gateway contribute nothing here.
+            **vendor.upstream_kwargs(tiers.upstreams_for(selection.vendor)),
             # A client that reads what the provider said about money, on every
             # tier whose vendor says anything. Every other tier gets ADK's own
             # client and reports token counts alone, which is what the cost
