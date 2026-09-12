@@ -60,6 +60,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from analysis_service.claims import FrameworkName
 from analysis_service.markdown_loader import RESOLVE_ERRORS
+from analysis_service.system_model import ModelIndex
 from evals import build_review_docs as docs
 from evals.harness.fingerprint import (
     SUPPORTED_VERSIONS,
@@ -656,9 +657,7 @@ def mark_targets(case: GoldenCase) -> tuple[MarkTarget, ...]:
     package carries which, and a package that ships a new record type arrives
     here through its own answers.
     """
-    flows: FlowMap = {
-        flow.id: (flow.source, flow.destination) for flow in case.model.data_flows
-    }
+    flows: FlowMap = ModelIndex.of(case.model).flow_endpoints
     grouped: dict[str, list[str]] = {}
     frameworks: dict[str, FrameworkName] = {}
     aliases: dict[str, set[str]] = {}

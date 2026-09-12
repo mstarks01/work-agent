@@ -36,7 +36,7 @@ import itertools
 import pytest
 
 from analysis_service.critic import endpoint_targets
-from analysis_service.system_model import TrustBoundary
+from analysis_service.system_model import ModelIndex, TrustBoundary
 from evals import verify_corpus
 from evals.harness.fingerprint import key_claim
 from evals.harness.identity import ClaimPair, SubsetVerbIdentity, endpoint_form
@@ -148,7 +148,7 @@ def identity_key(case: GoldenCase, claim: ReferenceThreat) -> str:
     actually merge. Resolving here is not a relaxation of the equality rule
     above; it is the same rule over the same spelling of a place.
     """
-    flows = {flow.id: (flow.source, flow.destination) for flow in case.model.data_flows}
+    flows = ModelIndex.of(case.model).flow_endpoints
     elements = ", ".join(sorted(endpoint_form(claim.affected_element_ids, flows)))
     return f"{case.meta.id} | {claim.category} | {elements}"
 
@@ -225,16 +225,11 @@ class TestTheFourReadersOfOnePlace:
     exactly how two readers of one rule drift while both suites stay green.
     """
 
-    def _flows(self, case):
-        return {
-            flow.id: (flow.source, flow.destination) for flow in case.model.data_flows
-        }
-
     def test_the_two_folds_answer_alike_on_every_corpus_citation(self, corpus):
         """The pair with no relation between them: they must simply agree."""
         disagreements = []
         for case in corpus:
-            flows = self._flows(case)
+            flows = ModelIndex.of(case.model).flow_endpoints
             for claim in case.stride_claims():
                 runtime = endpoint_targets(claim.affected_element_ids, flows)
                 harness = endpoint_form(claim.affected_element_ids, flows)
@@ -272,7 +267,7 @@ class TestTheFourReadersOfOnePlace:
         is a finding counted once and reported twice.
         """
         for case in corpus:
-            flows = self._flows(case)
+            flows = ModelIndex.of(case.model).flow_endpoints
             for left, right in itertools.combinations(case.stride_claims(), 2):
                 same_key = _key(case, left, flows) == _key(case, right, flows)
                 same_place = endpoint_targets(
@@ -293,7 +288,7 @@ class TestTheFourReadersOfOnePlace:
         splits would mean a vote landing on a finding the scorer never matched.
         """
         for case in corpus:
-            flows = self._flows(case)
+            flows = ModelIndex.of(case.model).flow_endpoints
             matcher = SubsetVerbIdentity({case.id: flows})
             for left, right in itertools.combinations(case.stride_claims(), 2):
                 if _key(case, left, flows) != _key(case, right, flows):
@@ -325,7 +320,7 @@ class TestTheFourReadersOfOnePlace:
         """
         wider = 0
         for case in corpus:
-            flows = self._flows(case)
+            flows = ModelIndex.of(case.model).flow_endpoints
             matcher = SubsetVerbIdentity({case.id: flows})
             for left, right in itertools.combinations(case.stride_claims(), 2):
                 if left.category != right.category:

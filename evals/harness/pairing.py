@@ -52,7 +52,7 @@ from evals.harness.applicability import (
     declared_level,
     score_applicability,
 )
-from evals.harness.reference import GoldenCase, ReferenceRequirement
+from evals.harness.reference import GoldenCase
 
 #: The repository this module lives in. A rendered pairing may not be written
 #: inside it; see the licensing note above.
@@ -220,14 +220,6 @@ def _catalog(level: int) -> dict[str, Requirement]:
     return {entry.id: entry for entry in requirements_for(level)}
 
 
-def _references(case: GoldenCase) -> dict[str, ReferenceRequirement]:
-    return {
-        reference.requirement: reference
-        for reference in case.references.get(FRAMEWORK) or ()
-        if isinstance(reference, ReferenceRequirement)
-    }
-
-
 def _deferrals(block: FrameworkAnalysis) -> Mapping[str, str]:
     """Every unit the service withheld for want of another kind of evidence."""
     return {
@@ -249,7 +241,7 @@ def pair_case(
     level = declared_level(case)
     catalog = _catalog(level)
     claims = _claims_by_requirement(block.claims)
-    references = _references(case)
+    references = case.requirements_for(FRAMEWORK)
     deferrals = _deferrals(block)
 
     applied_pairs = []

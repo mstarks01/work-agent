@@ -10,7 +10,6 @@ import pytest
 
 from analysis_service.certification import (
     MANIFEST_VERSION,
-    BlessedManifest,
     CertificationError,
     CertificationGate,
     CertifyResult,
@@ -23,7 +22,7 @@ from analysis_service.report import (
     NodeRun,
     Report,
 )
-from tests.factories import sample_report
+from tests.factories import blessed_manifest, sample_report
 
 FP_A = "a" * 64
 INSTRUCTIONS = "1c" * 32
@@ -45,13 +44,6 @@ def tier_of(node: str) -> TierName:
     return _TIERS[node]
 
 
-def manifest(tiers: dict[TierName, set[str]]) -> BlessedManifest:
-    return BlessedManifest(
-        version=MANIFEST_VERSION,
-        tiers={tier: frozenset(prints) for tier, prints in tiers.items()},
-    )
-
-
 def observed(**nodes: set[str]) -> dict[str, frozenset[str]]:
     return {node: frozenset(prints) for node, prints in nodes.items()}
 
@@ -66,7 +58,7 @@ class TestTierKeying:
         # technicality.
         result = certify(
             observed(critic={FP_A}, recritic={FP_A}),
-            manifest({"strong": {FP_A}}),
+            blessed_manifest({"strong": {FP_A}}),
             tier_of,
             ALL_NODES,
         )
@@ -74,12 +66,14 @@ class TestTierKeying:
 
     def test_a_tier_with_no_blessed_set_fails_closed(self):
         # The honest pre-baseline state the shipped manifest ships in.
-        result = certify(observed(extract={FP_A}), manifest({}), tier_of, ALL_NODES)
+        result = certify(
+            observed(extract={FP_A}), blessed_manifest({}), tier_of, ALL_NODES
+        )
         assert not result.certified
         assert result.uncertified[0].node == "extract"
 
     def test_a_tier_accumulates_several_blessed_builds(self):
-        blessed = manifest({"base": {FP_A, FP_B}})
+        blessed = blessed_manifest({"base": {FP_A, FP_B}})
         assert certify(observed(extract={FP_A}), blessed, tier_of, ALL_NODES).certified
         assert certify(observed(extract={FP_B}), blessed, tier_of, ALL_NODES).certified
         assert not certify(
@@ -93,7 +87,7 @@ class TestPerExecutionSets:
     def test_a_node_that_ran_twice_certifies_only_if_both_are_blessed(self):
         # A build that moved partway through a sweep gives one node two hashes;
         # that is the drift signal, not a defect.
-        blessed = manifest({"strong": {FP_A}})
+        blessed = blessed_manifest({"strong": {FP_A}})
         assert certify(observed(critic={FP_A}), blessed, tier_of, ALL_NODES).certified
         drifted = certify(observed(critic={FP_A, FP_B}), blessed, tier_of, ALL_NODES)
         assert not drifted.certified
@@ -103,7 +97,7 @@ class TestPerExecutionSets:
         # Absence is the sole encoding of "never ran" — never one of two
         # drifting synonyms.
         with pytest.raises(CertificationError, match="empty fingerprint set"):
-            certify({"critic": frozenset()}, manifest({}), tier_of, ALL_NODES)
+            certify({"critic": frozenset()}, blessed_manifest({}), tier_of, ALL_NODES)
 
 
 class TestTheThirdState:
@@ -113,7 +107,10 @@ class TestTheThirdState:
         # Folding it into the boolean would mark an ordinary run untrusted,
         # which is how a gate teaches people to bypass it.
         result = certify(
-            observed(extract={FP_A}), manifest({"base": {FP_A}}), tier_of, ALL_NODES
+            observed(extract={FP_A}),
+            blessed_manifest({"base": {FP_A}}),
+            tier_of,
+            ALL_NODES,
         )
         assert result.certified
         assert result.unexercised == ("strong",)
@@ -122,7 +119,7 @@ class TestTheThirdState:
     def test_a_fully_exercised_run_is_complete(self):
         result = certify(
             observed(extract={FP_A}, critic={FP_B}),
-            manifest({"base": {FP_A}, "strong": {FP_B}}),
+            blessed_manifest({"base": {FP_A}, "strong": {FP_B}}),
             tier_of,
             ALL_NODES,
         )
@@ -134,7 +131,10 @@ class TestTheThirdState:
         # A manifest-derived expectation would be empty exactly on day one, and
         # would conflate a stale manifest with an unexercised one.
         result = certify(
-            observed(extract={FP_A}), manifest({}), tier_of, ["extract", "critic"]
+            observed(extract={FP_A}),
+            blessed_manifest({}),
+            tier_of,
+            ["extract", "critic"],
         )
         assert result.unexercised == ("strong",)
 
@@ -242,7 +242,7 @@ class TestGatePolicy:
 
     def gate(self, require_certified: bool) -> CertificationGate:
         return CertificationGate(
-            manifest=manifest({"base": {FP_A}, "strong": {FP_B}}),
+            manifest=blessed_manifest({"base": {FP_A}, "strong": {FP_B}}),
             tier_of=tier_of,
             require_certified=require_certified,
         )

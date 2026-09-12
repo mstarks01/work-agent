@@ -12,7 +12,6 @@ from pathlib import Path
 import pytest
 
 from analysis_service.certification import (
-    MANIFEST_VERSION,
     BlessedManifest,
     CertificationError,
     certify,
@@ -29,6 +28,7 @@ from tests.factories import (
     DEFAULT_FRAMEWORKS,
     SAMPLE_INSTRUCTIONS,
     TEST_TIER_ENV,
+    blessed_manifest,
     repo_tiers,
     sample_fingerprint,
 )
@@ -44,19 +44,12 @@ def tier_of(graph_node: str) -> TierName:
     return _TIER_OF(TIER_NODE_BY_GRAPH_NODE[graph_node])
 
 
-def _manifest(tiers: dict[TierName, set[str]]) -> BlessedManifest:
-    return BlessedManifest(
-        version=MANIFEST_VERSION,
-        tiers={tier: frozenset(prints) for tier, prints in tiers.items()},
-    )
-
-
 def _blessed_from(observations: dict[str, frozenset[str]]) -> BlessedManifest:
     """Bless every fingerprint a variant produced, collapsed onto its tier."""
     tiers: dict[TierName, set[str]] = {}
     for node, prints in observations.items():
         tiers.setdefault(tier_of(node), set()).update(prints)
-    return _manifest(tiers)
+    return blessed_manifest(tiers)
 
 
 ALL_NODES = tuple(TIER_NODE_BY_GRAPH_NODE)

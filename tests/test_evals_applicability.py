@@ -140,12 +140,10 @@ class Block:
         self.rejected_claims = list(rejected_claims)
         self.unreconciled_rulings = list(unreconciled_rulings)
 
-    def all_claims(self):
-        return (*self.claims, *self.rejected_claims)
-
-    #: The real reader, bound onto the fake rather than reimplemented here. A
+    #: The real readers, bound onto the fake rather than reimplemented here. A
     #: second copy of "which problems name this claim" is exactly the shape
     #: that lets a fake agree with itself while the block disagrees.
+    all_claims = FrameworkAnalysis.all_claims
     re_ask_kinds = FrameworkAnalysis.re_ask_kinds
 
 
@@ -773,8 +771,7 @@ class DispositionBlock:
         self.rejected_claims = list(rejected_claims)
         self.scope = list(scope)
 
-    def all_claims(self):
-        return (*self.claims, *self.rejected_claims)
+    all_claims = FrameworkAnalysis.all_claims
 
 
 def deferred(unit, needs="code"):

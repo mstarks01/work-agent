@@ -77,7 +77,7 @@ class EvalRunError(RuntimeError):
     """A graph run produced neither the artifact the mode wanted nor a rejection."""
 
 
-class CaseFailure(Exception):
+class CaseFailure(GraphFailed):
     """A case that did not become a report, and what its graph ran first.
 
     Two ways in. The graph ran to the end and the result failed to build, in
@@ -91,11 +91,6 @@ class CaseFailure(Exception):
     classifies, exactly the one it would have caught before this wrapper
     existed.
     """
-
-    def __init__(self, cause: Exception, node_runs: Sequence[NodeRun]) -> None:
-        super().__init__(str(cause))
-        self.cause = cause
-        self.node_runs = tuple(node_runs)
 
 
 @dataclass(frozen=True)

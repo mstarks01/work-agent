@@ -62,7 +62,7 @@ from analysis_service.evidence import (
     UNKNOWN_PREFIX,
     render_catalog,
 )
-from analysis_service.frameworks import PACKAGES, schemas_for
+from analysis_service.frameworks import PACKAGES
 from analysis_service.grounding import verify_quote
 from analysis_service.markdown_loader import MarkdownLoader, split_sections
 from analysis_service.prompts import (
@@ -81,6 +81,7 @@ from analysis_service.token_caps import (
     TOKEN_CAPS,
     prompt_key,
 )
+from evals.harness.exemplar_verbs import proposal_type
 
 PROMPTS_DIR = Path(__file__).resolve().parents[1] / "prompts"
 FRAMEWORKS_DIR = Path(__file__).resolve().parents[1] / "frameworks"
@@ -250,18 +251,6 @@ def system_for_label(label):
         if source_block(body)[0] == label:
             return body
     return None
-
-
-def proposal_type(framework):
-    """The record one package's lane agent actually emits a claim as.
-
-    A table lookup through ``schemas_for`` rather than a name, so an exemplar is
-    parsed against its own framework's shape: STRIDE's carries ``sequence`` and
-    ``severity``, ASVS's carries ``requirement``, and parsing either against the
-    other's record is how a worked example of a dead run ships.
-    """
-    claims = schemas_for(framework).proposals.model_fields["claims"]
-    return get_args(claims.annotation)[0]
 
 
 def exemplar_proposals(framework, lane):

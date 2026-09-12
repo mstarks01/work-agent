@@ -38,10 +38,12 @@ from pydantic import BaseModel, Field
 from analysis_service import frameworks as framework_registry
 from analysis_service.binding import NodeBinding
 from analysis_service.budgets import BudgetPolicy
+from analysis_service.certification import MANIFEST_VERSION, BlessedManifest
 from analysis_service.charges import CHARGE_METADATA_KEY, UPSTREAM_METADATA_KEY
 from analysis_service.claims import (
     Ground,
     Mitigation,
+    Rating,
     Severity,
     Verdict,
 )
@@ -69,6 +71,7 @@ from analysis_service.identity import build_identity, execution_fingerprint
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.model_tiers import (
     ModelTierConfig,
+    TierName,
     charges_env_var_for,
     credentials_env_var_for,
     load_model_tiers,
@@ -155,6 +158,14 @@ TEST_CREDENTIAL_ENV: dict[str, str] = {
     "ANALYSIS_VERTEX_PROJECT": "test-project",
     "ANALYSIS_VERTEX_LOCATION": "us-central1",
 }
+
+
+def blessed_manifest(tiers: dict[TierName, set[str]]) -> BlessedManifest:
+    """A manifest at the current version, blessing the prints given per tier."""
+    return BlessedManifest(
+        version=MANIFEST_VERSION,
+        tiers={tier: frozenset(prints) for tier, prints in tiers.items()},
+    )
 
 
 def repo_tiers() -> ModelTierConfig:
@@ -517,6 +528,12 @@ def sample_proposal(
     fields["evidence_refs"] = ["crossing:flow:customer-to-web-app:login"]
     fields.update(overrides)
     return ThreatProposal.model_validate(fields)
+
+
+def severity(likelihood: Rating = "medium", impact: Rating = "high") -> Severity:
+    return Severity(
+        likelihood=likelihood, impact=impact, justification="Stated model fact."
+    )
 
 
 def sample_ruling(threat_id: str = "S-01", **overrides: Any) -> ThreatRuling:

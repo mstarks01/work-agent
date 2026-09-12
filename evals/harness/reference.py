@@ -550,6 +550,16 @@ class GoldenCase:
         """One framework's reference set."""
         return self.references[framework]
 
+    def requirements_for(
+        self, framework: FrameworkName
+    ) -> dict[str, ReferenceRequirement]:
+        """One framework's catalog-keyed records, by requirement identifier."""
+        return {
+            reference.requirement: reference
+            for reference in self.references.get(framework) or ()
+            if isinstance(reference, ReferenceRequirement)
+        }
+
     def must_find_for(self, framework: FrameworkName) -> tuple[ReferenceClaim, ...]:
         """One framework's ``must-find`` records."""
         return tuple(ref for ref in self.references[framework] if ref.must_find)

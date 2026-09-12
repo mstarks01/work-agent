@@ -36,7 +36,7 @@ from analysis_service.claims import (
     ScopeEntry,
 )
 from analysis_service.frameworks.asvs.record import requirement_of
-from evals.harness.reference import GoldenCase, ReferenceRequirement
+from evals.harness.reference import GoldenCase
 
 if TYPE_CHECKING:
     from evals.harness.applicability import ApplicabilityScore, DispositionScore
@@ -175,14 +175,6 @@ def _by_requirement(claims: Sequence[RuledClaim]) -> dict[str, RuledClaim]:
     return keyed
 
 
-def _references(case: GoldenCase) -> dict[str, ReferenceRequirement]:
-    return {
-        reference.requirement: reference
-        for reference in case.references.get(FRAMEWORK) or ()
-        if isinstance(reference, ReferenceRequirement)
-    }
-
-
 def _charge_miss(
     requirement: str,
     rejections: Mapping[str, RuledClaim],
@@ -215,7 +207,7 @@ def attribute_case(
     this cannot disagree with the two numbers it explains about which
     requirements were lost.
     """
-    references = _references(case)
+    references = case.requirements_for(FRAMEWORK)
     applied = _by_requirement(block.claims)
     rejections = _by_requirement(block.rejected_claims)
     scope = {entry.unit: entry for entry in block.scope}

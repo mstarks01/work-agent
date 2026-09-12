@@ -167,7 +167,7 @@ def verb_keyed_frameworks() -> tuple[FrameworkName, ...]:
 def lane_verbs(framework: FrameworkName) -> tuple[LaneVerbs, ...]:
     """One package's exemplars, per lane, in the package's declared lane order."""
     loader = MarkdownLoader(DEFAULT_FRAMEWORKS_DIR / framework)
-    record = _proposal_type(framework)
+    record = proposal_type(framework)
     lanes = []
     for lane in package_for(framework).lanes:
         sections = split_sections(loader.load(lane_exemplars_doc(lane)))
@@ -271,7 +271,7 @@ def collisions(framework: FrameworkName) -> tuple[Collision, ...]:
     return tuple(found)
 
 
-def _proposal_type(framework: FrameworkName):
+def proposal_type(framework: FrameworkName):
     """The record one package's lane agent emits a claim as.
 
     Resolved through ``schemas_for`` rather than named, so each package's drafts

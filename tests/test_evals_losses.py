@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.claims import UnreconciledRuling
+from analysis_service.system_model import ModelIndex
 from evals.harness import losses
 from evals.harness.identity import SubsetVerbIdentity, endpoint_subset
 from evals.harness.ledger import Ledger
@@ -21,7 +21,7 @@ from evals.harness.losses import CAUSES, attribute_case, pooled
 from evals.harness.reference import load_case
 from evals.harness.scorer import score_case
 from evals.harness.triggers import case_trigger_recall
-from tests.eval_factories import draft_threat, promote
+from tests.eval_factories import draft_threat, promote, unreconciled
 from tests.test_evals_applicability import Block
 
 CASE_DIR = (
@@ -36,7 +36,7 @@ def case():
 
 @pytest.fixture(scope="module")
 def flows(case):
-    return {flow.id: (flow.source, flow.destination) for flow in case.model.data_flows}
+    return ModelIndex.of(case.model).flow_endpoints
 
 
 def charge(case, flows, drafts, produced, unreconciled=()):
@@ -221,11 +221,6 @@ class TestAKillDuringARepairIsChargedApartFromOneTheCriticArgued:
     re-asked claim is.
     """
 
-    def _fumbled(self, claim_id, kind="dropped"):
-        return UnreconciledRuling.of(
-            claim_id=claim_id, kind=kind, message="the first pass got this wrong"
-        )
-
     def test_a_kill_the_first_pass_ruled_cleanly_charges_no_re_ask(self, case, flows):
         reference = case.stride_claims()[0]
         draft = at(reference, 1, reference.verb)
@@ -241,7 +236,7 @@ class TestAKillDuringARepairIsChargedApartFromOneTheCriticArgued:
         draft = at(reference, 1, reference.verb)
 
         charged = charge(
-            case, flows, [draft], [], unreconciled=[self._fumbled(draft.id)]
+            case, flows, [draft], [], unreconciled=[unreconciled(draft.id)]
         )
 
         loss = by_index(charged)[0]
@@ -258,7 +253,7 @@ class TestAKillDuringARepairIsChargedApartFromOneTheCriticArgued:
             flows,
             [draft],
             [promote(draft)],
-            unreconciled=[self._fumbled(draft.id, "verdict-shape")],
+            unreconciled=[unreconciled(draft.id, "verdict-shape")],
         )
 
         loss = by_index(charged)[0]
@@ -266,7 +261,7 @@ class TestAKillDuringARepairIsChargedApartFromOneTheCriticArgued:
 
     def test_a_reference_no_draft_reached_has_no_ruling_to_charge(self, case, flows):
         """A mark naming a claim no row names annotates nothing."""
-        charged = charge(case, flows, [], [], unreconciled=[self._fumbled("stride-1")])
+        charged = charge(case, flows, [], [], unreconciled=[unreconciled("stride-1")])
 
         assert all(loss.re_ask == () for loss in charged.losses)
 
@@ -279,9 +274,9 @@ class TestAKillDuringARepairIsChargedApartFromOneTheCriticArgued:
             [draft],
             [],
             unreconciled=[
-                self._fumbled(draft.id),
-                self._fumbled(draft.id, "verdict-shape"),
-                self._fumbled(draft.id, "verdict-shape"),
+                unreconciled(draft.id),
+                unreconciled(draft.id, "verdict-shape"),
+                unreconciled(draft.id, "verdict-shape"),
             ],
         )
 
@@ -299,7 +294,7 @@ class TestAKillDuringARepairIsChargedApartFromOneTheCriticArgued:
         assert "first critic pass fumbled" not in capsys.readouterr().out
 
         losses.render(
-            [charge(case, flows, [draft], [], unreconciled=[self._fumbled(draft.id)])]
+            [charge(case, flows, [draft], [], unreconciled=[unreconciled(draft.id)])]
         )
         out = capsys.readouterr().out
         assert "first critic pass fumbled" in out
