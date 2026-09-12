@@ -117,13 +117,14 @@ from analysis_service.vendors import UPSTREAM_SLUG
 # none carries a default, for the reason ``max_active_jobs`` carries none: a
 # budget nobody has chosen is version 5's behaviour, and it is the defect this
 # version exists to end.
-# Version 7 adds ``[timeout_ms_by_upstream]``: a per-request timeout keyed by the
-# upstream slug a gateway request is pinned to, read where a tier's pin names
-# one. OpenAI's flex tier serves the same weights slower and its guide asks for
-# a timeout above ten minutes, so the shipped row states fifteen. Hard cutover
-# like the versions before it: the table is required, and a deployment that
-# wants no per-upstream timeout writes an empty one and means it.
-SUPPORTED_VERSION = 7
+# Version 8 adds ``[bounds_by_upstream]``: a per-request timeout and a job
+# deadline keyed by the upstream slug a gateway request is pinned to, read
+# where a tier's pin names one. OpenAI's flex tier serves the same weights
+# slower and its guide asks for a timeout above ten minutes, so the shipped row
+# states thirty minutes for both bounds. Hard cutover like the versions before
+# it: the table is required, and a deployment that wants no per-upstream bound
+# writes an empty one and means it.
+SUPPORTED_VERSION = 8
 
 _ENV_PREFIX = "ANALYSIS_"
 
@@ -146,6 +147,20 @@ class ResilienceConfigError(ValueError):
     """The resilience configuration is invalid or unusable."""
 
 
+class UpstreamBounds(BaseModel):
+    """The two durations a request pinned to one upstream reads instead of the base.
+
+    Both required, because a row that stated one and inherited the other would
+    be the shape that cuts a thirty-minute request at a fifteen-minute
+    deadline. A slow upstream is slow for the job as well as for the call.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    timeout_ms: int = Field(gt=0)
+    job_deadline_ms: int = Field(gt=0)
+
+
 class ResilienceConfig(BaseModel):
     """Validated retry, timeout and input bounds for one deployment.
 
@@ -166,12 +181,13 @@ class ResilienceConfig(BaseModel):
     version: int = Field(ge=1)
     attempts: int = Field(ge=1)
     timeout_ms: int = Field(gt=0)
-    #: The per-request timeout for a request pinned to a named upstream, in
-    #: milliseconds, keyed by the gateway's slug for it. Read by
-    #: :meth:`request_timeout_seconds` where a tier's ``[upstreams]`` pin names
-    #: a key here; ``timeout_ms`` stands for every other request. Required and
-    #: empty-able rather than defaulted, so a file states whether it has one.
-    timeout_ms_by_upstream: dict[str, int]
+    #: The bounds a request pinned to a named upstream reads, keyed by the
+    #: gateway's slug for it. :meth:`request_timeout_seconds` and
+    #: :meth:`deadline_seconds` read a row where a tier's ``[upstreams]`` pin
+    #: names its key; ``timeout_ms`` and ``job_deadline_ms`` stand for every
+    #: other request and job. Required and empty-able rather than defaulted, so
+    #: a file states whether it has one.
+    bounds_by_upstream: dict[str, UpstreamBounds]
     max_source_bytes: int = Field(gt=0)
     max_sources: int = Field(ge=1)
     job_deadline_ms: int = Field(gt=0)
@@ -183,22 +199,13 @@ class ResilienceConfig(BaseModel):
     global_max_tokens_per_window: int = Field(ge=1)
 
     @model_validator(mode="after")
-    def _check_upstream_timeouts(self) -> Self:
+    def _check_upstream_keys(self) -> Self:
         bad_keys = [
-            key
-            for key in self.timeout_ms_by_upstream
-            if not UPSTREAM_SLUG.fullmatch(key)
+            key for key in self.bounds_by_upstream if not UPSTREAM_SLUG.fullmatch(key)
         ]
         if bad_keys:
             raise ValueError(
-                f"timeout_ms_by_upstream keys {bad_keys} are not provider slugs"
-            )
-        bad_values = [
-            key for key, value in self.timeout_ms_by_upstream.items() if value <= 0
-        ]
-        if bad_values:
-            raise ValueError(
-                f"timeout_ms_by_upstream values for {bad_values} must be positive"
+                f"bounds_by_upstream keys {bad_keys} are not provider slugs"
             )
         return self
 
@@ -219,14 +226,33 @@ class ResilienceConfig(BaseModel):
             budget=RetryBudget(capacity=budget_capacity, ratio=self.retry_budget_ratio),
         )
 
-    def deadline_seconds(self) -> float:
+    def deadline_seconds(self, upstreams: Iterable[str] = ()) -> float:
         """The job deadline as ``asyncio`` wants it: seconds, not milliseconds.
+
+        ``upstreams`` is everything the deployment's bound tiers are pinned
+        to, from :meth:`~analysis_service.model_tiers.ModelTierConfig.pinned_upstreams`.
+        Where any of them has a row in :attr:`bounds_by_upstream`, the largest
+        row's deadline is the bound, for the reason
+        :meth:`request_timeout_seconds` gives; otherwise ``job_deadline_ms``.
 
         The file is in milliseconds to match ``timeout_ms`` beside it — one unit
         for every duration an operator edits — and the conversion lives here so
         no caller has to remember which of the two it is holding.
         """
-        return self.job_deadline_ms / 1000
+        return self._pinned("job_deadline_ms", upstreams, self.job_deadline_ms) / 1000
+
+    def _pinned(self, bound: str, upstreams: Iterable[str], base: int) -> int:
+        """The largest row for ``bound`` among ``upstreams``, else ``base``.
+
+        The one reader of the table for both durations, so the two cannot
+        disagree about which pinned upstream wins.
+        """
+        rows = [
+            getattr(self.bounds_by_upstream[name], bound)
+            for name in upstreams
+            if name in self.bounds_by_upstream
+        ]
+        return max(rows, default=base)
 
     def budget_policy(self) -> BudgetPolicy:
         """The per-window bounds, as the value admission checks against."""
@@ -248,10 +274,10 @@ class ResilienceConfig(BaseModel):
 
         ``upstreams`` is what the tier's request is pinned to, from the tiers
         file's ``[upstreams]`` table. Where any of them has a row in
-        :attr:`timeout_ms_by_upstream`, the largest such row is the bound,
-        because the slowest upstream a request may land on is the one the
-        timeout has to fit. Where none has a row, ``timeout_ms`` stands, and a
-        direct vendor pins nothing so it always reads that.
+        :attr:`bounds_by_upstream`, the largest such row's timeout is the
+        bound, because the slowest upstream a request may land on is the one
+        the timeout has to fit. Where none has a row, ``timeout_ms`` stands,
+        and a direct vendor pins nothing so it always reads that.
 
         The sibling of :meth:`deadline_seconds`, and it exists for the reason
         that one gives: the file states every duration in milliseconds, so the
@@ -274,12 +300,7 @@ class ResilienceConfig(BaseModel):
         what LiteLLM receives, rather than asserting this number against a
         second copy of itself.
         """
-        pinned = [
-            self.timeout_ms_by_upstream[name]
-            for name in upstreams
-            if name in self.timeout_ms_by_upstream
-        ]
-        return max(pinned, default=self.timeout_ms) / 1000
+        return self._pinned("timeout_ms", upstreams, self.timeout_ms) / 1000
 
 
 def _override(
@@ -320,7 +341,7 @@ def load_resilience(
             " 'job_deadline_ms', 'retry_budget_ratio', 'max_active_jobs',"
             " 'budget_window_seconds', 'max_jobs_per_window',"
             " 'max_tokens_per_window', 'global_max_tokens_per_window' and the"
-            " 'timeout_ms_by_upstream' table"
+            " 'bounds_by_upstream' table"
         )
 
     overrides = {

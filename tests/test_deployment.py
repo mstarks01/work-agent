@@ -364,13 +364,16 @@ def test_a_declared_upstream_rides_the_adapter_as_the_request_body_pin():
     }
 
 
-def test_a_pin_on_a_slow_upstream_reads_that_upstream_timeout():
+def test_a_pin_on_a_slow_upstream_reads_that_upstream_bounds():
     """The flex row in ``config/resilience.toml``, read through the pin."""
     env = OPENROUTER_ENV | {"ANALYSIS_MODEL_UPSTREAMS_OPENROUTER": "openai/flex"}
-    pipeline = Deployment.from_env(env=env).pipeline(DEFAULT_FRAMEWORKS)
+    deployment = Deployment.from_env(env=env)
+    pipeline = deployment.pipeline(DEFAULT_FRAMEWORKS)
     nodes = {node.name: node for node in pipeline.workflow.graph.nodes}
 
-    assert translator_of(nodes[CRITIC_NODE].model)._additional_args["timeout"] == 900.0
+    assert translator_of(nodes[CRITIC_NODE].model)._additional_args["timeout"] == 1800.0
+    assert deployment.job_deadline_seconds() == 1800.0
+    assert deployment.tiers.pinned_upstreams() == ("openai/flex",)
 
 
 def test_a_pin_on_an_upstream_with_no_row_reads_the_base_timeout():
@@ -379,6 +382,7 @@ def test_a_pin_on_an_upstream_with_no_row_reads_the_base_timeout():
     nodes = {node.name: node for node in pipeline.workflow.graph.nodes}
 
     assert translator_of(nodes[CRITIC_NODE].model)._additional_args["timeout"] == 300.0
+    assert Deployment.from_env(env=env).job_deadline_seconds() == 900.0
 
 
 def test_an_unpinned_gateway_and_a_direct_vendor_send_no_pin():
@@ -887,7 +891,8 @@ def test_the_app_enforces_the_bounds_its_deployment_configured():
     app = create_app(deployment=deployment, store=InMemoryJobStore(), verifier=object())
 
     assert app.state.max_active_jobs == deployment.resilience.max_active_jobs
-    assert app.state.job_deadline_seconds == deployment.resilience.deadline_seconds()
+    assert app.state.job_deadline_seconds == deployment.job_deadline_seconds()
+    assert app.state.job_deadline_seconds == 900.0
     assert app.state.limits == deployment.resilience.source_limits()
 
 

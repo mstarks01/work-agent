@@ -497,6 +497,21 @@ class ModelTierConfig(BaseModel):
         """
         return self.upstreams.get(vendor, ())
 
+    def pinned_upstreams(self) -> tuple[str, ...]:
+        """Every upstream a bound tier's request is pinned to, without repeats.
+
+        What a job-wide bound reads: the deadline covers every tier a job runs
+        on, so the slowest pinned upstream anywhere in the deployment is the
+        one it has to fit. Empty where nothing is pinned.
+        """
+        return tuple(
+            dict.fromkeys(
+                name
+                for vendor in self.bound_vendors
+                for name in self.upstreams_for(vendor)
+            )
+        )
+
     def charge_mode(self, vendor: VendorName) -> ChargeMode | None:
         """The charge arrangement this deployment runs under for one vendor.
 

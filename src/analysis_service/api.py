@@ -569,7 +569,7 @@ def create_app(
         job_deadline_seconds,
         deployment,
         "job_deadline_seconds",
-        lambda d: d.resilience.deadline_seconds(),
+        lambda d: d.job_deadline_seconds(),
     )
     app.state.max_active_jobs = _setting(
         max_active_jobs,

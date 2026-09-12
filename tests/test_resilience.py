@@ -45,8 +45,9 @@ VALID = (
     "max_jobs_per_window = 30\n"
     "max_tokens_per_window = 20000000\n"
     "global_max_tokens_per_window = 100000000\n"
-    "[timeout_ms_by_upstream]\n"
-    '"openai/flex" = 900000\n'
+    '[bounds_by_upstream."openai/flex"]\n'
+    "timeout_ms = 1800000\n"
+    "job_deadline_ms = 1800000\n"
 )
 
 
@@ -70,7 +71,9 @@ def config(**kwargs: Any) -> ResilienceConfig:
         "max_jobs_per_window": 30,
         "max_tokens_per_window": 20000000,
         "global_max_tokens_per_window": 100000000,
-        "timeout_ms_by_upstream": {"openai/flex": 900000},
+        "bounds_by_upstream": {
+            "openai/flex": {"timeout_ms": 1800000, "job_deadline_ms": 1800000}
+        },
     }
     return ResilienceConfig(**(fields | kwargs))
 
@@ -154,56 +157,90 @@ def test_the_request_timeout_converts_like_the_deadline_does():
     assert loaded.deadline_seconds() == 900.0
 
 
-class TestATimeoutKeyedByUpstream:
-    """A request pinned to a slow upstream reads that upstream's own bound."""
+class TestBoundsKeyedByUpstream:
+    """A request pinned to a slow upstream reads that upstream's own bounds."""
 
-    def test_the_shipped_file_states_fifteen_minutes_for_openai_flex(self):
+    FLEX = '[bounds_by_upstream."openai/flex"]\n'
+
+    @staticmethod
+    def rows(**rows):
+        return {
+            name: {"timeout_ms": timeout, "job_deadline_ms": deadline}
+            for name, (timeout, deadline) in rows.items()
+        }
+
+    def test_the_shipped_file_states_thirty_minutes_for_openai_flex(self):
         loaded = load_resilience(CONFIG_PATH, env={})
-        assert loaded.timeout_ms_by_upstream == {"openai/flex": 900000}
-        assert loaded.request_timeout_seconds(("openai/flex",)) == 900.0
+        flex = loaded.bounds_by_upstream["openai/flex"]
+        assert (flex.timeout_ms, flex.job_deadline_ms) == (1800000, 1800000)
+        assert loaded.request_timeout_seconds(("openai/flex",)) == 1800.0
+        assert loaded.deadline_seconds(("openai/flex",)) == 1800.0
 
-    def test_an_unpinned_request_reads_the_base_timeout(self):
+    def test_an_unpinned_request_and_job_read_the_base_bounds(self):
         assert config().request_timeout_seconds() == 300.0
+        assert config().deadline_seconds() == 900.0
         assert config().request_timeout_seconds(()) == 300.0
+        assert config().deadline_seconds(()) == 900.0
 
-    def test_a_pin_with_no_row_reads_the_base_timeout(self):
+    def test_a_pin_with_no_row_reads_the_base_bounds(self):
         assert config().request_timeout_seconds(("openai",)) == 300.0
+        assert config().deadline_seconds(("openai",)) == 900.0
 
-    def test_the_slowest_pinned_upstream_bounds_the_request(self):
-        loaded = config(timeout_ms_by_upstream={"openai/flex": 900000, "azure": 400000})
+    def test_the_slowest_pinned_upstream_bounds_both_durations(self):
+        loaded = config(
+            bounds_by_upstream=self.rows(
+                **{"openai/flex": (900000, 1200000), "azure": (400000, 1500000)}
+            )
+        )
         assert loaded.request_timeout_seconds(("azure", "openai/flex")) == 900.0
+        assert loaded.deadline_seconds(("azure", "openai/flex")) == 1500.0
         assert loaded.request_timeout_seconds(("azure",)) == 400.0
 
     def test_a_row_may_sit_below_the_base_and_wins_anyway(self):
         """Configurable means the row is the answer, not a floor over the base."""
-        loaded = config(timeout_ms_by_upstream={"openai/flex": 120000})
+        loaded = config(
+            bounds_by_upstream=self.rows(**{"openai/flex": (120000, 60000)})
+        )
         assert loaded.request_timeout_seconds(("openai/flex",)) == 120.0
+        assert loaded.deadline_seconds(("openai/flex",)) == 60.0
 
-    def test_the_base_override_never_touches_a_row(self, tmp_path):
-        loaded = load_resilience(write(tmp_path, VALID), env={TIMEOUT_MS_VAR: "60000"})
+    def test_the_base_overrides_never_touch_a_row(self, tmp_path):
+        loaded = load_resilience(
+            write(tmp_path, VALID),
+            env={TIMEOUT_MS_VAR: "60000", JOB_DEADLINE_MS_VAR: "120000"},
+        )
         assert loaded.request_timeout_seconds() == 60.0
-        assert loaded.request_timeout_seconds(("openai/flex",)) == 900.0
+        assert loaded.deadline_seconds() == 120.0
+        assert loaded.request_timeout_seconds(("openai/flex",)) == 1800.0
+        assert loaded.deadline_seconds(("openai/flex",)) == 1800.0
 
     def test_the_table_is_required_rather_than_defaulted(self, tmp_path):
-        without = VALID.replace(
-            '[timeout_ms_by_upstream]\n"openai/flex" = 900000\n', ""
-        )
-        with pytest.raises(ResilienceConfigError, match="timeout_ms_by_upstream"):
+        without = VALID[: VALID.index(self.FLEX)]
+        with pytest.raises(ResilienceConfigError, match="bounds_by_upstream"):
             load_resilience(write(tmp_path, without), env={})
 
     def test_an_empty_table_is_a_stated_choice(self, tmp_path):
-        without = VALID.replace('"openai/flex" = 900000\n', "")
-        loaded = load_resilience(write(tmp_path, without), env={})
+        empty = VALID[: VALID.index(self.FLEX)] + "[bounds_by_upstream]\n"
+        loaded = load_resilience(write(tmp_path, empty), env={})
         assert loaded.request_timeout_seconds(("openai/flex",)) == 300.0
+        assert loaded.deadline_seconds(("openai/flex",)) == 900.0
+
+    def test_a_row_states_both_bounds_or_is_refused(self, tmp_path):
+        """A row that raised one bound alone would cut a long request at the other."""
+        one_bound = VALID.replace("job_deadline_ms = 1800000\n", "")
+        with pytest.raises(ResilienceConfigError, match="job_deadline_ms"):
+            load_resilience(write(tmp_path, one_bound), env={})
 
     @pytest.mark.parametrize("key", ["OpenAI/Flex", "openai/", "a b"])
     def test_a_key_that_is_not_a_slug_is_refused(self, key):
         with pytest.raises(ValueError, match="not provider slugs"):
-            config(timeout_ms_by_upstream={key: 1000})
+            config(bounds_by_upstream=self.rows(**{key: (1000, 1000)}))
 
-    def test_a_non_positive_row_is_refused(self):
-        with pytest.raises(ValueError, match="must be positive"):
-            config(timeout_ms_by_upstream={"openai/flex": 0})
+    @pytest.mark.parametrize("bound", ["timeout_ms", "job_deadline_ms"])
+    def test_a_non_positive_bound_is_refused(self, bound):
+        row = {"timeout_ms": 1000, "job_deadline_ms": 1000, bound: 0}
+        with pytest.raises(ValueError):
+            config(bounds_by_upstream={"openai/flex": row})
 
 
 def test_a_sub_second_timeout_survives_the_conversion():
@@ -407,7 +444,7 @@ def test_a_missing_file_fails_closed(tmp_path):
 
 def test_an_unknown_key_fails_closed(tmp_path):
     # Before the table header, because a key after one belongs to the table.
-    path = write(tmp_path, VALID.replace("[timeout_ms", "budget = 9\n[timeout_ms", 1))
+    path = write(tmp_path, VALID.replace("[bounds_by", "budget = 9\n[bounds_by", 1))
     with pytest.raises(ResilienceConfigError):
         load_resilience(path, env={})
 

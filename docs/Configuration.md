@@ -770,8 +770,9 @@ implies a provider was tried.
 `max_sources = 10`, `job_deadline_ms = 900000`, `retry_budget_ratio = 0.1`,
 `max_active_jobs = 3`, `budget_window_seconds = 3600`,
 `max_jobs_per_window = 30`, `max_tokens_per_window = 20000000`,
-`global_max_tokens_per_window = 100000000`, and a `[timeout_ms_by_upstream]`
-table holding `"openai/flex" = 900000` (`version = 7`). On library
+`global_max_tokens_per_window = 100000000`, and a `[bounds_by_upstream]` table
+whose one row gives `openai/flex` a `timeout_ms` and a `job_deadline_ms` of
+`1800000` each (`version = 8`). On library
 defaults the LLM nodes never retry and never time out, so a single 429 kills a
 paid-for job; two more bound what one job may carry, the deadline bounds how
 long one may run, and the ceiling bounds how many one caller may run at once.
@@ -883,17 +884,20 @@ caller — that is the evidence for sizing `timeout_ms`, which is still oversize
 against measured latency but needs a p99 across real submissions rather than a
 single trace.
 
-**A request pinned to a slow upstream reads its own timeout.** The
-`[timeout_ms_by_upstream]` table is keyed by the gateway's slug for an upstream,
-and it is read only where a tier's `[upstreams]` pin in the tiers file names a
-key in it. Where a pin names several upstreams with rows, the largest row is
-the bound. Every other request reads `timeout_ms`. OpenAI's flex tier serves
-the same weights at half the price and slower, and its guide asks for a timeout
-above ten minutes, so the shipped row states fifteen. Edit the row for another
-bound. `ANALYSIS_TIMEOUT_MS` sets `timeout_ms` alone and never a row. The job
-deadline is not scaled with it: a fifteen-minute request under a fifteen-minute
-deadline is cut by the deadline first, so raise `ANALYSIS_JOB_DEADLINE_MS` when
-you pin a slow upstream.
+**A request pinned to a slow upstream reads its own bounds.** The
+`[bounds_by_upstream]` table is keyed by the gateway's slug for an upstream, and
+each row states a `timeout_ms` and a `job_deadline_ms`. A row is read only where
+a tier's `[upstreams]` pin in the tiers file names its key. The timeout applies
+to that tier's requests, and the deadline to every job of a deployment that
+pins the upstream on any bound tier, because a slow upstream is slow for the
+job as well as for the call. Where pins name several rows, the largest row is
+the bound for each duration. Every other request and job reads `timeout_ms`
+and `job_deadline_ms`. OpenAI's flex tier serves the same weights at half the
+price and slower, and its guide asks for a timeout above ten minutes, so the
+shipped row states thirty minutes for both. Edit the row for another bound. A
+row states both bounds or is refused, so a long request is never cut by a
+shorter deadline the row did not raise. `ANALYSIS_TIMEOUT_MS` and
+`ANALYSIS_JOB_DEADLINE_MS` set the base values alone and never a row.
 
 `attempts` is a **total** count, and it is now literally the request count per
 node. It did not used to be, and that gap was the 429 storm. On the OpenAI/Azure
@@ -1047,10 +1051,10 @@ it with a measurement — see [Tuning the models](../evals/TUNING.md).
 | Variable | Effect |
 | --- | --- |
 | `ANALYSIS_RETRY_ATTEMPTS` | Total attempts per LLM call. |
-| `ANALYSIS_TIMEOUT_MS` | Per-request timeout, milliseconds, for a request pinned to no upstream with a row in `[timeout_ms_by_upstream]`. |
+| `ANALYSIS_TIMEOUT_MS` | Per-request timeout, milliseconds, for a request pinned to no upstream with a row in `[bounds_by_upstream]`. |
 | `ANALYSIS_MAX_SOURCE_BYTES` | Total UTF-8 bytes across all of a job's sources. |
 | `ANALYSIS_MAX_SOURCES` | How many sources one job may carry. |
-| `ANALYSIS_JOB_DEADLINE_MS` | Wall-clock budget for one whole job, milliseconds. Turn it down to shed load. |
+| `ANALYSIS_JOB_DEADLINE_MS` | Wall-clock budget for one whole job, milliseconds, where no pinned upstream has a row in `[bounds_by_upstream]`. Turn it down to shed load. |
 | `ANALYSIS_RETRY_BUDGET_RATIO` | Retries as a share of successful requests. Turn it down to give up sooner under sustained failure. |
 | `ANALYSIS_BUDGET_WINDOW_SECONDS` | Width of the rolling budget window. |
 | `ANALYSIS_MAX_JOBS_PER_WINDOW` | Jobs one subject may start per window. Turn it down to shed load. |
