@@ -38,10 +38,12 @@ here, and the number that could veto the generator-critic pattern outright is
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections import Counter
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from analysis_service.claims import FrameworkAnalysis
 from analysis_service.frameworks.stride.record import DraftThreat, StrideCategory
 from evals.harness.identity import Matcher
 from evals.harness.ledger import Ledger
@@ -85,6 +87,13 @@ class KilledDraft:
     claim: str
     disposition: Disposition
     reference_index: int | None
+    #: The step the critic said it rejected the draft at, off the block's own
+    #: verdict: ``lane``, ``reasoning``, ``duplicate``, ``evidence`` and the
+    #: rest of :data:`~analysis_service.claims.RejectionStep`. ``None`` where
+    #: the block carries no verdict for the draft, which is a kill the record
+    #: cannot explain and is counted under its own key rather than folded into
+    #: a step the critic never named.
+    cause: str | None = None
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -93,6 +102,7 @@ class KilledDraft:
             "claim": self.claim,
             "disposition": self.disposition,
             "reference_index": self.reference_index,
+            "cause": self.cause,
         }
 
 
@@ -111,6 +121,9 @@ class CriticYield:
     must_find_before: int
     must_find_after: int
     must_find_total: int
+    #: The references the post-critic score matched, so a kill can be read as
+    #: gross (the draft that had matched died) or net (nothing took its place).
+    matched_after_indices: frozenset[int] = frozenset()
 
     # --- the two numbers that matter -------------------------------------
 
@@ -129,6 +142,30 @@ class CriticYield:
         )
 
     @property
+    def matched_lost(self) -> int:
+        """Of :attr:`matched_killed`, the kills whose reference no surviving
+        claim took: the net destruction. A killed draft's reference can be
+        matched again by another draft after the critic, and the first
+        Baseline had two such kills read as two destroyed findings while the
+        report still carried both. ``matched_killed`` stays the gross count."""
+        return sum(
+            1
+            for draft in self.killed
+            if draft.disposition.startswith("matched")
+            and draft.reference_index not in self.matched_after_indices
+        )
+
+    @property
+    def must_find_lost(self) -> int:
+        """The net form of :attr:`must_find_killed`."""
+        return sum(
+            1
+            for draft in self.killed
+            if draft.disposition == "matched-must-find"
+            and draft.reference_index not in self.matched_after_indices
+        )
+
+    @property
     def must_find_killed(self) -> int:
         """The sharpest form of the veto: a killed draft that had answered a
         reference the Tier 2 gate depends on."""
@@ -137,6 +174,27 @@ class CriticYield:
         )
 
     # --- rates, all rule-and-ledger-relative ------------------------------
+
+    @property
+    def killed_by_cause(self) -> dict[str, dict[str, int]]:
+        """Every kill by the step the critic named, and what each step cost.
+
+        The critic states why it rejected a draft, and nothing counted it: the
+        second Baseline's four must-find kills were three ``reasoning`` and one
+        ``lane``, read by hand. Per step, the kills, the ones that had matched a
+        reference, and the ones that had answered a must-find, so a prompt
+        change that moves the critic's reasoning kills is visible as that and
+        not as a bare count. An unexplained kill is keyed ``unstated``.
+        """
+        by_cause: dict[str, dict[str, int]] = {}
+        for draft in self.killed:
+            entry = by_cause.setdefault(
+                draft.cause or "unstated", {"killed": 0, "matched": 0, "must_find": 0}
+            )
+            entry["killed"] += 1
+            entry["matched"] += draft.disposition.startswith("matched")
+            entry["must_find"] += draft.disposition == "matched-must-find"
+        return dict(sorted(by_cause.items()))
 
     @property
     def kill_count(self) -> int:
@@ -188,6 +246,8 @@ class CriticYield:
                 "must_find_after": self.must_find_after,
                 "must_find_total": self.must_find_total,
                 "must_find_killed": self.must_find_killed,
+                "matched_lost": self.matched_lost,
+                "must_find_lost": self.must_find_lost,
             },
             "metrics": {
                 "kill_rate": round(self.kill_rate, 3),
@@ -195,6 +255,7 @@ class CriticYield:
                 "matched_kill_rate": round(self.matched_kill_rate, 3),
                 "kill_precision": round(self.kill_precision, 3),
             },
+            "killed_by_cause": self.killed_by_cause,
             "killed": [draft.to_json() for draft in self.killed],
         }
 
@@ -213,21 +274,48 @@ def score_case_with_yield(
     produced: Sequence[DraftThreat],
     matcher: Matcher,
     votes: Ledger,
+    block: FrameworkAnalysis | None = None,
 ) -> ScoredCase:
     """Score both sides of the critic through one matcher and one ledger.
 
     ``score`` is the post-critic score the rest of the harness already
     reports — identical to what :func:`score_case` alone would have returned,
     because the rule is deterministic and both passes read one ledger.
+
+    ``block`` is the report's own framework block, read for the one fact the
+    drafts do not carry: the step the critic said it rejected each killed draft
+    at. Without it every kill is ``unstated``.
     """
     pre = score_case(case, drafts, matcher, votes)
     post = score_case(case, produced, matcher, votes)
-    return ScoredCase(score=post, critic_yield=_yield(pre, post, drafts))
+    return ScoredCase(
+        score=post, critic_yield=_yield(pre, post, drafts, rejection_steps(block))
+    )
+
+
+def rejection_steps(block: FrameworkAnalysis | None) -> dict[str, str]:
+    """Each rejected claim's stated step, keyed by claim ID, off the block's verdicts.
+
+    The one reader of ``rejected_because`` for this instrument. A rejected
+    claim whose verdict names no step is absent here, so its kill reads
+    ``unstated`` rather than a step the critic never wrote.
+    """
+    if block is None:
+        return {}
+    return {
+        claim.id: claim.verdict.rejected_because
+        for claim in block.rejected_claims
+        if claim.verdict.rejected_because is not None
+    }
 
 
 def _yield(
-    pre: CaseScore, post: CaseScore, drafts: Sequence[DraftThreat]
+    pre: CaseScore,
+    post: CaseScore,
+    drafts: Sequence[DraftThreat],
+    steps: Mapping[str, str] | None = None,
 ) -> CriticYield:
+    steps = steps or {}
     surviving = set(post.produced_ids)
     dispositions = _dispositions(pre)
     killed = tuple(
@@ -237,6 +325,7 @@ def _yield(
             claim=candidate_claim(draft),
             disposition=dispositions[draft.id][0],
             reference_index=dispositions[draft.id][1],
+            cause=steps.get(draft.id),
         )
         for draft in drafts
         if draft.id not in surviving
@@ -253,6 +342,7 @@ def _yield(
         must_find_before=pre.must_find_matched,
         must_find_after=post.must_find_matched,
         must_find_total=pre.must_find_total,
+        matched_after_indices=frozenset(pair.reference_index for pair in post.matched),
     )
 
 
@@ -296,6 +386,12 @@ def aggregate_yield(yields: Sequence[CriticYield]) -> dict[str, Any]:
     matched_before = sum(entry.matched_before for entry in yields)
     matched_killed = sum(entry.matched_killed for entry in yields)
     must_find_killed = sum(entry.must_find_killed for entry in yields)
+    matched_lost = sum(entry.matched_lost for entry in yields)
+    must_find_lost = sum(entry.must_find_lost for entry in yields)
+    by_cause: dict[str, Counter[str]] = {}
+    for entry in yields:
+        for cause, counts in entry.killed_by_cause.items():
+            by_cause.setdefault(cause, Counter()).update(counts)
     return {
         "cases": len(yields),
         "drafts_in": drafts_in,
@@ -304,10 +400,17 @@ def aggregate_yield(yields: Sequence[CriticYield]) -> dict[str, Any]:
         "rejected_killed": rejected_killed,
         "matched_killed": matched_killed,
         "must_find_killed": must_find_killed,
+        "matched_lost": matched_lost,
+        "must_find_lost": must_find_lost,
         "kill_rate": round(ratio(killed, drafts_in), 3),
         "rejected_kill_rate": round(ratio(rejected_killed, rejected_before), 3),
         "matched_kill_rate": round(ratio(matched_killed, matched_before), 3),
         "kill_precision": round(ratio(rejected_killed, killed), 3),
+        # Every kill by the step the critic named, pooled; the per-step
+        # ``matched`` and ``must_find`` are what a step cost.
+        "killed_by_cause": {
+            cause: dict(counts) for cause, counts in sorted(by_cause.items())
+        },
     }
 
 
@@ -323,7 +426,8 @@ def render(yields: Sequence[CriticYield]) -> None:
             f"{entry.case_id:<26} critic {entry.drafts_in}->{entry.threats_out}"
             f"  killed-rejected {entry.rejected_killed}/{entry.rejected_before}"
             f"  killed-real {entry.matched_killed}/{entry.matched_before}"
-            f"  (must-find {entry.must_find_killed})"
+            f"  (must-find {entry.must_find_killed}, lost for good"
+            f" {entry.matched_lost})"
         )
     if yields:
         totals = aggregate_yield(yields)
@@ -332,8 +436,19 @@ def render(yields: Sequence[CriticYield]) -> None:
             f" ({totals['kill_rate']:.0%}),"
             f" rejected caught {totals['rejected_kill_rate']:.0%},"
             f" real destroyed {totals['matched_kill_rate']:.0%}"
+            f" of which lost for good {totals['matched_lost']}"
+            f" (must-find {totals['must_find_lost']})"
             " (instrument, non-gating)"
         )
+        if totals["killed_by_cause"]:
+            print(
+                "  by the step the critic named: "
+                + ", ".join(
+                    f"{cause} {counts['killed']} (matched {counts['matched']},"
+                    f" must-find {counts['must_find']})"
+                    for cause, counts in totals["killed_by_cause"].items()
+                )
+            )
 
 
 def artifact(yields: Sequence[CriticYield]) -> dict[str, Any]:

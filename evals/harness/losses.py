@@ -22,6 +22,10 @@ Five causes, decided in this order for one missed reference:
   scorer assigned it to a sibling reference. Two references at
   one place under one action are the merges ``verbs.UNSEPARATED`` records,
   and the loss is the corpus's to rule on rather than the lane's.
+* ``misfiled``: a surviving claim in another lane cites the place with the
+  reference's action — the scorer's own lane error. The finding was written and
+  filed under the wrong category, which is a routing fix and neither a lead nor
+  a verb; charging it to ``place`` hid it behind the lane's silence.
 * ``critic``: no surviving claim cites the place, but a draft the critic
   rejected did, with the reference's action. The finding was written and killed.
 * ``place``: a candidate rule led the lane to the reference's elements and no
@@ -66,8 +70,8 @@ from evals.harness.triggers import case_trigger_recall
 from evals.harness.verbs import same_action
 
 #: The causes a miss is charged to, in the order they are decided.
-Cause = Literal["verb", "merged", "critic", "place", "unled"]
-CAUSES: tuple[Cause, ...] = ("verb", "merged", "critic", "place", "unled")
+Cause = Literal["verb", "merged", "misfiled", "critic", "place", "unled"]
+CAUSES: tuple[Cause, ...] = ("verb", "merged", "misfiled", "critic", "place", "unled")
 
 
 @dataclass(frozen=True)
@@ -79,9 +83,9 @@ class Loss:
     must_find: bool
     cause: Cause
     reference_verb: str
-    #: The surviving claim at the reference's place, for a ``verb`` or a
-    #: ``merged`` loss, or the rejected draft there for a ``critic`` one.
-    #: Absent otherwise.
+    #: The surviving claim at the reference's place, for a ``verb``, a
+    #: ``merged`` or a ``misfiled`` loss, or the rejected draft there for a
+    #: ``critic`` one. Absent otherwise.
     draft_id: str | None = None
     draft_verb: str | None = None
     #: What the *first* critic pass got wrong on ``draft_id``, from
@@ -205,6 +209,11 @@ def attribute_case(
     }
     hits = case_trigger_recall(case, "stride").hits
     surviving = {claim.id for claim in produced}
+    # The scorer's own record of a finding filed in the wrong lane, keyed by
+    # the reference it answers; read here rather than re-derived, so this and
+    # ``lane_accuracy`` cannot disagree about which misses are misfiled.
+    misfiled = {error.reference_index: error for error in score.lane_errors}
+    by_id = {claim.id: claim for claim in produced}
     losses: list[Loss] = []
     for index in score.missed:
         reference = references[index]
@@ -228,6 +237,21 @@ def attribute_case(
                     draft_id=claim.id,
                     draft_verb=claim.verb,
                     re_ask=block.re_ask_kinds(claim.id),
+                )
+            )
+            continue
+        if index in misfiled:
+            error = misfiled[index]
+            losses.append(
+                Loss(
+                    index,
+                    lane,
+                    index in must_find,
+                    "misfiled",
+                    verb,
+                    draft_id=error.threat_id,
+                    draft_verb=by_id[error.threat_id].verb,
+                    re_ask=block.re_ask_kinds(error.threat_id),
                 )
             )
             continue

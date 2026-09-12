@@ -328,3 +328,92 @@ def test_an_untouched_critic_yields_nothing_and_breaks_nothing(case):
     assert result.rejected_kill_rate == 0.0
     assert result.matched_kill_rate == 0.0
     assert result.to_json()["counts"]["drafts_in"] == 1
+
+
+def test_a_kill_another_draft_made_good_is_gross_but_not_lost(case):
+    """Two drafts at one reference; the critic kills one; the reference survives."""
+    reference = _must_find(case)
+    first = _draft_for(reference, 1)
+    second = _draft_for(reference, 2)
+    result = score_case_with_yield(
+        case,
+        [first, second],
+        [promote(second)],
+        _identity_matcher([first, second]),
+        Ledger(),
+    ).critic_yield
+
+    assert result.kill_count == 1
+    assert result.matched_killed == 1
+    assert result.matched_lost == 0
+    assert result.must_find_lost == 0
+    assert result.matched_after == 1
+
+
+def test_a_kill_nothing_made_good_is_lost(case):
+    reference = _must_find(case)
+    killed = _draft_for(reference, 1)
+    result = score_case_with_yield(
+        case, [killed], [], _identity_matcher([killed]), Ledger()
+    ).critic_yield
+
+    assert (result.matched_killed, result.matched_lost) == (1, 1)
+    assert (result.must_find_killed, result.must_find_lost) == (1, 1)
+
+
+def test_the_critic_stated_cause_rides_on_the_kill(case):
+    """Read off the block's own verdict; every kill without one is ``unstated``."""
+    reference = _must_find(case)
+    killed = _draft_for(reference, 1)
+    rejected = promote(
+        killed,
+        verdict=Verdict(
+            status="rejected", reason="not this lane", rejected_because="lane"
+        ),
+    )
+    block = (
+        _report_with(case, [])
+        .analyses[0]
+        .model_copy(update={"rejected_claims": [rejected]})
+    )
+    result = score_case_with_yield(
+        case, [killed], [], _identity_matcher([killed]), Ledger(), block
+    ).critic_yield
+
+    assert result.killed[0].cause == "lane"
+    assert result.killed_by_cause == {
+        "lane": {"killed": 1, "matched": 1, "must_find": 1}
+    }
+    assert aggregate_yield([result])["killed_by_cause"]["lane"]["must_find"] == 1
+
+    without = score_case_with_yield(
+        case, [killed], [], _identity_matcher([killed]), Ledger()
+    ).critic_yield
+    assert without.killed_by_cause == {
+        "unstated": {"killed": 1, "matched": 1, "must_find": 1}
+    }
+
+
+def test_the_net_kill_count_agrees_with_the_loss_instrument(case):
+    """Two readers of one fact — a must-find the critic lost for good — tested against each other."""
+    from analysis_service.system_model import ModelIndex
+    from evals.harness.identity import SubsetVerbIdentity
+    from evals.harness.losses import attribute_case
+    from tests.test_evals_applicability import Block
+
+    reference = _must_find(case)
+    killed = _draft_for(reference, 1)
+    saved = _draft_for(_expected(case), 2)
+    flows = ModelIndex.of(case.model).flow_endpoints
+    matcher = SubsetVerbIdentity({case.id: flows})
+    produced = [promote(saved)]
+    scored = score_case_with_yield(case, [killed, saved], produced, matcher, Ledger())
+    charged = attribute_case(
+        case, scored.score, [killed, saved], produced, flows, Block(produced)
+    )
+
+    critic_rows = [loss for loss in charged.losses if loss.cause == "critic"]
+    assert scored.critic_yield.must_find_lost == sum(
+        1 for loss in critic_rows if loss.must_find
+    )
+    assert scored.critic_yield.matched_lost == len(critic_rows)
