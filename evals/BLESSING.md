@@ -608,11 +608,11 @@ drop one of the two.
 
 `tests/test_case_review.py` fails on a new case that arrives with no submission
 clearing it, and its `UNREVIEWED` table says what each unread case leaves
-unchecked. Eleven of the 13 cases that shipped before this was enforced are
-still unread. The table is not the count — `evals.review_submission`
-derives that from the corpus and the merged submissions, so no list can disagree
-with it — and an entry for a case somebody has since read is spent and can be
-deleted.
+unchecked. Cases that shipped before this was enforced are still unread, and
+`uv run python webapp/sitting.py --list` names them. The table is not the
+count — `evals.review_submission` derives that from the corpus and the merged
+submissions, so no list can disagree with it — and an entry for a case somebody
+has since read is spent and can be deleted.
 
 **Why it cannot be replaced by a lint.** Review sitting 01 found a reference claim
 asserting the model emits training data in a case with no training pipeline. A
