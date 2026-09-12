@@ -49,3 +49,31 @@ Nobody has voted on this Baseline's findings, so every vote-dependent number bel
 | recall | must-find recall | rejected rate | writing objections |
 | --- | --- | --- | --- |
 | 0.467 | 0.479 | no votes yet | no votes yet |
+
+## Commit `fb9d7925584e`, corpus `b09805c6726d`
+
+1 baseline(s). Numbers in this section compare with each other and with nothing above or below it.
+
+### `fb9d792-gpt-5.6-terra-8a940b54`
+
+`strong`: `openrouter/openai/gpt-5.6-terra` via `OpenAI` · frameworks stride · 1 sweep(s) · $0.00 recorded · submitted by mstarks01
+
+Vote coverage: 0 of 103 unmatched finding(s) judged by a person.
+
+Nobody has voted on this Baseline's findings, so every vote-dependent number below reads `no votes yet`.
+
+**Series `maintainer`** — reads maintainer votes.
+
+`stride`
+
+| recall | must-find recall | rejected rate | writing objections |
+| --- | --- | --- | --- |
+| 0.473 | 0.518 | no votes yet | no votes yet |
+
+**Series `all`** — reads maintainer, contributor votes.
+
+`stride`
+
+| recall | must-find recall | rejected rate | writing objections |
+| --- | --- | --- | --- |
+| 0.473 | 0.518 | no votes yet | no votes yet |
