@@ -56,7 +56,7 @@ Nobody has voted on this Baseline's findings, so every vote-dependent number bel
 
 ### `503f2d8-gpt-5.6-terra-2f8a87a0`
 
-`strong`: `openrouter/openai/gpt-5.6-terra` via `OpenAI` · frameworks stride · 1 sweep(s) · $0.00 recorded · submitted by mstarks01
+`strong`: `openrouter/openai/gpt-5.6-terra` via `OpenAI` · frameworks stride · 1 sweep(s) · $2.41 reported by the provider · submitted by mstarks01
 
 Vote coverage: 0 of 110 unmatched finding(s) judged by a person.
 
@@ -84,7 +84,7 @@ Nobody has voted on this Baseline's findings, so every vote-dependent number bel
 
 ### `fb9d792-gpt-5.6-terra-8a940b54`
 
-`strong`: `openrouter/openai/gpt-5.6-terra` via `OpenAI` · frameworks stride · 1 sweep(s) · $0.00 recorded · submitted by mstarks01
+`strong`: `openrouter/openai/gpt-5.6-terra` via `OpenAI` · frameworks stride · 1 sweep(s) · $3.10 reported by the provider · submitted by mstarks01
 
 Vote coverage: 0 of 103 unmatched finding(s) judged by a person.
 

@@ -32,7 +32,17 @@ IDENTITY = {
 }
 
 
-def merged(root, name, *, identity=None, sweeps=1, cost=0.60, scores=None, voted=False):
+def merged(
+    root,
+    name,
+    *,
+    identity=None,
+    sweeps=1,
+    cost=0.60,
+    reported=None,
+    scores=None,
+    voted=False,
+):
     """One merged Baseline on disk, with as much scored detail as asked for."""
     directory = root / "evals" / "baselines" / name
     directory.mkdir(parents=True, exist_ok=True)
@@ -49,7 +59,8 @@ def merged(root, name, *, identity=None, sweeps=1, cost=0.60, scores=None, voted
             {
                 "artifact": f"{stem}.json",
                 "submitted_by": "ada",
-                "cost": {"actual_usd": cost},
+                "cost": {"actual_usd": cost}
+                | ({"reported_usd": reported} if reported is not None else {}),
             }
         )
     (directory / "baseline.json").write_text(
@@ -96,6 +107,35 @@ class TestARow:
         assert "`strong`: `openai/gpt-5.6`" in text
         assert "2 sweep(s)" in text
         assert "$1.00 recorded" in text
+
+    def test_a_gateway_row_prints_what_the_provider_said_it_charged(self, tmp_path):
+        """A route with no unit price has one real figure, and it is not zero.
+
+        `cost_usd` is arithmetic over recorded rates, and a gateway fronts many
+        providers at many rates, so there is nothing to compute. The provider's
+        own figure is all such a Baseline has; a row that printed the
+        arithmetic alone published a paid sweep as free.
+        """
+        merged(tmp_path, "gateway", cost=0.0, reported=2.41)
+        assert "$2.41 reported by the provider" in build(tmp_path)
+
+    def test_a_row_that_can_state_neither_figure_says_so_rather_than_zero(
+        self, tmp_path
+    ):
+        merged(tmp_path, "silent", cost=0.0)
+        text = build(tmp_path)
+        assert "no cost stated" in text
+        assert "$0.00" not in text
+
+    def test_a_row_holding_both_kinds_of_sweep_prints_both(self, tmp_path):
+        directory = merged(tmp_path, "mixed", cost=0.50)
+        manifest = json.loads((directory / "baseline.json").read_text())
+        manifest["sweeps"].append(
+            dict(manifest["sweeps"][0], cost={"actual_usd": 0.0, "reported_usd": 2.00})
+        )
+        (directory / "baseline.json").write_text(json.dumps(manifest))
+        text = build(tmp_path)
+        assert "$0.50 recorded + $2.00 reported by the provider" in text
 
     def test_it_names_the_submitter(self, tmp_path):
         merged(tmp_path, "one")
