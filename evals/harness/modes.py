@@ -710,6 +710,19 @@ def score_extraction(case: GoldenCase, result: ExtractionResult) -> ExtractionSc
     )
 
 
+def _singular(word: str) -> str:
+    """One word with a plural ``s`` dropped, so ``servers`` and ``server`` are one.
+
+    Deliberately crude: three letters of stem before the ``s``, and no other
+    ending. It serves a check that must not accuse, so under-stemming leaves a
+    pair looking different and over-stemming never invents a match that a
+    reader would dispute.
+    """
+    return (
+        word[:-1] if len(word) > 3 and word.endswith("s") and word[-2] != "s" else word
+    )
+
+
 def _unsourced(
     case: GoldenCase, extra: Sequence[str], extracted: SystemModel | None
 ) -> tuple[str, ...]:
@@ -720,6 +733,14 @@ def _unsourced(
     case's own source text, which over-credits a model that assembled a name
     from scattered words. The question this answers is whether the model
     *invented* a component, and a check that accuses one should be sure.
+
+    Singular and plural are one word here. A source writing "game servers",
+    "Analysts" and "dashboards" had a model's ``game server``, ``analyst`` and
+    ``dashboard`` read as three invented components on the first run that used
+    this — 3.5 a run, against a true count near zero. Which of the two forms an
+    extraction should write is the naming rule's question, and it is measured
+    as recall against the corpus; charging it a second time here as invention
+    would count one disagreement twice.
 
     **Only a component the text could name is asked.** An entity, a process and
     a data store are things a submitter describes, so a name absent from their
@@ -740,7 +761,7 @@ def _unsourced(
     if extracted is None:
         return ()
     text = re.sub(r"[^a-z0-9 ]", " ", " ".join(s.text for s in case.sources).lower())
-    words = set(text.split())
+    words = {_singular(word) for word in text.split()}
     by_id = {element.id: element for element in extracted.elements()}
     out = []
     for element_id in extra:
@@ -752,7 +773,7 @@ def _unsourced(
         tokens = [
             w for w in re.split(r"[^a-z0-9]+", element.name.lower()) if len(w) > 2
         ]
-        if tokens and not set(tokens) <= words:
+        if tokens and not {_singular(token) for token in tokens} <= words:
             out.append(element_id)
     return tuple(out)
 

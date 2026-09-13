@@ -1175,3 +1175,22 @@ def test_a_coined_flow_label_is_never_invention(case):
 
     assert score.extra, "the widened model should carry an extra flow"
     assert score.unsourced == ()
+
+
+def test_a_plural_in_the_source_covers_a_singular_name(case):
+    """The source's "game servers" sources a model's `game server`.
+
+    Which form to write is the naming rule's question and is already measured
+    as recall. Charging it here as invention counts one disagreement twice, and
+    it read three ordinary plurals as invented components before this.
+    """
+    raw = case.model.model_dump()
+    first = raw["processes"][0]
+    plural = first["name"] if first["name"].endswith("s") else first["name"] + "s"
+    raw["processes"].append(dict(first, id="process:pluralised", name=plural))
+    widened = type(case.model).model_validate(raw)
+
+    score = modes.score_extraction(case, modes.ExtractionResult(case.id, widened, ()))
+
+    assert score.extra, "the widened model should carry an extra process"
+    assert score.unsourced == ()
