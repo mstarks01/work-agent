@@ -109,7 +109,7 @@ def test_every_signed_draft_reaches_the_critic(fixtures, model):
 
 
 def test_the_critic_reads_the_recommendations_it_now_rules_on(fixtures, model):
-    """Step 4 needs the block, and the fixtures carry one each.
+    """The recommendation reading needs the block, and the fixtures carry one each.
 
     Read off each fixture's own mitigation rather than a string pinned here. A
     pinned string passes while every recommendation the critic reads describes

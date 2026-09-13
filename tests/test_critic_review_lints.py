@@ -242,42 +242,72 @@ def test_an_unsigned_set_is_named_rather_than_trusted():
 
 
 @pytest.mark.parametrize("fixture", ALL, ids=IDS)
-def test_every_mitigation_addresses_the_claim_it_sits_under(fixture):
-    """Step 4 of ``prompts/critic.md`` rules on the recommendation, so it has to be one.
+def test_a_recommendation_ruled_sound_is_about_this_claim(fixture):
+    """A fixture's own `recommendation_sound` decides which rule applies.
 
-    A critic obeying step 4 rejects a draft whose mitigation addresses
-    something other than its claim. So a placeholder recommendation — one whose
-    words are about this fixture file rather than about the claim — kills every
-    fixture expecting to survive, and ``valid_preserved`` reads 0 of 3 for a
-    reason that is an artefact of this file.
+    A package whose critic text rules on a draft's recommendation needs the
+    set to carry both kinds. Where the reader ruled the advice sound it has to be about this
+    claim, and the mechanical half of that is decidable: advice about this
+    claim names a place this claim is about, and advice about the harness
+    names the harness.
 
-    Relevance is a judgement and this does not make it. What it decides is the
-    mechanical half: a recommendation about this claim names a place this claim
-    is about, and a recommendation about the harness names the harness.
+    Where the reader ruled it unsound it is a deliberate distractor, and
+    :func:`test_an_unsound_recommendation_sits_on_a_draft_that_must_die` is
+    what holds it in place instead.
 
     Asked of a package whose drafts carry recommendations, which is a property
     of the record rather than a package's name: a package whose claims offer
-    none gives step 4 nothing to rule on, and this passes over it rather than
-    demanding a field its record does not declare.
+    none asks for no such judgement and reads nothing here.
     """
     draft = draft_of(fixture)
-    cited = set(draft.affected_element_ids)
     mitigations = getattr(draft, "mitigations", None)
     if mitigations is None:
         pytest.skip(f"{fixture.framework} claims carry no recommendations")
 
-    assert mitigations, f"{fixture.id}: step 4 has nothing to rule on"
+    assert mitigations, (
+        f"{fixture.id}: the recommendation reading has nothing to rule on"
+    )
     for mitigation in mitigations:
         words = f"{mitigation.summary} {mitigation.detail}".lower()
-        assert any(element_id.lower() in words for element_id in cited), (
-            f"{fixture.id}: a mitigation naming none of {sorted(cited)} is not"
-            " a recommendation about this claim"
-        )
         for term in ("fixture", "placeholder", "the critic now reads"):
             assert term not in words, (
-                f"{fixture.id}: a mitigation naming {term!r} describes this file"
-                " rather than the claim, which is what step 4 rejects a draft for"
+                f"{fixture.id}: a recommendation naming {term!r} describes this"
+                " file rather than the claim"
             )
+        if not fixture.expect.recommendation_sound:
+            continue
+        cited = set(draft.affected_element_ids)
+        assert any(element_id.lower() in words for element_id in cited), (
+            f"{fixture.id}: advice ruled sound that names none of"
+            f" {sorted(cited)} is not advice about this claim"
+        )
+
+
+def test_an_unsound_recommendation_sits_on_a_draft_that_must_die():
+    """The distractors, and the pair the set cannot yet carry.
+
+    **A plausible recommendation must not rescue an unsupported finding.** That
+    is what an unsound recommendation on a negative fixture measures: the
+    critic has to reject the claim for its own argument, and
+    :func:`test_no_mitigation_hands_a_negative_fixture_its_own_anchors` stops
+    it from reaching the anchors through the advice.
+
+    The converse — **a flawed recommendation must not erase a valid threat** —
+    needs a fixture that survives while carrying one, and the replay cannot
+    read it: a ruling carries no judgement on a recommendation, so a critic
+    that rejected a good claim over its advice and one that ruled correctly are
+    told apart only by the fate, which this set already pins for other reasons.
+    The fixture arrives with the observable, and this test names the hole until
+    then.
+    """
+    unsound = [entry for entry in ALL if not entry.expect.recommendation_sound]
+
+    assert unsound, "no distractor: the set cannot tell reading from rejecting"
+    assert all(not entry.expect.survives for entry in unsound), (
+        "a surviving fixture carrying unsound advice is the pair that proves a"
+        " flawed recommendation does not erase a valid threat. Nothing in a"
+        " ruling observes the recommendation yet, so add the observable with it"
+    )
 
 
 @pytest.mark.parametrize("fixture", ALL, ids=IDS)

@@ -33,17 +33,18 @@
       },
       "mitigations": [
         {
-          "summary": "Encrypt `store:orders-db` at rest, and apply the same key to its snapshots and disk images",
-          "detail": "The claim is about a copy taken outside the database, so a key that covers only the live volume leaves it open. Encrypt the store and every snapshot and image taken from it under one managed key, and hold that key where the storage layer cannot read it on its own."
+          "summary": "Check encryption coverage for orders-db and its backups, snapshots and disk images; enable it wherever absent",
+          "detail": "Nothing states whether `store:orders-db` is encrypted at rest, so the first step is to find out, across the live store and every copy taken from it. Enable it wherever it is absent. Which key arrangement to use is a separate decision this claim does not settle."
         }
       ]
     },
     "expect": {
       "survives": true,
-      "status": "needs-info"
+      "status": "needs-info",
+      "recommendation_sound": true
     },
     "rationale": "The ordinary argument, and it follows. Scoped to a copy the attacker obtains unencrypted rather than to anyone reaching storage: a backup may carry its own encryption, so the broader claim would assert something the model does not settle. It genuinely depends on the unknown, so it is conditional. This is the fixture that fails if the change is answered by rejecting everything conditional.",
-    "reviewed_by": null,
+    "reviewed_by": "mstarks01",
     "framework": "stride",
     "drafted_by": "agent-stand-in"
   },
@@ -91,17 +92,18 @@
       },
       "mitigations": [
         {
-          "summary": "Verify the signature on `flow:card-processor-to-storefront-api:settlement-webhook`, and confirm the payment with the processor before marking an order paid",
-          "detail": "Two steps, because the claim rests on two. A signature stops an attacker who can reach the public endpoint from writing the notification. An independent confirmation to the processor stops `process:storefront-api` from treating any single received message as proof of payment."
+          "summary": "Authenticate callbacks using the processor's supported verification mechanism, and validate payment details before updating the order",
+          "detail": "Use whatever verification the card processor supports for `flow:card-processor-to-storefront-api:settlement-webhook`; a signed callback is the usual form. Then have `process:storefront-api` check the payment details the callback carries against the order before it marks one paid, so authenticating the message and establishing the payment state stay two separate steps."
         }
       ]
     },
     "expect": {
       "survives": true,
-      "status": "needs-info"
+      "status": "needs-info",
+      "recommendation_sound": true
     },
     "rationale": "The source says the submitter would have to check how the callback is authenticated, so the unknown is real and the claim depends on it. The consequence is qualified on the API trusting the callback without verifying payment independently: callback authentication alone does not establish how payment state is updated, and the unqualified version asserts a second fact the model does not carry.",
-    "reviewed_by": null,
+    "reviewed_by": "mstarks01",
     "framework": "stride",
     "drafted_by": "agent-stand-in"
   },
@@ -153,10 +155,11 @@
         "moon",
         "orbit",
         "tidal"
-      ]
+      ],
+      "recommendation_sound": false
     },
     "rationale": "The audit's own reproduction. The ground resolves and the cited fact is real; the conclusion follows from it by no reading. The reason has to engage with the consequence rather than with the unknown, or the critic has rejected the right draft for a reason that would reject fixture 1 as well.",
-    "reviewed_by": null,
+    "reviewed_by": "mstarks01",
     "framework": "stride",
     "drafted_by": "agent-stand-in"
   },
@@ -209,10 +212,11 @@
         "session cookie",
         "derive",
         "orders-db"
-      ]
+      ],
+      "recommendation_sound": false
     },
     "rationale": "The one the set is for. True cited fact, right vocabulary, a real attack as the conclusion. Neither the signing key's presence in `store:orders-db` nor its derivability from the stored records is established anywhere in the model. A critic that catches fixture 3 and not this has learned nothing, and a reason that says only 'the control is unknown' has caught neither.",
-    "reviewed_by": null,
+    "reviewed_by": "mstarks01",
     "framework": "stride",
     "drafted_by": "agent-stand-in"
   },
@@ -269,16 +273,17 @@
       },
       "mitigations": [
         {
-          "summary": "Authenticate `flow:storefront-api-to-order-service:submit-order` with a caller identity that `process:order-service` verifies on every request",
-          "detail": "The flow is accepted on network position alone, so any workload that reaches the core network is accepted as the storefront. Require a verifiable caller identity on each request, and refuse a caller the order service cannot name, whatever network it arrives from."
+          "summary": "Authenticate every submit-order request, and authorize the verified caller to submit orders",
+          "detail": "`flow:storefront-api-to-order-service:submit-order` is accepted on network position alone. Authentication alone would still admit any workload that holds an identity, so `process:order-service` has to check that the caller it verified is one permitted to submit orders."
         }
       ]
     },
     "expect": {
-      "survives": true
+      "survives": true,
+      "recommendation_sound": true
     },
     "rationale": "The argument stands entirely on a stated fact the source spells out, and the unknown it also cites is a different flow's transport. That one irrelevant ground is what routes the whole draft past the critic today. It must survive, and the verdict it deserves is `confirmed`. Either surviving status passes this fixture for the initial test \u2014 which is also its limit: neither one shows the critic identified the unknown as irrelevant, and that needs its own observable.",
-    "reviewed_by": null,
+    "reviewed_by": "mstarks01",
     "framework": "stride",
     "drafted_by": "agent-stand-in"
   },
@@ -342,10 +347,11 @@
         "drain",
         "retry",
         "inject"
-      ]
+      ],
+      "recommendation_sound": false
     },
     "rationale": "The replacement for the receipt-names-the-shopper draft, which was arguable: an order identifier does correlate to a shopper through another store, so calling that an invention was a judgement a careful critic could refuse. This invents a whole mechanism instead \u2014 a retry queue draining the bucket into the database \u2014 and nothing in the model or the source describes one. The same irrelevant unknown shields it, and must not buy it a pass any more than it buys one for fixture 5.",
-    "reviewed_by": null,
+    "reviewed_by": "mstarks01",
     "framework": "stride",
     "drafted_by": "agent-stand-in"
   },
@@ -405,10 +411,11 @@
         "cmek",
         "encrypted at rest",
         "encryption_at_rest"
-      ]
+      ],
+      "recommendation_sound": false
     },
     "rationale": "The draft's own quote states the opposite of what it asserts, and the model carries `encryption_at_rest` as a customer-managed key. It now also carries the irrelevant unknown: without one it reaches the critic today, so it would have tested contradiction detection and not the bypass this change closes. No step is pinned \u2014 the model showing what the draft calls missing reads as `evidence`, the draft asserting what the model contradicts reads as `reasoning`, and this set is not the place to settle that.",
-    "reviewed_by": null,
+    "reviewed_by": "mstarks01",
     "framework": "stride",
     "drafted_by": "agent-stand-in"
   },
@@ -459,10 +466,11 @@
         "service account",
         "tls",
         "authentication"
-      ]
+      ],
+      "recommendation_sound": false
     },
     "rationale": "The replacement for the per-shopper-credentials draft, which asserted a reassurance rather than a threat and so gave a critic a second reason to reject it. This is a genuine threat claim \u2014 a forged receipt breaks the archive's record of what happened \u2014 whose premise its own quote contradicts: the write is authenticated by the order service's service account. It carries no unknown ground on purpose, so it reaches the critic both before and after the change and is the positive control: if it survives, the critic cannot detect contradiction at all, and the bypassed fixtures say nothing about the bypass.",
-    "reviewed_by": null,
+    "reviewed_by": "mstarks01",
     "framework": "stride",
     "drafted_by": "agent-stand-in"
   }
