@@ -42,6 +42,7 @@ from analysis_service.graph import (
     ENTRY_PREPARE,
     EXTRACT_NODE,
     Analysis,
+    Pipeline,
     analyze_node_name,
     tier_node_by_graph_node,
 )
@@ -197,7 +198,7 @@ class LaneAwareLlm(ScriptedLlm):
         return self.replies[lane] if lane else default
 
 
-def build(case, entry, models: dict[str, ScriptedLlm]) -> object:
+def build(case, entry, models: dict[str, ScriptedLlm]) -> Pipeline:
     def resolve(tier_node: str) -> BaseLlm:
         graph_node = next(
             node for node, tier in TIER_NODE_BY_GRAPH_NODE.items() if tier == tier_node
