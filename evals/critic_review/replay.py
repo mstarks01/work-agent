@@ -29,7 +29,7 @@ import json
 import re
 from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Protocol
 
 from analysis_service.claims import Ruling
 from analysis_service.critic import complete_rulings, critic_view, review_issues
@@ -468,7 +468,22 @@ def score(
     return ReplayScore(outcomes=tuple(outcomes))
 
 
-def _reading(ruling: Ruling | None) -> Any | None:
+class RecommendationReadingLike(Protocol):
+    """The two fields this module reads off a package's recommendation reading.
+
+    Structural rather than an import of STRIDE's
+    :class:`~analysis_service.frameworks.stride.record.RecommendationReading`,
+    because a package declares its own and this module must not name one. What
+    it replaces is ``Any``, which typed nothing: ``score`` reads both fields,
+    so a package declaring a reading with a verdict and no words would have
+    raised ``AttributeError`` on a paid run with ``mypy`` clean beforehand.
+    """
+
+    sound: bool
+    note: str
+
+
+def _reading(ruling: Ruling | None) -> RecommendationReadingLike | None:
     """The critic's reading of the advice, or ``None`` where it made none.
 
     The one reader of that field, so the verdict on the advice and the words
@@ -477,7 +492,8 @@ def _reading(ruling: Ruling | None) -> Any | None:
     recommend nothing carries no such field, so every row answers ``None`` and
     the third half has no denominator.
     """
-    return getattr(ruling, "recommendation", None)
+    reading: RecommendationReadingLike | None = getattr(ruling, "recommendation", None)
+    return reading
 
 
 async def replay(

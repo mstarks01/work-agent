@@ -17,7 +17,7 @@ from typing import get_args
 
 import pytest
 
-from analysis_service.frameworks import PACKAGES, schemas_for
+from analysis_service.frameworks import PACKAGES, FrameworkName, schemas_for
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.prompts import compose_critic_prompt
 from analysis_service.system_model import SystemModel
@@ -27,7 +27,20 @@ from evals.critic_review.model import CriticFixture
 
 PACKAGE = PACKAGES["stride"]
 PACKAGE_RULINGS = schemas_for("stride").rulings
-RULING_SHAPE = get_args(PACKAGE_RULINGS.model_fields["claims"].annotation)[0]
+
+
+def ruling_shape(framework: FrameworkName):
+    """The model one of this package's rulings parses into.
+
+    The batch declares ``claims``, and the element of that list is the shape
+    every reader here cares about. One spelling of that walk, because the
+    stride helpers below and the parity test at the end both take it.
+    """
+    batch = schemas_for(framework).rulings
+    return get_args(batch.model_fields["claims"].annotation)[0]
+
+
+RULING_SHAPE = ruling_shape("stride")
 #: What this package requires of a ruling beyond the neutral two fields.
 PACKAGE_REQUIRED = {
     name: "medium"
@@ -544,6 +557,34 @@ def test_the_gate_and_the_run_read_the_set_through_one_rule():
     assert R.carries_both_answers(rows)
     assert not R.carries_both_answers(
         (survives, sound) for survives, sound in rows if survives is sound
+    )
+
+
+@pytest.mark.parametrize("framework", sorted(PACKAGES))
+def test_every_package_reading_carries_the_two_fields_the_replay_reads(framework):
+    """The positive control on the shape ``_reading`` promises.
+
+    ``score`` reads ``sound`` and ``note`` off whatever a package's ruling
+    declares. Typing that ``Any`` checked neither, so a package declaring a
+    reading with a verdict and no words would raise ``AttributeError`` on a
+    paid run with ``mypy`` clean beforehand.
+
+    Asked of the package's own registered ruling model rather than of STRIDE's
+    class, so it answers for a package registered tomorrow. A package whose
+    claims recommend nothing declares no such field and is skipped — that is
+    the ``None`` every row already answers.
+    """
+    field = ruling_shape(framework).model_fields.get("recommendation")
+    if field is None:
+        pytest.skip(f"{framework} rulings carry no recommendation reading")
+
+    (reading,) = [a for a in get_args(field.annotation) if a is not type(None)]
+    fields = {name: f.annotation for name, f in reading.model_fields.items()}
+
+    assert fields.get("sound") is bool, f"{framework}: a reading with no verdict"
+    assert fields.get("note") is str, (
+        f"{framework}: a reading with no words behind the verdict, which"
+        " `recommendation_note` would read as an AttributeError"
     )
 
 
