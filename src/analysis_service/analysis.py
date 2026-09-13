@@ -96,6 +96,23 @@ SENSITIVE_ASSET_TAGS = frozenset(
     {"credentials", "pii", "financial", "health", "secrets", "business-critical-data"}
 )
 
+#: The other half of :data:`~analysis_service.system_model.CORE_ASSET_TAGS`:
+#: what a failure would cost rather than what an element holds. An attacker
+#: acts on data; reputation loss is what the business suffers because they did,
+#: and ``availability-critical`` states what a component being down would mean.
+#:
+#: **No source states either one.** The word "reputation" appears in none of the
+#: thirteen corpus sources, and no rule stands in for it: 11 corpus processes
+#: are ``exposure: internet-facing`` and 5 carry the tag. So an extraction is
+#: measured with these removed from both sides — grading a model for not
+#: inventing a tag its input never contains measures nothing (#877).
+#:
+#: ``test_analysis.py`` holds the two halves to a partition of the vocabulary,
+#: so a tag added to :data:`~analysis_service.system_model.CORE_ASSET_TAGS`
+#: fails until somebody says which
+#: kind it is.
+CONSEQUENCE_ASSET_TAGS = frozenset({"availability-critical", "reputation"})
+
 
 # A control attribute states its own absence or its own unverifiability in its
 # first token, which is the only position this module reads. Everything after

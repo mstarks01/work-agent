@@ -7,6 +7,7 @@ result would change the prompt bytes two otherwise-identical jobs send.
 
 import pytest
 
+from analysis_service import analysis
 from analysis_service.analysis import (
     CONTROL_ATTRIBUTES,
     control_state,
@@ -23,6 +24,7 @@ from analysis_service.analysis import (
     zone_kinds,
 )
 from analysis_service.system_model import (
+    CORE_ASSET_TAGS,
     DataFlow,
     DataStore,
     ExternalEntity,
@@ -267,3 +269,26 @@ def test_a_term_fires_at_the_start_of_a_word_or_as_a_whole_word():
     assert not matches_term("java$", "a javascript front end")
     assert matches_term("java$", "a java service")
     assert not matches_term("log$", "the login flow")
+
+
+class TestTheAssetVocabularySplitsInTwo:
+    """Every asset tag is a data class or a consequence, and never both.
+
+    An attacker acts on data; reputation loss is what the business suffers
+    because they did. The two halves are read by different code — the
+    sensitive half decides whether a disclosure is a loss, the consequence
+    half is dropped from an extraction score because no source states one
+    (#877) — so a tag belonging to neither would be silently ungoverned by
+    both.
+    """
+
+    def test_the_two_halves_partition_the_vocabulary(self):
+        assert (
+            analysis.SENSITIVE_ASSET_TAGS | analysis.CONSEQUENCE_ASSET_TAGS
+            == CORE_ASSET_TAGS
+        ), (
+            "a tag added to CORE_ASSET_TAGS must be declared a data class or a consequence"
+        )
+
+    def test_no_tag_is_both(self):
+        assert not (analysis.SENSITIVE_ASSET_TAGS & analysis.CONSEQUENCE_ASSET_TAGS)
