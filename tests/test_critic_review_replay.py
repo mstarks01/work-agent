@@ -378,3 +378,67 @@ def test_a_word_inside_a_longer_word_is_not_an_anchor():
     """The property the word-boundary form had, kept."""
     assert not R._engages("the injector was replaced", ("inject",))
     assert R._engages("an attacker injects a row", ("inject",))
+
+
+def test_a_dismissal_is_recorded_so_relevance_can_be_read(fixtures, model):
+    """#894's question, in a field the replay reads.
+
+    A critic that weighed an unknown and found it irrelevant and one that never
+    opened the question emitted the same ruling. A confirmed is reachable only
+    by naming every such pair, so the ruling now states it.
+    """
+    shielded = next(
+        f
+        for f in fixtures
+        if f.expect.survives
+        and any(g["kind"] == "unknown-attribute" for g in f.draft["grounds"])
+    )
+    pairs = [
+        {"element_id": g["element_id"], "attribute": g["attribute"]}
+        for g in shielded.draft["grounds"]
+        if g["kind"] == "unknown-attribute"
+    ]
+    payload = {"claims": []}
+    for f in fixtures:
+        status = "needs-info" if f.expect.survives else "rejected"
+        r = rule(f.draft["id"], status, "; ".join(f.expect.reason_must_name))
+        if f.id == shielded.id:
+            r["verdict"] = {
+                "status": "confirmed",
+                "reason": "",
+                "immaterial_unknowns": pairs,
+            }
+        payload["claims"].append(r)
+
+    score, problems = run(fixtures, model, payload)
+    row = {o.fixture_id: o for o in score.outcomes}[shielded.id]
+
+    assert not problems, "naming every pair makes the confirmation assemblable"
+    assert row.status == "confirmed"
+    assert row.judged_the_unknown
+    assert row.to_json()["dismissed_unknowns"]
+
+
+def test_a_confirmation_naming_no_pair_is_still_a_review_problem(fixtures, model):
+    """Silence cannot confirm, so the bypass the field opens is closed."""
+    shielded = next(
+        f
+        for f in fixtures
+        if f.expect.survives
+        and any(g["kind"] == "unknown-attribute" for g in f.draft["grounds"])
+    )
+    payload = {
+        "claims": [
+            rule(f.draft["id"], "needs-info", "open fact")
+            if f.id != shielded.id
+            else {
+                **rule(f.draft["id"], "needs-info"),
+                "verdict": {"status": "confirmed", "reason": ""},
+            }
+            for f in fixtures
+        ]
+    }
+
+    _, problems = run(fixtures, model, payload)
+
+    assert any("immaterial_unknowns" in p for p in problems)

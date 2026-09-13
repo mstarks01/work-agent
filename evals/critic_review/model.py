@@ -73,12 +73,14 @@ class Expectation(BaseModel):
     ``needs-info`` is the only surviving verdict available. Pinning an exact
     status there would pin that limitation as though it were the answer.
 
-    **What no expectation here can see is whether the critic judged the unknown
-    irrelevant.** Either surviving verdict passes such a fixture, and
-    ``complete_rulings`` fills ``related_unknowns`` from the draft's own grounds
-    afterwards, so a critic that weighed relevance and one that never looked
-    produce the same ruling. That question needs an observable the ruling does
-    not currently carry, and it is tracked apart rather than faked here.
+    **Whether the critic judged the unknown irrelevant is now observable.** A
+    ``confirmed`` on a draft citing an unknown is reachable only by naming every
+    such pair in ``immaterial_unknowns``, so the ruling states the judgement
+    rather than leaving a critic that weighed relevance and one that never
+    looked producing the same answer. ``judged_the_unknown`` on the replay's
+    outcome reads it. An exact ``status`` is still optional, because which
+    surviving verdict a fixture deserves is a separate question from whether
+    the critic engaged with the unknown.
 
     ``rejected_because`` is optional for the second reason: which step kills a
     contradicted draft is a live question — the model showing what the draft

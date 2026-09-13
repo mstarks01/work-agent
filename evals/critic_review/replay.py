@@ -143,6 +143,22 @@ class FixtureOutcome:
     #: What the reader ruled the recommendation was, carried so the row says
     #: what it was compared against.
     recommendation_expected: bool | None = None
+    #: The unknown pairs the critic said this claim does not rest on. Empty
+    #: where it dismissed none, which on a draft citing one is a critic that
+    #: left the question alone — the fact #894 asks for, in a field.
+    dismissed_unknowns: tuple[tuple[str, str], ...] = ()
+
+    @property
+    def judged_the_unknown(self) -> bool:
+        """Did the critic rule on whether this claim rests on what it cites?
+
+        A ``confirmed`` on a draft citing an unknown is only reachable by
+        naming every such pair, so it answers yes by construction; a ruling
+        that names a pair answers yes whatever its verdict. What this
+        separates is the critic that read the question from the one that
+        produced a verdict without touching it.
+        """
+        return bool(self.dismissed_unknowns) or self.status == "confirmed"
 
     @property
     def recommendation_agrees(self) -> bool | None:
@@ -167,6 +183,8 @@ class FixtureOutcome:
             "status": self.status,
             "fate_agrees": self.fate_agrees,
             "reason_engages": self.reason_engages,
+            "dismissed_unknowns": [list(pair) for pair in self.dismissed_unknowns],
+            "judged_the_unknown": self.judged_the_unknown,
             "recommendation_read": self.recommendation_read,
             "recommendation_expected": self.recommendation_expected,
             "recommendation_agrees": self.recommendation_agrees,
@@ -360,9 +378,24 @@ def score(
                 reason_engages=_engages(reason, anchors) if anchors else None,
                 recommendation_read=_recommendation(ruling),
                 recommendation_expected=fixture.expect.recommendation_sound,
+                dismissed_unknowns=tuple(sorted(dismissed_unknowns(ruling))),
             )
         )
     return ReplayScore(outcomes=tuple(outcomes))
+
+
+def dismissed_unknowns(ruling: Ruling | None) -> frozenset[tuple[str, str]]:
+    """The unknown pairs this ruling says the claim does not rest on.
+
+    Neutral, because ``immaterial_unknowns`` is on the shared verdict: an
+    unknown ground is a fact about what a draft cites, and every package's
+    claims can cite one.
+    """
+    if ruling is None:
+        return frozenset()
+    return frozenset(
+        (ref.element_id, ref.attribute) for ref in ruling.verdict.immaterial_unknowns
+    )
 
 
 def _recommendation(ruling: Ruling | None) -> bool | None:

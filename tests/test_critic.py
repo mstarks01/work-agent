@@ -546,11 +546,68 @@ class TestAnUnknownGroundMakesTheClaimConditional:
             ],
         )
 
-    def test_a_confirmation_is_reported_for_the_re_ask(self, model):
+    def test_a_confirmation_that_dismisses_nothing_is_reported(self, model):
+        """Silence cannot confirm. A critic that never opened the question is refused."""
         problems = review_issues([self._draft()], [sample_ruling("S-01")], model)
 
-        assert "cannot be confirmed" in "; ".join(problems.messages)
+        assert "immaterial_unknowns" in "; ".join(problems.messages)
         assert problems.implicated == frozenset({"S-01"})
+
+    def test_a_confirmation_naming_the_unknown_as_immaterial_is_accepted(self, model):
+        """The judgement the prompt asks for, in a field the seam reads.
+
+        A draft may cite an open fact its argument never uses, and 78% of the
+        corpus's drafts cite one. Refusing every ``confirmed`` on them asked the
+        critic whether the claim depends on the unknown and then discarded the
+        answer — and sent the case to a paid re-ask for answering.
+        """
+        ruling = sample_ruling(
+            "S-01",
+            verdict=ProposedVerdict(
+                status="confirmed",
+                immaterial_unknowns=[
+                    UnknownRef(
+                        element_id="store:orders-db", attribute="encryption_at_rest"
+                    )
+                ],
+            ),
+        )
+
+        assert not review_issues([self._draft()], [ruling], model)
+
+    def test_a_confirmation_dismissing_only_some_names_what_is_left(self, model):
+        """The message tells a re-ask what is outstanding, not what it answered."""
+        draft = sample_draft(
+            "S-01",
+            grounds=[
+                Ground(
+                    kind="unknown-attribute",
+                    element_id="store:orders-db",
+                    attribute="encryption_at_rest",
+                ),
+                Ground(
+                    kind="unknown-attribute",
+                    element_id="flow:customer-to-web-app:login",
+                    attribute="encryption_in_transit",
+                ),
+            ],
+        )
+        ruling = sample_ruling(
+            "S-01",
+            verdict=ProposedVerdict(
+                status="confirmed",
+                immaterial_unknowns=[
+                    UnknownRef(
+                        element_id="store:orders-db", attribute="encryption_at_rest"
+                    )
+                ],
+            ),
+        )
+
+        message = "; ".join(review_issues([draft], [ruling], model).messages)
+
+        assert "encryption_in_transit" in message
+        assert "encryption_at_rest" not in message
 
     def test_a_draft_the_critic_never_ruled_is_a_problem_and_not_a_verdict(self, model):
         """An unruled draft routes to the re-ask; nothing fills it in.
