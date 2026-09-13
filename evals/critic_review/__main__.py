@@ -186,6 +186,13 @@ def main(argv: list[str] | None = None) -> int:
     for outcome in score.outcomes:
         mark = "pass" if outcome.passes else "FAIL"
         print(f"  [{mark}] {outcome.fixture_id}: {outcome.status} — {outcome.reason}")
+        if outcome.recommendation_read is False:
+            # The words behind the verdict on the advice. Printed only where
+            # the critic called it unsound, because that is the reading a
+            # person has to check: whether it found the flaw the reader meant
+            # or some other one.
+            note = outcome.recommendation_note or "(no note)"
+            print(f"           advice ruled unsound: {note}")
     for problem in problems:
         print(f"REVIEW PROBLEM: {problem}", file=sys.stderr)
 

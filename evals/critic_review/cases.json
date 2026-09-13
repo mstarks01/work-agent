@@ -542,7 +542,7 @@
       "recommendation_sound": false
     },
     "rationale": "A claim resting on two stated facts and asserting nothing beyond them. It does not posit a vulnerable handler, an attacker holding the password, or an intended narrower grant the model never states \u2014 the three the critic named when it rejected the first drafting of this fixture. What it says is that an unauthenticated path stands in front of an identity wider than that path needs, which both cited facts establish together.\n\nThe advice is the flaw. Moving the password and rotating it changes where a secret lives; it does not narrow the grant, and an attacker reaching this path never handles the password at all. So the recommendation is sound-sounding and addresses something other than the claim, which is what this fixture is for.",
-    "reviewed_by": null,
+    "reviewed_by": "mstarks01",
     "framework": "stride",
     "drafted_by": "agent-stand-in"
   }
