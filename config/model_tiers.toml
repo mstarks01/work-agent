@@ -159,6 +159,9 @@ review_independence = "shared"
 #                       worse than no figure on a record somebody reads as a
 #                       cost.
 #
+# A key for a vendor that reports no charge is an error, as is one for a vendor
+# with a single arrangement.
+#
 # A VENDOR THAT ROUTES TO MORE THAN ONE UPSTREAM may be pinned to the ones a
 # request may reach, here or in ANALYSIS_MODEL_UPSTREAMS_{VENDOR} as a
 # comma-separated list. Optional: an analysis is an analysis whichever upstream
@@ -169,9 +172,6 @@ review_independence = "shared"
 #
 # [upstreams]
 # openrouter = ["openai"]
-#
-# A key for a vendor that reports no charge is an error, as is one for a vendor
-# with a single arrangement.
 #
 # `review` is NOT required while `review_independence = "shared"` leaves the
 # node map pointing criticism at `strong`, because nothing runs on it and the

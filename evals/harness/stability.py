@@ -166,6 +166,32 @@ class CaseStability:
         }
 
 
+def _claim_scored_framework() -> FrameworkName:
+    """The package the ``scores`` block holds rows for, read off the registry.
+
+    A row in that block names a case and its matched reference indices and
+    names no framework, so the block can carry one package's rows and no more.
+    That package is the one whose claims compose an identity from an action and
+    a place — :data:`~evals.harness.fingerprint.IDENTIFIER_OF` answers ``None``
+    for it — and a package identified by a catalog requirement is scored in
+    ``applicability`` instead.
+
+    Asked of the registry rather than spelled at each site, so a second
+    composed package is refused by name here rather than filed silently under
+    this one's.
+    """
+    composed = sorted(
+        name for name, identifier in IDENTIFIER_OF.items() if identifier is None
+    )
+    if len(composed) != 1:
+        raise ProvenanceError(
+            "the 'scores' block names no framework, so it holds one package's"
+            f" rows; {composed} each compose a claim identity from an action and"
+            " a place, so the block needs a framework field before this reads it"
+        )
+    return composed[0]
+
+
 def read_run(artifact: EvalArtifact) -> ScoredRun:
     """Reduce a loaded artifact to its per-``(framework, case)`` matched sets.
 
@@ -186,8 +212,9 @@ def read_run(artifact: EvalArtifact) -> ScoredRun:
     # the wrong shape is a file to re-produce, and a KeyError out of a
     # comparison reads as a defect in the comparison.
     try:
+        scored = _claim_scored_framework()
         for score in artifact.block("scores"):
-            scope: Scope = ("stride", str(score["case"]))
+            scope: Scope = (scored, str(score["case"]))
             matched[scope] = frozenset(
                 str(pair["reference_index"]) for pair in score["matched"]
             )
@@ -229,8 +256,9 @@ def _causes(artifact: EvalArtifact) -> dict[Scope, dict[str, str]] | None:
     if rows is None:
         return None
     try:
+        scored = _claim_scored_framework()
         return {
-            ("stride", str(row["case"])): {
+            (scored, str(row["case"])): {
                 str(loss["reference_index"]): str(loss["cause"])
                 for loss in row["losses"]
             }
@@ -247,22 +275,21 @@ def _content(
 ) -> dict[Scope, dict[str, tuple[str, frozenset[str]]]] | None:
     """Each matched reference's severity band and resolved place, off the report bundle.
 
-    Read only for a package that composes its identity from an action and a
-    place, by its own declaration: its scorer records which claim matched
-    each reference, and its claims carry a severity. A catalog-identified
-    package records matched identifiers alone, so there is nothing here to
-    read for it. ``None`` where the bundle is absent, which is the shape of a
-    sweep copied without its reports.
+    Read for the package :func:`_claim_scored_framework` names, which is the
+    only one the ``scores`` block holds rows for: its scorer records which
+    claim matched each reference, and its claims carry a severity. A
+    catalog-identified package records matched identifiers alone, so there is
+    nothing here to read for it. ``None`` where the bundle is absent, which is
+    the shape of a sweep copied without its reports.
     """
     directory = reports_dir(artifact.path)
     if not directory.is_dir():
         return None
     content: dict[Scope, dict[str, tuple[str, frozenset[str]]]] = {}
     try:
+        scored = _claim_scored_framework()
         for score in artifact.block("scores"):
-            scope: Scope = ("stride", str(score["case"]))
-            if IDENTIFIER_OF[scope[0]] is not None:
-                continue
+            scope: Scope = (scored, str(score["case"]))
             path = directory / f"{scope[1]}.report.json"
             if not path.is_file():
                 return None

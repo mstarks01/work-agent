@@ -68,6 +68,16 @@ from evals.harness.stability import (
 Fate = Literal["both", "downstream", "extraction", "recovered"]
 FATES: tuple[Fate, ...] = ("both", "downstream", "extraction", "recovered")
 
+#: What an ``extraction`` loss is charged to, in :attr:`ReferenceFate.lacked`'s
+#: own order. ``unread`` is not a reading of the model; it says no model was
+#: handed in for the case, so nothing here was measured.
+LACKED_KINDS: tuple[str, ...] = (
+    "element_missing",
+    "attribute_differs",
+    "held_the_place",
+    "unread",
+)
+
 #: The mode each side of the pair has to be, by position.
 END_TO_END = "end-to-end"
 ANALYSIS = "analysis"
@@ -91,15 +101,41 @@ class ReferenceFate:
     #: ``<element>.<attribute>: <blessed> -> <extracted>`` for every scored
     #: attribute that differs on a reference element the model did carry.
     differing_attributes: tuple[str, ...] = ()
+    #: Whether an extracted model was scored for this case at all. Both lists
+    #: above are empty when none was, which is the same shape as a model that
+    #: carried the place unchanged — and the two are opposite findings.
+    extraction_read: bool = False
+
+    @property
+    def lacked(self) -> str | None:
+        """What the extracted model lacked here, or ``None`` where nothing lost.
+
+        **The one reader.** The row, the pooled counts and the rendered line all
+        ask this, so a loss cannot be one kind in the artifact and another in
+        the summary printed beside it. The order is decided here: a missing
+        element outranks a differing attribute on the elements that were there,
+        and a row with neither lost on a model that held the place.
+
+        ``unread`` is separated from ``held_the_place`` by
+        :attr:`extraction_read` and by nothing else, because the two carry the
+        same empty lists. Reading the empty lists alone reports the sharper
+        finding — the lane lost on a model that held the place — for a case
+        where no model was measured.
+        """
+        if self.fate != "extraction":
+            return None
+        if not self.extraction_read:
+            return "unread"
+        if self.missing_elements:
+            return "element_missing"
+        if self.differing_attributes:
+            return "attribute_differs"
+        return "held_the_place"
 
     @property
     def held_the_place(self) -> bool:
-        """An ``extraction`` loss on a model that carried every element the reference names, unchanged."""
-        return (
-            self.fate == "extraction"
-            and not self.missing_elements
-            and not self.differing_attributes
-        )
+        """An ``extraction`` loss on a measured model that carried the place unchanged."""
+        return self.lacked == "held_the_place"
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -108,6 +144,7 @@ class ReferenceFate:
             "must_find": self.must_find,
             "missing_elements": list(self.missing_elements),
             "differing_attributes": list(self.differing_attributes),
+            "lacked": self.lacked,
             "held_the_place": self.held_the_place,
         }
 
@@ -311,6 +348,7 @@ def _case_handoff(
                 claim.tier == "must-find",
                 missing_elements=missing,
                 differing_attributes=differing,
+                extraction_read=extraction is not None,
             )
         )
     return CaseHandoff(framework, case_id, tuple(rows), extraction, tuple(warnings))
@@ -325,33 +363,16 @@ def pooled(rows: Sequence[CaseHandoff]) -> dict[str, Any]:
         for entry in row.fates:
             totals[entry.fate] += 1
             must_find[entry.fate] += bool(entry.must_find)
-            if entry.fate == "extraction":
-                if entry.missing_elements:
-                    lacked["element_missing"] += 1
-                elif entry.differing_attributes:
-                    lacked["attribute_differs"] += 1
-                elif row.extraction is not None:
-                    lacked["held_the_place"] += 1
-                else:
-                    lacked["unread"] += 1
+            if entry.lacked is not None:
+                lacked[entry.lacked] += 1
     return {
         "cases": len(rows),
         "references": sum(totals.values()),
         "by_fate": {fate: totals[fate] for fate in FATES},
         "must_find_by_fate": {fate: must_find[fate] for fate in FATES},
         # What the extracted model lacked at each extraction loss, one kind
-        # per row in the order decided: a missing element outranks a differing
-        # attribute on the elements that were there, and a row with neither
-        # lost on a model that held the place.
-        "extraction_lacked": {
-            kind: lacked[kind]
-            for kind in (
-                "element_missing",
-                "attribute_differs",
-                "held_the_place",
-                "unread",
-            )
-        },
+        # per row, off :attr:`ReferenceFate.lacked`.
+        "extraction_lacked": {kind: lacked[kind] for kind in LACKED_KINDS},
         "cases_with_crossings_mismatch": sum(
             1
             for row in rows
@@ -398,15 +419,12 @@ def render(rows: Sequence[CaseHandoff], warnings: Sequence[str]) -> None:
         for entry in row.fates:
             if entry.fate != "extraction":
                 continue
-            what = (
-                f"missing {', '.join(entry.missing_elements)}"
-                if entry.missing_elements
-                else (
-                    "; ".join(entry.differing_attributes)
-                    if entry.differing_attributes
-                    else ("held the place" if row.extraction is not None else "unread")
-                )
-            )
+            what = {
+                "element_missing": f"missing {', '.join(entry.missing_elements)}",
+                "attribute_differs": "; ".join(entry.differing_attributes),
+                "held_the_place": "held the place",
+                "unread": "unread",
+            }[entry.lacked or "unread"]
             mark = " must-find" if entry.must_find else ""
             print(f"    extraction: reference {entry.reference}{mark}: {what}")
     totals = pooled(rows)

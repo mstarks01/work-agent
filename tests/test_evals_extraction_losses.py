@@ -345,3 +345,30 @@ class TestWhatIsRefused:
 
         assert not any(w.startswith("runs are of different modes") for w in warnings)
         assert any("disagree on tiers" in w for w in warnings)
+
+
+def test_a_row_with_no_model_behind_it_says_unread_everywhere(tmp_path, sampling, case):  # noqa: F811
+    """The row, the pooled count and the rendered line answer with one voice.
+
+    An ``extraction`` loss with no extracted model carries the same two empty
+    lists as one on a model that held every element the reference names, and
+    the two are opposite findings: the first measured nothing, the second is
+    the sharpest reading the instrument offers. Reading the empty lists alone
+    reports the second for the first.
+    """
+    n = len(case.stride_claims())
+    end, analysis = pair(
+        tmp_path,
+        provenance(sampling),
+        end_matched=[],
+        analysis_matched=[0],
+        references=n,
+    )
+    runs = load_runs([end, analysis])
+    rows = attribute_handoff(runs[0], runs[1], {CASE: case}, {})
+    row = {entry.reference: entry for entry in rows[0].fates}["0"]
+
+    assert row.lacked == "unread"
+    assert row.to_json()["held_the_place"] is False
+    assert not row.held_the_place
+    assert pooled(rows)["extraction_lacked"]["unread"] == 1

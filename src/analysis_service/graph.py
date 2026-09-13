@@ -1675,10 +1675,12 @@ def route_review(
     ruling set reconciles, which is the honest reading of a framework that
     drafted nothing.
 
-    An absent *reviewed* key beside drafts every one of which code settled is
-    the ``settled`` route out of ``merge``: the critic was never called, and
-    :func:`~analysis_service.critic.complete_rulings` fills the ruling set from
-    the drafts' own grounds, so the same check reconciles and takes ``accept``.
+    An absent *reviewed* key with no drafts beside it is the ``settled`` route
+    out of ``merge``: the lanes drafted nothing, the critic was never called,
+    and an empty ruling set against an empty draft set reconciles, so the same
+    check takes ``accept``. A draft its own grounds make conditional does not
+    reach here that way — it is shown to the critic like any other, and a
+    ruling missing for it is a dropped draft the re-ask is asked to supply.
     """
     model = SystemModel.model_validate(valid_model)
     state = keys.state(ctx)
@@ -1704,7 +1706,7 @@ def route_review(
             update={"unreconciled_rulings": [*parked.unreconciled_rulings, *drift]}
         )
         state.put(nodes.key("marks"), parked.model_dump(mode="json"))
-    rulings = _rulings_of(ruled, nodes.schemas)
+    rulings = rulings_of(ruled, nodes.schemas)
     outcome = review(package_drafts, rulings, model)
     if isinstance(outcome, Revision):
         # ``previous_review`` is the parked payload itself rather than anything
@@ -1749,8 +1751,16 @@ def _drafts_of(drafts: list | None, package: FrameworkPackage) -> list[Claim]:
     return [package.record.model_validate(draft) for draft in drafts or []]
 
 
-def _rulings_of(ruled: Sequence[Any], schemas: FrameworkSchemas) -> list[Ruling]:
-    """One critic's emission, revalidated as this framework's own ruling type."""
+def rulings_of(ruled: Sequence[Any], schemas: FrameworkSchemas) -> list[Ruling]:
+    """One critic's emission, revalidated as this framework's own ruling type.
+
+    Public because it is the one reader of "what shape is a critic's answer",
+    and the graph is not its only caller: ``evals/critic_review`` replays a
+    critic outside the graph and has to parse what comes back the same way.
+    Parsing with the neutral :class:`~analysis_service.claims.Ruling` instead
+    refuses every STRIDE ruling, because ``frameworks/stride/critic.md`` asks
+    for a ``confidence`` the neutral model forbids.
+    """
     return list(schemas.rulings.model_validate({"claims": list(ruled)}).claims)
 
 
@@ -1763,7 +1773,7 @@ def _canonical_rulings(ruled: Sequence[Any], schemas: FrameworkSchemas) -> list[
     payloads would read that as a re-ask changing a ruling it was told to carry
     across. The model's own dump is one spelling per ruling.
     """
-    return [ruling.model_dump(mode="json") for ruling in _rulings_of(ruled, schemas)]
+    return [ruling.model_dump(mode="json") for ruling in rulings_of(ruled, schemas)]
 
 
 def fail_review(valid_model: dict, ctx, keys: GraphKeys, nodes: FrameworkNodes) -> dict:
@@ -1786,7 +1796,7 @@ def fail_review(valid_model: dict, ctx, keys: GraphKeys, nodes: FrameworkNodes) 
     # raises the CriticOutputError naming exactly what still does not reconcile.
     assemble_claims(
         _drafts_of(state.get(nodes.key("drafts")), nodes.package),
-        _rulings_of(_claims_of(state.get(nodes.key("reviewed"))), nodes.schemas),
+        rulings_of(_claims_of(state.get(nodes.key("reviewed"))), nodes.schemas),
         model,
         nodes.schemas,
     )
@@ -2016,7 +2026,7 @@ def _framework_block(
     # reconciles is caught on its own router, which raises in ``critic_failed``.
     accepted = state.get(nodes.key("accepted"))
     drafts = _drafts_of(state.get(nodes.key("drafts")) if accepted else None, package)
-    rulings = _rulings_of(
+    rulings = rulings_of(
         _claims_of(state.get(nodes.key("reviewed")) if accepted else None), schemas
     )
     claims, rejected = assemble_claims(drafts, rulings, model, schemas)
