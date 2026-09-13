@@ -1126,3 +1126,33 @@ def _rename_one_boundary(case):
             if element.get("trust_zone") == old:
                 element["trust_zone"] = new
     return type(case.model).model_validate(raw)
+
+
+class TestInventionIsScoredApartFromTheCorpusGap:
+    """An extra element the source never names is the only kind of invention.
+
+    Precision counts three different things as one: a component the model
+    invented, a component the corpus omits, and the model's own word for a
+    component the corpus paraphrased. Only the first is the model's fault, and
+    only the first is decidable — against the submitted bytes (#882).
+    """
+
+    def test_an_element_the_source_names_is_not_invention(self, case):
+        raw = case.model.model_dump()
+        first = raw["processes"][0]
+        extra = dict(first, id="process:invented", name=first["name"] + " replica")
+        raw["processes"].append(extra)
+        widened = type(case.model).model_validate(raw)
+        score = modes.score_extraction(
+            case, modes.ExtractionResult(case.id, widened, ())
+        )
+        assert score.extra, "the widened model should carry an extra element"
+        # "replica" appears in no corpus source, so this one is invention.
+        assert score.unsourced == score.extra
+
+    def test_the_reading_is_empty_when_nothing_was_added(self, case):
+        score = modes.score_extraction(
+            case, modes.ExtractionResult(case.id, case.model, ())
+        )
+        assert score.extra == ()
+        assert score.unsourced == ()
