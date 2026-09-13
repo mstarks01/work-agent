@@ -239,3 +239,62 @@ def test_an_unsigned_set_is_named_rather_than_trusted():
             f" works. Unsigned: {unsigned}"
         )
     assert all(entry.reviewed_by for entry in ALL)
+
+
+@pytest.mark.parametrize("fixture", ALL, ids=IDS)
+def test_every_mitigation_addresses_the_claim_it_sits_under(fixture):
+    """Step 4 of ``prompts/critic.md`` rules on the recommendation, so it has to be one.
+
+    A critic obeying step 4 rejects a draft whose mitigation addresses
+    something other than its claim. So a placeholder recommendation — one whose
+    words are about this fixture file rather than about the claim — kills every
+    fixture expecting to survive, and ``valid_preserved`` reads 0 of 3 for a
+    reason that is an artefact of this file.
+
+    Relevance is a judgement and this does not make it. What it decides is the
+    mechanical half: a recommendation about this claim names a place this claim
+    is about, and a recommendation about the harness names the harness.
+
+    Asked of a package whose drafts carry recommendations, which is a property
+    of the record rather than a package's name: a package whose claims offer
+    none gives step 4 nothing to rule on, and this passes over it rather than
+    demanding a field its record does not declare.
+    """
+    draft = draft_of(fixture)
+    cited = set(draft.affected_element_ids)
+    mitigations = getattr(draft, "mitigations", None)
+    if mitigations is None:
+        pytest.skip(f"{fixture.framework} claims carry no recommendations")
+
+    assert mitigations, f"{fixture.id}: step 4 has nothing to rule on"
+    for mitigation in mitigations:
+        words = f"{mitigation.summary} {mitigation.detail}".lower()
+        assert any(element_id.lower() in words for element_id in cited), (
+            f"{fixture.id}: a mitigation naming none of {sorted(cited)} is not"
+            " a recommendation about this claim"
+        )
+        for term in ("fixture", "placeholder", "the critic now reads"):
+            assert term not in words, (
+                f"{fixture.id}: a mitigation naming {term!r} describes this file"
+                " rather than the claim, which is what step 4 rejects a draft for"
+            )
+
+
+@pytest.mark.parametrize("fixture", ALL, ids=IDS)
+def test_no_mitigation_hands_a_negative_fixture_its_own_anchors(fixture):
+    """A critic must not pass ``reason_engages`` by quoting the recommendation.
+
+    ``_engages`` matches the anchors against the ruling's reason. An anchor
+    spelled in the draft's own mitigation is one a critic can return without
+    reading the source or the argument, which is the same bypass
+    :func:`test_no_anchor_is_satisfied_by_naming_the_unknown_alone` refuses one
+    step earlier.
+    """
+    draft = draft_of(fixture)
+    words = " ".join(
+        f"{mitigation.summary} {mitigation.detail}"
+        for mitigation in getattr(draft, "mitigations", ())
+    ).lower()
+
+    for anchor in fixture.expect.reason_must_name:
+        assert anchor.lower() not in words, anchor

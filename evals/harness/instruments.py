@@ -160,7 +160,11 @@ class ModeRun:
     #: are what one package's own record earned, so they arrive under a key
     #: rather than as a field somebody has to add.
     rows: Mapping[str, tuple[Any, ...]]
-    #: Cases the estimate gate's hold stopped before, never attempted (#334).
+    #: Cases the sweep never attempted: the estimate gate's hold refused the
+    #: spend before them (#334), or a fault the sweep cannot measure ended it
+    #: before them (#886). Never a case that ran — one that ran is priced and
+    #: counted whether or not it produced a report, so a case in both this list
+    #: and the failures would read as never reached and as billed at once.
     #: Empty on a sweep that ran to the end, which is what makes a stopped
     #: sweep a visibly partial record rather than one claiming to be whole.
     stopped_before: tuple[str, ...] = ()

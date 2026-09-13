@@ -33,8 +33,8 @@ from typing import Any
 
 from analysis_service.claims import Ruling
 from analysis_service.critic import complete_rulings, critic_view, review_issues
-from analysis_service.frameworks import FrameworkPackage
-from analysis_service.graph import render_fenced
+from analysis_service.frameworks import FrameworkPackage, schemas_for
+from analysis_service.graph import render_fenced, rulings_of
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.prompts import compose_critic_prompt
 from analysis_service.skills import compose_critic_skills
@@ -96,11 +96,20 @@ def parse_rulings(raw: str, package: FrameworkPackage) -> list[Ruling]:
     Fails loudly on output that is not the contract. A replay that quietly read
     zero rulings would report every fixture as surviving, which is the most
     flattering wrong answer available.
+
+    **The graph's own reader, never a second one.**
+    :func:`~analysis_service.graph.rulings_of` is what the ``review`` node
+    parses a critic's emission with, and this module exists to run that critic
+    outside the graph. The neutral :class:`~analysis_service.claims.Ruling`
+    refuses every real STRIDE ruling here: ``frameworks/stride/critic.md`` —
+    which :func:`compose` loads — asks for a ``confidence`` on every ruling,
+    and the neutral model is ``extra="forbid"``. A scripted ruling carries no
+    package field, so two readers disagree only on the paid call.
     """
     payload = json.loads(raw)
     if not isinstance(payload, dict) or "claims" not in payload:
         raise ValueError("critic output carries no 'claims' array")
-    return [Ruling.model_validate(entry) for entry in payload["claims"]]
+    return rulings_of(payload["claims"], schemas_for(package.name))
 
 
 @dataclass(frozen=True)

@@ -14,7 +14,7 @@ does not have is marked; a proposal the package defers never becomes a draft;
 each lane's proposals resolve their evidence references against the catalog
 derived from the same model the agents chose from; :func:`join_drafts` runs the
 whole-set checks, snapping references, dropping duplicate IDs, resolving and
-bounding element references, verifying quotes and dropping settled duplicates;
+bounding element references and verifying quotes;
 a draft on a unit the package's own rules ruled out is refused; and every mark
 is narrowed once to the drafts that survived. Each pass marks what it sees and
 cannot know what a later pass drops, so the narrowing is the last step and
@@ -60,7 +60,6 @@ from analysis_service.claims import (
     UnverifiedGround,
 )
 from analysis_service.coverage import build_coverage
-from analysis_service.critic import endpoint_targets
 from analysis_service.evidence import (
     evidence_catalog,
     ground_issues,
@@ -68,7 +67,7 @@ from analysis_service.evidence import (
     known_proposals,
     resolve_proposals,
 )
-from analysis_service.frameworks import FrameworkPackage, lane_of, schemas_for
+from analysis_service.frameworks import FrameworkPackage, schemas_for
 from analysis_service.grounding import (
     PreparedSource,
     deadline_spent,
@@ -713,7 +712,7 @@ def join_drafts(
         if sources
         else _QuoteCheck(list(bounded.drafts), [], [], [])
     )
-    kept, settled_duplicates = _drop_settled_duplicates(checked.drafts, index)
+    kept = list(checked.drafts)
     return JoinedDrafts(
         drafts=kept,
         marks=AnalysisMarks(
@@ -726,76 +725,6 @@ def join_drafts(
                 *referenced.dropped,
                 *bounded.dropped,
                 *checked.groundless,
-                *settled_duplicates,
             ],
         ).merged_with(package.record.claim_marks(kept)),
     )
-
-
-def _drop_settled_duplicates(
-    claims: Sequence[Claim], index: ModelIndex
-) -> tuple[list[Claim], list[DroppedClaim]]:
-    """Keep one of each set of drafts whose grounds settle them alike.
-
-    **The one duplicate check no reader would otherwise make.** A draft its own
-    grounds settle is ruled in code and never shown to a critic (#439), and
-    :func:`~analysis_service.critic.critic_view` computes :func:`~analysis_service.critic.duplicate_groups` over the shown set —
-    so two conditional drafts naming one action at one place both reach the
-    report, and nothing anywhere compares them. The critic cannot: it is not
-    given them.
-
-    Runs last in the fan-in, on the drafts that survived every other check, so
-    the targets it compares are the ones the report will carry rather than the
-    ones an agent wrote. The key is :func:`~analysis_service.critic.duplicate_groups`'s own — the lane, the
-    verb and the endpoint-resolved targets — plus the unstated controls the
-    drafts rest on. The critic reads a pair and judges it; code deletes, so its
-    key is the stricter one. Two conditional drafts resting on different
-    unknowns ask different questions: a REST flow and a WebSocket flow between
-    one pair of processes fold to one place, and a draft on each rests on its
-    own flow's unstated authentication. The first Baseline deleted exactly that
-    pair, and the dropped draft's question about the socket's session went with
-    it.
-
-    **First wins, and the choice is deterministic rather than good.** Lane order
-    is the package's own, so two runs of one input drop the same copy. Picking
-    the better-written of the two would be a judgement, and judgement is the
-    critic's; what code can do here is stop one finding being reported twice.
-
-    A draft carrying no verb belongs to a package whose identity is a catalog
-    identifier, and its duplicates are ID collisions :func:`_drop_duplicate_ids`
-    already refused. Those pass through untouched.
-    """
-    flows = index.flow_endpoints
-    seen: dict[tuple[object, ...], str] = {}
-    kept: list[Claim] = []
-    dropped: list[DroppedClaim] = []
-    for claim in claims:
-        settled = type(claim).settled_by_grounds(claim) is not None
-        if not settled or claim.verb is None:
-            kept.append(claim)
-            continue
-        key = (
-            lane_of(claim),
-            claim.verb,
-            endpoint_targets(claim.affected_element_ids, flows),
-            frozenset(
-                (ref.element_id, ref.attribute) for ref in claim.unknown_grounds()
-            ),
-        )
-        first = seen.get(key)
-        if first is None:
-            seen[key] = claim.id
-            kept.append(claim)
-            continue
-        dropped.append(
-            DroppedClaim.of(
-                claim_id=claim.id,
-                title=claim.title,
-                reason=(
-                    f"names the same action at the same place as {first!r} in"
-                    " its lane, and both rest on the same unstated controls, so"
-                    " no critic sees either to rule on the pair"
-                ),
-            )
-        )
-    return kept, dropped
