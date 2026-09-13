@@ -588,13 +588,14 @@ def test_every_package_reading_carries_the_two_fields_the_replay_reads(framework
     )
 
 
-def test_a_surviving_draft_whose_unknown_was_never_ruled_on_is_counted(fixtures, model):
-    """The question a ``needs-info`` can leave alone, and #894's whole point.
+def test_a_surviving_draft_that_set_no_unknown_aside_is_counted(fixtures, model):
+    """The state #894 asks the instrument to show, and the half it cannot.
 
-    A critic that weighed relevance and one that never looked emitted the same
-    ruling before ``immaterial_unknowns`` existed. A surviving draft that
-    cites an unknown and dismisses none of it is the second of those, and no
-    score above moves on it.
+    ``immaterial_unknowns`` makes a **dismissal** observable. It does not make
+    a considered-and-kept unknown observable, so a draft that genuinely rests
+    on the fact it cites lands here having been ruled exactly right — both
+    ``credible-conditional`` fixtures did on the first live run. The list is
+    printed and never scored for that reason.
     """
     payload = {
         "claims": [
@@ -605,15 +606,18 @@ def test_a_surviving_draft_whose_unknown_was_never_ruled_on_is_counted(fixtures,
 
     score, _ = run(survivors(fixtures), model, payload)
 
-    unjudged = {o.fixture_id for o in score.unknown_unjudged}
+    listed = {o.fixture_id for o in score.unknown_not_dismissed}
     cites = {o.fixture_id for o in score.outcomes if o.cites_unknown}
     confirmed = {o.fixture_id for o in score.outcomes if o.status == "confirmed"}
 
-    assert unjudged == cites - confirmed, (
-        "every surviving draft citing an unknown that was not confirmed left"
-        " the question alone"
+    assert listed == cites - confirmed, (
+        "every surviving draft citing an unknown that was not confirmed set"
+        " none of it aside"
     )
-    assert unjudged, "the set carries at least one such draft"
+    assert listed, "the set carries at least one such draft"
+    assert all(o.passes for o in score.unknown_not_dismissed), (
+        "a row here can be a correct ruling, so the list must never be read as a fault"
+    )
 
 
 def test_the_words_behind_the_advice_verdict_are_kept(fixtures, model):
