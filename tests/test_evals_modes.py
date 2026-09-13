@@ -1077,3 +1077,52 @@ def test_a_node_that_raises_mid_graph_still_hands_the_sweep_what_ran(case, monke
     # promises, never a figure that looks like a spend.
     assert all(ran[node].usage is None for node in lanes & set(ran))
     assert isinstance(raised.value.cause, RuntimeError)
+
+
+class TestZonesAreScoredApartFromCitableElements:
+    """A trust zone reaches no claim, so it is not counted as extraction recall.
+
+    ``identity.comparable_elements`` drops every ``boundary:`` ID before any
+    claim comparison, so a zone the extraction named differently costs no match
+    downstream. Counting one as a miss depressed endpoint recall by eleven
+    points over the sweep of 2026-09-13. The zones still get a number, because
+    the crossings derive from them.
+    """
+
+    def test_a_renamed_zone_does_not_move_endpoint_recall(self, case):
+        whole = modes.score_extraction(
+            case, modes.ExtractionResult(case.id, case.model, ())
+        )
+        renamed = _rename_one_boundary(case)
+        after = modes.score_extraction(
+            case, modes.ExtractionResult(case.id, renamed, ())
+        )
+
+        assert whole.endpoint_recall == after.endpoint_recall == 1.0
+
+    def test_but_it_does_move_zone_recall(self, case):
+        renamed = _rename_one_boundary(case)
+        after = modes.score_extraction(
+            case, modes.ExtractionResult(case.id, renamed, ())
+        )
+
+        assert after.zone_recall < 1.0
+
+
+def _rename_one_boundary(case):
+    """The case's model with one trust zone renamed, references and all.
+
+    A rename rather than a deletion: a model missing a zone its elements point
+    at is invalid, and the question here is what a *differently named* zone
+    costs, which is the only thing extraction actually does to them.
+    """
+    raw = case.model.model_dump()
+    old = raw["trust_boundaries"][0]["id"]
+    new = old + "-zone"
+    raw["trust_boundaries"][0]["id"] = new
+    raw["trust_boundaries"][0]["name"] = raw["trust_boundaries"][0]["name"] + " zone"
+    for collection in ("external_entities", "processes", "data_stores"):
+        for element in raw.get(collection, []):
+            if element.get("trust_zone") == old:
+                element["trust_zone"] = new
+    return type(case.model).model_validate(raw)
