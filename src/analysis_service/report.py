@@ -251,6 +251,13 @@ from analysis_service.vendors import ServedTrust, vendor_for_route
 # element it names, never by a union across the lane's drafts. Both are a
 # meaning change to an existing field and would be major on their own.
 # Archived rows written under 2.x carry larger numbers.
+# 3.0 also carries ``immaterial_unknowns`` on a verdict: the unknown grounds a
+# claim cites and does not rest on. Neutral rather than a package's, because an
+# unknown ground is a fact about what any package's draft cites. It is what
+# makes a ``confirmed`` reachable on a draft naming an open fact its argument
+# never uses — 78% of the corpus's drafts name one — and a confirmation that
+# lists none is still refused, so silence cannot confirm.
+#
 # 3.0 also carries ``recommendation`` on a STRIDE threat: what the critic made
 # of the advice the finding carries, as ``sound`` and a ``note``. It is the
 # package's field because ``mitigations`` is, and it sits beside the verdict

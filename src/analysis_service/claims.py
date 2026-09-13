@@ -462,6 +462,22 @@ class ProposedVerdict(BaseModel):
     status: VerdictStatus
     reason: str = Field(default="", max_length=REASON_MAX_CHARS)
     related_unknowns: list[UnknownRef] = Field(default_factory=list)
+    #: The unknown grounds this claim cites and does **not** rest on.
+    #:
+    #: A draft may name an open fact its argument never uses, and until a
+    #: ruling could say so, every such draft was refused a ``confirmed``:
+    #: :func:`~analysis_service.critic._confirmed_on_unknown_issues` read the
+    #: draft's grounds and nothing else. That is 78% of the corpus's drafts, so
+    #: for most findings the critic's only verdicts were ``needs-info`` and
+    #: ``rejected`` — while ``prompts/critic.md`` asks it, in the same breath,
+    #: whether the claim depends on the unknown it names.
+    #:
+    #: **Each dismissed pair is named, and silence still refuses.** A
+    #: ``confirmed`` is legal only where every one of the draft's unknown
+    #: grounds appears here, so a critic that never opened the question cannot
+    #: confirm by omission and one that did has said which pairs and can be
+    #: measured on it. It is the observable #894 asks for.
+    immaterial_unknowns: list[UnknownRef] = Field(default_factory=list)
     rejected_because: RejectionStep | None = None
 
 

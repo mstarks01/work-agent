@@ -386,7 +386,19 @@ def complete_rulings(
             )
             completed.append(ruling.model_copy(update={"verdict": verdict}))
             continue
-        derived = by_id.get(ruling.id, [])
+        # A pair the critic dismissed is not one this claim hangs on, so it is
+        # not filled in beside the ones that are. Without this the service
+        # would hand back, as the question a reader must answer, the very fact
+        # the critic just said the argument does not use.
+        dismissed = {
+            (ref.element_id, ref.attribute)
+            for ref in ruling.verdict.immaterial_unknowns
+        }
+        derived = [
+            ref
+            for ref in by_id.get(ruling.id, [])
+            if (ref.element_id, ref.attribute) not in dismissed
+        ]
         if ruling.verdict.status != "needs-info" or not derived:
             completed.append(ruling)
             continue
@@ -447,25 +459,53 @@ def _duplicate_on_unit_issues(
 def _confirmed_on_unknown_issues(
     drafts: Sequence[Claim], rulings: Iterable[Ruling]
 ) -> list[UnreconciledRuling]:
-    """Every ``confirmed`` ruling on a draft whose grounds cite an unknown.
+    """Every ``confirmed`` ruling on a draft resting on an unknown it did not dismiss.
 
-    The draft's own evidence says the fact is open, so a confirmation asserts
-    what the model does not state. The critic's choices on such a draft are
-    ``needs-info`` — which the service completes — or ``rejected`` with a
-    reason, and a re-ask is what turns a confirmation into one of those.
+    A draft citing an open fact its argument never uses is not a conditional
+    claim, and 78% of the corpus's drafts cite one. Reading the draft's grounds
+    alone refused a ``confirmed`` on all of them, which asked the critic for a
+    judgement — does this claim *depend* on the unknown it names — and then
+    discarded the answer.
+
+    So the ruling states it, per pair. A ``confirmed`` is legal where every one
+    of the draft's unknown grounds appears in
+    :attr:`~analysis_service.claims.ProposedVerdict.immaterial_unknowns`; any
+    pair left unaccounted for is reported, and a critic that says nothing is
+    refused exactly as before. Silence cannot confirm, and a dismissal is a
+    claim somebody can check.
+
+    The message names the pairs still outstanding rather than every pair the
+    draft cites, so a re-ask is told what is missing rather than what it
+    already answered.
     """
     by_id = {draft.id: draft.unknown_grounds() for draft in drafts}
-    return [
-        UnreconciledRuling.of(
-            claim_id=ruling.id,
-            kind="confirmed-on-unknown",
-            message=f"claim {ruling.id!r} is ruled confirmed but its own grounds cite"
-            f" {_named(by_id[ruling.id])} as never stated, so it cannot"
-            " be confirmed: rule it needs-info, or reject it with a reason",
+    problems = []
+    for ruling in rulings:
+        if ruling.verdict.status != "confirmed":
+            continue
+        dismissed = {
+            (ref.element_id, ref.attribute)
+            for ref in ruling.verdict.immaterial_unknowns
+        }
+        outstanding = [
+            ref
+            for ref in by_id.get(ruling.id, [])
+            if (ref.element_id, ref.attribute) not in dismissed
+        ]
+        if not outstanding:
+            continue
+        problems.append(
+            UnreconciledRuling.of(
+                claim_id=ruling.id,
+                kind="confirmed-on-unknown",
+                message=f"claim {ruling.id!r} is ruled confirmed but its own grounds"
+                f" cite {_named(outstanding)} as never stated, and the ruling does"
+                " not say the claim stands without them: name each in"
+                " immaterial_unknowns where the argument does not rest on it,"
+                " or rule it needs-info, or reject it with a reason",
+            )
         )
-        for ruling in rulings
-        if ruling.verdict.status == "confirmed" and by_id.get(ruling.id)
-    ]
+    return problems
 
 
 def endpoint_targets(
