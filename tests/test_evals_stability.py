@@ -501,3 +501,31 @@ class TestContentStability:
         write_reports(a, self.CASE, {0: ("high", [])})
         with pytest.raises(ProvenanceError, match="matched content"):
             load_runs([a])
+
+
+def test_a_second_composed_package_is_not_reported_as_a_malformed_artifact(tmp_path):
+    """The registry's defect names the registry, never the file it was reading.
+
+    ``read_run`` wraps its block reads in a handler that calls the artifact
+    malformed, and ``ProvenanceError`` is a ``ValueError``, so a registry
+    question asked inside that handler came back as
+    ``<path>: malformed score block``. The path named a file with nothing wrong
+    with it, which is the wrong error naming the wrong cause — the failure
+    ``artifact.load_artifact`` documents at length for its own version field.
+    """
+    from unittest import mock
+
+    from evals.harness import stability
+
+    artifact = mock.Mock()
+    artifact.path = tmp_path / "sweep.json"
+    artifact.block.return_value = []
+
+    with (
+        mock.patch.dict(stability.IDENTIFIER_OF, {"asvs": None}, clear=False),
+        pytest.raises(ProvenanceError) as raised,
+    ):
+        stability.read_run(artifact)
+
+    assert "malformed" not in str(raised.value)
+    assert "needs a framework field" in str(raised.value)
