@@ -469,3 +469,31 @@ def test_a_confirmation_naming_no_pair_is_still_a_review_problem(fixtures, model
     _, problems = run(fixtures, model, payload)
 
     assert any("immaterial_unknowns" in p for p in problems)
+
+
+def test_a_killed_discriminator_is_not_reported_as_a_deficient_set(fixtures, model):
+    """Two different facts, told apart.
+
+    The first live run of the nine-fixture set rejected the one row carrying
+    advice the reader ruled unsound, so every draft the critic kept expected
+    the same answer and the reading could not be told from a constant. That is
+    true of the run and false of the set, and one warning claiming both sends a
+    reader to fix a fixture file that is already right.
+    """
+    payload = {
+        "claims": [
+            rule(
+                f.draft["id"],
+                "rejected"
+                if not f.expect.recommendation_sound
+                else surviving_status(f),
+                "x",
+            )
+            for f in fixtures
+        ]
+    }
+
+    score, _ = run(fixtures, model, payload)
+
+    assert not score.recommendation_informative, "no surviving row disagrees"
+    assert score.set_carries_both_answers, "but the set does carry both"

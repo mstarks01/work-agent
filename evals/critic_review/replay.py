@@ -241,20 +241,31 @@ class ReplayScore:
     def recommendation_informative(self) -> bool:
         """Can this set tell a real reading from a constant answer?
 
-        **Only where the readable fixtures disagree about the right answer.**
-        A critic emits a reading on the drafts it lets survive, so those rows
-        are the whole denominator of :attr:`recommendation_agreed`. Where every
-        one of them expects the same ``sound``, a critic that answers with that
-        constant and never opens the block scores full marks — which is the
-        failure :attr:`unsupported_removed` and :attr:`valid_preserved` were
-        split apart to avoid, arriving on the third half instead.
+        **Only where the drafts this critic kept disagree about the right
+        answer.** A reading is emitted on the drafts a critic lets survive, so
+        those rows are the whole denominator of
+        :attr:`recommendation_agreed`. Where every one of them expects the same
+        ``sound``, a critic answering with that constant and never opening the
+        block scores full marks — the failure :attr:`unsupported_removed` and
+        :attr:`valid_preserved` were split apart to avoid.
 
-        False on a set whose surviving fixtures all carry advice ruled sound.
-        The fixture that fixes it is one that survives while carrying flawed
-        advice, which is also the pair that proves a flawed recommendation does
-        not erase a valid threat.
+        **It is a fact about the run, not about the set.** A set carrying both
+        answers still reports false here when the critic rejected the row that
+        would have discriminated, and that is the honest reading: the number
+        this run produced cannot be told from a constant, whatever the set
+        could have measured. :attr:`set_carries_both_answers` is the other
+        half, so the warning can say which of the two happened.
         """
         return len({o.recommendation_expected for o in self.outcomes if o.survived}) > 1
+
+    @property
+    def set_carries_both_answers(self) -> bool:
+        """Could this set discriminate at all, whatever the critic did with it?
+
+        Read over every row rather than the survivors, so a critic that killed
+        the discriminating fixture is not reported as a deficient fixture set.
+        """
+        return len({o.recommendation_expected for o in self.outcomes}) > 1
 
     @property
     def recommendation_unread(self) -> tuple[FixtureOutcome, ...]:
@@ -292,9 +303,10 @@ class ReplayScore:
             "recommendation_agreed": {
                 "got": agreed,
                 "of": of_read,
-                # A number nobody may read as a score while every readable
-                # fixture expects one answer.
+                # A number nobody may read as a score while every draft the
+                # critic kept expects one answer.
                 "informative": self.recommendation_informative,
+                "set_carries_both_answers": self.set_carries_both_answers,
             },
             "recommendation_unread": [o.fixture_id for o in self.recommendation_unread],
             "rejected_without_engaging": [

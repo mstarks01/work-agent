@@ -161,11 +161,16 @@ def main(argv: list[str] | None = None) -> int:
     print(f"valid preserved     : {preserved}/{of_preserved}")
     print(f"recommendation read : {agreed}/{of_read} agree with the reader")
     if not score.recommendation_informative:
+        why = (
+            "the critic rejected the fixture whose advice the reader ruled"
+            " unsound, so no surviving draft disagrees with the rest"
+            if score.set_carries_both_answers
+            else "no fixture survives while carrying advice the reader ruled unsound"
+        )
         print(
-            "  WARNING: every fixture that can carry a reading expects the same"
-            " answer, so a critic that never opens the block scores full marks"
-            " here. This number says nothing until a fixture survives while"
-            " carrying advice the reader ruled unsound.",
+            f"  WARNING: {why}. Every draft this critic kept expects the same"
+            " answer, so one that never opened the block scores full marks"
+            " here. This number says nothing about this run.",
             file=sys.stderr,
         )
     if score.recommendation_unread:
