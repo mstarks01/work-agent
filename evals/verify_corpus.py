@@ -701,6 +701,38 @@ def framework_issues(case_dir: Path, meta: dict, model: SystemModel) -> Iterator
             yield f"case.json declares {name!r}, but {CLAIMS_DIR}/{name}.json is absent"
 
 
+#: Lanes the corpus cannot measure, each with the reason it cannot.
+#:
+#: **A hole that is named, never an exemption that is earned.** An entry here
+#: says a run of that lane is unmeasured and that no case in the corpus can
+#: honestly fix it. It is not permission to ship the lane untested: it is the
+#: record that the number nobody has is a number nobody has.
+#:
+#: The reason is a property of the lane, so it answers for a chapter nobody has
+#: written yet. A lane the standard itself calls conditional — ASVS names OAuth
+#: and WebRTC where it tells an operator to filter out what does not apply —
+#: has no record to expect in a corpus holding no such system, and demanding
+#: one would make the merge bar reward an expectation somebody invented. That
+#: is the failure :data:`LANES_REQUIRED_PER_CASE` avoids per case, and this is
+#: the same failure at corpus scale.
+#:
+#: The remedy is a case, not an entry: write a system the lane really applies to
+#: and delete the line. ``tests/test_corpus_lints.py`` refuses an entry naming a
+#: lane no package declares, and refuses one whose lane *does* carry a
+#: must-find — so a line here cannot outlive the hole it describes.
+UNMEASURED_LANES: Mapping[FrameworkName, Mapping[str, str]] = {
+    "asvs": {
+        "oauth-and-oidc": (
+            "the standard scopes this chapter to a delegated-authorization"
+            " protocol, and no corpus case runs one: the nearest, an identity"
+            " broker that takes another provider's assertion as a sign-in,"
+            " never says which protocol carries it. See"
+            " https://github.com/mstarks01/work-agent/issues/887"
+        )
+    },
+}
+
+
 def lane_coverage_issues(must_find_lanes: Mapping[str, set[object]]) -> Iterator[str]:
     """The corpus-wide half of the merge bar: #167's second check.
 
@@ -708,15 +740,29 @@ def lane_coverage_issues(must_find_lanes: Mapping[str, set[object]]) -> Iterator
     somewhere in the corpus. A lane is one **Model Tier** call, so an unmeasured
     lane is the granularity that spends money — which is why the bar sits at the
     lane rather than at the framework.
+
+    :data:`UNMEASURED_LANES` names the lanes this corpus cannot reach, and each
+    one says why. They are reported rather than passed over, so a reader of a
+    clean run still learns which lanes no number covers.
     """
     for name, package in PACKAGES.items():
         seen = must_find_lanes.get(name, set())
+        declared_holes = UNMEASURED_LANES.get(name, {})
         for lane in package.lanes:
-            if lane not in seen:
-                yield (
-                    f"{name}: the {lane} lane carries no must-find record anywhere"
-                    " in the corpus, so a run of it is unmeasured"
+            if lane in seen:
+                continue
+            if lane in declared_holes:
+                print(
+                    f"unmeasured: {name}: the {lane} lane carries no must-find"
+                    f" record, because {declared_holes[lane]}"
                 )
+                continue
+            yield (
+                f"{name}: the {lane} lane carries no must-find record anywhere"
+                " in the corpus, so a run of it is unmeasured. If no case can"
+                " honestly carry one, add it to UNMEASURED_LANES with the"
+                " reason, stated as a property of the lane"
+            )
 
 
 def check_case(case_dir: Path) -> list[str]:

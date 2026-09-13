@@ -482,3 +482,147 @@ class TestHowTheTwoPlacesRelate:
         losses.render([charge(case, flows, [draft], [promote(draft)])])
 
         assert "1 equal" in capsys.readouterr().out
+
+
+# --- The cause is a fact about the rule, never about the input order ----------
+
+
+def merge_pair(case, flows) -> tuple[int, int]:
+    """Two references at one place under one verb, as case 01 carries them.
+
+    The scorer matches a claim there to one of the two, so the other is a miss
+    with that claim still sitting at its place — which is the only shape where
+    two claims compete to be charged. Derived rather than pinned to an index,
+    so a corpus edit that renumbers the references does not silently stop
+    testing this.
+    """
+    references = case.stride_claims()
+    return next(
+        (i, j)
+        for i, left in enumerate(references)
+        for j, right in enumerate(references)
+        if i < j
+        and left.category == right.category
+        and left.verb == right.verb
+        and endpoint_subset(
+            left.affected_element_ids, right.affected_element_ids, flows
+        )
+    )
+
+
+def test_two_claims_at_one_place_charge_the_same_cause_in_either_order(case, flows):
+    """Reversing the report's claims must not move a cause.
+
+    The defect this pins: ``_at_place`` returned the claims in report order and
+    the charge read ``[0]``, so the label depended on which claim the report
+    happened to list first. Reversing the claims — no finding changed, no match
+    changed — moved case 05's reference 9 between ``merged`` and ``verb`` in
+    two archived Baselines. An instrument that priced three prompt edits this
+    week cannot answer differently when its input is shuffled.
+    """
+    reference = case.stride_claims()[merge_pair(case, flows)[0]]
+    other = "guess-credential" if reference.verb != "guess-credential" else "replay"
+    same_verb = at(reference, 1, reference.verb)
+    other_verb = at(reference, 2, other)
+    produced = [promote(same_verb), promote(other_verb)]
+
+    forward = by_index(charge(case, flows, [same_verb, other_verb], produced))
+    reversed_ = by_index(
+        charge(case, flows, [other_verb, same_verb], list(reversed(produced)))
+    )
+
+    # Both claims sit at the place, so exactly one reference of the merge pair
+    # is left over and both orders have to charge it the same way.
+    assert forward, "the pair leaves a miss for the two claims to compete over"
+    assert {index: loss.cause for index, loss in forward.items()} == {
+        index: loss.cause for index, loss in reversed_.items()
+    }
+    assert {index: loss.draft_id for index, loss in forward.items()} == {
+        index: loss.draft_id for index, loss in reversed_.items()
+    }
+
+
+def test_a_claim_carrying_the_references_action_wins_over_one_that_does_not(
+    case, flows
+):
+    """The rule behind the tie-break, stated on its own.
+
+    A reference answered by a claim under its own action is a merge the corpus
+    must rule on. Charging it to the verb while that claim sits beside it would
+    send a reader to fix an exemplar that is already right.
+    """
+    first, second = merge_pair(case, flows)
+    reference = case.stride_claims()[first]
+    other = "guess-credential" if reference.verb != "guess-credential" else "replay"
+    # The wrong-verb claim is listed first, so report order argues for "verb".
+    other_verb = at(reference, 1, other)
+    same_verb = at(reference, 2, reference.verb)
+
+    charged = by_index(
+        charge(
+            case,
+            flows,
+            [other_verb, same_verb],
+            [promote(other_verb), promote(same_verb)],
+        )
+    )
+
+    missed = next(index for index in (first, second) if index in charged)
+    assert charged[missed].cause == "merged"
+    assert charged[missed].draft_id == same_verb.id
+
+
+def test_a_displaced_draft_is_named_the_same_way_in_either_order(case, flows):
+    """``displaced_draft_id`` names a draft in the artifact, so it is ordered too.
+
+    The third order-sensitive read: ``_nearby`` returned the first overlapping
+    draft. Same reasoning, same fix, and a separate test because a reader who
+    fixes one of the three does not automatically fix the others.
+    """
+    hits = case_trigger_recall(case, "stride").hits
+    references = case.stride_claims()
+    # A reference the rules led to, resolving to two elements, so a draft can
+    # share one without the two places containing each other.
+    led = next(
+        index
+        for index, hit in enumerate(hits)
+        if hit.rule_ids
+        and len(endpoint_form(references[index].affected_element_ids, flows)) >= 2
+    )
+    reference = references[led]
+    here = sorted(endpoint_form(reference.affected_element_ids, flows))
+    # Anchors that resolve clear of the reference's own place, and that the
+    # identity rule actually reads. A flow whose endpoints are the reference's
+    # would make the draft's place *equal* to it, and a ``boundary:`` ID is
+    # dropped before any comparison — either one turns the overlap this test
+    # needs into a match.
+    elsewhere = sorted(
+        element.id
+        for element in case.model.elements()
+        if not element.id.startswith("boundary:")
+        and not endpoint_form([element.id], flows) & set(here)
+    )
+    near_a = draft_threat(
+        1,
+        reference.category,
+        "near a",
+        element_ids=[here[0], elsewhere[0]],
+        verb=reference.verb,
+    )
+    near_b = draft_threat(
+        2,
+        reference.category,
+        "near b",
+        element_ids=[here[1], elsewhere[1]],
+        verb=reference.verb,
+    )
+    produced = [promote(near_a), promote(near_b)]
+
+    forward = by_index(charge(case, flows, [near_a, near_b], produced))
+    reversed_ = by_index(
+        charge(case, flows, [near_b, near_a], list(reversed(produced)))
+    )
+
+    assert forward[led].cause == "place"
+    assert forward[led].displaced_draft_id is not None
+    assert forward[led].displaced_draft_id == reversed_[led].displaced_draft_id

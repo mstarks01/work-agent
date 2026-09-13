@@ -53,6 +53,15 @@ from evals.review_submission import REPO_ROOT, unreviewed_cases
 #: acceptable. They are the cases that shipped before step 6 was enforced, and
 #: the list is meant to shrink to nothing.
 UNREVIEWED: dict[str, str] = {
+    "02-iot-fleet-telemetry": (
+        "18 STRIDE claims, waiting on a re-sitting rather than on a first "
+        "reading. The sitting of 2026-09-12 read this case and signed four "
+        "files, one of them claims/asvs.json. The case no longer declares "
+        "ASVS — its precondition refutes an MQTT fleet — so that file is gone "
+        "and the signature cannot match. Nothing the reader read has changed. "
+        "A sitting over the current three files clears it, and #887 tracks "
+        "the lane the removed records leave unmeasured."
+    ),
     "03-batch-data-pipeline": "17 STRIDE claims, unread. Declares STRIDE only.",
     "04-ml-inference-service": (
         "18 STRIDE claims and 10 ASVS records. One STRIDE claim asserted the "

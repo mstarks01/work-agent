@@ -82,6 +82,28 @@ class ValidationIssue(BaseModel):
     element_id: str | None = None
     field: str | None = None
 
+    @property
+    def is_citation(self) -> bool:
+        """Did this issue come from the one gate rule that reads the sources?
+
+        :func:`_citation_issues` is the only rule taking data from outside the
+        model, and it is the only rule that can name either of these fields. A
+        caller that supplies no sources can never see one.
+
+        The property exists so a caller asking *which half of the gate failed*
+        reads the answer here rather than re-deriving it from a code. The eval
+        harness asks: a model citing a quote that is not in its source is an
+        extraction the repair pass exists to fix, and grading that is a
+        different job from reporting a malformed model.
+        """
+        return self.field in CITATION_FIELDS
+
+
+#: The fields only :func:`_citation_issues` writes. Named beside the rule so the
+#: rule and :attr:`ValidationIssue.is_citation` cannot drift apart;
+#: ``tests/test_validation.py`` drives the gate both ways and holds them to it.
+CITATION_FIELDS: frozenset[str] = frozenset({"source_label", "source_excerpt"})
+
 
 def allowed_asset_tags(extra_asset_tags: Collection[str] = ()) -> frozenset[str]:
     """The controlled asset vocabulary: core tags plus config extensions."""

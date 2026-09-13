@@ -52,6 +52,7 @@ from analysis_service.graph import (
     ENTRY_PREPARE,
     STATE_EXTRACTED_MODEL,
     STATE_FRAMEWORK_OPTIONS,
+    STATE_SOURCE_TEXTS,
     STATE_VALID_MODEL,
     Entry,
     GraphProducedNothing,
@@ -329,6 +330,17 @@ class ExtractionScore:
     #: it fires on an invented control the blessed model happens to state too.
     #: Non-gating, like every number here.
     unbased: tuple[UnbasedControl, ...] = ()
+    #: The citation half of the validity gate, as it ruled on this extraction:
+    #: an excerpt that is not in the source it names, or a label naming a source
+    #: the job never carried.
+    #:
+    #: A measurement rather than a Tier 1 failure, because production does not
+    #: treat it as one either — the ``validate`` node routes such a model to
+    #: ``repair``, and this mode stops before that pass. So the number says how
+    #: much work the repair pass is being left, and a sweep that reported it as
+    #: a malformed model would fail every run for doing its job. Non-gating,
+    #: like every number here.
+    uncited: tuple[ValidationIssue, ...] = ()
 
     @property
     def recall(self) -> float:
@@ -481,6 +493,7 @@ class ExtractionScore:
             # few lines a reader opens this file for.
             "attributes_differing": [check.to_json() for check in self.differing],
             "unbased_controls": [flag.model_dump(mode="json") for flag in self.unbased],
+            "uncited": [issue.model_dump(mode="json") for issue in self.uncited],
         }
 
 
@@ -675,7 +688,18 @@ async def run_extraction(case: GoldenCase, pipeline: Pipeline) -> ExtractionResu
     # derived IDs, so scoring a candidate's raw IDs by set membership would
     # count an abbreviated slug as one missing element and one extra, on a
     # reading of the source that was correct.
-    model, issues = parse_and_validate(state[STATE_EXTRACTED_MODEL], normalize_ids=True)
+    #
+    # ``sources`` mirrors it too, and for a sharper reason: the citation half
+    # of the gate does not run without them, so omitting them grades a model
+    # against a weaker gate than the one production applies, and an invented
+    # excerpt that passes here fails inside a job. The mapping is read off the
+    # state the executor seeded rather than rebuilt from ``case.sources``, so
+    # the gate sees the labels the run actually carried.
+    model, issues = parse_and_validate(
+        state[STATE_EXTRACTED_MODEL],
+        normalize_ids=True,
+        sources=state.get(STATE_SOURCE_TEXTS, {}),
+    )
     return ExtractionResult(
         case_id=case.id,
         extracted=model,
@@ -704,6 +728,7 @@ def score_extraction(case: GoldenCase, result: ExtractionResult) -> ExtractionSc
         blessed_crossings=crossing_keys(case.model) or (),
         extracted_crossings=crossing_keys(result.extracted),
         unbased=_unbased(case, result.extracted),
+        uncited=tuple(issue for issue in result.issues if issue.is_citation),
         unsourced=_unsourced(
             case, sorted(extracted_ids - blessed_ids), result.extracted
         ),
