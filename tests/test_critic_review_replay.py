@@ -13,10 +13,11 @@ from __future__ import annotations
 
 import asyncio
 import json
+from typing import get_args
 
 import pytest
 
-from analysis_service.frameworks import PACKAGES
+from analysis_service.frameworks import PACKAGES, schemas_for
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.prompts import compose_critic_prompt
 from analysis_service.system_model import SystemModel
@@ -25,6 +26,14 @@ from evals.critic_review.loading import REPO_ROOT, corpus_model, load_fixtures
 from evals.critic_review.model import CriticFixture
 
 PACKAGE = PACKAGES["stride"]
+PACKAGE_RULINGS = schemas_for("stride").rulings
+RULING_SHAPE = get_args(PACKAGE_RULINGS.model_fields["claims"].annotation)[0]
+#: What this package requires of a ruling beyond the neutral two fields.
+PACKAGE_REQUIRED = {
+    name: "medium"
+    for name, field in RULING_SHAPE.model_fields.items()
+    if field.is_required() and name not in ("id", "verdict")
+}
 PACKAGE_LOADER = MarkdownLoader(REPO_ROOT / "frameworks" / "stride")
 PROMPT_LOADER = MarkdownLoader(REPO_ROOT / "prompts")
 
@@ -100,17 +109,34 @@ def test_every_signed_draft_reaches_the_critic(fixtures, model):
 
 
 def test_the_critic_reads_the_recommendations_it_now_rules_on(fixtures, model):
-    """Step 4 needs the block, and the fixtures carry one each."""
+    """Step 4 needs the block, and the fixtures carry one each.
+
+    Read off each fixture's own mitigation rather than a string pinned here. A
+    pinned string passes while every recommendation the critic reads describes
+    this file rather than a claim.
+    """
     prompt = composed(fixtures, model)
 
-    assert "Placeholder so the fixture carries the block" in prompt
+    for fixture in fixtures:
+        # ``mitigations`` is a field of a package whose claims recommend
+        # something. A package whose record declares none shows the critic
+        # nothing here, and there is nothing to look for.
+        for mitigation in fixture.draft.get("mitigations", ()):
+            assert mitigation["summary"] in prompt
 
 
 def rule(claim_id: str, status: str, reason: str = "") -> dict:
+    """One scripted ruling, in the shape this package's critic really emits.
+
+    The package's own required fields are filled from its schema, never spelled
+    here. A helper emitting the neutral shape alone lets the replay's parser and
+    the graph's drift apart while both stay green: the graph reads a
+    ``ThreatRuling``, and nothing offline would hand the replay one.
+    """
     verdict = {"status": status, "reason": reason}
     if status == "rejected":
         verdict["rejected_because"] = "reasoning"
-    return {"id": claim_id, "verdict": verdict}
+    return {"id": claim_id, "verdict": verdict, **PACKAGE_REQUIRED}
 
 
 def run(fixtures, model, payload: dict):
@@ -201,3 +227,22 @@ def test_a_dropped_fixture_is_a_review_problem_and_not_a_silent_pass(fixtures, m
     _, problems = run(fixtures, model, payload)
 
     assert problems
+
+
+def test_the_replay_parses_what_this_package_asks_a_critic_for():
+    """The two readers of "what shape is a critic's answer", against each other.
+
+    The harness composes ``frameworks/stride/critic.md``, which asks for a
+    ``confidence`` on every ruling. Parsing the answer with the neutral
+    ``Ruling``, which forbids one, raises on every real ruling after the paid
+    call while scripted rulings carrying no package field pass. Built from the
+    package's own schema rather than spelled here, so a package that adds a
+    second judgement field is covered the day it lands.
+    """
+    emission = {"claims": [rule("S-01", "needs-info", "open fact")]}
+
+    parsed = R.parse_rulings(json.dumps(emission), PACKAGE)
+
+    assert PACKAGE_REQUIRED, "this package asks a critic for nothing of its own"
+    assert [ruling.id for ruling in parsed] == ["S-01"]
+    assert isinstance(parsed[0], RULING_SHAPE)

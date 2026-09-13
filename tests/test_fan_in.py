@@ -15,7 +15,6 @@ from analysis_service.frameworks import schemas_for
 from analysis_service.frameworks.stride import STRIDE
 from analysis_service.frameworks.stride.record import DraftThreat
 from analysis_service.sources import DEFAULT_DESCRIPTION_LABEL
-from analysis_service.system_model import ModelIndex
 from tests.factories import (
     sample_draft,
     sample_proposal,
@@ -130,7 +129,7 @@ class TestJoinDrafts:
         element="store:orders-db",
         attribute="encryption_at_rest",
     ):
-        """A draft an ``unknown`` ground settles, so no critic ever sees it."""
+        """A draft an ``unknown`` ground makes conditional. The critic still reads it."""
         return sample_draft(
             threat_id,
             "information-disclosure",
@@ -146,26 +145,31 @@ class TestJoinDrafts:
             ],
         )
 
-    def test_two_conditional_drafts_at_one_place_become_one(self, model):
-        """The duplicate no reader would otherwise make.
+    def test_two_conditional_drafts_at_one_place_both_reach_the_critic(self, model):
+        """The fan-in deletes neither, and the critic is shown the pair.
 
-        A draft its grounds settle is ruled in code and never shown to a critic,
-        and ``critic_view`` computes the duplicate pairs over the shown set — so
-        both of these reached the report and nothing compared them.
+        **One question, one reader.** Whether two drafts are one finding is the
+        critic's judgement, and every draft reaches it — a conditional one
+        included. A second reader here would key on the lane, the verb and the
+        endpoint-resolved place, which is
+        :func:`~analysis_service.critic.duplicate_groups`'s own key, and it
+        would answer first by deleting one of the pair.
+
+        Both halves are asserted together, so neither can drift into answering
+        on its own.
         """
-        drafts = {
-            "information-disclosure": [
-                self._conditional("D-01", "first"),
-                self._conditional("D-02", "second"),
-            ]
+        pair = [self._conditional("D-01", "first"), self._conditional("D-02", "second")]
+
+        joined = join_drafts({"information-disclosure": pair}, STRIDE, model)
+
+        assert [draft.title for draft in joined.drafts] == ["first", "second"]
+        assert joined.marks.dropped_claims == []
+        assert critic.duplicate_groups(joined.drafts, model) == {
+            "D-01": ["D-02"],
+            "D-02": ["D-01"],
         }
-
-        joined = join_drafts(drafts, STRIDE, model)
-
-        assert [draft.title for draft in joined.drafts] == ["first"]
-        (mark,) = joined.marks.dropped_claims
-        assert (mark.claim_id, mark.title) == ("D-02", "second")
-        assert "'D-01'" in mark.reason
+        view = {row["id"]: row for row in critic.critic_view(joined.drafts, model)}
+        assert view["D-01"]["same_action_as"] == ["D-02"]
 
     def test_two_conditional_drafts_at_two_places_both_survive(self, model):
         """The key is the action and the place, not the fact they are both open."""
@@ -187,11 +191,11 @@ class TestJoinDrafts:
         assert joined.marks.dropped_claims == []
 
     def test_a_reviewable_draft_is_left_to_the_critic(self, model):
-        """Code drops only what no critic will read.
+        """Code drops no duplicate at all, whatever a draft rests on.
 
-        A draft resting on stated facts is shown, so its duplicates are the
-        critic's to rule on — and rejecting one there is a judgement about which
-        description is better, which code has no business making.
+        Every draft is shown, so its duplicates are the critic's to rule on —
+        and rejecting one is a judgement about which description is better,
+        which code has no business making.
         """
         drafts = {
             "information-disclosure": [
@@ -1008,71 +1012,3 @@ class TestFanIn:
         by_lane = {row.lane: row.drafts for row in merged.coverage}
         assert set(by_lane) == set(STRIDE.lanes)
         assert (by_lane["spoofing"], by_lane["tampering"]) == (1, 1)
-
-
-class TestSettledDuplicates:
-    """Two conditional drafts are one finding only when they ask one question.
-
-    A draft its own grounds settle never reaches a critic, so the fan-in is the
-    only place two of them are compared. The key is the lane, the verb, the
-    place and the unstated controls the drafts rest on. The first Baseline
-    dropped a WebSocket draft for a REST draft between the same two processes:
-    one place under the endpoint fold, two flows, two unstated controls, and
-    the dropped draft's question about the socket's session went with it.
-    """
-
-    @pytest.fixture
-    def index(self):
-        return ModelIndex.of(valid_model())
-
-    @staticmethod
-    def resting_on(threat_id, attribute, category="spoofing", verb="impersonate"):
-        return sample_draft(
-            threat_id,
-            category,
-            verb=verb,
-            affected_element_ids=["flow:customer-to-web-app:login"],
-            grounds=[
-                Ground(
-                    kind="unknown-attribute",
-                    element_id="flow:customer-to-web-app:login",
-                    attribute=attribute,
-                )
-            ],
-        )
-
-    def test_one_question_asked_twice_keeps_the_first(self, index):
-        drafts = [
-            self.resting_on("S-01", "authentication"),
-            self.resting_on("S-02", "authentication"),
-        ]
-
-        kept, dropped = fan_in._drop_settled_duplicates(drafts, index)
-
-        assert [claim.id for claim in kept] == ["S-01"]
-        assert [(mark.claim_id, mark.title) for mark in dropped] == [
-            ("S-02", drafts[1].title)
-        ]
-        assert "'S-01'" in dropped[0].reason
-
-    def test_two_unstated_controls_are_two_questions(self, index):
-        drafts = [
-            self.resting_on("S-01", "authentication"),
-            self.resting_on("S-02", "encryption_in_transit"),
-        ]
-
-        kept, dropped = fan_in._drop_settled_duplicates(drafts, index)
-
-        assert [claim.id for claim in kept] == ["S-01", "S-02"]
-        assert dropped == []
-
-    def test_two_lanes_are_two_findings(self, index):
-        drafts = [
-            self.resting_on("S-01", "authentication"),
-            self.resting_on("T-01", "authentication", category="tampering"),
-        ]
-
-        kept, dropped = fan_in._drop_settled_duplicates(drafts, index)
-
-        assert [claim.id for claim in kept] == ["S-01", "T-01"]
-        assert dropped == []

@@ -139,11 +139,17 @@ INVENTED = {"evidence_refs": ["crossing:flow:not-a-flow-in-this-model"]}
 DEAD: dict[str, Any] = {"dead": True}
 
 
-def sweep(monkeypatch, case, spoofing_first: dict[str, Any] | None) -> Any:
+def sweep(
+    monkeypatch, case, spoofing_first: dict[str, Any] | None, *, trailing: int = 0
+) -> Any:
     """Two cases through one pipeline: the first optionally broken, then a clean one.
 
     ``spoofing_first`` is the spoofing agent's evidence on the *first* case
     only; ``None`` runs both cases clean.
+
+    ``trailing`` appends further clean cases after those two. A sweep that
+    stops on its last case leaves nothing behind it, so proving that the cases
+    *after* a stop are named takes a case after the stop.
     """
     label = case.sources[0].label
     first = spoofing_first
@@ -183,11 +189,15 @@ def sweep(monkeypatch, case, spoofing_first: dict[str, Any] | None) -> Any:
     )
     monkeypatch.setattr(modes, "build_eval_pipeline", lambda *a, **k: pipeline)
     second = replace(case, meta=case.meta.model_copy(update={"id": "case-second"}))
+    later = [
+        replace(case, meta=case.meta.model_copy(update={"id": f"case-{n + 3}"}))
+        for n in range(trailing)
+    ]
     # A real deployment even though the pipeline is scripted: the sweep folds
     # each execution's tier and sampling into its provenance record, and both
     # come from the deployment rather than from the graph.
     deployment = Deployment.from_env(env=TEST_TIER_ENV)
-    return asyncio.run(_run_mode([case, second], "analysis", deployment))
+    return asyncio.run(_run_mode([case, second, *later], "analysis", deployment))
 
 
 def _reply_for(case, graph_node: str) -> str:
@@ -395,15 +405,19 @@ def test_a_provider_fault_stops_the_sweep_without_losing_the_finished_cases(
         monkeypatch, RuntimeError("This request requires more credits")
     )
 
-    run = sweep(monkeypatch, case, None)
+    run = sweep(monkeypatch, case, None, trailing=1)
 
     # The first case survived, whole.
     assert [entry.case_id for entry in run.grounds] == [case.id]
     assert run.latency["critic_stride"].executions == 2
     # And the sweep says plainly that it did not finish.
-    assert run.stopped_before == ("case-second",)
     assert any("the sweep stopped here" in failure for failure in run.failures)
     assert any("more credits" in failure for failure in run.failures)
+    # The case that stopped it ran, and the provider billed what finished, so
+    # it is the sweep's failure and not one of the cases nobody attempted.
+    # Counting it in both prices a billed case as one the sweep never reached.
+    assert run.stopped_before == ("case-3",)
+    assert run.payloads[-1]["case"] == "case-second"
 
 
 def test_the_stopping_fault_names_its_type_even_when_its_message_is_empty(
@@ -412,7 +426,7 @@ def test_the_stopping_fault_names_its_type_even_when_its_message_is_empty(
     """A provider error often carries no message, and a blank line helps nobody."""
     _raise_on_second_report(monkeypatch, RuntimeError())
 
-    run = sweep(monkeypatch, case, None)
+    run = sweep(monkeypatch, case, None, trailing=1)
 
     assert any("RuntimeError()" in failure for failure in run.failures)
     assert run.payloads[-1]["run_failure"] == "RuntimeError()"

@@ -280,6 +280,12 @@ async def _run_mode(
         this one are not attempted — but it ends the way a refused spend hold
         already ended, with the artifact written and the exit code non-zero.
 
+        **This case is not one of the cases nobody attempted.** It ran, the
+        provider billed what finished, and ``executions`` carries that. So it
+        stays out of ``stopped_before`` and is counted as the failure it is;
+        listing it in both would price a billed case as one the sweep never
+        reached, which is the reading #886 exists to end.
+
         ``repr`` rather than ``str``: a provider error's message is sometimes
         empty, and a line naming no type would tell a reader nothing at all.
         """
@@ -360,7 +366,7 @@ async def _run_mode(
                 # the next case would fail the same way. Stop, but keep what
                 # ran.
                 record_abort(case, failed.cause)
-                stopped_before = tuple(later.id for later in cases[position:])
+                stopped_before = tuple(later.id for later in cases[position + 1 :])
                 break
             record_failure(case, failed.cause)
             continue
@@ -371,7 +377,7 @@ async def _run_mode(
             continue
         except Exception as error:  # noqa: BLE001 — every fault, so none is free
             record_abort(case, error)
-            stopped_before = tuple(later.id for later in cases[position:])
+            stopped_before = tuple(later.id for later in cases[position + 1 :])
             break
 
         runs[case.id] = run

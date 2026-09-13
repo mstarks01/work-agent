@@ -737,6 +737,29 @@ class TestAStoppedSweepSaysSo:
             "stopped_before": 1,
         }
 
+    def test_the_case_that_stopped_the_sweep_is_counted_once(self):
+        """Attempted and never-attempted partition the corpus, with no overlap.
+
+        The case a provider fault stops on ran, and the provider billed what
+        finished on it. So it belongs to the cases the sweep attempted and to
+        the failures, and to ``stopped`` it does not: a case counted in both
+        makes ``attempted`` short by one while ``failed`` still names it, and a
+        billed case reads as one the sweep never reached.
+        """
+        artifact = self.artifact(
+            ("03",),
+            ["01", "02"],
+            payloads=[
+                {"case": "01"},
+                {"case": "02", "run_failure": "RuntimeError('out of credit')"},
+            ],
+        )
+        counts = artifact["completion"]
+
+        assert "02" not in artifact["stopped"]
+        assert counts["attempted"] + counts["stopped_before"] == 3
+        assert counts["failed"] == 1
+
 
 class TestTheSweepLoopPassesTheCasesThatRan:
     """The call site of :func:`hold`, driven with no provider.
