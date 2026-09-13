@@ -178,6 +178,16 @@ def main(argv: list[str] | None = None) -> int:
             "  survived with the advice unread: "
             + ", ".join(o.fixture_id for o in score.recommendation_unread)
         )
+    if score.unknown_unjudged:
+        # The other question a surviving ruling can leave alone. A draft
+        # citing an unknown that the ruling neither confirms nor dismisses is
+        # a critic that never answered "does this claim depend on it" — which
+        # is the state #894 asks the instrument to make visible, and which no
+        # score above moves.
+        print(
+            "  survived with the unknown unjudged: "
+            + ", ".join(o.fixture_id for o in score.unknown_unjudged)
+        )
     if score.rejected_without_engaging:
         print(
             "rejected without engaging the reader's anchors: "

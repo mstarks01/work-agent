@@ -23,6 +23,7 @@ from analysis_service.grounding import normalize, verify_normalized
 from analysis_service.system_model import ModelIndex
 from evals.critic_review.loading import corpus_model, load_fixtures, source_text
 from evals.critic_review.model import CriticFixture, FixtureKind
+from evals.critic_review.replay import carries_both_answers
 
 
 def draft_of(fixture: CriticFixture):
@@ -39,7 +40,7 @@ IDS = [entry.id for entry in ALL]
 
 
 def test_the_set_is_small_and_carries_every_kind():
-    """Four kinds, and none of them empty.
+    """Every kind the vocabulary names, and none of them empty.
 
     A set missing ``credible-conditional`` would be passed by a critic that
     rejects every conditional draft, which is the cheapest wrong answer to the
@@ -296,16 +297,19 @@ def test_the_set_carries_both_answers_about_a_recommendation():
     that survives while carrying one, and it is also what keeps the
     recommendation measure honest: where every readable fixture expects the same
     answer, a critic replying ``sound`` to all of them scores full marks without
-    opening the block. ``ReplayScore.recommendation_informative`` reads the same
-    fact at run time.
+    opening the block.
+
+    **Through the same reader the run uses.** :func:`carries_both_answers` is
+    the rule, and ``ReplayScore.set_carries_both_answers`` calls it over a
+    run's rows, so the gate over this file and the warning the instrument
+    prints cannot disagree about whether the set discriminates.
     """
     unsound = [entry for entry in ALL if not entry.expect.recommendation_sound]
     assert unsound, "no distractor: the set cannot tell reading from rejecting"
 
-    readable = {
-        entry.expect.recommendation_sound for entry in ALL if entry.expect.survives
-    }
-    assert len(readable) > 1, (
+    assert carries_both_answers(
+        (entry.expect.survives, entry.expect.recommendation_sound) for entry in ALL
+    ), (
         "every fixture that can carry a reading expects the same answer, so the"
         " recommendation measure cannot tell a reading from a constant. Add a"
         " fixture that survives while carrying advice a reader ruled unsound"
