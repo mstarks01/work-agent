@@ -40,6 +40,7 @@ from analysis_service.prompts import compose_critic_prompt
 from analysis_service.skills import compose_critic_skills
 from analysis_service.system_model import SystemModel
 from evals.critic_review.model import CriticFixture
+from evals.harness.modes import singular
 
 #: The placeholders this module fills, and the whole of what ``critic.md``
 #: declares. Held to the prompt file by a test rather than trusted: an unfilled
@@ -285,19 +286,46 @@ class ReplayScore:
         }
 
 
+def _words(text: str) -> list[str]:
+    """One text as its words, singular and lowercased.
+
+    Through :func:`~evals.harness.modes.singular`, which is the rule this
+    repository already measured for exactly this: a plural on one side and a
+    singular on the other are one word, and two readers of that question
+    disagree. On the first live run the critic rejected a draft for the right
+    reason — "the model does not state that process:order-service **queues**
+    failed database writes ... or **replays** archive objects" — against
+    anchors spelled ``queue`` and ``replay``, and a word-boundary match scored
+    it as engaging with nothing.
+    """
+    return [singular(word) for word in re.split(r"[^a-z0-9]+", text.lower()) if word]
+
+
 def _engages(reason: str, anchors: tuple[str, ...]) -> bool:
     """Does this reason name any of the facts the reader asked it to address?
 
-    Word-boundary matching on each anchor, case-insensitively. Crude on
-    purpose: the reason is prose and a reader cannot predict its wording, only
-    the fact it has to engage with. What this refuses is the reason that
-    engages with none of them — "the claim rests on an unknown control" — which
-    is the same sentence for every conditional draft in the corpus.
+    Crude on purpose: the reason is prose and a reader cannot predict its
+    wording, only the fact it has to engage with. What this refuses is the
+    reason that engages with none of them — "the claim rests on an unknown
+    control" — which is the same sentence for every conditional draft in the
+    corpus.
+
+    An anchor matches where its words appear in order and together, so a
+    multi-word anchor is a phrase rather than a bag, and a word inside a longer
+    word is not a match — the property the word-boundary form had and the one
+    worth keeping.
     """
-    folded = reason.lower()
-    return any(
-        re.search(rf"\b{re.escape(anchor.lower())}\b", folded) for anchor in anchors
-    )
+    words = _words(reason)
+    for anchor in anchors:
+        wanted = _words(anchor)
+        if not wanted:
+            continue
+        if any(
+            words[i : i + len(wanted)] == wanted
+            for i in range(len(words) - len(wanted) + 1)
+        ):
+            return True
+    return False
 
 
 def score(
