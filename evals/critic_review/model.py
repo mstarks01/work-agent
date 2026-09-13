@@ -94,6 +94,32 @@ class Expectation(BaseModel):
     rejected_because: Literal["evidence", "reasoning", "lane", "duplicate"] | None = (
         None
     )
+    #: Is this draft's recommendation sound advice for this claim?
+    #:
+    #: Read where the package's own critic text asks for a recommendation
+    #: judgement. STRIDE's does; a package whose claims recommend nothing
+    #: never reaches this.
+    #:
+    #: **Claim validity and recommendation quality are separate outcomes.** A
+    #: plausible recommendation must not rescue an unsupported finding, and a
+    #: flawed one must not erase a valid threat — so a negative fixture carries
+    #: a recommendation that reads well and does not hold, and the critic has
+    #: to reject the claim for its own argument rather than for the advice
+    #: under it.
+    #:
+    #: ``False`` on five fixtures by the reader's ruling: two propose a control
+    #: the model already states (``store:receipt-archive`` carries CMEK; the
+    #: append flow carries the order service's own service account), one turns
+    #: on a mechanism the source never establishes, and two repair the claim's
+    #: starting point while leaving the step that does not follow. Each is a
+    #: deliberate distractor, so nobody repairs it later as though it were a
+    #: defect in the fixture.
+    #:
+    #: What no expectation here can yet see is whether the critic *noticed*. A
+    #: ruling carries no judgement on a recommendation, so a critic that read
+    #: the advice and one that never looked emit the same ruling. Tracked apart
+    #: rather than faked, like the relevance question on fixture 5.
+    recommendation_sound: bool = True
     #: Anchors the ruling's ``reason`` must name, for a fixture that must die.
     #:
     #: **A rejection is only right for the right reason.** "The control is

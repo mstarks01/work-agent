@@ -835,7 +835,7 @@ def test_ruling_view_drops_a_grounds_empty_branches_and_nothing_else():
 
 
 def test_the_critic_is_shown_the_recommendations_it_now_rules_on():
-    """``mitigations`` reaches the view, because step 4 rules on it.
+    """``mitigations`` reaches the view, because the package's critic rules on it.
 
     A mitigation is copied into the report from this same draft and no other
     seam looks at it, so a recommendation that is well formed and irrelevant

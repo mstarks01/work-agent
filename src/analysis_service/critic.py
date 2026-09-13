@@ -829,16 +829,24 @@ def _ruling_view(
 ) -> list[dict]:
     """The drafts as a critic reads them, with no empty branches.
 
-    A critic's steps read ``description`` (evidence), the lane,
-    ``affected_element_ids`` (duplicate), ``grounds`` and ``mitigations`` — plus
-    whatever its own framework grades.
+    The three shared steps read ``description`` (evidence), the lane and
+    ``affected_element_ids`` (duplicate), over ``grounds``. Everything else here
+    is for whatever its own framework grades.
 
-    ``mitigations`` is the largest block here: a
+    ``mitigations`` is the largest block, and it is a package's field rather
+    than the neutral claim's: a
     :class:`~analysis_service.claims.Mitigation` is a 200-character summary plus
     2000 characters of detail and a draft carries a list of them. It is shown
     because it is what the report tells an operator to do, it is copied into the
-    report from this same draft, and no other seam looks at it. A recommendation
-    that is well formed and irrelevant costs a reader more than a missing one.
+    report from this same draft, and no other seam looks at it — so a package
+    whose critic text asks for a reading of it gets one, and a package whose
+    claims recommend nothing carries no such field and is shown none.
+
+    **A recommendation never decides a claim.** Validity and advice are
+    separate judgements, so a package's text rules the advice and rules the
+    claim on its own argument; ``frameworks/stride/critic.md`` is where that is
+    said, because ``mitigations`` is STRIDE's field and the shared prompt has
+    no business reading one.
 
     ``exclude_defaults`` is what drops the empty branches of a
     :class:`~analysis_service.claims.Ground`. That model is one flat object
