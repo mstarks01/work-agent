@@ -143,6 +143,12 @@ class FixtureOutcome:
     #: What the reader ruled the recommendation was, carried so the row says
     #: what it was compared against.
     recommendation_expected: bool | None = None
+    #: Why the critic ruled the advice as it did, in its own words. Empty where
+    #: it made no reading, and empty on a sound one, which is the ordinary
+    #: value. Carried because ``recommendation_read`` alone is a verdict with
+    #: no argument behind it, and a reader asking whether the critic found the
+    #: *right* flaw has nothing else to read.
+    recommendation_note: str = ""
     #: The unknown pairs the critic said this claim does not rest on. Empty
     #: where it dismissed none, which on a draft citing one is a critic that
     #: left the question alone — the fact #894 asks for, in a field.
@@ -186,6 +192,7 @@ class FixtureOutcome:
             "dismissed_unknowns": [list(pair) for pair in self.dismissed_unknowns],
             "judged_the_unknown": self.judged_the_unknown,
             "recommendation_read": self.recommendation_read,
+            "recommendation_note": self.recommendation_note,
             "recommendation_expected": self.recommendation_expected,
             "recommendation_agrees": self.recommendation_agrees,
             "passes": self.passes,
@@ -375,6 +382,7 @@ def score(
     outcomes = []
     for fixture, draft in zip(fixtures, drafts, strict=True):
         ruling = completed.get(draft.id)
+        reading = _reading(ruling)
         survived = None if ruling is None else ruling.verdict.status != "rejected"
         reason = "" if ruling is None else ruling.verdict.reason
         anchors = fixture.expect.reason_must_name
@@ -388,7 +396,8 @@ def score(
                 reason=reason,
                 fate_agrees=survived == fixture.expect.survives,
                 reason_engages=_engages(reason, anchors) if anchors else None,
-                recommendation_read=_recommendation(ruling),
+                recommendation_read=None if reading is None else bool(reading.sound),
+                recommendation_note="" if reading is None else reading.note,
                 recommendation_expected=fixture.expect.recommendation_sound,
                 dismissed_unknowns=tuple(sorted(dismissed_unknowns(ruling))),
             )
@@ -410,15 +419,16 @@ def dismissed_unknowns(ruling: Ruling | None) -> frozenset[tuple[str, str]]:
     )
 
 
-def _recommendation(ruling: Ruling | None) -> bool | None:
-    """What the critic ruled the advice was, or ``None`` where it read none.
+def _reading(ruling: Ruling | None) -> Any | None:
+    """The critic's reading of the advice, or ``None`` where it made none.
 
-    Read off whatever the package's ruling declares, never off a package's
-    name: a package whose claims recommend nothing carries no such field, so
-    every row answers ``None`` and the third half has no denominator.
+    The one reader of that field, so the verdict on the advice and the words
+    behind it cannot come from two places. Read off whatever the package's
+    ruling declares, never off a package's name: a package whose claims
+    recommend nothing carries no such field, so every row answers ``None`` and
+    the third half has no denominator.
     """
-    reading = getattr(ruling, "recommendation", None)
-    return None if reading is None else bool(reading.sound)
+    return getattr(ruling, "recommendation", None)
 
 
 async def replay(

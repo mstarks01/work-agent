@@ -497,3 +497,31 @@ def test_a_killed_discriminator_is_not_reported_as_a_deficient_set(fixtures, mod
 
     assert not score.recommendation_informative, "no surviving row disagrees"
     assert score.set_carries_both_answers, "but the set does carry both"
+
+
+def test_the_words_behind_the_advice_verdict_are_kept(fixtures, model):
+    """``recommendation_read`` alone is a verdict with no argument behind it.
+
+    A reader asking whether the critic found the flaw the fixture is about, or
+    some other one, has only the note to read. The first run of the nine-fixture
+    set recorded ``False`` against an empty string, which says a critic
+    disagreed with the advice and nothing about why.
+    """
+    payload = {"claims": []}
+    for f in fixtures:
+        status = surviving_status(f) if f.expect.survives else "rejected"
+        ruling = rule(f.draft["id"], status, "; ".join(f.expect.reason_must_name))
+        if f.expect.survives:
+            ruling["recommendation"] = {
+                "sound": f.expect.recommendation_sound,
+                "note": "" if f.expect.recommendation_sound else "narrows no grant",
+            }
+        payload["claims"].append(ruling)
+
+    score, _ = run(fixtures, model, payload)
+    unsound = [o for o in score.outcomes if o.recommendation_read is False]
+
+    assert unsound, "the set carries a fixture whose advice is ruled unsound"
+    for outcome in unsound:
+        assert outcome.recommendation_note == "narrows no grant"
+        assert outcome.to_json()["recommendation_note"] == "narrows no grant"
