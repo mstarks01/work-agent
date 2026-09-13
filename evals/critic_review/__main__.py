@@ -31,7 +31,7 @@ from google.genai import types
 
 from analysis_service.binding import build_tier_adapters
 from analysis_service.deployment import Deployment
-from analysis_service.frameworks import PACKAGES, FrameworkName
+from analysis_service.frameworks import PACKAGES, FrameworkName, schemas_for
 from analysis_service.markdown_loader import MarkdownLoader
 from evals.critic_review.loading import REPO_ROOT, corpus_model, load_fixtures
 from evals.critic_review.model import CriticFixture
@@ -110,6 +110,17 @@ def main(argv: list[str] | None = None) -> int:
         env=deployment.env,
     )[tier]
 
+    # The node's own sampling and the node's own output schema. ADK gives a
+    # real critic node both through its ``LlmAgent``: the tier's
+    # ``generate_content_config``, and a ``response_format`` derived from the
+    # agent's ``output_schema`` — ADK's LiteLLM adapter builds it from
+    # ``config.response_schema``. A request built without them is a shape this
+    # service never sends — ``ExecutedLlm`` says every node binds a schema and
+    # so never streams — and an unconstrained gpt-5.6 answered one with no text
+    # at all, which the replay could only report as a parse failure.
+    sampling = deployment.sampling.for_tier(tier)
+    schema = schemas_for(framework).rulings
+
     async def call(instruction: str) -> str:
         """One turn through the adapter the graph would have used.
 
@@ -117,10 +128,13 @@ def main(argv: list[str] | None = None) -> int:
         the single word the graph's own critic turn carries, so what reaches
         the provider has the shape a real critic call has.
         """
+        config = sampling.to_generate_content_config()
+        config.system_instruction = instruction
+        config.response_schema = schema
         request = LlmRequest(
             model=adapter.model,
             contents=[types.Content(role="user", parts=[types.Part(text="Rule.")])],
-            config=types.GenerateContentConfig(system_instruction=instruction),
+            config=config,
         )
         chunks = []
         async for response in adapter.generate_content_async(request, False):

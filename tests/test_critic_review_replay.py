@@ -345,3 +345,36 @@ def test_the_third_half_says_when_it_cannot_tell_a_reading_from_a_constant(
     assert score.recommendation_agreed == (3, 3), "the flattering full marks"
     assert not score.recommendation_informative
     assert score.to_json()["recommendation_agreed"]["informative"] is False
+
+
+def test_an_anchor_matches_the_word_form_the_critic_actually_wrote():
+    """The reason from the first live run, which scored as engaging with nothing.
+
+    The critic rejected the invented-mechanism draft for exactly the fact the
+    reader named, and wrote the verbs as plurals. Anchors are spelled singular,
+    a word-boundary match refused both, and the run reported "rejected without
+    engaging the reader's anchors" — the one answer that reads as a critic
+    killing the right draft for the wrong reason.
+
+    ``singular`` is the rule this repository already measured for plural drift,
+    and it is now the only reader of that question.
+    """
+    reason = (
+        "The model does not state that process:order-service queues failed "
+        "database writes in store:receipt-archive or replays archive objects "
+        "into store:orders-db."
+    )
+
+    assert R._engages(reason, ("queue", "replay", "drain", "retry", "inject"))
+
+
+def test_an_anchor_is_a_phrase_and_never_a_bag_of_words():
+    """A multi-word anchor has to appear together and in order."""
+    assert R._engages("the signing key is held outside", ("signing key",))
+    assert not R._engages("the key signs nothing", ("signing key",))
+
+
+def test_a_word_inside_a_longer_word_is_not_an_anchor():
+    """The property the word-boundary form had, kept."""
+    assert not R._engages("the injector was replaced", ("inject",))
+    assert R._engages("an attacker injects a row", ("inject",))
