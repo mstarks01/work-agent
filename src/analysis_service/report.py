@@ -256,7 +256,11 @@ from analysis_service.vendors import ServedTrust, vendor_for_route
 # unknown ground is a fact about what any package's draft cites. It is what
 # makes a ``confirmed`` reachable on a draft naming an open fact its argument
 # never uses — 78% of the corpus's drafts name one — and a confirmation that
-# lists none is still refused, so silence cannot confirm.
+# lists none is still refused, so silence cannot confirm. The review seam
+# checks that field against the draft's own grounds, so ``UnreconciledKind``
+# carries a ninth value, ``dismissal-off-grounds``. Widening a closed set is a
+# major change on the rule above, and it rides 3.0 for the reason
+# ``absent-attribute`` does: 3.0 has never shipped.
 #
 # 3.0 also carries ``recommendation`` on a STRIDE threat: what the critic made
 # of the advice the finding carries, as ``sound`` and a ``note``. It is the

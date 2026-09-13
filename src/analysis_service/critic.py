@@ -390,10 +390,7 @@ def complete_rulings(
         # not filled in beside the ones that are. Without this the service
         # would hand back, as the question a reader must answer, the very fact
         # the critic just said the argument does not use.
-        dismissed = {
-            (ref.element_id, ref.attribute)
-            for ref in ruling.verdict.immaterial_unknowns
-        }
+        dismissed = ruling.verdict.dismissed_pairs()
         derived = [
             ref
             for ref in by_id.get(ruling.id, [])
@@ -407,7 +404,7 @@ def complete_rulings(
         }
         added = [ref for ref in derived if (ref.element_id, ref.attribute) not in named]
         reason = ruling.verdict.reason or (
-            f"The claim rests on {_named(derived)}, which the input never stated."
+            f"The claim rests on {_named(_pairs(derived))}, which the input never stated."
         )
         verdict = ruling.verdict.model_copy(
             update={
@@ -419,8 +416,20 @@ def complete_rulings(
     return completed
 
 
-def _named(unknowns: Sequence[UnknownRef]) -> str:
-    return ", ".join(f"`{ref.attribute}` on `{ref.element_id}`" for ref in unknowns)
+def _named(pairs: Iterable[tuple[str, str]]) -> str:
+    """``(element_id, attribute)`` pairs as one sentence fragment.
+
+    The one spelling of a pair in a message a re-ask reads, so the three
+    checks that name one cannot describe the same fact three ways.
+    """
+    return ", ".join(
+        f"`{attribute}` on `{element_id}`" for element_id, attribute in pairs
+    )
+
+
+def _pairs(unknowns: Iterable[UnknownRef]) -> list[tuple[str, str]]:
+    """References as the pairs :meth:`~analysis_service.claims.ProposedVerdict.dismissed_pairs` speaks in."""
+    return [(ref.element_id, ref.attribute) for ref in unknowns]
 
 
 def _duplicate_on_unit_issues(
@@ -483,10 +492,7 @@ def _confirmed_on_unknown_issues(
     for ruling in rulings:
         if ruling.verdict.status != "confirmed":
             continue
-        dismissed = {
-            (ref.element_id, ref.attribute)
-            for ref in ruling.verdict.immaterial_unknowns
-        }
+        dismissed = ruling.verdict.dismissed_pairs()
         outstanding = [
             ref
             for ref in by_id.get(ruling.id, [])
@@ -499,13 +505,60 @@ def _confirmed_on_unknown_issues(
                 claim_id=ruling.id,
                 kind="confirmed-on-unknown",
                 message=f"claim {ruling.id!r} is ruled confirmed but its own grounds"
-                f" cite {_named(outstanding)} as never stated, and the ruling does"
+                f" cite {_named(_pairs(outstanding))} as never stated, and the ruling does"
                 " not say the claim stands without them: name each in"
                 " immaterial_unknowns where the argument does not rest on it,"
                 " or rule it needs-info, or reject it with a reason",
             )
         )
     return problems
+
+
+def _dismissal_off_grounds_issues(
+    drafts: Sequence[Claim], rulings: Iterable[Ruling]
+) -> list[UnreconciledRuling]:
+    """Every ``immaterial_unknowns`` entry naming a pair the draft never cites.
+
+    ``related_unknowns`` is checked against the model, in
+    :func:`_unresolved_unknown_ref_issues`, because a question nobody can
+    answer is worse than no question. This is the same rule on the other
+    field, against the other source of truth: a dismissal is a statement about
+    **this draft's own grounds**, so a pair that is not one of them dismisses
+    nothing.
+
+    It matters because the dismissal is what buys a ``confirmed``. A critic
+    that names a near-miss spelling — the right element and a neighbouring
+    attribute — leaves the real pair outstanding, and
+    :func:`_confirmed_on_unknown_issues` reports that. What it cannot report is
+    the entry itself, so the re-ask is told a pair is missing while the ruling
+    looks to a reader as though it answered one. Both sentences are owed.
+
+    Asked of every status, unlike the ``confirmed`` rule. A ``needs-info`` that
+    dismisses a pair the draft does not carry is the same wrong statement, and
+    ``complete_rulings`` filters ``related_unknowns`` by that set whatever the
+    verdict says.
+    """
+    by_id = {
+        draft.id: {(ref.element_id, ref.attribute) for ref in draft.unknown_grounds()}
+        for draft in drafts
+    }
+    issues = []
+    for ruling in rulings:
+        cited = by_id.get(ruling.id, set())
+        stray = sorted(ruling.verdict.dismissed_pairs() - cited)
+        if not stray:
+            continue
+        issues.append(
+            UnreconciledRuling.of(
+                claim_id=ruling.id,
+                kind="dismissal-off-grounds",
+                message=f"claim {ruling.id!r} names"
+                f" {_named(stray)} in immaterial_unknowns, which its own"
+                " grounds do not cite as never stated: dismiss only the pairs"
+                " the draft carries",
+            )
+        )
+    return issues
 
 
 def endpoint_targets(
@@ -655,6 +708,7 @@ def review_issues(
     dropped = sorted(drafted_ids - ruled_ids)
     per_ruling = (
         _confirmed_on_unknown_issues(drafts, rulings)
+        + _dismissal_off_grounds_issues(drafts, rulings)
         + _duplicate_on_unit_issues(drafts, rulings)
         + _verdict_shape_issues(rulings)
         + _unresolved_unknown_ref_issues(rulings, system_model)
