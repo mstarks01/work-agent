@@ -343,13 +343,19 @@ def complete_rulings(
 ) -> list[Ruling]:
     """Each ruling with what the draft's grounds settle already filled in.
 
-    A draft whose grounds settle it (:meth:`Claim.settled_by_grounds`) is not
-    shown to the critic, and where the critic wrote no ruling on it the
-    settled ruling is added here. Where a critic did rule on one — a scripted
-    critic reads every draft — a ``needs-info`` ruling gains the pairs in
-    ``related_unknowns`` (beside any the critic named) and, where the critic
-    wrote none, a reason naming them. What a critic may not do is confirm such
-    a draft, which :func:`review_issues` reports.
+    A ``needs-info`` ruling on a draft citing an unknown ground gains the pairs
+    in ``related_unknowns`` (beside any the critic named) and, where the critic
+    wrote none, a reason naming them. Code supplies those references because a
+    hand-written pair naming an attribute the model does not carry is a failure
+    the service can prevent and a critic cannot (#409). What a critic may not do
+    is confirm such a draft, which :func:`review_issues` reports.
+
+    **A missing ruling is not filled in here.** Every draft is shown, so a draft
+    with no ruling means the critic dropped it, and
+    :func:`review_issues` routes that to the bounded re-ask. Completing it from
+    the draft's own grounds would hand back an automatic verdict for a claim
+    nobody reviewed — which is the state this seam exists to leave behind, and
+    it would arrive silently, on the path where the critic failed.
 
     A ruling on a draft the package's own table calls misfiled
     (:meth:`~analysis_service.claims.Claim.misfiled`) becomes ``rejected`` with
@@ -363,15 +369,8 @@ def complete_rulings(
     misfiled = {
         draft.id: reason for draft in drafts if (reason := type(draft).misfiled(draft))
     }
-    ruled_ids = {ruling.id for ruling in rulings}
-    settled = [
-        ruling
-        for draft in drafts
-        if draft.id not in ruled_ids
-        and (ruling := type(draft).settled_by_grounds(draft)) is not None
-    ]
     completed = []
-    for ruling in (*rulings, *settled):
+    for ruling in rulings:
         if ruling.id in misfiled:
             # A lane error is a table lookup, so the ruling is the table's
             # whatever the critic said (#442). The reason names the lanes the
@@ -410,15 +409,6 @@ def complete_rulings(
 
 def _named(unknowns: Sequence[UnknownRef]) -> str:
     return ", ".join(f"`{ref.attribute}` on `{ref.element_id}`" for ref in unknowns)
-
-
-def unsettled_drafts(drafts: Sequence[Claim]) -> list[Claim]:
-    """The drafts a critic reads: every one its own grounds do not settle.
-
-    A draft :meth:`Claim.settled_by_grounds` rules is ruled in code and never
-    shown, so the critic spends nothing on it (#439).
-    """
-    return [draft for draft in drafts if type(draft).settled_by_grounds(draft) is None]
 
 
 def _duplicate_on_unit_issues(
@@ -817,7 +807,18 @@ def _claim_order(claim: RuledClaim) -> tuple[int, str]:
     return rank, claim.id
 
 
-_DRAFT_UNRULED_FIELDS = frozenset({"mitigations"})
+#: Draft fields no critic rules on, so no critic is shown them. **Empty**, and
+#: the constant stays because what belongs in it is a live question: every field
+#: here is prompt budget spent on judgement nobody asked for, and every field
+#: wrongly here is a judgement nobody can make.
+#:
+#: ``mitigations`` sat here while the critic ruled only on a draft's argument.
+#: A mitigation is what the report tells an operator to *do*, it is copied into
+#: the report verbatim, and a well-formed recommendation can still be
+#: irrelevant to the claim it sits under or wrong about what would close it.
+#: Nothing else reviews it, so leaving it out of the view meant nothing
+#: reviewed it at all.
+_DRAFT_UNRULED_FIELDS: frozenset[str] = frozenset()
 
 
 def _ruling_view(
@@ -826,16 +827,18 @@ def _ruling_view(
     rated_unlike: Mapping[str, Sequence[str]] = MappingProxyType({}),
     repaired: Sequence[RepairedQuote] = (),
 ) -> list[dict]:
-    """The drafts as a critic reads them: no recommendations, no empty branches.
+    """The drafts as a critic reads them, with no empty branches.
 
     A critic's steps read ``description`` (evidence), the lane,
-    ``affected_element_ids`` (duplicate), and ``grounds`` — plus whatever its own
-    framework grades. ``mitigations`` is read by none of them, and the prompt
-    already says so. A :class:`~analysis_service.claims.Mitigation` is a
-    200-character summary plus 2000 characters of detail, and a draft carries a
-    list of them, so this is the largest block in the longest prompt the graph
-    sends that no judgement is spent on. Same argument as
-    :func:`~analysis_service.graph._without_source_fields`, one node further down.
+    ``affected_element_ids`` (duplicate), ``grounds`` and ``mitigations`` — plus
+    whatever its own framework grades.
+
+    ``mitigations`` is the largest block here: a
+    :class:`~analysis_service.claims.Mitigation` is a 200-character summary plus
+    2000 characters of detail and a draft carries a list of them. It is shown
+    because it is what the report tells an operator to do, it is copied into the
+    report from this same draft, and no other seam looks at it. A recommendation
+    that is well formed and irrelevant costs a reader more than a missing one.
 
     ``exclude_defaults`` is what drops the empty branches of a
     :class:`~analysis_service.claims.Ground`. That model is one flat object
@@ -912,9 +915,15 @@ def critic_view(
     One function rather than four calls in the right order, because the graph
     builds this view twice — once for the first pass over the whole fan-in, once
     for the bounded re-ask over the few drafts it names — and the two must agree
-    about what a critic reads. A draft its own grounds settle is dropped first
-    (:func:`unsettled_drafts`), then the pairs the critic would otherwise hunt
-    for are computed and attached.
+    about what a critic reads.
+
+    **Every draft is shown.** A draft citing an unknown ground is conditional,
+    and :meth:`Claim.settled_by_grounds` still says so in code — but whether an
+    argument follows from the facts it cites is a different question from
+    whether those facts are open, and only the second can be answered by a
+    rule. Showing the critic the first set and not the second left roughly four
+    fifths of a report's findings with their reasoning read by nobody, and a
+    draft could reach that state by citing an unknown it did not depend on.
 
     **The pairs are computed over every shown draft, never over ``only``.** A
     duplicate is a relation between two drafts, so narrowing the set first would
@@ -928,7 +937,7 @@ def critic_view(
     first pass hands them in; the re-ask hands in none, because its job is
     structural and it is told not to re-decide a verdict.
     """
-    shown = unsettled_drafts(drafts)
+    shown = list(drafts)
     duplicates = duplicate_groups(shown, system_model)
     rated_unlike = rating_disagreements(shown)
     chosen = shown if only is None else [d for d in shown if d.id in only]
@@ -989,10 +998,9 @@ def review(
     problems = review_issues(drafts, rulings, system_model)
     if not problems:
         return Accepted(count=len(rulings))
-    shown = unsettled_drafts(drafts)
     return Revision(
         problems=list(problems.problems),
-        roster=[draft.id for draft in shown],
+        roster=[draft.id for draft in drafts],
         unreconciled=critic_view(drafts, system_model, only=problems.implicated),
         repairable=sorted(problems.repairable),
     )
