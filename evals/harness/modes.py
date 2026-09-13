@@ -721,6 +721,15 @@ def _unsourced(
     from scattered words. The question this answers is whether the model
     *invented* a component, and a check that accuses one should be sure.
 
+    **Only a component the text could name is asked.** An entity, a process and
+    a data store are things a submitter describes, so a name absent from their
+    words is a component nobody mentioned. A flow's name is a label the model
+    coins for an interaction — ``dashboards-query-telemetry-lake`` — and rule 2
+    of ``extract.md`` has it invent a zone for each one the text implies, so
+    neither is a name the source was ever going to contain. Asking anyway read
+    41 coined flow labels and 3 invented zones as invention on the first run
+    that used this.
+
     What it is not is a rename test. Deciding that an extra element is a
     blessed one under another name needs a fuzzy comparison, which this
     repository refuses in graded code for the reason
@@ -736,7 +745,9 @@ def _unsourced(
     out = []
     for element_id in extra:
         element = by_id.get(element_id)
-        if element is None:
+        if element is None or not element_id.startswith(
+            ("entity:", "process:", "store:")
+        ):
             continue
         tokens = [
             w for w in re.split(r"[^a-z0-9]+", element.name.lower()) if len(w) > 2
