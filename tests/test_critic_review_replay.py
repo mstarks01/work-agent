@@ -499,6 +499,82 @@ def test_a_killed_discriminator_is_not_reported_as_a_deficient_set(fixtures, mod
     assert score.set_carries_both_answers, "but the set does carry both"
 
 
+def test_a_deficient_set_is_not_reported_as_a_killed_discriminator(fixtures, model):
+    """The other direction of the same warning, and the one that was wrong.
+
+    Reading the expectation on every row scored ``set_carries_both_answers``
+    true on any set holding one negative fixture, because a negative row
+    carries unsound advice by construction. So the set as it stood before the
+    ninth fixture — no row surviving with advice the reader ruled unsound —
+    reported "the critic rejected the discriminator" at a critic that had
+    agreed with every signed expectation.
+
+    The harness is that set and that critic.
+    """
+    deficient = [f for f in fixtures if f.kind != "sound-claim-flawed-advice"]
+    payload = {
+        "claims": [
+            rule(
+                f.draft["id"],
+                surviving_status(f) if f.expect.survives else "rejected",
+                f.expect.reason_must_name[0] if f.expect.reason_must_name else "open",
+            )
+            for f in deficient
+        ]
+    }
+
+    score, _ = run(deficient, model, payload)
+
+    assert not score.recommendation_informative, "no surviving row disagrees"
+    assert not score.set_carries_both_answers, (
+        "the set carries no discriminating row, so the critic cannot have killed one"
+    )
+
+
+def test_the_gate_and_the_run_read_the_set_through_one_rule():
+    """The lint over the file and the score over a run, against each other.
+
+    Two readers of "can this set discriminate" is how the warning came to
+    name the wrong cause. They are one function now, so the fixture set is
+    driven through both spellings of its rows here rather than each being
+    trusted against its own expectation.
+    """
+    rows = [(f.expect.survives, f.expect.recommendation_sound) for f in load_fixtures()]
+
+    assert R.carries_both_answers(rows)
+    assert not R.carries_both_answers(
+        (survives, sound) for survives, sound in rows if survives is sound
+    )
+
+
+def test_a_surviving_draft_whose_unknown_was_never_ruled_on_is_counted(fixtures, model):
+    """The question a ``needs-info`` can leave alone, and #894's whole point.
+
+    A critic that weighed relevance and one that never looked emitted the same
+    ruling before ``immaterial_unknowns`` existed. A surviving draft that
+    cites an unknown and dismisses none of it is the second of those, and no
+    score above moves on it.
+    """
+    payload = {
+        "claims": [
+            rule(f.draft["id"], surviving_status(f), "open fact")
+            for f in survivors(fixtures)
+        ]
+    }
+
+    score, _ = run(survivors(fixtures), model, payload)
+
+    unjudged = {o.fixture_id for o in score.unknown_unjudged}
+    cites = {o.fixture_id for o in score.outcomes if o.cites_unknown}
+    confirmed = {o.fixture_id for o in score.outcomes if o.status == "confirmed"}
+
+    assert unjudged == cites - confirmed, (
+        "every surviving draft citing an unknown that was not confirmed left"
+        " the question alone"
+    )
+    assert unjudged, "the set carries at least one such draft"
+
+
 def test_the_words_behind_the_advice_verdict_are_kept(fixtures, model):
     """``recommendation_read`` alone is a verdict with no argument behind it.
 

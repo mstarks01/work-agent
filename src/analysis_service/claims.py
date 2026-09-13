@@ -444,7 +444,7 @@ REASON_MAX_CHARS = 1000
 class ProposedVerdict(BaseModel):
     """The critic's ruling on one threat, as the critic emits it.
 
-    The four fields and **no rule between them**, which is what makes this the
+    The five fields and **no rule between them**, which is what makes this the
     shape a provider can be asked to generate: nothing a critic writes here is
     a shape error, so nothing it writes can fail the node on the way into
     state. Whether the combination is *coherent* — a ``needs-info`` that names
@@ -479,6 +479,21 @@ class ProposedVerdict(BaseModel):
     #: measured on it. It is the observable #894 asks for.
     immaterial_unknowns: list[UnknownRef] = Field(default_factory=list)
     rejected_because: RejectionStep | None = None
+
+    def dismissed_pairs(self) -> frozenset[tuple[str, str]]:
+        """``immaterial_unknowns`` as the ``(element_id, attribute)`` pairs it names.
+
+        **The one reader of that field as a set.** Three sites ask the same
+        question of it — the review seam refusing a ``confirmed`` that leaves
+        a pair unaccounted for, ``complete_rulings`` declining to hand a
+        dismissed pair back as a question, and the critic-review replay
+        recording what the critic ruled on — and each one spelled the
+        comprehension itself. A rule with three readers is how the three come
+        to disagree about what a dismissal is.
+        """
+        return frozenset(
+            (ref.element_id, ref.attribute) for ref in self.immaterial_unknowns
+        )
 
 
 class Verdict(ProposedVerdict):
@@ -1538,7 +1553,7 @@ class MissingMitigation(BaseModel):
 
 
 # How much of one problem's sentence a mark carries. Set above what the
-# longest of the eight sentences can compose from its own inputs at their
+# longest of the nine sentences can compose from its own inputs at their
 # field bounds — a claim ID, an element ID, an attribute and the attribute
 # names of one element type, about 1,040 characters together — so the cut is
 # a fail-safe against a producer nobody has written yet and never a silent
@@ -1564,13 +1579,15 @@ UNNAMED_CLAIM = "(unnamed)"
 #: * ``duplicate-on-unit`` — a draft naming a catalog unit was rejected as a
 #:   duplicate, which that framework decides by identifier before any critic
 #:   reads it;
+#: * ``dismissal-off-grounds`` — a ruling names a pair in
+#:   ``immaterial_unknowns`` that the draft's own grounds do not cite;
 #: * ``verdict-shape`` — a verdict's fields disagree with its own ``status``;
 #: * ``unresolved-unknown`` — a ``needs-info`` names an element or attribute
 #:   the model does not hold, or names nothing at all;
 #: * ``unbriefed-change`` — the re-ask changed a ruling no problem named, and
 #:   the first pass's ruling was kept.
 #:
-#: The first seven are the *first* pass's problems and the last is the second
+#: The first eight are the *first* pass's problems and the last is the second
 #: look's, which is why one field carries both: each is a way the review did
 #: not reconcile, and a reader asking "did this run repair itself" wants one
 #: list rather than two.
@@ -1579,6 +1596,7 @@ UnreconciledKind = Literal[
     "invented",
     "duplicate-id",
     "confirmed-on-unknown",
+    "dismissal-off-grounds",
     "duplicate-on-unit",
     "verdict-shape",
     "unresolved-unknown",

@@ -609,6 +609,89 @@ class TestAnUnknownGroundMakesTheClaimConditional:
         assert "encryption_in_transit" in message
         assert "encryption_at_rest" not in message
 
+    def test_a_dismissal_of_a_pair_the_draft_never_cites_is_reported(self, model):
+        """``immaterial_unknowns`` is a statement about this draft's own grounds.
+
+        ``related_unknowns`` is checked against the model, so a question
+        nobody can answer never reaches a reader. Nothing checked the other
+        field, and a near-miss spelling is the shape that matters: the right
+        element with a neighbouring attribute dismisses nothing, leaves the
+        real pair outstanding, and still reads to a person as though the
+        critic answered the question.
+
+        Both sentences are owed — what is outstanding, and what was named that
+        should not have been.
+        """
+        draft = sample_draft(
+            "S-01",
+            grounds=[
+                Ground(
+                    kind="unknown-attribute",
+                    element_id="store:orders-db",
+                    attribute="encryption_at_rest",
+                )
+            ],
+        )
+        ruling = sample_ruling(
+            "S-01",
+            verdict=ProposedVerdict(
+                status="confirmed",
+                immaterial_unknowns=[
+                    UnknownRef(
+                        element_id="store:orders-db",
+                        attribute="encryption_in_transit",
+                    )
+                ],
+            ),
+        )
+
+        problems = review_issues([draft], [ruling], model)
+        kinds = {problem.kind for problem in problems.problems}
+
+        assert kinds == {"confirmed-on-unknown", "dismissal-off-grounds"}
+        message = "; ".join(problems.messages)
+        assert "encryption_in_transit" in message, "the stray pair is named"
+        assert "encryption_at_rest" in message, "the outstanding pair is named"
+
+    def test_a_dismissal_is_checked_on_every_status_not_only_a_confirmation(
+        self, model
+    ):
+        """``complete_rulings`` filters by the dismissed set whatever the verdict says.
+
+        So a ``needs-info`` naming a pair the draft does not carry is the same
+        wrong statement, and it is reported without a ``confirmed`` beside it.
+        """
+        draft = sample_draft(
+            "S-01",
+            grounds=[
+                Ground(
+                    kind="unknown-attribute",
+                    element_id="store:orders-db",
+                    attribute="encryption_at_rest",
+                )
+            ],
+        )
+        ruling = sample_ruling(
+            "S-01",
+            verdict=ProposedVerdict(
+                status="needs-info",
+                reason="open",
+                related_unknowns=[
+                    UnknownRef(
+                        element_id="store:orders-db", attribute="encryption_at_rest"
+                    )
+                ],
+                immaterial_unknowns=[
+                    UnknownRef(element_id="store:ghost", attribute="technology")
+                ],
+            ),
+        )
+
+        problems = review_issues([draft], [ruling], model)
+
+        assert {p.kind for p in problems.problems} == {"dismissal-off-grounds"}
+        assert "store:ghost" in "; ".join(problems.messages)
+
     def test_a_draft_the_critic_never_ruled_is_a_problem_and_not_a_verdict(self, model):
         """An unruled draft routes to the re-ask; nothing fills it in.
 
@@ -1115,6 +1198,7 @@ PRODUCERS = {
     "invented": ("_dropped_and_invented", "S-1"),
     "duplicate-id": ("_duplicate_id", "S-01"),
     "confirmed-on-unknown": ("_confirmed_on_unknown", "S-01"),
+    "dismissal-off-grounds": ("_dismissal_off_grounds", "S-01"),
     "duplicate-on-unit": ("_duplicate_on_unit", "v5.0.0-6.2.1"),
     "verdict-shape": ("_verdict_shape", "S-01"),
     "unresolved-unknown": ("_unresolved_unknown", "S-01"),
@@ -1174,6 +1258,30 @@ class TestEveryProblemCarriesItsClaimAndItsKind:
             ],
         )
         return review_issues([draft], [sample_ruling("S-01")], valid_model()).problems
+
+    def _dismissal_off_grounds(self):
+        draft = sample_draft(
+            "S-01",
+            grounds=[
+                Ground(
+                    kind="unknown-attribute",
+                    element_id="store:orders-db",
+                    attribute="encryption_at_rest",
+                )
+            ],
+        )
+        ruling = sample_ruling(
+            "S-01",
+            verdict=ProposedVerdict(
+                status="confirmed",
+                immaterial_unknowns=[
+                    UnknownRef(
+                        element_id="store:orders-db", attribute="encryption_in_transit"
+                    )
+                ],
+            ),
+        )
+        return review_issues([draft], [ruling], valid_model()).problems
 
     def _duplicate_on_unit(self):
         draft = self._asvs_draft()

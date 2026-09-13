@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
 from typing import Any
 
@@ -129,6 +129,13 @@ class FixtureOutcome:
     #: For a fixture that must die, did the reason engage with the inference or
     #: the contradiction the reader identified? ``None`` where nothing is owed.
     reason_engages: bool | None
+    #: Did the **reader** say this draft reaches the report? Carried rather
+    #: than derived from :attr:`survived` and :attr:`fate_agrees`, which cannot
+    #: answer it at all where the critic returned no ruling.
+    survival_expected: bool
+    #: Does this draft's own evidence cite an unknown attribute? What makes
+    #: :attr:`judged_the_unknown` a question worth asking of the row.
+    cites_unknown: bool
     #: What the critic made of the recommendation: ``True``/``False`` as it
     #: ruled, ``None`` where it made no reading. Read off the package's own
     #: ruling field, so a package whose claims recommend nothing answers
@@ -189,6 +196,7 @@ class FixtureOutcome:
             "status": self.status,
             "fate_agrees": self.fate_agrees,
             "reason_engages": self.reason_engages,
+            "cites_unknown": self.cites_unknown,
             "dismissed_unknowns": [list(pair) for pair in self.dismissed_unknowns],
             "judged_the_unknown": self.judged_the_unknown,
             "recommendation_read": self.recommendation_read,
@@ -269,10 +277,38 @@ class ReplayScore:
     def set_carries_both_answers(self) -> bool:
         """Could this set discriminate at all, whatever the critic did with it?
 
-        Read over every row rather than the survivors, so a critic that killed
-        the discriminating fixture is not reported as a deficient fixture set.
+        Read against the **reader's** ruling on which drafts survive, not the
+        critic's, so a critic that killed the discriminating fixture is not
+        reported as a deficient fixture set. Reading every row instead scored
+        true on any set holding one negative fixture, because a negative row
+        carries unsound advice by construction — which sent a reader to blame
+        a critic that had done nothing wrong.
+
+        :func:`carries_both_answers` is the rule, shared with the lint over the
+        fixture file.
         """
-        return len({o.recommendation_expected for o in self.outcomes}) > 1
+        return carries_both_answers(
+            (o.survival_expected, o.recommendation_expected) for o in self.outcomes
+        )
+
+    @property
+    def unknown_unjudged(self) -> tuple[FixtureOutcome, ...]:
+        """Surviving drafts citing an unknown that the ruling never ruled on.
+
+        The other half of what ``immaterial_unknowns`` made observable. A
+        ``needs-info`` that dismisses no pair is a critic that produced a
+        verdict without touching the question ``prompts/critic.md`` asks it —
+        does this claim depend on the unknown it names — and before the field
+        existed that state could not be told from a critic that weighed
+        relevance and said no. Counted apart for the reason
+        :attr:`recommendation_unread` is: a question left alone is not a wrong
+        answer, and averaging the two hides both.
+        """
+        return tuple(
+            o
+            for o in self.outcomes
+            if o.survived and o.cites_unknown and not o.judged_the_unknown
+        )
 
     @property
     def recommendation_unread(self) -> tuple[FixtureOutcome, ...]:
@@ -316,11 +352,32 @@ class ReplayScore:
                 "set_carries_both_answers": self.set_carries_both_answers,
             },
             "recommendation_unread": [o.fixture_id for o in self.recommendation_unread],
+            "unknown_unjudged": [o.fixture_id for o in self.unknown_unjudged],
             "rejected_without_engaging": [
                 o.fixture_id for o in self.rejected_without_engaging
             ],
             "outcomes": [o.to_json() for o in self.outcomes],
         }
+
+
+def carries_both_answers(rows: Iterable[tuple[bool, bool | None]]) -> bool:
+    """Do the drafts a **reader** says survive disagree about the advice?
+
+    One rule with two callers — :attr:`ReplayScore.set_carries_both_answers`
+    over a run's rows, and the lint over the fixture file — so the instrument
+    and the gate cannot answer differently about the same set. Each row is
+    ``(the reader's ``survives``, the reader's ``recommendation_sound``)``.
+
+    Only a surviving draft carries a reading, so the survivors are the whole
+    denominator of :attr:`ReplayScore.recommendation_agreed`. Where they all
+    expect the same ``sound``, a critic answering with that constant and never
+    opening the block scores full marks, which is the failure
+    :attr:`ReplayScore.unsupported_removed` and
+    :attr:`ReplayScore.valid_preserved` were split apart to avoid. A row the
+    reader says must die is not in the question: its advice is unsound by
+    construction, so counting it makes every set look discriminating.
+    """
+    return len({sound for survives, sound in rows if survives}) > 1
 
 
 def _words(text: str) -> list[str]:
@@ -396,27 +453,19 @@ def score(
                 reason=reason,
                 fate_agrees=survived == fixture.expect.survives,
                 reason_engages=_engages(reason, anchors) if anchors else None,
+                survival_expected=fixture.expect.survives,
+                cites_unknown=bool(draft.unknown_grounds()),
                 recommendation_read=None if reading is None else bool(reading.sound),
                 recommendation_note="" if reading is None else reading.note,
                 recommendation_expected=fixture.expect.recommendation_sound,
-                dismissed_unknowns=tuple(sorted(dismissed_unknowns(ruling))),
+                dismissed_unknowns=(
+                    ()
+                    if ruling is None
+                    else tuple(sorted(ruling.verdict.dismissed_pairs()))
+                ),
             )
         )
     return ReplayScore(outcomes=tuple(outcomes))
-
-
-def dismissed_unknowns(ruling: Ruling | None) -> frozenset[tuple[str, str]]:
-    """The unknown pairs this ruling says the claim does not rest on.
-
-    Neutral, because ``immaterial_unknowns`` is on the shared verdict: an
-    unknown ground is a fact about what a draft cites, and every package's
-    claims can cite one.
-    """
-    if ruling is None:
-        return frozenset()
-    return frozenset(
-        (ref.element_id, ref.attribute) for ref in ruling.verdict.immaterial_unknowns
-    )
 
 
 def _reading(ruling: Ruling | None) -> Any | None:

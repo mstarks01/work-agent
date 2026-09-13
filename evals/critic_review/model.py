@@ -118,18 +118,22 @@ class Expectation(BaseModel):
     #: to reject the claim for its own argument rather than for the advice
     #: under it.
     #:
-    #: ``False`` on five fixtures by the reader's ruling: two propose a control
+    #: ``False`` on six fixtures by the reader's ruling: two propose a control
     #: the model already states (``store:receipt-archive`` carries CMEK; the
     #: append flow carries the order service's own service account), one turns
-    #: on a mechanism the source never establishes, and two repair the claim's
-    #: starting point while leaving the step that does not follow. Each is a
-    #: deliberate distractor, so nobody repairs it later as though it were a
-    #: defect in the fixture.
+    #: on a mechanism the source never establishes, two repair the claim's
+    #: starting point while leaving the step that does not follow, and one —
+    #: the only row of the six the reader says survives — moves a secret
+    #: without narrowing the grant its claim is about. Each is a deliberate
+    #: distractor, so nobody repairs it later as though it were a defect in
+    #: the fixture.
     #:
-    #: What no expectation here can yet see is whether the critic *noticed*. A
-    #: ruling carries no judgement on a recommendation, so a critic that read
-    #: the advice and one that never looked emit the same ruling. Tracked apart
-    #: rather than faked, like the relevance question on fixture 5.
+    #: **Whether the critic noticed is observable.** A ruling carries its own
+    #: reading of the advice, so a critic that opened the block and one that
+    #: never did no longer emit the same ruling:
+    #: ``FixtureOutcome.recommendation_read`` reads it, and
+    #: ``ReplayScore.recommendation_unread`` counts the drafts that survived
+    #: with no reading apart from the ones that disagree.
     recommendation_sound: bool = True
     #: Anchors the ruling's ``reason`` must name, for a fixture that must die.
     #:
