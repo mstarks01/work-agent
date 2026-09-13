@@ -26,6 +26,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from analysis_service.frameworks import FrameworkName
+
 #: What each fixture is built to catch, and the four the review change turns on.
 #:
 #: ``credible-conditional`` — a sound argument that genuinely depends on an
@@ -89,7 +91,9 @@ class Expectation(BaseModel):
 
     survives: bool
     status: Literal["confirmed", "needs-info", "rejected"] | None = None
-    rejected_because: Literal["evidence", "reasoning", "lane", "duplicate"] | None = None
+    rejected_because: Literal["evidence", "reasoning", "lane", "duplicate"] | None = (
+        None
+    )
     #: Anchors the ruling's ``reason`` must name, for a fixture that must die.
     #:
     #: **A rejection is only right for the right reason.** "The control is
@@ -112,6 +116,13 @@ class CriticFixture(BaseModel):
 
     id: str = Field(min_length=1)
     kind: FixtureKind
+    #: Which package's drafts this fixture grades, and **no default**: a draft
+    #: is one package's record, so a fixture that did not say would be read
+    #: against whichever package a caller happened to pass. The field is what
+    #: keeps the lints and the harness package-neutral — both look the package
+    #: up rather than importing one — so a second package needs a second
+    #: fixture file and no code change.
+    framework: FrameworkName
     #: The corpus case whose blessed model this draft is written against. The
     #: model is read from the corpus rather than copied here, so a fixture
     #: cannot quietly describe a system the corpus no longer holds.
@@ -131,4 +142,14 @@ class CriticFixture(BaseModel):
     #: ``tests/test_critic_review_lints.py`` refuses to let an unsigned set gate
     #: anything. ``bootstrap`` says who drafted it, which is never who signs it.
     reviewed_by: str | None = None
-    bootstrap: Literal["agent-stand-in"] = "agent-stand-in"
+    #: Who *drafted* the fixture and its proposed answer, which is never who
+    #: signs it. ``tests/test_critic_review_lints.py`` reads this beside
+    #: ``reviewed_by`` and refuses a set the drafting agent signed for itself:
+    #: that is the whole failure the signature exists to prevent, and a field
+    #: nobody compares would let it back in silently.
+    #:
+    #: Named apart from ``case.json``'s ``bootstrap``, which says how a *corpus
+    #: case* was made. The two facts are different and the field guard matches
+    #: on a field's name, so one spelling for both would let a reader of this
+    #: one stand in as a reader of that one.
+    drafted_by: Literal["agent-stand-in"] = "agent-stand-in"

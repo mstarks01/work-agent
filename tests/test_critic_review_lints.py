@@ -16,35 +16,25 @@ Deterministic, credential-free, and free of provider calls.
 
 from __future__ import annotations
 
-import json
-from pathlib import Path
-
 import pytest
 
-from analysis_service.frameworks.stride.record import DraftThreat
+from analysis_service.frameworks import PACKAGES
 from analysis_service.grounding import normalize, verify_normalized
-from analysis_service.system_model import ModelIndex, SystemModel
+from analysis_service.system_model import ModelIndex
+from evals.critic_review.loading import corpus_model, load_fixtures, source_text
 from evals.critic_review.model import CriticFixture, FixtureKind
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-CASES = REPO_ROOT / "evals" / "critic_review" / "cases.json"
+
+def draft_of(fixture: CriticFixture):
+    """The fixture's draft in its own package's record shape.
+
+    Looked up in ``PACKAGES`` rather than imported, so this lint reads whichever
+    package a fixture names and a second package's fixtures need no edit here.
+    """
+    return PACKAGES[fixture.framework].record.model_validate(fixture.draft)
 
 
-def fixtures() -> list[CriticFixture]:
-    raw = json.loads(CASES.read_text(encoding="utf-8"))
-    return [CriticFixture.model_validate(entry) for entry in raw]
-
-
-def corpus_model(case_id: str) -> SystemModel:
-    path = REPO_ROOT / "evals" / "corpus" / case_id / "model.json"
-    return SystemModel.model_validate(json.loads(path.read_text(encoding="utf-8")))
-
-
-def source_text(case_id: str) -> str:
-    return (REPO_ROOT / "evals" / "corpus" / case_id / "source.md").read_text("utf-8")
-
-
-ALL = fixtures()
+ALL = load_fixtures()
 IDS = [entry.id for entry in ALL]
 
 
@@ -72,7 +62,7 @@ def test_both_halves_of_the_measurement_have_rows():
 @pytest.mark.parametrize("fixture", ALL, ids=IDS)
 def test_each_draft_is_one_a_lane_agent_could_have_emitted(fixture):
     """The package's own record parses it, so the fixture is a draft and not a sketch."""
-    DraftThreat.model_validate(fixture.draft)
+    draft_of(fixture)
 
 
 @pytest.mark.parametrize("fixture", ALL, ids=IDS)
@@ -80,7 +70,7 @@ def test_every_element_a_fixture_names_is_in_its_corpus_model(fixture):
     """A fixture describing elements the case does not hold tests nothing."""
     model = corpus_model(fixture.case)
     known = {element.id for element in model.elements()}
-    draft = DraftThreat.model_validate(fixture.draft)
+    draft = draft_of(fixture)
 
     assert set(draft.affected_element_ids) <= known
     for ground in draft.grounds:
@@ -95,8 +85,8 @@ def test_every_quoted_ground_is_really_in_the_source(fixture):
     """The quotes are the case's own words, checked the way the gate checks them.
 
     A fixture arguing against a sentence nobody submitted would be rejected for
-    its citation rather than for its reasoning, and would stop testing the thing
-    it was written for.
+    its citation rather than for its reasoning, and stops testing the thing it
+    is there to test.
 
     Read through :func:`~analysis_service.grounding.verify_normalized`, which is
     what the fan-in runs on a real ground. A second rule here would eventually
@@ -106,7 +96,7 @@ def test_every_quoted_ground_is_really_in_the_source(fixture):
     break.
     """
     folded = normalize(source_text(fixture.case))
-    draft = DraftThreat.model_validate(fixture.draft)
+    draft = draft_of(fixture)
 
     for ground in draft.grounds:
         if ground.kind == "quote":
@@ -118,7 +108,7 @@ def test_an_unknown_ground_names_an_attribute_the_model_really_leaves_open(fixtu
     """The shield has to be real, or the bypass fixture does not exercise it."""
     model = corpus_model(fixture.case)
     by_id = {element.id: element for element in model.elements()}
-    draft = DraftThreat.model_validate(fixture.draft)
+    draft = draft_of(fixture)
 
     for ground in draft.grounds:
         if ground.kind != "unknown-attribute":
@@ -176,7 +166,7 @@ def test_no_anchor_is_satisfied_by_naming_the_unknown_alone(fixture):
     a critic that rejected the draft for being conditional, which is the answer
     these fixtures exist to fail.
     """
-    draft = DraftThreat.model_validate(fixture.draft)
+    draft = draft_of(fixture)
     shields = {
         ground.attribute.lower()
         for ground in draft.grounds
@@ -199,8 +189,7 @@ def test_the_set_keeps_a_control_that_reaches_the_critic_today():
         for entry in ALL
         if not entry.expect.survives
         and not any(
-            ground.kind == "unknown-attribute"
-            for ground in DraftThreat.model_validate(entry.draft).grounds
+            ground.kind == "unknown-attribute" for ground in draft_of(entry).grounds
         )
     ]
 
@@ -214,12 +203,23 @@ def test_every_other_negative_fixture_is_behind_the_bypass():
         for entry in ALL
         if not entry.expect.survives
         and any(
-            ground.kind == "unknown-attribute"
-            for ground in DraftThreat.model_validate(entry.draft).grounds
+            ground.kind == "unknown-attribute" for ground in draft_of(entry).grounds
         )
     ]
 
     assert len(shielded) >= 3, "too few negative fixtures exercise the bypass"
+
+
+def test_no_fixture_is_signed_by_whoever_drafted_it():
+    """The signature means a second reader, or it means nothing.
+
+    ``drafted_by`` says an agent drafted the fixture and its proposed answer.
+    If that same name could appear in ``reviewed_by``, the set would carry a
+    signature attesting that its author agrees with itself, which is the exact
+    failure the field exists to prevent.
+    """
+    for entry in ALL:
+        assert entry.reviewed_by != entry.drafted_by, entry.id
 
 
 def test_an_unsigned_set_is_named_rather_than_trusted():
