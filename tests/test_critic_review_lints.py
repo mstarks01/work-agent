@@ -332,3 +332,34 @@ def test_no_mitigation_hands_a_negative_fixture_its_own_anchors(fixture):
 
     for anchor in fixture.expect.reason_must_name:
         assert anchor.lower() not in words, anchor
+
+
+def test_the_cli_resolves_its_critic_tier_through_the_one_reader():
+    """The CLI's node name is the graph's, and `tier_of` is what takes it.
+
+    Two spellings name this node: the graph's ``critic_<framework>`` and the
+    tiers file's ``critic/<framework>``.
+    :meth:`~analysis_service.deployment.Deployment.tier_of` is documented as the
+    one place that walk is written, and asking ``tiers.resolve_tier`` with the
+    graph spelling raises ``unknown LLM node`` — so the run dies at its first
+    line, after a reader has already paid for nothing.
+
+    Driven against a real deployment rather than a spelling assertion, so the
+    two names are checked against each other and not each against its own idea.
+    """
+    from analysis_service.deployment import Deployment
+    from evals.critic_review.__main__ import _critic_node
+
+    env = {
+        "ANALYSIS_MODEL_BASE_VENDOR": "openrouter",
+        "ANALYSIS_MODEL_BASE_MODEL": "openai/gpt-5.6-terra",
+        "ANALYSIS_MODEL_STRONG_VENDOR": "openrouter",
+        "ANALYSIS_MODEL_STRONG_MODEL": "openai/gpt-5.6-terra",
+        "ANALYSIS_MODEL_CHARGES_OPENROUTER": "direct",
+    }
+    deployment = Deployment.from_env(env=env)
+
+    for framework in PACKAGES:
+        node = _critic_node(framework)
+        assert deployment.tier_of(node) in ("base", "strong", "review")
+        assert node in deployment.tier_nodes

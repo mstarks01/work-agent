@@ -59,7 +59,15 @@ def _one_case(fixtures: list[CriticFixture]) -> str:
 
 
 def _critic_node(framework: FrameworkName) -> str:
-    """This package's critic node name, as the node map spells it."""
+    """This package's critic node, as the *graph* names it.
+
+    :meth:`~analysis_service.deployment.Deployment.tier_of` takes this spelling
+    and is the one place the walk to a tier is written — graph node to
+    canonical tier node to tier. The tiers file spells the same node
+    ``critic/<framework>``, so a caller that asked
+    ``tiers.resolve_tier`` with this name is a second reader of that walk, and
+    a wrong one.
+    """
     return f"critic_{framework}"
 
 
@@ -93,7 +101,8 @@ def main(argv: list[str] | None = None) -> int:
     deployment = Deployment.from_env()
     # The tier the critic node runs on, read from the node map rather than
     # named here: a deployment that moves the critic moves this run with it.
-    tier = deployment.tiers.resolve_tier(_critic_node(framework))
+    # Through ``tier_of``, which is the one reader of the two-step walk.
+    tier = deployment.tier_of(_critic_node(framework))
     adapter = build_tier_adapters(
         deployment.tiers,
         deployment.sampling,
