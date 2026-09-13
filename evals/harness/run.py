@@ -149,6 +149,19 @@ from evals.harness.structural import report_issues
 EVALS_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CORPUS_DIR = EVALS_ROOT / "corpus"
 
+#: The faults a sweep **measures**: it records one, and runs the next case.
+#:
+#: A refused model and a draft the fan-in rejects are both rates somebody asked
+#: for, so a sweep that died on the first one would report neither. Everything
+#: else — a provider refusal, a timeout, a transport fault — is not a
+#: measurement, and the sweep stops on it.
+#:
+#: One tuple rather than a test at each site, because ``_run_mode`` asks this
+#: question twice: once of a bare exception and once of the cause inside a
+#: :class:`~evals.harness.modes.CaseFailure`. Two readers of one rule would
+#: eventually disagree about which faults cost a sweep its artifact.
+MEASURED: tuple[type[Exception], ...] = (modes.EvalRunError, *CAUGHT)
+
 
 def _select(cases: Sequence[GoldenCase], wanted: Sequence[str]) -> list[GoldenCase]:
     if not wanted:
@@ -184,6 +197,15 @@ async def _run_mode(
     a provider timeout is not a measurement and still ends the sweep, and
     neither is a :class:`~evals.harness.grounds.GroundMisShape`, which is this
     service assembling its own record wrongly rather than anything a model did.
+
+    **A sweep that ends early still returns what it measured.** :data:`MEASURED`
+    decides which faults the loop records and carries on from; every other one
+    stops the sweep the way a refused spend hold does — the cases left are named
+    in ``stopped_before``, the fault is a Tier 1 failure, and the caller writes
+    the artifact and the reports for the cases that finished. Before this, the
+    fault left as an exception and took the finished cases with it: on
+    2026-09-12 a provider refused on credit part-way through an end-to-end
+    sweep, and the $2.85 already spent produced no artifact at all (#886).
 
     ``accepted`` is the amount the estimate gate took consent for, and the
     hold runs **between cases, never inside one**: a case that has started has
@@ -247,6 +269,23 @@ async def _run_mode(
             return
         raise error
 
+    def record_abort(case: GoldenCase, error: Exception) -> None:
+        """A fault that ends the sweep, recorded rather than raised.
+
+        **What ran is paid for, whatever stopped the run.** A provider refusal
+        that leaves ``_run_mode`` as an exception costs the caller every
+        finished case, because ``command_run`` never reaches ``build_artifact``:
+        on 2026-09-12 that cost $2.85 and wrote nothing (#886). The sweep still
+        ends here — a provider fault is not a measurement, and the cases after
+        this one are not attempted — but it ends the way a refused spend hold
+        already ended, with the artifact written and the exit code non-zero.
+
+        ``repr`` rather than ``str``: a provider error's message is sometimes
+        empty, and a line naming no type would tell a reader nothing at all.
+        """
+        failures.append(f"{case.id}: the sweep stopped here: {error!r}")
+        payloads.append({"case": case.id, "run_failure": repr(error)})
+
     for position, case in enumerate(cases):
         if position and accepted is not None:
             remaining = [later.id for later in cases[position:]]
@@ -279,20 +318,30 @@ async def _run_mode(
             skipped.append(case.id)
             continue
         pipeline = pipeline_for(case)
-        if mode == "extraction":
-            result = await modes.run_extraction(case, pipeline)
-            executions += result.node_runs
-            score = modes.score_extraction(case, result)
-            extractions.append(score)
-            payloads.append(score.to_json())
-            failures += [
-                f"{case.id}: extraction is not a valid system model:"
-                f" {issue.code}: {issue.message}"
-                for issue in result.issues
-            ]
-            continue
-
+        # One try over the whole case, so a fault anywhere in it leaves the
+        # sweep holding what the earlier cases already paid for. The extraction
+        # branch sat outside this and lost a sweep the same way the analysis
+        # branch did.
         try:
+            if mode == "extraction":
+                result = await modes.run_extraction(case, pipeline)
+                executions += result.node_runs
+                score = modes.score_extraction(case, result)
+                extractions.append(score)
+                payloads.append(score.to_json())
+                # The citation half is scored, not failed. It fires when the
+                # model quotes a source wrongly, which production hands to
+                # ``repair`` and this mode stops before; ``score.uncited``
+                # carries every one into the artifact. Everything else is still
+                # a malformed model.
+                failures += [
+                    f"{case.id}: extraction is not a valid system model:"
+                    f" {issue.code}: {issue.message}"
+                    for issue in result.issues
+                    if not issue.is_citation
+                ]
+                continue
+
             run = (
                 await modes.run_analysis(case, pipeline)
                 if mode == "analysis"
@@ -306,13 +355,24 @@ async def _run_mode(
             # one. The raising node's own call is the one figure no path
             # meters, so the price is a floor.
             executions += failed.node_runs
+            if not isinstance(failed.cause, MEASURED):
+                # Not a measurement: the provider or the transport failed, and
+                # the next case would fail the same way. Stop, but keep what
+                # ran.
+                record_abort(case, failed.cause)
+                stopped_before = tuple(later.id for later in cases[position:])
+                break
             record_failure(case, failed.cause)
             continue
-        except CAUGHT as error:
-            # A fault before the executor started: nothing ran, so nothing is
-            # owed to the usage block.
+        except MEASURED as error:
+            # A refused model, or a fault before the executor started. Both are
+            # rates somebody asked for, so the sweep records one and goes on.
             record_failure(case, error)
             continue
+        except Exception as error:  # noqa: BLE001 — every fault, so none is free
+            record_abort(case, error)
+            stopped_before = tuple(later.id for later in cases[position:])
+            break
 
         runs[case.id] = run
         executions += run.report.nodes

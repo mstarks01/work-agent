@@ -119,58 +119,7 @@ category.
 
 ---
 
-## Part 2 — the 5 recorded ASVS records
-
-The narrower question, per record: **does this requirement apply to this system, and does the input show it satisfied?** An ASVS claim rules applicability and never a pass.
-
-
-### authorization
-
-**A1.** `V8.2.1` — Nothing states what restricts the device gateway's access to the device registry.
-
-- `process:device-gateway`, `store:device-registry`, `flow:device-gateway-to-device-registry:look-up-device`
-- authentication on the flow is unknown; the requirement applies and stays open.
-
-> mark:
-
-**A2.** `V8.3.1` — Nothing states which layer enforces a tenant boundary on telemetry writes.
-
-- `process:telemetry-normalizer`, `store:telemetry-lake`
-- The normalizer writes every fleet's readings and no enforcing layer is named.
-
-> mark:
-
-
-### oauth-and-oidc
-
-**A3.** `V10.4.4` — Company SSO is named for operator dashboards and nothing says which grant it uses.
-
-- `entity:fleet-operator`, `store:telemetry-lake`, `flow:fleet-operator-to-telemetry-lake:query-dashboards`
-- tech:oauth fires on the SSO mention. The chapter may apply and the input never settles it.
-
-> mark:
-
-
-### cryptography
-
-**A4.** `V11.3.2` — No cipher is stated for either the device registry or the telemetry lake at rest.
-
-- `store:device-registry`, `store:telemetry-lake`
-- Both carry encryption_at_rest unknown against confidential and customer data.
-
-> mark:
-
-
-### encoding-and-sanitization
-
-**A5.** `V1.2.4` — Nothing says how the normalizer builds the queries that load readings into BigQuery.
-
-- `process:telemetry-normalizer`, `store:telemetry-lake`
-- tech:database fires on the BigQuery store.
-
-> mark:
-
-## Part 3 — the 18 recorded STRIDE threats
+## Part 2 — the 18 recorded STRIDE threats
 
 Only after your own list exists.
 
@@ -393,7 +342,6 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "fc745e273aff8be740a814f0a9b4a45d6f3c6fe39dc7c8efa2b879d4f270ac74",
       "model.json": "72cd6e017da3a53ea67530013be257ea4ed360932f86a0e9419be6273c4588eb",
-      "claims/asvs.json": "a3158156ef12c655c2547b56e9e802bdee30d183d7b3d44ce7a2a838f003a468",
       "claims/stride.json": "bde9c43b971a6a77370e399214b273d8b005ef4a01e2fe7ca99b62a47c35729e"
       }
     }

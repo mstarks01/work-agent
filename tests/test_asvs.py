@@ -18,7 +18,7 @@ import re
 from collections import Counter
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, get_args
 
 import pytest
 from pydantic import ValidationError
@@ -71,7 +71,7 @@ from analysis_service.report import (
 )
 from analysis_service.skills import lane_skill_doc
 from analysis_service.sources import SourceLimits
-from analysis_service.system_model import SystemModel
+from analysis_service.system_model import Process, SystemModel
 from tests.factories import PROJECT_ROOT, sample_draft, valid_model
 
 ASVS = PACKAGES["asvs"]
@@ -521,6 +521,11 @@ def test_the_agent_supplies_a_key_and_never_a_chapter():
         # Airflow and Spark: the model states what both processes present, and
         # neither is the web. A statement, not a silence.
         ("03-batch-data-pipeline", "refuted"),
+        # An MQTT broker and a Pub/Sub consumer, both stating ``non-web``. One
+        # flow polls a firmware bucket over HTTPS, which is the shape
+        # ``prompts/extract.md`` calls a non-web agent — so the transport does
+        # not carry the answer away from the two processes that gave one.
+        ("02-iot-fleet-telemetry", "refuted"),
         # The source never says what the controller or the store servers
         # present, so nothing here is decided. Its remedy is to submit more.
         ("07-cicd-store-deploy", "undecidable"),
@@ -572,25 +577,86 @@ def test_the_processes_decide_whatever_the_flows_leave_unsaid(kinds, expected):
     assert answer == expected
 
 
-def test_a_stated_web_protocol_still_satisfies_on_its_own():
+def test_a_stated_web_protocol_satisfies_where_the_interfaces_left_it_open():
     """A flow that says HTTPS says the same thing by another route.
 
-    Kept as a satisfier because it is one. What it lost is the power to *refuse*
-    and the power to hold the answer open, neither of which was ever a fact about
-    transport.
+    Kept as a satisfier because it is one, but only on the question the
+    interfaces did not answer. What it lost is the power to *contradict* a
+    process that answered, which was never a fact about transport.
+    """
+    model = valid_model()
+    silent = [
+        process.model_copy(update={"interface_kind": "unknown"})
+        for process in model.processes
+    ]
+    web = [flow.model_copy(update={"protocol": "HTTPS"}) for flow in model.data_flows]
+
+    answer = run_precondition(
+        ASVS, model.model_copy(update={"processes": silent, "data_flows": web})
+    )
+
+    assert answer == "satisfied"
+
+
+def test_one_process_that_never_said_is_enough_to_let_a_protocol_answer():
+    """The interfaces leave it open when *any* of them does.
+
+    The boundary between the two halves of the rule: a model that is only
+    partly decided has not answered, so the flows are still read.
+    """
+    model = valid_model()
+    template = model.processes[0]
+    mixed = [
+        template.model_copy(update={"id": f"process:p{index}", "interface_kind": kind})
+        for index, kind in enumerate(("non-web", "unknown"))
+    ]
+    web = [flow.model_copy(update={"protocol": "HTTPS"}) for flow in model.data_flows]
+
+    answer = run_precondition(
+        ASVS, model.model_copy(update={"processes": mixed, "data_flows": web})
+    )
+
+    assert answer == "satisfied"
+
+
+def test_a_stated_web_protocol_does_not_overrule_a_decided_model():
+    """The backup agent of ``prompts/extract.md``, as a test.
+
+    This is the shape the extraction prompt teaches a model to write. A
+    precondition that reads a transport over an interface answers "web
+    application" here, and opens 17 lanes on a system the same repository
+    calls non-web. Both readers answer the same way.
+
+    :func:`test_the_extract_prompt_still_teaches_the_shape_this_test_pins` holds
+    the other half: that the prompt still asks for this pair. The two tests are
+    the seam, because a rule with two readers needs them checked against each
+    other rather than each against its own expectation.
     """
     model = valid_model()
     non_web = [
         process.model_copy(update={"interface_kind": "non-web"})
         for process in model.processes
     ]
-    web = [flow.model_copy(update={"protocol": "HTTPS"}) for flow in model.data_flows]
+    web = [flow.model_copy(update={"protocol": "https"}) for flow in model.data_flows]
 
     answer = run_precondition(
         ASVS, model.model_copy(update={"processes": non_web, "data_flows": web})
     )
 
-    assert answer == "satisfied"
+    assert answer == "refuted"
+
+
+def test_the_extract_prompt_still_teaches_the_shape_this_test_pins():
+    """The other reader of "is this a web application", read where it is written.
+
+    If somebody rewrites the prompt's example, this fails and points at the
+    precondition — rather than the precondition silently answering a question
+    the prompt no longer asks.
+    """
+    prompt = (PROJECT_ROOT / "prompts" / "extract.md").read_text("utf-8")
+
+    assert 'protocol: "https"' in prompt
+    assert 'interface_kind: "non-web"' in prompt
 
 
 def test_a_flow_that_never_said_no_longer_holds_a_decided_model_open():
@@ -1470,3 +1536,46 @@ class TestADraftStatesItsDirection:
         )
 
         assert draft.direction == ""
+
+
+def test_an_interface_kind_this_rule_never_saw_does_not_refuse_a_model():
+    """A fourth ``interface_kind`` must not be read as a refusal.
+
+    ``interface_kind`` is a three-value ``Literal`` today, so "every process
+    answered non-web" and "no process said unknown" pick out the same models.
+    They stop agreeing the moment a fourth value lands, and the second reading
+    would refute every model carrying it — on a value the rule has never been
+    shown. The honest answer for an unread value is ``undecidable``.
+
+    Driven with the field forced past its own type, because that is the whole
+    point: the defect is unreachable until somebody widens the ``Literal``, and
+    a test that waited for them would arrive after the wrong answers did.
+    """
+    model = valid_model()
+    unseen = [
+        process.model_copy(update={"interface_kind": "batch"})
+        for process in model.processes
+    ]
+    silent = [
+        flow.model_copy(update={"protocol": "unknown"}) for flow in model.data_flows
+    ]
+
+    answer = run_precondition(
+        ASVS, model.model_copy(update={"processes": unseen, "data_flows": silent})
+    )
+
+    assert answer == "undecidable"
+
+
+def test_the_three_interface_kinds_this_rule_reads_are_the_three_that_exist():
+    """The registry check: if a fourth arrives, the rule above is what to revisit.
+
+    A guard against an unread value is worth nothing if nobody notices the day
+    a value stops being unread. This fails then, and names the branch.
+    """
+    kinds = get_args(Process.model_fields["interface_kind"].annotation)
+
+    assert set(kinds) == {"web", "non-web", "unknown"}, (
+        "asvs_precondition refutes on 'every process says non-web' and answers"
+        " undecidable for anything else; decide where a new kind belongs"
+    )

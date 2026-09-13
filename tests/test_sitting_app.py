@@ -21,6 +21,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from analysis_service.actions import ACTION_VERBS, family_of
 from evals import review_submission as review_submissions
 from evals import verify_corpus
 from evals.harness import envelope as envelopes
@@ -32,12 +33,39 @@ from webapp.sitting import main as app_main
 from webapp.sitting_base import MIN_OWN_LIST
 
 LOOPBACK = "http://127.0.0.1:8020"
-CASE = "02-iot-fleet-telemetry"
+CASE = "01-payments-checkout"
 OTHER = "03-batch-data-pipeline"
+
+
+def unused_verb(claims: list[dict]) -> str:
+    """An action no claim already files at the first claim's place.
+
+    Derived rather than named, because every test that calls it needs a *new*
+    identity. A verb the case already carries there composes the identity that
+    is already in the file, so an added claim would arrive already marked and a
+    re-keyed one would not move — and the tests would pass on arithmetic that
+    measured nothing. Choosing it from the closed set keeps that true whichever
+    case ``CASE`` names.
+
+    One reader for the three fixtures that move a claim's identity, because
+    three copies of a verb name is three places to miss when ``CASE`` changes.
+    """
+    first = claims[0]
+    taken = {
+        claim["verb"]
+        for claim in claims
+        if claim["category"] == first["category"]
+        and claim["affected_element_ids"] == first["affected_element_ids"]
+    }
+    family = [
+        verb for verb in ACTION_VERBS if family_of(verb) == family_of(first["verb"])
+    ]
+    return next(verb for verb in family if verb not in taken)
+
 
 #: An own list long enough to open the recorded sets. Most tests here measure
 #: something other than the length gate, so they post this and get on with it.
-OWN_LIST = ["a spoofed device"]
+OWN_LIST = ["a spoofed shopper"]
 #: The same, for ``OTHER``, so a test that writes for both cases can tell the
 #: two lists apart in the file each one lands in.
 OTHER_LIST = ["a bad row in the batch"]
@@ -161,7 +189,7 @@ def tree(tmp_path):
     return build_tree(tmp_path)
 
 
-def sign(tree, case, reviewer, own_list=("a spoofed device reports for another",)):
+def sign(tree, case, reviewer, own_list=("a spoofed shopper checks out as another",)):
     """Merge one submission that clears a case, as a real reader would leave it.
 
     One JSON file under ``evals/review/submissions``, carrying an own list long
@@ -264,7 +292,7 @@ class TestTheOwnListRuleIsEnforced:
     def test_the_sets_arrive_once_the_list_is_in(self, client):
         app, _, _ = client
         app.post(
-            "/api/own-list", json={"case": CASE, "items": ["someone spoofs a device"]}
+            "/api/own-list", json={"case": CASE, "items": ["someone spoofs a shopper"]}
         )
         sets = app.get(f"/api/part-two?case={CASE}").json()["frameworks"]
         assert "stride" in sets
@@ -933,11 +961,11 @@ class TestACaseTakesOneOwnList:
         app = self.opened(tree)
         app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         assert app.get(f"/api/part-one?case={CASE}").json()["own_list"] == [
-            "a spoofed device"
+            "a spoofed shopper"
         ]
         blind = app.get(f"/api/part-one?case={OTHER}").json()
         assert blind["own_list"] is None
-        assert "a spoofed device" not in json.dumps(blind)
+        assert "a spoofed shopper" not in json.dumps(blind)
 
 
 class TestTheOwnListCarriesThePageToken:
@@ -1575,7 +1603,7 @@ class TestTwoLoginsOnOneMachine:
         assert draft_file(tree, CASE, "ada").is_file()
         assert draft_file(tree, CASE, "sam").is_file()
         assert ada.get(f"/api/part-one?case={CASE}").json()["own_list"] == [
-            "a spoofed device"
+            "a spoofed shopper"
         ]
 
 
@@ -2376,8 +2404,8 @@ class TestACorpusEditUnderAMergedSitting:
         claims = json.loads(path.read_text("utf-8"))
         added = {
             **claims[0],
-            "verb": "replay",
-            "claim": "A captured reading is replayed to the gateway.",
+            "verb": unused_verb(claims),
+            "claim": "A captured request is replayed to the service.",
         }
         path.write_text(json.dumps([*claims, added], indent=2) + "\n", encoding="utf-8")
 
@@ -2385,7 +2413,7 @@ class TestACorpusEditUnderAMergedSitting:
         """The first claim keeps its place and changes its identity."""
         path = self.claims_file(tree, case)
         claims = json.loads(path.read_text("utf-8"))
-        claims[0]["verb"] = "replay"
+        claims[0]["verb"] = unused_verb(claims)
         path.write_text(json.dumps(claims, indent=2) + "\n", encoding="utf-8")
 
     def opened(self, tree, reviewer="ada"):
@@ -2485,7 +2513,7 @@ class TestARecordSignsWhatWasServed:
     def move_claims(self, tree, case=CASE):
         path = tree / "evals" / "corpus" / case / "claims" / "stride.json"
         claims = json.loads(path.read_text("utf-8"))
-        claims[0]["verb"] = "replay"
+        claims[0]["verb"] = unused_verb(claims)
         path.write_text(json.dumps(claims, indent=2) + "\n", encoding="utf-8")
 
     def digest_now(self, tree, name, case=CASE):

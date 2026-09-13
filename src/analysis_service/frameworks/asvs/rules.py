@@ -779,13 +779,24 @@ def asvs_precondition(model: SystemModel) -> PreconditionResult:
     ``unknown`` was the correct value for it. The applicability question was
     simply not a question about transport.
 
-    A stated protocol still satisfies, because a flow that says HTTPS says the
-    same thing by another route. **It can no longer refuse on its own**, and it
-    can no longer hold the answer open: a model whose every process states
-    ``non-web`` has answered, whatever its flows leave unsaid.
+    **A protocol answers only where no process states an interface.** A flow
+    that says HTTPS says the same thing by another route, but it says it more
+    weakly, and `prompts/extract.md` makes that concrete: "A backup agent
+    shipping files over HTTPS is not a web application: ``protocol: "https"``,
+    ``interface_kind: "non-web"``." The extraction prompt teaches a model to
+    write exactly that pair, so a transport that outranked the interface would
+    read every such model as a web application and open 17 lanes on a system
+    the same repository had just called non-web. The two readers of "is this a
+    web application" now agree, and ``tests/test_asvs.py`` drives them against
+    each other over that sentence.
 
-    * ``satisfied`` — a process presents a web interface, or a flow speaks a web
-      protocol.
+    So the protocol is consulted only where the interfaces leave the question
+    open — no process at all, or a process whose ``interface_kind`` is
+    ``unknown``. A transport can still satisfy and can still refuse on its own;
+    what it can no longer do is contradict a process that answered.
+
+    * ``satisfied`` — a process presents a web interface; or the interfaces
+      never settled it and a flow speaks a web protocol.
     * ``undecidable`` — nothing says web and something never said. The input
       never settled it, and submitting more about the system does.
     * ``refuted`` — every process states a non-web interface, or (for a model
@@ -801,18 +812,35 @@ def asvs_precondition(model: SystemModel) -> PreconditionResult:
     which is the distinction this repo refuses to collapse anywhere else.
     """
     kinds = [process.interface_kind for process in model.processes]
+    if "web" in kinds:
+        return "satisfied"
+    # Every process answered, and every answer was non-web. The model settled
+    # the question, so no flow's transport is read: this is the branch that
+    # keeps the backup agent of ``prompts/extract.md`` out of ASVS.
+    #
+    # Spelled as "all of them say non-web" rather than "none of them says
+    # unknown", because the two are the same sentence only while
+    # ``interface_kind`` has exactly three values. A fourth would refuse every
+    # model carrying it, silently and on a value this rule has never been shown.
+    # Written this way a new kind falls through to the flows and then to
+    # ``undecidable``, which is the honest answer for a value nobody has taught
+    # this rule to read.
+    if kinds and all(kind == "non-web" for kind in kinds):
+        return "refuted"
+
+    # The interfaces left it open, so the flows are asked.
     speaks_web = any(
         term in flow.protocol.lower()
         for flow in model.data_flows
         for term in WEB_PROTOCOL_TERMS
     )
-    if "web" in kinds or speaks_web:
+    if speaks_web:
         return "satisfied"
 
-    # No process to read: fall back to the flows, which is the whole of what a
-    # model carrying only stores and entities can be asked.
+    # No process to read: the flows are the whole of what a model carrying only
+    # stores and entities can be asked, so there they may refuse as well.
     if not kinds:
         silent = any(not states_a_protocol(flow.protocol) for flow in model.data_flows)
         return "undecidable" if silent or not model.data_flows else "refuted"
 
-    return "undecidable" if "unknown" in kinds else "refuted"
+    return "undecidable"

@@ -38,13 +38,8 @@ def test_calibration_fixtures_pass_their_checks():
     assert problems == []
 
 
-def test_every_lane_of_every_carried_package_is_measured():
-    """The merge bar's corpus-wide half, over the corpus this repo ships.
-
-    A lane is one **Model Tier** call, so a lane with no ``must-find`` record
-    anywhere is a run nobody ever measured — and the deployment cannot check
-    that for itself, because it cannot read ``evals/``.
-    """
+def _must_find_lanes() -> dict[str, set[object]]:
+    """Every lane carrying a ``must-find`` record, per package, over the corpus."""
     must_find_lanes: dict[str, set[object]] = {}
     for case_dir in verify_corpus.case_dirs():
         for name in verify_corpus.PACKAGES:
@@ -56,8 +51,60 @@ def test_every_lane_of_every_carried_package_is_measured():
                 for record in verify_corpus._load_json_array(path)
                 if record.get("tier") == "must-find"
             )
+    return must_find_lanes
 
-    assert list(verify_corpus.lane_coverage_issues(must_find_lanes)) == []
+
+def test_every_lane_of_every_carried_package_is_measured():
+    """The merge bar's corpus-wide half, over the corpus this repo ships.
+
+    A lane is one **Model Tier** call, so a lane with no ``must-find`` record
+    anywhere is a run nobody ever measured — and the deployment cannot check
+    that for itself, because it cannot read ``evals/``.
+    """
+    assert list(verify_corpus.lane_coverage_issues(_must_find_lanes())) == []
+
+
+def test_every_declared_hole_names_a_lane_some_package_declares():
+    """A table nobody compares to its registry fails as quietly as a branch.
+
+    A renamed or deleted lane would leave an entry exempting nothing, and the
+    bar would still read as satisfied because the real lane's own name is what
+    it checks.
+    """
+    for name, holes in verify_corpus.UNMEASURED_LANES.items():
+        assert name in verify_corpus.PACKAGES, f"{name} is not a package"
+        declared = set(verify_corpus.PACKAGES[name].lanes)
+        assert set(holes) <= declared, f"{name}: {set(holes) - declared}"
+
+
+def test_no_declared_hole_outlives_the_lane_it_describes():
+    """An entry is deleted by writing the case, so a stale one must fail.
+
+    Without this the table is a ratchet: a lane that gains a ``must-find``
+    keeps its exemption, and the next lane to lose one inherits a line that
+    says the corpus cannot reach it when the corpus can.
+    """
+    measured = _must_find_lanes()
+    for name, holes in verify_corpus.UNMEASURED_LANES.items():
+        covered = set(holes) & measured.get(name, set())
+        assert not covered, (
+            f"{name}: {sorted(covered)} now carry a must-find record, so the"
+            " UNMEASURED_LANES entry is stale — delete it"
+        )
+
+
+def test_every_declared_hole_gives_a_reason_that_is_not_the_lanes_name():
+    """The reason answers for a lane nobody has written yet, or it is not one.
+
+    "OAuth is not in the corpus" restates the key. What the bar needs is the
+    property that makes the lane unreachable, so the next conditional chapter
+    is judged by the same sentence rather than by whether somebody recognises
+    its name.
+    """
+    for name, holes in verify_corpus.UNMEASURED_LANES.items():
+        for lane, reason in holes.items():
+            assert len(reason.split()) >= 12, f"{name}/{lane}: say why"
+            assert reason.strip() != lane, f"{name}/{lane}: the reason is the name"
 
 
 def test_an_unmeasured_lane_fails_the_merge_bar():

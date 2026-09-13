@@ -195,6 +195,30 @@ def _at_place(
     ]
 
 
+def _charged_to(claims: Sequence[DraftThreat], verb: str) -> DraftThreat:
+    """Which of several claims at one place a miss is charged to.
+
+    **The rule decides, never the input order.** ``_at_place`` returns the
+    claims in whatever order the report happens to list them, and reading
+    ``[0]`` made the cause a fact about that order: reversing the report's
+    claims moved case 05's reference 9 from ``merged`` to ``verb`` in two
+    archived Baselines, with no finding and no match changed. An instrument
+    that priced three prompt edits must not answer differently when its input
+    is shuffled.
+
+    Two keys, in order:
+
+    * **An action match wins.** A reference answered by a claim carrying its
+      own action is a merge — the lane wrote the threat and folded this
+      reference into it. A claim at the same place under a *different* action
+      is the weaker reading, and charging the miss to the verb while a merge
+      sits beside it names the wrong fix.
+    * **Then the claim ID**, which is arbitrary but stable, so the row a reader
+      sees does not move between two runs over one report.
+    """
+    return min(claims, key=lambda claim: (not same_action(claim.verb, verb), claim.id))
+
+
 def _relation(
     reference_ids: Sequence[str], draft_ids: Sequence[str], flows: FlowMap
 ) -> Relation | None:
@@ -218,19 +242,25 @@ def _relation(
 def _nearby(
     reference_ids: Sequence[str], drafts: Sequence[DraftThreat], flows: FlowMap
 ) -> DraftThreat | None:
-    """The first draft sharing an endpoint-resolved element with the reference.
+    """The draft sharing an endpoint-resolved element with the reference.
 
     Read through :func:`~evals.harness.identity.endpoint_form`, the same
     resolution the element half of the identity rule applies, so a flow cited
     on one side and its endpoint on the other count as one shared place.
     Called only for drafts the containment test already refused, so a hit here
     is an overlap and never a match.
+
+    Lowest ID among the drafts that overlap, for the reason
+    :func:`_charged_to` gives: this names a draft in the artifact, and which
+    one it names must not depend on the order the report listed them in.
     """
     place = endpoint_form(reference_ids, flows)
-    for draft in drafts:
-        if place & endpoint_form(draft.affected_element_ids, flows):
-            return draft
-    return None
+    overlapping = [
+        draft
+        for draft in drafts
+        if place & endpoint_form(draft.affected_element_ids, flows)
+    ]
+    return min(overlapping, key=lambda draft: draft.id) if overlapping else None
 
 
 def attribute_case(
@@ -278,7 +308,7 @@ def attribute_case(
         in_lane = [claim for claim in produced if claim.category == lane]
         at_place = _at_place(reference.affected_element_ids, in_lane, flows)
         if at_place:
-            claim = at_place[0]
+            claim = _charged_to(at_place, verb)
             losses.append(
                 Loss(
                     index,
@@ -326,7 +356,10 @@ def attribute_case(
         ]
         killed_here = _at_place(reference.affected_element_ids, killed, flows)
         if killed_here:
-            draft = killed_here[0]
+            # Every one of these already shares the reference's action, so the
+            # ID is the whole of the choice — and it is still a choice, so the
+            # same reader makes it.
+            draft = _charged_to(killed_here, verb)
             losses.append(
                 Loss(
                     index,

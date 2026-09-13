@@ -331,10 +331,10 @@ no reviewer sees it go. So every package carries a collision rule, and
 | Package | Comparable reference pairs | Collisions |
 |---|---|---|
 | `stride` | 291 | 3 |
-| `asvs` | 22 | 0 |
+| `asvs` | 21 | 0 |
 
 ASVS's denominator is small because the chapter separates almost everything
-first: 448 within-case pairs, of which 20 share a chapter, of which none shares
+first: 430 within-case pairs, of which 21 share a chapter, of which none shares
 a requirement identifier. A rise in the second column would mean two rulings on
 one requirement in one place, and one vote answering for both.
 
