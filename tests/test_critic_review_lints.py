@@ -130,11 +130,19 @@ def test_an_unknown_ground_names_an_attribute_the_model_really_leaves_open(fixtu
         )
 
 
-@pytest.mark.parametrize("fixture", ALL, ids=IDS)
-def test_a_rejection_expectation_names_the_step_that_kills_it(fixture):
-    """An expectation of "rejected" that names no step is half an expectation."""
-    if fixture.expect.status == "rejected":
-        assert fixture.expect.rejected_because is not None
+def test_the_contradiction_fixtures_leave_their_step_open_on_purpose():
+    """Which step kills a contradicted draft is unsettled, and stays unsettled.
+
+    The model showing what the draft calls missing reads as ``evidence``; the
+    draft asserting what the model contradicts reads as ``reasoning``. Both are
+    defensible, so a set proving the contradiction is caught must not also
+    fail a critic for picking the other name. This test exists so nobody
+    tightens that back up without deciding the taxonomy first.
+    """
+    contradicted = [entry for entry in ALL if entry.kind == "contradicted-by-source"]
+
+    assert contradicted
+    assert all(entry.expect.rejected_because is None for entry in contradicted)
 
 
 @pytest.mark.parametrize("fixture", ALL, ids=IDS)
@@ -143,6 +151,75 @@ def test_an_exact_status_agrees_with_whether_the_draft_survives(fixture):
     if fixture.expect.status is None:
         return
     assert fixture.expect.survives == (fixture.expect.status != "rejected")
+
+
+@pytest.mark.parametrize("fixture", ALL, ids=IDS)
+def test_every_negative_fixture_says_what_its_reason_must_engage_with(fixture):
+    """A rejection is only right for the right reason.
+
+    "The control is unknown" rejects every conditional draft in the corpus. It
+    would score full marks on every negative row here and destroy the report,
+    so a negative fixture that named no anchor would reward exactly the wrong
+    answer to the change.
+    """
+    if fixture.expect.survives:
+        assert fixture.expect.reason_must_name == (), "nothing to justify"
+    else:
+        assert fixture.expect.reason_must_name, fixture.id
+
+
+@pytest.mark.parametrize("fixture", ALL, ids=IDS)
+def test_no_anchor_is_satisfied_by_naming_the_unknown_alone(fixture):
+    """The anchors must not be answerable by the bypass wording itself.
+
+    An anchor of "unknown" or of the shielding attribute's own name would pass
+    a critic that rejected the draft for being conditional, which is the answer
+    these fixtures exist to fail.
+    """
+    draft = DraftThreat.model_validate(fixture.draft)
+    shields = {
+        ground.attribute.lower()
+        for ground in draft.grounds
+        if ground.kind == "unknown-attribute"
+    }
+
+    for anchor in fixture.expect.reason_must_name:
+        assert anchor.lower() not in {*shields, "unknown", "needs-info"}, anchor
+
+
+def test_the_set_keeps_a_control_that_reaches_the_critic_today():
+    """One negative row with no unknown ground, so a failure can be localised.
+
+    Every other negative fixture is behind the bypass, and if the critic cannot
+    detect a bad argument at all then all of them fail for that reason rather
+    than for the bypass. The row without a shield tells the two apart.
+    """
+    unshielded = [
+        entry
+        for entry in ALL
+        if not entry.expect.survives
+        and not any(
+            ground.kind == "unknown-attribute"
+            for ground in DraftThreat.model_validate(entry.draft).grounds
+        )
+    ]
+
+    assert unshielded, "no negative fixture reaches the critic before the change"
+
+
+def test_every_other_negative_fixture_is_behind_the_bypass():
+    """The rest must carry an unknown ground, or they do not test the change."""
+    shielded = [
+        entry
+        for entry in ALL
+        if not entry.expect.survives
+        and any(
+            ground.kind == "unknown-attribute"
+            for ground in DraftThreat.model_validate(entry.draft).grounds
+        )
+    ]
+
+    assert len(shielded) >= 3, "too few negative fixtures exercise the bypass"
 
 
 def test_an_unsigned_set_is_named_rather_than_trusted():

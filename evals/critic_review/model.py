@@ -62,14 +62,27 @@ class Expectation(BaseModel):
     ``False`` rows the critic rejected; "valid findings preserved" counts the
     ``True`` rows it did not.
 
-    ``status`` is the exact verdict, and it is **optional on purpose**. A
-    supported draft carrying an unknown it does not depend on ought to be
+    ``status`` is the exact verdict, and it is **optional on purpose**, for two
+    different reasons.
+
+    A supported draft carrying an unknown it does not depend on ought to be
     ``confirmed``, and today it cannot be: ``_confirmed_on_unknown_issues``
     refuses a ``confirmed`` on any draft with an unknown ground, so
     ``needs-info`` is the only surviving verdict available. Pinning an exact
-    status on such a fixture would pin that limitation as though it were the
-    answer. Where a reader can name the verdict, they do; where the code's own
-    shape decides it, they name only whether it lives.
+    status there would pin that limitation as though it were the answer.
+
+    **What no expectation here can see is whether the critic judged the unknown
+    irrelevant.** Either surviving verdict passes such a fixture, and
+    ``complete_rulings`` fills ``related_unknowns`` from the draft's own grounds
+    afterwards, so a critic that weighed relevance and one that never looked
+    produce the same ruling. That question needs an observable the ruling does
+    not currently carry, and it is tracked apart rather than faked here.
+
+    ``rejected_because`` is optional for the second reason: which step kills a
+    contradicted draft is a live question — the model showing what the draft
+    calls missing reads as ``evidence``, and the draft asserting what the model
+    contradicts reads as ``reasoning`` — and a fixture set proving the
+    contradiction is caught should not also be litigating the taxonomy.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -77,6 +90,19 @@ class Expectation(BaseModel):
     survives: bool
     status: Literal["confirmed", "needs-info", "rejected"] | None = None
     rejected_because: Literal["evidence", "reasoning", "lane", "duplicate"] | None = None
+    #: Anchors the ruling's ``reason`` must name, for a fixture that must die.
+    #:
+    #: **A rejection is only right for the right reason.** "The control is
+    #: unknown" rejects every conditional draft in the corpus and would score
+    #: full marks on every negative fixture here while destroying the report.
+    #: So each negative row names the inference or the contradiction the reader
+    #: identified, and a reason that engages with none of them fails even though
+    #: the verdict matches.
+    #:
+    #: Matched case-insensitively, and any one anchor is enough: the reason is
+    #: prose and a reader cannot predict its wording, only the fact it has to
+    #: engage with. Empty on a surviving fixture, which has nothing to justify.
+    reason_must_name: tuple[str, ...] = ()
 
 
 class CriticFixture(BaseModel):

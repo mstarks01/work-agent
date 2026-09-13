@@ -7,8 +7,8 @@
       "id": "S-01",
       "framework": "stride",
       "framework_version": "1.0",
-      "title": "Order records may be readable from storage media outside the database",
-      "description": "`store:orders-db` holds shopper addresses and card-last-four and is classified confidential. Nothing states whether it is encrypted at rest. If it is not, anyone reaching a backup, a snapshot or the underlying disk reads those records without going through `process:order-service` or its application account.",
+      "title": "Order records may be readable from a storage copy taken outside the database",
+      "description": "`store:orders-db` holds shopper addresses and card-last-four and is classified confidential. Nothing states whether it is encrypted at rest. An attacker who obtains an unencrypted storage copy \u2014 a snapshot, or the underlying disk \u2014 reads those records without going through `process:order-service` or its application account.",
       "affected_element_ids": [
         "store:orders-db"
       ],
@@ -42,7 +42,8 @@
       "survives": true,
       "status": "needs-info"
     },
-    "rationale": "The argument is the ordinary one and it follows: an unencrypted store is readable by whoever reaches the medium. It genuinely depends on the unknown, so it is conditional rather than confirmed. This is the fixture that fails if the change is answered by rejecting everything conditional."
+    "rationale": "The ordinary argument, and it follows. Scoped to a copy the attacker obtains unencrypted rather than to anyone reaching storage: a backup may carry its own encryption, so the broader claim would assert something the model does not settle. It genuinely depends on the unknown, so it is conditional. This is the fixture that fails if the change is answered by rejecting everything conditional.",
+    "reviewed_by": "mstarks01"
   },
   {
     "id": "credible-conditional-webhook-auth",
@@ -53,7 +54,7 @@
       "framework": "stride",
       "framework_version": "1.0",
       "title": "The settlement webhook may accept a forged paid notification",
-      "description": "`flow:card-processor-to-storefront-api:settlement-webhook` tells `process:storefront-api` that an order is paid. Nothing states how that callback is authenticated. If it is unauthenticated, anyone who can reach the public endpoint can mark an unpaid order paid.",
+      "description": "`flow:card-processor-to-storefront-api:settlement-webhook` tells `process:storefront-api` that an order is paid. Nothing states how that callback is authenticated. If the API trusts an unauthenticated callback without independently verifying payment with the processor, an attacker who can reach the public endpoint could mark an unpaid order paid.",
       "affected_element_ids": [
         "flow:card-processor-to-storefront-api:settlement-webhook",
         "process:storefront-api"
@@ -97,7 +98,8 @@
       "survives": true,
       "status": "needs-info"
     },
-    "rationale": "The source says the submitter would have to check how the callback is authenticated, so the unknown is real and the claim depends on it. The consequence follows from the webhook's stated purpose. Conditional and worth reporting."
+    "rationale": "The source says the submitter would have to check how the callback is authenticated, so the unknown is real and the claim depends on it. The consequence is qualified on the API trusting the callback without verifying payment independently: callback authentication alone does not establish how payment state is updated, and the unqualified version asserts a second fact the model does not carry.",
+    "reviewed_by": "mstarks01"
   },
   {
     "id": "nonsense-absurd-consequence",
@@ -141,9 +143,16 @@
     "expect": {
       "survives": false,
       "status": "rejected",
-      "rejected_because": "reasoning"
+      "rejected_because": "reasoning",
+      "reason_must_name": [
+        "gravitational",
+        "moon",
+        "orbit",
+        "tidal"
+      ]
     },
-    "rationale": "The ground resolves and the cited fact is real. The conclusion does not follow from it by any reading. This is the audit's own reproduction: today the schema accepts it, code rules it needs-info, and no reader ever sees it."
+    "rationale": "The audit's own reproduction. The ground resolves and the cited fact is real; the conclusion follows from it by no reading. The reason has to engage with the consequence rather than with the unknown, or the critic has rejected the right draft for a reason that would reject fixture 1 as well.",
+    "reviewed_by": "mstarks01"
   },
   {
     "id": "nonsense-plausible-non-sequitur",
@@ -188,9 +197,16 @@
     "expect": {
       "survives": false,
       "status": "rejected",
-      "rejected_because": "reasoning"
+      "rejected_because": "reasoning",
+      "reason_must_name": [
+        "signing key",
+        "session cookie",
+        "derive",
+        "orders-db"
+      ]
     },
-    "rationale": "The harder half of this kind, and the one that matters. It reads like a real finding: the cited fact is true, the vocabulary is right, and the consequence is a real attack. Nothing in the model puts a session signing key in the orders database, so the step from the fact to the conclusion is invented. A critic that catches only the Moon fixture has not learned anything."
+    "rationale": "The one the set is for. True cited fact, right vocabulary, a real attack as the conclusion. Neither the signing key's presence in `store:orders-db` nor its derivability from the stored records is established anywhere in the model. A critic that catches fixture 3 and not this has learned nothing, and a reason that says only 'the control is unknown' has caught neither.",
+    "reviewed_by": "mstarks01"
   },
   {
     "id": "irrelevant-unknown-over-sound-argument",
@@ -253,18 +269,84 @@
     "expect": {
       "survives": true
     },
-    "rationale": "The argument stands entirely on a stated fact the source spells out. The unknown it also cites is about a different flow's transport and the claim does not depend on it. Today that one irrelevant ground is enough to route the whole draft past the critic. It must survive \u2014 and no exact status is pinned, because the verdict it deserves is `confirmed` and the code will not currently allow that on a draft carrying any unknown ground."
+    "rationale": "The argument stands entirely on a stated fact the source spells out, and the unknown it also cites is a different flow's transport. That one irrelevant ground is what routes the whole draft past the critic today. It must survive, and the verdict it deserves is `confirmed`. Either surviving status passes this fixture for the initial test \u2014 which is also its limit: neither one shows the critic identified the unknown as irrelevant, and that needs its own observable.",
+    "reviewed_by": "mstarks01"
   },
   {
-    "id": "irrelevant-unknown-over-unsound-argument",
+    "id": "irrelevant-unknown-over-invented-mechanism",
     "kind": "irrelevant-unknown",
     "case": "01-payments-checkout",
     "draft": {
       "id": "S-06",
       "framework": "stride",
       "framework_version": "1.0",
-      "title": "The order service writes receipts that name the shopper who placed the order",
-      "description": "`flow:order-service-to-receipt-archive:append-receipt` writes a receipt for every completed order, and the receipt names the shopper. An attacker reading `store:receipt-archive` therefore learns which shopper placed which order.",
+      "title": "Writes to the receipt archive are replayed into the orders database",
+      "description": "`process:order-service` queues failed database writes as objects in `store:receipt-archive` and drains that queue back into `store:orders-db` when the database recovers. An attacker who can write an object to the bucket therefore injects rows into the orders table without ever authenticating to the database.",
+      "affected_element_ids": [
+        "store:receipt-archive",
+        "store:orders-db",
+        "process:order-service"
+      ],
+      "verb": "inject",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "Every completed order also gets a receipt written to a Cloud Storage bucket",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:shopper-to-storefront-api:place-order",
+          "attribute": "encryption_in_transit",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "tampering",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Rated for the fixture; the review change does not turn on the rating."
+      },
+      "mitigations": [
+        {
+          "summary": "Placeholder so the fixture carries the block the critic now reads",
+          "detail": "The mitigation block enters the critic view with this change, so every fixture carries one; its relevance is part of what a reader signs."
+        }
+      ]
+    },
+    "expect": {
+      "survives": false,
+      "status": "rejected",
+      "rejected_because": "reasoning",
+      "reason_must_name": [
+        "queue",
+        "replay",
+        "drain",
+        "retry",
+        "inject"
+      ]
+    },
+    "rationale": "The replacement for the receipt-names-the-shopper draft, which was arguable: an order identifier does correlate to a shopper through another store, so calling that an invention was a judgement a careful critic could refuse. This invents a whole mechanism instead \u2014 a retry queue draining the bucket into the database \u2014 and nothing in the model or the source describes one. The same irrelevant unknown shields it, and must not buy it a pass any more than it buys one for fixture 5.",
+    "reviewed_by": null
+  },
+  {
+    "id": "contradicted-receipt-archive-unencrypted",
+    "kind": "contradicted-by-source",
+    "case": "01-payments-checkout",
+    "draft": {
+      "id": "S-07",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Receipts rest unencrypted in the archive bucket",
+      "description": "`store:receipt-archive` holds a receipt for every completed order and nothing protects those objects on the medium, so an attacker reaching the bucket's storage reads them.",
       "affected_element_ids": [
         "store:receipt-archive"
       ],
@@ -272,7 +354,7 @@
       "grounds": [
         {
           "kind": "quote",
-          "text": "The receipt records which order was written and that the order service wrote it.",
+          "text": "the bucket is encrypted with a customer-managed key",
           "source_label": "System description",
           "element_id": "",
           "attribute": "",
@@ -306,75 +388,35 @@
     "expect": {
       "survives": false,
       "status": "rejected",
-      "rejected_because": "reasoning"
-    },
-    "rationale": "The same shield over an unsound argument. The quoted sentence says the receipt records the order and the writer \u2014 it does not name the shopper, and the draft asserts that it does. The irrelevant unknown must not buy it a pass any more than it buys one for the sound draft above."
-  },
-  {
-    "id": "contradicted-receipt-archive-unencrypted",
-    "kind": "contradicted-by-source",
-    "case": "01-payments-checkout",
-    "draft": {
-      "id": "S-07",
-      "framework": "stride",
-      "framework_version": "1.0",
-      "title": "Receipts rest unencrypted in the archive bucket",
-      "description": "`store:receipt-archive` holds a receipt for every completed order and nothing protects those objects on the medium, so anyone reaching the bucket's storage reads them.",
-      "affected_element_ids": [
-        "store:receipt-archive"
-      ],
-      "verb": "read",
-      "grounds": [
-        {
-          "kind": "quote",
-          "text": "the bucket is encrypted with a customer-managed key",
-          "source_label": "System description",
-          "element_id": "",
-          "attribute": "",
-          "flow_id": "",
-          "term": ""
-        }
-      ],
-      "category": "information-disclosure",
-      "severity": {
-        "likelihood": "medium",
-        "impact": "medium",
-        "level": "medium",
-        "justification": "Rated for the fixture; the review change does not turn on the rating."
-      },
-      "mitigations": [
-        {
-          "summary": "Placeholder so the fixture carries the block the critic now reads",
-          "detail": "The mitigation block enters the critic view with this change, so every fixture carries one; its relevance is part of what a reader signs."
-        }
+      "reason_must_name": [
+        "customer-managed",
+        "cmek",
+        "encrypted at rest",
+        "encryption_at_rest"
       ]
     },
-    "expect": {
-      "survives": false,
-      "status": "rejected",
-      "rejected_because": "evidence"
-    },
-    "rationale": "The draft's own quote states the opposite of what the draft asserts, and the model carries `encryption_at_rest` as a customer-managed key. The model shows the thing the draft says is missing, which is the step 1 outcome that rules on the subject rather than on the wording."
+    "rationale": "The draft's own quote states the opposite of what it asserts, and the model carries `encryption_at_rest` as a customer-managed key. It now also carries the irrelevant unknown: without one it reaches the critic today, so it would have tested contradiction detection and not the bypass this change closes. No step is pinned \u2014 the model showing what the draft calls missing reads as `evidence`, the draft asserting what the model contradicts reads as `reasoning`, and this set is not the place to settle that.",
+    "reviewed_by": "mstarks01"
   },
   {
-    "id": "contradicted-per-user-database-credentials",
+    "id": "contradicted-receipt-write-unauthenticated",
     "kind": "contradicted-by-source",
     "case": "01-payments-checkout",
     "draft": {
       "id": "S-08",
       "framework": "stride",
       "framework_version": "1.0",
-      "title": "Per-shopper database credentials leave each order readable only by its owner",
-      "description": "`flow:order-service-to-orders-db:read-write-orders` authenticates with a credential issued per shopper, so a compromise of `process:order-service` exposes one shopper's orders rather than the whole table.",
+      "title": "Anything on the core network can append a forged receipt",
+      "description": "`flow:order-service-to-receipt-archive:append-receipt` carries no authentication, so any workload in the core network can write an object into `store:receipt-archive` and enter a receipt for an order that was never placed.",
       "affected_element_ids": [
-        "flow:order-service-to-orders-db:read-write-orders",
-        "store:orders-db"
+        "flow:order-service-to-receipt-archive:append-receipt",
+        "store:receipt-archive"
       ],
-      "verb": "abuse-grant",
+      "verb": "forge",
       "grounds": [
         {
           "kind": "quote",
-          "text": "a single application account that has full read/write",
+          "text": "That is on TLS with the order service's own service account",
           "source_label": "System description",
           "element_id": "",
           "attribute": "",
@@ -382,7 +424,7 @@
           "term": ""
         }
       ],
-      "category": "elevation-of-privilege",
+      "category": "spoofing",
       "severity": {
         "likelihood": "medium",
         "impact": "medium",
@@ -399,8 +441,13 @@
     "expect": {
       "survives": false,
       "status": "rejected",
-      "rejected_because": "evidence"
+      "reason_must_name": [
+        "service account",
+        "tls",
+        "authentication"
+      ]
     },
-    "rationale": "The quote says a single shared account with full read/write; the draft asserts per-shopper credentials and a narrower blast radius. Contradicted by the sentence it cites, and the direction matters \u2014 this one understates the risk, which is the shape a reviewer is least likely to challenge."
+    "rationale": "The replacement for the per-shopper-credentials draft, which asserted a reassurance rather than a threat and so gave a critic a second reason to reject it. This is a genuine threat claim \u2014 a forged receipt breaks the archive's record of what happened \u2014 whose premise its own quote contradicts: the write is authenticated by the order service's service account. It carries no unknown ground on purpose, so it reaches the critic both before and after the change and is the positive control: if it survives, the critic cannot detect contradiction at all, and the bypassed fixtures say nothing about the bypass.",
+    "reviewed_by": null
   }
 ]
