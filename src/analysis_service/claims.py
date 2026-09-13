@@ -705,14 +705,23 @@ class Claim(BaseModel):
 
     @classmethod
     def settled_by_grounds(cls, draft: Claim) -> Ruling | None:
-        """The ruling a draft's own grounds settle before any critic reads it.
+        """The ruling a draft's own grounds support, in the pairs alone.
 
         A draft citing an ``unknown-attribute`` ground rests on a control the
         input never stated, and the prompts already say what that makes it: a
-        conditional claim, ruled ``needs-info`` on exactly those pairs. Code
-        rules it here, and the critic never sees it (#439). ``None`` for a
-        draft the grounds do not settle. A package whose ruling carries fields
-        beyond the neutral shape overrides this to fill them.
+        conditional claim, ``needs-info`` on exactly those pairs.
+
+        **This decides no verdict.** The critic reads every draft, conditional
+        ones included, because whether an argument follows from what it cites
+        is a different question from whether those facts are open, and only the
+        second is a rule (#889). What this composes is the reference half —
+        :func:`~analysis_service.critic.complete_rulings` fills
+        ``related_unknowns`` and a reason onto a ``needs-info`` the critic
+        wrote, because a hand-written pair naming an attribute the model does
+        not carry is a failure the service can prevent and a critic cannot
+        (#409). ``None`` for a draft the grounds do not settle. A package whose
+        ruling carries fields beyond the neutral shape overrides this to fill
+        them.
 
         The sentence names each pair, and names the count instead when the
         pairs overrun ``REASON_MAX_CHARS``. ``related_unknowns`` carries every

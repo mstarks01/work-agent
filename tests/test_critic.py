@@ -523,10 +523,12 @@ class TestSnapRulings:
         assert snapped == ruling
 
 
-class TestAnUnknownGroundSettlesTheVerdict:
-    """#439: a draft citing an ``unknown-attribute`` ground is conditional by
-    its own evidence, so the verdict is decided in code and the critic only
-    chooses between ``needs-info`` and ``rejected``."""
+class TestAnUnknownGroundMakesTheClaimConditional:
+    """A draft citing an ``unknown-attribute`` ground rests on a fact nobody
+    stated, so the claim is conditional — and the critic rules on it like any
+    other, because whether the argument follows from what it cites is a
+    different question from whether those facts are open (#889). Code supplies
+    the pairs a ``needs-info`` hangs on and decides no verdict."""
 
     @pytest.fixture
     def model(self):

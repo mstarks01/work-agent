@@ -80,12 +80,10 @@ def reaching_refs(case, element_ids) -> list[str]:
     claim's grounds name (#441), so a scripted draft has to cite a fact that
     reaches the elements it stands in for, or the service drops them. One
     entry, because these tests count grounds per draft; a ``crossing:`` entry
-    over an ``unknown:`` where both reach, because code rules a draft resting
-    on an unknown before any critic reads (#439) and routes around the critic
-    when that leaves nothing (#675 D22) — so a sweep whose every draft cited
-    an unknown would stamp no critic node, and these tests read that node.
-    Where nothing reaches every element the best partial reach is cited, and
-    the drop of the rest is the point.
+    over an ``unknown:`` where both reach, so a scripted draft rests on a stated
+    fact wherever the model offers one and these tests are not all reading one
+    kind of ground. Where nothing reaches every element the best partial reach
+    is cited, and the drop of the rest is the point.
     """
     from analysis_service.system_model import ModelIndex
 
@@ -136,9 +134,11 @@ def scripted_ruling(case, category) -> dict:
     Carries no ``severity``: the draft's rating stands, which is the common
     case and the one the assemble seam merges through.
 
-    The verdict follows the draft's grounds, as the contract asks (#439): a
-    draft citing an ``unknown-attribute`` ground gets a bare ``needs-info``
-    the service completes, and one resting on a crossing alone is confirmed.
+    The verdict follows the draft's grounds, which is one of the several answers
+    a critic may legally give: a draft citing an ``unknown-attribute`` ground
+    gets a bare ``needs-info`` the service completes with the pairs, and one
+    resting on a crossing alone is confirmed. Scripted so these tests read a
+    fixed critic; a live one rules on the argument as well.
     """
     reference = next(
         ref for ref in case.claims_for("stride") if ref.category == category

@@ -1,7 +1,12 @@
 # 28. A draft states its direction
 
-- **Status**: accepted
+- **Status**: accepted, amended 2026-09-13
 - **Date**: 2026-09-09
+- **Amendment**: [#889](https://github.com/mstarks01/work-agent/issues/889)
+  moved who settles a `question`. An unknown ground still makes a claim
+  conditional and code still supplies the pairs it hangs on; what code no
+  longer does is rule the draft and route it past the critic. The two passages
+  below state the current mechanism, and the rest of this record is unchanged.
 - **Effort**: [#713 — a typed applicability state on the proposal](https://github.com/mstarks01/work-agent/issues/713),
   with the three contract contradictions recorded on it from the audit on
   [#732](https://github.com/mstarks01/work-agent/issues/732)
@@ -52,7 +57,7 @@ turns on what silence means:
 | `direction` | what the lane asserts | what it must rest on | who settles it |
 |---|---|---|---|
 | `gap` | the input states a fact that fails the requirement | a quote or a stated attribute ground; never `absent_elements` alone | the critic confirms or rejects |
-| `question` | the input does not settle the requirement | `needs_evidence` names what would | code, as `needs-info`, on the #439 path where an unknown ground is cited; otherwise the critic |
+| `question` | the input does not settle the requirement | `needs_evidence` names what would | the critic, which reads every draft; code supplies the pairs a `needs-info` names where an unknown ground is cited |
 | `excluded` | the requirement has no subject in this system | `absent_elements`, or a stated fact that rules it out | the critic, by an `evidence` rejection, which is the one rejection that rules on the unit |
 
 Three rules follow, and each closes one contradiction above.
@@ -83,10 +88,13 @@ exclusions for `reasoning`. `prompts/critic.md`'s
 rule that a graph's shape confirms no *threat* is unchanged, because it is a
 rule about `gap` and not about `excluded`.
 
-**The #439 path keeps its answer.** A draft citing an unknown-attribute ground
-is ruled `needs-info` in code whatever its `direction`, because an unresolved
-premise blocks confirmation and blocks exclusion alike. A `gap` with an unknown
-ground reads as a `question`; the field does not override the ground.
+**An unknown ground still outranks the field.** A draft citing an
+unknown-attribute ground is conditional whatever its `direction`, because an
+unresolved premise blocks confirmation and blocks exclusion alike. A `gap` with
+an unknown ground reads as a `question`; the field does not override the
+ground. The critic rules such a draft like any other and may not confirm it,
+which `_confirmed_on_unknown_issues` enforces; code composes the pairs the
+`needs-info` names and decides no verdict.
 
 **Which package declares it is a property, not a name.** The field belongs to a
 package whose claims name a catalog unit and can rule it out. A package whose
