@@ -55,6 +55,22 @@ CORPUS_DIR = REPO_ROOT / "evals" / "corpus"
 # commands that exist to read it. The version guards the declared keys below,
 # not every field an instrument adds inside its own block.
 #
+# * Version 7 renames the claim scorer's coverage metrics inside ``scores``:
+#   ``recall`` to ``reference_coverage``, ``must_find_recall`` to
+#   ``must_find_coverage``, ``expected_recall`` to ``expected_coverage`` and
+#   ``element_accuracy`` to ``element_agreement`` (#890). No value moves. The
+#   old names read as detection quality and the numbers are not that: the
+#   matcher compares lane, action and endpoint-resolved targets and reads no
+#   prose, so a report whose every finding says "no security problem exists"
+#   scores what it scored before.
+#
+#   A rename inside a block is normally not a version event — see the ``stale``
+#   note above. This one is, because the reader cannot tell the two shapes
+#   apart from their contents: a float under a different key is still a float,
+#   and ``stability`` comparing an old sweep with a new one would raise on a
+#   missing key or, worse, read a number it could still find. The three
+#   archived Baselines were migrated and re-sealed rather than re-run.
+#
 # * Version 6 adds ``node_charges``: what each node's providers said they
 #   charged, summed across the sweep's executions (#822). Empty on every vendor
 #   that reports token counts alone, which is every direct vendor — the key is
@@ -74,7 +90,7 @@ CORPUS_DIR = REPO_ROOT / "evals" / "corpus"
 #   inference over blocks that write their keys whether or not a framework ran.
 # * Version 2 adds the two keys that say which *repository state* produced a
 #   sweep, beside the ``provenance`` block that already said which models did.
-ARTIFACT_VERSION = 6
+ARTIFACT_VERSION = 7
 
 #: What a recorded artifact carries where the fact was never captured. Only
 #: the sweeps taken before version 2 hold it: :func:`build` computes both keys

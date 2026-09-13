@@ -38,7 +38,7 @@ Nobody has voted on this Baseline's findings, so every vote-dependent number bel
 
 `stride`
 
-| recall | must-find recall | rejected rate | writing objections |
+| reference coverage | must-find coverage | rejected rate | writing objections |
 | --- | --- | --- | --- |
 | 0.467 | 0.479 | no votes yet | no votes yet |
 
@@ -46,7 +46,7 @@ Nobody has voted on this Baseline's findings, so every vote-dependent number bel
 
 `stride`
 
-| recall | must-find recall | rejected rate | writing objections |
+| reference coverage | must-find coverage | rejected rate | writing objections |
 | --- | --- | --- | --- |
 | 0.467 | 0.479 | no votes yet | no votes yet |
 
@@ -66,7 +66,7 @@ Nobody has voted on this Baseline's findings, so every vote-dependent number bel
 
 `stride`
 
-| recall | must-find recall | rejected rate | writing objections |
+| reference coverage | must-find coverage | rejected rate | writing objections |
 | --- | --- | --- | --- |
 | 0.527 | 0.634 | no votes yet | no votes yet |
 
@@ -74,7 +74,7 @@ Nobody has voted on this Baseline's findings, so every vote-dependent number bel
 
 `stride`
 
-| recall | must-find recall | rejected rate | writing objections |
+| reference coverage | must-find coverage | rejected rate | writing objections |
 | --- | --- | --- | --- |
 | 0.527 | 0.634 | no votes yet | no votes yet |
 
@@ -94,7 +94,7 @@ Nobody has voted on this Baseline's findings, so every vote-dependent number bel
 
 `stride`
 
-| recall | must-find recall | rejected rate | writing objections |
+| reference coverage | must-find coverage | rejected rate | writing objections |
 | --- | --- | --- | --- |
 | 0.473 | 0.518 | no votes yet | no votes yet |
 
@@ -102,6 +102,6 @@ Nobody has voted on this Baseline's findings, so every vote-dependent number bel
 
 `stride`
 
-| recall | must-find recall | rejected rate | writing objections |
+| reference coverage | must-find coverage | rejected rate | writing objections |
 | --- | --- | --- | --- |
 | 0.473 | 0.518 | no votes yet | no votes yet |

@@ -329,7 +329,7 @@ def test_analysis_mode_scores_against_the_reference_set(case):
     score = score_case(case, claims, matcher, Ledger())
 
     assert len(score.matched) == len(STRIDE_CATEGORIES)
-    assert score.element_accuracy == 1.0
+    assert score.element_agreement == 1.0
     assert score.severity_exact_rate == 1.0
 
 

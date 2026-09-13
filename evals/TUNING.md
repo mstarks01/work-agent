@@ -219,8 +219,8 @@ list). When tuning, watch these three:
 
 | Metric | What a good change does | Trap |
 | --- | --- | --- |
-| **must-find recall** (per case) | goes up, or holds, on **every** case | An aggregate average hides one case collapsing. Always read per case. |
-| **near/far exemplar delta** | shrinks or holds | A change can lift average recall while widening this gap — a worse model that looks better. The far-domain cases are the honest test. |
+| **must-find coverage** (per case) | goes up, or holds, on **every** case | An aggregate average hides one case collapsing. Always read per case. It is coverage of a reference, not a measure of whether the argument is right (#890). |
+| **near/far exemplar delta** | shrinks or holds | A change can lift average coverage while widening this gap — a worse model that looks better. The far-domain cases are the honest test. |
 | **critic yield** (a pair) | kills more junk (`killed-rejected`) without killing real findings (`killed-real`) | A kill count alone tells you nothing — read both halves together. |
 
 All of these are *relative to the rule and the ledger*. Use them to compare
