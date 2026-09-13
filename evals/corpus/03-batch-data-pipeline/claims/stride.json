@@ -32,7 +32,7 @@
   {
     "category": "spoofing",
     "affected_element_ids": [
-      "flow:ingest-scheduler-to-transform-job:trigger-transform"
+      "flow:ingest-scheduler-to-spark-transform-job:trigger-transform"
     ],
     "claim": "An attacker submits a transform run impersonating the scheduler, since authentication on the trigger path is unverified.",
     "tier": "expected",
@@ -47,7 +47,7 @@
     "category": "tampering",
     "affected_element_ids": [
       "store:landing-bucket",
-      "process:transform-job"
+      "process:spark-transform-job"
     ],
     "claim": "An attacker who can write to the landing bucket alters claim records before the nightly run, and only the schema is checked before they reach the warehouse.",
     "tier": "must-find",
@@ -61,8 +61,8 @@
   {
     "category": "tampering",
     "affected_element_ids": [
-      "store:airflow-metadata-db",
-      "flow:ingest-scheduler-to-airflow-metadata-db:read-connections"
+      "store:airflow-metadata-database",
+      "flow:ingest-scheduler-to-airflow-metadata-database:read-connections"
     ],
     "claim": "An attacker who can write to the Airflow metadata database rewrites a connection string to redirect the pipeline to infrastructure they control.",
     "tier": "expected",
@@ -77,7 +77,7 @@
     "category": "tampering",
     "affected_element_ids": [
       "store:claims-warehouse",
-      "flow:transform-job-to-claims-warehouse:load-records"
+      "flow:spark-transform-job-to-claims-warehouse:load-records"
     ],
     "claim": "An attacker who compromises the transform job writes fabricated claim rows into the warehouse alongside genuine ones.",
     "tier": "expected",
@@ -107,7 +107,7 @@
     "category": "repudiation",
     "affected_element_ids": [
       "store:claims-warehouse",
-      "process:transform-job"
+      "process:spark-transform-job"
     ],
     "claim": "A dispute over a warehouse row cannot be traced back to the extract it came from, because no lineage from file to loaded record is described.",
     "tier": "expected",
@@ -136,7 +136,7 @@
   {
     "category": "information-disclosure",
     "affected_element_ids": [
-      "store:airflow-metadata-db"
+      "store:airflow-metadata-database"
     ],
     "claim": "An attacker who reaches the Airflow metadata database recovers every partner key and connection string it holds, since its protection at rest is unverified.",
     "tier": "must-find",
@@ -164,7 +164,7 @@
   {
     "category": "information-disclosure",
     "affected_element_ids": [
-      "flow:transform-job-to-claims-warehouse:load-records"
+      "flow:spark-transform-job-to-claims-warehouse:load-records"
     ],
     "claim": "An attacker observing the load path reads claim records in transit, because transport encryption on it is unverified.",
     "tier": "expected",
@@ -193,7 +193,7 @@
   {
     "category": "denial-of-service",
     "affected_element_ids": [
-      "process:transform-job",
+      "process:spark-transform-job",
       "store:claims-warehouse"
     ],
     "claim": "An attacker crafts input that makes the transform job fail repeatedly, leaving the warehouse stale without any request-level error surfacing.",
@@ -208,7 +208,7 @@
   {
     "category": "elevation-of-privilege",
     "affected_element_ids": [
-      "store:airflow-metadata-db",
+      "store:airflow-metadata-database",
       "process:ingest-scheduler"
     ],
     "claim": "An attacker with a foothold in the landing network reads the metadata database and escalates to every credential the pipeline holds.",
@@ -223,8 +223,8 @@
   {
     "category": "elevation-of-privilege",
     "affected_element_ids": [
-      "process:transform-job",
-      "flow:ingest-scheduler-to-transform-job:trigger-transform"
+      "process:spark-transform-job",
+      "flow:ingest-scheduler-to-spark-transform-job:trigger-transform"
     ],
     "claim": "An attacker who can plant a file in the landing bucket gains execution in the warehouse network through the job it triggers.",
     "tier": "must-find",

@@ -40,8 +40,8 @@
       "interface_kind": "non-web"
     },
     {
-      "id": "process:transform-job",
-      "name": "transform job",
+      "id": "process:spark-transform-job",
+      "name": "Spark transform job",
       "description": "Spark job that normalizes claim records and loads them into the warehouse. Validates schema only.",
       "assets": [
         "pii",
@@ -72,8 +72,8 @@
       "encryption_at_rest": "unknown"
     },
     {
-      "id": "store:airflow-metadata-db",
-      "name": "airflow metadata db",
+      "id": "store:airflow-metadata-database",
+      "name": "Airflow metadata database",
       "description": "Airflow's own database, holding connection strings and the partner SFTP keys.",
       "assets": [
         "credentials",
@@ -141,7 +141,7 @@
       "operations": "read"
     },
     {
-      "id": "flow:ingest-scheduler-to-airflow-metadata-db:read-connections",
+      "id": "flow:ingest-scheduler-to-airflow-metadata-database:read-connections",
       "name": "read connections",
       "description": "Scheduler reads its connection strings and the partner keys.",
       "assets": [
@@ -151,7 +151,7 @@
       "source_excerpt": "Airflow keeps its connection strings and the partner keys in its own metadata database.",
       "source_label": "System description",
       "source": "process:ingest-scheduler",
-      "destination": "store:airflow-metadata-db",
+      "destination": "store:airflow-metadata-database",
       "protocol": "PostgreSQL wire protocol",
       "authentication": "unknown",
       "data_description": "connection strings, partner SFTP keys",
@@ -159,14 +159,14 @@
       "operations": "read"
     },
     {
-      "id": "flow:ingest-scheduler-to-transform-job:trigger-transform",
+      "id": "flow:ingest-scheduler-to-spark-transform-job:trigger-transform",
       "name": "trigger transform",
       "description": "Scheduler starts one transform run per landed file.",
       "assets": [],
       "source_excerpt": "For each file the scheduler triggers a Spark transform job in the warehouse network.",
       "source_label": "System description",
       "source": "process:ingest-scheduler",
-      "destination": "process:transform-job",
+      "destination": "process:spark-transform-job",
       "protocol": "unknown",
       "authentication": "unknown",
       "data_description": "run request naming the file to process",
@@ -174,7 +174,7 @@
       "operations": "write"
     },
     {
-      "id": "flow:transform-job-to-claims-warehouse:load-records",
+      "id": "flow:spark-transform-job-to-claims-warehouse:load-records",
       "name": "load records",
       "description": "Transform writes normalized claim rows into the warehouse.",
       "assets": [
@@ -183,7 +183,7 @@
       ],
       "source_excerpt": "Nothing validates the row contents beyond the schema.",
       "source_label": "System description",
-      "source": "process:transform-job",
+      "source": "process:spark-transform-job",
       "destination": "store:claims-warehouse",
       "protocol": "BigQuery API",
       "authentication": "unknown",

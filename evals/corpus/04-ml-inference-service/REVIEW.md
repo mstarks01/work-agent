@@ -75,8 +75,8 @@ Not part of the question, but the records cite these names, so you need them.
 
 | id | zone | at rest | classification |
 |---|---|---|---|
-| store:model-registry | boundary:model-network | unknown | internal |
-| store:feature-store | boundary:model-network | unknown | confidential |
+| store:model-registry-bucket | boundary:model-network | unknown | internal |
+| store:redis-feature-store | boundary:model-network | unknown | confidential |
 | store:inference-log | boundary:serving-edge | unknown | confidential |
 
 **Data flows**
@@ -85,10 +85,10 @@ Not part of the question, but the records cite these names, so you need them.
 |---|---|---|---|---|---|
 | flow:calling-service-to-inference-gateway:submit-inference-request | entity:calling-service | process:inference-gateway | HTTPS | per-team API key in a header, never expired or rotated | unknown |
 | flow:inference-gateway-to-model-server:forward-request | process:inference-gateway | process:model-server | unknown | none; accepted by network position | unknown |
-| flow:model-server-to-model-registry:load-artifact | process:model-server | store:model-registry | object storage API | model server's own service account | unknown |
-| flow:model-server-to-feature-store:read-features | process:model-server | store:feature-store | Redis protocol | none | unknown |
+| flow:model-server-to-model-registry-bucket:load-artifact | process:model-server | store:model-registry-bucket | object storage API | model server's own service account | unknown |
+| flow:model-server-to-redis-feature-store:read-features | process:model-server | store:redis-feature-store | Redis protocol | none | unknown |
 | flow:inference-gateway-to-inference-log:write-request-log | process:inference-gateway | store:inference-log | BigQuery API | unknown | unknown |
-| flow:ml-engineer-to-model-registry:publish-artifact | entity:ml-engineer | store:model-registry | object storage API | unknown; possibly a shared group account | unknown |
+| flow:ml-engineer-to-model-registry-bucket:publish-artifact | entity:ml-engineer | store:model-registry-bucket | object storage API | unknown; possibly a shared group account | unknown |
 
 **Trust boundaries**
 
@@ -136,14 +136,14 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A2.** `V5.2.1` — Nothing limits the size or type of a model artifact published into the registry.
 
-- `entity:ml-engineer`, `store:model-registry`, `flow:ml-engineer-to-model-registry:publish-artifact`
+- `entity:ml-engineer`, `store:model-registry-bucket`, `flow:ml-engineer-to-model-registry-bucket:publish-artifact`
 - An artifact upload path exists; feature:file-upload has a subject here.
 
 > mark:
 
 **A3.** `V5.2.2` — Nothing states what validates a published artifact before the model server loads it.
 
-- `store:model-registry`, `flow:ml-engineer-to-model-registry:publish-artifact`
+- `store:model-registry-bucket`, `flow:ml-engineer-to-model-registry-bucket:publish-artifact`
 - The registry is read by an internal server, so an unvalidated artifact is executed content.
 
 > mark:
@@ -183,7 +183,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A7.** `V11.3.2` — No cipher is stated for the feature store or the inference log at rest.
 
-- `store:feature-store`, `store:inference-log`
+- `store:redis-feature-store`, `store:inference-log`
 - Both are confidential with encryption_at_rest unknown.
 
 > mark:
@@ -213,7 +213,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A10.** `V13.3.2` — Nothing states what limits the model server's registry service account.
 
-- `process:model-server`, `store:model-registry`
+- `process:model-server`, `store:model-registry-bucket`
 - A service account is named and its scope is not.
 
 > mark:
@@ -254,7 +254,7 @@ on either of them. That is the finding this sitting exists for.
 
 **3.** An attacker publishes a model artifact under a shared group account with no individual identity behind it.
 
-- `flow:ml-engineer-to-model-registry:publish-artifact`, `entity:ml-engineer`
+- `flow:ml-engineer-to-model-registry-bucket:publish-artifact`, `entity:ml-engineer`
 - severity: medium/high · verb: `use-credential`
 - Publish authentication is unknown and possibly shared; report as unverified.
 
@@ -265,7 +265,7 @@ on either of them. That is the finding this sitting exists for.
 
 **4.** An attacker who can write to the registry swaps the model artifact and the model server loads it without any integrity verification.
 
-- `store:model-registry`, `flow:model-server-to-model-registry:load-artifact`
+- `store:model-registry-bucket`, `flow:model-server-to-model-registry-bucket:load-artifact`
 - severity: high/high · verb: `plant`
 - The defining supply-chain finding of this case; the source states verification is absent.
 
@@ -273,7 +273,7 @@ on either of them. That is the finding this sitting exists for.
 
 **5.** An attacker with model-network access writes to the unauthenticated Redis feature store and changes the features a decision is made on.
 
-- `store:feature-store`, `flow:model-server-to-feature-store:read-features`
+- `store:redis-feature-store`, `flow:model-server-to-redis-feature-store:read-features`
 - severity: medium/high · verb: `alter`
 - No password is a stated fact, not an unknown; poisoning features silently changes inference output.
 
@@ -292,7 +292,7 @@ on either of them. That is the finding this sitting exists for.
 
 **7.** Nobody can establish which engineer published a given model artifact, because publication runs through a shared account.
 
-- `store:model-registry`, `entity:ml-engineer`
+- `store:model-registry-bucket`, `entity:ml-engineer`
 - severity: medium/medium · verb: `unattributable`
 - Model provenance is the audit trail that matters here; a shared account destroys it.
 
@@ -319,7 +319,7 @@ on either of them. That is the finding this sitting exists for.
 
 **10.** An attacker with model-network access reads per-customer account age and spend bands from the unauthenticated feature store.
 
-- `store:feature-store`
+- `store:redis-feature-store`
 - severity: medium/high · verb: `read`
 - Stated absence of authentication over data tagged pii and financial.
 
@@ -354,7 +354,7 @@ on either of them. That is the finding this sitting exists for.
 
 **14.** An attacker with model-network access flushes or fills the unauthenticated Redis store, stalling every request that needs features.
 
-- `store:feature-store`, `process:model-server`
+- `store:redis-feature-store`, `process:model-server`
 - severity: medium/high · verb: `disable`
 - An unauthenticated cache is as easy to destroy as to read.
 
@@ -362,7 +362,7 @@ on either of them. That is the finding this sitting exists for.
 
 **15.** An attacker deletes or corrupts the registry artifact so the model server cannot start after a restart.
 
-- `store:model-registry`, `process:model-server`
+- `store:model-registry-bucket`, `process:model-server`
 - severity: low/high · verb: `delete`
 - Startup dependency with no fallback described.
 
@@ -373,7 +373,7 @@ on either of them. That is the finding this sitting exists for.
 
 **16.** An attacker who can write to the registry turns an unverified artifact load into code execution on the GPU nodes.
 
-- `store:model-registry`, `process:model-server`
+- `store:model-registry-bucket`, `process:model-server`
 - severity: medium/high · verb: `escalate`
 - Model artifacts are loaded as code; the escalation framing of the swap finding.
 
@@ -440,9 +440,9 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
-      "model.json": "6a4114a0c200dea084906e02d55f7ccf9f9f34df3795489c62a2cbb92533cfd2",
-      "claims/asvs.json": "44620310196608780da03c18469daf9f4cd4c40affb8a4527e40323489f82544",
-      "claims/stride.json": "219c4116a56305055f1ff4ce543c246ab37e0bb5e3082e83523044d56d5fb94d"
+      "model.json": "33af264a67f028a3684ba13f2b87061b0a7a9e8d716cb71914a1668d3c93d98a",
+      "claims/asvs.json": "cd157e2720c52ec5af8e1d19436f6f5f2c0d4e3b491f6a931ffdb4f32edd49a6",
+      "claims/stride.json": "288fe3576466a3adc2ee67154a9cfbdc919a60db6264466faba6b6092e05e47a"
       }
     }
   }

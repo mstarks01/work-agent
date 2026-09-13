@@ -124,7 +124,7 @@ FRONTIER = {
     #: It is not an element rule, so it is measured by :func:`_rules`'s
     #: verb-aware entry rather than by a shape function.
     "endpoint subset + verb": {
-        "splits": 14,
+        "splits": 15,
         "candidate_merges": 3,
         "reference_merges": 3,
     },
@@ -411,7 +411,7 @@ VERB_MEASURED = {
 #:
 #: Read it as ``evals/README.md`` reads every other agreement figure: the labels
 #: are agent-authored, so this measures reproduction and not correctness.
-SUBSET_VERB_AGREEMENT = {"agreements": 294, "total": 311}
+SUBSET_VERB_AGREEMENT = {"agreements": 293, "total": 311}
 
 
 def test_the_verb_separates_what_elements_alone_merge(corpus, flows_by_case):

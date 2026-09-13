@@ -16,7 +16,7 @@
     "chapter": "validation-and-business-logic",
     "requirement": "V2.2.2",
     "affected_element_ids": [
-      "entity:customer-support",
+      "entity:customer-support-staff",
       "process:moderation-website"
     ],
     "claim": "Nothing says which side validates the moderation actions support staff take on player accounts.",
@@ -28,9 +28,9 @@
     "chapter": "web-frontend-security",
     "requirement": "V3.3.1",
     "affected_element_ids": [
-      "entity:customer-support",
+      "entity:customer-support-staff",
       "process:moderation-website",
-      "flow:customer-support-to-moderation-website:moderate-accounts"
+      "flow:customer-support-staff-to-moderation-website:moderate-accounts"
     ],
     "claim": "The moderation website is browser-delivered and no cookie attribute is stated.",
     "tier": "expected",
@@ -66,7 +66,7 @@
     "chapter": "authorization",
     "requirement": "V8.2.2",
     "affected_element_ids": [
-      "entity:customer-support",
+      "entity:customer-support-staff",
       "process:moderation-website",
       "store:player-database"
     ],
