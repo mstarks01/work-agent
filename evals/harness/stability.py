@@ -211,8 +211,11 @@ def read_run(artifact: EvalArtifact) -> ScoredRun:
     # Refused by name rather than raised through: an artifact whose blocks are
     # the wrong shape is a file to re-produce, and a KeyError out of a
     # comparison reads as a defect in the comparison.
+    # Outside the try: a second composed package is a fact about the registry,
+    # and the handler below names the artifact as malformed. A file that is
+    # perfectly well formed would be blamed for a defect in the code.
+    scored = _claim_scored_framework()
     try:
-        scored = _claim_scored_framework()
         for score in artifact.block("scores"):
             scope: Scope = (scored, str(score["case"]))
             matched[scope] = frozenset(
@@ -255,8 +258,9 @@ def _causes(artifact: EvalArtifact) -> dict[Scope, dict[str, str]] | None:
         return None
     if rows is None:
         return None
+    # Outside the try, for the reason :func:`read_run` gives.
+    scored = _claim_scored_framework()
     try:
-        scored = _claim_scored_framework()
         return {
             (scored, str(row["case"])): {
                 str(loss["reference_index"]): str(loss["cause"])
@@ -286,8 +290,11 @@ def _content(
     if not directory.is_dir():
         return None
     content: dict[Scope, dict[str, tuple[str, frozenset[str]]]] = {}
+    # Outside the try: a second composed package is a fact about the registry,
+    # and the handler below names the artifact as malformed. A file that is
+    # perfectly well formed would be blamed for a defect in the code.
+    scored = _claim_scored_framework()
     try:
-        scored = _claim_scored_framework()
         for score in artifact.block("scores"):
             scope: Scope = (scored, str(score["case"]))
             path = directory / f"{scope[1]}.report.json"

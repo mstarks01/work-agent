@@ -219,6 +219,25 @@ class ReplayScore:
         return sum(1 for o in read if o.recommendation_agrees), len(read)
 
     @property
+    def recommendation_informative(self) -> bool:
+        """Can this set tell a real reading from a constant answer?
+
+        **Only where the readable fixtures disagree about the right answer.**
+        A critic emits a reading on the drafts it lets survive, so those rows
+        are the whole denominator of :attr:`recommendation_agreed`. Where every
+        one of them expects the same ``sound``, a critic that answers with that
+        constant and never opens the block scores full marks — which is the
+        failure :attr:`unsupported_removed` and :attr:`valid_preserved` were
+        split apart to avoid, arriving on the third half instead.
+
+        False on a set whose surviving fixtures all carry advice ruled sound.
+        The fixture that fixes it is one that survives while carrying flawed
+        advice, which is also the pair that proves a flawed recommendation does
+        not erase a valid threat.
+        """
+        return len({o.recommendation_expected for o in self.outcomes if o.survived}) > 1
+
+    @property
     def recommendation_unread(self) -> tuple[FixtureOutcome, ...]:
         """Surviving drafts the critic ruled without reading the advice on them.
 
@@ -251,7 +270,13 @@ class ReplayScore:
         return {
             "unsupported_removed": {"got": removed, "of": of_removed},
             "valid_preserved": {"got": preserved, "of": of_preserved},
-            "recommendation_agreed": {"got": agreed, "of": of_read},
+            "recommendation_agreed": {
+                "got": agreed,
+                "of": of_read,
+                # A number nobody may read as a score while every readable
+                # fixture expects one answer.
+                "informative": self.recommendation_informative,
+            },
             "recommendation_unread": [o.fixture_id for o in self.recommendation_unread],
             "rejected_without_engaging": [
                 o.fixture_id for o in self.rejected_without_engaging

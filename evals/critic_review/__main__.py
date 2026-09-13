@@ -137,6 +137,14 @@ def main(argv: list[str] | None = None) -> int:
     print(f"unsupported removed : {removed}/{of_removed}")
     print(f"valid preserved     : {preserved}/{of_preserved}")
     print(f"recommendation read : {agreed}/{of_read} agree with the reader")
+    if not score.recommendation_informative:
+        print(
+            "  WARNING: every fixture that can carry a reading expects the same"
+            " answer, so a critic that never opens the block scores full marks"
+            " here. This number says nothing until a fixture survives while"
+            " carrying advice the reader ruled unsound.",
+            file=sys.stderr,
+        )
     if score.recommendation_unread:
         print(
             "  survived with the advice unread: "
