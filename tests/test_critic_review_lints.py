@@ -252,8 +252,8 @@ def test_a_recommendation_ruled_sound_is_about_this_claim(fixture):
     names the harness.
 
     Where the reader ruled it unsound it is a deliberate distractor, and
-    :func:`test_an_unsound_recommendation_sits_on_a_draft_that_must_die` is
-    what holds it in place instead.
+    :func:`test_the_set_carries_both_answers_about_a_recommendation` is what
+    holds it in place instead.
 
     Asked of a package whose drafts carry recommendations, which is a property
     of the record rather than a package's name: a package whose claims offer
@@ -283,34 +283,32 @@ def test_a_recommendation_ruled_sound_is_about_this_claim(fixture):
         )
 
 
-def test_an_unsound_recommendation_sits_on_a_draft_that_must_die():
-    """The distractors, and the pair the set cannot yet carry.
+def test_the_set_carries_both_answers_about_a_recommendation():
+    """Both halves of the rule, each with a row that proves it.
 
-    **A plausible recommendation must not rescue an unsupported finding.** That
-    is what an unsound recommendation on a negative fixture measures: the
-    critic has to reject the claim for its own argument, and
-    :func:`test_no_mitigation_hands_a_negative_fixture_its_own_anchors` stops
-    it from reaching the anchors through the advice.
+    **A plausible recommendation must not rescue an unsupported finding.** The
+    negative fixtures carry advice that reads well, and the critic has to
+    reject them for their own argument —
+    :func:`test_no_mitigation_hands_a_negative_fixture_its_own_anchors` stops it
+    reaching the anchors through the advice.
 
-    The converse — **a flawed recommendation must not erase a valid threat** —
-    needs a fixture that survives while carrying one. The observable it waited
-    on now exists: ``recommendation`` on a STRIDE ruling carries what the
-    critic made of the advice, and the replay scores that beside the fate
-    rather than inside it. What the fixture still needs is a reader's ruling,
-    because an expectation nobody signed is one agent grading another's change,
-    and this set may not gain an unsigned row without taking the whole set
-    below the gate.
-
-    So this holds the shape that exists and names the one that is owed.
+    **A flawed recommendation must not erase a valid threat.** That needs a row
+    that survives while carrying one, and it is also what keeps the
+    recommendation measure honest: where every readable fixture expects the same
+    answer, a critic replying ``sound`` to all of them scores full marks without
+    opening the block. ``ReplayScore.recommendation_informative`` reads the same
+    fact at run time.
     """
     unsound = [entry for entry in ALL if not entry.expect.recommendation_sound]
-
     assert unsound, "no distractor: the set cannot tell reading from rejecting"
-    assert all(not entry.expect.survives for entry in unsound), (
-        "a fixture surviving with unsound advice is the pair that proves a"
-        " flawed recommendation does not erase a valid threat. The ruling now"
-        " observes the advice, so the fixture is writable — it needs a reader's"
-        " signature, not another mechanism"
+
+    readable = {
+        entry.expect.recommendation_sound for entry in ALL if entry.expect.survives
+    }
+    assert len(readable) > 1, (
+        "every fixture that can carry a reading expects the same answer, so the"
+        " recommendation measure cannot tell a reading from a constant. Add a"
+        " fixture that survives while carrying advice a reader ruled unsound"
     )
 
 
