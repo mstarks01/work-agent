@@ -128,11 +128,34 @@ class FixtureOutcome:
     #: For a fixture that must die, did the reason engage with the inference or
     #: the contradiction the reader identified? ``None`` where nothing is owed.
     reason_engages: bool | None
+    #: What the critic made of the recommendation: ``True``/``False`` as it
+    #: ruled, ``None`` where it made no reading. Read off the package's own
+    #: ruling field, so a package whose claims recommend nothing answers
+    #: ``None`` on every fixture and scores no third half.
+    recommendation_read: bool | None = None
 
     @property
     def passes(self) -> bool:
         """A fixture passes on its fate *and* on its reason, never on fate alone."""
         return self.fate_agrees and self.reason_engages is not False
+
+    #: What the reader ruled the recommendation was, carried so the row says
+    #: what it was compared against.
+    recommendation_expected: bool | None = None
+
+    @property
+    def recommendation_agrees(self) -> bool | None:
+        """Did the critic read the advice the way the reader ruled it?
+
+        ``None`` where the critic made no reading, which is the third answer
+        and not a failure of this comparison: a surviving draft with no reading
+        is a critic that did not look, and
+        :attr:`ReplayScore.recommendation_unread` counts those apart. A
+        rejected draft owes no reading.
+        """
+        if self.recommendation_read is None:
+            return None
+        return self.recommendation_read == self.recommendation_expected
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -143,6 +166,9 @@ class FixtureOutcome:
             "status": self.status,
             "fate_agrees": self.fate_agrees,
             "reason_engages": self.reason_engages,
+            "recommendation_read": self.recommendation_read,
+            "recommendation_expected": self.recommendation_expected,
+            "recommendation_agrees": self.recommendation_agrees,
             "passes": self.passes,
             "reason": self.reason,
         }
@@ -179,6 +205,34 @@ class ReplayScore:
         return got, len(self.positives)
 
     @property
+    def recommendation_agreed(self) -> tuple[int, int]:
+        """Of the readings the critic made, the ones that match the reader's ruling.
+
+        The third half, and the one the fixture set could not carry until a
+        ruling observed a recommendation. Reported beside the other two and
+        never in place of either: a critic that calls every recommendation
+        unsound scores well here on a set whose recommendations are mostly
+        unsound, which is why :attr:`recommendation_unread` sits next to it and
+        the per-row values are printed.
+        """
+        read = [o for o in self.outcomes if o.recommendation_agrees is not None]
+        return sum(1 for o in read if o.recommendation_agrees), len(read)
+
+    @property
+    def recommendation_unread(self) -> tuple[FixtureOutcome, ...]:
+        """Surviving drafts the critic ruled without reading the advice on them.
+
+        The state that had no observable: a critic that weighed the
+        recommendation and one that never looked emitted the same ruling. A
+        rejected draft owes no reading and is not counted here.
+        """
+        return tuple(
+            o
+            for o in self.outcomes
+            if o.survived and o.recommendation_read is None and o.ruled
+        )
+
+    @property
     def rejected_without_engaging(self) -> tuple[FixtureOutcome, ...]:
         """Killed the right draft, said nothing the reader asked it to say.
 
@@ -193,9 +247,12 @@ class ReplayScore:
     def to_json(self) -> dict[str, Any]:
         removed, of_removed = self.unsupported_removed
         preserved, of_preserved = self.valid_preserved
+        agreed, of_read = self.recommendation_agreed
         return {
             "unsupported_removed": {"got": removed, "of": of_removed},
             "valid_preserved": {"got": preserved, "of": of_preserved},
+            "recommendation_agreed": {"got": agreed, "of": of_read},
+            "recommendation_unread": [o.fixture_id for o in self.recommendation_unread],
             "rejected_without_engaging": [
                 o.fixture_id for o in self.rejected_without_engaging
             ],
@@ -248,9 +305,22 @@ def score(
                 reason=reason,
                 fate_agrees=survived == fixture.expect.survives,
                 reason_engages=_engages(reason, anchors) if anchors else None,
+                recommendation_read=_recommendation(ruling),
+                recommendation_expected=fixture.expect.recommendation_sound,
             )
         )
     return ReplayScore(outcomes=tuple(outcomes))
+
+
+def _recommendation(ruling: Ruling | None) -> bool | None:
+    """What the critic ruled the advice was, or ``None`` where it read none.
+
+    Read off whatever the package's ruling declares, never off a package's
+    name: a package whose claims recommend nothing carries no such field, so
+    every row answers ``None`` and the third half has no denominator.
+    """
+    reading = getattr(ruling, "recommendation", None)
+    return None if reading is None else bool(reading.sound)
 
 
 async def replay(

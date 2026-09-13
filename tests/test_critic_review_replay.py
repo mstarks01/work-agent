@@ -246,3 +246,76 @@ def test_the_replay_parses_what_this_package_asks_a_critic_for():
     assert PACKAGE_REQUIRED, "this package asks a critic for nothing of its own"
     assert [ruling.id for ruling in parsed] == ["S-01"]
     assert isinstance(parsed[0], RULING_SHAPE)
+
+
+def test_the_advice_is_scored_apart_from_the_fate(fixtures, model):
+    """The third half: what the critic made of the recommendation.
+
+    A critic that read the advice and one that never looked emitted the same
+    ruling, so a fixture's `recommendation_sound` could not be checked against
+    anything. The package's ruling carries the reading now, and this drives the
+    three answers it can give: agreeing with the reader, disagreeing, and
+    making no reading at all.
+    """
+    payload = {"claims": []}
+    for fixture in fixtures:
+        status = "needs-info" if fixture.expect.survives else "rejected"
+        ruling = rule(
+            fixture.draft["id"], status, "; ".join(fixture.expect.reason_must_name)
+        )
+        if fixture.expect.survives:
+            # The reader ruled every surviving fixture's advice sound, so an
+            # agreeing critic says so here.
+            ruling["recommendation"] = {"sound": True, "note": ""}
+        payload["claims"].append(ruling)
+
+    score, _ = run(fixtures, model, payload)
+
+    agreed, of_read = score.recommendation_agreed
+    assert of_read == sum(1 for f in fixtures if f.expect.survives)
+    assert agreed == of_read
+    # Every rejected draft owes no reading, so none is counted unread.
+    assert score.recommendation_unread == ()
+
+
+def test_a_surviving_draft_with_no_reading_is_counted_unread(fixtures, model):
+    """The state that had no observable, now named rather than read as approval."""
+    payload = {
+        "claims": [
+            rule(
+                f.draft["id"],
+                "needs-info" if f.expect.survives else "rejected",
+                "; ".join(f.expect.reason_must_name),
+            )
+            for f in fixtures
+        ]
+    }
+
+    score, _ = run(fixtures, model, payload)
+
+    assert score.recommendation_agreed == (0, 0)
+    unread = {o.fixture_id for o in score.recommendation_unread}
+    assert unread == {f.id for f in fixtures if f.expect.survives}
+
+
+def test_a_critic_disagreeing_about_the_advice_does_not_move_the_fate(fixtures, model):
+    """Validity and advice are separate outcomes, and the score keeps them so."""
+    payload = {"claims": []}
+    for fixture in fixtures:
+        status = "needs-info" if fixture.expect.survives else "rejected"
+        ruling = rule(
+            fixture.draft["id"], status, "; ".join(fixture.expect.reason_must_name)
+        )
+        ruling["recommendation"] = {
+            "sound": False,
+            "note": "names a control already stated",
+        }
+        payload["claims"].append(ruling)
+
+    score, _ = run(fixtures, model, payload)
+
+    preserved, of_preserved = score.valid_preserved
+    assert preserved == of_preserved, "the fate is unchanged by the advice reading"
+    agreed, of_read = score.recommendation_agreed
+    assert of_read == len(fixtures)
+    assert agreed == sum(1 for f in fixtures if not f.expect.recommendation_sound)

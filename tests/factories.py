@@ -478,8 +478,16 @@ def sample_draft(
 ) -> DraftThreat:
     """One lane agent's draft against valid_model(), before the critic rules."""
     threat = sample_threat(threat_id, category, **overrides)
+    # Exactly the fields a draft declares, read off the draft, for the reason
+    # :func:`sample_proposal` gives: naming the ruling's fields here is a second
+    # reader of what a ruling adds.
+    ruled = threat.model_dump()
     return DraftThreat.model_validate(
-        threat.model_dump(exclude={"confidence", "verdict"})
+        {
+            name: value
+            for name, value in ruled.items()
+            if name in DraftThreat.model_fields
+        }
     )
 
 
@@ -503,18 +511,15 @@ def sample_proposal(
     own provenance.
     """
     threat = sample_threat(threat_id, category)
-    fields: dict[str, Any] = threat.model_dump(
-        mode="json",
-        exclude={
-            "confidence",
-            "verdict",
-            "grounds",
-            "id",
-            "category",
-            "framework",
-            "framework_version",
-        },
-    )
+    # Exactly the fields the proposal declares, read off the proposal. A
+    # hand-kept list of what to drop is a second reader of "which fields does a
+    # ruling add", and it breaks on the day the ruling adds one.
+    ruled = threat.model_dump(mode="json")
+    fields: dict[str, Any] = {
+        name: value
+        for name, value in ruled.items()
+        if name in ThreatProposal.model_fields
+    }
     # Called with the threat ID the resolved draft will carry, because that is
     # what a test is talking about — the proposal itself names only the number,
     # and the lane supplies the letter.
