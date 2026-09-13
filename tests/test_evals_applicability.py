@@ -426,15 +426,20 @@ class TestPrecisionNeedsAReferenceSetSomebodyRead:
 def test_a_case_s_graph_is_built_for_the_frameworks_it_declares(corpus):
     """The wiring #200 turned on: the sweep runs each case's own declaration.
 
-    Seven cases declare ASVS and six do not. Building one graph for the sweep is
-    what left 63 records unread; building the declaration is also what stops a
-    STRIDE-only case paying for ASVS's 17 ``strong``-tier lanes.
+    Ten of the thirteen cases declare ASVS and three do not. Building one graph
+    for the sweep is what left 63 records unread; building the declaration is
+    also what stops a STRIDE-only case paying for ASVS's 17 ``strong``-tier
+    lanes.
+
+    A case declares ASVS only where the precondition can answer yes for it. An
+    MQTT broker reached over a serial console and a public firmware bucket is
+    not a web application, whatever transport one of its flows names.
     """
     built = {entry.id: case_frameworks(entry) for entry in corpus}
 
     assert sorted(built[CASE_ID]) == ["asvs", "stride"]
     with_asvs = [case_id for case_id, names in built.items() if "asvs" in names]
-    assert len(with_asvs) == 11
+    assert len(with_asvs) == 10
     assert all("stride" in names for names in built.values())
 
 

@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 
 from analysis_service.frameworks import PACKAGES
+from evals import verify_corpus
 from evals.harness.reference import load_corpus
 from evals.harness.triggers import by_framework, case_trigger_recall, corpus_recall
 
@@ -152,7 +153,15 @@ def test_every_case_gets_some_structural_lead(results):
 
 
 def test_every_lane_is_triggered_somewhere_in_the_corpus(results):
-    """A lane no rule ever fires in is a lane the candidate layer skipped."""
+    """A lane no rule ever fires in is a lane the candidate layer skipped.
+
+    A lane the corpus cannot measure at all is a different fact, and it is
+    :data:`~evals.verify_corpus.UNMEASURED_LANES` that holds it. Read from
+    there rather than restated here: this test asks whether a lane's reference
+    records draw a lead, and a lane with no reference records has no question
+    to answer. Two lists of unreachable lanes would eventually disagree about
+    which lanes those are.
+    """
     triggered = {
         (result.framework, hit.lane)
         for result in results
@@ -163,7 +172,9 @@ def test_every_lane_is_triggered_somewhere_in_the_corpus(results):
         f"{framework}/{lane}"
         for framework, package in PACKAGES.items()
         for lane in package.lanes
-        if (framework, lane) not in triggered and lane not in UNTRIGGERED_LANES
+        if (framework, lane) not in triggered
+        and lane not in UNTRIGGERED_LANES
+        and lane not in verify_corpus.UNMEASURED_LANES.get(framework, {})
     )
     assert not silent, f"no reference claim in these lanes draws a lead: {silent}"
 

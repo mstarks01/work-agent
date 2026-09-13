@@ -6,6 +6,7 @@ import pytest
 
 from analysis_service.system_model import SystemModel
 from analysis_service.validation import (
+    CITATION_FIELDS,
     MAX_ELEMENTS,
     allowed_asset_tags,
     parse_and_validate,
@@ -320,6 +321,43 @@ class TestCitationsResolve:
         )
         assert model is not None
         assert "invalid-reference" in codes(issues)
+
+    def test_every_issue_this_rule_raises_says_it_is_a_citation_issue(self):
+        """The rule and ``is_citation`` are checked against each other.
+
+        The eval harness asks which half of the gate failed, because the
+        citation half is a measurement there and the rest is a malformed
+        model. Two readers of one question, so neither is tested against its
+        own expectation: this drives the rule and asks the *property*.
+        """
+        citing = [
+            self.model_citing("Some other call"),  # a label naming no source
+            self.model_citing(""),  # an excerpt with no label
+            self.model_citing("Kickoff call", "words nobody submitted"),
+        ]
+
+        raised = [
+            issue for model in citing for issue in validate(model, sources=self.SOURCES)
+        ]
+
+        assert len(raised) == len(citing)
+        assert all(issue.is_citation for issue in raised)
+        assert {issue.field for issue in raised} <= CITATION_FIELDS
+
+    def test_no_other_gate_rule_claims_to_be_a_citation_issue(self):
+        """The other direction, and the one that catches a widened field name.
+
+        Every rule but this one runs without sources, so a gate run with none
+        may never return an issue the harness would score instead of failing.
+        """
+        model = valid_model()
+        model.processes[0].id = model.processes[0].id.upper()
+        model.trust_boundaries = []
+
+        issues = validate(model)
+
+        assert issues  # the model really is broken, so this proves something
+        assert not any(issue.is_citation for issue in issues)
 
 
 class TestExcerptsVerify:

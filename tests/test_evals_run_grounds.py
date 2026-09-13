@@ -361,3 +361,85 @@ def test_the_sweep_folds_latency_over_every_node_it_ran(monkeypatch, case):
     # present here, which is the difference the two folds exist to show.
     assert ENTRY_PREPARE in run.latency
     assert ENTRY_PREPARE not in run.usage
+
+
+# --- A sweep that cannot go on still returns what it paid for -----------------
+
+
+def _raise_on_second_report(monkeypatch, error: Exception) -> None:
+    """Let the first case finish, then fail the second the way a provider does."""
+    real_into_report = graph_module.Analysis.into_report
+    seen: list[int] = []
+
+    def into_report(self, *args, **kwargs):
+        seen.append(1)
+        if len(seen) == 2:
+            raise error
+        return real_into_report(self, *args, **kwargs)
+
+    monkeypatch.setattr(graph_module.Analysis, "into_report", into_report)
+
+
+def test_a_provider_fault_stops_the_sweep_without_losing_the_finished_cases(
+    monkeypatch, case
+):
+    """The #886 loss, as a test.
+
+    An end-to-end sweep hit an OpenRouter credit refusal part-way through. The
+    fault left ``_run_mode`` as an exception, so ``command_run`` never reached
+    ``build_artifact`` and the $2.85 already spent produced no artifact at all.
+    The sweep still stops — the next case would be refused the same way — but
+    the case that finished is measured, priced and kept.
+    """
+    _raise_on_second_report(
+        monkeypatch, RuntimeError("This request requires more credits")
+    )
+
+    run = sweep(monkeypatch, case, None)
+
+    # The first case survived, whole.
+    assert [entry.case_id for entry in run.grounds] == [case.id]
+    assert run.latency["critic_stride"].executions == 2
+    # And the sweep says plainly that it did not finish.
+    assert run.stopped_before == ("case-second",)
+    assert any("the sweep stopped here" in failure for failure in run.failures)
+    assert any("more credits" in failure for failure in run.failures)
+
+
+def test_the_stopping_fault_names_its_type_even_when_its_message_is_empty(
+    monkeypatch, case
+):
+    """A provider error often carries no message, and a blank line helps nobody."""
+    _raise_on_second_report(monkeypatch, RuntimeError())
+
+    run = sweep(monkeypatch, case, None)
+
+    assert any("RuntimeError()" in failure for failure in run.failures)
+    assert run.payloads[-1]["run_failure"] == "RuntimeError()"
+
+
+def test_a_measured_fault_still_runs_the_rest_of_the_sweep(monkeypatch, case):
+    """The other side of the rule, so the stop is not applied to everything.
+
+    A refused model and a rejected draft are rates somebody asked for. If a
+    reader widens the stopping branch to cover them, the sweep goes back to
+    reporting neither — which is the failure ``sweep``'s own docstring exists
+    for.
+    """
+    run = sweep(monkeypatch, case, DEAD)
+
+    assert run.stopped_before == ()
+    assert [entry.case_id for entry in run.grounds] == ["case-second"]
+
+
+def test_every_measured_fault_is_one_the_failure_recorder_can_classify():
+    """``MEASURED`` and ``record_failure`` are two readers of one rule.
+
+    ``record_failure`` re-raises anything it cannot classify. If ``MEASURED``
+    ever admitted such a type, the sweep would route it there and raise from
+    inside the handler that exists to stop it raising.
+    """
+    from evals.harness.grounds import CAUGHT
+    from evals.harness.run import MEASURED
+
+    assert set(MEASURED) == {modes.EvalRunError, *CAUGHT}

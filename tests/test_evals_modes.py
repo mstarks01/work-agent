@@ -42,6 +42,7 @@ from analysis_service.graph import (
     ENTRY_PREPARE,
     EXTRACT_NODE,
     Analysis,
+    Pipeline,
     analyze_node_name,
     tier_node_by_graph_node,
 )
@@ -197,7 +198,7 @@ class LaneAwareLlm(ScriptedLlm):
         return self.replies[lane] if lane else default
 
 
-def build(case, entry, models: dict[str, ScriptedLlm]) -> object:
+def build(case, entry, models: dict[str, ScriptedLlm]) -> Pipeline:
     def resolve(tier_node: str) -> BaseLlm:
         graph_node = next(
             node for node, tier in TIER_NODE_BY_GRAPH_NODE.items() if tier == tier_node
@@ -1194,3 +1195,67 @@ def test_a_plural_in_the_source_covers_a_singular_name(case):
 
     assert score.extra, "the widened model should carry an extra process"
     assert score.unsourced == ()
+
+
+# --- The citation half of the gate, which this mode runs with its sources -----
+
+
+def _extraction_of(case, model) -> modes.ExtractionResult:
+    """Drive ``run_extraction`` over a scripted extraction of ``model``."""
+    models: dict[str, ScriptedLlm] = {}
+    pipeline = build(case, ENTRY_EXTRACT_ONLY, models)
+    models["extract"].reply = json.dumps(model.model_dump(mode="json"))
+    return asyncio.run(modes.run_extraction(case, pipeline))
+
+
+def test_extraction_mode_checks_excerpts_against_the_sources(case):
+    """The gate rule production runs, which this mode ran without its input.
+
+    ``run_extraction`` called ``parse_and_validate`` with no ``sources``, and
+    :func:`analysis_service.validation._citation_issues` returns early when
+    there are none. So an invented quote passed here and failed inside a job,
+    and the mode graded extractions against a weaker gate than the one that
+    ships.
+    """
+    invented = edited(
+        case.model,
+        "processes",
+        0,
+        source_excerpt="the orbital telemetry relay aboard the spacecraft",
+    )
+
+    result = _extraction_of(case, invented)
+
+    assert [issue.code for issue in result.issues] == ["unverifiable-excerpt"]
+    assert result.issues[0].element_id == case.model.processes[0].id
+
+
+def test_a_faithful_extraction_still_passes_the_citation_check(case):
+    """The positive control: the blessed model quotes its own sources correctly.
+
+    Without this, a citation check that raised on everything would look exactly
+    like one that works.
+    """
+    result = _extraction_of(case, case.model)
+
+    assert result.issues == ()
+
+
+def test_an_invented_quote_is_scored_and_is_not_a_tier_one_failure(case):
+    """Where a citation failure goes: onto the score, not into the failure list.
+
+    Production routes such a model to ``repair``; this mode stops before that
+    pass, so failing the sweep would report the repair pass's ordinary input as
+    a malformed model. The number says how much work that pass is left.
+    """
+    invented = edited(
+        case.model, "processes", 0, source_excerpt="a sentence from no source"
+    )
+    result = _extraction_of(case, invented)
+
+    score = modes.score_extraction(case, result)
+
+    assert [issue.code for issue in score.uncited] == ["unverifiable-excerpt"]
+    assert score.to_json()["uncited"][0]["element_id"] == case.model.processes[0].id
+    # Nothing else moved: the model is complete and correct apart from the quote.
+    assert score.recall == 1.0 and score.precision == 1.0
