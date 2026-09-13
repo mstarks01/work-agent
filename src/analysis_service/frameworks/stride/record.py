@@ -18,12 +18,13 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Literal, get_args
 
-from pydantic import ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from analysis_service.actions import ActionVerb
 from analysis_service.claims import (
     MAX_CLAIMS_PER_BATCH,
     MAX_ELEMENTS_PER_PROPOSAL,
+    REASON_MAX_CHARS,
     AnalysisMarks,
     BlockSummary,
     Claim,
@@ -46,6 +47,7 @@ __all__ = [
     "CATEGORY_LETTERS",
     "STRIDE_CATEGORIES",
     "DraftThreat",
+    "RecommendationReading",
     "StrideAnalysis",
     "StrideCategory",
     "StrideSummary",
@@ -298,16 +300,56 @@ class DraftThreat(Claim):
         ]
 
 
+class RecommendationReading(BaseModel):
+    """What the critic made of a threat's recommendations, as its own fact.
+
+    **Separate from the verdict, and it never decides one.** A recommendation
+    that reads well does not make an unsupported threat hold, and flawed advice
+    does not make a sound threat go away, so this sits beside
+    :class:`~analysis_service.claims.Verdict` rather than inside it. The
+    critic's text says the same thing in the words a model reads.
+
+    **Absence is a third answer, not a synonym for sound.** ``None`` on a
+    surviving threat says the critic did not read the advice, which is exactly
+    what could not be told from a critic that read it and approved — the gap
+    the fixture set could not measure. A rejected threat's recommendations need
+    no reading, so ``None`` is the ordinary answer there.
+
+    One reading per ruling rather than one per mitigation. A threat's
+    recommendations are read together and a list of them is one answer to one
+    question; asking a model to index into a list it was shown is a spelling it
+    gets wrong, and an index nobody can resolve is worse than a sentence
+    naming the recommendation in words.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    #: Does every recommendation on this threat address it and would it close it?
+    sound: bool
+    #: What the advice misses, where it does not. Free of any rule binding it to
+    #: ``sound``: the critic's text asks for one on an unsound reading, and a
+    #: missing sentence is a thin record rather than output the service should
+    #: spend a re-ask on. Empty is the ordinary value on a sound reading.
+    note: str = Field(default="", max_length=REASON_MAX_CHARS)
+
+
 class Threat(DraftThreat, RuledClaim):
     """One ruled STRIDE finding, traceable to the elements it affects.
 
-    A draft plus the critic's two judgements. ``verdict`` arrives from
+    A draft plus the critic's judgements. ``verdict`` arrives from
     :class:`~analysis_service.claims.RuledClaim` — both parents derive from
     ``Claim``, so Pydantic resolves the field order without ambiguity — and
-    ``confidence`` is the one ruling field that is STRIDE's alone.
+    ``confidence`` and ``recommendation`` are the ruling fields that are
+    STRIDE's alone.
     """
 
     confidence: Rating  # critic-calibrated grounding in model facts
+    #: The critic's reading of this threat's ``mitigations``, or ``None`` where
+    #: it made none. Carried into the report because a reader acting on a
+    #: recommendation is who the reading is for; the report is where the advice
+    #: already sits, and a judgement on it that reached no reader would be a
+    #: fact with nobody to act on it.
+    recommendation: RecommendationReading | None = None
 
 
 class ThreatProposal(Proposal):
@@ -385,6 +427,12 @@ class ThreatRuling(Ruling):
 
     confidence: Rating
     severity: Severity | None = None
+    #: The critic's reading of the draft's ``mitigations``. Optional, because a
+    #: rejected threat's recommendations need none and because a reading is a
+    #: judgement rather than a shape the node should fail on; ``None`` reaching
+    #: a surviving threat is a critic that did not look, which the eval
+    #: measures rather than the service refusing.
+    recommendation: RecommendationReading | None = None
 
 
 class ThreatRulings(RulingBatch):

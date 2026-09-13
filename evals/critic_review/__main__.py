@@ -6,11 +6,16 @@ One model call. The set is eight drafts and a critic reads them together, which
 is also how it reads a real job — so this costs about what one critic node of
 one case costs, and is the narrowest instrument that can see the review change.
 
-It prints the two measures and never one. A critic that rejects every draft
+It prints the three measures and never one. A critic that rejects every draft
 removes every unsupported finding and destroys the report, and the preserved
 half is what says so. A rejection that engages with none of the anchors the
 reader named is counted apart, because on fate alone it is indistinguishable
 from having read the argument.
+
+The third measure is the advice: whether the critic read each surviving
+threat's recommendation the way the reader ruled it, and which it did not read
+at all. Validity and advice are separate outcomes, so a critic never rejects a
+claim for its recommendation and this number never moves the other two.
 """
 
 from __future__ import annotations
@@ -128,8 +133,15 @@ def main(argv: list[str] | None = None) -> int:
 
     removed, of_removed = score.unsupported_removed
     preserved, of_preserved = score.valid_preserved
+    agreed, of_read = score.recommendation_agreed
     print(f"unsupported removed : {removed}/{of_removed}")
     print(f"valid preserved     : {preserved}/{of_preserved}")
+    print(f"recommendation read : {agreed}/{of_read} agree with the reader")
+    if score.recommendation_unread:
+        print(
+            "  survived with the advice unread: "
+            + ", ".join(o.fixture_id for o in score.recommendation_unread)
+        )
     if score.rejected_without_engaging:
         print(
             "rejected without engaging the reader's anchors: "

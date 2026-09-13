@@ -293,20 +293,24 @@ def test_an_unsound_recommendation_sits_on_a_draft_that_must_die():
     it from reaching the anchors through the advice.
 
     The converse — **a flawed recommendation must not erase a valid threat** —
-    needs a fixture that survives while carrying one, and the replay cannot
-    read it: a ruling carries no judgement on a recommendation, so a critic
-    that rejected a good claim over its advice and one that ruled correctly are
-    told apart only by the fate, which this set already pins for other reasons.
-    The fixture arrives with the observable, and this test names the hole until
-    then.
+    needs a fixture that survives while carrying one. The observable it waited
+    on now exists: ``recommendation`` on a STRIDE ruling carries what the
+    critic made of the advice, and the replay scores that beside the fate
+    rather than inside it. What the fixture still needs is a reader's ruling,
+    because an expectation nobody signed is one agent grading another's change,
+    and this set may not gain an unsigned row without taking the whole set
+    below the gate.
+
+    So this holds the shape that exists and names the one that is owed.
     """
     unsound = [entry for entry in ALL if not entry.expect.recommendation_sound]
 
     assert unsound, "no distractor: the set cannot tell reading from rejecting"
     assert all(not entry.expect.survives for entry in unsound), (
-        "a surviving fixture carrying unsound advice is the pair that proves a"
-        " flawed recommendation does not erase a valid threat. Nothing in a"
-        " ruling observes the recommendation yet, so add the observable with it"
+        "a fixture surviving with unsound advice is the pair that proves a"
+        " flawed recommendation does not erase a valid threat. The ruling now"
+        " observes the advice, so the fixture is writable — it needs a reader's"
+        " signature, not another mechanism"
     )
 
 
