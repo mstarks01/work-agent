@@ -251,6 +251,14 @@ from analysis_service.vendors import ServedTrust, vendor_for_route
 # element it names, never by a union across the lane's drafts. Both are a
 # meaning change to an existing field and would be major on their own.
 # Archived rows written under 2.x carry larger numbers.
+# 3.0 also carries ``recommendation`` on a STRIDE threat: what the critic made
+# of the advice the finding carries, as ``sound`` and a ``note``. It is the
+# package's field because ``mitigations`` is, and it sits beside the verdict
+# rather than inside it, because a recommendation never decides a claim — a
+# plausible one does not make an unsupported threat hold, and a flawed one does
+# not make a sound threat go away. ``None`` says the critic read no advice
+# here, which on a surviving threat is a different fact from advice it approved
+# and is why the field is not a bare boolean defaulting to true.
 SCHEMA_VERSION = "3.0"
 
 # The envelope's disclaimer, which is about the *service* rather than about any
