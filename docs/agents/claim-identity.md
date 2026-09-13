@@ -50,7 +50,7 @@ within-lane reference pairs:
 |---|---|---|---|
 | equality | 88 | 22 | 2 |
 | endpoint subset | 14 | 81 | 24 |
-| **endpoint subset + verb** | **14** | **3** | **3** |
+| **endpoint subset + verb** | **15** | **3** | **3** |
 | overlap | 4 | 83 | 35 |
 | endpoint overlap | 1 | 99 | 129 |
 
@@ -94,7 +94,7 @@ Scored on the shared scoreboard, through `measure_agreement`:
 | Rule | Agreement with the recorded labels |
 |---|---|
 | `MechanicalIdentity` (element equality) | 200/311 = 64.3% |
-| `SubsetVerbIdentity` | **294/311 = 94.5%** |
+| `SubsetVerbIdentity` | **293/311 = 94.2%** |
 
 **This is an admission gate, not a quality statement.** It clears the 90% bar,
 and the bar exists to price a *candidate* rule — one nobody has measured, which
@@ -139,7 +139,7 @@ The corpus already treats them as adjacent, so the merge is correct.
 **Neither reading of an absent direction is usable.** Both are priced over the
 labelled pairs the shipped rule merges today:
 
-| An absent direction read as | New false splits, of the 186 merged correctly | Candidate merges recovered, of 3 |
+| An absent direction read as | New false splits, of the 185 merged correctly | Candidate merges recovered, of 3 |
 |---|---:|---:|
 | a mismatch | 90 | 2 |
 | a wildcard | 0 | 0 |
@@ -356,7 +356,7 @@ The rule is the only matcher a scored sweep has. A `match` is a recall hit; a
 `no-match` leaves the finding unmatched, and its fingerprint is looked up in
 the vote ledger — `rejected`, `pooled`, `open`, `unvoted` or `stale`, the last
 being a vote cast on an argument this run has moved past. Nothing asks a
-model. The rule's known error costs are the record above: 14 of 200 labelled
+model. The rule's known error costs are the record above: 15 of 200 labelled
 matches split, 3 of 111 candidate negatives merged, 3 of 291 reference pairs
 merged. A split surfaces as an unvoted finding in the queue rather than
 vanishing. A merge does not surface at all, which is why the candidate merge

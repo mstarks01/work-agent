@@ -27,8 +27,8 @@
       "interface_kind": "web"
     },
     {
-      "id": "process:background-worker",
-      "name": "background worker",
+      "id": "process:background-worker-process",
+      "name": "background worker process",
       "description": "Consumes queued jobs and performs the work against the database.",
       "assets": [
         "business-critical-data"
@@ -135,7 +135,7 @@
       "operations": "write"
     },
     {
-      "id": "flow:background-worker-to-message-queue:consume-job",
+      "id": "flow:background-worker-process-to-message-queue:consume-job",
       "name": "consume job",
       "description": "Worker takes jobs off the queue.",
       "assets": [
@@ -143,7 +143,7 @@
       ],
       "source_excerpt": "a background worker process picks them up and does the work",
       "source_label": "System description",
-      "source": "process:background-worker",
+      "source": "process:background-worker-process",
       "destination": "store:message-queue",
       "protocol": "unknown",
       "authentication": "unknown",
@@ -152,7 +152,7 @@
       "operations": "read-write"
     },
     {
-      "id": "flow:background-worker-to-database:read-write-records",
+      "id": "flow:background-worker-process-to-database:read-write-records",
       "name": "read write records",
       "description": "Worker reads and writes application records and log records.",
       "assets": [
@@ -160,7 +160,7 @@
       ],
       "source_excerpt": "The background worker reads and writes the database.",
       "source_label": "System description",
-      "source": "process:background-worker",
+      "source": "process:background-worker-process",
       "destination": "store:database",
       "protocol": "unknown",
       "authentication": "unknown",
@@ -186,7 +186,7 @@
       "operations": "read"
     },
     {
-      "id": "flow:background-worker-to-worker-config:read-configuration",
+      "id": "flow:background-worker-process-to-worker-config:read-configuration",
       "name": "read configuration",
       "description": "Worker reads its settings, including database credentials.",
       "assets": [
@@ -194,7 +194,7 @@
       ],
       "source_excerpt": "and the worker has a worker config",
       "source_label": "System description",
-      "source": "process:background-worker",
+      "source": "process:background-worker-process",
       "destination": "store:worker-config",
       "protocol": "unknown",
       "authentication": "unknown",

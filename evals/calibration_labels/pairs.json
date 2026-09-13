@@ -303,7 +303,7 @@
       "entity:sensor-node",
       "flow:sensor-node-to-device-gateway:publish-readings"
     ],
-    "reference_verb": "impersonate",
+    "reference_verb": "use-credential",
     "candidate_verb": "impersonate",
     "label": "match",
     "note": "Same action, same mechanism."
@@ -320,7 +320,7 @@
     "candidate_element_ids": [
       "process:device-gateway"
     ],
-    "reference_verb": "impersonate",
+    "reference_verb": "use-credential",
     "candidate_verb": "guess-credential",
     "label": "no-match",
     "note": "Recovering the key by physical extraction and guessing it are different attacker actions."
@@ -642,7 +642,7 @@
     "category": "tampering",
     "reference_claim": "An attacker who can write to the landing bucket alters claim records before the nightly run, and only the schema is checked before they reach the warehouse.",
     "reference_element_ids": [
-      "process:transform-job",
+      "process:spark-transform-job",
       "store:landing-bucket"
     ],
     "candidate_claim": "An attacker edits claim records sitting in the landing bucket before the 02:00 run picks them up.",
@@ -659,12 +659,12 @@
     "category": "tampering",
     "reference_claim": "An attacker who can write to the landing bucket alters claim records before the nightly run, and only the schema is checked before they reach the warehouse.",
     "reference_element_ids": [
-      "process:transform-job",
+      "process:spark-transform-job",
       "store:landing-bucket"
     ],
     "candidate_claim": "An attacker injects SQL through a claim record field that the transform does not sanitize.",
     "candidate_element_ids": [
-      "process:transform-job"
+      "process:spark-transform-job"
     ],
     "reference_verb": "alter",
     "candidate_verb": "inject",
@@ -679,12 +679,12 @@
     "category": "tampering",
     "reference_claim": "An attacker who can write to the Airflow metadata database rewrites a connection string to redirect the pipeline to infrastructure they control.",
     "reference_element_ids": [
-      "flow:ingest-scheduler-to-airflow-metadata-db:read-connections",
-      "store:airflow-metadata-db"
+      "flow:ingest-scheduler-to-airflow-metadata-database:read-connections",
+      "store:airflow-metadata-database"
     ],
     "candidate_claim": "An attacker changes an Airflow connection string so the pipeline reads from or writes to a system they control.",
     "candidate_element_ids": [
-      "store:airflow-metadata-db"
+      "store:airflow-metadata-database"
     ],
     "reference_verb": "alter",
     "candidate_verb": "alter",
@@ -750,11 +750,11 @@
     "category": "information-disclosure",
     "reference_claim": "An attacker who reaches the Airflow metadata database recovers every partner key and connection string it holds, since its protection at rest is unverified.",
     "reference_element_ids": [
-      "store:airflow-metadata-db"
+      "store:airflow-metadata-database"
     ],
     "candidate_claim": "An attacker who reaches Airflow's metadata database reads every partner key and connection string stored in it.",
     "candidate_element_ids": [
-      "store:airflow-metadata-db"
+      "store:airflow-metadata-database"
     ],
     "reference_verb": "recover-credential",
     "candidate_verb": "recover-credential",
@@ -766,7 +766,7 @@
     "category": "information-disclosure",
     "reference_claim": "An attacker who reaches the Airflow metadata database recovers every partner key and connection string it holds, since its protection at rest is unverified.",
     "reference_element_ids": [
-      "store:airflow-metadata-db"
+      "store:airflow-metadata-database"
     ],
     "candidate_claim": "An attacker reads the partner keys out of the landing bucket.",
     "candidate_element_ids": [
@@ -787,7 +787,7 @@
     ],
     "candidate_claim": "An attacker uploads a file large enough that the nightly job never finishes and genuine extracts go unprocessed.",
     "candidate_element_ids": [
-      "process:transform-job",
+      "process:spark-transform-job",
       "store:landing-bucket"
     ],
     "reference_verb": "flood",
@@ -800,12 +800,12 @@
     "category": "denial-of-service",
     "reference_claim": "An attacker crafts input that makes the transform job fail repeatedly, leaving the warehouse stale without any request-level error surfacing.",
     "reference_element_ids": [
-      "process:transform-job",
+      "process:spark-transform-job",
       "store:claims-warehouse"
     ],
     "candidate_claim": "An attacker crafts an extract that crashes the Spark job on every retry, so the warehouse silently stops being updated.",
     "candidate_element_ids": [
-      "process:transform-job"
+      "process:spark-transform-job"
     ],
     "reference_verb": "disable",
     "candidate_verb": "disable",
@@ -818,11 +818,11 @@
     "reference_claim": "An attacker with a foothold in the landing network reads the metadata database and escalates to every credential the pipeline holds.",
     "reference_element_ids": [
       "process:ingest-scheduler",
-      "store:airflow-metadata-db"
+      "store:airflow-metadata-database"
     ],
     "candidate_claim": "An attacker in the landing network reads Airflow's metadata database and obtains credentials for the systems downstream of it.",
     "candidate_element_ids": [
-      "store:airflow-metadata-db"
+      "store:airflow-metadata-database"
     ],
     "reference_verb": "escalate",
     "candidate_verb": "escalate",
@@ -834,12 +834,12 @@
     "category": "elevation-of-privilege",
     "reference_claim": "An attacker who can plant a file in the landing bucket gains execution in the warehouse network through the job it triggers.",
     "reference_element_ids": [
-      "flow:ingest-scheduler-to-transform-job:trigger-transform",
-      "process:transform-job"
+      "flow:ingest-scheduler-to-spark-transform-job:trigger-transform",
+      "process:spark-transform-job"
     ],
     "candidate_claim": "An attacker who can place a file in the landing bucket obtains code execution in the warehouse network via the job that processes it.",
     "candidate_element_ids": [
-      "process:transform-job",
+      "process:spark-transform-job",
       "store:landing-bucket"
     ],
     "reference_verb": "escalate",
@@ -940,13 +940,13 @@
     "category": "tampering",
     "reference_claim": "An attacker who can write to the registry swaps the model artifact and the model server loads it without any integrity verification.",
     "reference_element_ids": [
-      "flow:model-server-to-model-registry:load-artifact",
-      "store:model-registry"
+      "flow:model-server-to-model-registry-bucket:load-artifact",
+      "store:model-registry-bucket"
     ],
     "candidate_claim": "An attacker replaces the model artifact in the registry and the model server loads the substituted model without checking it.",
     "candidate_element_ids": [
-      "flow:model-server-to-model-registry:load-artifact",
-      "store:model-registry"
+      "flow:model-server-to-model-registry-bucket:load-artifact",
+      "store:model-registry-bucket"
     ],
     "reference_verb": "plant",
     "candidate_verb": "plant",
@@ -958,8 +958,8 @@
     "category": "tampering",
     "reference_claim": "An attacker who can write to the registry swaps the model artifact and the model server loads it without any integrity verification.",
     "reference_element_ids": [
-      "flow:model-server-to-model-registry:load-artifact",
-      "store:model-registry"
+      "flow:model-server-to-model-registry-bucket:load-artifact",
+      "store:model-registry-bucket"
     ],
     "candidate_claim": "An attacker poisons the training data so the published model behaves incorrectly.",
     "candidate_element_ids": null,
@@ -976,12 +976,12 @@
     "category": "tampering",
     "reference_claim": "An attacker with model-network access writes to the unauthenticated Redis feature store and changes the features a decision is made on.",
     "reference_element_ids": [
-      "flow:model-server-to-feature-store:read-features",
-      "store:feature-store"
+      "flow:model-server-to-redis-feature-store:read-features",
+      "store:redis-feature-store"
     ],
     "candidate_claim": "An attacker with access to the model network writes new values into Redis and changes the features the model scores on.",
     "candidate_element_ids": [
-      "store:feature-store"
+      "store:redis-feature-store"
     ],
     "reference_verb": "alter",
     "candidate_verb": "alter",
@@ -993,12 +993,12 @@
     "category": "tampering",
     "reference_claim": "An attacker with model-network access writes to the unauthenticated Redis feature store and changes the features a decision is made on.",
     "reference_element_ids": [
-      "flow:model-server-to-feature-store:read-features",
-      "store:feature-store"
+      "flow:model-server-to-redis-feature-store:read-features",
+      "store:redis-feature-store"
     ],
     "candidate_claim": "An attacker reads customer features out of the unauthenticated Redis store.",
     "candidate_element_ids": [
-      "store:feature-store"
+      "store:redis-feature-store"
     ],
     "reference_verb": "alter",
     "candidate_verb": "read",
@@ -1011,12 +1011,12 @@
     "reference_claim": "Nobody can establish which engineer published a given model artifact, because publication runs through a shared account.",
     "reference_element_ids": [
       "entity:ml-engineer",
-      "store:model-registry"
+      "store:model-registry-bucket"
     ],
     "candidate_claim": "Because artifacts are published from a shared account, there is no record of which individual published a given model.",
     "candidate_element_ids": [
-      "flow:ml-engineer-to-model-registry:publish-artifact",
-      "store:model-registry"
+      "flow:ml-engineer-to-model-registry-bucket:publish-artifact",
+      "store:model-registry-bucket"
     ],
     "reference_verb": "unattributable",
     "candidate_verb": "unattributable",
@@ -1113,11 +1113,11 @@
     "reference_claim": "An attacker with model-network access flushes or fills the unauthenticated Redis store, stalling every request that needs features.",
     "reference_element_ids": [
       "process:model-server",
-      "store:feature-store"
+      "store:redis-feature-store"
     ],
     "candidate_claim": "An attacker with model-network access issues a Redis command that wipes the feature store, stalling inference.",
     "candidate_element_ids": [
-      "store:feature-store"
+      "store:redis-feature-store"
     ],
     "reference_verb": "disable",
     "candidate_verb": "disable",
@@ -1130,12 +1130,12 @@
     "reference_claim": "An attacker who can write to the registry turns an unverified artifact load into code execution on the GPU nodes.",
     "reference_element_ids": [
       "process:model-server",
-      "store:model-registry"
+      "store:model-registry-bucket"
     ],
     "candidate_claim": "An attacker who can publish to the registry achieves code execution on the GPU nodes when the artifact is loaded.",
     "candidate_element_ids": [
       "process:model-server",
-      "store:model-registry"
+      "store:model-registry-bucket"
     ],
     "reference_verb": "escalate",
     "candidate_verb": "escalate",
@@ -1188,7 +1188,7 @@
     ],
     "candidate_claim": "An attacker who can reach the message queue writes job messages that the worker treats as coming from the web application.",
     "candidate_element_ids": [
-      "flow:background-worker-to-message-queue:consume-job",
+      "flow:background-worker-process-to-message-queue:consume-job",
       "store:message-queue"
     ],
     "reference_verb": "impersonate",
@@ -1201,12 +1201,12 @@
     "category": "tampering",
     "reference_claim": "An attacker places a poisoned message on the queue and the worker processes it as legitimate work.",
     "reference_element_ids": [
-      "process:background-worker",
+      "process:background-worker-process",
       "store:message-queue"
     ],
     "candidate_claim": "An attacker puts a crafted message on the queue and the background worker processes it as if it were legitimate work.",
     "candidate_element_ids": [
-      "process:background-worker",
+      "process:background-worker-process",
       "store:message-queue"
     ],
     "reference_verb": "plant",
@@ -1219,7 +1219,7 @@
     "category": "tampering",
     "reference_claim": "An attacker places a poisoned message on the queue and the worker processes it as legitimate work.",
     "reference_element_ids": [
-      "process:background-worker",
+      "process:background-worker-process",
       "store:message-queue"
     ],
     "candidate_claim": "An attacker enqueues jobs as the web application, since the queue does not authenticate producers.",
@@ -1254,12 +1254,12 @@
     "category": "repudiation",
     "reference_claim": "An attacker who compromises the worker erases or edits the log records that would show what it did, because the logs live in the same database the worker writes.",
     "reference_element_ids": [
-      "process:background-worker",
+      "process:background-worker-process",
       "store:database"
     ],
     "candidate_claim": "An attacker who controls the worker deletes the log entries recording their activity, because those logs sit in the database the worker writes.",
     "candidate_element_ids": [
-      "process:background-worker",
+      "process:background-worker-process",
       "store:database"
     ],
     "reference_verb": "delete",
@@ -1272,7 +1272,7 @@
     "category": "repudiation",
     "reference_claim": "An attacker who compromises the worker erases or edits the log records that would show what it did, because the logs live in the same database the worker writes.",
     "reference_element_ids": [
-      "process:background-worker",
+      "process:background-worker-process",
       "store:database"
     ],
     "candidate_claim": "An attacker floods the database so logging stops.",
@@ -1354,12 +1354,12 @@
     "category": "information-disclosure",
     "reference_claim": "An attacker on the internal network reads job contents in transit, because transport encryption between the tiers is unverified.",
     "reference_element_ids": [
-      "flow:background-worker-to-message-queue:consume-job",
+      "flow:background-worker-process-to-message-queue:consume-job",
       "flow:web-application-to-message-queue:enqueue-job"
     ],
     "candidate_claim": "An attacker on the internal network reads job messages moving between the application, the queue and the worker.",
     "candidate_element_ids": [
-      "flow:background-worker-to-message-queue:consume-job",
+      "flow:background-worker-process-to-message-queue:consume-job",
       "flow:web-application-to-message-queue:enqueue-job"
     ],
     "reference_verb": "intercept",
@@ -1372,12 +1372,12 @@
     "category": "denial-of-service",
     "reference_claim": "An attacker floods the queue with jobs until the worker cannot keep up and queued work stops completing.",
     "reference_element_ids": [
-      "process:background-worker",
+      "process:background-worker-process",
       "store:message-queue"
     ],
     "candidate_claim": "An attacker enqueues far more jobs than the worker can process, so queued work stops completing.",
     "candidate_element_ids": [
-      "process:background-worker",
+      "process:background-worker-process",
       "store:message-queue"
     ],
     "reference_verb": "flood",
@@ -1390,7 +1390,7 @@
     "category": "denial-of-service",
     "reference_claim": "An attacker floods the queue with jobs until the worker cannot keep up and queued work stops completing.",
     "reference_element_ids": [
-      "process:background-worker",
+      "process:background-worker-process",
       "store:message-queue"
     ],
     "candidate_claim": "An attacker deletes messages from the queue so submitted work is silently dropped.",
@@ -1425,12 +1425,12 @@
     "category": "elevation-of-privilege",
     "reference_claim": "An attacker who gets code execution in the worker inherits whatever database privilege its credentials carry, which is unverified and may be unrestricted.",
     "reference_element_ids": [
-      "process:background-worker",
+      "process:background-worker-process",
       "store:database"
     ],
     "candidate_claim": "An attacker who achieves execution in the worker gets whatever database rights the worker holds, which are not stated to be restricted.",
     "candidate_element_ids": [
-      "process:background-worker",
+      "process:background-worker-process",
       "store:database"
     ],
     "reference_verb": "abuse-grant",
@@ -1443,12 +1443,12 @@
     "category": "elevation-of-privilege",
     "reference_claim": "An attacker who gets code execution in the worker inherits whatever database privilege its credentials carry, which is unverified and may be unrestricted.",
     "reference_element_ids": [
-      "process:background-worker",
+      "process:background-worker-process",
       "store:database"
     ],
     "candidate_claim": "An attacker who achieves execution in the worker reads its config file.",
     "candidate_element_ids": [
-      "process:background-worker",
+      "process:background-worker-process",
       "store:worker-config"
     ],
     "reference_verb": "abuse-grant",
@@ -1592,7 +1592,7 @@
     ],
     "candidate_claim": "Nothing records which support agent performed a given moderation action on a player account.",
     "candidate_element_ids": [
-      "flow:customer-support-to-moderation-website:moderate-accounts",
+      "flow:customer-support-staff-to-moderation-website:moderate-accounts",
       "process:moderation-website"
     ],
     "reference_verb": "unattributable",
@@ -1610,7 +1610,7 @@
     ],
     "candidate_claim": "A support agent bans a player account without justification.",
     "candidate_element_ids": [
-      "flow:customer-support-to-moderation-website:moderate-accounts",
+      "flow:customer-support-staff-to-moderation-website:moderate-accounts",
       "process:moderation-website"
     ],
     "reference_verb": "unattributable",
@@ -1680,7 +1680,7 @@
     ],
     "candidate_claim": "A support agent browses player account data unrelated to any moderation case they are working.",
     "candidate_element_ids": [
-      "entity:customer-support",
+      "entity:customer-support-staff",
       "flow:moderation-website-to-player-database:read-write-players"
     ],
     "reference_verb": "abuse-grant",
@@ -1766,7 +1766,7 @@
     "category": "elevation-of-privilege",
     "reference_claim": "An attacker who gets any access to the moderation website acquires privilege over every player account it can reach.",
     "reference_element_ids": [
-      "entity:customer-support",
+      "entity:customer-support-staff",
       "process:moderation-website"
     ],
     "candidate_claim": "An attacker who gets into the moderation website gains control over every player account it can act on.",
@@ -1955,7 +1955,7 @@
     "category": "spoofing",
     "reference_claim": "An attacker submits a transform run impersonating the scheduler, since authentication on the trigger path is unverified.",
     "reference_element_ids": [
-      "flow:ingest-scheduler-to-transform-job:trigger-transform"
+      "flow:ingest-scheduler-to-spark-transform-job:trigger-transform"
     ],
     "candidate_claim": "An attacker cancels a scheduled Airflow run so the extract is never processed.",
     "candidate_element_ids": [
@@ -1971,12 +1971,12 @@
     "category": "tampering",
     "reference_claim": "An attacker who compromises the transform job writes fabricated claim rows into the warehouse alongside genuine ones.",
     "reference_element_ids": [
-      "flow:transform-job-to-claims-warehouse:load-records",
+      "flow:spark-transform-job-to-claims-warehouse:load-records",
       "store:claims-warehouse"
     ],
     "candidate_claim": "An attacker modifies the Spark job's code so every future run transforms records incorrectly.",
     "candidate_element_ids": [
-      "process:transform-job"
+      "process:spark-transform-job"
     ],
     "reference_verb": "forge",
     "candidate_verb": "alter",
@@ -1988,7 +1988,7 @@
     "category": "repudiation",
     "reference_claim": "A dispute over a warehouse row cannot be traced back to the extract it came from, because no lineage from file to loaded record is described.",
     "reference_element_ids": [
-      "process:transform-job",
+      "process:spark-transform-job",
       "store:claims-warehouse"
     ],
     "candidate_claim": "An analyst cannot reproduce a warehouse figure because the transform logic is undocumented.",
@@ -2020,12 +2020,12 @@
     "reference_claim": "An attacker publishes a model artifact under a shared group account with no individual identity behind it.",
     "reference_element_ids": [
       "entity:ml-engineer",
-      "flow:ml-engineer-to-model-registry:publish-artifact"
+      "flow:ml-engineer-to-model-registry-bucket:publish-artifact"
     ],
     "candidate_claim": "An attacker steals an ML engineer's laptop and publishes an artifact from it.",
     "candidate_element_ids": [
       "entity:ml-engineer",
-      "flow:ml-engineer-to-model-registry:publish-artifact"
+      "flow:ml-engineer-to-model-registry-bucket:publish-artifact"
     ],
     "reference_verb": "use-credential",
     "candidate_verb": "use-credential",
@@ -2053,7 +2053,7 @@
     "category": "information-disclosure",
     "reference_claim": "An attacker with model-network access reads per-customer account age and spend bands from the unauthenticated feature store.",
     "reference_element_ids": [
-      "store:feature-store"
+      "store:redis-feature-store"
     ],
     "candidate_claim": "An attacker reads customer features from the inference log.",
     "candidate_element_ids": [
@@ -2070,12 +2070,12 @@
     "reference_claim": "An attacker deletes or corrupts the registry artifact so the model server cannot start after a restart.",
     "reference_element_ids": [
       "process:model-server",
-      "store:model-registry"
+      "store:model-registry-bucket"
     ],
     "candidate_claim": "An attacker corrupts the feature store so the model server cannot start.",
     "candidate_element_ids": [
       "process:model-server",
-      "store:feature-store"
+      "store:redis-feature-store"
     ],
     "reference_verb": "delete",
     "candidate_verb": "disable",
@@ -2108,7 +2108,7 @@
     "category": "spoofing",
     "reference_claim": "An attacker holding the worker's database credentials connects to the database as the worker.",
     "reference_element_ids": [
-      "flow:background-worker-to-database:read-write-records"
+      "flow:background-worker-process-to-database:read-write-records"
     ],
     "candidate_claim": "An attacker who reaches the database queries it directly without any credential.",
     "candidate_element_ids": [
@@ -2124,7 +2124,7 @@
     "category": "tampering",
     "reference_claim": "An attacker with the worker's database access alters application records or the log records stored alongside them.",
     "reference_element_ids": [
-      "flow:background-worker-to-database:read-write-records",
+      "flow:background-worker-process-to-database:read-write-records",
       "store:database"
     ],
     "candidate_claim": "An attacker alters the message queue's contents after the worker has read them.",

@@ -32,7 +32,7 @@
   {
     "category": "spoofing",
     "affected_element_ids": [
-      "flow:ml-engineer-to-model-registry:publish-artifact",
+      "flow:ml-engineer-to-model-registry-bucket:publish-artifact",
       "entity:ml-engineer"
     ],
     "claim": "An attacker publishes a model artifact under a shared group account with no individual identity behind it.",
@@ -47,8 +47,8 @@
   {
     "category": "tampering",
     "affected_element_ids": [
-      "store:model-registry",
-      "flow:model-server-to-model-registry:load-artifact"
+      "store:model-registry-bucket",
+      "flow:model-server-to-model-registry-bucket:load-artifact"
     ],
     "claim": "An attacker who can write to the registry swaps the model artifact and the model server loads it without any integrity verification.",
     "tier": "must-find",
@@ -62,8 +62,8 @@
   {
     "category": "tampering",
     "affected_element_ids": [
-      "store:feature-store",
-      "flow:model-server-to-feature-store:read-features"
+      "store:redis-feature-store",
+      "flow:model-server-to-redis-feature-store:read-features"
     ],
     "claim": "An attacker with model-network access writes to the unauthenticated Redis feature store and changes the features a decision is made on.",
     "tier": "must-find",
@@ -91,7 +91,7 @@
   {
     "category": "repudiation",
     "affected_element_ids": [
-      "store:model-registry",
+      "store:model-registry-bucket",
       "entity:ml-engineer"
     ],
     "claim": "Nobody can establish which engineer published a given model artifact, because publication runs through a shared account.",
@@ -135,7 +135,7 @@
   {
     "category": "information-disclosure",
     "affected_element_ids": [
-      "store:feature-store"
+      "store:redis-feature-store"
     ],
     "claim": "An attacker with model-network access reads per-customer account age and spend bands from the unauthenticated feature store.",
     "tier": "must-find",
@@ -193,7 +193,7 @@
   {
     "category": "denial-of-service",
     "affected_element_ids": [
-      "store:feature-store",
+      "store:redis-feature-store",
       "process:model-server"
     ],
     "claim": "An attacker with model-network access flushes or fills the unauthenticated Redis store, stalling every request that needs features.",
@@ -208,7 +208,7 @@
   {
     "category": "denial-of-service",
     "affected_element_ids": [
-      "store:model-registry",
+      "store:model-registry-bucket",
       "process:model-server"
     ],
     "claim": "An attacker deletes or corrupts the registry artifact so the model server cannot start after a restart.",
@@ -223,7 +223,7 @@
   {
     "category": "elevation-of-privilege",
     "affected_element_ids": [
-      "store:model-registry",
+      "store:model-registry-bucket",
       "process:model-server"
     ],
     "claim": "An attacker who can write to the registry turns an unverified artifact load into code execution on the GPU nodes.",

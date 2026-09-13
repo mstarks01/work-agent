@@ -55,7 +55,7 @@ Not part of the question, but the records cite these names, so you need them.
 | id | kind | zone |
 |---|---|---|
 | entity:player | human | boundary:player-local-machine |
-| entity:customer-support | human | boundary:corp-network |
+| entity:customer-support-staff | human | boundary:corp-network |
 
 **Processes**
 
@@ -84,7 +84,7 @@ Not part of the question, but the records cite these names, so you need them.
 | flow:lobby-to-player-database:read-players | process:lobby | store:player-database | unknown | unknown | unknown |
 | flow:game-servers-to-stats-database:read-write-stats | process:game-servers | store:stats-database | unknown | unknown | unknown |
 | flow:game-servers-to-player-database:update-players | process:game-servers | store:player-database | unknown | unknown | unknown |
-| flow:customer-support-to-moderation-website:moderate-accounts | entity:customer-support | process:moderation-website | unknown | unknown | unknown |
+| flow:customer-support-staff-to-moderation-website:moderate-accounts | entity:customer-support-staff | process:moderation-website | unknown | unknown | unknown |
 | flow:moderation-website-to-player-database:read-write-players | process:moderation-website | store:player-database | unknown | unknown | unknown |
 
 **Trust boundaries**
@@ -133,7 +133,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A2.** `V2.2.2` — Nothing says which side validates the moderation actions support staff take on player accounts.
 
-- `entity:customer-support`, `process:moderation-website`
+- `entity:customer-support-staff`, `process:moderation-website`
 - The website acts on accounts on a reviewer's behalf, so the trusted-service-layer rule applies. Weaker than the store record because no interface detail is stated.
 
 > mark:
@@ -143,7 +143,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A3.** `V3.3.1` — The moderation website is browser-delivered and no cookie attribute is stated.
 
-- `entity:customer-support`, `process:moderation-website`, `flow:customer-support-to-moderation-website:moderate-accounts`
+- `entity:customer-support-staff`, `process:moderation-website`, `flow:customer-support-staff-to-moderation-website:moderate-accounts`
 - `interface_kind: web` puts this system in the chapter. Expected rather than must-find because the source names no session mechanism at all. The attribute is set by whatever emits Set-Cookie, which is the application or the layer in front of it, so either route settles it.
 
 > mark:
@@ -170,7 +170,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A6.** `V8.2.2` — Support staff act on player accounts and nothing restricts which accounts a given member of staff may reach.
 
-- `entity:customer-support`, `process:moderation-website`, `store:player-database`
+- `entity:customer-support-staff`, `process:moderation-website`, `store:player-database`
 - Data-specific access over a store holding every player. The source says the diagram records no authentication on any link, so nothing settles it.
 
 > mark:
@@ -211,7 +211,7 @@ on either of them. That is the finding this sitting exists for.
 
 **3.** An attacker reaches the moderation website posing as a support agent, since its authentication is unverified.
 
-- `flow:customer-support-to-moderation-website:moderate-accounts`, `process:moderation-website`
+- `flow:customer-support-staff-to-moderation-website:moderate-accounts`, `process:moderation-website`
 - severity: medium/high · verb: `impersonate`
 - A tool that can act on any player account; its access control is entirely unstated.
 
@@ -338,7 +338,7 @@ on either of them. That is the finding this sitting exists for.
 
 **17.** An attacker who gets any access to the moderation website acquires privilege over every player account it can reach.
 
-- `process:moderation-website`, `entity:customer-support`
+- `process:moderation-website`, `entity:customer-support-staff`
 - severity: medium/high · verb: `abuse-grant`
 - No role separation inside the tool is described; the blast radius is the whole player base.
 
@@ -397,9 +397,9 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "17e797d0315fdd53d5acf05962ca0ae8a23e08f84779f8528ade6422c34577a3",
-      "model.json": "f53ab08eee9f81331733edc1b4d662362276ee4c01dc7b6a8fae4675e32d5c3b",
-      "claims/asvs.json": "9eb95881803aec405f07fe6125df7b05633bf38904ddb846c92af3c511b9914c",
-      "claims/stride.json": "415ce911e658da6582476ef6bd0b1953d41e17493dd5b062d2143ca9954fe770"
+      "model.json": "c5d6a0c86b453217b8ac9e72fe4c79051511b299948844a6ecf777799fda1d97",
+      "claims/asvs.json": "972c7e0fb0ac301ed91e04d9d13461c5687ef21f80ffd84dbd93610c854fc2aa",
+      "claims/stride.json": "81ae038c68d7717ab5c29570c7fce609f940882eb44085367c9ecae375371f57"
       }
     }
   }

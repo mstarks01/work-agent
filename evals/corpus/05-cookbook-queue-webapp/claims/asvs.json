@@ -46,9 +46,9 @@
     "chapter": "secure-coding-and-architecture",
     "requirement": "V15.2.2",
     "affected_element_ids": [
-      "process:background-worker",
+      "process:background-worker-process",
       "store:message-queue",
-      "flow:background-worker-to-message-queue:consume-job"
+      "flow:background-worker-process-to-message-queue:consume-job"
     ],
     "claim": "Nothing states what bounds the work a queued job can consume.",
     "tier": "must-find",
