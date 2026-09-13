@@ -418,10 +418,13 @@ INSTRUMENTS: dict[str, Instrument] = {
         scored=True,
         keys=("scores", "exemplar_delta", "unlisted_for_promotion"),
         published=(
-            Column("recall", lambda blocks, _: scorer.published(blocks, "recall")),
             Column(
-                "must-find recall",
-                lambda blocks, _: scorer.published(blocks, "must_find_recall"),
+                "reference coverage",
+                lambda blocks, _: scorer.published(blocks, "reference_coverage"),
+            ),
+            Column(
+                "must-find coverage",
+                lambda blocks, _: scorer.published(blocks, "must_find_coverage"),
             ),
             Column(
                 "rejected rate",

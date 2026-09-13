@@ -26,7 +26,7 @@ def score(case: str, references: int, matched: list[int]) -> dict:
     return {
         "case": case,
         "counts": {"references": references, "matched": len(matched)},
-        "metrics": {"recall": round(len(matched) / references, 3)},
+        "metrics": {"reference_coverage": round(len(matched) / references, 3)},
         "matched": [
             {"reference_index": index, "threat_id": f"T-{index}"} for index in matched
         ],

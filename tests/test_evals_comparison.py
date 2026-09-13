@@ -80,8 +80,8 @@ def score_row(recall=0.8, rejected=0.0, unvoted=0):
     return {
         "case_id": "01",
         "metrics": {
-            "recall": recall,
-            "must_find_recall": 0.9,
+            "reference_coverage": recall,
+            "must_find_coverage": 0.9,
             "rejected_rate": rejected,
         },
         "counts": {"rejected": 0, "pooled": 0, "open": 0, "unvoted": unvoted},
