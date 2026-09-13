@@ -1156,3 +1156,22 @@ class TestInventionIsScoredApartFromTheCorpusGap:
         )
         assert score.extra == ()
         assert score.unsourced == ()
+
+
+def test_a_coined_flow_label_is_never_invention(case):
+    """A flow's name is the model's label for an interaction, not the text's word.
+
+    Asking whether the source contains `dashboards-query-telemetry-lake` reads
+    41 ordinary flow labels a run as invented components. Only an entity, a
+    process or a data store is a thing a submitter names.
+    """
+    raw = case.model.model_dump()
+    flow = dict(raw["data_flows"][0])
+    flow["id"] = flow["id"].rsplit(":", 1)[0] + ":a-label-no-source-contains"
+    flow["name"] = "a label no source contains"
+    raw["data_flows"].append(flow)
+    widened = type(case.model).model_validate(raw)
+    score = modes.score_extraction(case, modes.ExtractionResult(case.id, widened, ()))
+
+    assert score.extra, "the widened model should carry an extra flow"
+    assert score.unsourced == ()
