@@ -1,0 +1,406 @@
+[
+  {
+    "id": "credible-conditional-orders-db-at-rest",
+    "kind": "credible-conditional",
+    "case": "01-payments-checkout",
+    "draft": {
+      "id": "S-01",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Order records may be readable from storage media outside the database",
+      "description": "`store:orders-db` holds shopper addresses and card-last-four and is classified confidential. Nothing states whether it is encrypted at rest. If it is not, anyone reaching a backup, a snapshot or the underlying disk reads those records without going through `process:order-service` or its application account.",
+      "affected_element_ids": [
+        "store:orders-db"
+      ],
+      "verb": "read",
+      "grounds": [
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "store:orders-db",
+          "attribute": "encryption_at_rest",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "information-disclosure",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Rated for the fixture; the review change does not turn on the rating."
+      },
+      "mitigations": [
+        {
+          "summary": "Placeholder so the fixture carries the block the critic now reads",
+          "detail": "The mitigation block enters the critic view with this change, so every fixture carries one; its relevance is part of what a reader signs."
+        }
+      ]
+    },
+    "expect": {
+      "survives": true,
+      "status": "needs-info"
+    },
+    "rationale": "The argument is the ordinary one and it follows: an unencrypted store is readable by whoever reaches the medium. It genuinely depends on the unknown, so it is conditional rather than confirmed. This is the fixture that fails if the change is answered by rejecting everything conditional."
+  },
+  {
+    "id": "credible-conditional-webhook-auth",
+    "kind": "credible-conditional",
+    "case": "01-payments-checkout",
+    "draft": {
+      "id": "S-02",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "The settlement webhook may accept a forged paid notification",
+      "description": "`flow:card-processor-to-storefront-api:settlement-webhook` tells `process:storefront-api` that an order is paid. Nothing states how that callback is authenticated. If it is unauthenticated, anyone who can reach the public endpoint can mark an unpaid order paid.",
+      "affected_element_ids": [
+        "flow:card-processor-to-storefront-api:settlement-webhook",
+        "process:storefront-api"
+      ],
+      "verb": "forge",
+      "grounds": [
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:card-processor-to-storefront-api:settlement-webhook",
+          "attribute": "authentication",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "quote",
+          "text": "After they settle a payment they POST a webhook back to the storefront API to tell us the order is paid.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "spoofing",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Rated for the fixture; the review change does not turn on the rating."
+      },
+      "mitigations": [
+        {
+          "summary": "Placeholder so the fixture carries the block the critic now reads",
+          "detail": "The mitigation block enters the critic view with this change, so every fixture carries one; its relevance is part of what a reader signs."
+        }
+      ]
+    },
+    "expect": {
+      "survives": true,
+      "status": "needs-info"
+    },
+    "rationale": "The source says the submitter would have to check how the callback is authenticated, so the unknown is real and the claim depends on it. The consequence follows from the webhook's stated purpose. Conditional and worth reporting."
+  },
+  {
+    "id": "nonsense-absurd-consequence",
+    "kind": "nonsense-argument",
+    "case": "01-payments-checkout",
+    "draft": {
+      "id": "S-03",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Unencrypted order storage allows an attacker to alter the orbit of the Moon",
+      "description": "Nothing states whether `store:orders-db` is encrypted at rest. Because the records are not protected on the medium, an attacker who reads them gains control of the database's gravitational coupling and can move the Moon out of its orbit, ending tidal cycles worldwide.",
+      "affected_element_ids": [
+        "store:orders-db"
+      ],
+      "verb": "read",
+      "grounds": [
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "store:orders-db",
+          "attribute": "encryption_at_rest",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "information-disclosure",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Rated for the fixture; the review change does not turn on the rating."
+      },
+      "mitigations": [
+        {
+          "summary": "Placeholder so the fixture carries the block the critic now reads",
+          "detail": "The mitigation block enters the critic view with this change, so every fixture carries one; its relevance is part of what a reader signs."
+        }
+      ]
+    },
+    "expect": {
+      "survives": false,
+      "status": "rejected",
+      "rejected_because": "reasoning"
+    },
+    "rationale": "The ground resolves and the cited fact is real. The conclusion does not follow from it by any reading. This is the audit's own reproduction: today the schema accepts it, code rules it needs-info, and no reader ever sees it."
+  },
+  {
+    "id": "nonsense-plausible-non-sequitur",
+    "kind": "nonsense-argument",
+    "case": "01-payments-checkout",
+    "draft": {
+      "id": "S-04",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Unstated at-rest encryption lets an attacker forge a shopper session cookie",
+      "description": "Nothing states whether `store:orders-db` is encrypted at rest. Because the store's contents are unprotected, an attacker can derive the signing key for the shopper session cookie issued by `process:storefront-api` and mint a cookie for any shopper.",
+      "affected_element_ids": [
+        "store:orders-db",
+        "process:storefront-api"
+      ],
+      "verb": "forge",
+      "grounds": [
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "store:orders-db",
+          "attribute": "encryption_at_rest",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "spoofing",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Rated for the fixture; the review change does not turn on the rating."
+      },
+      "mitigations": [
+        {
+          "summary": "Placeholder so the fixture carries the block the critic now reads",
+          "detail": "The mitigation block enters the critic view with this change, so every fixture carries one; its relevance is part of what a reader signs."
+        }
+      ]
+    },
+    "expect": {
+      "survives": false,
+      "status": "rejected",
+      "rejected_because": "reasoning"
+    },
+    "rationale": "The harder half of this kind, and the one that matters. It reads like a real finding: the cited fact is true, the vocabulary is right, and the consequence is a real attack. Nothing in the model puts a session signing key in the orders database, so the step from the fact to the conclusion is invented. A critic that catches only the Moon fixture has not learned anything."
+  },
+  {
+    "id": "irrelevant-unknown-over-sound-argument",
+    "kind": "irrelevant-unknown",
+    "case": "01-payments-checkout",
+    "draft": {
+      "id": "S-05",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Anything that reaches the order service can submit an order",
+      "description": "`flow:storefront-api-to-order-service:submit-order` carries no authentication and is accepted on network position alone. Any workload that can reach `process:order-service` in the core network can submit an order as though it were `process:storefront-api`.",
+      "affected_element_ids": [
+        "flow:storefront-api-to-order-service:submit-order",
+        "process:order-service"
+      ],
+      "verb": "impersonate",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "There is no auth on that gRPC call \u2014 the order service accepts anything that can reach it, which is meant to be only the storefront API.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "derived-fact",
+          "text": "",
+          "source_label": "",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "flow:storefront-api-to-order-service:submit-order",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:shopper-to-storefront-api:place-order",
+          "attribute": "encryption_in_transit",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "spoofing",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Rated for the fixture; the review change does not turn on the rating."
+      },
+      "mitigations": [
+        {
+          "summary": "Placeholder so the fixture carries the block the critic now reads",
+          "detail": "The mitigation block enters the critic view with this change, so every fixture carries one; its relevance is part of what a reader signs."
+        }
+      ]
+    },
+    "expect": {
+      "survives": true
+    },
+    "rationale": "The argument stands entirely on a stated fact the source spells out. The unknown it also cites is about a different flow's transport and the claim does not depend on it. Today that one irrelevant ground is enough to route the whole draft past the critic. It must survive \u2014 and no exact status is pinned, because the verdict it deserves is `confirmed` and the code will not currently allow that on a draft carrying any unknown ground."
+  },
+  {
+    "id": "irrelevant-unknown-over-unsound-argument",
+    "kind": "irrelevant-unknown",
+    "case": "01-payments-checkout",
+    "draft": {
+      "id": "S-06",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "The order service writes receipts that name the shopper who placed the order",
+      "description": "`flow:order-service-to-receipt-archive:append-receipt` writes a receipt for every completed order, and the receipt names the shopper. An attacker reading `store:receipt-archive` therefore learns which shopper placed which order.",
+      "affected_element_ids": [
+        "store:receipt-archive"
+      ],
+      "verb": "read",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "The receipt records which order was written and that the order service wrote it.",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        },
+        {
+          "kind": "unknown-attribute",
+          "text": "",
+          "source_label": "",
+          "element_id": "flow:shopper-to-storefront-api:place-order",
+          "attribute": "encryption_in_transit",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "information-disclosure",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Rated for the fixture; the review change does not turn on the rating."
+      },
+      "mitigations": [
+        {
+          "summary": "Placeholder so the fixture carries the block the critic now reads",
+          "detail": "The mitigation block enters the critic view with this change, so every fixture carries one; its relevance is part of what a reader signs."
+        }
+      ]
+    },
+    "expect": {
+      "survives": false,
+      "status": "rejected",
+      "rejected_because": "reasoning"
+    },
+    "rationale": "The same shield over an unsound argument. The quoted sentence says the receipt records the order and the writer \u2014 it does not name the shopper, and the draft asserts that it does. The irrelevant unknown must not buy it a pass any more than it buys one for the sound draft above."
+  },
+  {
+    "id": "contradicted-receipt-archive-unencrypted",
+    "kind": "contradicted-by-source",
+    "case": "01-payments-checkout",
+    "draft": {
+      "id": "S-07",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Receipts rest unencrypted in the archive bucket",
+      "description": "`store:receipt-archive` holds a receipt for every completed order and nothing protects those objects on the medium, so anyone reaching the bucket's storage reads them.",
+      "affected_element_ids": [
+        "store:receipt-archive"
+      ],
+      "verb": "read",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "the bucket is encrypted with a customer-managed key",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "information-disclosure",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Rated for the fixture; the review change does not turn on the rating."
+      },
+      "mitigations": [
+        {
+          "summary": "Placeholder so the fixture carries the block the critic now reads",
+          "detail": "The mitigation block enters the critic view with this change, so every fixture carries one; its relevance is part of what a reader signs."
+        }
+      ]
+    },
+    "expect": {
+      "survives": false,
+      "status": "rejected",
+      "rejected_because": "evidence"
+    },
+    "rationale": "The draft's own quote states the opposite of what the draft asserts, and the model carries `encryption_at_rest` as a customer-managed key. The model shows the thing the draft says is missing, which is the step 1 outcome that rules on the subject rather than on the wording."
+  },
+  {
+    "id": "contradicted-per-user-database-credentials",
+    "kind": "contradicted-by-source",
+    "case": "01-payments-checkout",
+    "draft": {
+      "id": "S-08",
+      "framework": "stride",
+      "framework_version": "1.0",
+      "title": "Per-shopper database credentials leave each order readable only by its owner",
+      "description": "`flow:order-service-to-orders-db:read-write-orders` authenticates with a credential issued per shopper, so a compromise of `process:order-service` exposes one shopper's orders rather than the whole table.",
+      "affected_element_ids": [
+        "flow:order-service-to-orders-db:read-write-orders",
+        "store:orders-db"
+      ],
+      "verb": "abuse-grant",
+      "grounds": [
+        {
+          "kind": "quote",
+          "text": "a single application account that has full read/write",
+          "source_label": "System description",
+          "element_id": "",
+          "attribute": "",
+          "flow_id": "",
+          "term": ""
+        }
+      ],
+      "category": "elevation-of-privilege",
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Rated for the fixture; the review change does not turn on the rating."
+      },
+      "mitigations": [
+        {
+          "summary": "Placeholder so the fixture carries the block the critic now reads",
+          "detail": "The mitigation block enters the critic view with this change, so every fixture carries one; its relevance is part of what a reader signs."
+        }
+      ]
+    },
+    "expect": {
+      "survives": false,
+      "status": "rejected",
+      "rejected_because": "evidence"
+    },
+    "rationale": "The quote says a single shared account with full read/write; the draft asserts per-shopper credentials and a narrower blast radius. Contradicted by the sentence it cites, and the direction matters \u2014 this one understates the risk, which is the shape a reviewer is least likely to challenge."
+  }
+]
