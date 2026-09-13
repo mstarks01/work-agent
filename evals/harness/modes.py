@@ -71,6 +71,7 @@ from analysis_service.sampling import (
 from analysis_service.sources import Source
 from analysis_service.system_model import SystemModel
 from analysis_service.validation import ValidationIssue, parse_and_validate
+from evals.harness.identity import comparable_elements
 from evals.harness.reference import GoldenCase
 
 EVAL_APP_NAME = "analysis-evals"
@@ -397,11 +398,40 @@ class ExtractionScore:
 
     @property
     def endpoint_recall(self) -> float:
-        found = len(self.endpoint_matched) + len(
-            _endpoint_keys(self.extra) & _endpoint_keys(self.missing)
+        """Recall over the elements a claim can cite, so zones are not counted.
+
+        :func:`~evals.harness.identity.comparable_elements` drops every
+        ``boundary:`` ID before any claim comparison, so a zone the extraction
+        named differently cannot cost a single match downstream. Counting one
+        as a miss depressed this figure by eleven points — 0.642 against 0.755
+        on the sweep of 2026-09-13 — over 24 elements a run that no reader
+        consumes. Whether the zone structure itself is right is a real
+        question, and :attr:`zone_recall` beside this one is where it is asked.
+        """
+        found = len(comparable_elements(self.endpoint_matched)) + len(
+            comparable_elements(
+                _endpoint_keys(self.extra) & _endpoint_keys(self.missing)
+            )
         )
-        total = found + len(self.endpoint_missing)
+        total = found + len(comparable_elements(self.endpoint_missing))
         return found / total if total else 0.0
+
+    @property
+    def zone_recall(self) -> float:
+        """The half :attr:`endpoint_recall` no longer counts: the trust zones.
+
+        Kept apart rather than dropped. A zone name reaches no claim, but the
+        zones are what :meth:`~analysis_service.system_model.SystemModel.boundary_crossings`
+        is derived from, so a model that invents its own set is a finding even
+        though the identity rule never reads one.
+        """
+        blessed = {
+            key
+            for key in _endpoint_keys(self.missing) | _endpoint_keys(self.matched)
+            if key.startswith("boundary:")
+        }
+        gone = {key for key in self.endpoint_missing if key.startswith("boundary:")}
+        return (len(blessed) - len(gone)) / len(blessed) if blessed else 0.0
 
     @property
     def differing(self) -> tuple[AttributeCheck, ...]:
@@ -419,6 +449,7 @@ class ExtractionScore:
             "recall": round(self.recall, 3),
             "precision": round(self.precision, 3),
             "endpoint_recall": round(self.endpoint_recall, 3),
+            "zone_recall": round(self.zone_recall, 3),
             "endpoint_missing": sorted(self.endpoint_missing),
             "endpoint_extra": sorted(self.endpoint_extra),
             "initiator_recall": round(self.initiator_recall, 3),
@@ -925,8 +956,14 @@ def render_extraction(scores: Sequence[ExtractionScore]) -> None:
     strict = sum(score.recall for score in scores) / len(scores)
     endpoint = sum(score.endpoint_recall for score in scores) / len(scores)
     print(
-        f"recall: {strict:.2f} strict, {endpoint:.2f} folding the flow label"
+        f"recall: {strict:.2f} strict, {endpoint:.2f} folding the flow label and"
+        f" dropping the zones a claim cannot cite"
         f" — the gap is naming, not extraction (instrument, non-gating)"
+    )
+    zones = sum(score.zone_recall for score in scores) / len(scores)
+    print(
+        f"zones: {zones:.2f} recall — no claim cites one, so this scores the"
+        f" structure the crossings derive from rather than the identity rule"
     )
     initiator = sum(s.initiator_recall for s in scores) / len(scores)
     dropped = sum(len(s.initiators_missing) for s in scores)
