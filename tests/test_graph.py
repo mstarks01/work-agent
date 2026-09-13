@@ -21,7 +21,7 @@ from google.adk.agents import LlmAgent
 from google.adk.utils import instructions_utils
 from google.adk.workflow import FunctionNode, JoinNode
 
-from analysis_service import graph
+from analysis_service import critic, graph
 from analysis_service.binding import NodeBinding
 from analysis_service.claims import (
     CLAIM_BOUND_MARKS,
@@ -1178,13 +1178,18 @@ def test_the_marks_reach_the_report_through_assemble():
     assert analysis.marks.shared_element_names == []
 
 
-def test_merge_keeps_mitigations_out_of_the_prompt_but_in_the_report():
-    """The drafts the report is built from are not the drafts the critic reads."""
+def test_merge_shows_the_critic_the_mitigations_it_rules_on():
+    """The recommendation reaches both the prompt and the report unchanged.
+
+    It is copied into the report from the parked draft, so the critic reading
+    it is the only review it gets. The parked copy is what assembly uses, and
+    a critic that rules on a mitigation never rewrites one.
+    """
     ctx = FakeContext(**analyze_state(spoofing=[sample_proposal("S-01", "spoofing")]))
 
     graph.merge_drafts(valid_model().model_dump(mode="json"), ctx, KEYS, NODES)
 
-    assert "Set HttpOnly" not in ctx.state[NODES.key("draft_view")]
+    assert "Set HttpOnly" in ctx.state[NODES.key("draft_view")]
     assert ctx.state[NODES.key("drafts")][0]["mitigations"] == [
         {"summary": "Set HttpOnly and Secure on cookies", "detail": ""}
     ]
@@ -1585,14 +1590,18 @@ def test_a_duplicate_ruling_sends_no_draft_at_all():
     assert fenced(state[NODES.key("draft_roster")]) == ["S-01"]
 
 
-def test_the_re_ask_never_sees_a_field_the_critic_could_not_rule_on():
-    """``_ruling_view`` narrows here too — one view of a draft, not two."""
+def test_the_re_ask_reads_one_view_of_a_draft_and_not_a_second():
+    """``_ruling_view`` builds the re-ask's drafts too, so the two agree.
+
+    The first pass and the re-ask disagreeing about what a draft carries is how
+    a re-ask comes back ruling on something the critic never saw.
+    """
     drafts = [sample_draft("S-01"), sample_draft("T-01", category="tampering")]
 
     state = _revise(drafts, [sample_ruling("S-01")])
 
     (dropped,) = fenced(state[NODES.key("unreconciled_drafts")])
-    assert "mitigations" not in dropped
+    assert dropped == critic._ruling_view([drafts[1]])[0]
 
 
 def test_a_critic_that_emitted_nothing_routes_to_the_re_ask():

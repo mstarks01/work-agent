@@ -77,26 +77,33 @@ def test_the_prompt_carries_the_package_skills_and_the_shared_steps(fixtures, mo
     assert "rejected_because" in prompt
 
 
-def test_seven_of_the_eight_signed_drafts_never_reach_the_critic(fixtures, model):
-    """The baseline, and the whole reason the review change is on the table.
+def test_every_signed_draft_reaches_the_critic(fixtures, model):
+    """What the review change bought, stated over the set a reader signed.
 
-    Every fixture but the control carries an unknown ground, and
-    ``unsettled_drafts`` drops those before a critic reads anything. So the
-    nonsense arguments, the contradicted claims and the sound conditional
-    findings are all settled by the same rule, in code, unread — and no
-    measurement over a finished report can see the difference.
-
-    This test is expected to change when the review change lands. It is written
-    to state the baseline plainly, so that what moves is legible in one diff.
+    Seven of these eight carry an unknown ground. Under the rule that settled
+    such a draft in code, one reached the critic — so the nonsense arguments,
+    the contradicted claims and the sound conditional findings were all
+    disposed of by the same fact, unread, and no measurement over a finished
+    report could tell them apart.
     """
     prompt = composed(fixtures, model)
+
     shown = [fixture for fixture in fixtures if fixture.draft["id"] in prompt]
 
-    assert len(shown) == 1
-    assert shown[0].id == "contradicted-receipt-write-unauthenticated"
-    assert not any(
-        ground["kind"] == "unknown-attribute" for ground in shown[0].draft["grounds"]
-    ), "the one draft shown is the one carrying no unknown ground"
+    assert len(shown) == len(fixtures)
+    shielded = [
+        fixture
+        for fixture in fixtures
+        if any(g["kind"] == "unknown-attribute" for g in fixture.draft["grounds"])
+    ]
+    assert len(shielded) == 7, "the set is mostly drafts that used to skip review"
+
+
+def test_the_critic_reads_the_recommendations_it_now_rules_on(fixtures, model):
+    """Step 4 needs the block, and the fixtures carry one each."""
+    prompt = composed(fixtures, model)
+
+    assert "Placeholder so the fixture carries the block" in prompt
 
 
 def rule(claim_id: str, status: str, reason: str = "") -> dict:
