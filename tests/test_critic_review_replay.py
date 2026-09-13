@@ -125,6 +125,24 @@ def test_the_critic_reads_the_recommendations_it_now_rules_on(fixtures, model):
             assert mitigation["summary"] in prompt
 
 
+def surviving_status(fixture) -> str:
+    """The verdict a correct critic gives a fixture it keeps.
+
+    A draft citing an unknown ground is conditional, so ``needs-info``; one
+    resting on stated facts is ``confirmed``. Derived rather than assumed,
+    because a scripted ``needs-info`` on a draft naming no unknown is a
+    malformed verdict the review seam reports — which is what a fixture of the
+    ``sound-claim-flawed-advice`` kind is.
+    """
+    if any(g["kind"] == "unknown-attribute" for g in fixture.draft["grounds"]):
+        return "needs-info"
+    return "confirmed"
+
+
+def survivors(fixtures) -> list:
+    return [f for f in fixtures if f.expect.survives]
+
+
 def rule(claim_id: str, status: str, reason: str = "") -> dict:
     """One scripted ruling, in the shape this package's critic really emits.
 
@@ -166,7 +184,8 @@ def test_a_critic_answering_every_fixture_correctly_scores_both_halves(fixtures,
     score, _ = run(fixtures, model, payload)
 
     assert score.unsupported_removed == (5, 5)
-    assert score.valid_preserved == (3, 3)
+    kept = len(survivors(fixtures))
+    assert score.valid_preserved == (kept, kept)
     assert score.rejected_without_engaging == ()
 
 
@@ -185,7 +204,7 @@ def test_a_critic_that_rejects_everything_fails_the_preserved_half(fixtures, mod
 
     score, _ = run(fixtures, model, payload)
 
-    assert score.valid_preserved == (0, 3)
+    assert score.valid_preserved == (0, len(survivors(fixtures)))
     # And it does not even earn the removals: none of those reasons engages.
     assert score.unsupported_removed == (0, 5)
     assert len(score.rejected_without_engaging) == 5
@@ -198,12 +217,13 @@ def test_killing_the_right_draft_for_the_wrong_reason_is_reported_apart(
     payload = {"claims": []}
     for fixture in fixtures:
         claim_id = fixture.draft["id"]
-        status = "needs-info" if fixture.expect.survives else "rejected"
+        status = surviving_status(fixture) if fixture.expect.survives else "rejected"
         payload["claims"].append(rule(claim_id, status, "unknown control, so no"))
 
     score, _ = run(fixtures, model, payload)
 
-    assert score.valid_preserved == (3, 3)
+    kept = len(survivors(fixtures))
+    assert score.valid_preserved == (kept, kept)
     assert score.unsupported_removed == (0, 5)
     assert {o.fixture_id for o in score.rejected_without_engaging} == {
         f.id for f in fixtures if not f.expect.survives
@@ -259,20 +279,26 @@ def test_the_advice_is_scored_apart_from_the_fate(fixtures, model):
     """
     payload = {"claims": []}
     for fixture in fixtures:
-        status = "needs-info" if fixture.expect.survives else "rejected"
+        status = surviving_status(fixture) if fixture.expect.survives else "rejected"
         ruling = rule(
             fixture.draft["id"], status, "; ".join(fixture.expect.reason_must_name)
         )
         if fixture.expect.survives:
-            # The reader ruled every surviving fixture's advice sound, so an
-            # agreeing critic says so here.
-            ruling["recommendation"] = {"sound": True, "note": ""}
+            # A critic that agrees with the reader, fixture by fixture. Not a
+            # constant: one survivor carries advice the reader ruled unsound,
+            # which is the row that makes this measure worth reporting.
+            ruling["recommendation"] = {
+                "sound": fixture.expect.recommendation_sound,
+                "note": ""
+                if fixture.expect.recommendation_sound
+                else "leaves the grant",
+            }
         payload["claims"].append(ruling)
 
     score, _ = run(fixtures, model, payload)
 
     agreed, of_read = score.recommendation_agreed
-    assert of_read == sum(1 for f in fixtures if f.expect.survives)
+    assert of_read == len(survivors(fixtures))
     assert agreed == of_read
     # Every rejected draft owes no reading, so none is counted unread.
     assert score.recommendation_unread == ()
@@ -284,7 +310,7 @@ def test_a_surviving_draft_with_no_reading_is_counted_unread(fixtures, model):
         "claims": [
             rule(
                 f.draft["id"],
-                "needs-info" if f.expect.survives else "rejected",
+                surviving_status(f) if f.expect.survives else "rejected",
                 "; ".join(f.expect.reason_must_name),
             )
             for f in fixtures
@@ -302,7 +328,7 @@ def test_a_critic_disagreeing_about_the_advice_does_not_move_the_fate(fixtures, 
     """Validity and advice are separate outcomes, and the score keeps them so."""
     payload = {"claims": []}
     for fixture in fixtures:
-        status = "needs-info" if fixture.expect.survives else "rejected"
+        status = surviving_status(fixture) if fixture.expect.survives else "rejected"
         ruling = rule(
             fixture.draft["id"], status, "; ".join(fixture.expect.reason_must_name)
         )
@@ -321,20 +347,19 @@ def test_a_critic_disagreeing_about_the_advice_does_not_move_the_fate(fixtures, 
     assert agreed == sum(1 for f in fixtures if not f.expect.recommendation_sound)
 
 
-def test_the_third_half_says_when_it_cannot_tell_a_reading_from_a_constant(
-    fixtures, model
-):
-    """The counterweight the other two measures have and this one does not yet.
+def test_a_constant_reading_no_longer_scores_full_marks(fixtures, model):
+    """What the ninth fixture buys, as a property rather than a count.
 
     A critic emits a reading on the drafts it lets survive, so those rows are
-    the whole denominator. Every surviving fixture in this set carries advice
-    the reader ruled sound, so a critic answering ``sound: true`` without
-    opening the block scores full marks. The score says so rather than
-    reporting the number bare.
+    the whole denominator. While every one of them expected the same answer, a
+    critic replying ``sound: true`` without opening the block scored full
+    marks — the failure ``unsupported_removed`` and ``valid_preserved`` were
+    split apart to avoid. One survivor now carries advice the reader ruled
+    unsound, so the constant is wrong about exactly that row.
     """
     payload = {"claims": []}
     for f in fixtures:
-        status = "needs-info" if f.expect.survives else "rejected"
+        status = surviving_status(f) if f.expect.survives else "rejected"
         ruling = rule(f.draft["id"], status, "; ".join(f.expect.reason_must_name))
         if f.expect.survives:
             ruling["recommendation"] = {"sound": True, "note": ""}
@@ -342,9 +367,11 @@ def test_the_third_half_says_when_it_cannot_tell_a_reading_from_a_constant(
 
     score, _ = run(fixtures, model, payload)
 
-    assert score.recommendation_agreed == (3, 3), "the flattering full marks"
-    assert not score.recommendation_informative
-    assert score.to_json()["recommendation_agreed"]["informative"] is False
+    agreed, of_read = score.recommendation_agreed
+    assert of_read == len(survivors(fixtures))
+    assert agreed < of_read, "a constant reading must not score full marks"
+    assert score.recommendation_informative
+    assert score.to_json()["recommendation_agreed"]["informative"] is True
 
 
 def test_an_anchor_matches_the_word_form_the_critic_actually_wrote():
@@ -400,7 +427,7 @@ def test_a_dismissal_is_recorded_so_relevance_can_be_read(fixtures, model):
     ]
     payload = {"claims": []}
     for f in fixtures:
-        status = "needs-info" if f.expect.survives else "rejected"
+        status = surviving_status(f) if f.expect.survives else "rejected"
         r = rule(f.draft["id"], status, "; ".join(f.expect.reason_must_name))
         if f.id == shielded.id:
             r["verdict"] = {

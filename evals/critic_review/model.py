@@ -45,11 +45,20 @@ from analysis_service.frameworks import FrameworkName
 #: same shield: the unknown must change neither answer.
 #:
 #: ``contradicted-by-source`` — a claim whose own cited quote says the opposite.
+#:
+#: ``sound-claim-flawed-advice`` — a claim the model's stated facts support,
+#: carrying a recommendation that does not close it. The only kind about the
+#: *advice* rather than the claim, and the one that proves the second half of
+#: the rule: a plausible recommendation must not rescue an unsupported finding,
+#: and a flawed one must not erase a valid threat. Without a row of this kind
+#: every fixture that can carry a reading expects the same answer, and a critic
+#: replying ``sound`` to everything scores full marks.
 FixtureKind = Literal[
     "credible-conditional",
     "nonsense-argument",
     "irrelevant-unknown",
     "contradicted-by-source",
+    "sound-claim-flawed-advice",
 ]
 
 
