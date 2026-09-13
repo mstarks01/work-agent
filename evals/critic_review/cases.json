@@ -482,9 +482,10 @@
       "id": "S-09",
       "framework": "stride",
       "framework_version": "1.0",
-      "title": "One shared database account gives every path in the order service full write on every order",
-      "description": "`process:order-service` reaches `store:orders-db` over `flow:order-service-to-orders-db:read-write-orders` as a single application account holding full read/write. The model states this outright, so it is not a question about an unknown control: any path in the order service, and anyone who obtains the account's password, acts on every order row rather than on the rows one endpoint needs. A flaw in one handler is therefore total write access to the store.",
+      "title": "An unauthenticated caller reaches the database through an identity wider than that path needs",
+      "description": "Two facts the model states. `flow:storefront-api-to-order-service:submit-order` carries no authentication and is accepted on network position alone. And `process:order-service` reaches `store:orders-db` over `flow:order-service-to-orders-db:read-write-orders` as a single application account holding full read/write. So whatever the submit path does to the database, it does under an identity that may read and write every order, and nothing narrows that identity to what the path requires. Any workload in the core network can drive that path, so the authority standing behind an unauthenticated caller is the account's, not the caller's.",
       "affected_element_ids": [
+        "flow:storefront-api-to-order-service:submit-order",
         "flow:order-service-to-orders-db:read-write-orders",
         "store:orders-db",
         "process:order-service"
@@ -493,7 +494,7 @@
       "grounds": [
         {
           "kind": "quote",
-          "text": "a single application account that has full read/write",
+          "text": "There is no auth on that gRPC call \u2014 the order service accepts anything that can reach it, which is meant to be only the storefront API.",
           "source_label": "System description",
           "element_id": "",
           "attribute": "",
@@ -502,7 +503,7 @@
         },
         {
           "kind": "quote",
-          "text": "The password comes from an environment variable on the worker.",
+          "text": "a single application account that has full read/write",
           "source_label": "System description",
           "element_id": "",
           "attribute": "",
@@ -540,8 +541,8 @@
       "reason_must_name": [],
       "recommendation_sound": false
     },
-    "rationale": "A valid claim on stated facts, carrying advice that does not close it. The claim is about one account holding authority every path shares, and the recommendation is about where that account's password is kept and how often it changes \u2014 a real improvement that leaves the blast radius exactly as it was. It is the pair that proves a flawed recommendation does not erase a valid threat, and the only fixture whose readable expectation differs from the rest, so the recommendation measure can tell a critic that reads the block from one that answers 'sound' to everything.",
-    "reviewed_by": "mstarks01",
+    "rationale": "A claim resting on two stated facts and asserting nothing beyond them. It does not posit a vulnerable handler, an attacker holding the password, or an intended narrower grant the model never states \u2014 the three the critic named when it rejected the first drafting of this fixture. What it says is that an unauthenticated path stands in front of an identity wider than that path needs, which both cited facts establish together.\n\nThe advice is the flaw. Moving the password and rotating it changes where a secret lives; it does not narrow the grant, and an attacker reaching this path never handles the password at all. So the recommendation is sound-sounding and addresses something other than the claim, which is what this fixture is for.",
+    "reviewed_by": null,
     "framework": "stride",
     "drafted_by": "agent-stand-in"
   }
