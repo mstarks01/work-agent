@@ -319,3 +319,29 @@ def test_a_critic_disagreeing_about_the_advice_does_not_move_the_fate(fixtures, 
     agreed, of_read = score.recommendation_agreed
     assert of_read == len(fixtures)
     assert agreed == sum(1 for f in fixtures if not f.expect.recommendation_sound)
+
+
+def test_the_third_half_says_when_it_cannot_tell_a_reading_from_a_constant(
+    fixtures, model
+):
+    """The counterweight the other two measures have and this one does not yet.
+
+    A critic emits a reading on the drafts it lets survive, so those rows are
+    the whole denominator. Every surviving fixture in this set carries advice
+    the reader ruled sound, so a critic answering ``sound: true`` without
+    opening the block scores full marks. The score says so rather than
+    reporting the number bare.
+    """
+    payload = {"claims": []}
+    for f in fixtures:
+        status = "needs-info" if f.expect.survives else "rejected"
+        ruling = rule(f.draft["id"], status, "; ".join(f.expect.reason_must_name))
+        if f.expect.survives:
+            ruling["recommendation"] = {"sound": True, "note": ""}
+        payload["claims"].append(ruling)
+
+    score, _ = run(fixtures, model, payload)
+
+    assert score.recommendation_agreed == (3, 3), "the flattering full marks"
+    assert not score.recommendation_informative
+    assert score.to_json()["recommendation_agreed"]["informative"] is False
