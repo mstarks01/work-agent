@@ -26,6 +26,7 @@ take plain data.
 
 from __future__ import annotations
 
+import re
 from collections import Counter
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
@@ -303,6 +304,16 @@ class ExtractionScore:
     extra: tuple[str, ...]
     crossings_match: bool
     attributes: tuple[AttributeCheck, ...]
+    #: The extra elements whose name the submitted text does not contain, so
+    #: the model wrote a component nobody described. Carried rather than
+    #: recomputed, because it reads the case's source bytes.
+    #:
+    #: The rest of ``extra`` is not invention. On the sweep of 2026-09-13 every
+    #: one of the 35 extra elements a run was named word for word in the
+    #: source: some are the model's word for an element the corpus paraphrased,
+    #: and some are elements the corpus omits (#882). Precision counts all
+    #: three the same, so it answers no question on its own.
+    unsourced: tuple[str, ...] = ()
     #: The blessed model's pure initiators — elements that only ever start an
     #: interaction. Carried so the reading below needs no second model walk.
     blessed_initiators: tuple[str, ...] = ()
@@ -452,6 +463,7 @@ class ExtractionScore:
             "zone_recall": round(self.zone_recall, 3),
             "endpoint_missing": sorted(self.endpoint_missing),
             "endpoint_extra": sorted(self.endpoint_extra),
+            "unsourced": list(self.unsourced),
             "initiator_recall": round(self.initiator_recall, 3),
             "initiators_missing": sorted(self.initiators_missing),
             "crossings_match": self.crossings_match,
@@ -692,7 +704,46 @@ def score_extraction(case: GoldenCase, result: ExtractionResult) -> ExtractionSc
         blessed_crossings=crossing_keys(case.model) or (),
         extracted_crossings=crossing_keys(result.extracted),
         unbased=_unbased(case, result.extracted),
+        unsourced=_unsourced(
+            case, sorted(extracted_ids - blessed_ids), result.extracted
+        ),
     )
+
+
+def _unsourced(
+    case: GoldenCase, extra: Sequence[str], extracted: SystemModel | None
+) -> tuple[str, ...]:
+    """The extra elements the submitted text does not name, in element order.
+
+    **Conservative by construction, and deliberately so.** A name counts as
+    sourced when every one of its words of three letters or more appears in the
+    case's own source text, which over-credits a model that assembled a name
+    from scattered words. The question this answers is whether the model
+    *invented* a component, and a check that accuses one should be sure.
+
+    What it is not is a rename test. Deciding that an extra element is a
+    blessed one under another name needs a fuzzy comparison, which this
+    repository refuses in graded code for the reason
+    :mod:`analysis_service.evidence` states: there is no fuzzy match and no
+    repair, because inferring what an agent meant is the guess the mechanism
+    exists to remove.
+    """
+    if extracted is None:
+        return ()
+    text = re.sub(r"[^a-z0-9 ]", " ", " ".join(s.text for s in case.sources).lower())
+    words = set(text.split())
+    by_id = {element.id: element for element in extracted.elements()}
+    out = []
+    for element_id in extra:
+        element = by_id.get(element_id)
+        if element is None:
+            continue
+        tokens = [
+            w for w in re.split(r"[^a-z0-9]+", element.name.lower()) if len(w) > 2
+        ]
+        if tokens and not set(tokens) <= words:
+            out.append(element_id)
+    return tuple(out)
 
 
 def _unbased(
@@ -970,6 +1021,13 @@ def render_extraction(scores: Sequence[ExtractionScore]) -> None:
     print(
         f"initiators: {initiator:.2f} recall, {dropped} dropped — an element the"
         f" text describes by what it does rather than where it sits"
+    )
+    invented = sum(len(s.unsourced) for s in scores)
+    extra = sum(len(s.extra) for s in scores)
+    print(
+        f"invention: {invented} of {extra} extra element(s) are named nowhere in"
+        f" their source — the rest are the corpus's own gap or its own paraphrase,"
+        f" which precision cannot tell apart (#882)"
     )
     undrivable = [s.case_id for s in scores if not s.crossings_derivable]
     crossings = sum(s.crossings_recall for s in scores) / len(scores)
