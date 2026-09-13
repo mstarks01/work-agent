@@ -766,20 +766,29 @@ def check_case(case_dir: Path) -> list[str]:
     return problems
 
 
-def calibration_inputs() -> tuple[dict[str, set[str]], dict[str, dict[str, list[str]]]]:
+def calibration_inputs() -> tuple[
+    dict[str, set[str]], dict[str, dict[str, tuple[list[str], str | None]]]
+]:
     """What :func:`check_calibration` compares fixtures against, per case.
 
     The blessed model's element IDs, and each STRIDE reference claim mapped to
-    its own sorted element IDs. STRIDE's reference file only, because the
+    its own sorted element IDs **and its verb**. The verb is half of what the
+    identity rule reads, and a fixture carrying a stale one measures the rule
+    against a claim the corpus no longer states: two case-02 pairs held
+    ``impersonate`` after the corpus moved to ``use-credential``, and this
+    check saw nothing because it read the elements alone. STRIDE's reference file only, because the
     composed identity is STRIDE's: a framework that matches by requirement ID
     reaches no claim-equivalence question and contributes no pair.
     """
     elements: dict[str, set[str]] = {}
-    claims: dict[str, dict[str, list[str]]] = {}
+    claims: dict[str, dict[str, tuple[list[str], str | None]]] = {}
     for case_dir in case_dirs():
         records = _load_json_array(claims_file(case_dir, "stride"))
         claims[case_dir.name] = {
-            record["claim"]: sorted(record["affected_element_ids"])
+            record["claim"]: (
+                sorted(record["affected_element_ids"]),
+                record.get("verb"),
+            )
             for record in records
             if isinstance(record, dict)
         }
@@ -794,10 +803,16 @@ def _check_pair_elements(
     where: str,
     pair: dict[str, Any],
     element_ids: set[str],
-    reference_elements: list[str],
+    reference: tuple[list[str], str | None],
 ) -> list[str]:
-    """One pair's two element-ID fields, against the corpus they came from."""
+    """One pair's element-ID fields and reference verb, against their corpus."""
+    reference_elements, reference_verb = reference
     problems = []
+    if reference_verb is not None and pair["reference_verb"] != reference_verb:
+        problems.append(
+            f"{where} reference_verb {pair['reference_verb']!r} is not the"
+            f" claim's own {reference_verb!r}; re-run build_pairs.py"
+        )
     if sorted(pair["reference_element_ids"]) != reference_elements:
         problems.append(
             f"{where} reference_element_ids {pair['reference_element_ids']} are"
@@ -831,7 +846,7 @@ def _check_pair_elements(
 
 def check_calibration(
     elements_by_case: dict[str, set[str]],
-    claims_by_case: dict[str, dict[str, list[str]]],
+    claims_by_case: dict[str, dict[str, tuple[list[str], str | None]]],
 ) -> list[str]:
     """Every mechanical failure in the calibration-label fixtures.
 

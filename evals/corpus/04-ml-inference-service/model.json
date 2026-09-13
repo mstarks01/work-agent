@@ -55,8 +55,8 @@
   ],
   "data_stores": [
     {
-      "id": "store:model-registry",
-      "name": "model registry",
+      "id": "store:model-registry-bucket",
+      "name": "model registry bucket",
       "description": "Bucket holding model artifacts, loaded unverified at model server startup and written by engineers.",
       "assets": [
         "business-critical-data"
@@ -69,8 +69,8 @@
       "encryption_at_rest": "unknown"
     },
     {
-      "id": "store:feature-store",
-      "name": "feature store",
+      "id": "store:redis-feature-store",
+      "name": "Redis feature store",
       "description": "Redis holding per-customer features: account age and spend bands. No password configured.",
       "assets": [
         "pii",
@@ -134,7 +134,7 @@
       "operations": "write"
     },
     {
-      "id": "flow:model-server-to-model-registry:load-artifact",
+      "id": "flow:model-server-to-model-registry-bucket:load-artifact",
       "name": "load artifact",
       "description": "Model server pulls its model artifact at startup and loads it without verifying integrity.",
       "assets": [
@@ -143,7 +143,7 @@
       "source_excerpt": "The model server loads model artifacts from a model registry bucket at startup. It uses its own service account for that.",
       "source_label": "System description",
       "source": "process:model-server",
-      "destination": "store:model-registry",
+      "destination": "store:model-registry-bucket",
       "protocol": "object storage API",
       "authentication": "model server's own service account",
       "data_description": "model artifact",
@@ -151,7 +151,7 @@
       "operations": "read"
     },
     {
-      "id": "flow:model-server-to-feature-store:read-features",
+      "id": "flow:model-server-to-redis-feature-store:read-features",
       "name": "read features",
       "description": "Model server reads per-customer features for a request.",
       "assets": [
@@ -161,7 +161,7 @@
       "source_excerpt": "which the model server reads from a Redis feature store on the same network. Redis has no password on it",
       "source_label": "System description",
       "source": "process:model-server",
-      "destination": "store:feature-store",
+      "destination": "store:redis-feature-store",
       "protocol": "Redis protocol",
       "authentication": "none",
       "data_description": "account age and spend bands per customer",
@@ -186,7 +186,7 @@
       "operations": "write"
     },
     {
-      "id": "flow:ml-engineer-to-model-registry:publish-artifact",
+      "id": "flow:ml-engineer-to-model-registry-bucket:publish-artifact",
       "name": "publish artifact",
       "description": "Engineer pushes a new model artifact into the registry.",
       "assets": [
@@ -195,7 +195,7 @@
       "source_excerpt": "I'm not sure what governs who can push \u2014 I think it is a shared group account.",
       "source_label": "System description",
       "source": "entity:ml-engineer",
-      "destination": "store:model-registry",
+      "destination": "store:model-registry-bucket",
       "protocol": "object storage API",
       "authentication": "unknown; possibly a shared group account",
       "data_description": "model artifact",

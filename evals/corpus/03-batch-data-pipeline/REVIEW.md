@@ -64,14 +64,14 @@ Not part of the question, but the records cite these names, so you need them.
 | id | exposure | interface | zone | technology |
 |---|---|---|---|---|
 | process:ingest-scheduler | internal | non-web | boundary:landing-network | Airflow |
-| process:transform-job | internal | non-web | boundary:warehouse-network | Spark |
+| process:spark-transform-job | internal | non-web | boundary:warehouse-network | Spark |
 
 **Data stores**
 
 | id | zone | at rest | classification |
 |---|---|---|---|
 | store:landing-bucket | boundary:landing-network | unknown | confidential |
-| store:airflow-metadata-db | boundary:landing-network | unknown | confidential |
+| store:airflow-metadata-database | boundary:landing-network | unknown | confidential |
 | store:claims-warehouse | boundary:warehouse-network | unknown | confidential |
 
 **Data flows**
@@ -80,9 +80,9 @@ Not part of the question, but the records cite these names, so you need them.
 |---|---|---|---|---|---|
 | flow:insurance-partner-to-landing-bucket:push-daily-extract | entity:insurance-partner | store:landing-bucket | SFTP | static per-partner key issued at onboarding, never rotated | SSH transport (SFTP) |
 | flow:ingest-scheduler-to-landing-bucket:list-and-read-files | process:ingest-scheduler | store:landing-bucket | object storage API | unknown | unknown |
-| flow:ingest-scheduler-to-airflow-metadata-db:read-connections | process:ingest-scheduler | store:airflow-metadata-db | PostgreSQL wire protocol | unknown | unknown |
-| flow:ingest-scheduler-to-transform-job:trigger-transform | process:ingest-scheduler | process:transform-job | unknown | unknown | unknown |
-| flow:transform-job-to-claims-warehouse:load-records | process:transform-job | store:claims-warehouse | BigQuery API | unknown | unknown |
+| flow:ingest-scheduler-to-airflow-metadata-database:read-connections | process:ingest-scheduler | store:airflow-metadata-database | PostgreSQL wire protocol | unknown | unknown |
+| flow:ingest-scheduler-to-spark-transform-job:trigger-transform | process:ingest-scheduler | process:spark-transform-job | unknown | unknown | unknown |
+| flow:spark-transform-job-to-claims-warehouse:load-records | process:spark-transform-job | store:claims-warehouse | BigQuery API | unknown | unknown |
 | flow:data-analyst-to-claims-warehouse:run-queries | entity:data-analyst | store:claims-warehouse | BigQuery API | company SSO; dataset-wide grant with no column-level restriction | unknown |
 
 **Trust boundaries**
@@ -148,7 +148,7 @@ on either of them. That is the finding this sitting exists for.
 
 **3.** An attacker submits a transform run impersonating the scheduler, since authentication on the trigger path is unverified.
 
-- `flow:ingest-scheduler-to-transform-job:trigger-transform`
+- `flow:ingest-scheduler-to-spark-transform-job:trigger-transform`
 - severity: low/medium · verb: `impersonate`
 - Crosses landing into warehouse with unknown authentication.
 
@@ -159,7 +159,7 @@ on either of them. That is the finding this sitting exists for.
 
 **4.** An attacker who can write to the landing bucket alters claim records before the nightly run, and only the schema is checked before they reach the warehouse.
 
-- `store:landing-bucket`, `process:transform-job`
+- `store:landing-bucket`, `process:spark-transform-job`
 - severity: medium/high · verb: `alter`
 - Content validation is stated as absent; the case's headline integrity finding.
 
@@ -167,7 +167,7 @@ on either of them. That is the finding this sitting exists for.
 
 **5.** An attacker who can write to the Airflow metadata database rewrites a connection string to redirect the pipeline to infrastructure they control.
 
-- `store:airflow-metadata-db`, `flow:ingest-scheduler-to-airflow-metadata-db:read-connections`
+- `store:airflow-metadata-database`, `flow:ingest-scheduler-to-airflow-metadata-database:read-connections`
 - severity: low/high · verb: `alter`
 - The metadata database is a control plane, not just a data store — worth its own finding.
 
@@ -175,7 +175,7 @@ on either of them. That is the finding this sitting exists for.
 
 **6.** An attacker who compromises the transform job writes fabricated claim rows into the warehouse alongside genuine ones.
 
-- `store:claims-warehouse`, `flow:transform-job-to-claims-warehouse:load-records`
+- `store:claims-warehouse`, `flow:spark-transform-job-to-claims-warehouse:load-records`
 - severity: low/high · verb: `forge`
 - The load path has unverified authentication and no downstream reconciliation.
 
@@ -194,7 +194,7 @@ on either of them. That is the finding this sitting exists for.
 
 **8.** A dispute over a warehouse row cannot be traced back to the extract it came from, because no lineage from file to loaded record is described.
 
-- `store:claims-warehouse`, `process:transform-job`
+- `store:claims-warehouse`, `process:spark-transform-job`
 - severity: medium/medium · verb: `unattributable`
 - Batch pipelines lose attribution at the normalization step unless it is deliberately carried.
 
@@ -213,7 +213,7 @@ on either of them. That is the finding this sitting exists for.
 
 **10.** An attacker who reaches the Airflow metadata database recovers every partner key and connection string it holds, since its protection at rest is unverified.
 
-- `store:airflow-metadata-db`
+- `store:airflow-metadata-database`
 - severity: medium/high · verb: `recover-credential`
 - Single store concentrating credentials for the entire ingest path.
 
@@ -229,7 +229,7 @@ on either of them. That is the finding this sitting exists for.
 
 **12.** An attacker observing the load path reads claim records in transit, because transport encryption on it is unverified.
 
-- `flow:transform-job-to-claims-warehouse:load-records`
+- `flow:spark-transform-job-to-claims-warehouse:load-records`
 - severity: low/high · verb: `intercept`
 - Intra-zone, so lower likelihood than the crossing flows.
 
@@ -248,7 +248,7 @@ on either of them. That is the finding this sitting exists for.
 
 **14.** An attacker crafts input that makes the transform job fail repeatedly, leaving the warehouse stale without any request-level error surfacing.
 
-- `process:transform-job`, `store:claims-warehouse`
+- `process:spark-transform-job`, `store:claims-warehouse`
 - severity: medium/medium · verb: `disable`
 - Silent staleness rather than visible downtime — the failure mode analysts under-report on pipelines.
 
@@ -259,7 +259,7 @@ on either of them. That is the finding this sitting exists for.
 
 **15.** An attacker with a foothold in the landing network reads the metadata database and escalates to every credential the pipeline holds.
 
-- `store:airflow-metadata-db`, `process:ingest-scheduler`
+- `store:airflow-metadata-database`, `process:ingest-scheduler`
 - severity: medium/high · verb: `escalate`
 - Escalation framing of the credential concentration: one foothold to all downstream systems.
 
@@ -267,7 +267,7 @@ on either of them. That is the finding this sitting exists for.
 
 **16.** An attacker who can plant a file in the landing bucket gains execution in the warehouse network through the job it triggers.
 
-- `process:transform-job`, `flow:ingest-scheduler-to-transform-job:trigger-transform`
+- `process:spark-transform-job`, `flow:ingest-scheduler-to-spark-transform-job:trigger-transform`
 - severity: medium/high · verb: `escalate`
 - Data crossing into a compute zone that acts on it is the boundary crossing that matters here.
 
@@ -326,8 +326,8 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "df7757178c394258cbcf1643e81fca5b01f324058a0841824f008e74346da2d0",
-      "model.json": "466b9d3e1a737fa1ea723b7977841ad49860fb7397b27ab278e7b4936b81701c",
-      "claims/stride.json": "d0791056d4dddc1245a51bc0a23598dbddb827c399b444643f49916c10003433"
+      "model.json": "df987e0afdc0a810b093ad25abcdbdc38b517a9bf2f28f35ad88ab9f2112d390",
+      "claims/stride.json": "0d114c8ed9d6a003b1164eec306bcd90ac9e83c435c08196159e099722b80d69"
       }
     }
   }

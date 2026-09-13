@@ -44,7 +44,7 @@ fails a read file that changes under its recorded digest.
 
 So every agreement figure the suite produces is **self-consistency, not
 accuracy**: it measures how closely a rule reproduces the recorded
-dispositions. That includes the 90% bar. A rule at 94.5% agrees with those
+dispositions. That includes the 90% bar. A rule at 94.2% agrees with those
 dispositions 94.5% of the time; the calibration review records are the only
 evidence that those label opinions have been checked.
 
@@ -201,7 +201,7 @@ somewhere else.
 | `harness/calibration.py` | Rule-vs-label agreement over the labelled fixtures — the scoreboard any rule change must clear. |
 | `harness/verbs.py` | The closed vocabulary of attacker actions, and what counts as one action. |
 | `harness/exemplar_verbs.py` | Which actions a package's shipped exemplars demonstrate against which its reference sets grade, and the exemplar pairs that name one place and two actions. Reads text and blessed models only, so it costs no provider call. |
-| `harness/identity.py` | Claim identity from the fields a claim carries. `SubsetVerbIdentity` has 14 false splits of 200, 3 false merges of 111 and 3 false merges of 291, with no model call. |
+| `harness/identity.py` | Claim identity from the fields a claim carries. `SubsetVerbIdentity` has 15 false splits of 200, 3 false merges of 111 and 3 false merges of 291, with no model call. |
 | `harness/fingerprint.py` | A **Claim**'s identity as a versioned value code computes. No model call. |
 | `harness/ledger.py` | The append-only record of what a **person** decided about a finding. One file per voter, named by the GitHub login. |
 | `harness/content.py` | The two digests a vote records beside the fingerprint: the **structural** one over the verdict, the grounds and the ratings, and the **prose** one over the description and the mitigations. They are what make a vote a judgement of a claim rather than of an identity. No model call. |

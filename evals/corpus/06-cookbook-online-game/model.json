@@ -13,8 +13,8 @@
       "trust_zone": "boundary:player-local-machine"
     },
     {
-      "id": "entity:customer-support",
-      "name": "customer support",
+      "id": "entity:customer-support-staff",
+      "name": "customer support staff",
       "description": "Staff member who reviews and acts on player accounts.",
       "assets": [],
       "source_excerpt": "our customer support staff work from the corporate network and use a moderation website",
@@ -225,7 +225,7 @@
       "operations": "write"
     },
     {
-      "id": "flow:customer-support-to-moderation-website:moderate-accounts",
+      "id": "flow:customer-support-staff-to-moderation-website:moderate-accounts",
       "name": "moderate accounts",
       "description": "Support staff review and act on player accounts.",
       "assets": [
@@ -233,7 +233,7 @@
       ],
       "source_excerpt": "customer support staff work from the corporate network and use a moderation website",
       "source_label": "System description",
-      "source": "entity:customer-support",
+      "source": "entity:customer-support-staff",
       "destination": "process:moderation-website",
       "protocol": "unknown",
       "authentication": "unknown",

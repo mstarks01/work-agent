@@ -32,7 +32,7 @@
   {
     "category": "spoofing",
     "affected_element_ids": [
-      "flow:background-worker-to-database:read-write-records"
+      "flow:background-worker-process-to-database:read-write-records"
     ],
     "claim": "An attacker holding the worker's database credentials connects to the database as the worker.",
     "tier": "expected",
@@ -47,7 +47,7 @@
     "category": "tampering",
     "affected_element_ids": [
       "store:message-queue",
-      "process:background-worker"
+      "process:background-worker-process"
     ],
     "claim": "An attacker places a poisoned message on the queue and the worker processes it as legitimate work.",
     "tier": "must-find",
@@ -77,7 +77,7 @@
     "category": "tampering",
     "affected_element_ids": [
       "store:database",
-      "flow:background-worker-to-database:read-write-records"
+      "flow:background-worker-process-to-database:read-write-records"
     ],
     "claim": "An attacker with the worker's database access alters application records or the log records stored alongside them.",
     "tier": "expected",
@@ -92,7 +92,7 @@
     "category": "repudiation",
     "affected_element_ids": [
       "store:database",
-      "process:background-worker"
+      "process:background-worker-process"
     ],
     "claim": "An attacker who compromises the worker erases or edits the log records that would show what it did, because the logs live in the same database the worker writes.",
     "tier": "must-find",
@@ -164,7 +164,7 @@
     "category": "information-disclosure",
     "affected_element_ids": [
       "flow:web-application-to-message-queue:enqueue-job",
-      "flow:background-worker-to-message-queue:consume-job"
+      "flow:background-worker-process-to-message-queue:consume-job"
     ],
     "claim": "An attacker on the internal network reads job contents in transit, because transport encryption between the tiers is unverified.",
     "tier": "expected",
@@ -179,7 +179,7 @@
     "category": "denial-of-service",
     "affected_element_ids": [
       "store:message-queue",
-      "process:background-worker"
+      "process:background-worker-process"
     ],
     "claim": "An attacker floods the queue with jobs until the worker cannot keep up and queued work stops completing.",
     "tier": "must-find",
@@ -209,7 +209,7 @@
     "category": "denial-of-service",
     "affected_element_ids": [
       "store:database",
-      "process:background-worker"
+      "process:background-worker-process"
     ],
     "claim": "An attacker submits work that makes the worker exhaust database capacity, stalling both job processing and logging.",
     "tier": "expected",
@@ -238,7 +238,7 @@
   {
     "category": "elevation-of-privilege",
     "affected_element_ids": [
-      "process:background-worker",
+      "process:background-worker-process",
       "store:database"
     ],
     "claim": "An attacker who gets code execution in the worker inherits whatever database privilege its credentials carry, which is unverified and may be unrestricted.",

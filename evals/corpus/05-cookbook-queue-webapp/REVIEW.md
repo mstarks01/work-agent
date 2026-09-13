@@ -64,7 +64,7 @@ Not part of the question, but the records cite these names, so you need them.
 | id | exposure | interface | zone | technology |
 |---|---|---|---|---|
 | process:web-application | internet-facing | web | boundary:web-tier | unknown |
-| process:background-worker | internal | non-web | boundary:backend-tier | unknown |
+| process:background-worker-process | internal | non-web | boundary:backend-tier | unknown |
 
 **Data stores**
 
@@ -81,10 +81,10 @@ Not part of the question, but the records cite these names, so you need them.
 |---|---|---|---|---|---|
 | flow:browser-to-web-application:page-request | entity:browser | process:web-application | HTTP/S | unknown | encrypted (marked as the one encrypted link) |
 | flow:web-application-to-message-queue:enqueue-job | process:web-application | store:message-queue | unknown | unknown | unknown |
-| flow:background-worker-to-message-queue:consume-job | process:background-worker | store:message-queue | unknown | unknown | unknown |
-| flow:background-worker-to-database:read-write-records | process:background-worker | store:database | unknown | unknown | unknown |
+| flow:background-worker-process-to-message-queue:consume-job | process:background-worker-process | store:message-queue | unknown | unknown | unknown |
+| flow:background-worker-process-to-database:read-write-records | process:background-worker-process | store:database | unknown | unknown | unknown |
 | flow:web-application-to-web-application-config:read-configuration | process:web-application | store:web-application-config | unknown | unknown | unknown |
-| flow:background-worker-to-worker-config:read-configuration | process:background-worker | store:worker-config | unknown | unknown | unknown |
+| flow:background-worker-process-to-worker-config:read-configuration | process:background-worker-process | store:worker-config | unknown | unknown | unknown |
 
 **Trust boundaries**
 
@@ -148,7 +148,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A4.** `V15.2.2` — Nothing states what bounds the work a queued job can consume.
 
-- `process:background-worker`, `store:message-queue`, `flow:background-worker-to-message-queue:consume-job`
+- `process:background-worker-process`, `store:message-queue`, `flow:background-worker-process-to-message-queue:consume-job`
 - A queue with an internal worker raises the availability requirement; the input never reaches it.
 
 > mark:
@@ -219,7 +219,7 @@ on either of them. That is the finding this sitting exists for.
 
 **3.** An attacker holding the worker's database credentials connects to the database as the worker.
 
-- `flow:background-worker-to-database:read-write-records`
+- `flow:background-worker-process-to-database:read-write-records`
 - severity: medium/high · verb: `use-credential`
 - Credentials are stated to exist in the worker config; their protection is not.
 
@@ -230,7 +230,7 @@ on either of them. That is the finding this sitting exists for.
 
 **4.** An attacker places a poisoned message on the queue and the worker processes it as legitimate work.
 
-- `store:message-queue`, `process:background-worker`
+- `store:message-queue`, `process:background-worker-process`
 - severity: medium/high · verb: `plant`
 - The canonical queue-decoupling threat: the worker's input is only as trustworthy as write access to the queue.
 
@@ -246,7 +246,7 @@ on either of them. That is the finding this sitting exists for.
 
 **6.** An attacker with the worker's database access alters application records or the log records stored alongside them.
 
-- `store:database`, `flow:background-worker-to-database:read-write-records`
+- `store:database`, `flow:background-worker-process-to-database:read-write-records`
 - severity: medium/high · verb: `alter`
 - Records and their own audit log share one store — tampering with one covers the other.
 
@@ -257,7 +257,7 @@ on either of them. That is the finding this sitting exists for.
 
 **7.** An attacker who compromises the worker erases or edits the log records that would show what it did, because the logs live in the same database the worker writes.
 
-- `store:database`, `process:background-worker`
+- `store:database`, `process:background-worker-process`
 - severity: medium/high · verb: `delete`
 - The strongest finding available from the diagram: no separation between the audit record and the audited actor.
 
@@ -300,7 +300,7 @@ on either of them. That is the finding this sitting exists for.
 
 **12.** An attacker on the internal network reads job contents in transit, because transport encryption between the tiers is unverified.
 
-- `flow:web-application-to-message-queue:enqueue-job`, `flow:background-worker-to-message-queue:consume-job`
+- `flow:web-application-to-message-queue:enqueue-job`, `flow:background-worker-process-to-message-queue:consume-job`
 - severity: medium/medium · verb: `intercept`
 - Only the browser link is marked encrypted; the rest is explicitly silent.
 
@@ -311,7 +311,7 @@ on either of them. That is the finding this sitting exists for.
 
 **13.** An attacker floods the queue with jobs until the worker cannot keep up and queued work stops completing.
 
-- `store:message-queue`, `process:background-worker`
+- `store:message-queue`, `process:background-worker-process`
 - severity: medium/medium · verb: `flood`
 - A single worker behind an unbounded queue; the backlog is invisible to the user who submitted the work.
 
@@ -327,7 +327,7 @@ on either of them. That is the finding this sitting exists for.
 
 **15.** An attacker submits work that makes the worker exhaust database capacity, stalling both job processing and logging.
 
-- `store:database`, `process:background-worker`
+- `store:database`, `process:background-worker-process`
 - severity: low/medium · verb: `flood`
 - Shared store means one saturation affects the audit trail too.
 
@@ -346,7 +346,7 @@ on either of them. That is the finding this sitting exists for.
 
 **17.** An attacker who gets code execution in the worker inherits whatever database privilege its credentials carry, which is unverified and may be unrestricted.
 
-- `process:background-worker`, `store:database`
+- `process:background-worker-process`, `store:database`
 - severity: medium/high · verb: `abuse-grant`
 - Job content is attacker-influenceable via the queue, so worker execution is a realistic starting point.
 
@@ -397,9 +397,9 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "20b0aa82c922766db2353cade33f7a26b38c60a3c7061244ef4686b7a647778b",
-      "model.json": "4477832a6582412933f13ee4f65d981c66893953d7fb352d87bea51dcccefd5b",
-      "claims/asvs.json": "8a73f7df8642a1ab3ac7b9421efd5e7737520b21e00c3fa3dc5247b22ebe9839",
-      "claims/stride.json": "18ff482a563387a6a4815393dfc0a44ec56f1e2df224d0ae6bce940ba48f29ef"
+      "model.json": "2c1e465c69510db346e8d5709774450a74953df8c4e5de53037b4b4f43da1617",
+      "claims/asvs.json": "075017cff273aa1532584ba72d91af485363346aac8a5e22e7009cf2885db83b",
+      "claims/stride.json": "f2b2d70db625dcf2eb6f7f91b3532dc706137263d5ffb1ac707bef5dcddab39e"
       }
     }
   }

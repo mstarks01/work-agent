@@ -32,7 +32,7 @@
   {
     "category": "spoofing",
     "affected_element_ids": [
-      "flow:customer-support-to-moderation-website:moderate-accounts",
+      "flow:customer-support-staff-to-moderation-website:moderate-accounts",
       "process:moderation-website"
     ],
     "claim": "An attacker reaches the moderation website posing as a support agent, since its authentication is unverified.",
@@ -242,7 +242,7 @@
     "category": "elevation-of-privilege",
     "affected_element_ids": [
       "process:moderation-website",
-      "entity:customer-support"
+      "entity:customer-support-staff"
     ],
     "claim": "An attacker who gets any access to the moderation website acquires privilege over every player account it can reach.",
     "tier": "must-find",
