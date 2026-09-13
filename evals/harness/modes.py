@@ -735,8 +735,13 @@ def score_extraction(case: GoldenCase, result: ExtractionResult) -> ExtractionSc
     )
 
 
-def _singular(word: str) -> str:
+def singular(word: str) -> str:
     """One word with a plural ``s`` dropped, so ``servers`` and ``server`` are one.
+
+    Public because it has a second reader: ``evals/critic_review/replay.py``
+    matches a rejection reason against the anchors a reader named, and a critic
+    writing "queues" where the anchor says "queue" engaged with the fact
+    either way.
 
     Deliberately crude: three letters of stem before the ``s``, and no other
     ending. It serves a check that must not accuse, so under-stemming leaves a
@@ -786,7 +791,7 @@ def _unsourced(
     if extracted is None:
         return ()
     text = re.sub(r"[^a-z0-9 ]", " ", " ".join(s.text for s in case.sources).lower())
-    words = {_singular(word) for word in text.split()}
+    words = {singular(word) for word in text.split()}
     by_id = {element.id: element for element in extracted.elements()}
     out = []
     for element_id in extra:
@@ -798,7 +803,7 @@ def _unsourced(
         tokens = [
             w for w in re.split(r"[^a-z0-9]+", element.name.lower()) if len(w) > 2
         ]
-        if tokens and not {_singular(token) for token in tokens} <= words:
+        if tokens and not {singular(token) for token in tokens} <= words:
             out.append(element_id)
     return tuple(out)
 
