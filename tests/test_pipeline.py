@@ -19,6 +19,7 @@ from google.adk.models import LlmResponse
 
 from analysis_service import graph
 from analysis_service.api import create_app
+from analysis_service.claims import ProposedVerdict, UnknownRef
 from analysis_service.frameworks import PACKAGES, FrameworkName
 from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
 from analysis_service.identity import IDENTITY_VERSION, build_identity
@@ -150,10 +151,14 @@ def test_a_clean_run_produces_a_report():
     assert graph.REJECT_NODE not in visited
 
 
-def test_a_critic_with_nothing_to_rule_on_is_not_called():
-    """#675 D22: code rules a draft resting on an unknown (#439), and when that
-    leaves nothing, the critic is a paid call reading an empty view. ``merge``
-    routes straight to the router, which reconciles the code rulings alone."""
+def test_a_draft_resting_on_an_unknown_still_reaches_the_critic():
+    """The whole job, end to end, over a draft whose only ground is an unknown.
+
+    Its grounds make the claim conditional and the service supplies the pairs
+    that say so. Whether the argument follows from what it cites is a separate
+    question, it is the one a reader of the report cares about, and a rule
+    cannot answer it — so the draft goes to the critic like any other.
+    """
     replies = {
         "extract": valid_model().model_dump_json(),
         graph.analyze_node_name("stride", "spoofing"): proposal_json(
@@ -163,6 +168,15 @@ def test_a_critic_with_nothing_to_rule_on_is_not_called():
             quotes=[],
             evidence_refs=["unknown:store:orders-db:encryption_at_rest"],
         ),
+        CRITIC: claims_json(
+            sample_ruling(
+                "S-01",
+                verdict=ProposedVerdict(
+                    status="needs-info",
+                    reason="the argument holds if the store is clear",
+                ),
+            )
+        ),
     }
     pipeline, models = build(replies)
     outcome, visited = run(pipeline, job())
@@ -170,9 +184,12 @@ def test_a_critic_with_nothing_to_rule_on_is_not_called():
     assert isinstance(outcome, PipelineCompleted)
     (claim,) = block(outcome.report).claims
     assert claim.verdict.status == "needs-info"
-    assert CRITIC not in visited
-    assert models[CRITIC].seen == []
-    assert CRITIC not in {node.node for node in outcome.report.nodes}
+    assert CRITIC in visited
+    assert models[CRITIC].seen, "the critic read the draft"
+    # The references are still the service's, never the critic's (#409).
+    assert claim.verdict.related_unknowns == [
+        UnknownRef(element_id="store:orders-db", attribute="encryption_at_rest")
+    ]
 
 
 def test_lanes_that_draft_nothing_call_no_critic():

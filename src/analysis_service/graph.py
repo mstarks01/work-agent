@@ -145,7 +145,6 @@ from analysis_service.critic import (
     critic_view,
     merge_retry,
     review,
-    unsettled_drafts,
 )
 from analysis_service.domains import select_domain_packs
 from analysis_service.evidence import (
@@ -494,13 +493,17 @@ same target: ``assemble``. See
 argument."""
 ROUTE_REVIEW = "review"
 ROUTE_SETTLED = "settled"
-"""The fan-in's two routes. ``merge`` takes ``review`` when at least one draft
-is left for the critic to rule on, and ``settled`` when code ruled every draft
-its grounds settle (#439) or the lanes drafted nothing — then the critic is
-not called at all, and ``router`` reads an empty ruling set that
-:func:`~analysis_service.critic.complete_rulings` fills from the drafts alone.
-A critic shown nothing to rule on is a paid call that returns nothing, and
-the empty view it would have read is not evidence of anything."""
+"""The fan-in's two routes. ``merge`` takes ``review`` when there is a draft to
+rule on, and ``settled`` only when the lanes drafted nothing at all. A critic
+shown an empty view is a paid call that returns nothing, and the view it would
+have read is not evidence of anything.
+
+**A draft citing an unknown ground takes ``review`` like any other.** Its own
+grounds still say it is conditional, and
+:meth:`~analysis_service.claims.Claim.settled_by_grounds` still supplies the
+references that say so — but that is a fact about the certainty of the claim,
+not about whether its argument follows from what it cites, and a route around
+the critic answered the second question with the first."""
 ROUTE_ACCEPT = "accept"
 ROUTE_REVISE = "revise"
 """The critic re-ask route. ``route_review`` takes it when the critic's output
@@ -1547,9 +1550,9 @@ def merge_drafts(
     the agents emitted them and returns the drafts, the marks, the deferred
     units and the coverage as one value. This node reads the batches out of
     state, calls it once, parks each part of what it returns under this
-    framework's own key, and routes: ``review`` when any draft is unsettled,
-    ``settled`` when code ruled every one or there is none, so a critic is
-    never called to read an empty view (:data:`ROUTE_REVIEW`).
+    framework's own key, and routes: ``review`` when there is a draft,
+    ``settled`` when there is none, so a critic is never called to read an
+    empty view (:data:`ROUTE_REVIEW`).
 
     ``source_texts`` defaults to ``None`` so the in-process engine, which drives
     a hand-authored model with no job behind it, is not failed on a citation
@@ -1615,7 +1618,7 @@ def merge_drafts(
         ),
     )
     return _routed(
-        ROUTE_REVIEW if unsettled_drafts(merged.drafts) else ROUTE_SETTLED,
+        ROUTE_REVIEW if merged.drafts else ROUTE_SETTLED,
         {
             "framework": nodes.name,
             "draft_count": len(merged.drafts),

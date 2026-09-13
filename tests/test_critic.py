@@ -550,18 +550,31 @@ class TestAnUnknownGroundSettlesTheVerdict:
         assert "cannot be confirmed" in "; ".join(problems.messages)
         assert problems.implicated == frozenset({"S-01"})
 
-    def test_a_draft_the_critic_never_saw_is_ruled_from_the_grounds(self, model):
-        from analysis_service.critic import unsettled_drafts
+    def test_a_draft_the_critic_never_ruled_is_a_problem_and_not_a_verdict(self, model):
+        """An unruled draft routes to the re-ask; nothing fills it in.
 
-        other = sample_draft("S-02")
-        assert unsettled_drafts([self._draft(), other]) == [other]
-        assert not review_issues([self._draft()], [], model)
-        assembled = assemble_claims([self._draft()], [], model, SCHEMAS)
-        (claim,) = assembled.claims
-        assert (claim.verdict.status, claim.confidence) == ("needs-info", "low")
-        assert claim.verdict.related_unknowns == [
-            UnknownRef(element_id="store:orders-db", attribute="encryption_at_rest")
-        ]
+        Completing it from its own grounds would hand back an automatic
+        ``needs-info`` for a claim nobody reviewed, silently, on the path where
+        the critic failed. The re-ask exists for exactly this.
+        """
+        problems = review_issues([self._draft()], [], model)
+
+        assert problems
+        assert "S-01" in "; ".join(problems.messages)
+        assert problems.implicated == frozenset({"S-01"})
+
+    def test_the_critic_is_shown_the_draft_its_grounds_make_conditional(self, model):
+        """The change: an unknown ground no longer routes a draft past review.
+
+        Its grounds still say the claim is conditional. Whether the argument
+        follows from what it cites is a different question, and a rule cannot
+        answer it.
+        """
+        conditional, plain = self._draft(), sample_draft("S-02")
+
+        shown = critic.critic_view([conditional, plain], model)
+
+        assert [view["id"] for view in shown] == ["S-01", "S-02"]
 
     def test_a_bare_needs_info_is_completed_from_the_grounds(self, model):
         ruling = sample_ruling(
@@ -807,18 +820,33 @@ def test_ruling_view_keeps_every_field_the_critic_rules_on():
     assert view["grounds"][1]["flow_id"] == "flow:customer-to-web-app:login"
 
 
-def test_ruling_view_drops_what_no_verdict_is_reached_from():
-    """Mitigations and a Ground's empty branches, gone from the prompt only."""
+def test_ruling_view_drops_a_grounds_empty_branches_and_nothing_else():
+    """The empty branches go; every field a verdict is reached from stays."""
+    draft = sample_draft("S-01", "spoofing")
+
+    (view,) = critic._ruling_view([draft])
+
+    # A quote carries text and source_label; the other four fields are the
+    # empty string its own validator requires them to be.
+    assert set(view["grounds"][0]) == {"kind", "text", "source_label"}
+    assert set(view["grounds"][1]) == {"kind", "flow_id"}
+
+
+def test_the_critic_is_shown_the_recommendations_it_now_rules_on():
+    """``mitigations`` reaches the view, because step 4 rules on it.
+
+    A mitigation is copied into the report from this same draft and no other
+    seam looks at it, so a recommendation that is well formed and irrelevant
+    to its claim reached an operator unread. It is the largest block in this
+    prompt, and that is the cost of the only review it gets.
+    """
     draft = sample_draft("S-01", "spoofing")
     assert draft.mitigations, "the fixture must carry one for this to prove anything"
 
     (view,) = critic._ruling_view([draft])
 
-    assert "mitigations" not in view
-    # A quote carries text and source_label; the other four fields are the
-    # empty string its own validator requires them to be.
-    assert set(view["grounds"][0]) == {"kind", "text", "source_label"}
-    assert set(view["grounds"][1]) == {"kind", "flow_id"}
+    assert view["mitigations"]
+    assert view["mitigations"][0]["summary"] == draft.mitigations[0].summary
 
 
 def test_ruling_view_names_the_drafts_that_share_an_action():
