@@ -448,9 +448,17 @@ many of the cases it could read. The `over` column and
 `over_applied_for_promotion` are unchanged either way: the list is a reading for
 the next sitting, and only the rate over it is a score.
 
-- **must-find recall** — did the tool find the threats a case marks as
-  essential? Reported **per case**, never averaged: an average hides one case
-  failing completely, which is the failure that matters most.
+- **must-find coverage** — did the run reach the threats a case marks as
+  essential, under an equivalent action and at the same place? Reported **per
+  case**, never averaged: an average hides one case failing completely, which
+  is the failure that matters most.
+
+  **Coverage, not recall.** The matcher compares lane, action and
+  endpoint-resolved targets and reads no prose, so it says the run wrote a
+  finding in the right place about the right thing. Whether the finding argues
+  it correctly is a separate question the critic and the vote ledger answer.
+  Rewrite every finding to say "no security problem exists" and this number
+  does not move ([#890](https://github.com/mstarks01/work-agent/issues/890)).
 
   Where a sweep-wide mean *is* taken — the comparison table — it is a mean over
   the cases that finished. A case whose graph refused its model produces no
@@ -613,8 +621,8 @@ The shipped prompts teach by example, and every lane's `exemplars.md` works its
 threats against one of **two** systems: a payments system, and an event-driven
 sensor fleet the exemplars call system B. A tool shown an architecture may find
 that architecture's threats more easily. You cannot read that bias off an
-absolute score — only off the **gap** between recall on the near cases and
-recall on the far ones.
+absolute score — only off the **gap** between coverage on the near cases and
+coverage on the far ones.
 
 So the corpus carries one control per exemplar system: `01` for payments and
 `02` for the fleet. Neither is optional. Drop either and the near side loses a

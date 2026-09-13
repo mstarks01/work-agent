@@ -1,5 +1,5 @@
 {
-  "artifact_version": 6,
+  "artifact_version": 7,
   "mode": "analysis",
   "cases": [
     "01-payments-checkout",
@@ -4650,11 +4650,11 @@
               "stale": 0
             },
             "metrics": {
-              "must_find_recall": 0.727,
-              "expected_recall": 0.364,
-              "recall": 0.545,
+              "must_find_coverage": 0.727,
+              "expected_coverage": 0.364,
+              "reference_coverage": 0.545,
               "lane_accuracy": 1.0,
-              "element_accuracy": 1.0,
+              "element_agreement": 1.0,
               "element_jaccard": 0.583,
               "rejected_rate": 0.0,
               "rejected_rate_of_reviewed": 0.0,
@@ -5947,11 +5947,11 @@
               "stale": 0
             },
             "metrics": {
-              "must_find_recall": 0.6,
-              "expected_recall": 0.125,
-              "recall": 0.389,
+              "must_find_coverage": 0.6,
+              "expected_coverage": 0.125,
+              "reference_coverage": 0.389,
               "lane_accuracy": 1.0,
-              "element_accuracy": 1.0,
+              "element_agreement": 1.0,
               "element_jaccard": 0.619,
               "rejected_rate": 0.0,
               "rejected_rate_of_reviewed": 0.0,
@@ -7751,11 +7751,11 @@
               "stale": 0
             },
             "metrics": {
-              "must_find_recall": 0.444,
-              "expected_recall": 0.625,
-              "recall": 0.529,
+              "must_find_coverage": 0.444,
+              "expected_coverage": 0.625,
+              "reference_coverage": 0.529,
               "lane_accuracy": 1.0,
-              "element_accuracy": 1.0,
+              "element_agreement": 1.0,
               "element_jaccard": 0.63,
               "rejected_rate": 0.0,
               "rejected_rate_of_reviewed": 0.0,
@@ -9010,11 +9010,11 @@
               "stale": 0
             },
             "metrics": {
-              "must_find_recall": 0.9,
-              "expected_recall": 0.125,
-              "recall": 0.556,
+              "must_find_coverage": 0.9,
+              "expected_coverage": 0.125,
+              "reference_coverage": 0.556,
               "lane_accuracy": 1.0,
-              "element_accuracy": 1.0,
+              "element_agreement": 1.0,
               "element_jaccard": 0.65,
               "rejected_rate": 0.0,
               "rejected_rate_of_reviewed": 0.0,
@@ -10036,11 +10036,11 @@
               "stale": 0
             },
             "metrics": {
-              "must_find_recall": 0.6,
-              "expected_recall": 0.714,
-              "recall": 0.647,
+              "must_find_coverage": 0.6,
+              "expected_coverage": 0.714,
+              "reference_coverage": 0.647,
               "lane_accuracy": 1.0,
-              "element_accuracy": 1.0,
+              "element_agreement": 1.0,
               "element_jaccard": 0.564,
               "rejected_rate": 0.0,
               "rejected_rate_of_reviewed": 0.0,
@@ -10864,11 +10864,11 @@
               "stale": 0
             },
             "metrics": {
-              "must_find_recall": 0.636,
-              "expected_recall": 0.143,
-              "recall": 0.444,
+              "must_find_coverage": 0.636,
+              "expected_coverage": 0.143,
+              "reference_coverage": 0.444,
               "lane_accuracy": 1.0,
-              "element_accuracy": 1.0,
+              "element_agreement": 1.0,
               "element_jaccard": 0.719,
               "rejected_rate": 0.0,
               "rejected_rate_of_reviewed": 0.0,
@@ -11861,11 +11861,11 @@
               "stale": 0
             },
             "metrics": {
-              "must_find_recall": 0.455,
-              "expected_recall": 0.462,
-              "recall": 0.458,
+              "must_find_coverage": 0.455,
+              "expected_coverage": 0.462,
+              "reference_coverage": 0.458,
               "lane_accuracy": 1.0,
-              "element_accuracy": 1.0,
+              "element_agreement": 1.0,
               "element_jaccard": 0.606,
               "rejected_rate": 0.0,
               "rejected_rate_of_reviewed": 0.0,
@@ -13207,11 +13207,11 @@
               "stale": 0
             },
             "metrics": {
-              "must_find_recall": 0.5,
-              "expected_recall": 0.538,
-              "recall": 0.522,
+              "must_find_coverage": 0.5,
+              "expected_coverage": 0.538,
+              "reference_coverage": 0.522,
               "lane_accuracy": 0.923,
-              "element_accuracy": 1.0,
+              "element_agreement": 1.0,
               "element_jaccard": 0.5,
               "rejected_rate": 0.0,
               "rejected_rate_of_reviewed": 0.0,
@@ -14728,11 +14728,11 @@
               "stale": 0
             },
             "metrics": {
-              "must_find_recall": 0.9,
-              "expected_recall": 0.3,
-              "recall": 0.6,
+              "must_find_coverage": 0.9,
+              "expected_coverage": 0.3,
+              "reference_coverage": 0.6,
               "lane_accuracy": 1.0,
-              "element_accuracy": 1.0,
+              "element_agreement": 1.0,
               "element_jaccard": 0.625,
               "rejected_rate": 0.0,
               "rejected_rate_of_reviewed": 0.0,
@@ -15626,11 +15626,11 @@
               "stale": 0
             },
             "metrics": {
-              "must_find_recall": 0.556,
-              "expected_recall": 0.5,
-              "recall": 0.529,
+              "must_find_coverage": 0.556,
+              "expected_coverage": 0.5,
+              "reference_coverage": 0.529,
               "lane_accuracy": 1.0,
-              "element_accuracy": 1.0,
+              "element_agreement": 1.0,
               "element_jaccard": 0.454,
               "rejected_rate": 0.0,
               "rejected_rate_of_reviewed": 0.0,
@@ -16695,11 +16695,11 @@
               "stale": 0
             },
             "metrics": {
-              "must_find_recall": 0.667,
-              "expected_recall": 0.714,
-              "recall": 0.688,
+              "must_find_coverage": 0.667,
+              "expected_coverage": 0.714,
+              "reference_coverage": 0.688,
               "lane_accuracy": 1.0,
-              "element_accuracy": 1.0,
+              "element_agreement": 1.0,
               "element_jaccard": 0.553,
               "rejected_rate": 0.0,
               "rejected_rate_of_reviewed": 0.0,
@@ -17843,11 +17843,11 @@
               "stale": 0
             },
             "metrics": {
-              "must_find_recall": 0.556,
-              "expected_recall": 0.333,
-              "recall": 0.467,
+              "must_find_coverage": 0.556,
+              "expected_coverage": 0.333,
+              "reference_coverage": 0.467,
               "lane_accuracy": 1.0,
-              "element_accuracy": 1.0,
+              "element_agreement": 1.0,
               "element_jaccard": 0.548,
               "rejected_rate": 0.0,
               "rejected_rate_of_reviewed": 0.0,
@@ -19258,11 +19258,11 @@
               "stale": 0
             },
             "metrics": {
-              "must_find_recall": 0.7,
-              "expected_recall": 0.222,
-              "recall": 0.474,
+              "must_find_coverage": 0.7,
+              "expected_coverage": 0.222,
+              "reference_coverage": 0.474,
               "lane_accuracy": 1.0,
-              "element_accuracy": 1.0,
+              "element_agreement": 1.0,
               "element_jaccard": 0.739,
               "rejected_rate": 0.0,
               "rejected_rate_of_reviewed": 0.0,
@@ -20508,8 +20508,8 @@
           }
         ],
         "exemplar_delta": {
-          "near_recall": 0.467,
-          "far_recall": 0.538,
+          "near_coverage": 0.467,
+          "far_coverage": 0.538,
           "delta": -0.07
         },
         "unlisted_for_promotion": [],
@@ -26690,11 +26690,11 @@
         "stale": 0
       },
       "metrics": {
-        "must_find_recall": 0.727,
-        "expected_recall": 0.364,
-        "recall": 0.545,
+        "must_find_coverage": 0.727,
+        "expected_coverage": 0.364,
+        "reference_coverage": 0.545,
         "lane_accuracy": 1.0,
-        "element_accuracy": 1.0,
+        "element_agreement": 1.0,
         "element_jaccard": 0.583,
         "rejected_rate": 0.0,
         "rejected_rate_of_reviewed": 0.0,
@@ -27987,11 +27987,11 @@
         "stale": 0
       },
       "metrics": {
-        "must_find_recall": 0.6,
-        "expected_recall": 0.125,
-        "recall": 0.389,
+        "must_find_coverage": 0.6,
+        "expected_coverage": 0.125,
+        "reference_coverage": 0.389,
         "lane_accuracy": 1.0,
-        "element_accuracy": 1.0,
+        "element_agreement": 1.0,
         "element_jaccard": 0.619,
         "rejected_rate": 0.0,
         "rejected_rate_of_reviewed": 0.0,
@@ -29791,11 +29791,11 @@
         "stale": 0
       },
       "metrics": {
-        "must_find_recall": 0.444,
-        "expected_recall": 0.625,
-        "recall": 0.529,
+        "must_find_coverage": 0.444,
+        "expected_coverage": 0.625,
+        "reference_coverage": 0.529,
         "lane_accuracy": 1.0,
-        "element_accuracy": 1.0,
+        "element_agreement": 1.0,
         "element_jaccard": 0.63,
         "rejected_rate": 0.0,
         "rejected_rate_of_reviewed": 0.0,
@@ -31050,11 +31050,11 @@
         "stale": 0
       },
       "metrics": {
-        "must_find_recall": 0.9,
-        "expected_recall": 0.125,
-        "recall": 0.556,
+        "must_find_coverage": 0.9,
+        "expected_coverage": 0.125,
+        "reference_coverage": 0.556,
         "lane_accuracy": 1.0,
-        "element_accuracy": 1.0,
+        "element_agreement": 1.0,
         "element_jaccard": 0.65,
         "rejected_rate": 0.0,
         "rejected_rate_of_reviewed": 0.0,
@@ -32076,11 +32076,11 @@
         "stale": 0
       },
       "metrics": {
-        "must_find_recall": 0.6,
-        "expected_recall": 0.714,
-        "recall": 0.647,
+        "must_find_coverage": 0.6,
+        "expected_coverage": 0.714,
+        "reference_coverage": 0.647,
         "lane_accuracy": 1.0,
-        "element_accuracy": 1.0,
+        "element_agreement": 1.0,
         "element_jaccard": 0.564,
         "rejected_rate": 0.0,
         "rejected_rate_of_reviewed": 0.0,
@@ -32904,11 +32904,11 @@
         "stale": 0
       },
       "metrics": {
-        "must_find_recall": 0.636,
-        "expected_recall": 0.143,
-        "recall": 0.444,
+        "must_find_coverage": 0.636,
+        "expected_coverage": 0.143,
+        "reference_coverage": 0.444,
         "lane_accuracy": 1.0,
-        "element_accuracy": 1.0,
+        "element_agreement": 1.0,
         "element_jaccard": 0.719,
         "rejected_rate": 0.0,
         "rejected_rate_of_reviewed": 0.0,
@@ -33901,11 +33901,11 @@
         "stale": 0
       },
       "metrics": {
-        "must_find_recall": 0.455,
-        "expected_recall": 0.462,
-        "recall": 0.458,
+        "must_find_coverage": 0.455,
+        "expected_coverage": 0.462,
+        "reference_coverage": 0.458,
         "lane_accuracy": 1.0,
-        "element_accuracy": 1.0,
+        "element_agreement": 1.0,
         "element_jaccard": 0.606,
         "rejected_rate": 0.0,
         "rejected_rate_of_reviewed": 0.0,
@@ -35247,11 +35247,11 @@
         "stale": 0
       },
       "metrics": {
-        "must_find_recall": 0.5,
-        "expected_recall": 0.538,
-        "recall": 0.522,
+        "must_find_coverage": 0.5,
+        "expected_coverage": 0.538,
+        "reference_coverage": 0.522,
         "lane_accuracy": 0.923,
-        "element_accuracy": 1.0,
+        "element_agreement": 1.0,
         "element_jaccard": 0.5,
         "rejected_rate": 0.0,
         "rejected_rate_of_reviewed": 0.0,
@@ -36768,11 +36768,11 @@
         "stale": 0
       },
       "metrics": {
-        "must_find_recall": 0.9,
-        "expected_recall": 0.3,
-        "recall": 0.6,
+        "must_find_coverage": 0.9,
+        "expected_coverage": 0.3,
+        "reference_coverage": 0.6,
         "lane_accuracy": 1.0,
-        "element_accuracy": 1.0,
+        "element_agreement": 1.0,
         "element_jaccard": 0.625,
         "rejected_rate": 0.0,
         "rejected_rate_of_reviewed": 0.0,
@@ -37666,11 +37666,11 @@
         "stale": 0
       },
       "metrics": {
-        "must_find_recall": 0.556,
-        "expected_recall": 0.5,
-        "recall": 0.529,
+        "must_find_coverage": 0.556,
+        "expected_coverage": 0.5,
+        "reference_coverage": 0.529,
         "lane_accuracy": 1.0,
-        "element_accuracy": 1.0,
+        "element_agreement": 1.0,
         "element_jaccard": 0.454,
         "rejected_rate": 0.0,
         "rejected_rate_of_reviewed": 0.0,
@@ -38735,11 +38735,11 @@
         "stale": 0
       },
       "metrics": {
-        "must_find_recall": 0.667,
-        "expected_recall": 0.714,
-        "recall": 0.688,
+        "must_find_coverage": 0.667,
+        "expected_coverage": 0.714,
+        "reference_coverage": 0.688,
         "lane_accuracy": 1.0,
-        "element_accuracy": 1.0,
+        "element_agreement": 1.0,
         "element_jaccard": 0.553,
         "rejected_rate": 0.0,
         "rejected_rate_of_reviewed": 0.0,
@@ -39883,11 +39883,11 @@
         "stale": 0
       },
       "metrics": {
-        "must_find_recall": 0.556,
-        "expected_recall": 0.333,
-        "recall": 0.467,
+        "must_find_coverage": 0.556,
+        "expected_coverage": 0.333,
+        "reference_coverage": 0.467,
         "lane_accuracy": 1.0,
-        "element_accuracy": 1.0,
+        "element_agreement": 1.0,
         "element_jaccard": 0.548,
         "rejected_rate": 0.0,
         "rejected_rate_of_reviewed": 0.0,
@@ -41298,11 +41298,11 @@
         "stale": 0
       },
       "metrics": {
-        "must_find_recall": 0.7,
-        "expected_recall": 0.222,
-        "recall": 0.474,
+        "must_find_coverage": 0.7,
+        "expected_coverage": 0.222,
+        "reference_coverage": 0.474,
         "lane_accuracy": 1.0,
-        "element_accuracy": 1.0,
+        "element_agreement": 1.0,
         "element_jaccard": 0.739,
         "rejected_rate": 0.0,
         "rejected_rate_of_reviewed": 0.0,
@@ -42548,8 +42548,8 @@
     }
   ],
   "exemplar_delta": {
-    "near_recall": 0.467,
-    "far_recall": 0.538,
+    "near_coverage": 0.467,
+    "far_coverage": 0.538,
     "delta": -0.07
   },
   "unlisted_for_promotion": [],

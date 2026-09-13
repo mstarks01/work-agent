@@ -473,8 +473,8 @@ def test_element_disagreement_is_scored_not_filtered(case, no_votes):
 
     assert len(score.matched) == 1
     assert score.matched[0].element_overlap is False
-    assert score.element_accuracy == 0.0
-    assert score.recall > 0.0
+    assert score.element_agreement == 0.0
+    assert score.reference_coverage > 0.0
 
 
 def test_misfiled_threat_is_a_lane_error_and_not_a_recall_hit(case, no_votes):
@@ -549,8 +549,10 @@ def test_recall_and_artifact_over_the_whole_labelled_set(
     # label — two candidates against one reference still consume one.
     covered = {pair.reference_claim for pair in matches}
     assert len(score.matched) == len(covered)
-    assert score.recall == pytest.approx(len(covered) / len(case.claims_for("stride")))
-    assert score.must_find_recall > 0.0
+    assert score.reference_coverage == pytest.approx(
+        len(covered) / len(case.claims_for("stride"))
+    )
+    assert score.must_find_coverage > 0.0
     artifact = score.to_json()
     assert artifact["counts"]["produced"] == len(produced)
     assert len(artifact["rulings"]) == len(matcher.claim_calls)
@@ -565,15 +567,17 @@ def test_exemplar_delta_is_reported_near_minus_far(case):
 
     delta = exemplar_delta([near, far])
 
-    assert delta["delta"] == pytest.approx(delta["near_recall"] - delta["far_recall"])
+    assert delta["delta"] == pytest.approx(
+        delta["near_coverage"] - delta["far_coverage"]
+    )
 
 
 def test_empty_production_scores_zero_without_crashing(case):
     score = score_case(case, [], ScriptedMatcher(), no_votes)
 
-    assert score.recall == 0.0
-    assert score.must_find_recall == 0.0
-    assert score.element_accuracy == 0.0
+    assert score.reference_coverage == 0.0
+    assert score.must_find_coverage == 0.0
+    assert score.element_agreement == 0.0
     assert score.lane_accuracy == 0.0
     assert len(score.missed) == len(case.claims_for("stride"))
 

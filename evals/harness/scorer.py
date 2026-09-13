@@ -244,17 +244,33 @@ class CaseScore:
         return sum(1 for pair in self.matched if pair.tier == "must-find")
 
     @property
-    def must_find_recall(self) -> float:
+    def must_find_coverage(self) -> float:
         return ratio(self.must_find_matched, self.must_find_total)
 
     @property
-    def expected_recall(self) -> float:
+    def expected_coverage(self) -> float:
         expected_total = self.reference_count - self.must_find_total
         matched = sum(1 for pair in self.matched if pair.tier == "expected")
         return ratio(matched, expected_total)
 
     @property
-    def recall(self) -> float:
+    def reference_coverage(self) -> float:
+        """The share of this case's references some produced claim matches.
+
+        **Coverage, not recall, and the distinction is the whole name.** A
+        reference is covered when a claim shares its lane, an equivalent action
+        and an endpoint-resolved target set one of which contains the other.
+        None of that reads what the claim *says*. Replace every finding's title
+        and description with "no security problem exists", change nothing else,
+        and all three archived Baselines score exactly what they scored before.
+
+        So this tracks whether the run reached the right place under the right
+        action. Whether the argument it made there is correct is a separate
+        question, answered by a person through the vote ledger and by the
+        critic on the way into the report. Reading this number as "the share of
+        real threats found" over-claims in the direction nothing here can
+        check. See https://github.com/mstarks01/work-agent/issues/890.
+        """
         return ratio(len(self.matched), self.reference_count)
 
     # --- Tier 3: tracked, never absolute ---------------------------------
@@ -267,9 +283,14 @@ class CaseScore:
         return ratio(len(self.matched), len(self.matched) + len(self.lane_errors))
 
     @property
-    def element_accuracy(self) -> float:
+    def element_agreement(self) -> float:
         """Of matched pairs, the fraction citing at least one shared element.
-        Traceability is the property the whole report schema exists for."""
+
+        Traceability is the property the whole report schema exists for.
+        Agreement rather than accuracy, because the denominator is the pairs
+        the matcher already matched: a reference the run never reached
+        contributes nothing, so a thin run and a well-cited one read alike.
+        """
         return ratio(
             sum(1 for pair in self.matched if pair.element_overlap), len(self.matched)
         )
@@ -372,11 +393,11 @@ class CaseScore:
                 **self.standing_counts,
             },
             "metrics": {
-                "must_find_recall": round(self.must_find_recall, 3),
-                "expected_recall": round(self.expected_recall, 3),
-                "recall": round(self.recall, 3),
+                "must_find_coverage": round(self.must_find_coverage, 3),
+                "expected_coverage": round(self.expected_coverage, 3),
+                "reference_coverage": round(self.reference_coverage, 3),
                 "lane_accuracy": round(self.lane_accuracy, 3),
-                "element_accuracy": round(self.element_accuracy, 3),
+                "element_agreement": round(self.element_agreement, 3),
                 "element_jaccard": round(self.element_jaccard, 3),
                 "rejected_rate": round(self.rejected_rate, 3),
                 "rejected_rate_of_reviewed": round(self.rejected_rate_of_reviewed, 3),
@@ -755,16 +776,16 @@ def exemplar_delta(scores: Sequence[CaseScore]) -> dict[str, float]:
     control apiece, this still asks the one question worth asking, which is
     whether recall depends on having been shown the architecture. What it can
     no longer do is attribute a gap to a *particular* exemplar system — for
-    that, read the per-case recalls behind it.
+    that, read the per-case coverage figures behind it.
     """
     near = [score for score in scores if score.exemplar_proximity == "near"]
     far = [score for score in scores if score.exemplar_proximity == "far"]
-    near_recall = ratio(sum(score.recall for score in near), len(near))
-    far_recall = ratio(sum(score.recall for score in far), len(far))
+    near_coverage = ratio(sum(score.reference_coverage for score in near), len(near))
+    far_coverage = ratio(sum(score.reference_coverage for score in far), len(far))
     return {
-        "near_recall": round(near_recall, 3),
-        "far_recall": round(far_recall, 3),
-        "delta": round(near_recall - far_recall, 3),
+        "near_coverage": round(near_coverage, 3),
+        "far_coverage": round(far_coverage, 3),
+        "delta": round(near_coverage - far_coverage, 3),
     }
 
 
@@ -803,9 +824,9 @@ def render(scores: Sequence[CaseScore]) -> None:
         print(
             f"{score.case_id:<26} must-find {score.must_find_matched}/"
             f"{score.must_find_total}"
-            f"  recall {score.recall:.2f}"
+            f"  coverage {score.reference_coverage:.2f}"
             f"  lane {score.lane_accuracy:.2f}"
-            f"  element {score.element_accuracy:.2f}"
+            f"  element {score.element_agreement:.2f}"
             f"  rejected {score.rejected_rate:.2f}"
             f"  unvoted {score.unvoted_count}"
             + (f"  foreign {len(score.foreign)}" if score.foreign else "")
@@ -817,8 +838,8 @@ def render(scores: Sequence[CaseScore]) -> None:
         print(f"scored {len(scores)} case(s); every mean above divides by that")
         delta = exemplar_delta(scores)
         print(
-            f"exemplar delta: near {delta['near_recall']:.2f}"
-            f" vs far {delta['far_recall']:.2f}"
+            f"exemplar delta: near {delta['near_coverage']:.2f}"
+            f" vs far {delta['far_coverage']:.2f}"
             f" = {delta['delta']:+.2f} (tracked, non-gating)"
         )
 

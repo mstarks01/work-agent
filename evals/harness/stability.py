@@ -192,7 +192,7 @@ def read_run(artifact: EvalArtifact) -> ScoredRun:
                 str(pair["reference_index"]) for pair in score["matched"]
             )
             references[scope] = int(score["counts"]["references"])
-            recall[scope] = float(score["metrics"]["recall"])
+            recall[scope] = float(score["metrics"]["reference_coverage"])
         for entry in artifact.block("applicability"):
             scope = ("asvs", str(entry["case"]))
             matched[scope] = frozenset(str(item) for item in entry["matched"])
