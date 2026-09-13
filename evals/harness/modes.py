@@ -32,7 +32,11 @@ from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from typing import Any
 
-from analysis_service.analysis import control_state, states_a_protocol
+from analysis_service.analysis import (
+    CONSEQUENCE_ASSET_TAGS,
+    control_state,
+    states_a_protocol,
+)
 from analysis_service.basis import UnbasedControl, unbased_controls
 from analysis_service.claims import (
     Claim,
@@ -146,8 +150,14 @@ class AnalysisRun:
 
 
 def _tags(value: list[str]) -> str:
-    """One element's asset tags as a comparable string, order removed."""
-    return ", ".join(sorted(value))
+    """One element's asset tags as a comparable string, order removed.
+
+    Consequence tags are dropped from both sides. They say what a failure would
+    cost rather than what the element holds, no source states one, and the
+    corpus applies no rule an extraction could follow — so their disagreements
+    measured the vocabulary rather than the model (#877).
+    """
+    return ", ".join(sorted(set(value) - CONSEQUENCE_ASSET_TAGS))
 
 
 #: The attributes an extraction is measured on, each with the function that
