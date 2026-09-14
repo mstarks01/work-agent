@@ -90,7 +90,7 @@ def config_path(tmp_path):
 
 
 class TestNodeInventory:
-    def test_llm_nodes_are_the_bookends_plus_three_keys_per_framework(self):
+    def test_llm_nodes_are_the_service_nodes_plus_three_keys_per_framework(self):
         """The two shared extraction nodes, then each package's own three.
 
         Six ``analyze/<category>`` keys collapsed to one ``analyze/<framework>``
@@ -99,7 +99,7 @@ class TestNodeInventory:
         because an operator may point one package's critic at a different vendor
         from another's.
         """
-        assert LLM_NODES[:2] == ("extract", "repair")
+        assert LLM_NODES[:3] == ("extract", "repair", "assert")
         assert FRAMEWORK_NODES == (
             "analyze/asvs",
             "critic/asvs",
@@ -108,7 +108,7 @@ class TestNodeInventory:
             "critic/stride",
             "recritic/stride",
         )
-        assert LLM_NODES[2:] == FRAMEWORK_NODES
+        assert LLM_NODES[3:] == FRAMEWORK_NODES
 
     def test_every_carried_framework_needs_its_three_keys_of_every_install(self):
         """The triple is required in every file, whatever that install carries.

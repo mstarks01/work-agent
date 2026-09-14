@@ -38,7 +38,7 @@ cost no provider call.
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import cached_property
 from typing import Any
 
@@ -167,6 +167,12 @@ class ModeRun:
     #: are what one package's own record earned, so they arrive under a key
     #: rather than as a field somebody has to add.
     rows: Mapping[str, tuple[Any, ...]]
+    #: What the assertion mode produced: one score per case, and the resolved
+    #: catalogs those counts were taken over. Empty in every other mode. The
+    #: catalogs are written beside the artifact rather than into it, for the
+    #: reason ``INSTRUMENTS["assertions"]`` gives.
+    assertion_scores: list[modes.AssertionScore] = field(default_factory=list)
+    assertions: dict[str, modes.AssertionResult] = field(default_factory=dict)
     #: Cases the sweep never attempted: the estimate gate's hold refused the
     #: spend before them (#334), or a fault the sweep cannot measure ended it
     #: before them (#886). Never a case that ran — one that ran is priced and
@@ -319,6 +325,17 @@ class Instrument:
 #: reader can name one, and so a package that adds an instrument adds a key
 #: rather than editing four call sites.
 INSTRUMENTS: dict[str, Instrument] = {
+    "assertions": Instrument(
+        # **No artifact key of its own, deliberately.** Every count it prints
+        # rides in the per-case ``mode_output`` payloads the sweep already
+        # carries, and the rows behind them are written beside the artifact by
+        # ``bundle.write_assertions``. A top-level key here would move
+        # ``ARTIFACT_VERSION`` and re-seal every Baseline for a block no
+        # Baseline has anything to put in it.
+        render=lambda sweep: modes.render_assertions(sweep.run.assertion_scores),
+        artifact=lambda sweep: {},
+        keys=(),
+    ),
     "extraction": Instrument(
         render=lambda sweep: modes.render_extraction(sweep.run.extractions),
         artifact=lambda sweep: modes.artifact_extraction(sweep.run.extractions),

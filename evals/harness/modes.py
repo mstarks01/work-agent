@@ -39,6 +39,16 @@ from analysis_service.analysis import (
     control_state,
     states_a_protocol,
 )
+from analysis_service.assertions import (
+    ABSENT,
+    REGISTRY,
+    AssertionCatalog,
+    CatalogIssue,
+    CatalogProposal,
+    catalog_issues,
+    conflicts,
+    resolve_catalog,
+)
 from analysis_service.basis import (
     Coverage as BasisCoverage,
 )
@@ -54,9 +64,11 @@ from analysis_service.deployment import Deployment
 from analysis_service.execution import GraphExecutor, GraphFailed, GraphRun
 from analysis_service.frameworks.stride.record import DraftThreat
 from analysis_service.graph import (
+    ENTRY_ASSERT_ONLY,
     ENTRY_EXTRACT,
     ENTRY_EXTRACT_ONLY,
     ENTRY_PREPARE,
+    STATE_ASSERTION_PROPOSAL,
     STATE_EXTRACTED_MODEL,
     STATE_FRAMEWORK_OPTIONS,
     STATE_SOURCE_TEXTS,
@@ -79,6 +91,7 @@ from analysis_service.sampling import (
 )
 from analysis_service.sources import Source
 from analysis_service.system_model import (
+    UNKNOWN,
     DataFlow,
     Element,
     SystemModel,
@@ -1131,6 +1144,168 @@ async def run_extraction(case: GoldenCase, pipeline: Pipeline) -> ExtractionResu
     )
 
 
+@dataclass(frozen=True)
+class AssertionResult:
+    """One assertion run: what was proposed, what resolved, and what ran.
+
+    ``proposal`` is what the node emitted, kept for the reason
+    :attr:`ExtractionResult.raw` is kept: it is the only thing a re-score
+    cannot recompute, because resolving has already dropped rows and located
+    spans. ``issues`` is why each dropped row dropped.
+    """
+
+    case_id: str
+    proposal: Mapping[str, Any]
+    catalog: AssertionCatalog
+    issues: tuple[CatalogIssue, ...]
+    node_runs: tuple[NodeRun, ...] = ()
+
+
+@dataclass(frozen=True)
+class AssertionScore:
+    """What one case's assertion run produced, counted rather than graded.
+
+    **No agreement figure, because there is nothing to agree with.** No corpus
+    case carries a reference catalog, so every number here is a count of what
+    the run did: how many rows survived, which predicates they covered, and how
+    much of the model they reached. A figure comparing this to a reference
+    waits for a reference somebody signed (#926 Phase 6).
+
+    ``absences`` is the one number that answers the audit directly. It counts
+    rows whose value is ``absent`` — a control the sources say is **not there**
+    — which is the fact the graph's own attributes read as a stated control in
+    ten of the corpus's 21 stated mechanism values.
+    """
+
+    case_id: str
+    proposed: int
+    kept: int
+    dropped: Mapping[str, int]
+    subjects: int
+    bound_subjects: int
+    predicates: tuple[str, ...]
+    supported: int
+    spans: int
+    absences: int
+    unknowns: int
+    inferred: int
+    conflicts: int
+    subjects_reached: float
+
+    def to_json(self) -> dict[str, Any]:
+        """The per-case payload a sweep carries in the artifact's mode output."""
+        return {
+            "case": self.case_id,
+            "proposed": self.proposed,
+            "kept": self.kept,
+            "dropped": dict(sorted(self.dropped.items())),
+            "subjects": self.subjects,
+            "bound_subjects": self.bound_subjects,
+            "predicates": list(self.predicates),
+            "supported": self.supported,
+            "spans": self.spans,
+            "absences": self.absences,
+            "unknowns": self.unknowns,
+            "inferred": self.inferred,
+            "conflicts": self.conflicts,
+            "subjects_reached": round(self.subjects_reached, 3),
+        }
+
+
+async def run_assertions(case: GoldenCase, pipeline: Pipeline) -> AssertionResult:
+    """Mode 4: the sources and the blessed model through ``assert``, resolved.
+
+    The blessed model is seeded for the reason :func:`run_analysis` seeds it. A
+    row this node could not bind to an element would otherwise be
+    unattributable between two readings of one text, and the question this mode
+    asks is what the sources state — not whether two calls named one component
+    alike.
+    """
+    graph_run = await run_graph(
+        pipeline, case.sources, {STATE_VALID_MODEL: case.model.model_dump(mode="json")}
+    )
+    state = graph_run.final_state
+    if STATE_ASSERTION_PROPOSAL not in state:
+        raise EvalRunError(f"{case.id}: assert produced no assertions")
+    proposal = CatalogProposal.model_validate(state[STATE_ASSERTION_PROPOSAL])
+    catalog, issues = resolve_catalog(
+        proposal, case.model, state.get(STATE_SOURCE_TEXTS, {})
+    )
+    # The gate over what the resolver built, run rather than assumed: the
+    # resolver's contract is that its output raises nothing, and a sweep is
+    # where that contract meets real model output rather than a fixture.
+    issues = [
+        *issues,
+        *catalog_issues(
+            catalog, model=case.model, sources=state.get(STATE_SOURCE_TEXTS, {})
+        ),
+    ]
+    return AssertionResult(
+        case_id=case.id,
+        proposal=state[STATE_ASSERTION_PROPOSAL],
+        catalog=catalog,
+        issues=tuple(issues),
+        node_runs=tuple(graph_run.node_runs),
+    )
+
+
+def score_assertions(case: GoldenCase, result: AssertionResult) -> AssertionScore:
+    """Count what one assertion run produced. Nothing here grades it."""
+    catalog = result.catalog
+    entries = catalog.entries
+    bound = {subject.id for subject in catalog.subjects if ":" in subject.id}
+    element_ids = {element.id for element in case.model.elements()}
+    reached = {entry.subject for entry in entries} & element_ids
+    return AssertionScore(
+        case_id=result.case_id,
+        proposed=len(result.proposal.get("assertions", ())),
+        kept=len(entries),
+        dropped=Counter(issue.code for issue in result.issues),
+        subjects=len(catalog.subjects),
+        bound_subjects=len(bound & element_ids),
+        predicates=tuple(sorted({entry.predicate for entry in entries})),
+        supported=sum(1 for entry in entries if entry.support),
+        spans=sum(len(entry.support) for entry in entries),
+        absences=sum(1 for entry in entries if entry.value == ABSENT),
+        unknowns=sum(1 for entry in entries if entry.value == UNKNOWN),
+        inferred=sum(1 for entry in entries if entry.basis == "inferred"),
+        conflicts=len(conflicts(catalog)),
+        subjects_reached=len(reached) / len(element_ids) if element_ids else 0.0,
+    )
+
+
+def render_assertions(scores: Sequence[AssertionScore]) -> None:
+    """What an assertion sweep produced, per case and then over the corpus.
+
+    Every number is **non-gating**, for the reason
+    :func:`render_extraction`'s are: there is no reference catalog, so a low
+    count is a question to take to the source text rather than a defect.
+    """
+    for score in scores:
+        print(
+            f"{score.case_id:<26} kept {score.kept:>3}/{score.proposed:<3}"
+            f" spans {score.spans:>3} absences {score.absences:>2}"
+            f" unknowns {score.unknowns:>2} conflicts {score.conflicts:>2}"
+            f" elements reached {score.subjects_reached:.0%}"
+        )
+    if not scores:
+        return
+    dropped: Counter[str] = Counter()
+    for score in scores:
+        dropped.update(score.dropped)
+    covered = sorted({name for score in scores for name in score.predicates})
+    print(
+        f"\n{sum(s.kept for s in scores)} rows kept of"
+        f" {sum(s.proposed for s in scores)} proposed,"
+        f" {len(covered)} of {len(REGISTRY)} predicates covered"
+    )
+    for code, count in sorted(dropped.items()):
+        print(f"  dropped {code:<24} {count}")
+    print(
+        "  predicates with no row: " + ", ".join(sorted(set(REGISTRY) - set(covered)))
+    )
+
+
 def score_extraction(case: GoldenCase, result: ExtractionResult) -> ExtractionScore:
     """Compare an extraction to the blessed model, mechanically."""
     blessed_ids = {element.id for element in case.model.elements()}
@@ -1570,6 +1745,7 @@ def _report_of(
 
 MODE_ENTRIES: dict[str, Entry] = {
     "extraction": ENTRY_EXTRACT_ONLY,
+    "assertions": ENTRY_ASSERT_ONLY,
     "analysis": ENTRY_PREPARE,
     "end-to-end": ENTRY_EXTRACT,
 }
