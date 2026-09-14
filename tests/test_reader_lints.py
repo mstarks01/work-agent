@@ -32,6 +32,7 @@ from pathlib import Path
 
 import pytest
 
+from evals.harness.reference import MUST_FIND
 from tests.source_tree import REPO_ROOT, parse, source_files
 from webapp import main, offline_sitting, review, sitting
 from webapp.page import client_script
@@ -276,3 +277,72 @@ def test_every_field_declaration_gives_a_reason():
 
 def test_the_field_scan_reads_a_real_population():
     assert len(_declared_fields()) > 200
+
+
+# --- One spelling of the tier that drives the gate ---------------------------
+
+
+def _tier_comparisons(path: Path) -> list[int]:
+    """Lines comparing something to the must-find tier as a bare string.
+
+    An ``ast`` walk rather than a grep, because the question is about a
+    **comparison** and not about the characters: a label a report prints and a
+    key an artifact writes both hold the same words and neither decides
+    anything.
+    """
+    return [
+        node.lineno
+        for node in ast.walk(parse(path))
+        if isinstance(node, ast.Compare)
+        and any(isinstance(op, ast.Eq | ast.NotEq) for op in node.ops)
+        for side in (node.left, *node.comparators)
+        if isinstance(side, ast.Constant) and side.value == MUST_FIND
+    ]
+
+
+def test_the_must_find_tier_is_compared_through_one_name():
+    """A rule with a reader per module is how the readers come to disagree.
+
+    ``reference.MUST_FIND`` is the one spelling. Ten sites compared the literal
+    before this: the corpus lint, the claim scorer, the loss instruments, the
+    trigger recall, the verb pricing and the critic yield. Each was right, and
+    each would have stayed right only for as long as nobody renamed a tier.
+
+    A **label** is not a comparison and is not in scope: three sites in
+    ``pairing.py`` print the words as a column, driven by the ``must_find``
+    property, and one of them prints ``should-find`` beside it — a phrase that
+    is not a tier at all.
+    """
+    offenders = {
+        f"{path.relative_to(REPO_ROOT)}:{line}"
+        for path in source_files("evals", "src", "webapp")
+        for line in _tier_comparisons(path)
+        if path != REPO_ROOT / "evals" / "harness" / "reference.py"
+    }
+
+    assert not offenders, (
+        f"these compare the must-find tier as a bare string: {sorted(offenders)}."
+        " Import MUST_FIND, or ask the object's own `must_find` property."
+    )
+
+
+def test_the_tier_comparison_scan_finds_one_when_there_is_one(tmp_path):
+    """The positive control. The tree is clean, so a lint over it passes
+    whether or not the scan works at all — a synthetic offender is the only
+    thing that says the net has holes in the right size.
+
+    It also pins what is **not** an offence: a label carrying the same words,
+    and a comparison against the imported name.
+    """
+    module = tmp_path / "offender.py"
+    module.write_text(
+        "from evals.harness.reference import MUST_FIND\n"
+        "def rule(row):\n"
+        "    return row.tier == 'must-find'\n"
+        "def allowed(row):\n"
+        "    return row.tier == MUST_FIND\n"
+        "LABEL = 'must-find'\n",
+        encoding="utf-8",
+    )
+
+    assert _tier_comparisons(module) == [3]

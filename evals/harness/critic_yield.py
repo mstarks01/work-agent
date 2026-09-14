@@ -360,7 +360,7 @@ def _dispositions(score: CaseScore) -> dict[str, tuple[Disposition, int | None]]
     records: dict[str, tuple[Disposition, int | None]] = {}
     for pair in score.matched:
         matched: Disposition = (
-            "matched-must-find" if pair.tier == "must-find" else "matched-expected"
+            "matched-must-find" if pair.must_find else "matched-expected"
         )
         records[pair.threat_id] = (matched, pair.reference_index)
     for error in score.lane_errors:

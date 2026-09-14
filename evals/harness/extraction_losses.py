@@ -345,7 +345,7 @@ def _case_handoff(
             ReferenceFate(
                 reference,
                 fate,
-                claim.tier == "must-find",
+                claim.must_find,
                 missing_elements=missing,
                 differing_attributes=differing,
                 extraction_read=extraction is not None,

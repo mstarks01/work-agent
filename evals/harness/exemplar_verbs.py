@@ -62,7 +62,7 @@ from analysis_service.markdown_loader import MarkdownLoader, split_sections
 from analysis_service.skills import lane_exemplars_doc
 from evals.harness.fingerprint import IDENTIFIER_OF
 from evals.harness.identity import endpoint_subset
-from evals.harness.reference import GoldenCase
+from evals.harness.reference import MUST_FIND, GoldenCase
 
 __all__ = [
     "Collision",
@@ -134,7 +134,7 @@ class Undemonstrated:
 
     @property
     def must_find(self) -> bool:
-        return self.tier == "must-find"
+        return self.tier == MUST_FIND
 
 
 @dataclass(frozen=True)
