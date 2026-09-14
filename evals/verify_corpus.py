@@ -53,7 +53,7 @@ from analysis_service.sources import SourceKind
 from analysis_service.system_model import SystemModel
 from analysis_service.validation import parse_and_validate
 from evals.harness.calibration import SCORED_LABELS, Label, LabelAnnotation
-from evals.harness.reference import AsvsDisposition
+from evals.harness.reference import MUST_FIND, AsvsDisposition, Tier
 from evals.harness.verbs import unknown_verbs
 
 SOURCE_KINDS = frozenset(get_args(SourceKind))
@@ -123,7 +123,10 @@ UNASSIGNABLE: dict[tuple[str, str], str] = {
 }
 
 RATINGS = frozenset(("low", "medium", "high"))
-TIERS = frozenset(("must-find", "expected"))
+#: The tier vocabulary, off the type that declares it rather than listed again.
+#: A second list is how the corpus lint comes to admit a tier the scorer cannot
+#: read, or refuse one it can.
+TIERS = frozenset(get_args(Tier))
 EXEMPLAR_PROXIMITY = frozenset(("near", "far"))
 CASE_FIELDS = frozenset(
     (
@@ -593,7 +596,7 @@ def _check_claims(
             if lane not in seen_lanes:
                 yield f"{where_file} carries no reference record in the {lane} lane"
 
-    if not any(record.get("tier") == "must-find" for record in records):
+    if not any(record.get("tier") == MUST_FIND for record in records):
         yield (
             f"{where_file} carries no must-find record: tier 2 recall would be"
             " vacuous for this case"
@@ -1043,7 +1046,7 @@ def main() -> int:
             must_find_lanes.setdefault(name, set()).update(
                 RECORD_LANE[name](record)
                 for record in records
-                if isinstance(record, dict) and record.get("tier") == "must-find"
+                if isinstance(record, dict) and record.get("tier") == MUST_FIND
             )
         for problem in problems:
             print(f"{case_dir.name}: {problem}")
