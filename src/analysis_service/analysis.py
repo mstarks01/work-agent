@@ -52,6 +52,7 @@ from analysis_service.system_model import (
 )
 
 __all__ = [
+    "ABSENT_WORD",
     "CONTROL_ATTRIBUTES",
     "TEXT_ATTRIBUTES",
     "WHOLE_WORD",
@@ -75,6 +76,15 @@ __all__ = [
 ]
 
 ControlState = Literal["unverified", "absent", "stated"]
+
+#: The word a control attribute leads with to say the control is **not there**.
+#: The second of :func:`control_state`'s two sentinels, beside
+#: :data:`~analysis_service.system_model.UNKNOWN`, and named here because it is
+#: read in two places: this classifier, and the projection that writes a
+#: catalog's stated absence back into an attribute
+#: (:func:`~analysis_service.assertions.project`). Two spellings of one word is
+#: two chances to spell it differently.
+ABSENT_WORD = "none"
 
 # The five attributes ``prompts/extract.md`` names as security-relevant and
 # defaults to ``unknown``. The list is here rather than derived from the
@@ -195,7 +205,7 @@ def control_state(value: str) -> ControlState:
     """
     if not value.strip():
         return "unverified"
-    lead = leading_word(value, (UNKNOWN, "none"))
+    lead = leading_word(value, (UNKNOWN, ABSENT_WORD))
     if lead is None:
         return "stated"
     return "unverified" if lead == UNKNOWN else "absent"
