@@ -13,6 +13,7 @@ import shutil
 
 import pytest
 
+from analysis_service.grounding import verify_quote
 from analysis_service.report import (
     InputRef,
     SourceRef,
@@ -579,13 +580,15 @@ class TestTheReviewedAliases:
     def test_every_alias_excerpt_is_in_its_own_case_s_sources(self):
         """The load-bearing check: an alias is supported by the case's own words
         or it is somebody's preference. `verify_corpus` refuses one that is not,
-        and this says the shipped corpus satisfies it."""
+        and this says the shipped corpus satisfies it. It asks through
+        `verify_quote` rather than through a substring test of its own, so the
+        test cannot agree with an expectation the lint does not hold."""
         from evals.harness.reference import load_corpus
 
         for case in load_corpus(verify_corpus.CORPUS_DIR):
             text = "\n".join(source.text for source in case.sources)
             for alias in case.meta.aliases:
-                assert alias.excerpt in text, f"{case.id}: {alias.name}"
+                assert verify_quote(alias.excerpt, text), f"{case.id}: {alias.name}"
 
     def test_the_document_store_carries_no_alias_and_says_why(self):
         """The one qualification the reader made. Naming it after the platform
@@ -606,6 +609,31 @@ class TestTheReviewedAliases:
         assert "boundary:vendor-platform" in {
             zone.id for zone in case.model.trust_boundaries
         }
+
+    def test_an_alias_may_quote_a_sentence_the_source_wraps(self, tmp_path):
+        """A source hard-wraps its lines, so a quoted sentence carries a newline.
+
+        `model.json` quotes such a sentence today and `verify_quote` accepts it,
+        because the gate folds whitespace before it looks. An alias excerpt asks
+        the same question of the same bytes and must get the same answer.
+        """
+        source = verify_corpus.CORPUS_DIR / "01-payments-checkout"
+        case_dir = tmp_path / source.name
+        shutil.copytree(source, case_dir)
+        meta = json.loads((case_dir / "case.json").read_text(encoding="utf-8"))
+        meta["aliases"] = [
+            {
+                "element": "boundary:public-internet",
+                "name": "internet",
+                "excerpt": "It is the only thing we expose to the internet.",
+                "ruling": "Supported; the source names the zone this way.",
+            }
+        ]
+        (case_dir / "case.json").write_text(json.dumps(meta), encoding="utf-8")
+
+        wrapped = (case_dir / "source.md").read_text(encoding="utf-8")
+        assert "expose to the\ninternet." in wrapped
+        assert not list(verify_corpus._check_aliases(case_dir, meta))
 
     def test_an_alias_keeps_its_element_s_type(self):
         """An extraction that files the catalogue spreadsheet as a store has made
