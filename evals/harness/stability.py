@@ -477,6 +477,12 @@ def _fates(
     other names the missed ones. A reference no run calls a must-find is not
     here, and one every run agreed on contributes nothing below.
 
+    Restricted to the cases **every** run scored, which is the rule
+    :func:`compare_runs` states and applies for the same reason: a case one run
+    skipped has no second measurement. Folding it in reads the run that skipped
+    it as a run that found nothing there, which fabricates a spread the size of
+    the whole case.
+
     ``rows`` narrows to named ``(case, reference)`` pairs — the reading a fix
     that targets known references is priced on, rather than the corpus total.
 
@@ -485,9 +491,11 @@ def _fates(
     reading is right for the question it answers: how far the number moves
     **if the change does nothing**, which is what an effect has to clear.
     """
+    shared = frozenset.intersection(*(frozenset(run.must_find) for run in runs))
     known: dict[Scope, set[str]] = {}
     for run in runs:
-        for scope, fate in run.must_find.items():
+        for scope in shared:
+            fate = run.must_find[scope]
             named = fate.missed | (fate.matched if fate.names_the_tier else frozenset())
             known.setdefault(scope, set()).update(named)
     if rows:
@@ -498,10 +506,9 @@ def _fates(
         }
     fates: dict[tuple[Scope, str], tuple[int, int]] = {}
     for scope, refs in known.items():
-        scoring = [run for run in runs if scope in run.must_find]
         for ref in refs:
-            matched = sum(1 for run in scoring if ref in run.must_find[scope].matched)
-            fates[(scope, ref)] = (matched, len(scoring))
+            matched = sum(1 for run in runs if ref in run.must_find[scope].matched)
+            fates[(scope, ref)] = (matched, len(runs))
     return fates
 
 
@@ -530,6 +537,8 @@ def band(
     """
     if len(runs) < 2:
         raise ValueError("a spread needs two runs or more")
+    if not frozenset.intersection(*(frozenset(run.must_find) for run in runs)):
+        raise ValueError("the runs share no scored case, so there is no spread to read")
     fates = _fates(runs, rows)
     observed = floor = 0.0
     freedom = 0
@@ -564,18 +573,16 @@ def _totals(
     """Each run's must-find total, over the references this set can read.
 
     The same references the floor is summed over, so the two readings are of
-    one population. A must-find every run matched is outside it for a record
-    that names only the missed ones — and it is a constant, so it moves the
-    mean and not the spread.
+    one population — the cases every run scored, and no other. A must-find
+    every run matched is outside it for a record that names only the missed
+    ones, and it is a constant, so it moves the mean and not the spread.
     """
     universe: dict[Scope, set[str]] = {}
     for scope, ref in _fates(runs, rows):
         universe.setdefault(scope, set()).add(ref)
     return [
         sum(
-            len(refs & run.must_find[scope].matched)
-            for scope, refs in universe.items()
-            if scope in run.must_find
+            len(refs & run.must_find[scope].matched) for scope, refs in universe.items()
         )
         for run in runs
     ]
