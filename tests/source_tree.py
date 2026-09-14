@@ -15,9 +15,17 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
-#: Directory names no lint reads: build caches, frozen research probes and a
-#: virtual environment that may sit inside the tree.
+#: Directory names no lint reads, wherever they sit: build caches, frozen
+#: research probes, and a virtual environment that may sit inside the tree.
 _SKIPPED = frozenset({"__pycache__", "research", ".venv"})
+
+#: Directories no lint reads, by their place in the tree rather than by name.
+#: ``evals/runs`` holds run artifacts the repository does not track, and a live
+#: run leaves its probe scripts beside them, so a lint that reads that directory
+#: judges a file the tree does not hold (#942). Anchored rather than added to
+#: :data:`_SKIPPED`, so a future module directory that happens to be called
+#: ``runs`` stays under every lint.
+_SKIPPED_PATHS = ("evals/runs",)
 
 
 def source_files(*roots: str, suffixes: tuple[str, ...] = (".py",)) -> list[Path]:
@@ -27,8 +35,14 @@ def source_files(*roots: str, suffixes: tuple[str, ...] = (".py",)) -> list[Path
         for root in roots
         for suffix in suffixes
         for path in sorted((REPO_ROOT / root).rglob(f"*{suffix}"))
-        if not _SKIPPED & set(path.parts)
+        if not _SKIPPED & set(path.parts) and not _under_skipped_path(path)
     ]
+
+
+def _under_skipped_path(path: Path) -> bool:
+    """Does ``path`` sit under one of :data:`_SKIPPED_PATHS`?"""
+    relative = path.relative_to(REPO_ROOT).as_posix()
+    return any(relative.startswith(f"{skipped}/") for skipped in _SKIPPED_PATHS)
 
 
 @cache

@@ -149,6 +149,12 @@ extend-exclude = ["docs/research"]
 # checking only `src/` would leave the checker blind to exactly the drift it
 # was added for.
 files = ["src", "tests", "evals", "examples", "webapp"]
+# `evals/runs` holds run artifacts the repository does not track, and a live run
+# leaves its probe scripts beside them. Checking them fails the push gate on a
+# file the tree does not hold. `ruff` already skips them, because it respects
+# `.gitignore`; `tests/source_tree.py` skips them for the lints that walk the
+# tree; this is the third reader of the same rule (#942).
+exclude = ["^evals/runs/"]
 # `src` on the path, so `src/analysis_service/api.py` is the module
 # `analysis_service.api` and not also `src.analysis_service.api`. With the layouts
 # outside it -- `evals/` and `examples/` have no `__init__.py` -- that needs
