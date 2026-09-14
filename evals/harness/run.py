@@ -42,7 +42,7 @@ import sys
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
 
 from analysis_service.actions import VerbError
 from analysis_service.certification import CertificationError, CertifyResult, certify
@@ -174,6 +174,11 @@ def _select(cases: Sequence[GoldenCase], wanted: Sequence[str]) -> list[GoldenCa
     return [by_id[case_id] for case_id in wanted]
 
 
+#: What :func:`_batches` cuts, which is a case with its corpus position here
+#: and could be anything a later caller has to keep in order.
+_T = TypeVar("_T")
+
+
 @dataclass(frozen=True)
 class _CaseOutcome:
     """What one case leaves behind, before the sweep folds it in case order.
@@ -193,14 +198,14 @@ class _CaseOutcome:
     error: Exception | None = None
 
 
-def _batches(cases: Sequence[GoldenCase], size: int) -> list[list[GoldenCase]]:
-    """The cases in corpus order, cut into groups of ``size``.
+def _batches(items: Sequence[_T], size: int) -> list[list[_T]]:
+    """One sequence, in order, cut into groups of ``size``.
 
     A batch is the unit the spend hold runs between and the unit a stopping
     fault takes down with it, so the cut is stated here rather than implied by
     a slice at each site.
     """
-    return [list(cases[start : start + size]) for start in range(0, len(cases), size)]
+    return [list(items[start : start + size]) for start in range(0, len(items), size)]
 
 
 async def _run_mode(
@@ -419,16 +424,32 @@ async def _run_mode(
         payloads.append(measured.payload)
         return False
 
-    # Every case the sweep will attempt, in corpus order, with the ones no
-    # selected package declares named apart. Decided before anything runs: a
-    # skipped case spends nothing, so counting it in the spend rate would
-    # divide by a larger number and project low.
-    attempted = [case for case in cases if modes.select_frameworks(case, only)]
-    skipped = [case.id for case in cases if case not in attempted]
+    # Every case the sweep will attempt, in corpus order, each with its
+    # position in the corpus, and the ones no selected package declares named
+    # apart. Decided before anything runs: a skipped case spends nothing, so
+    # counting it in the spend rate would divide by a larger number and project
+    # low. The position is carried rather than recovered by ``index``, because
+    # two cases of one corpus can compare equal and the second would then be
+    # priced as the first.
+    attempted: list[tuple[int, GoldenCase]] = []
+    skipped: list[str] = []
+    for position, case in enumerate(cases):
+        if modes.select_frameworks(case, only):
+            attempted.append((position, case))
+        else:
+            # Not a failure: --framework asked for packages this case does not
+            # declare, so there is nothing here to measure. Named rather than
+            # dropped, because a case absent from a sweep and a case that
+            # scored nothing are different facts.
+            skipped.append(case.id)
     ran = 0
     for batch in _batches(attempted, in_flight):
         if ran and accepted is not None:
-            remaining = [later.id for later in attempted[attempted.index(batch[0]) :]]
+            # From this batch's first case to the end of the corpus, skipped
+            # cases included. Those spend nothing, so counting them pushes the
+            # projection up — the safe direction for a gate somebody consents
+            # to, and the reading this had before batches existed.
+            remaining = [later.id for later in cases[batch[0][0] :]]
             try:
                 accepted = consent.hold(accepted, executions, remaining, ask, ran=ran)
             except consent.Refused as refusal:
@@ -442,7 +463,7 @@ async def _run_mode(
         # The pipelines before the batch, not inside it: building one runs the
         # credential and supported-param gates, and two cases of one framework
         # set would otherwise race to build the same graph twice.
-        built = [(case, pipeline_for(case)) for case in batch]
+        built = [(case, pipeline_for(case)) for _, case in batch]
         ran += len(batch)
         outcomes = await asyncio.gather(
             *(run_one(case, pipeline) for case, pipeline in built)
@@ -452,7 +473,7 @@ async def _run_mode(
         # batch after this one.
         stopping = [fold(outcome) for outcome in outcomes]
         if any(stopping):
-            after = attempted[attempted.index(batch[-1]) + 1 :]
+            after = cases[batch[-1][0] + 1 :]
             stopped_before = tuple(later.id for later in after)
             break
 

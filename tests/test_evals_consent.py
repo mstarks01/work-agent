@@ -825,7 +825,23 @@ class TestTheSweepLoopPassesTheCasesThatRan:
             )
         return float(prompts[-1].split("(")[1].split(")")[0])
 
-    def first_hold(self, monkeypatch, capsys, cases, in_flight):
+    def test_a_skipped_case_still_counts_among_the_cases_left(
+        self, priced, monkeypatch, capsys
+    ):
+        """The two halves of the rate are counted differently, on purpose.
+
+        A skipped case is kept out of ``ran``, because it produced none of the
+        spend the rate divides. It is kept **in** the cases left to run,
+        because over-counting there pushes the projection up, which is the safe
+        direction for a figure somebody is about to accept.
+        """
+        printed = self.first_hold(
+            monkeypatch, capsys, cases=4, in_flight=1, selected=[1, 1, 0, 1]
+        )
+
+        assert "3 case(s) have not run: 01, 02, 03" in printed
+
+    def first_hold(self, monkeypatch, capsys, cases, in_flight, selected=None):
         """Sweep ``cases`` cases at a batch size; return what the first hold said.
 
         The hold prints what it has spent and which cases have not run, and
@@ -836,8 +852,11 @@ class TestTheSweepLoopPassesTheCasesThatRan:
         boundary that is, is the fact under test.
         """
         made = [SimpleNamespace(id=f"{index:02d}") for index in range(cases)]
+        runs = [True] * cases if selected is None else selected
         monkeypatch.setattr(
-            modes, "select_frameworks", lambda case, only=(): ("stride",)
+            modes,
+            "select_frameworks",
+            lambda case, only=(): ("stride",) if runs[int(case.id)] else (),
         )
         monkeypatch.setattr(
             modes, "build_eval_pipeline", lambda *args, **kwargs: SimpleNamespace()
