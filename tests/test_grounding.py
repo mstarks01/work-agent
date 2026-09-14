@@ -16,6 +16,8 @@ from analysis_service.grounding import (
     MAX_REPAIR_QUOTE_CHARS,
     MAX_REPAIR_WORK,
     REPAIR_THRESHOLD,
+    index_source,
+    locate_quote,
     meaning_moved,
     normalize,
     prepare_source,
@@ -493,3 +495,114 @@ class TestATruncatedScanSaysSo:
 
         assert repair is not None
         assert repair.complete
+
+
+class TestLocatingAQuote:
+    """The locator and the verifier read one matcher, so they cannot disagree."""
+
+    def test_a_span_hands_back_the_submitter_s_own_words(self):
+        indexed = index_source(SOURCE)
+        spans = locate_quote("a single shared password", indexed)
+        assert [SOURCE[span.start : span.end] for span in spans] == [
+            "a single\nshared password"
+        ]
+
+    def test_a_span_names_whole_words(self):
+        """The ladder compares word by word, so an offset inside one is a lie.
+
+        ``main`` is quoted without the markdown the source wraps it in, and the
+        span hands back the marked-up word the submitter wrote.
+        """
+        indexed = index_source(SOURCE)
+        spans = locate_quote("rebuild main by hand", indexed)
+        assert [SOURCE[span.start : span.end] for span in spans] == [
+            "rebuild `main` by hand"
+        ]
+
+    def test_a_cut_quote_gives_one_span_per_fragment(self):
+        indexed = index_source(SOURCE)
+        spans = locate_quote("The ledger service…full read/write", indexed)
+        assert [SOURCE[span.start : span.end] for span in spans] == [
+            "The ledger service",
+            "full read/write",
+        ]
+
+    def test_a_quote_the_ladder_refuses_has_no_span(self):
+        indexed = index_source(SOURCE)
+        assert locate_quote("a rotated per-service password", indexed) is None
+
+    def test_a_quote_that_normalizes_away_has_no_span(self):
+        indexed = index_source(SOURCE)
+        assert locate_quote("…", indexed) is None
+
+    @pytest.mark.parametrize(
+        "quote",
+        [
+            "a single shared password",
+            "ledger service talks to the accounts database",
+            "THE LEDGER SERVICE",
+            "rebuild `main` by hand",
+            "a rotated per-service password",
+            "environment variable, and that account has full",
+            "deploy goes wrong",
+            "the accounts database…every table",
+            "the accounts database…database",
+            "",
+            "…",
+        ],
+    )
+    def test_the_locator_answers_exactly_when_the_verifier_does(self, quote):
+        """Two readers of one rule, tested against each other rather than apart.
+
+        A quote either has a span or is not in the source. A locator that
+        refused a quote the ladder accepts would silently drop support, and one
+        that accepted a quote the ladder refuses would cite words nobody wrote.
+        """
+        indexed = index_source(SOURCE)
+        assert (locate_quote(quote, indexed) is not None) == verify_quote(quote, SOURCE)
+
+
+class TestTheLocatorOverTheCorpus:
+    """The two properties the locator rests on, measured rather than assumed."""
+
+    def corpus(self):
+        from evals import verify_corpus
+        from evals.harness.reference import load_case
+
+        for case_dir in verify_corpus.case_dirs():
+            case = load_case(case_dir)
+            yield case, {source.label: source.text for source in case.sources}
+
+    def test_the_word_by_word_fold_agrees_with_normalize_on_every_source(self):
+        """``index_source`` refuses a source whose two folds differ, and none does.
+
+        ``NFKC`` is defined over a string rather than over a character, so
+        folding word by word is not the same operation by construction. The
+        guard makes a disagreement answer ``None`` instead of handing back
+        offsets that name the wrong words, and this says the guard is idle on
+        real input rather than hiding one.
+        """
+        for _, sources in self.corpus():
+            for text in sources.values():
+                assert index_source(text) is not None
+
+    def test_every_excerpt_the_ladder_accepts_has_a_span(self):
+        """Over every element excerpt of the 13 blessed models.
+
+        The claim is an equivalence, so it is measured both ways: a quote the
+        ladder accepts has a span, and the span holds the quote back.
+        """
+        checked = 0
+        for case, sources in self.corpus():
+            for element in case.model.elements():
+                text = sources.get(element.source_label)
+                if not element.source_excerpt or text is None:
+                    continue
+                checked += 1
+                spans = locate_quote(element.source_excerpt, index_source(text))
+                assert (spans is not None) == verify_quote(element.source_excerpt, text)
+                if spans is None:
+                    continue
+                window = text[spans[0].start : spans[-1].end]
+                assert verify_quote(element.source_excerpt, window)
+        assert checked > 200

@@ -33,6 +33,7 @@ a model differently.
 
 from __future__ import annotations
 
+import hashlib
 import re
 import unicodedata
 from collections import Counter
@@ -179,6 +180,25 @@ class Source(BaseModel):
     def size_bytes(self) -> int:
         """This source's contribution to the job's budget, in UTF-8 bytes."""
         return len(self.text.encode("utf-8"))
+
+    def digest(self) -> str:
+        """This source's content digest — :func:`text_digest` of its text."""
+        return text_digest(self.text)
+
+
+def text_digest(text: str) -> str:
+    """The sha256 hex digest of ``text``, over its UTF-8 bytes.
+
+    **What a support span pins a quote to.** A span names offsets into the
+    exact retained text, so a source that changes underneath it names different
+    words. The digest is what lets a reader see that, and it is recomputed and
+    compared rather than trusted: nothing but this function writes one.
+
+    Over the bytes rather than over a normalized form, because the question is
+    whether the submission changed, and every rung of the citation ladder is a
+    concession about *quoting* rather than about identity.
+    """
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def total_bytes(sources: Sequence[Source]) -> int:
