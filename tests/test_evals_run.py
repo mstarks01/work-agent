@@ -115,7 +115,7 @@ class TestWhatAnExtractionSweepPrints:
         render_extraction([self.score(agreeing=False)])
 
         out = capsys.readouterr().out
-        assert "attributes 0/1" in out
+        assert "fields 0/1" in out
         assert "kind" in out
         assert "instrument, non-gating" in out
         assert "FAIL" not in out
