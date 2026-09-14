@@ -74,6 +74,12 @@ _PINNED = (
 #: as a property of the name, never as a ticket number. Delete the name and its
 #: tests instead when the reason is only that the tests exist.
 TEST_ONLY: dict[str, str] = {
+    "missing_steps": (
+        "the question the migration table's own guard asks: which versions"
+        " between the oldest and the current one carry no step. Its only"
+        " caller is that guard by design — a version bump that forgets a step"
+        " is found by a test rather than by an operator"
+    ),
     "measure_direction": (
         "the one aggregation ADR 0031 pins its direction numbers with, and the"
         " instrument a later candidate rule is priced through"
