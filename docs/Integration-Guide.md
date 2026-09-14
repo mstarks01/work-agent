@@ -178,7 +178,7 @@ Two behaviours worth knowing:
 - **Keep the described system under 150 elements** (`MAX_ELEMENTS`; see
   [Configuration](Configuration.md)). A larger system comes back as a
   `too-many-elements` rejection — split it and submit the parts separately.
-  Analysis quality is best in the 8–20 element range.
+  Analysis quality is best in the 8–22 element range.
 
 A short but well-formed description — this is
 [`examples/orders.md`](../examples/orders.md), the same file the web app's

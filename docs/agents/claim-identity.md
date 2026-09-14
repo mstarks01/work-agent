@@ -52,7 +52,7 @@ within-lane reference pairs:
 | endpoint subset | 14 | 81 | 24 |
 | **endpoint subset + verb** | **15** | **3** | **3** |
 | overlap | 4 | 83 | 35 |
-| endpoint overlap | 1 | 99 | 129 |
+| endpoint overlap | 1 | 98 | 129 |
 
 No element-only row is usable: the tightest loses 89 paraphrases and the loosest
 destroys 129 findings. **The verb row is the first one that is.**

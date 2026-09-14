@@ -616,7 +616,7 @@ Three properties make the record worth keeping:
 ## The corpus
 
 Thirteen cases, each sized so a person can enumerate its threats exhaustively
-(roughly 8–20 elements).
+(roughly 8–22 elements).
 
 The shipped prompts teach by example, and every lane's `exemplars.md` works its
 threats against one of **two** systems: a payments system, and an event-driven

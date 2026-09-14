@@ -17,8 +17,8 @@
   {
     "category": "spoofing",
     "affected_element_ids": [
-      "flow:game-client-to-game-servers:gameplay-traffic",
-      "process:game-servers"
+      "flow:game-client-to-game-server:gameplay-traffic",
+      "process:game-server"
     ],
     "claim": "An attacker connects directly to a game server on its exposed port, bypassing the lobby, as a player who was never assigned to that match.",
     "tier": "must-find",
@@ -48,7 +48,7 @@
     "category": "tampering",
     "affected_element_ids": [
       "process:game-client",
-      "flow:game-client-to-game-servers:gameplay-traffic"
+      "flow:game-client-to-game-server:gameplay-traffic"
     ],
     "claim": "A player modifies the game client on their own machine and sends manipulated gameplay actions that the servers accept.",
     "tier": "must-find",
@@ -63,7 +63,7 @@
     "category": "tampering",
     "affected_element_ids": [
       "store:stats-database",
-      "flow:game-servers-to-stats-database:read-write-stats"
+      "flow:game-server-to-stats-database:read-write-stats"
     ],
     "claim": "An attacker alters match statistics in the stats database to change rankings or rewards.",
     "tier": "must-find",
@@ -78,7 +78,7 @@
     "category": "tampering",
     "affected_element_ids": [
       "store:player-database",
-      "flow:game-servers-to-player-database:update-players"
+      "flow:game-server-to-player-database:update-players"
     ],
     "claim": "An attacker who influences a game server writes fabricated progression onto player records.",
     "tier": "expected",
@@ -108,7 +108,7 @@
     "category": "repudiation",
     "affected_element_ids": [
       "store:player-database",
-      "process:game-servers"
+      "process:game-server"
     ],
     "claim": "A player disputes a change to their record and no log distinguishes whether the lobby, a game server or the moderation website made it.",
     "tier": "expected",
@@ -137,7 +137,7 @@
     "category": "information-disclosure",
     "affected_element_ids": [
       "flow:game-client-to-lobby:matchmaking",
-      "flow:game-client-to-game-servers:gameplay-traffic"
+      "flow:game-client-to-game-server:gameplay-traffic"
     ],
     "claim": "An attacker on the network path reads matchmaking and gameplay traffic, including player identifiers, because encryption on both client links is unverified.",
     "tier": "must-find",
@@ -145,14 +145,14 @@
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "Both links are recorded as bare port numbers — the model gives no transport protection at all.",
+    "notes": "Both links are recorded as bare port numbers \u2014 the model gives no transport protection at all.",
     "verb": "intercept"
   },
   {
     "category": "information-disclosure",
     "affected_element_ids": [
       "process:game-client",
-      "process:game-servers"
+      "process:game-server"
     ],
     "claim": "A player extracts information from their own client that the server sends but should not reveal, such as other players' positions.",
     "tier": "expected",
@@ -196,8 +196,8 @@
   {
     "category": "denial-of-service",
     "affected_element_ids": [
-      "process:game-servers",
-      "flow:game-client-to-game-servers:gameplay-traffic"
+      "process:game-server",
+      "flow:game-client-to-game-server:gameplay-traffic"
     ],
     "claim": "An attacker floods a game server's exposed port and disrupts a match in progress for every player in it.",
     "tier": "must-find",
@@ -226,7 +226,7 @@
   {
     "category": "elevation-of-privilege",
     "affected_element_ids": [
-      "process:game-servers",
+      "process:game-server",
       "store:player-database"
     ],
     "claim": "An attacker who compromises an internet-exposed game server gains write access to player records across the production network.",

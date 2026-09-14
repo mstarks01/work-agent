@@ -67,8 +67,18 @@ CALIBRATION_PATH = Path(__file__).resolve().parent / "calibration_labels" / "pai
 
 # A reference set must be exhaustively enumerable by a person, which is only
 # true of small systems.
+#
+# The ceiling rose from 20 for the reference corrections of #925. Case 02 models
+# the broker its source names — "forwarded onto Pub/Sub and picked up by the
+# telemetry normalizer" — rather than hiding it in a flow's `protocol` string,
+# and case 13 models the host that serves its console. Both cases describe the
+# system they always described; what grew is how much of it the reference
+# admits, and refusing that would hold the corpus at a size bought by leaving
+# named components out. 22 leaves one slot, on the reasoning
+# `analysis_service.token_caps.alarm_at` states: nothing has to leave to make
+# room for it.
 MIN_ELEMENTS = 8
-MAX_ELEMENTS = 20
+MAX_ELEMENTS = 22
 
 # A floor, not a count: the fixtures hold 339. A set below this, or one whose
 # scored half is all matches or all non-matches, cannot measure agreement.
