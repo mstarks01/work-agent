@@ -1159,6 +1159,114 @@ class TestInventionIsScoredApartFromTheCorpusGap:
         assert score.unsourced == ()
 
 
+class TestAnExtraElementSplitsByWhetherARenameCanExplainIt:
+    """Precision counts a rename and an addition alike; these are two facts.
+
+    Which blessed element an extra one renames needs a fuzzy comparison and is
+    refused. Whether it renames anything is set arithmetic: a rename displaces
+    a blessed element of its own type, so an extra element of a type the
+    extraction matched completely has nothing to be a rename of (#882).
+    """
+
+    def widened(self, case, collection, element):
+        raw = case.model.model_dump()
+        raw[collection].append(element)
+        return modes.score_extraction(
+            case,
+            modes.ExtractionResult(case.id, type(case.model).model_validate(raw), ()),
+        )
+
+    def test_an_extra_of_a_fully_matched_type_cannot_be_a_rename(self, case):
+        """Every blessed process is present, so an extra process is an addition."""
+        first = case.model.model_dump()["processes"][0]
+        score = self.widened(
+            case,
+            "processes",
+            dict(first, id="process:added", name=first["name"] + " replica"),
+        )
+
+        assert score.missing == ()
+        assert score.additions == score.extra
+        assert score.possible_renames == ()
+
+    def test_an_extra_of_a_displaced_type_could_be_one(self, case):
+        """One blessed process dropped and another added: the second could be
+        the first under a name this scorer may not guess at."""
+        raw = case.model.model_dump()
+        dropped = raw["processes"][0]["id"]
+        model = type(case.model).model_validate(raw)
+        score = modes.score_extraction(
+            case,
+            modes.ExtractionResult(case.id, _renamed_process(model, dropped), ()),
+        )
+
+        assert dropped in score.missing
+        assert score.possible_renames == score.extra
+        assert score.additions == ()
+
+    def test_the_two_partition_the_extra_elements(self, case):
+        """One reading, split two ways: neither loses an element nor repeats one."""
+        first = case.model.model_dump()["processes"][0]
+        score = self.widened(
+            case, "processes", dict(first, id="process:added", name="added thing")
+        )
+
+        assert sorted(score.possible_renames + score.additions) == sorted(score.extra)
+        assert not set(score.possible_renames) & set(score.additions)
+
+    def test_a_displaced_type_does_not_excuse_another_type(self, case):
+        """A missing process says nothing about an extra store."""
+        raw = case.model.model_dump()
+        dropped = raw["processes"].pop(0)
+        store = dict(raw["data_stores"][0], id="store:added", name="added store")
+        raw["data_stores"].append(store)
+        for flow in list(raw.get("data_flows", ())):
+            if dropped["id"] in (flow["source"], flow["destination"]):
+                raw["data_flows"].remove(flow)
+        score = modes.score_extraction(
+            case,
+            modes.ExtractionResult(case.id, type(case.model).model_validate(raw), ()),
+        )
+
+        assert "store:added" in score.additions
+        assert "store:added" not in score.possible_renames
+
+    def test_a_coined_flow_label_is_not_a_name_a_submitter_writes(self, case):
+        """``named_extra`` and ``_unsourced`` ask one population, one reader.
+
+        107 of the 136 extra elements a run were flows on the sweep of
+        2026-09-13, so a split over the whole of ``extra`` reads the labels the
+        model coins rather than the corpus.
+        """
+        raw = case.model.model_dump()
+        flow = dict(raw["data_flows"][0])
+        flow["id"] = flow["id"].rsplit(":", 1)[0] + ":another-label"
+        flow["name"] = "another label"
+        raw["data_flows"].append(flow)
+        score = modes.score_extraction(
+            case,
+            modes.ExtractionResult(case.id, type(case.model).model_validate(raw), ()),
+        )
+
+        assert flow["id"] in score.extra
+        assert flow["id"] not in score.named_extra
+        assert score.unsourced == ()
+
+
+def _renamed_process(model, element_id):
+    """The model with one process re-identified, and its flows re-pointed."""
+    raw = model.model_dump()
+    new = element_id + "-under-another-name"
+    for process in raw["processes"]:
+        if process["id"] == element_id:
+            process["id"] = new
+    for flow in raw.get("data_flows", ()):
+        for end in ("source", "destination"):
+            if flow[end] == element_id:
+                flow[end] = new
+    return type(model).model_validate(raw)
+
+
 def test_a_coined_flow_label_is_never_invention(case):
     """A flow's name is the model's label for an interaction, not the text's word.
 
