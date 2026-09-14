@@ -715,31 +715,19 @@ def test_no_document_counts_the_registry(path):
 #
 # Every LLM node that asks for structured output hands one JSON Schema to
 # whichever vendor its tier selects, so a shape one vendor refuses is a node
-# that cannot run there. **Measured rather than reasoned**: on
-# ``google/gemini-3.5-flash-lite`` through OpenRouter an extraction run
-# succeeded while an assertion run returned ``INVALID_ARGUMENT``, and a bisect
-# over the schema found the one difference that decides it.
+# that cannot run there.
 #
-# ====================================  ===========================  =======
-# schema                                root capped object arrays    route
-# ====================================  ===========================  =======
-# ``SystemModel``                       none                         OK
-# ``CatalogProposal`` (before the fix)  ``assertions`` maxItems 500  refused
-# ``stride.proposals``                  ``claims`` maxItems 400      refused
-# ``asvs.proposals``                    ``claims`` maxItems 400      refused
-# ``stride.rulings``                    none                         OK
-# ``asvs.rulings``                      none                         OK
-# ====================================  ===========================  =======
+# **A cap on a root-level array of objects is one such shape.** Measured rather
+# than reasoned, on ``google/gemini-3.5-flash-lite`` through OpenRouter: refused
+# at every ``maxItems`` from 8 to 500, while the same cap on a nested array, or
+# on a root array of strings, is accepted — which is why ``SystemModel`` runs
+# there with five capped ``assets`` lists. ``anyOf`` was the first suspect and is
+# not the cause.
 #
-# The cap is refused at every value tried, from 8 to 500, and only at the root:
-# the same cap on a *nested* array of objects is accepted, and so is a cap on a
-# root array of strings — which is why ``SystemModel`` runs there with five
-# capped ``assets`` lists.
-#
-# ``anyOf`` was the first suspect and is **not** the cause. A nullable enum, a
-# nullable nested object and both critics' whole ruling schemas are accepted on
-# that route, so the nullable judgement fields the critic record argues for cost
-# nothing here.
+# ``docs/research/structured-output-shapes.md`` is the measurement, with the
+# probe that re-derives it. The tables live there rather than here so that one
+# reading of a third party's surface has one home; what this module holds is the
+# rule the tree is checked against.
 
 #: Model-facing schemas that cap a root-level array of objects, with what it
 #: costs. Each would be a node that cannot run on a vendor refusing the shape.
