@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from evals.harness.artifact import ARTIFACT_VERSION, DECLARED_KEYS
+from evals.harness.artifact import ARTIFACT_VERSION, DECLARED_KEYS, load_artifact
 from evals.harness.provenance import ProvenanceError
 from evals.harness.stability import (
     aggregate_stability,
@@ -406,6 +406,46 @@ class TestCauseStability:
 
         assert entry.cause_stable is None and entry.cause_moving is None
         assert aggregate_stability([entry])["cause_stable"] is None
+
+    def test_a_run_that_omits_the_block_reads_unread_rather_than_refusing(
+        self,
+        tmp_path,
+        sampling,  # noqa: F811
+    ):
+        """The shape of the first merged Baseline: a sweep taken before #729,
+        which carries this version and omits a key the version declares.
+
+        The two readers are driven against each other here, because that is how
+        the defect survived: ``block`` was tested for raising and ``_causes``
+        for returning ``None``, and the second was driven by a ``losses`` value
+        of ``None`` rather than by an artifact with no such key. Between them
+        sat a handler for an exception nobody raises, so the whole comparison
+        died on the one artifact that has this shape.
+        """
+        record = provenance(sampling)
+        a = write_run(
+            tmp_path,
+            "a.json",
+            record,
+            [score(self.CASE, 2, [0])],
+            losses=losses_block(self.CASE, {1: "verb"}),
+        )
+        b = write_run(tmp_path, "b.json", record, [score(self.CASE, 2, [0])])
+        raw = json.loads(b.read_text(encoding="utf-8"))
+        del raw["losses"]
+        b.write_text(json.dumps(raw, indent=2), encoding="utf-8")
+
+        (older,) = load_runs([b])
+        assert older.causes is None
+        with pytest.raises(ProvenanceError, match="predates the instrument"):
+            load_artifact(b).block("losses")
+        assert load_artifact(b).carries("losses") is False
+
+        entry = compare_runs(load_runs([a, b]))[0]
+
+        # Recall needs no losses block, and reads across both runs.
+        assert entry.always == 1
+        assert entry.cause_stable is None and entry.cause_moving is None
 
     def test_a_miss_the_losses_block_does_not_charge_is_refused(
         self,

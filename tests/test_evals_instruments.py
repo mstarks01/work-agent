@@ -361,6 +361,20 @@ class TestReadingABlockFailsClosed:
         with pytest.raises(ProvenanceError, match="not a key an artifact declares"):
             self.loaded({"nope": 1}).block("nope")
 
+    def test_carries_answers_for_the_same_keys_block_raises_on(self):
+        """The two are one reader: ``carries`` is false exactly where ``block``
+        refuses the file, and both refuse an undeclared key outright."""
+        from evals.harness.provenance import ProvenanceError
+
+        artifact = self.loaded({"scores": []})
+
+        assert artifact.carries("scores") is True
+        assert artifact.carries("losses") is False
+        with pytest.raises(ProvenanceError, match="predates the instrument"):
+            artifact.block("losses")
+        with pytest.raises(ProvenanceError, match="not a key an artifact declares"):
+            artifact.carries("nope")
+
 
 class TestOneCaseMeasuredAlone:
     """``measure_case`` over one finished run, with no sweep around it.

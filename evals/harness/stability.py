@@ -251,11 +251,17 @@ def read_run(artifact: EvalArtifact) -> ScoredRun:
 
 
 def _causes(artifact: EvalArtifact) -> dict[Scope, dict[str, str]] | None:
-    """Each missed reference's charged cause, off the ``losses`` block, or ``None`` without one."""
-    try:
-        rows = artifact.block("losses")
-    except KeyError:
+    """Each missed reference's charged cause, off the ``losses`` block, or ``None`` without one.
+
+    Two artifacts have no causes to read and they are different files: one
+    predates the instrument and omits the key, and one ran it over a mode that
+    charges nothing and writes ``None``. Both read ``unread`` here, and neither
+    may take the rest of the comparison down with it — recall and content need
+    no losses block.
+    """
+    if not artifact.carries("losses"):
         return None
+    rows = artifact.block("losses")
     if rows is None:
         return None
     # Outside the try, for the reason :func:`read_run` gives.
