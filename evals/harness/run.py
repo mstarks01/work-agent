@@ -83,6 +83,7 @@ from evals.harness import (
 )
 from evals.harness.archive import archive_bytes
 from evals.harness.artifact import (
+    ARTIFACT_VERSION,
     REPO_ROOT,
     EvalArtifact,
     corpus_digest,
@@ -123,6 +124,7 @@ from evals.harness.instruments import (
     render_all,
 )
 from evals.harness.losses import CaseLosses
+from evals.harness.migrate import migrate_file
 from evals.harness.provenance import (
     UNSET,
     ProvenanceError,
@@ -1161,6 +1163,53 @@ def command_score(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_migrate(args: argparse.Namespace) -> int:
+    """Lift an older sweep artifact to the version the loader reads (no credentials).
+
+    One way, into a copy, and never inside a merged Baseline: those are
+    digest-sealed, and a rewrite in place fails the repo-wide verify. The
+    loader is unchanged and still takes exactly one version — what this repairs
+    is a file, deliberately, when somebody asks.
+
+    What it is for is the archive under ``evals/runs/``. Every repeat set this
+    repository has paid for sits there at an older version, and the band
+    reading is calibrated on repeat sets, so the data that sharpens the
+    instrument is the data the loader refuses (#916).
+    """
+    out = Path(args.out)
+    if _sealed(out):
+        print(
+            f"{out}: sits inside {BASELINES_DIR}, where a merged Baseline's files"
+            " are digest-sealed; write the lifted copy elsewhere",
+            file=sys.stderr,
+        )
+        return 1
+    lifted, refused = 0, 0
+    for source in sorted(Path(p) for p in args.artifact):
+        target = out / source.name if out.is_dir() or len(args.artifact) > 1 else out
+        # Per file, and the walk carries on. This exists to lift an archive,
+        # and an archive holds files a lift cannot help: a sweep from before
+        # execution identities were recorded is refused by the loader for a
+        # reason no rename repairs. Stopping at the first would leave the
+        # twenty behind it unlifted for the sake of one.
+        try:
+            was = migrate_file(source, target)
+            # Through the loader, so a lift that produced something unreadable
+            # says so here rather than at the instrument that reads it next.
+            load_artifact(target)
+        except ProvenanceError as error:
+            print(f"cannot lift {source}: {error}", file=sys.stderr)
+            target.unlink(missing_ok=True)
+            refused += 1
+            continue
+        print(f"{source} (version {was}) -> {target}")
+        lifted += 1
+    print(f"{lifted} artifact(s) lifted to artifact_version {ARTIFACT_VERSION}")
+    if refused:
+        print(f"{refused} refused; see above", file=sys.stderr)
+    return 1 if refused else 0
+
+
 def _sealed(path: Path) -> bool:
     """Whether ``path`` sits inside the directory of merged, digest-sealed Baselines."""
     return path.resolve().is_relative_to(BASELINES_DIR.resolve())
@@ -1830,6 +1879,18 @@ def _stability_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def _migrate_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "artifact", nargs="+", help="the sweep artifact(s) to lift, read-only"
+    )
+    parser.add_argument(
+        "--out",
+        required=True,
+        help="where the lifted copy goes: a file for one artifact, a directory"
+        " for several. Never inside evals/baselines.",
+    )
+
+
 def _compare_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("before", help="the sweep from before the edit")
     parser.add_argument("after", help="the sweep from after it")
@@ -1964,6 +2025,12 @@ COMMANDS: dict[str, Command] = {
         " (no credentials)",
         run=standings.command_agreement,
         arguments=_agreement_arguments,
+    ),
+    "migrate": Command(
+        help="lift an older sweep artifact to the version the loader reads,"
+        " into a copy (no credentials)",
+        run=command_migrate,
+        arguments=_migrate_arguments,
     ),
     "comparison": Command(
         help="rebuild evals/baselines/README.md from the merged Baselines"
