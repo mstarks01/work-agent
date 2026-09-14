@@ -159,10 +159,11 @@
       "source": "process:build-runner",
       "destination": "entity:public-package-registry",
       "protocol": "unknown",
-      "authentication": "none \u2014 the runner does not verify signatures on the packages it downloads",
+      "authentication": "unknown",
       "data_description": "dependency packages named by the lockfile, which is taken as given",
       "encryption_in_transit": "unknown",
-      "operations": "read"
+      "operations": "read",
+      "notes": "The source states one verification gap: the runner does not verify signatures on what it downloads. That is artifact authenticity under a signing trust policy, not how the runner authenticates to the registry, which the source never describes. This prose is the only record of it \u2014 no rule reads notes, so the gap reaches no candidate and no evidence entry until the assertion layer in #926 gives it a field."
     },
     {
       "id": "flow:build-runner-to-image-registry:push-image",

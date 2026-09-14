@@ -74,7 +74,16 @@ TOKEN_CAPS: dict[str, int] = {
     # chose differently — a plural, an expanded abbreviation, a qualifier the
     # text never attached — and 38 of the 39 lost flows ran between an endpoint
     # that had itself drifted.
-    "prompts/extract": 3000,
+    #
+    # Raised again to 3600 for two conventions the reference was applying and
+    # the prompt never stated (#925). `data_classification` now names its four
+    # tiers and says a tier is an inference that takes an assumptions entry;
+    # `interface_kind` now says the test is the interface a caller programs
+    # against, so an RPC service is non-web over any transport. Both were
+    # decided inside the corpus and nowhere else, which graded every extraction
+    # against rules it was never given — the defect the audit is about, in the
+    # contract rather than in the code.
+    "prompts/extract": 3600,
     "prompts/repair": 900,
     # One package's own text, under ``frameworks/<name>/``.
     f"package/{CRITIC_DOC}": 1200,
