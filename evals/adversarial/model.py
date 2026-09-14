@@ -16,12 +16,13 @@ registry fails as quietly as the branch it replaced.
 
 from __future__ import annotations
 
-import hashlib
 import json
 from pathlib import Path
 from typing import Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from analysis_service.sources import text_digest
 
 CASES_DIR = Path(__file__).resolve().parent / "cases"
 
@@ -138,8 +139,9 @@ class AdversarialCase(BaseModel):
         return digest_of(self.source_text()) == self.source_sha256
 
 
-def digest_of(text: str) -> str:
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+#: The one reader of "what is this text's content digest", shared with the
+#: support spans that pin a quote to the source it came from.
+digest_of = text_digest
 
 
 def load_case(directory: Path) -> AdversarialCase:

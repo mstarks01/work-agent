@@ -80,6 +80,7 @@ rather than leaning on the label check to do it.
 
 from __future__ import annotations
 
+import bisect
 import math
 import re
 import time
@@ -288,32 +289,153 @@ def verify_quote(quote: str, source: str) -> bool:
 def verify_normalized(quote: str, haystack: str) -> bool:
     """The same question, against a source :func:`normalize` already folded.
 
+    ``haystack`` must be normalized already: a rung applied to one side only
+    would compare two different dialects of the same string.
+    """
+    return match_normalized(quote, haystack) is not None
+
+
+def match_normalized(quote: str, haystack: str) -> tuple[tuple[int, int], ...] | None:
+    """Where each of ``quote``'s fragments sits in ``haystack``, or ``None``.
+
+    **The one reader of "is this quote in this source", for both callers of
+    that question.** :func:`verify_normalized` asks whether the answer exists
+    and :func:`locate_quote` asks where it is, so neither can accept a quote
+    the other rejects.
+
     The fifth rung: ``…`` splits the quote into fragments, each of which must
     appear **in order, after the last**. A quote marking a cut is a *sequence*
     of verbatim spans rather than one, so searching from a cursor is what makes
     the marker mean something — an unmarked elision, which is the failure mode
     both measured true rejections shared, still fails.
 
-    A quote with no fragment left after normalization verifies against nothing.
-    The schema requires a ``quote`` ground to carry text, so a blank one has
+    A quote with no fragment left after normalization matches nothing. The
+    schema requires a ``quote`` ground to carry text, so a blank one has
     already failed validation — but ``"…"`` is non-blank and normalizes away to
     nothing, and letting it through would make it the universal citation.
 
-    ``haystack`` must be normalized already: a rung applied to one side only
-    would compare two different dialects of the same string.
+    Half-open offsets into ``haystack``, one pair per fragment that survived
+    normalization, in the order the quote wrote them.
     """
-    fragments = [normalize(raw) for raw in _ELLIPSIS.split(quote)]
-    matched = False
+    found_at: list[tuple[int, int]] = []
     cursor = 0
-    for fragment in fragments:
+    for raw in _ELLIPSIS.split(quote):
+        fragment = normalize(raw)
         if not fragment:
             continue
         found = haystack.find(fragment, cursor)
         if found < 0:
-            return False
+            return None
         cursor = found + len(fragment)
-        matched = True
-    return matched
+        found_at.append((found, cursor))
+    return tuple(found_at) or None
+
+
+#: A word of a source, for the offset table :func:`index_source` builds. Nothing
+#: outside this module reads either field; :class:`Span` is what a caller gets.
+class _Word(NamedTuple):
+    start: int
+    end: int
+    folded: str
+
+
+class Span(NamedTuple):
+    """Half-open code-point offsets into a source's exact retained text.
+
+    ``source[span.start:span.end]`` is the submitter's own words, which is the
+    property that makes a span quotable: it is never the model's spelling of
+    them.
+
+    **A span names whole words.** The ladder collapses whitespace and compares
+    word by word, so a sub-word offset would claim a precision the ladder does
+    not have. A quote that opens mid-word therefore yields a span that opens at
+    that word.
+    """
+
+    start: int
+    end: int
+
+
+@dataclass(frozen=True)
+class IndexedSource:
+    """One source folded for the ladder, with every folded word's origin kept.
+
+    ``haystack`` is what :func:`match_normalized` searches. ``words`` holds the
+    same words in the same order, each with its offsets into the original text,
+    so a match position converts back to a span of the submission.
+
+    Built by :func:`index_source`, and built once per source by a caller that
+    locates many quotes in it.
+    """
+
+    haystack: str
+    words: tuple[_Word, ...]
+    #: Where each word starts inside ``haystack``, for the reverse lookup.
+    offsets: tuple[int, ...]
+
+
+def index_source(source: str) -> IndexedSource | None:
+    """Fold ``source`` word by word, keeping each word's offsets, or ``None``.
+
+    **It answers ``None`` when the word-by-word fold disagrees with
+    :func:`normalize`.** The two are the same operation in a different order,
+    and the corpus's 13 sources agree, but ``NFKC`` is defined over a string
+    rather than over a character: a source that folds differently in one pass
+    than in many would hand back offsets that name the wrong words. Refusing is
+    the honest answer, because a quote with no span is a quote the caller can
+    still verify, while a wrong span is a citation pointing somewhere else.
+
+    A word whose fold is empty — ``**`` on its own — is dropped rather than
+    joined, because :func:`normalize` removes the markup and then collapses the
+    whitespace around it into one space.
+    """
+    words = tuple(
+        _Word(match.start(), match.end(), normalize(match.group()))
+        for match in re.finditer(r"\S+", source)
+    )
+    kept = tuple(word for word in words if word.folded)
+    haystack = " ".join(word.folded for word in kept)
+    if haystack != normalize(source):
+        return None
+    offsets: list[int] = []
+    at = 0
+    for word in kept:
+        offsets.append(at)
+        at += len(word.folded) + 1
+    return IndexedSource(haystack, kept, tuple(offsets))
+
+
+def locate_quote(quote: str, indexed: IndexedSource) -> tuple[Span, ...] | None:
+    """Where ``quote`` sits in the source ``indexed`` was built from.
+
+    One :class:`Span` per fragment the quote marks with ``…``, in the order the
+    quote wrote them, or ``None`` where the ladder refuses the quote. The
+    answer agrees with :func:`verify_quote` by construction: both read
+    :func:`match_normalized`.
+
+    **The caller never states an offset; this computes it.** A model proposes
+    words and code decides whether they are in the source and where, so a
+    support span cannot claim a position the source does not hold.
+    """
+    matches = match_normalized(quote, indexed.haystack)
+    if matches is None:
+        return None
+    return tuple(
+        Span(
+            indexed.words[_word_at(indexed, start)].start,
+            indexed.words[_word_at(indexed, end - 1)].end,
+        )
+        for start, end in matches
+    )
+
+
+def _word_at(indexed: IndexedSource, position: int) -> int:
+    """The index of the word covering ``position`` in ``indexed.haystack``.
+
+    A position on the space between two words belongs to the word before it,
+    which is what ``bisect_right`` answers.
+    """
+    return bisect.bisect_right(indexed.offsets, position) - 1
 
 
 def repair_deadline() -> float:
