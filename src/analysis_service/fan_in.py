@@ -47,6 +47,7 @@ from analysis_service.candidates import generate_candidates
 from analysis_service.claims import (
     BEYOND_GROUNDS,
     ELEMENT_REF_MAX_CHARS,
+    MAX_CLAIMS_PER_BATCH,
     MENTION_MAX_CHARS,
     AnalysisMarks,
     Claim,
@@ -136,7 +137,34 @@ def fan_in(
     agent read in its scope line, because a claim on it would put the same
     unit on the report twice, once as a claim and once as not applicable
     (#443).
+
+    Raises :class:`DraftJoinError` when a lane emitted more than
+    :data:`~analysis_service.claims.MAX_CLAIMS_PER_BATCH` proposals. This is
+    where that bound lives, because the model-facing schema cannot carry it
+    without costing a vendor (#942).
     """
+    # The emission bound, checked first and raising alone, as the validity
+    # gate's element cap does: a batch too large to read cannot be made
+    # acceptable by fixing its rows. It counts what the agent wrote rather than
+    # what survived `ProposalBatch`'s salvage, because the malformed half is work
+    # too — `invalid_proposal_marks` walks every entry of it — so a bound over
+    # the kept half alone would admit an unbounded emission.
+    #
+    # It lives here rather than on the field so that no model-facing schema caps
+    # a root-level array of objects, which at least one vendor's structured
+    # output refuses outright (#942), and so that the bound has one reader for
+    # every framework instead of a line each package writes.
+    over = {
+        lane: len(batch.claims) + len(batch.invalid)
+        for lane, batch in batches.items()
+        if len(batch.claims) + len(batch.invalid) > MAX_CLAIMS_PER_BATCH
+    }
+    if over:
+        counts = ", ".join(f"{lane} emitted {count}" for lane, count in over.items())
+        raise DraftJoinError(
+            f"a {package.name} lane agent emitted more than"
+            f" {MAX_CLAIMS_PER_BATCH} proposals: {counts}"
+        )
     catalog = evidence_catalog(model)
     invalid = {
         lane: invalid_proposal_marks(batch.invalid, package, lane)
@@ -243,7 +271,12 @@ def fan_in(
 
 
 class DraftJoinError(ValueError):
-    """One framework's merged lane agents' drafts fail a mechanical check."""
+    """One framework's lane agents' output fails a mechanical check.
+
+    Two rules raise it: a merged draft resting on a ground the model cannot
+    support, and a lane emitting more than :data:`MAX_CLAIMS_PER_BATCH`
+    proposals.
+    """
 
 
 class JoinedDrafts(NamedTuple):

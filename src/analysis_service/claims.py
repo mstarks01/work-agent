@@ -282,6 +282,14 @@ GROUND_TERM_MAX_CHARS = 100
 # in the tree, with headroom: 84 claims in a batch, 13 grounds on a claim and 14
 # affected elements. They bound an emission that is not a lane's work at all,
 # and none of them constrains what the service has actually produced.
+#
+# Every one below the first bounds a *nested* array and is carried by the field,
+# so the model is asked for the shape the service accepts.
+# :data:`MAX_CLAIMS_PER_BATCH` bounds the root array and is carried by
+# :func:`~analysis_service.fan_in.fan_in` instead: a root-level array of objects
+# with ``maxItems`` is a shape at least one vendor's structured output refuses
+# outright, at every value from 8 to 500 (#942). A bound that costs a vendor
+# belongs where code reads the output.
 MAX_CLAIMS_PER_BATCH = 400
 MAX_GROUNDS_PER_CLAIM = 60
 MAX_QUOTES_PER_PROPOSAL = 20
@@ -1112,11 +1120,21 @@ class ProposalBatch(BaseModel):
     the provider is asked for exactly the strict shape and never told there is
     a slot for a bad one. A payload that already carries ``invalid`` is a
     batch read back from state and is validated as it stands.
+
+    **``claims`` carries no length bound**, and that is deliberate rather than
+    an omission. :data:`MAX_CLAIMS_PER_BATCH` still holds, enforced by
+    :func:`~analysis_service.fan_in.fan_in` before it reads a row: a root-level
+    array of objects carrying ``maxItems`` is refused outright by at least one
+    vendor's structured output, so the field would cost every lane agent of
+    every framework that route (#942). One shared reader also answers the parity
+    question a field cannot: a package narrowing ``claims`` drops the base's
+    constraints in silence, so a field-borne bound is a line each package has to
+    remember to write.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    claims: list[Proposal] = Field(max_length=MAX_CLAIMS_PER_BATCH)
+    claims: list[Proposal]
     invalid: SkipJsonSchema[list[InvalidProposal]] = Field(default_factory=list)
 
     @model_validator(mode="wrap")

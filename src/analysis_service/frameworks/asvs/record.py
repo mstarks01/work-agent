@@ -39,7 +39,6 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic.json_schema import SkipJsonSchema
 
 from analysis_service.claims import (
-    MAX_CLAIMS_PER_BATCH,
     BlockSummary,
     Claim,
     FrameworkAnalysis,
@@ -357,9 +356,10 @@ class RequirementProposals(ProposalBatch):
     # A narrowing, which is the point of the wrapper; `list` is invariant, so
     # mypy reports the override. Sound here for the reason STRIDE's is: these
     # models are built by validation and read, never appended to.
-    claims: list[RequirementProposal] = Field(  # type: ignore[assignment]
-        max_length=MAX_CLAIMS_PER_BATCH
-    )
+    #
+    # No length bound, for the reason `ProposalBatch` gives: `fan_in` carries
+    # MAX_CLAIMS_PER_BATCH, so a narrowing cannot drop it.
+    claims: list[RequirementProposal]  # type: ignore[assignment]
 
 
 class RequirementRulingProposal(Ruling):
