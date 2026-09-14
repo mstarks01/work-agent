@@ -905,6 +905,21 @@ class TestResolvingAProposal:
         _, issues = self.resolve(self.row(predicate="vibes"))
         assert issues[0].subject == FLOW
 
+    def test_a_proposal_over_the_cap_is_refused_before_a_row_is_read(self):
+        """The bound lives here, because the schema cannot carry it.
+
+        A root array carrying ``maxItems`` is a shape one vendor refuses, so
+        the cap is enforced where code reads the output rather than where a
+        provider has to accept it.
+        """
+        rows = [
+            self.row(value=f"mechanism {index}") for index in range(MAX_ASSERTIONS + 1)
+        ]
+        held, issues = self.resolve(*rows)
+
+        assert held.entries == []
+        assert codes(issues) == ["too-many-assertions"]
+
 
 class TestTheProjection:
     """What one graph attribute would hold, built from the rows.
