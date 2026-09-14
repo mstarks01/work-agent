@@ -223,6 +223,7 @@ somewhere else.
 | `harness/instruments.py` | Every measurement a sweep reports, as one table keyed by instrument — the per-case row, the fold, the rendering, and the artifact keys each one owns. |
 | `harness/artifact.py` | The sweep artifact: one declared shape, written once by `build` and read back through `load_artifact`, which refuses a file missing any declared key. |
 | `harness/archive.py` | The bytes each archived file's producer writes, as one table keyed by file kind. A Baseline holds five kinds and three encodings — a report is UTF-8, the drafts beside it are escaped ASCII, a manifest sorts its keys — and every writer asks here rather than picking one. |
+| `harness/migrate.py` | Lifting an older sweep artifact to the version the loader reads, into a copy. One step per version, keyed by the version it lifts from, so a chain is composed by lookup. Not a compatibility shim: nothing here runs during a load, and the loader still takes exactly one version. `run.py migrate`. |
 | `harness/run.py` | The command-line entry point. `score` re-reads the ledger over a finished sweep's saved reports, so a vote reaches the numbers without a second sweep. |
 | `harness/submit.py` | `submit <kind>`: runs a contribution's CI checks locally as a checklist, then packages the kind's allowlist on a fresh branch and opens the PR through `gh`. Kinds live in a table: `vote`, `sitting`, `baseline`. `verify-contribution --author` re-runs those checks in CI against the login GitHub says opened the PR. |
 
