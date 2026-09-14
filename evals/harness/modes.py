@@ -49,6 +49,7 @@ from analysis_service.assertions import (
     catalog_issues,
     conflicts,
     project,
+    projection_fields,
     resolve_catalog,
 )
 from analysis_service.basis import (
@@ -1194,16 +1195,37 @@ class AssertionScore:
     inferred: int
     conflicts: int
     subjects_reached: float
+    #: The control facts the blessed model states that some predicate in
+    #: :data:`~analysis_service.assertions.REGISTRY` can project into, and how
+    #: many of them the catalog's own rows reach. **This is the denominator the
+    #: projection had none of**: ``projected`` counts what the catalog emitted,
+    #: so a catalog reaching one attribute and getting it right read 1/1.
+    #:
+    #: Only pairs whose blessed value reads as ``stated`` are counted, because
+    #: reaching an attribute the blessed model leaves unverified asks nothing of
+    #: the model. Registry version 2 can reach five attributes; on corpus case
+    #: 01 that is 20 pairs, 13 of them stated.
+    reachable: int
+    reached: int
     #: The graph attributes the catalog reaches, and what projecting them costs.
-    #: ``agrees`` counts the attributes whose projected value reads the same
-    #: **control state** as the blessed model's own — the one reader both sides
-    #: go through. ``degraded`` counts the ones that read ``unknown`` because a
-    #: scope, a second value or a second predicate would not fit one string,
-    #: which is the loss the compatibility projection is *supposed* to report
-    #: rather than hide.
+    #: ``degraded`` counts the ones that read ``unknown`` because a scope, a
+    #: second value or a second predicate would not fit one string, which is the
+    #: loss the compatibility projection is *supposed* to report rather than
+    #: hide.
     projected: int
-    projection_agrees: int
     projection_degraded: int
+    #: Agreement through **control state**, the one reader both sides go
+    #: through, **split by what was agreed about**. ``agrees_stated`` is an
+    #: agreement about a fact the blessed model states. ``agrees_unstated`` is
+    #: an agreement that the blessed model states nothing — both sides reading
+    #: ``unknown`` or both reading ``absent``.
+    #:
+    #: Two fields rather than one, because pooling them is the #891 mistake:
+    #: agreeing that an unstated control is unknown is free, and on the first
+    #: assertion benchmark two of luna's eight agreements were of that kind.
+    #: Their sum is the single figure they replace, so no reader loses one.
+    agrees_stated: int
+    agrees_unstated: int
 
     def to_json(self) -> dict[str, Any]:
         """The per-case payload a sweep carries in the artifact's mode output."""
@@ -1222,9 +1244,12 @@ class AssertionScore:
             "inferred": self.inferred,
             "conflicts": self.conflicts,
             "subjects_reached": round(self.subjects_reached, 3),
+            "reachable": self.reachable,
+            "reached": self.reached,
             "projected": self.projected,
-            "projection_agrees": self.projection_agrees,
             "projection_degraded": self.projection_degraded,
+            "agrees_stated": self.agrees_stated,
+            "agrees_unstated": self.agrees_unstated,
         }
 
 
@@ -1302,6 +1327,40 @@ _DEGRADED: frozenset[str] = frozenset(get_args(ProjectionReason)) - {
 }
 
 
+def reachable_controls(model: SystemModel) -> tuple[tuple[str, str], ...]:
+    """Every ``(element, attribute)`` pair a catalog can be asked to reproduce.
+
+    The projection's denominator, derived from the blessed model rather than
+    authored: an attribute is reachable when some predicate in
+    :data:`~analysis_service.assertions.REGISTRY` projects into it, the element
+    carries it, and the blessed value reads as ``stated``.
+
+    **Stated only.** Reaching an attribute the blessed model leaves unverified
+    asks nothing of a model — both sides read ``unknown`` and agree for free —
+    so counting those pairs in the denominator would make a sparse case look
+    harder than it is and a thorough one look worse.
+
+    No human review is needed for this to be ground truth, because the blessed
+    control attributes are the same reviewed facts the extraction scorer already
+    compares. It is not a reference *catalog*: it says nothing about the rows a
+    predicate projecting into no graph field should hold, which is nine of the
+    sixteen in registry version 2.
+
+    The attribute set comes from
+    :func:`~analysis_service.assertions.projection_fields`, the one reader of
+    which field each predicate is authoritative for, rather than folded out of
+    :data:`~analysis_service.assertions.REGISTRY` a second time here.
+    """
+    attributes = sorted(set(projection_fields().values()))
+    return tuple(
+        (element.id, attribute)
+        for element in model.elements()
+        for attribute in attributes
+        if hasattr(element, attribute)
+        and control_state(str(getattr(element, attribute))) == "stated"
+    )
+
+
 def _projection_counts(case: GoldenCase, catalog: AssertionCatalog) -> dict[str, int]:
     """How much of the blessed graph the catalog's own rows reproduce.
 
@@ -1309,23 +1368,41 @@ def _projection_counts(case: GoldenCase, catalog: AssertionCatalog) -> dict[str,
     Comparing the strings would report a disagreement wherever two correct
     readings of one sentence are worded differently, which is the mistake the
     extraction scorer makes nowhere else.
+
+    Agreement is split by what was agreed about. A projection landing on an
+    attribute the blessed model states is counted apart from one landing where
+    it states nothing, because the second costs a model nothing to get right.
     """
     index = ModelIndex.of(case.model)
-    agrees = 0
+    reachable = reachable_controls(case.model)
+    stated = set(reachable)
+    reached: set[tuple[str, str]] = set()
+    agrees_stated = 0
+    agrees_unstated = 0
     projections = project(catalog)
     for projection in projections:
         element = index.get(projection.element_id)
         if element is None:
             continue
+        key = (projection.element_id, projection.attribute)
+        if key in stated:
+            reached.add(key)
         blessed = getattr(element, projection.attribute, UNKNOWN)
-        if control_state(projection.value) == control_state(str(blessed)):
-            agrees += 1
+        if control_state(projection.value) != control_state(str(blessed)):
+            continue
+        if key in stated:
+            agrees_stated += 1
+        else:
+            agrees_unstated += 1
     return {
+        "reachable": len(reachable),
+        "reached": len(reached),
         "projected": len(projections),
-        "projection_agrees": agrees,
         "projection_degraded": sum(
             1 for projection in projections if projection.reason in _DEGRADED
         ),
+        "agrees_stated": agrees_stated,
+        "agrees_unstated": agrees_unstated,
     }
 
 
@@ -1342,8 +1419,9 @@ def render_assertions(scores: Sequence[AssertionScore]) -> None:
             f" spans {score.spans:>3} absences {score.absences:>2}"
             f" unknowns {score.unknowns:>2} conflicts {score.conflicts:>2}"
             f" elements reached {score.subjects_reached:.0%}"
-            f" projected {score.projection_agrees}/{score.projected}"
-            f" degraded {score.projection_degraded}"
+            f" reached {score.reached}/{score.reachable}"
+            f" agrees {score.agrees_stated} (+{score.agrees_unstated} unstated)"
+            f" degraded {score.projection_degraded} of {score.projected}"
         )
     if not scores:
         return
