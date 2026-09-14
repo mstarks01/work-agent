@@ -131,14 +131,16 @@ class TestTheRegistryAnswersItsVocabularies:
         """A predicate cannot be authoritative for a field that does not exist."""
         assert set(projection_fields().values()) <= set(all_attribute_names())
 
-    def test_nine_of_the_fourteen_predicates_project_into_nothing(self):
+    def test_ten_of_the_sixteen_predicates_project_into_nothing(self):
         """ADR 0034's figure, re-derived rather than asserted in its prose.
 
         It is the whole argument for the catalog: the graph has no field for
-        most of what the first release scopes.
+        most of what the first release scopes. Registry version 2 added two
+        predicates a live run showed the sources state, and only one of them
+        has a field to land in.
         """
-        assert len(REGISTRY) == 14
-        assert len(REGISTRY) - len(projection_fields()) == 9
+        assert len(REGISTRY) == 16
+        assert len(REGISTRY) - len(projection_fields()) == 10
 
     def test_two_predicates_can_project_into_one_field(self):
         """A mechanism and the credential it presents share one string today.
@@ -497,6 +499,16 @@ REFUSALS: dict[str, tuple[str, AssertionCatalog, dict]] = {
         "offsets that do not hold the quote beside them",
         catalog([moved_span(start=0, end=8)]),
         {"sources": SOURCES},
+    ),
+    "exclusive-without-support": (
+        (
+            "an exclusivity claim closes the world for a predicate, so it needs"
+            " a source rather than a basis of its own"
+        ),
+        catalog(
+            [stated(basis="inferred", support=[], explanation="a", exclusive=True)]
+        ),
+        {},
     ),
     "unassessed-assessor": (
         "an assessment with nobody behind it is a model judging itself",

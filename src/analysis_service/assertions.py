@@ -137,7 +137,7 @@ __all__ = [
 #: whenever a predicate is added, removed, re-spelled, or has its value
 #: vocabulary, scope requirement or multiplicity changed — each of those
 #: changes what a row means, and a reader comparing two runs has to know.
-REGISTRY_VERSION = 1
+REGISTRY_VERSION = 2
 
 #: The value that says a source stated this fact is **not there**. A positive
 #: statement about an absence, which :attr:`Assertion.basis` then attributes:
@@ -347,6 +347,11 @@ REGISTRY: Mapping[str, Predicate] = MappingProxyType(
             value="term",
             terms=frozenset({"rotated", "not-rotated"}),
         ),
+        "credential-custody": Predicate(
+            meaning="where this credential is kept",
+            subjects=frozenset({"credential"}),
+            value="text",
+        ),
         "credential-expiry": Predicate(
             meaning="whether this credential stops working on its own",
             subjects=frozenset({"credential"}),
@@ -376,6 +381,13 @@ REGISTRY: Mapping[str, Predicate] = MappingProxyType(
             subjects=frozenset({"interaction"}),
             value="term",
             terms=frozenset({"verified"}),
+        ),
+        "internet-exposure": Predicate(
+            meaning="whether this component can be reached from the internet",
+            subjects=frozenset({"component"}),
+            value="term",
+            terms=frozenset({"internet-facing", "internal"}),
+            projects_into="exposure",
         ),
         "network-membership": Predicate(
             meaning="which zone this component sits in",
@@ -477,6 +489,16 @@ class Assertion(BaseModel):
     #: What an ``inferred`` value was inferred from, or what a ``derived`` rule
     #: is. One field, because both answer "why is this value here".
     explanation: str = Field(default="", max_length=1000)
+    #: Whether the source states that **no other subject** holds this predicate
+    #: at this value. "The only thing we expose to the internet", "the one
+    #: encrypted link". It is what lets a reader close the world for one
+    #: predicate: without it, every subject the catalog is silent about stays
+    #: unknown, which is the honest default and also the useless one when a
+    #: submitter has told you the set is complete.
+    #:
+    #: A claim, so it needs a source: the gate refuses it on a row that is not
+    #: ``stated`` or carries no span.
+    exclusive: bool = False
     assessment: Assessment = "unchecked"
     #: Who assessed the support, and which version of them. Required once
     #: ``assessment`` moves off ``unchecked``.
@@ -513,6 +535,7 @@ CatalogIssueCode = Literal[
     "missing-premise",
     "dangling-premise",
     "circular-support",
+    "exclusive-without-support",
     "dangling-source",
     "stale-digest",
     "unverifiable-span",
@@ -925,6 +948,11 @@ def _entry_issues(
     # where they are given.
     if entry.basis in ("inferred", "derived") and not entry.explanation:
         refuse("missing-premise", "an inferred or derived value says what it rests on")
+    if entry.exclusive and (entry.basis != "stated" or not entry.support):
+        refuse(
+            "exclusive-without-support",
+            "an exclusivity claim is a source's claim, so it cites the words",
+        )
     if entry.assessment != "unchecked" and not entry.assessor:
         refuse("unassessed-assessor", "an assessment names who made it")
 
@@ -1111,6 +1139,9 @@ class AssertionProposal(BaseModel):
     basis: Basis
     quotes: list[QuoteProposal] = Field(default_factory=list, max_length=MAX_SPANS)
     explanation: str = Field(default="", max_length=1000)
+    #: See :attr:`Assertion.exclusive`. A model sets it only where the source
+    #: says the set is complete.
+    exclusive: bool = False
 
 
 class CatalogProposal(BaseModel):
@@ -1257,6 +1288,7 @@ def _resolve_row(
         basis=row.basis,
         support=spans,
         explanation=row.explanation,
+        exclusive=row.exclusive,
     )
     subjects.setdefault(subject.id, subject)
     return assertion_id(entry), entry
@@ -1349,7 +1381,13 @@ def _merge(held: Assertion, found: Assertion) -> Assertion:
     for span in found.support:
         if span not in spans:
             spans.append(span)
-    return held.model_copy(update={"support": spans[:MAX_SPANS]})
+    return held.model_copy(
+        update={
+            "support": spans[:MAX_SPANS],
+            # Either source stating the set is complete states it for the row.
+            "exclusive": held.exclusive or found.exclusive,
+        }
+    )
 
 
 # --- What the graph's own fields would say ----------------------------------
