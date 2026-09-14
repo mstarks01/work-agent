@@ -20,5 +20,13 @@
       "exemplar_proximity": "near"
     }
   ],
+  "aliases": [
+    {
+      "element": "store:firmware-bucket",
+      "name": "Cloud Storage bucket",
+      "excerpt": "nodes poll a Cloud Storage bucket",
+      "ruling": "Supported shorthand for the bucket supplying firmware images."
+    }
+  ],
   "notes": "Far-domain case (ticket 009 decision 6). Structurally unlike the payments exemplar in the ways that matter for recall: the external entities are physically accessible devices rather than browser users, the highest-severity path is a pull-based firmware update rather than a request/response API, identity is one shared key across thousands of principals, and the worst outcome is code execution on hardware rather than disclosure of records. If exemplar anchoring biases recall, the firmware and physical-access lanes are where it should show."
 }

@@ -1387,3 +1387,110 @@ def test_an_invented_quote_is_scored_and_is_not_a_tier_one_failure(case):
     assert score.to_json()["uncited"][0]["element_id"] == case.model.processes[0].id
     # Nothing else moved: the model is complete and correct apart from the quote.
     assert score.recall == 1.0 and score.precision == 1.0
+
+
+class TestASupportedNameIsNamedDifferentlyRatherThanMissed:
+    """Two standards, and the corpus's `aliases` is the seam between them.
+
+    *Semantic fidelity* asks whether a name identifies the described thing;
+    *naming-policy conformity* asks whether it keeps the source's wording. An
+    extraction writing `process:airflow-scheduler` where the corpus wrote
+    `process:ingest-scheduler` passes the first and fails the second, and one
+    number charges it as though it found nothing (#882).
+    """
+
+    CASE = "03-batch-data-pipeline"
+
+    def scored(self, renames):
+        """The blessed model with elements re-identified, as a model naming them
+        its own way would emit."""
+        from evals.harness.reference import load_case
+
+        case = load_case(
+            Path(__file__).resolve().parents[1] / "evals" / "corpus" / self.CASE
+        )
+        raw = case.model.model_dump()
+        for collection in ("external_entities", "processes", "data_stores"):
+            for element in raw.get(collection, []):
+                if element["id"] in renames:
+                    element["id"] = renames[element["id"]]
+        for flow in raw.get("data_flows", []):
+            for end in ("source", "destination"):
+                flow[end] = renames.get(flow[end], flow[end])
+        model = type(case.model).model_validate(raw)
+        return case, modes.score_extraction(
+            case, modes.ExtractionResult(case.id, model, ())
+        )
+
+    def test_the_source_s_own_word_is_credited_as_the_same_element(self):
+        """`Airflow scheduler` is what the text calls it, in five runs of five."""
+        _, score = self.scored(
+            {"process:ingest-scheduler": "process:airflow-scheduler"}
+        )
+
+        assert "process:ingest-scheduler" in score.missing
+        assert score.sourced_recall > score.endpoint_recall
+        assert [credit.blessed for credit in score.aliased] == [
+            "process:ingest-scheduler"
+        ]
+        assert score.naming_departures == 1
+
+    def test_the_credit_carries_the_words_that_support_it(self):
+        """A reader meeting the higher number checks the ruling from the
+        artifact rather than opening the corpus at the sweep's commit."""
+        _, score = self.scored(
+            {"process:ingest-scheduler": "process:airflow-scheduler"}
+        )
+
+        assert (
+            score.aliased[0].excerpt
+            == "An Airflow scheduler running in the landing network"
+        )
+        assert score.to_json()["aliased"][0]["excerpt"]
+
+    def test_a_plural_is_the_same_name(self):
+        """`extract.md` asks for the singular of the source's word, so an alias
+        taken from the source is compared in the singular. Charging the plural
+        as a different component counts one disagreement twice."""
+        _, plural = self.scored({"entity:data-analyst": "entity:analysts"})
+        _, singular = self.scored({"entity:data-analyst": "entity:analyst"})
+
+        assert plural.naming_departures == singular.naming_departures == 1
+
+    def test_an_unsupported_name_is_still_missed(self):
+        """The mechanism credits a ruled name and nothing else. No fuzzy match."""
+        _, score = self.scored({"process:ingest-scheduler": "process:nightly-job"})
+
+        assert score.aliased == ()
+        assert score.sourced_recall == score.endpoint_recall
+
+    def test_an_exact_extraction_needs_no_credit(self):
+        _, score = self.scored({})
+
+        assert score.aliased == ()
+        assert score.sourced_recall == score.endpoint_recall == 1.0
+
+    def test_a_case_nobody_ruled_on_reads_the_strict_number(self):
+        """An absent ruling is not a ruling that every name is the only one."""
+        from evals.harness.reference import load_case
+
+        case = load_case(
+            Path(__file__).resolve().parents[1]
+            / "evals"
+            / "corpus"
+            / "01-payments-checkout"
+        )
+        assert case.meta.aliases == []
+        raw = case.model.model_dump()
+        raw["processes"][0]["id"] = "process:something-else"
+        for flow in raw.get("data_flows", []):
+            for end in ("source", "destination"):
+                if flow[end] == case.model.processes[0].id:
+                    flow[end] = "process:something-else"
+        score = modes.score_extraction(
+            case,
+            modes.ExtractionResult(case.id, type(case.model).model_validate(raw), ()),
+        )
+
+        assert score.aliased == ()
+        assert score.sourced_recall == score.endpoint_recall

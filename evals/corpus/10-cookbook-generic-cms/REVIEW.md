@@ -100,6 +100,10 @@ Not part of the question, but the records cite these names, so you need them.
 - `entity:admin` — The admin connects from outside the hosted network. (basis: "they do it from wherever they happen to be — there is no jump host".)
 - `entity:cdn` — The CDN and its bucket sit in a separate trust zone from the hosted network. (basis: Assets 'do not come off the web server'; the web server 'pushes them up to the CDN's bucket', implying a distinct, separately operated location.)
 
+**Reviewed aliases** — other names a reader ruled identify the same element, each with the words in the source that support it. An extraction using one is named differently, not wrong.
+
+- `store:cdn-bucket — CDN's bucket` — Essentially grammatical normalization of “the CDN’s bucket”. Source: > pushes them up to the CDN's bucket
+
 ### Your list
 
 Write what could go wrong. Anything: an attack, a missing control, a question
