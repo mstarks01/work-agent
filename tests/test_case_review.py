@@ -53,6 +53,20 @@ from evals.review_submission import REPO_ROOT, unreviewed_cases
 #: acceptable. They are the cases that shipped before step 6 was enforced, and
 #: the list is meant to shrink to nothing.
 UNREVIEWED: dict[str, str] = {
+    "01-payments-checkout": (
+        "21 STRIDE claims and 17 ASVS records, waiting on a re-sitting rather "
+        "than on a first reading. The sittings of 2026-09-08 and 2026-09-09 "
+        "read this case and signed four files, one of them model.json. The "
+        "reference corrections of #925 changed five fields in that file — two "
+        "protocols and the receipt archive's classification to unknown, the "
+        "order service to non-web, and an assumptions entry recording the "
+        "orders DB classification — so the signature cannot match. **Unlike "
+        "02, something the reader read has changed**: they read a model that "
+        "stated HTTPS on two flows, and the claims they ruled on were written "
+        "against it. A sitting over the current four files clears it, and it "
+        "is the one place a person has to look again rather than a digest to "
+        "refresh."
+    ),
     "02-iot-fleet-telemetry": (
         "18 STRIDE claims, waiting on a re-sitting rather than on a first "
         "reading. The sitting of 2026-09-12 read this case and signed four "

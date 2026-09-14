@@ -81,10 +81,11 @@
       ],
       "source_excerpt": "Airflow keeps its connection strings and the partner keys in its own metadata database.",
       "source_label": "System description",
-      "technology": "PostgreSQL",
+      "technology": "unknown",
       "trust_zone": "boundary:landing-network",
       "data_classification": "confidential",
-      "encryption_at_rest": "unknown"
+      "encryption_at_rest": "unknown",
+      "notes": "The source calls it Airflow's own metadata database and names no product."
     },
     {
       "id": "store:claims-warehouse",
@@ -152,7 +153,7 @@
       "source_label": "System description",
       "source": "process:ingest-scheduler",
       "destination": "store:airflow-metadata-database",
-      "protocol": "PostgreSQL wire protocol",
+      "protocol": "unknown",
       "authentication": "unknown",
       "data_description": "connection strings, partner SFTP keys",
       "encryption_in_transit": "unknown",

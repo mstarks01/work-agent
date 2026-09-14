@@ -39,10 +39,24 @@ Never derive boundary crossings — they are computed mechanically from the zone
 
 `interface_kind` is what a **Process** presents: `web` for the HTTP family as an application presents it — a browser UI, a REST, GraphQL or SOAP API, a websocket. A portal, console, web app or site is `web`; a batch job, broker or queue daemon is `non-web`.
 
+**The test is the interface a caller programs against, not the transport underneath.** An RPC service — gRPC, Thrift, a broker consumer, a bespoke binary protocol — is `non-web` even over HTTP/2, because its caller writes against the service's own contract rather than URLs, methods and status codes.
+
 **Neither it nor a flow's `protocol` licenses the other**, in either direction:
 
 - "The supplier portal" says what the portal presents and nothing about transport: `interface_kind: "web"`, `protocol: "unknown"`.
 - A backup agent shipping files over HTTPS is not a web application: `protocol: "https"`, `interface_kind: "non-web"`.
+- A worker its callers reach over gRPC is not a web application either: `protocol: "gRPC"`, `interface_kind: "non-web"`.
+
+### `data_classification`
+
+A **scheme word**, never the contents. One of:
+
+- `public` — the text says it is published or world-readable.
+- `internal` — for use inside the organisation; disclosure harms no outside party.
+- `confidential` — disclosure harms a person or the business: personal, payment or health data, credentials, secrets, commercially sensitive records.
+- `unknown` — the text does not say what is held, or what it says does not settle the tier.
+
+A tier is nearly always inferred from stated contents, so any tier but `unknown` takes an `assumptions` entry under rule 8 whose basis names those contents. Where the stated contents do not settle it, write `unknown`: a storage location, an access mechanism and an encryption control say how a store is protected, never what is in it. "Customer name, address, and the card they paid with" is a `description`; `confidential` is the classification.
 
 ### Reading what a source says
 

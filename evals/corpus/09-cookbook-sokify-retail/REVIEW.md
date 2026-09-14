@@ -89,7 +89,7 @@ Not part of the question, but the records cite these names, so you need them.
 | flow:web-api-to-sims:order-handover | process:web-api | process:sims | unknown | unknown | unknown |
 | flow:sims-to-delivery-address-flat-file:address-write | process:sims | store:delivery-address-flat-file | unknown | unknown | unknown |
 | flow:sims-to-fax-gateway:dispatch-note | process:sims | process:fax-gateway | unknown | unknown | unknown |
-| flow:fax-gateway-to-customer:confirmation-fax | process:fax-gateway | entity:customer | fax | the dialled destination is never verified; nobody checks the fax arrived at the right place | unknown |
+| flow:fax-gateway-to-customer:confirmation-fax | process:fax-gateway | entity:customer | fax | unknown | unknown |
 
 **Trust boundaries**
 
@@ -105,7 +105,7 @@ Not part of the question, but the records cite these names, so you need them.
 - `process:web-api` — The source states outright that nobody can say what the API does about authentication, so every flow into it holds authentication unknown rather than absent.
 - `process:fax-gateway` — The source does not say whether the gateway is operated in-house or by a third party; it is zoned with Sokify's own systems on the strength of being described as part of what SIMS does with an order.
 - `process:catalogue-spreadsheet` — Typed as a process rather than an external entity: it is the org's own tooling and the source describes it by what its macros execute, not by who operates it. It is the resting place of the catalogue and the code that pushes SQL, and is modelled once.
-- `flow:fax-gateway-to-customer:confirmation-fax` — The stated absence is destination verification, not authentication in general — the source says nobody checks the fax arrived at the right place, and says nothing else about how this leg is controlled.
+- `flow:fax-gateway-to-customer:confirmation-fax` — The source states one verification gap: the gateway dials the number stored against the order and nobody checks it arrived at the right place. That is assurance that the recipient is the intended one, not how this leg authenticates, which the source never describes. It is also not an integrity property — a fax can arrive unaltered at the wrong recipient. This prose is the only record of it — no rule reads notes, so the gap reaches no candidate and no evidence entry until the assertion layer in #926 gives it a field.
 - `boundary:sokify-internal-systems` — The source names no network segments; this zone groups the components described as Sokify's own systems.
 
 **Assumptions**
@@ -446,7 +446,7 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "603873a0d569ba3f0ac4a91a363086b54bae022cf432862d17be9eec9465e4ea",
-      "model.json": "9141866e92172660bdff951ab56360adc1c067abcee39ad51b35c206284028d2",
+      "model.json": "f6fa157c61944d3001eb3323ccaeb77c32aeba5181e39ffd372d90168e4457ea",
       "claims/asvs.json": "fa211c11c2a82bf649b5518b6d7120ece7720af93b570fdcfb1a56b15a0b0adb",
       "claims/stride.json": "33f48cb7d16f23f0d627279af76e3c66acdf37011ca3fbd319b9a9965af07c2a"
       }

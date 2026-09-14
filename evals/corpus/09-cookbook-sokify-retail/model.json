@@ -263,11 +263,11 @@
       ],
       "source_excerpt": "The gateway dials the number stored against the order and nobody checks it arrived at the right place.",
       "source_label": "System description",
-      "notes": "The stated absence is destination verification, not authentication in general \u2014 the source says nobody checks the fax arrived at the right place, and says nothing else about how this leg is controlled.",
+      "notes": "The source states one verification gap: the gateway dials the number stored against the order and nobody checks it arrived at the right place. That is assurance that the recipient is the intended one, not how this leg authenticates, which the source never describes. It is also not an integrity property \u2014 a fax can arrive unaltered at the wrong recipient. This prose is the only record of it \u2014 no rule reads notes, so the gap reaches no candidate and no evidence entry until the assertion layer in #926 gives it a field.",
       "source": "process:fax-gateway",
       "destination": "entity:customer",
       "protocol": "fax",
-      "authentication": "the dialled destination is never verified; nobody checks the fax arrived at the right place",
+      "authentication": "unknown",
       "data_description": "Order confirmation carrying the customer's name and address",
       "encryption_in_transit": "unknown",
       "operations": "write"
