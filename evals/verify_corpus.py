@@ -50,7 +50,11 @@ from analysis_service.report import (
     SourceRef,
 )
 from analysis_service.sources import SourceKind
-from analysis_service.system_model import SystemModel, make_element_id
+from analysis_service.system_model import (
+    ELEMENT_GROUPS,
+    SystemModel,
+    make_element_id,
+)
 from analysis_service.validation import parse_and_validate
 from evals.harness.calibration import SCORED_LABELS, Label, LabelAnnotation
 from evals.harness.reference import MUST_FIND, AsvsDisposition, Tier
@@ -448,13 +452,24 @@ def _check_citations(model: object, sources: dict[str, str]) -> Iterator[str]:
     is not a check. The corpus is the thing those validators are measured
     against, so it verifies itself.
 
-    A source declared with no readable text skips the excerpt half alone — the
-    label must still resolve, and the missing file is :func:`_check_sources`'
-    to report rather than this function's to report twice.
+    Three rungs, and the presence one comes first: an element that quotes
+    nothing cites nothing, which the service refuses too (#925). A corpus that
+    graded a model through this check while carrying an uncited element itself
+    would be holding the extraction to a rule its own reference breaks.
+
+    A source declared with no readable text skips the verbatim rung alone — the
+    excerpt must still exist and the label must still resolve, and the missing
+    file is :func:`_check_sources`' to report rather than this function's to
+    report twice.
     """
     if not isinstance(model, dict):
         return
-    for elements in model.values():
+    # The element groups by name, rather than every list the file happens to
+    # hold: ``assumptions`` is a list of objects too, and it carries no citation
+    # of its own. Reading it here asks an assumption for an excerpt and names
+    # the failure against an element ID it does not have.
+    for group in ELEMENT_GROUPS:
+        elements = model.get(group)
         if not isinstance(elements, list):
             continue
         for element in elements:
@@ -463,6 +478,10 @@ def _check_citations(model: object, sources: dict[str, str]) -> Iterator[str]:
             excerpt = element.get("source_excerpt")
             label = element.get("source_label")
             if not excerpt:
+                yield (
+                    f"model.json: {element.get('id')} carries no source_excerpt,"
+                    " so nothing ties it to the case's own sources"
+                )
                 continue
             if not label:
                 yield (

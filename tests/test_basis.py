@@ -14,6 +14,8 @@ from analysis_service.basis import (
     IN_SCOPE,
     MAX_SCAN_WORK,
     content_tokens,
+    coverage,
+    dispositions,
     stated_controls,
     unbased_controls,
 )
@@ -136,11 +138,65 @@ def test_a_value_of_function_words_alone_is_not_flagged():
     assert unbased_controls(model, WORKED_EXAMPLE) == []
 
 
+def test_a_value_of_function_words_alone_is_reported_as_unread(caplog):
+    """And the difference is legible, rather than an empty list either way (#925).
+
+    A stated mechanism rewritten to ``the`` reads as a control on every
+    mechanical check the service has, and this diagnostic is the one place that
+    could say otherwise. It cannot — there is no token to search — so it says
+    that instead of saying nothing.
+    """
+    model = _model(authentication="the")
+
+    read = coverage(model, WORKED_EXAMPLE)
+
+    assert (read.stated, read.measured, read.tokenless) == (1, 0, 1)
+    assert read.flagged == 0
+    assert read.unmeasured == 1
+
+
 def test_an_element_citing_a_source_the_job_never_carried_is_passed_over():
     """The validity gate refuses that shape; this reports on it a second time."""
     model = _model(authentication="OAuth 2.0")
 
     assert unbased_controls(model, {"Some other label": "anything"}) == []
+
+
+def test_an_erased_citation_is_counted_as_unread_not_as_clean(caplog):
+    """The composition #925 names, from this side of it.
+
+    Blanking a citation takes the element out of the scan, and the flag list
+    that results is indistinguishable from a model whose every control echoed
+    its source. ``coverage`` is what tells the two apart.
+    """
+    model = _model(authentication="arbitrary nonsense")
+    for element in model.elements():
+        element.source_excerpt = ""
+        element.source_label = ""
+
+    read = coverage(model, WORKED_EXAMPLE)
+
+    assert unbased_controls(model, WORKED_EXAMPLE) == []
+    assert (read.stated, read.measured, read.uncited) == (1, 0, 1)
+    assert read.flagged == 0
+
+
+def test_every_stated_control_lands_in_exactly_one_disposition():
+    """The walk partitions, so no value leaves the denominator unaccounted.
+
+    Counted from the corpus rather than a fixture: a value the walk dropped
+    would be missing from both the rate and the coverage, which is the failure
+    ``coverage`` exists to make impossible.
+    """
+    for case_dir in verify_corpus.case_dirs():
+        case = load_case(case_dir)
+        sources = {source.label: source.text for source in case.sources}
+        walked = list(dispositions(case.model, sources))
+        read = coverage(case.model, sources)
+
+        assert len(walked) == read.stated
+        assert read.measured + read.uncited + read.tokenless == read.stated
+        assert read.flagged <= read.measured
 
 
 def test_a_version_number_survives_as_one_token():
@@ -240,6 +296,33 @@ def test_the_published_strict_rung_rate_is_what_the_corpus_gives(corpus_values):
     ]
 
     assert len(flagged) == CORPUS_FLAGGED_STRICT, flagged
+
+
+def test_the_corpus_is_read_in_full_so_its_clean_rate_means_something(
+    corpus_values,
+):
+    """0 flags over 22 values, and 22 of 22 actually searched (#925).
+
+    The published rate is only a rate if the denominator was read. This ties
+    the table's ``values`` column to the coverage of the same walk: were a case
+    to lose its citations, ``measured`` would fall and the 0 would stop meaning
+    what the table says it means.
+    """
+    totals = {"stated": 0, "measured": 0, "uncited": 0, "tokenless": 0, "flagged": 0}
+    for case_dir in verify_corpus.case_dirs():
+        case = load_case(case_dir)
+        sources = {source.label: source.text for source in case.sources}
+        for key, value in coverage(case.model, sources).to_json().items():
+            totals[key] += value
+
+    assert totals == {
+        "stated": CORPUS_VALUES,
+        "measured": CORPUS_VALUES,
+        "uncited": 0,
+        "tokenless": 0,
+        "flagged": CORPUS_FLAGGED_WEAK,
+    }
+    assert len(corpus_values) == totals["measured"]
 
 
 def test_the_corpus_runs_clean_through_the_shipped_reader():
