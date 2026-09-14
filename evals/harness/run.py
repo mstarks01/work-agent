@@ -42,7 +42,7 @@ import sys
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
 
 from analysis_service.actions import VerbError
 from analysis_service.certification import CertificationError, CertifyResult, certify
@@ -174,6 +174,40 @@ def _select(cases: Sequence[GoldenCase], wanted: Sequence[str]) -> list[GoldenCa
     return [by_id[case_id] for case_id in wanted]
 
 
+#: What :func:`_batches` cuts, which is a case with its corpus position here
+#: and could be anything a later caller has to keep in order.
+_T = TypeVar("_T")
+
+
+@dataclass(frozen=True)
+class _CaseOutcome:
+    """What one case leaves behind, before the sweep folds it in case order.
+
+    Exactly one of ``run``, ``extraction`` and ``error`` is set. ``executions``
+    is carried whichever it is: the provider billed every node that finished,
+    including on a case that then failed.
+    """
+
+    case: GoldenCase
+    executions: tuple[NodeRun, ...] = ()
+    run: modes.AnalysisRun | None = None
+    extraction: modes.ExtractionScore | None = None
+    #: The extraction's own validity issues, which the fold reads apart: the
+    #: citation half is scored and every other one is a malformed model.
+    issues: tuple[Any, ...] = ()
+    error: Exception | None = None
+
+
+def _batches(items: Sequence[_T], size: int) -> list[list[_T]]:
+    """One sequence, in order, cut into groups of ``size``.
+
+    A batch is the unit the spend hold runs between and the unit a stopping
+    fault takes down with it, so the cut is stated here rather than implied by
+    a slice at each site.
+    """
+    return [list(items[start : start + size]) for start in range(0, len(items), size)]
+
+
 async def _run_mode(
     cases: Sequence[GoldenCase],
     mode: str,
@@ -181,6 +215,7 @@ async def _run_mode(
     only: Sequence[FrameworkName] = (),
     accepted: float | None = None,
     ask: Callable[[str], str] | None = None,
+    in_flight: int = 1,
 ) -> ModeRun:
     """Run one mode over the selected cases, collecting Tier 1 failures.
 
@@ -209,11 +244,25 @@ async def _run_mode(
     sweep, and the $2.85 already spent produced no artifact at all (#886).
 
     ``accepted`` is the amount the estimate gate took consent for, and the
-    hold runs **between cases, never inside one**: a case that has started has
-    already committed its spend, and interrupting it would pay for a
+    hold runs **between batches, never inside one**: a case that has started
+    has already committed its spend, and interrupting it would pay for a
     measurement nobody could read. ``None`` means the contributor accepted
     ``unknown``, so there is nothing to measure against and the hold never
     fires.
+
+    ``in_flight`` is how many cases run at once, and it is what a batch is. At
+    ``1`` — the default — a batch is one case and every guarantee above reads
+    as it always has. Above it the hold's guarantee weakens by exactly that
+    factor: it may overspend by a batch rather than by a case, because a batch
+    that has started has committed its spend the same way one case has. So the
+    knob is off unless somebody asks for it, and ``command_run`` refuses a
+    value over the deployment's own ``max_active_jobs`` — a sweep is one caller
+    driving many jobs, and that bound is what a deployment already states about
+    how many of its jobs may be in flight for one caller.
+
+    **The artifact does not depend on the batch size.** Each case's work is
+    done with nothing shared, and the results are folded back in case order, so
+    a sweep at any ``in_flight`` writes the same bytes as one at ``1``.
     """
     # One graph per distinct framework set rather than one for the sweep. A case
     # declares the frameworks whose **Precondition** allows it and whose records
@@ -244,7 +293,6 @@ async def _run_mode(
     coverage: list[TaggedRow] = []
     extractions: list[modes.ExtractionScore] = []
     rows: dict[str, list[Any]] = {}
-    skipped: list[str] = []
     stopped_before: tuple[str, ...] = ()
 
     def record_failure(case: GoldenCase, error: Exception) -> None:
@@ -293,62 +341,23 @@ async def _run_mode(
         failures.append(f"{case.id}: the sweep stopped here: {error!r}")
         payloads.append({"case": case.id, "run_failure": repr(error)})
 
-    for position, case in enumerate(cases):
-        if position and accepted is not None:
-            remaining = [later.id for later in cases[position:]]
-            try:
-                # `position` counts every case the loop reached; a skipped one
-                # spent nothing, so counting it would divide the spend by a
-                # larger number and project low. `remaining` over-counts the
-                # same way and is left alone, because that pushes the figure
-                # up — the safe direction for a gate somebody consents to.
-                accepted = consent.hold(
-                    accepted,
-                    executions,
-                    remaining,
-                    ask,
-                    ran=position - len(skipped),
-                )
-            except consent.Refused as refusal:
-                # Not an exception out of the sweep: everything already run is
-                # paid for, so the caller still writes the artifact and the
-                # reports. ``stopped_before`` is what stops the partial record
-                # reading as a whole one.
-                print(refusal)
-                stopped_before = tuple(remaining)
-                break
-        if not modes.select_frameworks(case, only):
-            # Not a failure: --framework asked for packages this case does not
-            # declare, so there is nothing here to measure. Named rather than
-            # dropped, because a case absent from a sweep and a case that
-            # scored nothing are different facts.
-            skipped.append(case.id)
-            continue
-        pipeline = pipeline_for(case)
-        # One try over the whole case, so a fault anywhere in it leaves the
-        # sweep holding what the earlier cases already paid for. The extraction
-        # branch sat outside this and lost a sweep the same way the analysis
-        # branch did.
+    async def run_one(case: GoldenCase, pipeline: Pipeline) -> _CaseOutcome:
+        """One case's work, sharing nothing with the cases beside it.
+
+        Every fault is caught and returned rather than raised, because a batch
+        runs its cases together: a raising sibling would take the results of
+        cases the provider has already billed for. Which fault stops the sweep
+        is decided in the fold below, where ``stopped_before`` is decided too.
+        """
         try:
             if mode == "extraction":
                 result = await modes.run_extraction(case, pipeline)
-                executions += result.node_runs
-                score = modes.score_extraction(case, result)
-                extractions.append(score)
-                payloads.append(score.to_json())
-                # The citation half is scored, not failed. It fires when the
-                # model quotes a source wrongly, which production hands to
-                # ``repair`` and this mode stops before; ``score.uncited``
-                # carries every one into the artifact. Everything else is still
-                # a malformed model.
-                failures += [
-                    f"{case.id}: extraction is not a valid system model:"
-                    f" {issue.code}: {issue.message}"
-                    for issue in result.issues
-                    if not issue.is_citation
-                ]
-                continue
-
+                return _CaseOutcome(
+                    case=case,
+                    executions=tuple(result.node_runs),
+                    extraction=modes.score_extraction(case, result),
+                    issues=tuple(result.issues),
+                )
             run = (
                 await modes.run_analysis(case, pipeline)
                 if mode == "analysis"
@@ -357,40 +366,116 @@ async def _run_mode(
         except modes.CaseFailure as failed:
             # The provider billed every node that finished, whether the graph
             # then failed to build its report (#707) or a later node raised
-            # (#711), so what ran joins the sweep's executions before the
-            # failure is classified: a failed case is priced like a finished
-            # one. The raising node's own call is the one figure no path
-            # meters, so the price is a floor.
-            executions += failed.node_runs
-            if not isinstance(failed.cause, MEASURED):
+            # (#711), so what ran is carried out with the failure: a failed
+            # case is priced like a finished one. The raising node's own call
+            # is the one figure no path meters, so the price is a floor.
+            return _CaseOutcome(
+                case=case, executions=tuple(failed.node_runs), error=failed.cause
+            )
+        except Exception as error:  # noqa: BLE001 — every fault, so none is free
+            # A refused model and a provider fault arrive the same way here and
+            # are told apart by :data:`MEASURED` in the fold, which is the one
+            # reader of that question.
+            return _CaseOutcome(case=case, error=error)
+        return _CaseOutcome(case=case, executions=tuple(run.report.nodes), run=run)
+
+    def fold(outcome: _CaseOutcome) -> bool:
+        """Fold one case's outcome into the sweep. ``True`` where it stops it.
+
+        Called in case order over a finished batch, so the accumulators below
+        are in corpus order whatever order the cases finished in — a
+        byte-identical artifact is the acceptance test for a change here.
+        """
+        case = outcome.case
+        executions.extend(outcome.executions)
+        if outcome.error is not None:
+            if not isinstance(outcome.error, MEASURED):
                 # Not a measurement: the provider or the transport failed, and
                 # the next case would fail the same way. Stop, but keep what
                 # ran.
-                record_abort(case, failed.cause)
-                stopped_before = tuple(later.id for later in cases[position + 1 :])
-                break
-            record_failure(case, failed.cause)
-            continue
-        except MEASURED as error:
-            # A refused model, or a fault before the executor started. Both are
-            # rates somebody asked for, so the sweep records one and goes on.
-            record_failure(case, error)
-            continue
-        except Exception as error:  # noqa: BLE001 — every fault, so none is free
-            record_abort(case, error)
-            stopped_before = tuple(later.id for later in cases[position + 1 :])
-            break
-
+                record_abort(case, outcome.error)
+                return True
+            record_failure(case, outcome.error)
+            return False
+        if outcome.extraction is not None:
+            extractions.append(outcome.extraction)
+            payloads.append(outcome.extraction.to_json())
+            # The citation half is scored, not failed. It fires when the model
+            # quotes a source wrongly, which production hands to ``repair`` and
+            # this mode stops before; ``score.uncited`` carries every one into
+            # the artifact. Everything else is still a malformed model.
+            failures.extend(
+                f"{case.id}: extraction is not a valid system model:"
+                f" {issue.code}: {issue.message}"
+                for issue in outcome.issues
+                if not issue.is_citation
+            )
+            return False
+        run = outcome.run
+        assert run is not None  # an outcome carries a run, a score or an error
         runs[case.id] = run
-        executions += run.report.nodes
         issues = report_issues(run.report)
-        failures += [f"{case.id}: {issue}" for issue in issues]
+        failures.extend(f"{case.id}: {issue}" for issue in issues)
         measured = measure_case(case, run, issues)
-        grounds += measured.grounds
-        coverage += measured.coverage
+        grounds.extend(measured.grounds)
+        coverage.extend(measured.coverage)
         for name, row in measured.rows.items():
             rows.setdefault(name, []).append(row)
         payloads.append(measured.payload)
+        return False
+
+    # Every case the sweep will attempt, in corpus order, each with its
+    # position in the corpus, and the ones no selected package declares named
+    # apart. Decided before anything runs: a skipped case spends nothing, so
+    # counting it in the spend rate would divide by a larger number and project
+    # low. The position is carried rather than recovered by ``index``, because
+    # two cases of one corpus can compare equal and the second would then be
+    # priced as the first.
+    attempted: list[tuple[int, GoldenCase]] = []
+    skipped: list[str] = []
+    for position, case in enumerate(cases):
+        if modes.select_frameworks(case, only):
+            attempted.append((position, case))
+        else:
+            # Not a failure: --framework asked for packages this case does not
+            # declare, so there is nothing here to measure. Named rather than
+            # dropped, because a case absent from a sweep and a case that
+            # scored nothing are different facts.
+            skipped.append(case.id)
+    ran = 0
+    for batch in _batches(attempted, in_flight):
+        if ran and accepted is not None:
+            # From this batch's first case to the end of the corpus, skipped
+            # cases included. Those spend nothing, so counting them pushes the
+            # projection up — the safe direction for a gate somebody consents
+            # to, and the reading this had before batches existed.
+            remaining = [later.id for later in cases[batch[0][0] :]]
+            try:
+                accepted = consent.hold(accepted, executions, remaining, ask, ran=ran)
+            except consent.Refused as refusal:
+                # Not an exception out of the sweep: everything already run is
+                # paid for, so the caller still writes the artifact and the
+                # reports. ``stopped_before`` is what stops the partial record
+                # reading as a whole one.
+                print(refusal)
+                stopped_before = tuple(remaining)
+                break
+        # The pipelines before the batch, not inside it: building one runs the
+        # credential and supported-param gates, and two cases of one framework
+        # set would otherwise race to build the same graph twice.
+        built = [(case, pipeline_for(case)) for _, case in batch]
+        ran += len(batch)
+        outcomes = await asyncio.gather(
+            *(run_one(case, pipeline) for case, pipeline in built)
+        )
+        # Every case in the batch ran and was billed, so every outcome is
+        # folded even when an earlier one stops the sweep. What stops is the
+        # batch after this one.
+        stopping = [fold(outcome) for outcome in outcomes]
+        if any(stopping):
+            after = cases[batch[-1][0] + 1 :]
+            stopped_before = tuple(later.id for later in after)
+            break
 
     if skipped:
         # Printed, never silent: a narrowed sweep that quietly measured 9 of 13
@@ -646,6 +731,28 @@ def _pin_record(tiers: ModelTierConfig, selection: TierSelection) -> dict[str, A
     return {"upstreams": list(tiers.upstreams_for(selection.vendor))}
 
 
+def _cases_in_flight(args: argparse.Namespace, deployment: Deployment) -> int:
+    """How many cases this sweep may run at once, or a refusal saying why not.
+
+    Bounded by the deployment's own ``max_active_jobs`` rather than by a number
+    of the harness's own. A sweep is one caller driving one job per case, and
+    that bound is what the deployment already states about how many of its jobs
+    one caller may have in flight. Reading it here keeps the ceiling in the
+    file an operator turns down mid-incident.
+    """
+    wanted = int(args.cases_in_flight)
+    ceiling = deployment.resilience.max_active_jobs
+    if wanted < 1:
+        raise SystemExit(f"--cases-in-flight {wanted}: run at least one case at a time")
+    if wanted > ceiling:
+        raise SystemExit(
+            f"--cases-in-flight {wanted}: this deployment's max_active_jobs is"
+            f" {ceiling}, which is how many jobs one caller may have in flight."
+            " Raise it in config/resilience.toml, or ask for fewer"
+        )
+    return wanted
+
+
 def _contribution_note(commit: Any) -> tuple[str, ...]:
     """What to say about this sweep's contributability, before the money goes.
 
@@ -735,6 +842,9 @@ def command_run(args: argparse.Namespace) -> int:
     # is certified against are then one configuration rather than two reads
     # that could disagree.
     deployment = Deployment.from_env()
+    # Before the consent gate, because a refusal here costs nothing and a
+    # contributor should not accept an amount for a sweep that will not start.
+    in_flight = _cases_in_flight(args, deployment)
 
     # Informed, affirmative consent, before the first request spends anything
     # (#334). There is no ceiling: the contributor may accept any amount, and
@@ -755,7 +865,15 @@ def command_run(args: argparse.Namespace) -> int:
         return 1
 
     mode_run = asyncio.run(
-        _run_mode(cases, args.mode, deployment, tuple(args.framework), accepted, ask)
+        _run_mode(
+            cases,
+            args.mode,
+            deployment,
+            tuple(args.framework),
+            accepted,
+            ask,
+            in_flight=in_flight,
+        )
     )
     failures = mode_run.failures
     ran = [case for case in cases if case.id not in mode_run.stopped_before]
@@ -1451,6 +1569,17 @@ def _run_arguments(parser: argparse.ArgumentParser) -> None:
         " case declares.",
     )
     parser.add_argument("--corpus", default=DEFAULT_CORPUS_DIR)
+    parser.add_argument(
+        "--cases-in-flight",
+        type=int,
+        default=1,
+        metavar="N",
+        help="run N cases at once. One by default, which is what the spend hold"
+        " and every published sweep assume: the hold runs between batches, so"
+        " at N the run may pass what you accepted by a batch rather than by a"
+        " case. The artifact does not depend on it. Refused above the"
+        " deployment's own max_active_jobs.",
+    )
     parser.add_argument(
         "--roster",
         default=str(roster.DEFAULT_ROSTER_PATH),
