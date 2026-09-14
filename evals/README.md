@@ -219,7 +219,7 @@ somewhere else.
 | `harness/instruction_delta.py` | What one prompt edit did: which node's instruction moved, and what moved with it. |
 | `harness/provenance.py` | What each node execution actually ran on — tier, requested route, served build, fingerprint — written into the artifact and read back by a promotion. |
 | `harness/certify.py` | Promoting a winning configuration: rewrites `config/sampling.toml` and records its fingerprints as blessed. The certification check itself lives in the service (`analysis_service.certification`), which this imports. |
-| `harness/modes.py` | The three run modes over the shipped graph, and the extraction score: element agreement, the derived crossings, and the attributes a Candidate rule reads. |
+| `harness/modes.py` | The four run modes over the shipped graph, the assertion counts, and the extraction score: element agreement, the derived crossings, and the attributes a Candidate rule reads. |
 | `harness/instruments.py` | Every measurement a sweep reports, as one table keyed by instrument — the per-case row, the fold, the rendering, and the artifact keys each one owns. |
 | `harness/artifact.py` | The sweep artifact: one declared shape, written once by `build` and read back through `load_artifact`, which refuses a file missing any declared key. |
 | `harness/archive.py` | The bytes each archived file's producer writes, as one table keyed by file kind. A Baseline holds five kinds and three encodings — a report is UTF-8, the drafts beside it are escaped ASCII, a manifest sorts its keys — and every writer asks here rather than picking one. |
@@ -318,6 +318,16 @@ costing a second sweep, and `score` can recompute every scored reading from
 them. `extraction` mode stops at the validity gate, produces no report, and
 says so. Expect roughly 30–80 KB per report. These files are publishable: they
 carry corpus source text, which is in this repository.
+
+An `assertions` run reads the sources against the blessed model and writes one
+row per statement the sources make: subject, predicate, value, and the span of
+the source that says so. It writes
+`artifact.reports/<case>.assertions.json` — what the node proposed, the rows
+code built from it, and why each dropped row dropped — and prints counts per
+case. **There is no agreement figure**, because no corpus case carries a
+reference catalog: the counts say what the run produced, and `absences` is the
+one that answers the audit directly, because a control the sources say is *not
+there* has nowhere to live in a System Model attribute.
 
 An `extraction` run prints element recall and precision per case, then the
 attribute agreement split by attribute. Read the split first when the element

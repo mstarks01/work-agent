@@ -1,6 +1,7 @@
 """Model-tier configuration for the graph's LLM nodes.
 
-There are three vendor-neutral tiers. ``base`` runs extraction and repair.
+There are three vendor-neutral tiers. ``base`` runs extraction, repair and
+the assertion pass.
 ``strong`` runs a framework's lane agents. ``review`` exists so a deployment can
 bind criticism away from the analysis it checks. Each tier selects its own
 ``(vendor, model)`` pair, so the three may run different vendors at once, and no
@@ -139,7 +140,7 @@ def _framework_nodes() -> tuple[str, ...]:
 
 
 FRAMEWORK_NODES: tuple[str, ...] = _framework_nodes()
-LLM_NODES: tuple[str, ...] = ("extract", "repair", *FRAMEWORK_NODES)
+LLM_NODES: tuple[str, ...] = ("extract", "repair", "assert", *FRAMEWORK_NODES)
 
 
 def critic_pairing_issues(resolve_tier) -> list[str]:

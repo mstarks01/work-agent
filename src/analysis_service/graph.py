@@ -126,6 +126,7 @@ from google.adk.workflow import START, FunctionNode, JoinNode, Workflow
 from google.genai import types
 from pydantic import ValidationError
 
+from analysis_service.assertions import CatalogProposal
 from analysis_service.basis import unbased_controls
 from analysis_service.candidates import generate_candidates
 from analysis_service.claims import (
@@ -175,6 +176,7 @@ from analysis_service.markdown_loader import MarkdownLoader, estimate_tokens
 from analysis_service.model_tiers import ReviewIndependence, TierName
 from analysis_service.prompts import (
     compose_analyze_prompt,
+    compose_assert_prompt,
     compose_critic_prompt,
     compose_extract_prompt,
     compose_recritic_prompt,
@@ -226,6 +228,8 @@ logger = logging.getLogger(__name__)
 # preparation, one assembly. #162 ruled that one **Valid System Model** serves
 # every framework a job selects, so nothing here is per-framework.
 EXTRACT_NODE = "extract"
+ASSERT_NODE = "assert"
+READ_MODEL_NODE = "read"
 VALIDATE_NODE = "validate"
 REPAIR_NODE = "repair"
 REVALIDATE_NODE = "revalidate"
@@ -457,6 +461,7 @@ def tier_node_by_graph_node(
     return {
         EXTRACT_NODE: "extract",
         REPAIR_NODE: "repair",
+        ASSERT_NODE: "assert",
         **{
             node: tier
             for name in frameworks
@@ -467,7 +472,7 @@ def tier_node_by_graph_node(
 
 # --- Routes -----------------------------------------------------------------
 
-Entry = Literal["extract", "prepare", "extract-only"]
+Entry = Literal["extract", "prepare", "extract-only", "assert-only"]
 
 ENTRY_EXTRACT: Entry = "extract"
 ENTRY_PREPARE: Entry = "prepare"
@@ -481,6 +486,15 @@ ENTRY_EXTRACT_ONLY: Entry = "extract-only"
 :func:`~analysis_service.validation.parse_and_validate` gate ``validate`` uses.
 Spending every framework's lane agents and critics to score an extraction would
 be that many kinds of noise on one number."""
+
+ENTRY_ASSERT_ONLY: Entry = "assert-only"
+"""The assertion eval mode: render a **Valid System Model** seeded in state,
+run ``assert`` over it and the sources, and stop.
+
+The model is seeded rather than extracted for the reason :data:`ENTRY_PREPARE`
+seeds one: a row this node could not bind to an element would otherwise be
+unattributable between the two readings, and the question this mode asks is
+what the sources *state*, not whether two calls named one component alike."""
 
 ROUTE_VALID = "valid"
 ROUTE_INVALID = "invalid"
@@ -575,6 +589,10 @@ STATE_REPAIR_BASELINE = "repair_baseline"
 STATE_MODEL_REPAIR = "model_repair"
 
 STATE_EXTRACTED_MODEL = "extracted_model"
+# What ``assert`` emits: a ``CatalogProposal``, before code resolves its rows
+# into a catalog. Structured, because a driver reads it back and resolves it —
+# see :func:`~analysis_service.assertions.resolve_catalog`.
+STATE_ASSERTION_PROPOSAL = "assertion_proposal"
 STATE_VALID_MODEL = "valid_model"
 # What ``prepare`` put in front of every lane of every framework: the packs this
 # model earned. Written where the selection happens rather than recomputed at a
@@ -660,6 +678,7 @@ SHARED_STRUCTURED_KEYS: frozenset[str] = frozenset(
     {
         STATE_SOURCE_TEXTS,
         STATE_EXTRACTED_MODEL,
+        STATE_ASSERTION_PROPOSAL,
         STATE_VALID_MODEL,
         STATE_DOMAIN_PACKS,
         STATE_ANALYSIS,
@@ -1204,6 +1223,18 @@ def reject_model(validation_issues: str, ctx, keys: GraphKeys) -> dict[str, Any]
 _ELEMENT_SOURCE_FIELDS = ("source_excerpt", "source_label", "source_speaker")
 
 
+def render_model(valid_model: dict) -> str:
+    """The model as every agent reads it: stripped, then fenced.
+
+    **The one reader of "what does the model look like to a model".** Two
+    entries write :data:`STATE_SYSTEM_MODEL` — ``prepare`` in the analysing
+    graph and ``read`` in the assertion one — and they call this rather than
+    each fencing a view of their own, so no agent can be shown a model another
+    agent would not recognise.
+    """
+    return render_fenced(_without_source_fields(valid_model))
+
+
 def _without_source_fields(valid_model: dict) -> dict:
     """The model as a reasoning view: every element's own quote removed.
 
@@ -1332,7 +1363,7 @@ def prepare_analysis(
     # calls have been paid for, and a lane agent has been told to rule at a level
     # nobody supplied.
     _check_options(frameworks, options)
-    state.prompt(STATE_SYSTEM_MODEL, render_fenced(_without_source_fields(valid_model)))
+    state.prompt(STATE_SYSTEM_MODEL, render_model(valid_model))
     state.prompt(
         STATE_BOUNDARY_CROSSINGS,
         render_fenced([crossing.model_dump(mode="json") for crossing in crossings]),
@@ -2224,6 +2255,39 @@ def _extract_node(
     )
 
 
+def _assert_node(
+    prompt_loader: MarkdownLoader,
+    resolve_model: ModelResolver,
+    resolve_sampling: SamplingResolver,
+) -> LlmAgent:
+    """The assertion node: the sources and the model in, one flat list out."""
+    return _llm_node(
+        name=ASSERT_NODE,
+        tier_node="assert",
+        instruction=compose_assert_prompt(prompt_loader),
+        output_schema=CatalogProposal,
+        output_key=STATE_ASSERTION_PROPOSAL,
+        resolve_model=resolve_model,
+        resolve_sampling=resolve_sampling,
+    )
+
+
+def _read_model_node_func(keys: GraphKeys) -> Callable[..., Any]:
+    """Render the seeded model for the assertion node, and nothing else.
+
+    A rendered key is written by the node that derives it, so the assertion
+    graph derives its own rather than taking bytes from its driver. It renders
+    through :func:`render_model`, which ``prepare`` also calls, so the two
+    graphs show one model one way.
+    """
+
+    def read(valid_model: dict, ctx) -> dict[str, Any]:
+        keys.state(ctx).prompt(STATE_SYSTEM_MODEL, render_model(valid_model))
+        return {"elements": len(valid_model.get("data_flows", []))}
+
+    return read
+
+
 def _instruction(skills: str, prompt: str) -> str:
     """Skill text then prompt text: what to know, then what to do with it.
 
@@ -2439,7 +2503,12 @@ def build_pipeline(
     produced. It is a parameter here, not a second topology in the eval tree,
     because two definitions of the same graph drift.
     """
-    if entry not in (ENTRY_EXTRACT, ENTRY_PREPARE, ENTRY_EXTRACT_ONLY):
+    if entry not in (
+        ENTRY_EXTRACT,
+        ENTRY_PREPARE,
+        ENTRY_EXTRACT_ONLY,
+        ENTRY_ASSERT_ONLY,
+    ):
         raise ValueError(f"unknown graph entry point: {entry!r}")
     if not frameworks:
         raise ValueError("a graph must be built for at least one framework")
@@ -2465,6 +2534,12 @@ def build_pipeline(
     if entry == ENTRY_EXTRACT_ONLY:
         extract = _extract_node(prompt_loader, resolve_model, resolve_sampling)
         return pipeline(Workflow(name=name, edges=[(START, extract)]), [extract])
+
+    if entry == ENTRY_ASSERT_ONLY:
+        assert_keys = GraphKeys.of(frameworks)
+        read = _node(_read_model_node_func(assert_keys), READ_MODEL_NODE)
+        catalog = _assert_node(prompt_loader, resolve_model, resolve_sampling)
+        return pipeline(Workflow(name=name, edges=[(START, read, catalog)]), [catalog])
 
     keys = GraphKeys.of(frameworks)
     disclaimers = {

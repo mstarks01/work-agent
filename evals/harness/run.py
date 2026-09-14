@@ -96,6 +96,7 @@ from evals.harness.bundle import (
     optional_block,
     runs_from_reports,
     stride_threats,
+    write_assertions,
     write_extractions,
     write_reports,
 )
@@ -198,6 +199,9 @@ class _CaseOutcome:
     executions: tuple[NodeRun, ...] = ()
     run: modes.AnalysisRun | None = None
     extraction: modes.ExtractionScore | None = None
+    #: The assertion mode's counterparts to the two fields below.
+    assertion: modes.AssertionScore | None = None
+    assertion_result: modes.AssertionResult | None = None
     #: The extraction the score above was taken over, carried so the sweep can
     #: write it beside the artifact. ``None`` outside the extraction mode.
     result: modes.ExtractionResult | None = None
@@ -294,6 +298,8 @@ async def _run_mode(
     payloads: list[dict[str, Any]] = []
     runs: dict[str, modes.AnalysisRun] = {}
     extracted: dict[str, modes.ExtractionResult] = {}
+    resolved: dict[str, modes.AssertionResult] = {}
+    assertion_scores: list[modes.AssertionScore] = []
     # Every execution the sweep performed, kept flat so the per-node totals,
     # the certification verdict and the artifact's provenance are three views
     # of one list rather than three folds that could disagree.
@@ -360,6 +366,14 @@ async def _run_mode(
         is decided in the fold below, where ``stopped_before`` is decided too.
         """
         try:
+            if mode == "assertions":
+                resolved = await modes.run_assertions(case, pipeline)
+                return _CaseOutcome(
+                    case=case,
+                    executions=tuple(resolved.node_runs),
+                    assertion=modes.score_assertions(case, resolved),
+                    assertion_result=resolved,
+                )
             if mode == "extraction":
                 result = await modes.run_extraction(case, pipeline)
                 return _CaseOutcome(
@@ -407,6 +421,12 @@ async def _run_mode(
                 record_abort(case, outcome.error)
                 return True
             record_failure(case, outcome.error)
+            return False
+        if outcome.assertion is not None:
+            assertion_scores.append(outcome.assertion)
+            payloads.append(outcome.assertion.to_json())
+            if outcome.assertion_result is not None:
+                resolved[case.id] = outcome.assertion_result
             return False
         if outcome.extraction is not None:
             extractions.append(outcome.extraction)
@@ -503,6 +523,8 @@ async def _run_mode(
         failures=failures,
         runs=runs,
         extracted=extracted,
+        assertion_scores=assertion_scores,
+        assertions=resolved,
         provenance=provenance_of(
             executions,
             tier_of=deployment.tier_of,
@@ -952,6 +974,7 @@ def command_run(args: argparse.Namespace) -> int:
         print(f"artifact written to {args.out}")
         write_reports(args.out, args.mode, mode_run.runs)
         write_extractions(args.out, args.mode, mode_run.extracted)
+        write_assertions(args.out, args.mode, mode_run.assertions)
 
     for failure in failures:
         print(f"TIER 1 FAILURE: {failure}", file=sys.stderr)

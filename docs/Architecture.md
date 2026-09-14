@@ -113,7 +113,8 @@ it.
 Every LLM node runs on one of two **model tiers** — named for the job they do,
 not for any vendor's product line:
 
-- **`base`** — the workhorse: `extract` and `repair`.
+- **`base`** — the workhorse: `extract`, `repair` and `assert`, which are
+  transcription rather than judgement.
 - **`strong`** — judgement: every framework's lane agents, its `critic`, and the
   `recritic`.
 
