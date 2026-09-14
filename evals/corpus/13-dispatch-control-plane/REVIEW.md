@@ -118,10 +118,15 @@ Not part of the question, but the records cite these names, so you need them.
 - `flow:duty-engineer-to-dispatch-console:open-console` — The source states nobody wrote down how an engineer signs in.
 - `flow:dispatch-console-to-dispatch-api:live-job-status` — The source states nobody wrote down whether the socket runs over TLS, whether its handshake is authenticated, or whether it checks the session again once open.
 - `flow:schedule-importer-to-scheduling-partner:pull-schedule-feed` — The source states nothing was written down about how the partner identifies our importer, or how our importer identifies the partner.
+- `boundary:scheduling-partner-platform` — The source establishes an organizational distinction: the scheduling partner is another company. Drawing that distinction as a trust zone is a separate modelling judgement, and the reviewed alias on 'scheduling partner' rules on the name alone.
 
 **Assumptions**
 
 - `process:dispatch-api` — The dispatch API is not reachable from the internet. (basis: The source states the control plane is not reachable from the internet, and places the dispatch API in it; the source states nothing about the API's own exposure.)
+
+**Reviewed aliases** — other names a reader ruled identify the same element, each with the words in the source that support it. An extraction using one is named differently, not wrong.
+
+- `boundary:scheduling-partner-platform — scheduling partner` — The source identifies the scheduling partner as another company. 'Platform' is an additional abstraction supplied by the corpus. Source: > A scheduling partner, which is another company
 
 ### Your list
 
@@ -428,7 +433,7 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
-      "model.json": "2916d2ebbc9e051af0f1085e8fdf29f97a888acad694e904ce227aa7bcddaf24",
+      "model.json": "6175c8ee1086669d62bc72ac43f8e5421cee4608575e24e6ecd92ef7dbc26fe7",
       "claims/asvs.json": "21223b93d65a21e5b8de043940250783cfd9408246e5c1825bef5b8cf4c3ec45",
       "claims/stride.json": "07a43e4387e0f3d490edbdf732259e37957f4a09394d4e23e5203fca2d4558f3"
       }

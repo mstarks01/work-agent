@@ -100,6 +100,11 @@ Not part of the question, but the records cite these names, so you need them.
 - `process:lobby` — The lobby and the game servers accept connections from arbitrary networks. (basis: Stated to be reachable "from wherever a player is, so they are exposed".)
 - `store:player-database` — Player records constitute personal data. (basis: Described as player accounts acted on by customer support moderation.)
 
+**Reviewed aliases** — other names a reader ruled identify the same element, each with the words in the source that support it. An extraction using one is named differently, not wrong.
+
+- `boundary:corp-network — corporate network` — The source spells out corporate network; the corpus abbreviates corporate. Source: > our customer support staff work from the corporate network
+- `boundary:prod-network — production network` — The source spells out production network; the corpus abbreviates production. Source: > The client connects out to two things in our production network.
+
 ### Your list
 
 Write what could go wrong. Anything: an attack, a missing control, a question

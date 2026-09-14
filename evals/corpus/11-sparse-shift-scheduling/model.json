@@ -225,7 +225,8 @@
       "description": "Run by another team; the source says nothing else about it.",
       "source_excerpt": "The payroll system, which is run by another team",
       "source_label": "System description",
-      "kind": "tenant"
+      "kind": "tenant",
+      "notes": "The source establishes an organizational distinction: the payroll system is run by another team. Drawing that distinction as a trust zone is a separate modelling judgement, and the reviewed alias on 'another team' rules on the name alone."
     }
   ],
   "assumptions": [
