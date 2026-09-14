@@ -114,6 +114,13 @@ and carries it as a part of its identity: `evals/harness/baseline.py` refuses a
 sweep whose record names no upstream or more than one, and names the Baseline
 after route and upstream together otherwise.
 
+It carries the pin beside the served name, because the two answer different
+questions. The served name is the organisation that answered, and one
+organisation serves several endpoints: a flex endpoint and a standard one were
+measured 2.1x apart in price and 46% apart in latency, and both reported the
+same organisation. The pin is what you chose, so the artifact records it per
+tier and two endpoints of one provider name two Baselines.
+
 It also stops an estimate. Those backends charge different rates — one slug
 lists 1.0e-07 per input token and reaches an endpoint charging 1.04e-06 — so
 the route has no one rate, and `evals/harness/prices.py` reports it as
@@ -262,6 +269,11 @@ What a pin buys is a **Baseline**: one is named after the single upstream the
 record says served every node on the tier, so a sweep meant to be published
 pins one. A key for a vendor that routes to one provider is an error, because
 there is nothing to pin.
+
+The sweep records the pin per tier, and the Baseline identity carries it. A
+tier you leave unpinned records an empty list, which says the gateway chose;
+that is a configuration of its own and not the same as a sweep taken before
+this was recorded.
 
 Under `iam`, Work Agent passes an **empty** `api_key` rather than none at all.
 That is not a detail: LiteLLM reads `AWS_BEARER_TOKEN_BEDROCK` out of the

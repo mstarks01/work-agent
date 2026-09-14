@@ -848,15 +848,11 @@ def _baseline_closing(root: Path, author: str) -> str:
     manifest = _baseline_manifest(root)
     identity = manifest.get("identity", {})
     sweeps = manifest.get("sweeps", [])
-    # Escaped for the reason `comparison._inline` gives: these come out of the
-    # contributor's own artifact, and this text is the review aid a maintainer
-    # reads before merging it.
-    upstreams = identity.get("upstreams", {})
-    models = ", ".join(
-        f"{comparison._inline(tier)}: {comparison._inline(model)}"
-        + (f" via {comparison._inline(upstreams[tier])}" if tier in upstreams else "")
-        for tier, model in sorted(identity.get("models", {}).items())
-    )
+    # Through the comparison table's reader, so the summary a maintainer reads
+    # before merging and the table published afterwards describe one Baseline
+    # one way. It escapes every value, for the reason `comparison._inline`
+    # gives: these come out of the contributor's own artifact.
+    models = comparison.models_phrase(identity, code=False)
     # A cost that is not a table is not money and names nothing unpriced; the
     # baseline re-check lists it as a problem, and this summary reads past it.
     costs = [
