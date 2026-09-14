@@ -395,6 +395,20 @@ estimate rather than a recorded number. Spend on the narrowest instrument that
 can see the change: one case first, five runs of that case next, and the corpus
 only for a batch.
 
+**Run cases at once where waiting is the cost.** A sweep runs one case at a
+time by default. `--cases-in-flight N` runs N together, bounded by the
+deployment's own `max_active_jobs`, and the artifact is byte for byte what a
+sequential sweep writes. It buys the most in the extraction mode, which has one
+node and so waits for its whole wall clock: 13 cases take 6.7 minutes and a
+five-run spread takes 33.
+
+Read what it costs before you turn it on. The spend hold runs **between
+batches**, so at N the run may pass the amount you accepted by a batch rather
+than by a case. Under `--accept-cost unknown` the hold never fires at all, at
+any N. And N cases in flight reserve N times the maximum-output cost against a
+gateway's in-flight budget, which is what refused a $2.41 sweep at a $1.24
+balance on 2026-09-12.
+
 **Do not price a targeted fix against the corpus total.** The total's band is
 about 4 must-finds of 129, and no ceiling written so far clears it. A fix that
 targets named rows is measured on those rows: the case-09 spread on 2026-09-12
