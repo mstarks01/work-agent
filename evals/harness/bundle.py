@@ -18,9 +18,11 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
+from analysis_service.assertions import project
 from analysis_service.claims import FrameworkAnalysis, FrameworkName
 from analysis_service.frameworks import PACKAGES
 from analysis_service.frameworks.stride.record import Threat
@@ -158,6 +160,11 @@ def write_assertions(
     * ``catalog`` — the rows code built, which every count was taken over.
     * ``issues`` — why each dropped row dropped, structured as a repair pass
       would receive it.
+    * ``projection`` — what each graph attribute the rows reach would hold, the
+      reason it reads that way, and the rows behind it. It is here rather than
+      recomputed by a reader because a degraded value is only explainable with
+      the rows that would not fit, and the counts in the artifact carry the
+      totals without them.
 
     **These files are publishable** on the same reading the reports are: they
     carry quotes of corpus source text, which is in this repository. The same
@@ -178,6 +185,9 @@ def write_assertions(
                     "catalog": result.catalog.model_dump(mode="json"),
                     "issues": [
                         issue.model_dump(mode="json") for issue in result.issues
+                    ],
+                    "projection": [
+                        asdict(projection) for projection in project(result.catalog)
                     ],
                 },
             ),
