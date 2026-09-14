@@ -76,6 +76,7 @@ from analysis_service.grounding import (
     normalize,
     verify_quote,
 )
+from analysis_service.references import canonical
 from analysis_service.sources import text_digest
 from analysis_service.system_model import (
     ELEMENT_ID,
@@ -101,13 +102,16 @@ __all__ = [
     "UNIVERSAL_TERMS",
     "Assertion",
     "AssertionCatalog",
+    "AssertionProposal",
     "Basis",
     "CatalogIssue",
     "CatalogIssueCode",
+    "CatalogProposal",
     "Conflict",
     "Predicate",
     "Qualifier",
     "QualifierKind",
+    "QuoteProposal",
     "SpanSource",
     "Subject",
     "SubjectType",
@@ -117,6 +121,7 @@ __all__ = [
     "catalog_issues",
     "conflicts",
     "projection_fields",
+    "resolve_catalog",
     "span_source",
     "spans_for",
     "subject_id",
@@ -256,10 +261,14 @@ class Predicate:
     """
 
     meaning: str
-    subjects: frozenset[str]
+    subjects: frozenset[SubjectType]
     value: ValueKind
     terms: frozenset[str] = frozenset()
-    refers_to: frozenset[str] = frozenset()
+    #: What a ``reference`` value names. Exactly one subject type, never two:
+    #: the model writes a name and code builds the subject ID from it, so a
+    #: predicate that admitted two referent types would leave code guessing
+    #: which one a name meant. ``tests/test_assertions.py`` holds it to one.
+    refers_to: frozenset[SubjectType] = frozenset()
     requires: tuple[str, ...] = ()
     multiplicity: Multiplicity = "one"
     projects_into: str = ""
@@ -372,7 +381,7 @@ REGISTRY: Mapping[str, Predicate] = MappingProxyType(
             meaning="which component this principal administers",
             subjects=frozenset({"principal"}),
             value="reference",
-            refers_to=frozenset({"component", "zone"}),
+            refers_to=frozenset({"component"}),
             multiplicity="many",
         ),
         "tenant-ownership": Predicate(
@@ -901,10 +910,14 @@ def _entry_issues(
         refuse("unsupported-assertion", "a stated value cites the words that state it")
     if entry.basis == "legacy" and entry.support:
         refuse("legacy-with-support", "a legacy value is never support-backed")
-    if entry.basis == "inferred" and not entry.premises:
-        refuse("missing-premise", "an inferred value names what it rests on")
-    if entry.basis == "derived" and not entry.explanation:
-        refuse("missing-premise", "a derived value names the rule that derived it")
+    # An inference says what it rests on, in words a person reads and, where
+    # code made it, in rows. **Not in rows alone**: an assertion's identity is
+    # computed, so a model writing a premise ID would be writing a key it
+    # cannot compute, and demanding one buys a fabricated reference rather
+    # than a basis. The words are required; the rows are optional and checked
+    # where they are given.
+    if entry.basis in ("inferred", "derived") and not entry.explanation:
+        refuse("missing-premise", "an inferred or derived value says what it rests on")
     if entry.assessment != "unchecked" and not entry.assessor:
         refuse("unassessed-assessor", "an assessment names who made it")
 
@@ -1037,3 +1050,269 @@ def _cycle_issues(
         )
         for identity in sorted(looping)
     ]
+
+
+# --- What a model emits, and what code builds from it ------------------------
+#
+# The **Proposal** shape, for the reason ``claims.Proposal`` gives: a model
+# names its evidence and code constructs the record, so a support span's
+# offsets and the quote beside them can never disagree. Two flat lists a
+# provider's schema compiler can express exactly.
+
+
+class QuoteProposal(BaseModel):
+    """A span of a source a model proposes, in the model's own spelling.
+
+    No offsets. :func:`resolve_catalog` finds where the quote sits, or refuses
+    it, which is what keeps a span from claiming a position the source does not
+    hold.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    source_label: str = Field(min_length=1, max_length=200)
+    quote: str = Field(min_length=1, max_length=MAX_QUOTE_CHARS)
+
+
+class AssertionProposal(BaseModel):
+    """One assertion a model proposes, before code resolves it.
+
+    ``subject`` reads one of two ways, and ``subject_type`` decides which. For
+    ``component``, ``interaction`` and ``zone`` it is an **Element ID** from the
+    model the node was shown, snapped against that model exactly as a **Lane
+    Agent**'s element reference is. For ``principal``, ``credential`` and
+    ``artifact`` it is a short name, and code slugs it into the subject ID.
+
+    ``value`` reads by the predicate: a term from its vocabulary, free text, or
+    — for a reference predicate — the *name* of what it points at, which code
+    resolves the same two ways. A model never writes a subject ID it would have
+    to compute.
+
+    There is no premise list. An assertion's identity is computed, so a premise
+    ID is a key a model cannot write; an inference states its basis in
+    ``explanation``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    subject_type: SubjectType
+    subject: str = Field(min_length=1, max_length=300)
+    predicate: str = Field(min_length=1, max_length=60)
+    value: str = Field(min_length=1, max_length=MAX_VALUE_CHARS)
+    reason: UnknownReason | None = None
+    scope: list[Qualifier] = Field(default_factory=list, max_length=MAX_QUALIFIERS)
+    basis: Basis
+    quotes: list[QuoteProposal] = Field(default_factory=list, max_length=MAX_SPANS)
+    explanation: str = Field(default="", max_length=1000)
+
+
+class CatalogProposal(BaseModel):
+    """What the assertion node emits: one flat list and nothing else.
+
+    The subject table is **derived** rather than declared. A model that listed
+    subjects beside the rows that name them would have two places to spell one
+    subject, and the two would eventually differ.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    assertions: list[AssertionProposal] = Field(
+        default_factory=list, max_length=MAX_ASSERTIONS
+    )
+
+
+def resolve_catalog(
+    proposal: CatalogProposal,
+    model: SystemModel,
+    sources: Mapping[str, str],
+) -> tuple[AssertionCatalog, list[CatalogIssue]]:
+    """Build the catalog a proposal describes, and say what it cost.
+
+    **The resolver constructs, so the gate cannot fail.** Every row it keeps is
+    one :func:`catalog_issues` raises nothing for, and every row it drops comes
+    back as an issue naming why — the shape a **Proposal** already has, where
+    an agent selects and the service builds.
+
+    Four things happen to a row, in order. Its predicate is looked up, and an
+    unregistered one drops it. Its subject is resolved: a graph-bound one is
+    snapped against the model's element IDs, and one of this layer's own is
+    slugged from the name written. Its quotes are located in the sources they
+    name, and a ``stated`` row left with no span drops rather than take a
+    fabricated one. Its identity is computed, and two rows that share one are
+    **one row carrying both spans** — which is how two sources for one fact keep
+    both provenances, rather than becoming a duplicate the gate refuses.
+
+    A dropped row is not a lost fact. The issues are what the repair pass reads,
+    and repair has the sources in front of it.
+    """
+    prepared = _prepare(sources)
+    element_ids = [element.id for element in model.elements()]
+    labels = {element.id: element.name for element in model.elements()}
+
+    kept: dict[str, Assertion] = {}
+    subjects: dict[str, Subject] = {}
+    issues: list[CatalogIssue] = []
+
+    for row in proposal.assertions:
+        resolved = _resolve_row(row, element_ids, labels, subjects, prepared, issues)
+        if resolved is None:
+            continue
+        identity, entry = resolved
+        held = kept.get(identity)
+        kept[identity] = entry if held is None else _merge(held, entry)
+
+    catalog = AssertionCatalog(
+        subjects=sorted(subjects.values(), key=lambda subject: subject.id),
+        entries=list(kept.values()),
+    )
+    return catalog, issues
+
+
+def _prepare(sources: Mapping[str, str]) -> Mapping[str, SpanSource]:
+    """Every source folded once, keyed by label, for every quote taken from it.
+
+    A source whose two folds disagree is absent here rather than wrong: see
+    :func:`~analysis_service.grounding.index_source`. Its quotes then find no
+    span, which is the same outcome as a quote that is not in it.
+    """
+    built = {}
+    for label, text in sources.items():
+        prepared = span_source(label, text)
+        if prepared is not None:
+            built[label] = prepared
+    return built
+
+
+def _resolve_row(
+    row: AssertionProposal,
+    element_ids: Collection[str],
+    labels: Mapping[str, str],
+    subjects: dict[str, Subject],
+    prepared: Mapping[str, SpanSource],
+    issues: list[CatalogIssue],
+) -> tuple[str, Assertion] | None:
+    """One proposed row as an assertion, or ``None`` with the reason recorded."""
+
+    def drop(code: CatalogIssueCode, message: str) -> None:
+        issues.append(
+            CatalogIssue(code=code, message=message, subject=row.subject or None)
+        )
+
+    predicate = REGISTRY.get(row.predicate)
+    if predicate is None:
+        drop("unknown-predicate", f"{row.predicate!r} is not a registered predicate")
+        return None
+    if row.subject_type not in predicate.subjects:
+        drop(
+            "wrong-subject-type",
+            f"{row.predicate!r} accepts {', '.join(sorted(predicate.subjects))},"
+            f" not {row.subject_type!r}",
+        )
+        return None
+
+    subject = _subject(row.subject_type, row.subject, element_ids, labels)
+    if subject is None:
+        drop("dangling-subject", f"{row.subject!r} names no {row.subject_type}")
+        return None
+
+    value = row.value
+    if predicate.value == "reference" and value not in UNIVERSAL_TERMS:
+        referent = _subject(_referent_type(predicate), value, element_ids, labels)
+        if referent is None:
+            drop(
+                "illegal-value",
+                f"{value!r} names no {predicate.value} this predicate takes",
+            )
+            return None
+        subjects.setdefault(referent.id, referent)
+        value = referent.id
+    elif not predicate.admits(value, ()):
+        drop("illegal-value", f"{value!r} is not a legal value for {row.predicate!r}")
+        return None
+
+    spans = [span for quote in row.quotes for span in _spans(quote, prepared)][
+        :MAX_SPANS
+    ]
+    if row.basis == "stated" and value != UNKNOWN and not spans:
+        drop(
+            "unsupported-assertion",
+            f"no quote for {row.predicate!r} on {subject.id!r} is in the source"
+            " it names, and a span is never fabricated",
+        )
+        return None
+
+    entry = Assertion(
+        subject=subject.id,
+        predicate=row.predicate,
+        value=value,
+        reason=row.reason if value == UNKNOWN else None,
+        scope=list(row.scope),
+        basis=row.basis,
+        support=spans,
+        explanation=row.explanation,
+    )
+    subjects.setdefault(subject.id, subject)
+    return assertion_id(entry), entry
+
+
+def _referent_type(predicate: Predicate) -> SubjectType:
+    """The one subject type a reference predicate points at.
+
+    One, never two: ``tests/test_assertions.py`` holds the registry to it, so
+    this reads the single member rather than choosing between members.
+    """
+    return next(iter(predicate.refers_to))
+
+
+def _subject(
+    subject_type: SubjectType,
+    written: str,
+    element_ids: Collection[str],
+    labels: Mapping[str, str],
+) -> Subject | None:
+    """The subject a model's word names, or ``None`` where it names none.
+
+    Two resolutions, because a subject type says which. A graph-bound name is
+    an **Element ID** the model was shown, snapped through
+    :func:`~analysis_service.references.canonical` so a near spelling resolves
+    and an ambiguous one does not. One of this layer's own is a name, and its
+    ID is the name's slug — the same derivation an element ID has, so two
+    spellings of one principal are one subject.
+    """
+    prefixes = SUBJECT_PREFIXES[subject_type]
+    if subject_type in GRAPH_BOUND:
+        found = canonical(written, element_ids)
+        if not found or found.split(":", 1)[0] not in prefixes:
+            return None
+        return Subject(id=found, type=subject_type, label=labels[found])
+    try:
+        identity = subject_id(subject_type, written)
+    except ValueError:
+        return None
+    return Subject(id=identity, type=subject_type, label=written.strip())
+
+
+def _spans(
+    quote: QuoteProposal, prepared: Mapping[str, SpanSource]
+) -> tuple[SupportSpan, ...]:
+    """Where one proposed quote sits, or nothing where it is not there."""
+    source = prepared.get(quote.source_label)
+    if source is None:
+        return ()
+    return spans_for(quote.quote, source)
+
+
+def _merge(held: Assertion, found: Assertion) -> Assertion:
+    """Two rows of one identity as one row carrying both rows' spans.
+
+    Identity settles the subject, the predicate, the scope and the value, so
+    what differs is the support and the words behind it. The spans join,
+    deduplicated and bounded; the first row's basis and explanation stand,
+    because a second row cannot change what the first rests on without being a
+    different assertion.
+    """
+    spans = list(held.support)
+    for span in found.support:
+        if span not in spans:
+            spans.append(span)
+    return held.model_copy(update={"support": spans[:MAX_SPANS]})
