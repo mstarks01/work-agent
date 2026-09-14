@@ -167,12 +167,19 @@ distinctions the audit fixtures need.
 | `signature-verification` | artifact, interaction | `verified` | none |
 | `destination-verification` | interaction | `verified` | none |
 | `network-membership` | component | zone reference | `ZonedElement.trust_zone` |
-| `administrative-authority` | principal | component reference | `TrustBoundary.kind` |
-| `tenant-ownership` | component | principal reference | `TrustBoundary.kind` |
+| `administrative-authority` | principal | component reference | none |
+| `tenant-ownership` | component | principal reference | none |
 
 Every predicate also admits `absent` and `unknown`, by rule 1. Nine project into
 nothing, which is the measurement in one line: **the graph has no field for nine
 of the fourteen facts the first release scopes.**
+
+**Neither zone predicate projects, and `TrustBoundary.kind` is why.** The zone
+kind answers who controls a zone and then what authority it holds, so the two
+predicates decide it together. It also holds one value from a closed vocabulary
+with no `unknown` in it, and rule 9 needs an `unknown` to write when a
+projection cannot fit. So the zone kind stays the graph's own, and Phase 4 rules
+on it with the projection in front of it.
 
 **A fact outside the registry stays source material.** Extraction does not
 invent a predicate and does not force a fact into the nearest wrong one. That is
