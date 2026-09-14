@@ -108,6 +108,7 @@ Not part of the question, but the records cite these names, so you need them.
 **Reviewed aliases** — other names a reader ruled identify the same element, each with the words in the source that support it. An extraction using one is named differently, not wrong.
 
 - `store:firmware-bucket — Cloud Storage bucket` — Supported shorthand for the bucket supplying firmware images. Source: > nodes poll a Cloud Storage bucket
+- `boundary:analytics-core — analytics network` — The source explicitly places the consumer in the analytics network. Source: > a Python consumer in our analytics network
 
 ### Your list
 

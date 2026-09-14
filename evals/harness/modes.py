@@ -412,6 +412,14 @@ class ExtractionScore:
         :class:`~evals.harness.reference.ElementAlias`. Nothing here infers a
         rename, so a case nobody has ruled on reads exactly
         :attr:`endpoint_recall`.
+
+        **A credit rules on the name and on nothing else.** It does not say the
+        two zones hold the same members, answer to the same owner or carry the
+        same privilege, and it does not say the extraction was right to draw a
+        zone there at all. Those are modelling judgements, and each one is
+        decided by the reference set and the claim scorer rather than here. Read
+        a credit as "the source names the thing this way", which is the only
+        question the excerpt can answer.
         """
         credited = comparable_elements(
             frozenset(credit.blessed for credit in self.aliased)
