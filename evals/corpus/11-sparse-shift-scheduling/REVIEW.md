@@ -92,10 +92,18 @@ Not part of the question, but the records cite these names, so you need them.
 | boundary:internal-network | network |
 | boundary:payroll-team-environment | tenant |
 
+**Recorded notes** — hedges, probed gaps and source disagreements live here, so read them before the sets.
+
+- `boundary:payroll-team-environment` — The source establishes an organizational distinction: the payroll system is run by another team. Drawing that distinction as a trust zone is a separate modelling judgement, and the reviewed alias on 'another team' rules on the name alone.
+
 **Assumptions**
 
 - `process:scheduling-web-app` — The scheduling web app is reachable from outside the internal network. (basis: Colleagues are stated to reach it from their own phones, which the source does not place on the internal network.)
 - `process:scheduling-web-app` — The scheduling web app itself sits on the internal network. (basis: The source lists the service, database and share as internal and does not place the web app anywhere; it is grouped with them for want of any stated zone of its own.)
+
+**Reviewed aliases** — other names a reader ruled identify the same element, each with the words in the source that support it. An extraction using one is named differently, not wrong.
+
+- `boundary:payroll-team-environment — another team` — The source identifies the payroll system's operator as another team. The label preserves that case-specific ownership distinction without inventing a team name. Source: > The payroll system, which is run by another team
 
 ### Your list
 
@@ -398,7 +406,7 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "2507fd3081003c1c94427ef81dcea36f6ca92f5358c965789b49ec4af89b6a60",
-      "model.json": "7cd2f3acd89c4fc856cd54867d9d2fe4617b74ed96b6a8b4dc8599c261d0d2a5",
+      "model.json": "2f8c04bbf7697bad5d95f117fcc38406ae9b539dd67b433bc85fa95031d7a42a",
       "claims/asvs.json": "5aa40048cd72a41cfaf7079d760a9a6aee4bf16a197e22203d32d60c39a54e6f",
       "claims/stride.json": "b56e600389930164b345d4859160bc6fd77bc59df466b5ecf0af5e22bb8d67b0"
       }

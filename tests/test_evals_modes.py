@@ -1471,16 +1471,25 @@ class TestASupportedNameIsNamedDifferentlyRatherThanMissed:
         assert score.sourced_recall == score.endpoint_recall == 1.0
 
     def test_a_case_nobody_ruled_on_reads_the_strict_number(self):
-        """An absent ruling is not a ruling that every name is the only one."""
-        from evals.harness.reference import load_case
+        """An absent ruling is not a ruling that every name is the only one.
 
-        case = load_case(
-            Path(__file__).resolve().parents[1]
-            / "evals"
-            / "corpus"
-            / "01-payments-checkout"
+        The unruled case is found rather than named, because a reader may rule
+        on any case at any time and that is not a reason for this to fail. It
+        fails loudly when every case carries a ruling, since nothing then
+        measures what this says it measures.
+        """
+        from evals.harness.reference import load_corpus
+
+        corpus = Path(__file__).resolve().parents[1] / "evals" / "corpus"
+        case = next(
+            (
+                candidate
+                for candidate in load_corpus(corpus)
+                if not candidate.meta.aliases and candidate.model.processes
+            ),
+            None,
         )
-        assert case.meta.aliases == []
+        assert case is not None, "every corpus case now carries a ruling"
         raw = case.model.model_dump()
         raw["processes"][0]["id"] = "process:something-else"
         for flow in raw.get("data_flows", []):

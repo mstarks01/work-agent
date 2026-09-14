@@ -39,6 +39,12 @@
       "name": "flat file",
       "excerpt": "the flat file are encrypted",
       "ruling": "Supported; the source expressly says the file contains delivery addresses."
+    },
+    {
+      "element": "boundary:marketing-office",
+      "name": "office",
+      "excerpt": "The spreadsheet lives on a marketing laptop in the office.",
+      "ruling": "The source places the marketing laptop in the office. It does not identify a separate marketing-only office."
     }
   ],
   "notes": "Cookbook conversion 3 of 4. Scoped subset of the source diagram: the mobile app's Instagram leg is dropped, and the source's store-to-store address copy is re-modelled as SIMS performing the export, because a data store does not initiate an interaction. Neither removal changes any remaining element's attributes. Two trust shapes earn its place. The first is a standing write path from an unmanaged endpoint in another zone: marketing's spreadsheet macros send SQL statements straight into the web API, so catalogue authority and database authority are the same authority. The second is the fax leg, where the control is not unverified but unavailable \u2014 a channel that cannot authenticate its destination is a different fact from an unknown, and nothing else in the corpus grades that distinction. On proximity: this is the corpus's closest far case to the payments exemplar's domain, since it is a shop with card data at rest. It is deliberately kept far in the model itself \u2014 the source never says where payment is captured, so no payment flow exists and no element outside the database carries the financial tag. The near control for the exemplar delta remains 01-payments-checkout alone."

@@ -255,7 +255,8 @@
       "assets": [],
       "source_excerpt": "A scheduling partner, which is another company, publishes tomorrow's planned work.",
       "source_label": "System description",
-      "kind": "tenant"
+      "kind": "tenant",
+      "notes": "The source establishes an organizational distinction: the scheduling partner is another company. Drawing that distinction as a trust zone is a separate modelling judgement, and the reviewed alias on 'scheduling partner' rules on the name alone."
     }
   ],
   "assumptions": [

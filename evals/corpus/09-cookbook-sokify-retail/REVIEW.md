@@ -118,6 +118,7 @@ Not part of the question, but the records cite these names, so you need them.
 
 - `process:catalogue-spreadsheet — spreadsheet` — Supported explicitly across the sentence describing where marketing keeps the catalogue. Its macros justify modeling executable behaviour, so the alias keeps the process type. Source: > Marketing keep the catalogue in a spreadsheet.
 - `store:delivery-address-flat-file — flat file` — Supported; the source expressly says the file contains delivery addresses. Source: > the flat file are encrypted
+- `boundary:marketing-office — office` — The source places the marketing laptop in the office. It does not identify a separate marketing-only office. Source: > The spreadsheet lives on a marketing laptop in the office.
 
 ### Your list
 
