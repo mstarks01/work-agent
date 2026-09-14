@@ -36,6 +36,7 @@ from analysis_service.assertions import (
     assertion_id,
     catalog_issues,
     conflicts,
+    project,
     projection_fields,
     resolve_catalog,
     span_source,
@@ -889,3 +890,108 @@ class TestResolvingAProposal:
     def test_a_dropped_row_names_what_it_was_about(self):
         _, issues = self.resolve(self.row(predicate="vibes"))
         assert issues[0].subject == FLOW
+
+
+class TestTheProjection:
+    """What one graph attribute would hold, built from the rows.
+
+    The rule is that the projection **never picks**. Where the catalog holds
+    more than one string's worth, it writes ``unknown`` and says which kind of
+    loss that was.
+    """
+
+    def rows(self, *entries):
+        return catalog(list(entries))
+
+    def row(self, **overrides):
+        fields = {
+            "subject": FLOW,
+            "predicate": "transport-encryption",
+            "value": "TLS",
+            "basis": "stated",
+            "support": span_for("Shoppers sign in"),
+        }
+        return Assertion(**{**fields, **overrides})
+
+    def test_one_unscoped_value_is_the_value(self):
+        (projected,) = project(self.rows(self.row()))
+        assert (projected.attribute, projected.value, projected.reason) == (
+            "encryption_in_transit",
+            "TLS",
+            "stated",
+        )
+
+    def test_a_stated_absence_is_the_word_the_graph_reads_as_absent(self):
+        """``none`` and ``absent`` are one fact in two vocabularies."""
+        (projected,) = project(self.rows(self.row(value=ABSENT)))
+        assert (projected.value, projected.reason) == ("none", "absent")
+
+    def test_two_values_under_one_attribute_project_to_unknown(self):
+        (projected,) = project(self.rows(self.row(), self.row(value=ABSENT)))
+        assert (projected.value, projected.reason) == (UNKNOWN, "several-values")
+
+    def test_a_scoped_value_projects_to_unknown(self):
+        """A string cannot carry the qualifier, and writing it bare would
+        generalise a control the source scoped."""
+        scoped = self.row(scope=[Qualifier(kind="environment", value="staging")])
+        (projected,) = project(self.rows(scoped))
+        assert (projected.value, projected.reason) == (UNKNOWN, "scoped")
+
+    def test_two_predicates_feeding_one_field_project_to_unknown(self):
+        """A mechanism and the credential it presents share `authentication`."""
+        mechanism = self.row(predicate="authentication-mechanism", value="a password")
+        credential = self.row(
+            predicate="credential-presented", value="credential:session-cookie"
+        )
+        held = AssertionCatalog(
+            subjects=[
+                *subjects((FLOW, "interaction", "place order")),
+                *subjects(
+                    ("credential:session-cookie", "credential", "session cookie")
+                ),
+            ],
+            entries=[mechanism, credential],
+        )
+        (projected,) = project(held)
+        assert (projected.attribute, projected.reason) == (
+            "authentication",
+            "several-predicates",
+        )
+
+    def test_an_unknown_row_projects_the_sentinel(self):
+        silent = self.row(value=UNKNOWN, reason="silent", support=[])
+        (projected,) = project(self.rows(silent))
+        assert (projected.value, projected.reason) == (UNKNOWN, "unknown")
+
+    def test_an_attribute_no_row_reaches_is_absent_from_the_result(self):
+        """Filling it would assert silence rather than report it."""
+        projected = project(self.rows(self.row()))
+        assert [one.attribute for one in projected] == ["encryption_in_transit"]
+
+    def test_a_projection_names_the_rows_behind_it(self):
+        (projected,) = project(self.rows(self.row(), self.row(value=ABSENT)))
+        assert len(projected.rows) == 2
+        assert all(one.startswith("assertion:") for one in projected.rows)
+
+    def test_a_subject_of_this_layer_s_own_projects_into_nothing(self):
+        """A principal has no element, so no attribute of one can hold its facts."""
+        held = AssertionCatalog(
+            subjects=subjects(("credential:build-token", "credential", "build token")),
+            entries=[
+                Assertion(
+                    subject="credential:build-token",
+                    predicate="credential-rotation",
+                    value="not-rotated",
+                    basis="stated",
+                    support=span_for("Shoppers sign in"),
+                )
+            ],
+        )
+        assert project(held) == ()
+
+    def test_the_order_is_stable(self):
+        held = self.rows(self.row(), self.row(predicate="authentication-mechanism"))
+        assert [one.attribute for one in project(held)] == [
+            "authentication",
+            "encryption_in_transit",
+        ]

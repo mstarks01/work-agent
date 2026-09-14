@@ -97,6 +97,7 @@ __all__ = [
     "MAX_QUOTE_CHARS",
     "MAX_SPANS",
     "MAX_SUBJECTS",
+    "NONE",
     "REGISTRY",
     "REGISTRY_VERSION",
     "UNIVERSAL_TERMS",
@@ -109,6 +110,8 @@ __all__ = [
     "CatalogProposal",
     "Conflict",
     "Predicate",
+    "Projection",
+    "ProjectionReason",
     "Qualifier",
     "QualifierKind",
     "QuoteProposal",
@@ -120,6 +123,7 @@ __all__ = [
     "assertion_id",
     "catalog_issues",
     "conflicts",
+    "project",
     "projection_fields",
     "resolve_catalog",
     "span_source",
@@ -1316,3 +1320,102 @@ def _merge(held: Assertion, found: Assertion) -> Assertion:
         if span not in spans:
             spans.append(span)
     return held.model_copy(update={"support": spans[:MAX_SPANS]})
+
+
+# --- What the graph's own fields would say ----------------------------------
+
+
+#: Why a projected value reads the way it does. Closed, because the whole point
+#: of projecting is to say what the one string cost: a reader comparing a
+#: projection to the attribute beside it needs to know whether the value is the
+#: catalog's answer or the catalog refusing to answer in one word.
+ProjectionReason = Literal[
+    "stated",
+    "absent",
+    "unknown",
+    "scoped",
+    "several-values",
+    "several-predicates",
+]
+
+
+@dataclass(frozen=True)
+class Projection:
+    """What one element attribute would hold, built from the catalog's rows.
+
+    ``value`` is spelled the way the **System Model** spells it: a mechanism as
+    written, :data:`~analysis_service.system_model.UNKNOWN` where the catalog
+    does not settle the attribute, and ``"none"`` for a stated absence, which is
+    the word :func:`~analysis_service.analysis.control_state` reads as absent.
+
+    ``rows`` names the assertions behind it, so a reader of a degraded value can
+    see what would not fit.
+    """
+
+    element_id: str
+    attribute: str
+    value: str
+    reason: ProjectionReason
+    rows: tuple[str, ...]
+
+
+#: The word a **System Model** control attribute carries for a stated absence.
+#: ``control_state`` reads it as ``absent``; the catalog spells the same fact
+#: :data:`ABSENT`, and this is the one place the two spellings meet.
+NONE = "none"
+
+
+def project(catalog: AssertionCatalog) -> tuple[Projection, ...]:
+    """What each graph attribute the catalog reaches would hold.
+
+    **Loss-aware, and it never picks.** One string holds one unscoped value, so
+    the catalog's rows fit it or they do not. Where two predicates feed one
+    attribute, where two values sit under one attribute, or where the source
+    scoped the only value it stated, the projection writes ``unknown`` and
+    ``reason`` says which of those happened. Choosing between them would drop a
+    fact the catalog holds, and writing a summary of both would write a value
+    the catalog does not hold.
+
+    An attribute no row reaches is **absent from the result**, not ``unknown``:
+    the catalog says nothing about it, and a projection that filled it would be
+    asserting silence rather than reporting it.
+
+    Sorted by element then attribute, so two readings of one catalog agree on
+    order.
+    """
+    fields = projection_fields()
+    grouped: dict[tuple[str, str], list[tuple[str, Assertion]]] = {}
+    for entry in catalog.entries:
+        attribute = fields.get(entry.predicate, "")
+        if attribute and entry.subject.split(":", 1)[0] in _ELEMENT_PREFIXES:
+            grouped.setdefault((entry.subject, attribute), []).append(
+                (assertion_id(entry), entry)
+            )
+    return tuple(
+        _projected(element_id, attribute, rows)
+        for (element_id, attribute), rows in sorted(grouped.items())
+    )
+
+
+def _projected(
+    element_id: str, attribute: str, rows: list[tuple[str, Assertion]]
+) -> Projection:
+    """One attribute's projected value, and the reason it reads that way."""
+    ids = tuple(sorted(identity for identity, _ in rows))
+    stated = [entry for _, entry in rows if entry.value != UNKNOWN]
+
+    def projected(value: str, reason: ProjectionReason) -> Projection:
+        return Projection(element_id, attribute, value, reason, ids)
+
+    if not stated:
+        return projected(UNKNOWN, "unknown")
+    if len({entry.predicate for entry in stated}) > 1:
+        return projected(UNKNOWN, "several-predicates")
+    if len({entry.value for entry in stated}) > 1:
+        return projected(UNKNOWN, "several-values")
+    if any(entry.scope for entry in stated):
+        return projected(UNKNOWN, "scoped")
+    value = stated[0].value
+    if value == ABSENT:
+        return projected(NONE, "absent")
+    return projected(value, "stated")
