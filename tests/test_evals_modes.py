@@ -24,6 +24,7 @@ from evals.harness.reference import load_case
 from evals.harness.structural import report_issues
 
 CORPUS = Path(__file__).resolve().parents[1] / "evals" / "corpus"
+from analysis_service.analysis import control_state
 from analysis_service.certification import fingerprints_of
 from analysis_service.claims import (
     AnalysisMarks,
@@ -49,7 +50,8 @@ from analysis_service.graph import (
 )
 from analysis_service.report import Report
 from analysis_service.sampling import load_sampling
-from analysis_service.system_model import ZONE_ATTRIBUTE
+from analysis_service.system_model import ZONE_ATTRIBUTE, normalize_element_ids
+from analysis_service.validation import validate
 from tests.factories import DEFAULT_FRAMEWORKS, EVAL_MODEL, ScriptedLlm
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -415,7 +417,7 @@ def test_a_faithful_extraction_agrees_on_every_scored_attribute(case):
 
     assert score.attributes  # the case carries scored attributes at all
     assert score.differing == ()
-    assert score.attribute_agreement == 1.0
+    assert score.scored_field_agreement == 1.0
 
 
 def test_a_mistyped_trust_boundary_moves_no_element_number(case):
@@ -435,7 +437,7 @@ def test_a_mistyped_trust_boundary_moves_no_element_number(case):
     assert [
         (check.element_id, check.blessed, check.extracted) for check in score.differing
     ] == [("boundary:core-services", "network", "tenant")]
-    assert score.attribute_agreement < 1.0
+    assert score.scored_field_agreement < 1.0
 
 
 def test_an_invented_control_is_caught_where_the_blessed_model_says_unknown(case):
@@ -501,7 +503,7 @@ def test_the_case_payload_carries_the_disagreements_and_the_count(case):
     ).to_json()
 
     assert payload["attributes_compared"] > 1
-    assert payload["attribute_agreement"] < 1.0
+    assert payload["scored_field_agreement"] < 1.0
     assert payload["attributes_differing"] == [
         {
             "element": "process:storefront-api",
@@ -572,7 +574,7 @@ def test_an_extraction_that_produced_nothing_compares_no_attributes(case):
     score = score_of(case, None)
 
     assert score.attributes == ()
-    assert score.attribute_agreement == 0.0
+    assert score.scored_field_agreement == 0.0
     assert score.crossings_match is False
 
 
@@ -1570,3 +1572,272 @@ class TestASupportedNameIsNamedDifferentlyRatherThanMissed:
 
         assert score.aliased == ()
         assert score.sourced_recall == score.endpoint_recall
+
+
+class TestTheFalsificationFixtures:
+    """Ten mutations of a blessed model, and what each figure says about them.
+
+    **A scorer is only as good as the wrong answers it refuses.** Every
+    mutation here is a model a person would reject on sight, run through
+    ``score_extraction`` with the case's real sources. Each is pinned to the
+    figure that catches it, so improving the scorer cannot quietly stop
+    catching one, and the three nothing catches are pinned as open rather than
+    left to be rediscovered (#925).
+
+    The mutations are the audit's own program, which is what makes them a
+    regression test rather than a fixture somebody wrote to pass.
+    """
+
+    def score(self, case, model):
+        result = modes.ExtractionResult(
+            case.id,
+            model,
+            tuple(validate(model, sources={s.label: s.text for s in case.sources})),
+        )
+        return modes.score_extraction(case, result)
+
+    def case_01(self):
+        return load_case(CORPUS / "01-payments-checkout")
+
+    def test_a_deleted_parallel_flow_costs_an_interaction(self):
+        """Case 13's console reaches its API two ways; drop one.
+
+        ``endpoint_recall`` folds a flow's label and then takes a *set*, so the
+        pair survives and the figure does not move. The lost WebSocket is a
+        whole handshake, session and transport surface, not a naming
+        difference, and ``interaction_recall`` is the reading that says so.
+        """
+        case = load_case(CORPUS / "13-dispatch-control-plane")
+        model = case.model.model_copy(deep=True)
+        model.data_flows = [
+            flow for flow in model.data_flows if "live-job-status" not in flow.id
+        ]
+
+        score = self.score(case, model)
+
+        assert score.endpoint_recall == 1.0
+        assert score.interaction_recall < 1.0
+        assert score.crossings_match is False
+
+    def test_renaming_the_hard_elements_shows_as_lost_coverage(self):
+        """Agreement can be bought by dropping the facts that are hard to get right.
+
+        ``_check_attributes`` joins on the exact element ID, so renaming case
+        01's five flows takes all 25 of their scored fields out of the
+        numerator *and* the denominator. Agreement stays perfect over the 22
+        that are left, and ``comparison_coverage`` is what stops that reading
+        like a perfect model.
+        """
+        case = self.case_01()
+        model = case.model.model_copy(deep=True)
+        for index, flow in enumerate(model.data_flows):
+            flow.name = f"interaction {index}"
+            flow.protocol = "arbitrary nonsense"
+            flow.authentication = "arbitrary nonsense"
+            flow.encryption_in_transit = "arbitrary nonsense"
+            flow.operations = "unknown"
+        model = normalize_element_ids(model)
+
+        score = self.score(case, model)
+
+        assert score.scored_field_agreement == 1.0
+        assert score.attributes_compared < score.attributes_comparable
+        assert score.comparison_coverage < 0.5
+
+    def test_collapsing_every_zone_moves_the_partition_not_the_name(self):
+        """One zone for everything keeps every zone name the reference holds."""
+        case = self.case_01()
+        model = case.model.model_copy(deep=True)
+        for element in model.zoned_elements():
+            element.trust_zone = "boundary:public-internet"
+
+        score = self.score(case, model)
+
+        assert score.zone_recall == 1.0
+        assert score.sourced_zone_recall == 1.0
+        assert score.zone_partition_agreement < 0.5
+
+    def test_a_zone_for_every_element_is_charged_as_invented_crossings(self):
+        """The opposite failure, and recall alone rewards it.
+
+        Give each element its own new zone and keep the originals empty: every
+        blessed crossing is still derived, so ``crossings_recall`` reads 1.0
+        over a model that separated everything from everything.
+        """
+        case = self.case_01()
+        model = case.model.model_copy(deep=True)
+        for index, element in enumerate(model.zoned_elements()):
+            zone = model.trust_boundaries[0].model_copy(deep=True)
+            zone.name = f"zone {index}"
+            zone.id = f"boundary:zone-{index}"
+            model.trust_boundaries.append(zone)
+            element.trust_zone = zone.id
+
+        score = self.score(case, model)
+
+        assert score.zone_recall == 1.0
+        assert score.crossings_recall == 1.0
+        assert score.crossings_precision < 1.0
+        assert score.zone_partition_agreement < 1.0
+
+    def test_erasing_every_citation_fails_the_gate_and_reads_as_unmeasured(self):
+        """The composition of schema, gate and diagnostic, tested as one.
+
+        Each piece was correct alone: the gate checks the citations it is
+        given, and the diagnostic passes over an element citing nothing because
+        the gate refuses that shape. Blanking the fields is what falls between
+        them.
+        """
+        case = self.case_01()
+        model = case.model.model_copy(deep=True)
+        for element in model.elements():
+            element.source_excerpt = ""
+            element.source_label = ""
+            for attribute in (
+                "authentication",
+                "encryption_in_transit",
+                "encryption_at_rest",
+            ):
+                value = getattr(element, attribute, None)
+                if isinstance(value, str) and control_state(value) == "stated":
+                    setattr(element, attribute, "arbitrary nonsense")
+
+        score = self.score(case, model)
+
+        assert [issue.code for issue in score.uncited] == ["missing-citation"] * len(
+            model.elements()
+        )
+        assert score.unbased == ()
+        assert score.basis_coverage.measured == 0
+        assert score.basis_coverage.uncited == score.basis_coverage.stated
+
+    def test_a_mechanism_of_function_words_reads_as_unmeasured(self):
+        """``the`` is a stated control on every mechanical check there is."""
+        case = self.case_01()
+        model = case.model.model_copy(deep=True)
+        for element in model.elements():
+            for attribute in (
+                "authentication",
+                "encryption_in_transit",
+                "encryption_at_rest",
+            ):
+                value = getattr(element, attribute, None)
+                if isinstance(value, str) and control_state(value) == "stated":
+                    setattr(element, attribute, "the")
+
+        score = self.score(case, model)
+
+        assert score.unbased == ()
+        assert score.basis_coverage.measured == 0
+        assert score.basis_coverage.tokenless == score.basis_coverage.stated
+
+    def test_an_invented_mechanism_is_flagged_by_the_diagnostic(self):
+        """The one semantic failure a mechanical figure does reach."""
+        case = self.case_01()
+        model = case.model.model_copy(deep=True)
+        for element in model.elements():
+            for attribute in (
+                "protocol",
+                "authentication",
+                "encryption_in_transit",
+                "encryption_at_rest",
+                "data_classification",
+            ):
+                value = getattr(element, attribute, None)
+                if isinstance(value, str) and control_state(value) == "stated":
+                    setattr(element, attribute, "arbitrary nonsense")
+
+        score = self.score(case, model)
+
+        assert score.scored_field_agreement == 1.0
+        assert score.control_state_agreement == 1.0
+        assert len(score.unbased) == 5
+        assert score.basis_coverage.flagged == 5
+
+
+class TestWhatNoFigureHereReaches:
+    """Three mutations every number in this module scores as perfect.
+
+    Pinned rather than left implicit. Each needs a judgement about *meaning* —
+    whether a value follows from a source, and whether support for one fact
+    supports another — and no reduction of a string to a state can supply it.
+    The audit's plan puts them behind per-assertion support (#741), and these
+    tests are what will fail, loudly, on the day that lands (#925).
+
+    Read as a specification of the remaining gap, not as behaviour worth
+    keeping.
+    """
+
+    def score(self, case, model):
+        return TestTheFalsificationFixtures().score(case, model)
+
+    def case_01(self):
+        return load_case(CORPUS / "01-payments-checkout")
+
+    def perfect(self, score):
+        return (
+            score.recall == 1.0
+            and score.scored_field_agreement == 1.0
+            and score.control_state_agreement == 1.0
+            and score.comparison_coverage == 1.0
+            and score.zone_partition_agreement == 1.0
+            and score.crossings_precision == 1.0
+            and score.interaction_recall == 1.0
+            and score.unbased == ()
+            and score.uncited == ()
+        )
+
+    def test_a_control_reversed_into_its_own_contradiction_still_scores_clean(self):
+        """The source says MFA is not rolled out; say the opposite in its words.
+
+        Both values lead with a mechanism rather than a sentinel, so
+        ``control_state`` reads both as ``stated``. The words are the source's
+        own, so the basis diagnostic finds them.
+        """
+        case = self.case_01()
+        model = case.model.model_copy(deep=True)
+        flow = next(f for f in model.data_flows if "place-order" in f.id)
+        flow.authentication = "session cookie; MFA enforced for every shopper"
+
+        assert self.perfect(self.score(case, model))
+
+    def test_a_real_quote_about_something_else_still_scores_clean(self):
+        """Every excerpt replaced by the source's opening line.
+
+        The quote verifies, because it is really in the source. Whether it has
+        anything to do with the element citing it is the question nothing here
+        asks.
+        """
+        case = self.case_01()
+        model = case.model.model_copy(deep=True)
+        for element in model.elements():
+            element.source_excerpt = (
+                "Checkout and order-capture path for our storefront."
+            )
+            element.description = ""
+            element.notes = ""
+        model.assumptions = []
+
+        assert self.perfect(self.score(case, model))
+
+    def test_a_control_borrowed_from_another_flow_loses_only_two_fields(self):
+        """The receipt archive's controls, moved onto the card-processor webhook.
+
+        The diagnostic searches the whole cited source rather than the
+        element's own excerpt, so a mechanism the source describes for another
+        connection echoes here too. The evidence catalog quietly drops the two
+        unknown entries that webhook would otherwise carry.
+        """
+        case = self.case_01()
+        model = case.model.model_copy(deep=True)
+        flow = next(f for f in model.data_flows if "settlement-webhook" in f.id)
+        flow.authentication = "order service's own service account"
+        flow.encryption_in_transit = "TLS"
+
+        score = self.score(case, model)
+        lost = set(evidence_catalog(case.model)) - set(evidence_catalog(model))
+
+        assert score.unbased == ()
+        assert score.uncited == ()
+        assert len(score.differing) == 2
+        assert len(lost) == 2

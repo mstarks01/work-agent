@@ -48,6 +48,16 @@ CORPUS_DIR = REPO_ROOT / "evals" / "corpus"
 # half-understanding them.
 #
 #
+# #925 renames the extraction scorer's ``attribute_agreement`` to
+# ``scored_field_agreement`` and adds five figures beside it inside
+# ``mode_output``, and bumps nothing. The rename is the shape version 7 treats
+# as a version event, and the difference is the reader: ``stability`` compares
+# ``scores`` across two artifacts, so a float under a renamed key there is a
+# silent misreading. Nothing reads an older artifact's ``mode_output`` at all —
+# no command pairs two extraction sweeps, and no committed Baseline carries an
+# extraction payload, because all three ran in ``analysis`` mode. The declared
+# key itself is unchanged.
+#
 # #743 added the ``stale`` standing to every unlisted threat's counts and
 # ``carried`` inside every writing row, and bumped nothing: both sit inside a
 # block this version already declares, no reader asks an older artifact for
