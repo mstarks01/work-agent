@@ -31,7 +31,7 @@ from collections import Counter
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
-from typing import Any, get_args
+from typing import Any, NamedTuple, get_args
 
 from analysis_service.analysis import (
     CONSEQUENCE_ASSET_TAGS,
@@ -202,18 +202,50 @@ def _tags(value: list[str]) -> str:
 #: reports disagreement that is not there. ``trust_zone`` is absent for the
 #: opposite reason: :attr:`ExtractionScore.crossings_match` already reads it,
 #: derived rather than compared string by string.
-_SCORED_ATTRIBUTES: Mapping[str, Callable[[Any], str]] = {
-    "kind": str,
-    "exposure": str,
-    "interface_kind": str,
-    "assets": _tags,
-    "operations": str,
-    "protocol": lambda value: "stated" if states_a_protocol(value) else "silent",
-    "authentication": control_state,
-    "encryption_in_transit": control_state,
-    "encryption_at_rest": control_state,
-    "data_classification": control_state,
+class _Scored(NamedTuple):
+    """How one attribute is compared, and whether the comparison reads the fact.
+
+    ``states`` is the half a reader of the aggregate has to know about.
+    ``kind``, ``exposure``, ``interface_kind`` and ``operations`` hold closed
+    vocabularies and ``assets`` a controlled one, so comparing them compares
+    what they say. The other five hold free text that is reduced to a state
+    first: ``control_state`` maps a whole mechanism to ``stated``, ``absent`` or
+    ``unverified``, and a protocol to whether it says anything at all. Those
+    comparisons agree on ``session cookie; no MFA`` against ``session cookie;
+    MFA enforced for every shopper``, and on either against ``arbitrary
+    nonsense`` (#891, #925).
+
+    A field added to the table must say which it is, so a sixth control
+    attribute cannot default into the aggregate as though it compared a fact.
+    """
+
+    reduce: Callable[[Any], str]
+    states: bool
+
+
+def _protocol_state(value: Any) -> str:
+    return "stated" if states_a_protocol(value) else "silent"
+
+
+_SCORED_ATTRIBUTES: Mapping[str, _Scored] = {
+    "kind": _Scored(str, states=False),
+    "exposure": _Scored(str, states=False),
+    "interface_kind": _Scored(str, states=False),
+    "assets": _Scored(_tags, states=False),
+    "operations": _Scored(str, states=False),
+    "protocol": _Scored(_protocol_state, states=True),
+    "authentication": _Scored(control_state, states=True),
+    "encryption_in_transit": _Scored(control_state, states=True),
+    "encryption_at_rest": _Scored(control_state, states=True),
+    "data_classification": _Scored(control_state, states=True),
 }
+
+#: The scored fields whose comparison reads a state rather than the fact. Taken
+#: off the table rather than listed beside it, so the two cannot disagree about
+#: which fields those are.
+STATE_REDUCED: frozenset[str] = frozenset(
+    name for name, scored in _SCORED_ATTRIBUTES.items() if scored.states
+)
 
 
 @dataclass(frozen=True)
@@ -405,6 +437,15 @@ class ExtractionScore:
     #: blank or whose mechanisms carry no content token reads clean on every
     #: other figure here, and this is where it stops reading clean (#925).
     basis_coverage: BasisCoverage = field(default_factory=BasisCoverage.empty)
+    #: Scored fields the blessed model carries, which is what
+    #: :attr:`attributes_compared` is a fraction of. Counted at scoring time
+    #: from the reference, because the score does not keep the model and a
+    #: denominator recovered later would be a second reader of it.
+    blessed_scored_fields: int = 0
+    #: ``(agreed, total)`` over every pair of zoned elements both models carry,
+    #: asked whether the pair shares a zone. Computed at scoring time for the
+    #: reason the field above is: the score does not keep either model.
+    zone_pairs: tuple[int, int] | None = None
 
     @property
     def recall(self) -> float:
@@ -564,9 +605,62 @@ class ExtractionScore:
         return len(self.crossings_found) / len(self.blessed_crossings)
 
     @property
+    def crossings_precision(self) -> float:
+        """Of the crossings the extraction derived, the share the reference holds.
+
+        **Recall alone never charges an invented crossing**, and inventing them
+        is free: put every element in a zone of its own and every flow in the
+        model crosses a boundary, so the blessed crossings are all still there
+        and recall reads 1.0 over a partition that is wrong everywhere (#925).
+        A model that separated nothing is the opposite failure and recall
+        already sees it, which is why both are reported rather than folded.
+
+        ``0.0`` where the extraction derived none, on the same reading
+        :attr:`crossings_recall` gives an empty reference: nothing derived is
+        not a perfect score.
+        """
+        derived = self.extracted_crossings
+        if not derived:
+            return 0.0
+        return len(self.crossings_found) / len(frozenset(derived))
+
+    @property
     def crossings_derivable(self) -> bool:
         """Whether the extraction was well-formed enough to derive crossings."""
         return self.extracted_crossings is not None
+
+    @property
+    def interaction_recall(self) -> float:
+        """Endpoint recall with multiplicity, so a parallel flow is not free.
+
+        :func:`_endpoint_keys` returns a *set*, and the schema and the corpus
+        both carry more than one interaction between the same pair — case 13's
+        console reaches its API with ordinary dispatch requests and with a
+        WebSocket held open for live job status. Delete one and the pair is
+        still in the folded set, so ``endpoint_recall`` reads 1.0 over a model
+        that lost a whole handshake, session and transport surface (#925).
+
+        So the graph is read as a directed multigraph: for each endpoint pair,
+        how many of the reference's interactions the extraction kept, capped at
+        the reference's count so duplicates cannot pay for a miss elsewhere.
+        A pair the extraction named differently still counts, exactly as
+        ``endpoint_recall`` intends — this charges the *number* of interactions
+        and never their labels.
+        """
+        blessed = Counter(
+            _endpoint_key(element_id)
+            for element_id in (*self.matched, *self.missing)
+            if _element_type(element_id) == DataFlow.id_prefix
+        )
+        if not blessed:
+            return 0.0
+        extracted = Counter(
+            _endpoint_key(element_id)
+            for element_id in (*self.matched, *self.extra)
+            if _element_type(element_id) == DataFlow.id_prefix
+        )
+        kept = sum(min(count, extracted[pair]) for pair, count in blessed.items())
+        return kept / sum(blessed.values())
 
     @property
     def endpoint_matched(self) -> frozenset[str]:
@@ -668,14 +762,100 @@ class ExtractionScore:
         return (len(blessed) - len(gone) + len(credited)) / len(blessed)
 
     @property
+    def zone_partition_agreement(self) -> float:
+        """Do the same elements sit together, whatever the zones are called?
+
+        **A zone recall is a recall over zone *names*.** Every figure beside it
+        reads a name too, so a model can keep every name and put the members
+        anywhere: collapse case 01's five elements into one existing zone and
+        ``zone_recall`` holds at 1.0, and split each into a zone of its own
+        while retaining the originals empty and every zone, endpoint and
+        crossing figure holds at 1.0 (#925).
+
+        So this reads the *partition* and never a name. Over the zoned elements
+        both models carry, every pair is asked one question — do these two share
+        a zone? — and the score is the share of pairs the two models answer the
+        same way. A renaming moves it not at all, which is the point: it is the
+        one zone figure a naming difference cannot reach.
+
+        ``0.0`` where fewer than two zoned elements are shared, because there is
+        no pair to ask and an empty agreement is not a perfect one.
+        """
+        pairs = self.zone_pairs
+        if not pairs:
+            return 0.0
+        agreed, total = pairs
+        return agreed / total
+
+    @property
     def differing(self) -> tuple[AttributeCheck, ...]:
         """The checks the two models answered differently, in model order."""
         return tuple(check for check in self.attributes if not check.agrees)
 
     @property
-    def attribute_agreement(self) -> float:
+    def scored_field_agreement(self) -> float:
+        """Agreement over every scored field of the elements both models hold.
+
+        **Not an accuracy.** Half these fields are compared after a reduction to
+        a state, so this rises when an extraction picks the right *kind* of
+        answer and says nothing about whether the answer is right.
+        :attr:`control_state_agreement` is that half on its own, and
+        :attr:`comparison_coverage` says how much of the reference it was taken
+        over at all.
+        """
         agreed = len(self.attributes) - len(self.differing)
         return agreed / len(self.attributes) if self.attributes else 0.0
+
+    @property
+    def control_state_agreement(self) -> float:
+        """The :data:`STATE_REDUCED` fields alone, named for what they compare.
+
+        ``protocol``, ``authentication``, ``encryption_in_transit``,
+        ``encryption_at_rest`` and ``data_classification`` reach this after a
+        whole mechanism has been folded to one of three words. So a 1.0 here
+        means the extraction agreed about which *state* each control is in —
+        stated, absent or unverified — and carries no claim about the mechanism,
+        version, principal, scope or strength it named (#891).
+        """
+        checks = [c for c in self.attributes if c.attribute in STATE_REDUCED]
+        if not checks:
+            return 0.0
+        return sum(check.agrees for check in checks) / len(checks)
+
+    @property
+    def attributes_comparable(self) -> int:
+        """Scored fields the reference carries, whether or not one was compared.
+
+        The denominator :attr:`attributes_compared` is a subset of. An element
+        the extraction named differently leaves the comparison entirely, taking
+        its attributes with it, so agreement can be *improved* by dropping the
+        elements whose facts are hardest to get right — five renamed flows take
+        25 of case 01's 47 fields out of the numerator and the denominator
+        together (#925).
+        """
+        return self.blessed_scored_fields
+
+    @property
+    def attributes_compared(self) -> int:
+        """Scored fields the two models were actually compared on.
+
+        The numerator :attr:`comparison_coverage` and the serialised count both
+        read, so the figure and the number beside it cannot be taken over two
+        different populations.
+        """
+        return len(self.attributes)
+
+    @property
+    def comparison_coverage(self) -> float:
+        """What fraction of the reference's scored fields was compared at all.
+
+        Read beside every agreement above it. A high agreement over a low
+        coverage is a statement about the elements that happened to align, and
+        alignment here is exact-ID: a renamed element is not compared, not
+        compared leniently.
+        """
+        total = self.attributes_comparable
+        return self.attributes_compared / total if total else 0.0
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -683,8 +863,14 @@ class ExtractionScore:
             "recall": round(self.recall, 3),
             "precision": round(self.precision, 3),
             "endpoint_recall": round(self.endpoint_recall, 3),
+            # The same fold with multiplicity, so a second interaction between
+            # one pair of endpoints is not free to drop (#925).
+            "interaction_recall": round(self.interaction_recall, 3),
             "zone_recall": round(self.zone_recall, 3),
             "sourced_zone_recall": round(self.sourced_zone_recall, 3),
+            # The zone figure a naming difference cannot reach: do the same
+            # elements sit together, whatever the zones are called (#925).
+            "zone_partition_agreement": round(self.zone_partition_agreement, 3),
             "endpoint_missing": sorted(self.endpoint_missing),
             "endpoint_extra": sorted(self.endpoint_extra),
             "unsourced": list(self.unsourced),
@@ -696,14 +882,24 @@ class ExtractionScore:
             "initiators_missing": sorted(self.initiators_missing),
             "crossings_match": self.crossings_match,
             "crossings_recall": round(self.crossings_recall, 3),
+            # Beside recall, which never charges an invented crossing.
+            "crossings_precision": round(self.crossings_precision, 3),
             "crossings_derivable": self.crossings_derivable,
             "crossings_missing": sorted(
                 frozenset(self.blessed_crossings) - self.crossings_found
             ),
             "missing": list(self.missing),
             "extra": list(self.extra),
-            "attribute_agreement": round(self.attribute_agreement, 3),
-            "attributes_compared": len(self.attributes),
+            # Named for what it compares. Half these fields reach the check as
+            # a state rather than as the fact they hold, so this is agreement
+            # over scored fields and never an extraction accuracy (#891).
+            "scored_field_agreement": round(self.scored_field_agreement, 3),
+            "control_state_agreement": round(self.control_state_agreement, 3),
+            "attributes_compared": self.attributes_compared,
+            # The denominator beside the count, so a figure taken over half the
+            # reference cannot read like one taken over all of it (#925).
+            "attributes_comparable": self.attributes_comparable,
+            "comparison_coverage": round(self.comparison_coverage, 3),
             # The disagreements alone. An agreeing check is a number, and the
             # count above carries it; writing all of them out would bury the
             # few lines a reader opens this file for.
@@ -944,6 +1140,8 @@ def score_extraction(case: GoldenCase, result: ExtractionResult) -> ExtractionSc
         extra=tuple(sorted(extracted_ids - blessed_ids)),
         crossings_match=crossings_match,
         attributes=_check_attributes(case.model, result.extracted),
+        blessed_scored_fields=_scored_fields(case.model),
+        zone_pairs=_zone_pairs(case.model, result.extracted),
         blessed_initiators=tuple(sorted(pure_initiators(case.model))),
         blessed_crossings=crossing_keys(case.model) or (),
         extracted_crossings=crossing_keys(result.extracted),
@@ -1113,6 +1311,54 @@ def _basis(
     return tuple(flags), read
 
 
+def _zone_pairs(
+    blessed: SystemModel, extracted: SystemModel | None
+) -> tuple[int, int] | None:
+    """Every pair of shared zoned elements, and how many the models agree about.
+
+    Agreement on one pair is "both models put these two together" or "both put
+    them apart" — the question a zone *name* cannot answer and a partition can.
+    Over the elements both models carry, because a missing element is already
+    counted as a miss and reading it here would charge one omission twice.
+
+    ``None`` where fewer than two elements are shared: no pair exists, which is
+    a different fact from every pair agreeing.
+    """
+    if extracted is None:
+        return None
+    theirs = {element.id: element.trust_zone for element in extracted.zoned_elements()}
+    shared = [
+        (element.id, element.trust_zone)
+        for element in blessed.zoned_elements()
+        if element.id in theirs
+    ]
+    if len(shared) < 2:
+        return None
+    agreed = 0
+    total = 0
+    for index, (one_id, one_zone) in enumerate(shared):
+        for other_id, other_zone in shared[index + 1 :]:
+            total += 1
+            if (one_zone == other_zone) == (theirs[one_id] == theirs[other_id]):
+                agreed += 1
+    return agreed, total
+
+
+def _scored_fields(model: SystemModel) -> int:
+    """How many scored fields this model's elements carry between them.
+
+    The same walk :func:`_check_attributes` makes, over one model rather than
+    the pair, so ``compared`` and ``comparable`` count the same population and
+    their ratio is a coverage rather than two unrelated numbers.
+    """
+    return sum(
+        1
+        for element in model.elements()
+        for attribute in _SCORED_ATTRIBUTES
+        if attribute in type(element).model_fields
+    )
+
+
 def _check_attributes(
     blessed: SystemModel, extracted: SystemModel | None
 ) -> tuple[AttributeCheck, ...]:
@@ -1134,15 +1380,15 @@ def _check_attributes(
         counterpart = counterparts.get(element.id)
         if counterpart is None:
             continue
-        for attribute, reduce_value in _SCORED_ATTRIBUTES.items():
+        for attribute, scored in _SCORED_ATTRIBUTES.items():
             if attribute not in type(element).model_fields:
                 continue
             checks.append(
                 AttributeCheck(
                     element_id=element.id,
                     attribute=attribute,
-                    blessed=reduce_value(getattr(element, attribute)),
-                    extracted=reduce_value(getattr(counterpart, attribute)),
+                    blessed=scored.reduce(getattr(element, attribute)),
+                    extracted=scored.reduce(getattr(counterpart, attribute)),
                 )
             )
     return tuple(checks)
@@ -1348,7 +1594,12 @@ def render_extraction(scores: Sequence[ExtractionScore]) -> None:
             f"  precision {score.precision:.2f}"
             f"  crossings {'match' if score.crossings_match else 'DIFFER'}"
             f"/{score.crossings_recall:.2f}"
-            f"  attributes {agreed}/{len(score.attributes)}"
+            f"  fields {agreed}/{score.attributes_compared}"
+            + (
+                f" of {score.attributes_comparable}"
+                if score.attributes_comparable
+                else ""
+            )
         )
     if not scores:
         return
@@ -1370,10 +1621,20 @@ def render_extraction(scores: Sequence[ExtractionScore]) -> None:
             f" — {departures} element(s) found and named another way, which is"
             f" naming policy rather than a component the extraction missed"
         )
+    interactions = sum(score.interaction_recall for score in scores) / len(scores)
+    print(
+        f"  {interactions:.2f} counting interactions rather than pairs — a second"
+        f" flow between one pair of endpoints is its own surface (#925)"
+    )
     zones = sum(score.zone_recall for score in scores) / len(scores)
     print(
         f"zones: {zones:.2f} recall — no claim cites one, so this scores the"
         f" structure the crossings derive from rather than the identity rule"
+    )
+    partition = sum(score.zone_partition_agreement for score in scores) / len(scores)
+    print(
+        f"  {partition:.2f} of element pairs sit together in both models — the"
+        f" one zone figure a naming difference cannot reach (#925)"
     )
     zone_credits = sum(
         1 for score in scores for credit in score.aliased if _is_zone(credit.blessed)
@@ -1414,19 +1675,41 @@ def render_extraction(scores: Sequence[ExtractionScore]) -> None:
     crossings = sum(s.crossings_recall for s in scores) / len(scores)
     print(
         f"crossings: {sum(s.crossings_match for s in scores)}/{len(scores)} match"
-        f" by name, {crossings:.2f} recall by endpoint pair"
+        f" by name, {crossings:.2f} recall and"
+        f" {sum(s.crossings_precision for s in scores) / len(scores):.2f} precision"
+        f" by endpoint pair"
         + (f"; underivable on {len(undrivable)}" if undrivable else "")
     )
     unbased = sum(len(score.unbased) for score in scores)
+    read = sum(score.basis_coverage.measured for score in scores)
+    stated = sum(score.basis_coverage.stated for score in scores)
     print(
-        f"unbased controls: {unbased} stated with no word in the cited source"
+        f"unbased controls: {unbased} stated with no word in the cited source,"
+        f" out of {read} read of {stated} stated"
         f" — a diagnostic, gating nothing (analysis_service.basis)"
     )
     totals = aggregate_attributes(scores)
+    comparable = sum(score.attributes_comparable for score in scores)
+    # The coverage clause only where there is a denominator to divide by: a
+    # score built without one would otherwise read "over 22/0".
+    over = f" over {totals['compared']}/{comparable} of the reference's fields"
     print(
-        f"attributes: {totals['agreed']}/{totals['compared']} agree"
-        f" ({totals['agreement']:.0%}) (instrument, non-gating)"
+        f"scored fields: {totals['agreed']}/{totals['compared']} agree"
+        f" ({totals['agreement']:.0%}){over if comparable else ''}"
+        f" (instrument, non-gating)"
     )
+    states = [
+        check
+        for score in scores
+        for check in score.attributes
+        if check.attribute in STATE_REDUCED
+    ]
+    if states:
+        agreed_states = sum(check.agrees for check in states)
+        print(
+            f"  of those, {agreed_states}/{len(states)} are a control *state*"
+            f" agreeing — stated, absent or unverified, never the mechanism (#891)"
+        )
     for name, split in totals["by_attribute"].items():
         print(
             f"  {name:28} {split['agreed']:5,}/{split['compared']:<7,}"
