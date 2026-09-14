@@ -246,8 +246,43 @@ before-and-after pair of corpus sweeps.** Every prompt-edit ceiling priced in
 the week to 2026-09-13 — 3, 4, 5, 9 and 14 — is at or under that line. That is
 the reasoning behind step 3's rule, and #879 is where the measurement lives.
 
+### Do not buy the band. Read it off the runs you have.
+
+Five sweeps of one configuration is the obvious way to get the number above,
+and it costs about $28 for a deviation on four degrees of freedom — whose own
+95% interval runs from about 0.6 to 2.9 times the truth. `stability` reads it
+off the fates instead, for nothing:
+
+```sh
+python -m evals.harness.run stability before.json after.json   --calibrate case09-r*.json --calibrate case03-r*.json
+```
+
+Each must-find is matched or missed in each run, so a reference matched in `m`
+of `k` runs contributes `m(k-m)/(k(k-1))` to the total's variance. Summing over
+the references gives the band from **two** sweeps, because the sum runs over
+the references rather than over the runs.
+
+That sum assumes the references move independently and they do not: a run that
+goes badly goes badly across several at once, so the sum is a **floor**.
+`--calibrate` takes repeat sets — three or more runs of one configuration,
+which the single-case spreads of step 3 already produce — and measures the gap
+rather than assuming it. The floor and the observed deviation are two readings
+of one question, tested against each other.
+
+Read on the two 13-case sweeps of 2026-09-13 with the three single-case repeat
+sets as calibration: 14 of 86 readable must-finds moved, floor sd 2.65,
+inflation 1.63 on 12 degrees of freedom, **sd 3.37**. Every repeat run that
+lands from now on sharpens it and costs nothing extra.
+
+**Price your own fix, not the corpus.** `--row <case>:<reference>` narrows the
+band to the references a fix targets, which is the reading step 3 asks for. The
+nine rows #867 targets read sd 1.27, so its ceiling of 9 needs **one run each
+side** of the six cases that hold them — against 13 runs each side to see an
+effect of 3 on the corpus total.
+
 ASVS has its own band and nobody has measured it. It has 17 lanes and its own
-scorer, so nothing here carries across.
+scorer, so nothing here carries across — but the instrument reads its record
+too, so its first pair of sweeps will report one.
 
 ### Which numbers matter
 

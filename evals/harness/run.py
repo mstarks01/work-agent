@@ -38,6 +38,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import math
 import sys
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
@@ -138,9 +139,11 @@ from evals.harness.reference import (
 )
 from evals.harness.scorer import CaseScore
 from evals.harness.stability import (
+    Band,
     CaseStability,
     ScoredRun,
     aggregate_stability,
+    band,
     comparability_warnings,
     compare_runs,
     load_runs,
@@ -1280,11 +1283,14 @@ def command_stability(args: argparse.Namespace) -> int:
     try:
         runs = load_runs(args.artifact)
         stability = compare_runs(runs)
+        calibration = [load_runs(paths) for paths in (args.calibrate or ())]
+        measured = band(runs, calibration=calibration, rows=_rows(args.row))
     except (ProvenanceError, ValueError) as error:
         print(f"cannot compare: {error}", file=sys.stderr)
         return 1
 
     _print_stability(runs, stability)
+    _print_band(measured, bool(args.row))
     if args.out:
         report = {
             "runs": [
@@ -1294,6 +1300,7 @@ def command_stability(args: argparse.Namespace) -> int:
             "warnings": comparability_warnings(runs),
             "cases": [entry.to_json() for entry in stability],
             "aggregate": aggregate_stability(stability),
+            "band": measured.to_json(),
         }
         Path(args.out).write_text(json.dumps(report, indent=2) + "\n", "utf-8")
         print(f"stability report written to {args.out}")
@@ -1337,6 +1344,46 @@ def command_extraction_losses(args: argparse.Namespace) -> int:
         Path(args.out).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
         print(f"extraction-loss report written to {args.out}")
     return 0
+
+
+def _rows(named: Sequence[str] | None) -> set[tuple[str, str]]:
+    """``--row case:reference`` pairs, or an empty set for the whole corpus.
+
+    The reference half is kept as text, because the two packages key a
+    reference differently — one by an index into a case's list and one by a
+    catalog identifier — and the comparison is by equality either way.
+    """
+    rows = set()
+    for entry in named or ():
+        case, _, reference = entry.partition(":")
+        if not case or not reference:
+            raise SystemExit(f"--row {entry!r}: write it as <case>:<reference>")
+        rows.add((case, reference))
+    return rows
+
+
+def _print_band(measured: Band, narrowed: bool) -> None:
+    """The spread of the must-find total, and what it costs to see past it."""
+    scope = "the named rows" if narrowed else "the corpus"
+    if not measured.references:
+        print(f"band: no must-find fate to read over {scope}")
+        return
+    calibrated = (
+        f"x{measured.inflation:.2f} for references that move together,"
+        f" measured on {measured.calibration_freedom} degrees of freedom"
+        if measured.inflation is not None
+        else "uncalibrated, so this is a floor: pass --calibrate <repeat runs>"
+    )
+    needed = ", ".join(
+        f"{effect}: {measured.runs_needed(effect)}" for effect in (3, 5, 10)
+    )
+    print(
+        f"band over {scope}: {measured.volatile} of {measured.references}"
+        f" must-find(s) moved across {measured.runs} run(s);"
+        f" sd {measured.sd:.2f} must-find(s)"
+        f" (floor {math.sqrt(measured.floor_variance):.2f}, {calibrated})"
+    )
+    print(f"  runs each side to clear 2 sd, by effect — {needed}")
 
 
 def _print_stability(
@@ -1762,6 +1809,25 @@ def _stability_arguments(parser: argparse.ArgumentParser) -> None:
         ),
     )
     parser.add_argument("--out", help="where to write the stability report")
+    parser.add_argument(
+        "--calibrate",
+        action="append",
+        nargs="+",
+        metavar="ARTIFACT",
+        default=[],
+        help="a repeat set — three or more runs of one configuration — whose"
+        " own spread says how much the reference-level floor under-states."
+        " Repeatable, once per set. Without it the band is reported as a floor.",
+    )
+    parser.add_argument(
+        "--row",
+        action="append",
+        default=[],
+        metavar="CASE:REFERENCE",
+        help="price these references rather than the corpus total. Repeatable."
+        " A fix that targets known rows is measured on them: the corpus total"
+        " is the noisiest reading available.",
+    )
 
 
 def _compare_arguments(parser: argparse.ArgumentParser) -> None:

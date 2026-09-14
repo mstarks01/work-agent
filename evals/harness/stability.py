@@ -46,9 +46,10 @@ from __future__ import annotations
 
 import itertools
 import json
+import math
 from collections import Counter
-from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from collections.abc import Collection, Iterable, Mapping, Sequence
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -59,6 +60,7 @@ from evals.harness.bundle import reports_dir
 from evals.harness.fingerprint import IDENTIFIER_OF
 from evals.harness.identity import endpoint_form
 from evals.harness.provenance import ProvenanceError
+from evals.harness.reference import MUST_FIND
 from evals.harness.scorer import ratio
 
 #: One case of one framework. Stability is per framework because the two
@@ -66,6 +68,32 @@ from evals.harness.scorer import ratio
 #: composed identity, ASVS's finite catalog by string compare — so pooling their spread
 #: would report one volatility figure over two populations.
 Scope = tuple[FrameworkName, str]
+
+
+@dataclass(frozen=True)
+class MustFindFate:
+    """One run's answer about one case's must-find references.
+
+    ``matched`` and ``missed`` are both recorded because the two packages name
+    different halves. A package whose claims compose an identity marks the tier
+    on each *matched* row and cannot name a reference no run ever matched; a
+    package identified by a catalog requirement lists the *missed* ones by
+    identifier. :func:`band` needs neither half to be complete, because a
+    reference every run agreed on contributes nothing to a spread.
+    """
+
+    matched: frozenset[str] = frozenset()
+    missed: frozenset[str] = frozenset()
+    #: Whether ``matched`` is already narrowed to must-finds. A record that
+    #: marks the tier on each matched row answers ``True``, and its matched set
+    #: names must-finds outright. A record that marks no tier and lists the
+    #: missed must-finds instead answers ``False``: its matched set holds every
+    #: reference it matched, so the must-finds among them are the ones some
+    #: other run named as missed.
+    #:
+    #: A property of the record rather than of the package that wrote it, so a
+    #: package added tomorrow answers by saying which half its block names.
+    names_the_tier: bool = True
 
 
 @dataclass(frozen=True)
@@ -96,6 +124,11 @@ class ScoredRun:
     #: severity band and its endpoint-resolved place, off the report bundle.
     #: ``None`` where no bundle sits beside the artifact.
     content: dict[Scope, dict[str, tuple[str, frozenset[str]]]] | None = None
+    #: This run's must-find fates per scope: which the run matched, and which
+    #: it named as missed. Both packages answer, out of their own block, and
+    #: the missed half is empty for a package whose record names only the
+    #: matched ones — see :func:`band` for why that costs the reading nothing.
+    must_find: dict[Scope, MustFindFate] = field(default_factory=dict)
 
     @property
     def cases(self) -> frozenset[Scope]:
@@ -215,6 +248,7 @@ def read_run(artifact: EvalArtifact) -> ScoredRun:
     # and the handler below names the artifact as malformed. A file that is
     # perfectly well formed would be blamed for a defect in the code.
     scored = _claim_scored_framework()
+    must_find: dict[Scope, MustFindFate] = {}
     try:
         for score in artifact.block("scores"):
             scope: Scope = (scored, str(score["case"]))
@@ -223,11 +257,29 @@ def read_run(artifact: EvalArtifact) -> ScoredRun:
             )
             references[scope] = int(score["counts"]["references"])
             recall[scope] = float(score["metrics"]["reference_coverage"])
+            # This package marks the tier on each matched row and names no
+            # missed reference, so the missed half stays empty.
+            must_find[scope] = MustFindFate(
+                matched=frozenset(
+                    str(pair["reference_index"])
+                    for pair in score["matched"]
+                    if pair.get("tier") == MUST_FIND
+                )
+            )
         for entry in artifact.block("applicability"):
             scope = ("asvs", str(entry["case"]))
             matched[scope] = frozenset(str(item) for item in entry["matched"])
             references[scope] = int(entry["expected"])
             recall[scope] = float(entry["recall"])
+            # This one names the missed must-finds by catalog identifier, and
+            # marks no tier on a matched row — so the matched half is the
+            # matched set narrowed to identifiers some run named as a must-find,
+            # which ``band`` does once it holds every run.
+            must_find[scope] = MustFindFate(
+                matched=frozenset(str(item) for item in entry["matched"]),
+                missed=frozenset(str(item) for item in entry["must_find_missed"]),
+                names_the_tier=False,
+            )
     except (KeyError, TypeError, ValueError) as exc:
         raise ProvenanceError(f"{artifact.path}: malformed score block: {exc}") from exc
 
@@ -247,6 +299,7 @@ def read_run(artifact: EvalArtifact) -> ScoredRun:
         recall=recall,
         causes=_causes(artifact),
         content=_content(artifact, matched),
+        must_find=must_find,
     )
 
 
@@ -326,6 +379,206 @@ def _content(
             f"{artifact.path}: cannot read matched content off its reports: {exc}"
         ) from exc
     return content
+
+
+@dataclass(frozen=True)
+class Band:
+    """How far a sweep's must-find total moves when nothing about it changed.
+
+    **The number every "is this fix worth a run" judgement rests on**, and the
+    expensive way to get it is to sweep one configuration five times and take
+    the sample deviation of five totals. That buys a deviation on four degrees
+    of freedom, whose own 95% interval runs from about 0.6 to 2.9 times the
+    truth — a wide answer for the price of five sweeps.
+
+    This reads it off the fates instead. Each must-find reference is matched or
+    missed in each run, so a reference matched in ``m`` of ``k`` runs
+    contributes ``m(k-m)/(k(k-1))`` to the total's variance, unbiased. Summing
+    over the references gives :attr:`floor_variance` from runs already paid
+    for, and a pair of sweeps is enough because the sum is over the references
+    rather than over the runs.
+
+    **It is a floor and not the answer.** The sum assumes the references move
+    independently, and they do not: a run that goes badly goes badly across
+    several at once. :attr:`inflation` is that gap, measured rather than
+    assumed — :func:`band` computes it wherever it is given repeat runs whose
+    totals have a deviation of their own, and the two readings are then tested
+    against each other rather than each against its own expectation.
+
+    Without a calibration the reading is honest about being a floor.
+    """
+
+    #: Must-find references whose fate the runs can read. A reference every run
+    #: agreed on contributes nothing, so a package whose record cannot name the
+    #: ones nobody matched loses nothing by it.
+    references: int
+    #: Of those, the ones matched in some runs and not others. The whole of the
+    #: floor comes from these.
+    volatile: int
+    runs: int
+    floor_variance: float
+    #: Observed variance over the calibration runs' own totals, and the floor
+    #: over those same runs. ``None`` where nothing was given to calibrate on.
+    observed_variance: float | None = None
+    calibration_floor: float | None = None
+    #: Degrees of freedom behind the calibration, which is what says how much
+    #: to trust it: one repeat set of five runs carries four.
+    calibration_freedom: int = 0
+
+    @property
+    def inflation(self) -> float | None:
+        """How much wider the truth is than the floor, in variance. ``None`` uncalibrated."""
+        if not self.observed_variance or not self.calibration_floor:
+            return None
+        return self.observed_variance / self.calibration_floor
+
+    @property
+    def variance(self) -> float:
+        return self.floor_variance * (self.inflation or 1.0)
+
+    @property
+    def sd(self) -> float:
+        return math.sqrt(self.variance)
+
+    def runs_needed(self, effect: float) -> int:
+        """Runs each side for an effect of ``effect`` must-finds to clear two deviations.
+
+        The difference of two means of ``n`` runs has variance ``2v/n``, so the
+        answer is ``n >= 8v/effect**2``. One run each side is the floor of the
+        answer and never zero: a comparison needs a before and an after.
+        """
+        if effect <= 0:
+            raise ValueError("an effect of nothing needs no measurement")
+        return max(1, math.ceil(8 * self.variance / effect**2))
+
+    def to_json(self) -> dict[str, Any]:
+        return {
+            "references": self.references,
+            "volatile": self.volatile,
+            "runs": self.runs,
+            "floor_variance": round(self.floor_variance, 3),
+            "floor_sd": round(math.sqrt(self.floor_variance), 3),
+            "inflation": None if self.inflation is None else round(self.inflation, 3),
+            "calibration_freedom": self.calibration_freedom,
+            "sd": round(self.sd, 3),
+            "runs_needed": {
+                str(effect): self.runs_needed(effect) for effect in (3, 5, 10)
+            },
+        }
+
+
+def _fates(
+    runs: Sequence[ScoredRun], rows: Collection[tuple[str, str]] = ()
+) -> dict[tuple[Scope, str], tuple[int, int]]:
+    """Each must-find reference's ``(matched runs, runs that scored its case)``.
+
+    A reference is a must-find where **any** run says so, which is how the two
+    packages' half-answers combine: one marks the tier on a matched row, the
+    other names the missed ones. A reference no run calls a must-find is not
+    here, and one every run agreed on contributes nothing below.
+
+    ``rows`` narrows to named ``(case, reference)`` pairs — the reading a fix
+    that targets known references is priced on, rather than the corpus total.
+
+    A reference no run in the set ever matched is absent, because no record
+    names a must-find nobody found. It contributes no spread either, so the
+    reading is right for the question it answers: how far the number moves
+    **if the change does nothing**, which is what an effect has to clear.
+    """
+    known: dict[Scope, set[str]] = {}
+    for run in runs:
+        for scope, fate in run.must_find.items():
+            named = fate.missed | (fate.matched if fate.names_the_tier else frozenset())
+            known.setdefault(scope, set()).update(named)
+    if rows:
+        wanted = set(rows)
+        known = {
+            scope: {ref for ref in refs if (scope[1], ref) in wanted}
+            for scope, refs in known.items()
+        }
+    fates: dict[tuple[Scope, str], tuple[int, int]] = {}
+    for scope, refs in known.items():
+        scoring = [run for run in runs if scope in run.must_find]
+        for ref in refs:
+            matched = sum(1 for run in scoring if ref in run.must_find[scope].matched)
+            fates[(scope, ref)] = (matched, len(scoring))
+    return fates
+
+
+def _floor(fates: Mapping[tuple[Scope, str], tuple[int, int]]) -> float:
+    """The variance the fates account for, summed over the references."""
+    return sum(
+        matched * (scoring - matched) / (scoring * (scoring - 1))
+        for matched, scoring in fates.values()
+        if scoring > 1
+    )
+
+
+def band(
+    runs: Sequence[ScoredRun],
+    calibration: Sequence[Sequence[ScoredRun]] = (),
+    rows: Collection[tuple[str, str]] = (),
+) -> Band:
+    """The spread of the must-find total over ``runs``, off their fates.
+
+    ``calibration`` is repeat sets — the same case or corpus run several times
+    — whose totals carry a deviation of their own. Each one contributes its
+    observed variance and its floor, and the ratio of the two sums is how much
+    the independence assumption under-states. Three runs is the minimum that
+    says anything, so a pair contributes nothing and is ignored rather than
+    counted as agreement.
+    """
+    if len(runs) < 2:
+        raise ValueError("a spread needs two runs or more")
+    fates = _fates(runs, rows)
+    observed = floor = 0.0
+    freedom = 0
+    for repeat in calibration:
+        if len(repeat) < 3:
+            continue
+        # Over everything the repeat set holds, never over ``rows``. How much
+        # the references co-move is a property of a run rather than of the
+        # subset being priced, and a handful of rows carries too little of it
+        # to measure — narrowing here read the inflation as absent and priced
+        # a targeted fix against the floor alone.
+        totals = _totals(repeat)
+        mean = sum(totals) / len(totals)
+        degrees = len(totals) - 1
+        observed += sum((total - mean) ** 2 for total in totals)
+        floor += _floor(_fates(repeat)) * degrees
+        freedom += degrees
+    return Band(
+        references=len(fates),
+        volatile=sum(1 for m, k in fates.values() if 0 < m < k),
+        runs=len(runs),
+        floor_variance=_floor(fates),
+        observed_variance=observed / freedom if freedom else None,
+        calibration_floor=floor / freedom if freedom else None,
+        calibration_freedom=freedom,
+    )
+
+
+def _totals(
+    runs: Sequence[ScoredRun], rows: Collection[tuple[str, str]] = ()
+) -> list[int]:
+    """Each run's must-find total, over the references this set can read.
+
+    The same references the floor is summed over, so the two readings are of
+    one population. A must-find every run matched is outside it for a record
+    that names only the missed ones — and it is a constant, so it moves the
+    mean and not the spread.
+    """
+    universe: dict[Scope, set[str]] = {}
+    for scope, ref in _fates(runs, rows):
+        universe.setdefault(scope, set()).add(ref)
+    return [
+        sum(
+            len(refs & run.must_find[scope].matched)
+            for scope, refs in universe.items()
+            if scope in run.must_find
+        )
+        for run in runs
+    ]
 
 
 def load_runs(paths: Iterable[Path | str]) -> list[ScoredRun]:

@@ -79,6 +79,12 @@ from evals.harness.verbs import check_verb
 # rather than a tier.
 Tier = Literal["must-find", "expected"]
 
+#: The tier that drives the hard recall gate. Named so a reader asking "is this
+#: the tier that counts" spells it once — the corpus writes it, the scorer
+#: counts it, and every instrument that reports a must-find number reads it
+#: back off a record.
+MUST_FIND: Tier = "must-find"
+
 #: The shared files every case carries, whatever frameworks it is graded for.
 CASE_FILES = ("source.md", "model.json", "case.json")
 
@@ -159,7 +165,7 @@ class ReferenceClaim(BaseModel):
 
     @property
     def must_find(self) -> bool:
-        return self.tier == "must-find"
+        return self.tier == MUST_FIND
 
     @property
     def lane(self) -> str:
