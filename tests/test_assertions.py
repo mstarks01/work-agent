@@ -17,12 +17,15 @@ from analysis_service.assertions import (
     ABSENT,
     GRAPH_BOUND,
     MAX_ASSERTIONS,
+    MAX_QUOTE_CHARS,
+    MAX_SUBJECTS,
     REGISTRY,
     REGISTRY_VERSION,
     SUBJECT_PREFIXES,
     UNIVERSAL_TERMS,
     Assertion,
     AssertionCatalog,
+    CatalogIssueCode,
     Qualifier,
     QualifierKind,
     Subject,
@@ -31,11 +34,12 @@ from analysis_service.assertions import (
     catalog_issues,
     conflicts,
     projection_fields,
+    span_source,
     spans_for,
     subject_id,
     support_span,
 )
-from analysis_service.system_model import UNKNOWN, all_attribute_names
+from analysis_service.system_model import UNKNOWN, SystemModel, all_attribute_names
 
 SOURCE_LABEL = "System description"
 
@@ -247,9 +251,25 @@ class TestASpanIsLocatedByCode:
         assert support_span("MFA is enforced everywhere", SOURCE_LABEL, SOURCE) is None
 
     def test_a_cut_quote_yields_one_span_per_fragment(self):
-        spans = spans_for("Shoppers sign in…shopper accounts yet", SOURCE_LABEL, SOURCE)
+        prepared = span_source(SOURCE_LABEL, SOURCE)
+        spans = spans_for("Shoppers sign in…shopper accounts yet", prepared)
         assert len(spans) == 2
         assert SOURCE[spans[0].start : spans[0].end] == "Shoppers sign in"
+
+    def test_a_source_is_folded_once_for_every_quote_taken_from_it(self):
+        """The fold reads every character, so it belongs to the source.
+
+        A body building spans for a whole catalog prepares each source once.
+        Folding per quote spends the whole submission once for every row.
+        """
+        prepared = span_source(SOURCE_LABEL, SOURCE)
+        assert spans_for("session", prepared)[0] == support_span(
+            "session", SOURCE_LABEL, SOURCE
+        )
+
+    def test_a_quote_past_the_bound_takes_no_span(self):
+        """Refused rather than cut: a cut quote beside whole offsets is a lie."""
+        assert support_span("x" * (MAX_QUOTE_CHARS + 1), SOURCE_LABEL, SOURCE) is None
 
     def test_the_digest_pins_the_text_the_span_was_taken_from(self):
         span = support_span("session", SOURCE_LABEL, SOURCE)
@@ -257,94 +277,243 @@ class TestASpanIsLocatedByCode:
         assert span.digest != other.digest
 
 
+def stated(**overrides):
+    """One well-formed stated assertion, which each refusal breaks one way."""
+    fields = {
+        "subject": FLOW,
+        "predicate": "authentication-mechanism",
+        "value": "email and password",
+        "basis": "stated",
+        "support": span_for("sign in with email and password"),
+    }
+    return Assertion(**{**fields, **overrides})
+
+
+def looping_pair():
+    """Two assertions, each the other's premise."""
+    first = stated(basis="inferred", support=[], explanation="a")
+    second = stated(value="company SSO", basis="inferred", support=[], explanation="b")
+    first = first.model_copy(update={"premises": [assertion_id(second)]})
+    return [
+        first.model_copy(),
+        second.model_copy(update={"premises": [assertion_id(first)]}),
+    ]
+
+
+def over_the_cap(cap, make):
+    return [make(index) for index in range(cap + 1)]
+
+
+def moved_span(**overrides):
+    return stated(
+        support=[
+            span_for("sign in with email and password")[0].model_copy(update=overrides)
+        ]
+    )
+
+
+def versioned(entries, version):
+    held = catalog(entries)
+    held.registry_version = version
+    return held
+
+
+#: Every way the gate refuses a catalog, with a fixture that raises it and the
+#: reason the refusal exists. **Self-completing against the enum**: a code added
+#: to ``CatalogIssueCode`` fails ``test_every_refusal_code_has_a_fixture`` until
+#: somebody writes the catalog that raises it. A refusal nobody has seen raised
+#: looks exactly like a refusal that cannot fire.
+REFUSALS: dict[str, tuple[str, AssertionCatalog, dict]] = {
+    "wrong-registry-version": (
+        "version 1's rows say nothing version 2 can read",
+        versioned([stated()], REGISTRY_VERSION + 1),
+        {"sources": SOURCES},
+    ),
+    "too-many-assertions": (
+        "a catalog too large to read cannot be fixed by fixing its rows",
+        catalog(over_the_cap(MAX_ASSERTIONS, lambda n: stated(value=f"mechanism {n}"))),
+        {},
+    ),
+    "too-many-subjects": (
+        "the same, for what the rows point at",
+        AssertionCatalog(
+            subjects=[
+                Subject(id=f"principal:p{index}", type="principal", label=f"p{index}")
+                for index in range(MAX_SUBJECTS + 1)
+            ]
+        ),
+        {},
+    ),
+    "duplicate-subject": (
+        "one ID naming two subjects resolves while pointing nowhere",
+        catalog([], rows=((FLOW, "interaction", "one"), (FLOW, "interaction", "two"))),
+        {},
+    ),
+    "duplicate-assertion": (
+        "two rows of one identity; one row carries both spans",
+        catalog([stated(), stated()]),
+        {"sources": SOURCES},
+    ),
+    "subject-type-mismatch": (
+        "a subject typed against the prefix its own ID carries",
+        catalog([], rows=(("process:order-service", "principal", "order service"),)),
+        {},
+    ),
+    "dangling-subject": (
+        "a row about a subject nothing declares",
+        catalog([stated(subject="flow:a-to-b:c")]),
+        {},
+    ),
+    "dangling-binding": (
+        "a graph-bound subject the model does not hold",
+        catalog([stated()]),
+        {"model": SystemModel(), "sources": SOURCES},
+    ),
+    "unknown-predicate": (
+        "a predicate the registry does not hold, so nothing decides its values",
+        catalog([stated(predicate="vibes")]),
+        {},
+    ),
+    "wrong-subject-type": (
+        "a predicate asked of a kind of subject it does not answer for",
+        catalog(
+            [stated(subject="credential:session-cookie")],
+            rows=(("credential:session-cookie", "credential", "session cookie"),),
+        ),
+        {},
+    ),
+    "illegal-value": (
+        "a term outside the predicate's own vocabulary",
+        catalog(
+            [
+                Assertion(
+                    subject=FLOW,
+                    predicate="mfa-requirement",
+                    value="probably",
+                    basis="stated",
+                    support=span_for("MFA"),
+                )
+            ]
+        ),
+        {"sources": SOURCES},
+    ),
+    "missing-reason": (
+        "an unknown that does not say whether anyone asked",
+        catalog(
+            [
+                Assertion(
+                    subject=FLOW,
+                    predicate="transport-encryption",
+                    value=UNKNOWN,
+                    basis="stated",
+                )
+            ]
+        ),
+        {},
+    ),
+    "unwanted-reason": (
+        "a reason on a value that is not unknown",
+        catalog([stated(reason="silent")]),
+        {"sources": SOURCES},
+    ),
+    "missing-scope": (
+        "a grant that names no resource and no operation",
+        catalog(
+            [
+                Assertion(
+                    subject="principal:analyst",
+                    predicate="authorization-grant",
+                    value="reads every column",
+                    basis="stated",
+                    support=span_for("reads over TLS"),
+                )
+            ],
+            rows=(("principal:analyst", "principal", "analyst"),),
+        ),
+        {"sources": SOURCES},
+    ),
+    "unsupported-assertion": (
+        "the empty-citation bypass, at the assertion layer (#925)",
+        catalog([stated(support=[])]),
+        {},
+    ),
+    "legacy-with-support": (
+        "an imported value is never support-backed, whatever quote it carries",
+        catalog([stated(basis="legacy")]),
+        {"sources": SOURCES},
+    ),
+    "missing-premise": (
+        "an inferred value that names nothing it rests on",
+        catalog([stated(basis="inferred", support=[])]),
+        {},
+    ),
+    "dangling-premise": (
+        "a premise that is no assertion here",
+        catalog(
+            [
+                stated(
+                    basis="inferred",
+                    support=[],
+                    premises=["assertion:nowhere"],
+                    explanation="from the session cookie",
+                )
+            ]
+        ),
+        {},
+    ),
+    "circular-support": (
+        "support that loops reads as justified from every row on the loop",
+        catalog(looping_pair()),
+        {},
+    ),
+    "dangling-source": (
+        "a span naming a source the job does not carry",
+        catalog([stated()]),
+        {"sources": {"Other": SOURCE}},
+    ),
+    "stale-digest": (
+        "a source that changed under the offsets taken from it",
+        catalog([stated()]),
+        {"sources": {SOURCE_LABEL: SOURCE.replace("email and password", "a key")}},
+    ),
+    "unverifiable-span": (
+        "offsets that do not hold the quote beside them",
+        catalog([moved_span(start=0, end=8)]),
+        {"sources": SOURCES},
+    ),
+    "unassessed-assessor": (
+        "an assessment with nobody behind it is a model judging itself",
+        catalog([stated(assessment="supported")]),
+        {"sources": SOURCES},
+    ),
+}
+
+
 class TestWhatTheGateRefuses:
-    def stated(self, **overrides):
-        fields = {
-            "subject": FLOW,
-            "predicate": "authentication-mechanism",
-            "value": "email and password",
-            "basis": "stated",
-            "support": span_for("sign in with email and password"),
-        }
-        return Assertion(**{**fields, **overrides})
+    @pytest.mark.parametrize("code", sorted(REFUSALS))
+    def test_the_gate_raises_it(self, code):
+        why, held, reads = REFUSALS[code]
+        assert code in codes(catalog_issues(held, **reads)), why
+
+    def test_every_refusal_code_has_a_fixture(self):
+        """The table answers ``CatalogIssueCode``, with nothing left over."""
+        assert set(REFUSALS) == set(get_args(CatalogIssueCode))
+
+    @pytest.mark.parametrize(
+        "code", ["wrong-registry-version", "too-many-assertions", "too-many-subjects"]
+    )
+    def test_the_refusals_that_return_alone(self, code):
+        """A catalog nobody can read reports that, rather than its rows."""
+        _, held, reads = REFUSALS[code]
+        assert codes(catalog_issues(held, **reads)) == [code]
 
     def test_a_well_formed_catalog_raises_nothing(self):
-        assert catalog_issues(catalog([self.stated()]), sources=SOURCES) == []
+        assert catalog_issues(catalog([stated()]), sources=SOURCES) == []
 
     def test_an_issue_names_the_row_it_is_about(self):
         """An issue a reader cannot trace back to a row is a message, not a fault."""
-        (issue,) = catalog_issues(catalog([self.stated(support=[])]))
-        assert issue.assertion == assertion_id(self.stated())
-
-    def test_a_catalog_keyed_by_another_registry_is_refused(self):
-        """Fail closed rather than read version 1's rows under version 2's rules."""
-        held = catalog([self.stated()])
-        held.registry_version = REGISTRY_VERSION + 1
-        assert codes(catalog_issues(held, sources=SOURCES)) == [
-            "wrong-registry-version"
-        ]
-
-    def test_an_unregistered_predicate(self):
-        issues = catalog_issues(catalog([self.stated(predicate="vibes")]))
-        assert codes(issues) == ["unknown-predicate"]
-
-    def test_a_subject_nothing_declares(self):
-        issues = catalog_issues(catalog([self.stated(subject="flow:a-to-b:c")]))
-        assert "dangling-subject" in codes(issues)
-
-    def test_a_predicate_on_the_wrong_kind_of_subject(self):
-        rows = (("credential:session-cookie", "credential", "session cookie"),)
-        issues = catalog_issues(
-            catalog([self.stated(subject="credential:session-cookie")], rows=rows)
-        )
-        assert "wrong-subject-type" in codes(issues)
-
-    def test_a_subject_typed_against_its_own_prefix(self):
-        rows = (("process:order-service", "principal", "order service"),)
-        issues = catalog_issues(catalog([], rows=rows))
-        assert codes(issues) == ["subject-type-mismatch"]
-
-    def test_a_subject_declared_twice(self):
-        rows = (
-            (FLOW, "interaction", "place order"),
-            (FLOW, "interaction", "place order again"),
-        )
-        issues = catalog_issues(catalog([], rows=rows))
-        assert codes(issues) == ["duplicate-subject"]
-
-    def test_a_term_outside_the_predicate_s_vocabulary(self):
-        row = Assertion(
-            subject=FLOW,
-            predicate="mfa-requirement",
-            value="probably",
-            basis="stated",
-            support=span_for("MFA"),
-        )
-        assert "illegal-value" in codes(catalog_issues(catalog([row]), sources=SOURCES))
-
-    def test_a_reference_to_a_subject_of_the_wrong_type(self):
-        rows = (
-            (FLOW, "interaction", "place order"),
-            ("process:order-service", "component", "order service"),
-        )
-        row = Assertion(
-            subject=FLOW,
-            predicate="credential-presented",
-            value="process:order-service",
-            basis="stated",
-            support=span_for("service account"),
-        )
-        issues = catalog_issues(catalog([row], rows=rows), sources=SOURCES)
-        assert "illegal-value" in codes(issues)
-
-    def test_an_unknown_that_does_not_say_why(self):
-        row = Assertion(
-            subject=FLOW,
-            predicate="transport-encryption",
-            value=UNKNOWN,
-            basis="stated",
-        )
-        assert "missing-reason" in codes(catalog_issues(catalog([row])))
+        (issue,) = catalog_issues(catalog([stated(support=[])]))
+        assert issue.assertion == assertion_id(stated())
 
     def test_an_unknown_needs_no_span(self):
         """There is nothing to quote when the sources do not answer."""
@@ -357,112 +526,9 @@ class TestWhatTheGateRefuses:
         )
         assert catalog_issues(catalog([row]), sources=SOURCES) == []
 
-    def test_a_reason_on_a_value_that_is_not_unknown(self):
-        issues = catalog_issues(
-            catalog([self.stated(reason="silent")]), sources=SOURCES
-        )
-        assert codes(issues) == ["unwanted-reason"]
-
-    def test_a_grant_with_no_resource_and_no_operation(self):
-        rows = (("principal:analyst", "principal", "analyst"),)
-        row = Assertion(
-            subject="principal:analyst",
-            predicate="authorization-grant",
-            value="reads every column",
-            basis="stated",
-            support=span_for("reads over TLS"),
-        )
-        issues = catalog_issues(catalog([row], rows=rows), sources=SOURCES)
-        assert codes(issues) == ["missing-scope"]
-
-    def test_a_stated_value_that_cites_nothing(self):
-        """The empty-citation bypass, at the assertion layer (#925)."""
-        issues = catalog_issues(catalog([self.stated(support=[])]))
-        assert codes(issues) == ["unsupported-assertion"]
-
-    def test_a_legacy_value_that_claims_support(self):
-        issues = catalog_issues(catalog([self.stated(basis="legacy")]), sources=SOURCES)
-        assert codes(issues) == ["legacy-with-support"]
-
-    def test_an_inferred_value_that_names_no_premise(self):
-        issues = catalog_issues(catalog([self.stated(basis="inferred", support=[])]))
-        assert codes(issues) == ["missing-premise"]
-
-    def test_a_derived_value_that_names_no_rule(self):
-        issues = catalog_issues(catalog([self.stated(basis="derived", support=[])]))
-        assert codes(issues) == ["missing-premise"]
-
-    def test_a_premise_that_names_no_assertion_here(self):
-        row = self.stated(
-            basis="inferred",
-            support=[],
-            premises=["assertion:nowhere"],
-            explanation="from the session cookie",
-        )
-        assert "dangling-premise" in codes(catalog_issues(catalog([row])))
-
-    def test_support_that_supports_itself(self):
-        """A row that is its own premise reads as justified from every step."""
-        row = self.stated(basis="inferred", support=[], explanation="itself")
-        row = row.model_copy(update={"premises": [assertion_id(row)]})
-        assert "circular-support" in codes(catalog_issues(catalog([row])))
-
-    def test_support_that_loops_through_another_row(self):
-        first = self.stated(basis="inferred", support=[], explanation="a")
-        second = self.stated(
-            value="company SSO", basis="inferred", support=[], explanation="b"
-        )
-        first = first.model_copy(update={"premises": [assertion_id(second)]})
-        second = second.model_copy(update={"premises": [assertion_id(first)]})
-        issues = catalog_issues(catalog([first, second]))
-        assert "circular-support" in codes(issues)
-
-    def test_an_assessment_with_nobody_behind_it(self):
-        issues = catalog_issues(
-            catalog([self.stated(assessment="supported")]), sources=SOURCES
-        )
-        assert codes(issues) == ["unassessed-assessor"]
-
-    def test_a_span_naming_a_source_the_job_does_not_carry(self):
-        issues = catalog_issues(catalog([self.stated()]), sources={"Other": SOURCE})
-        assert codes(issues) == ["dangling-source"]
-
-    def test_a_span_whose_source_changed_underneath_it(self):
-        moved = {SOURCE_LABEL: SOURCE.replace("email and password", "a hardware key")}
-        issues = catalog_issues(catalog([self.stated()]), sources=moved)
-        assert codes(issues) == ["stale-digest"]
-
-    def test_a_span_whose_offsets_do_not_hold_its_quote(self):
-        span = span_for("sign in with email and password")[0]
-        moved = span.model_copy(update={"start": 0, "end": 8})
-        issues = catalog_issues(
-            catalog([self.stated(support=[moved])]), sources=SOURCES
-        )
-        assert codes(issues) == ["unverifiable-span"]
-
-    def test_two_rows_sharing_one_identity(self):
-        issues = catalog_issues(
-            catalog([self.stated(), self.stated()]), sources=SOURCES
-        )
-        assert "duplicate-assertion" in codes(issues)
-
-    def test_a_catalog_over_the_cap_returns_that_alone(self):
-        """A catalog too large to read cannot be fixed by fixing its rows."""
-        rows = [
-            self.stated(value=f"mechanism {index}")
-            for index in range(MAX_ASSERTIONS + 1)
-        ]
-        assert codes(catalog_issues(catalog(rows))) == ["too-many-assertions"]
-
-    def test_a_binding_the_model_does_not_hold_needs_the_model(self):
-        """Without a model there is nothing to resolve the binding against."""
-        from analysis_service.system_model import SystemModel
-
-        assert catalog_issues(catalog([self.stated()]), sources=SOURCES) == []
-        issues = catalog_issues(
-            catalog([self.stated()]), model=SystemModel(), sources=SOURCES
-        )
-        assert "dangling-binding" in codes(issues)
+    def test_a_binding_goes_unchecked_without_a_model(self):
+        """A check that cannot be made is never a check that passed."""
+        assert catalog_issues(catalog([stated()]), sources=SOURCES) == []
 
 
 class TestConflictsAreDerived:
