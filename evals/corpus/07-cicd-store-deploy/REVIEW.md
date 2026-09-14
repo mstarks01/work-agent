@@ -98,7 +98,7 @@ Not part of the question, but the records cite these names, so you need them.
 | flow:developer-to-git-server:push-branches | entity:developer | store:git-server | unknown | unknown | unknown |
 | flow:developer-to-build-runner:manual-rebuild | entity:developer | process:build-runner | unknown | unknown | unknown |
 | flow:build-runner-to-git-server:fetch-source | process:build-runner | store:git-server | unknown | unknown | unknown |
-| flow:build-runner-to-public-package-registry:resolve-dependencies | process:build-runner | entity:public-package-registry | unknown | none — the runner does not verify signatures on the packages it downloads | unknown |
+| flow:build-runner-to-public-package-registry:resolve-dependencies | process:build-runner | entity:public-package-registry | unknown | unknown | unknown |
 | flow:build-runner-to-image-registry:push-image | process:build-runner | store:image-registry | unknown | unknown | unknown |
 | flow:build-runner-to-deploy-controller:set-current-release | process:build-runner | process:deploy-controller | unknown | a shared build token, the same for every pipeline, never rotated since the pipeline was set up | unknown |
 | flow:store-server-to-deploy-controller:poll-current-release | process:store-server | process:deploy-controller | unknown | unknown | unknown |
@@ -117,6 +117,7 @@ Not part of the question, but the records cite these names, so you need them.
 
 - `process:store-server` — One element stands for the whole fleet of ~1,200 identical servers; the source describes them collectively and states no per-store difference.
 - `store:git-server` — The source treats the git server both as somewhere source rests and as something developers push to; modelled as a Data Store, which is where the source code actually lives.
+- `flow:build-runner-to-public-package-registry:resolve-dependencies` — The source states one verification gap: the runner does not verify signatures on what it downloads. That is artifact authenticity under a signing trust policy, not how the runner authenticates to the registry, which the source never describes. This prose is the only record of it — no rule reads notes, so the gap reaches no candidate and no evidence entry until the assertion layer in #926 gives it a field.
 
 **Assumptions**
 
@@ -409,7 +410,7 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "1bfb96ef3374b697ef78e76661daa3d2b227792a3b20d2d1ee1d526cde02652c",
-      "model.json": "8d0b808bd8e65df6bd975fcd5050596c32040e1eac75b4b8252593bf5de3aa2c",
+      "model.json": "3a5681119550c5b8e5e461b414a3266d95ac7ebb887bd25f863244f0c50854ec",
       "claims/stride.json": "20819276989745ff8df40a7b64cbaf6f595c1324b30ea2f160caa68c35363e1f"
       }
     }

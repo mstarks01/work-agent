@@ -24,7 +24,7 @@ from evals.harness.reference import load_case
 from evals.harness.structural import report_issues
 
 CORPUS = Path(__file__).resolve().parents[1] / "evals" / "corpus"
-from analysis_service.analysis import control_state
+from analysis_service.analysis import control_state, states_a_protocol
 from analysis_service.certification import fingerprints_of
 from analysis_service.claims import (
     AnalysisMarks,
@@ -555,9 +555,22 @@ def test_the_two_attributes_the_asvs_precondition_reads_are_scored(case):
     (#659). The protocol is compared by state rather than wording: two correct
     readings of "over gRPC" spell it differently, and neither is an invention.
     """
-    reworded = edited(case.model, "data_flows", 0, protocol="HTTP over TLS")
-    invented = edited(case.model, "data_flows", 0, protocol="unknown")
-    retyped = edited(case.model, "processes", 0, interface_kind="non-web")
+    # Found rather than indexed: the case's first flow states no protocol once
+    # the reference stops inferring one (#925), and a test pinned to a corpus
+    # position reads a different fact after every corpus edit.
+    stated = next(
+        index
+        for index, flow in enumerate(case.model.data_flows)
+        if states_a_protocol(flow.protocol)
+    )
+    web = next(
+        index
+        for index, process in enumerate(case.model.processes)
+        if process.interface_kind == "web"
+    )
+    reworded = edited(case.model, "data_flows", stated, protocol="HTTP over TLS")
+    invented = edited(case.model, "data_flows", stated, protocol="unknown")
+    retyped = edited(case.model, "processes", web, interface_kind="non-web")
 
     assert score_of(case, reworded).differing == ()
     assert [

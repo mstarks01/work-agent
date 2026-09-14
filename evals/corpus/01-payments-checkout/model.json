@@ -53,7 +53,7 @@
       "technology": "Python worker",
       "trust_zone": "boundary:core-services",
       "exposure": "internal",
-      "interface_kind": "web"
+      "interface_kind": "non-web"
     }
   ],
   "data_stores": [
@@ -83,7 +83,7 @@
       "source_label": "System description",
       "technology": "Cloud Storage bucket",
       "trust_zone": "boundary:core-services",
-      "data_classification": "internal",
+      "data_classification": "unknown",
       "encryption_at_rest": "customer-managed key (CMEK)"
     }
   ],
@@ -100,7 +100,7 @@
       "source_label": "System description",
       "source": "entity:shopper",
       "destination": "process:storefront-api",
-      "protocol": "HTTPS",
+      "protocol": "unknown",
       "authentication": "session cookie issued after email and password login; no MFA",
       "data_description": "order contents, shipping address, card last-four",
       "encryption_in_transit": "unknown",
@@ -117,11 +117,12 @@
       "source_label": "System description",
       "source": "entity:card-processor",
       "destination": "process:storefront-api",
-      "protocol": "HTTPS POST",
+      "protocol": "unknown",
       "authentication": "unknown",
       "data_description": "settlement confirmation for an order",
       "encryption_in_transit": "unknown",
-      "operations": "write"
+      "operations": "write",
+      "notes": "The source says the processor POSTs the callback and names no transport, so the protocol is unknown; the word POST is kept in the description rather than read as a protocol."
     },
     {
       "id": "flow:storefront-api-to-order-service:submit-order",
@@ -209,6 +210,12 @@
       "element_id": "process:order-service",
       "attribute": "exposure",
       "basis": "Described as \"in our core network; it is not exposed outside\"."
+    },
+    {
+      "assumption": "The orders DB holds confidential data under the scheme in prompts/extract.md.",
+      "element_id": "store:orders-db",
+      "attribute": "data_classification",
+      "basis": "The source says it holds \"shopper addresses and card-last-four\", which is personal and payment-related data, so disclosure harms the people described."
     }
   ]
 }

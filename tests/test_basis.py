@@ -25,9 +25,9 @@ from evals.harness.reference import load_case
 
 # The figures published in the module docstring's table. Re-derived below, so
 # the prose and the code cannot drift apart.
-CORPUS_VALUES = 22
+CORPUS_VALUES = 21
 CORPUS_FLAGGED_WEAK = 0
-CORPUS_FLAGGED_STRICT = 16
+CORPUS_FLAGGED_STRICT = 15
 
 
 def _model(**flow) -> SystemModel:

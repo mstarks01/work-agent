@@ -80,7 +80,7 @@ Not part of the question, but the records cite these names, so you need them.
 |---|---|---|---|---|---|
 | flow:insurance-partner-to-landing-bucket:push-daily-extract | entity:insurance-partner | store:landing-bucket | SFTP | static per-partner key issued at onboarding, never rotated | SSH transport (SFTP) |
 | flow:ingest-scheduler-to-landing-bucket:list-and-read-files | process:ingest-scheduler | store:landing-bucket | object storage API | unknown | unknown |
-| flow:ingest-scheduler-to-airflow-metadata-database:read-connections | process:ingest-scheduler | store:airflow-metadata-database | PostgreSQL wire protocol | unknown | unknown |
+| flow:ingest-scheduler-to-airflow-metadata-database:read-connections | process:ingest-scheduler | store:airflow-metadata-database | unknown | unknown | unknown |
 | flow:ingest-scheduler-to-spark-transform-job:trigger-transform | process:ingest-scheduler | process:spark-transform-job | unknown | unknown | unknown |
 | flow:spark-transform-job-to-claims-warehouse:load-records | process:spark-transform-job | store:claims-warehouse | BigQuery API | unknown | unknown |
 | flow:data-analyst-to-claims-warehouse:run-queries | entity:data-analyst | store:claims-warehouse | BigQuery API | company SSO; dataset-wide grant with no column-level restriction | unknown |
@@ -92,6 +92,10 @@ Not part of the question, but the records cite these names, so you need them.
 | boundary:partner-network | network |
 | boundary:landing-network | network |
 | boundary:warehouse-network | network |
+
+**Recorded notes** — hedges, probed gaps and source disagreements live here, so read them before the sets.
+
+- `store:airflow-metadata-database` — The source calls it Airflow's own metadata database and names no product.
 
 **Assumptions**
 
@@ -332,7 +336,7 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "df7757178c394258cbcf1643e81fca5b01f324058a0841824f008e74346da2d0",
-      "model.json": "df987e0afdc0a810b093ad25abcdbdc38b517a9bf2f28f35ad88ab9f2112d390",
+      "model.json": "73e08617511dd8060f92ed958164f3a5f107575795e0c43ecca8228b852f80db",
       "claims/stride.json": "0d114c8ed9d6a003b1164eec306bcd90ac9e83c435c08196159e099722b80d69"
       }
     }

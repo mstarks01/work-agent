@@ -83,15 +83,15 @@ is treated as one a person would keep.
 =====================================  ======  =======  ============
 rung                                   values  flagged  false-reject
 =====================================  ======  =======  ============
-every content token present                22       16        72.7%
-**at least one content token present**     22        0         0.0%
+every content token present                21       15        71.4%
+**at least one content token present**     21        0         0.0%
 =====================================  ======  =======  ============
 
 **The strict rung is dead, and not because the values are wrong.** It fails on
 the prose around the mechanism: ``"static per-partner key issued at onboarding,
 never rotated"`` names a key the source names, and then loses on ``issued``,
 ``onboarding`` and ``rotated`` — the writer's summary of a source that said the
-same thing in other words. Sixteen of the 22 fail that way. So the rule is the
+same thing in other words. Fifteen of the 21 fail that way. So the rule is the
 weak rung, and the strict one is recorded here to say it was measured rather
 than assumed.
 
@@ -99,8 +99,18 @@ than assumed.
 rung.** That figure came from #465's first pass, whose function-word list grew
 after seeing which values failed — fitted to the sample, which is why #470 made
 freezing the list an acceptance criterion. The list here was written from the
-closed-class rule before the run, so four values it does not excuse now fail,
-and 16 is what the strict rung actually costs. The weak rung reads 0 either way.
+closed-class rule before the run. The two figures are not a difference to take:
+the corpus itself has changed since, and ``tests/test_basis.py`` re-derives
+every number in this table from the corpus it ships beside. The weak rung reads
+0 either way.
+
+**The denominator moves when the corpus is corrected, which is the point of
+re-deriving it.** Case 09's fax leg stated a destination-verification gap in its
+``authentication`` field, so a missing safeguard sat in this measurement as a
+stated control; ruling it to ``unknown`` (#925) took it out. Case 07 carried the
+same family of fact as ``none`` and was never in here at all — one pair of
+inconsistent values, visible from this side as a denominator of 22 that should
+always have been 21.
 
 :func:`~evals.harness.modes.score_extraction` measures the same failure from the
 other side, as ``unverified -> stated``: it asks whether an extraction invented
