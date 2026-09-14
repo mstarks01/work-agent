@@ -20,6 +20,19 @@ record rather than the vendor's flag: a sweep whose nodes on the tier name one
 upstream is named after route and upstream together, and a sweep that names
 none or more than one is refused.
 
+It carries a seventh part beside it: the upstream the deployment **pinned** the
+tier to. The served name is the organisation that answered, and one
+organisation serves several endpoints, so it cannot tell them apart. Measured
+on 2026-09-13 over eight single-case runs of one gateway route, four pinned to
+a provider's flex endpoint and four to its standard one: 22.6s at $0.24/M
+against 33.0s at $0.51/M, with no overlap in the latency ranges — and every one
+of the eight recorded the same served upstream, because one organisation serves
+both endpoints. Two configurations 2.1x apart in price would have computed one
+identity and pooled into one directory. The pin is
+what the operator chose, so it is known before the call and needs nothing from
+the gateway; ``_models_record`` writes it per tier and :func:`declared_pins`
+reads it back.
+
 The directory name is derived, from the short commit, the strong-tier model
 slug, and an 8-hex prefix of the identity hash. Two contributors who sweep one
 configuration therefore collide at one directory, and the filesystem enforces
@@ -98,6 +111,15 @@ class BaselineIdentity:
     upstream provider the record names for it. Empty on a direct route, and
     empty for an aggregator tier the record cannot settle, which
     :data:`BASELINE_RULES` refuses and :func:`configuration_label` marks.
+
+    ``upstream_pins`` is the seventh, and answers what the sixth cannot: which
+    *endpoint* of that provider the operator asked for. A served upstream is
+    the organisation the gateway named, and one organisation serves several
+    endpoints — ``openai/flex`` and ``openai`` both report ``OpenAI`` while
+    differing 2.1x in price and 46% in latency. Without the pin those two
+    sweeps compute one identity and pool into one directory. Read from the
+    ``models`` block, which records the declaration per tier, so a sweep taken
+    before that was recorded carries no pin and keeps the identity it had.
     """
 
     repo_commit: str
@@ -106,6 +128,7 @@ class BaselineIdentity:
     sampling: str
     frameworks: tuple[str, ...]
     upstreams: tuple[tuple[str, str], ...]
+    upstream_pins: tuple[tuple[str, tuple[str, ...]], ...]
 
     @classmethod
     def from_artifact(
@@ -167,15 +190,19 @@ class BaselineIdentity:
                 for tier, named in recorded_upstreams(artifact, models).items()
                 if len(named) == 1
             ),
+            upstream_pins=tuple(sorted(declared_pins(artifact, models).items())),
         )
 
     def to_json(self) -> dict[str, Any]:
         """The identity as the manifest stores it and :func:`verify` recomputes.
 
-        ``upstreams`` is written only where a tier carries one. A direct route
-        carries none, and a key that was always present would move the hash,
-        the name and the directory of every merged Baseline on a direct route
-        to say nothing new.
+        ``upstreams`` and ``upstream_pins`` are written only where a tier
+        carries one. A direct route carries neither, and a key that was always
+        present would move the hash, the name and the directory of every merged
+        Baseline on a direct route to say nothing new. An aggregator tier the
+        deployment left unpinned still writes its key, with an empty list: the
+        gateway choosing is a configuration, and it is not the same fact as a
+        sweep that recorded no pin at all.
         """
         parts = {
             "repo_commit": self.repo_commit,
@@ -186,6 +213,10 @@ class BaselineIdentity:
         }
         if self.upstreams:
             parts["upstreams"] = dict(self.upstreams)
+        if self.upstream_pins:
+            parts["upstream_pins"] = {
+                tier: list(names) for tier, names in self.upstream_pins
+            }
         return parts
 
     @property
@@ -245,6 +276,30 @@ def recorded_upstreams(
         if execution.tier in by_tier and execution.served_upstream:
             by_tier[execution.tier].add(execution.served_upstream)
     return {tier: tuple(sorted(named)) for tier, named in by_tier.items()}
+
+
+def declared_pins(
+    artifact: EvalArtifact, models: tuple[tuple[str, str], ...]
+) -> dict[str, tuple[str, ...]]:
+    """The upstreams each tier's requests were pinned to, as the deployment declared them.
+
+    The one reader of the recorded pin. Keyed like
+    :func:`recorded_upstreams`, by the tiers whose vendor reaches more than one
+    provider, because only those have an endpoint to choose. A tier whose
+    record carries no declaration is absent rather than empty: a sweep taken
+    before the pin was recorded does not know what it ran under, and reading
+    that as "the gateway chose" would give it an identity it cannot support.
+    """
+    recorded = artifact.block("models").get("tiers", {})
+    pins: dict[str, tuple[str, ...]] = {}
+    for tier, route in models:
+        if vendor_for_route(route).routes_to_one_provider:
+            continue
+        declared = recorded.get(tier, {}).get("upstreams")
+        if declared is None:
+            continue
+        pins[tier] = tuple(sorted(str(name) for name in declared))
+    return pins
 
 
 def _unmet_one_provider(artifact: EvalArtifact, identity: BaselineIdentity) -> str:
