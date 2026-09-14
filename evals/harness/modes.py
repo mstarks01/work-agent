@@ -250,6 +250,16 @@ class AttributeCheck:
         }
 
 
+def _is_zone(element_id: str) -> bool:
+    """Is this a trust zone, the element type the claim comparison never reads?
+
+    The one spelling of that test here, held to
+    :func:`~evals.harness.identity.comparable_elements` — which drops exactly
+    this population — by ``tests/test_evals_modes.py``.
+    """
+    return element_id.startswith(f"{TrustBoundary.id_prefix}:")
+
+
 def _endpoint_key(element_id: str) -> str:
     """One element ID reduced to what identifies it structurally.
 
@@ -588,6 +598,21 @@ class ExtractionScore:
         total = found + len(comparable_elements(self.endpoint_missing))
         return found / total if total else 0.0
 
+    def _zones(self) -> tuple[frozenset[str], frozenset[str]]:
+        """The case's trust zones, and the ones the extraction did not write.
+
+        The one reader of that split, so :attr:`zone_recall` and
+        :attr:`sourced_zone_recall` cannot disagree about the population they
+        score over.
+        """
+        blessed = frozenset(
+            key
+            for key in _endpoint_keys(self.missing) | _endpoint_keys(self.matched)
+            if _is_zone(key)
+        )
+        gone = frozenset(key for key in self.endpoint_missing if _is_zone(key))
+        return blessed, gone
+
     @property
     def zone_recall(self) -> float:
         """The half :attr:`endpoint_recall` no longer counts: the trust zones.
@@ -597,13 +622,37 @@ class ExtractionScore:
         is derived from, so a model that invents its own set is a finding even
         though the identity rule never reads one.
         """
-        blessed = {
-            key
-            for key in _endpoint_keys(self.missing) | _endpoint_keys(self.matched)
-            if key.startswith("boundary:")
-        }
-        gone = {key for key in self.endpoint_missing if key.startswith("boundary:")}
+        blessed, gone = self._zones()
         return (len(blessed) - len(gone)) / len(blessed) if blessed else 0.0
+
+    @property
+    def sourced_zone_recall(self) -> float:
+        """:attr:`zone_recall`, crediting a zone a reader ruled supported.
+
+        The zone half of the pair :attr:`sourced_recall` and
+        :attr:`endpoint_recall` make, and it sits beside :attr:`zone_recall`
+        rather than replacing it, for the same reason: one asks whether the
+        extraction kept the source's wording, the other whether the name
+        identifies the zone the source describes.
+
+        A ``boundary:`` ID reaches :attr:`sourced_recall` through nothing —
+        :func:`~evals.harness.identity.comparable_elements` drops every zone
+        before a credit counts there — so this is the only figure a reviewed
+        alias on a zone can move. A case nobody ruled on reads exactly
+        :attr:`zone_recall`.
+
+        A credit rules on the name and on nothing else. It does not say two
+        zones hold the same members, answer to the same owner or carry the same
+        privilege, and it does not say the extraction was right to draw a zone
+        there at all.
+        """
+        blessed, gone = self._zones()
+        if not blessed:
+            return 0.0
+        credited = gone & frozenset(
+            credit.blessed for credit in self.aliased if _is_zone(credit.blessed)
+        )
+        return (len(blessed) - len(gone) + len(credited)) / len(blessed)
 
     @property
     def differing(self) -> tuple[AttributeCheck, ...]:
@@ -622,6 +671,7 @@ class ExtractionScore:
             "precision": round(self.precision, 3),
             "endpoint_recall": round(self.endpoint_recall, 3),
             "zone_recall": round(self.zone_recall, 3),
+            "sourced_zone_recall": round(self.sourced_zone_recall, 3),
             "endpoint_missing": sorted(self.endpoint_missing),
             "endpoint_extra": sorted(self.endpoint_extra),
             "unsourced": list(self.unsourced),
@@ -1302,6 +1352,15 @@ def render_extraction(scores: Sequence[ExtractionScore]) -> None:
         f"zones: {zones:.2f} recall — no claim cites one, so this scores the"
         f" structure the crossings derive from rather than the identity rule"
     )
+    zone_credits = sum(
+        1 for score in scores for credit in score.aliased if _is_zone(credit.blessed)
+    )
+    if zone_credits:
+        sourced_zones = sum(score.sourced_zone_recall for score in scores) / len(scores)
+        print(
+            f"  {sourced_zones:.2f} crediting a zone a reader ruled supported"
+            f" — {zone_credits} credit(s), which no other figure reads"
+        )
     initiator = sum(s.initiator_recall for s in scores) / len(scores)
     dropped = sum(len(s.initiators_missing) for s in scores)
     print(

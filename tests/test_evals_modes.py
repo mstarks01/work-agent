@@ -19,6 +19,7 @@ from google.adk.models.base_llm import BaseLlm
 from pydantic import Field
 
 from evals.harness import modes
+from evals.harness.identity import comparable_elements
 from evals.harness.reference import load_case
 from evals.harness.structural import report_issues
 
@@ -48,6 +49,7 @@ from analysis_service.graph import (
 )
 from analysis_service.report import Report
 from analysis_service.sampling import load_sampling
+from analysis_service.system_model import ZONE_ATTRIBUTE
 from tests.factories import DEFAULT_FRAMEWORKS, EVAL_MODEL, ScriptedLlm
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -1422,6 +1424,28 @@ class TestASupportedNameIsNamedDifferentlyRatherThanMissed:
             case, modes.ExtractionResult(case.id, model, ())
         )
 
+    ZONE_CASE = "01-payments-checkout"
+
+    def zoned(self, renames):
+        """The same, over trust zones, which every zoned element names."""
+        from evals.harness.reference import load_case
+
+        case = load_case(
+            Path(__file__).resolve().parents[1] / "evals" / "corpus" / self.ZONE_CASE
+        )
+        raw = case.model.model_dump()
+        for boundary in raw.get("trust_boundaries", []):
+            boundary["id"] = renames.get(boundary["id"], boundary["id"])
+        for collection in ("external_entities", "processes", "data_stores"):
+            for element in raw.get(collection, []):
+                zone = element.get(ZONE_ATTRIBUTE)
+                if zone in renames:
+                    element[ZONE_ATTRIBUTE] = renames[zone]
+        model = type(case.model).model_validate(raw)
+        return case, modes.score_extraction(
+            case, modes.ExtractionResult(case.id, model, ())
+        )
+
     def test_the_source_s_own_word_is_credited_as_the_same_element(self):
         """`Airflow scheduler` is what the text calls it, in five runs of five."""
         _, score = self.scored(
@@ -1469,6 +1493,49 @@ class TestASupportedNameIsNamedDifferentlyRatherThanMissed:
 
         assert score.aliased == ()
         assert score.sourced_recall == score.endpoint_recall == 1.0
+
+    def test_a_zone_the_reader_ruled_moves_only_the_zone_figure(self):
+        """A ruled zone reaches `sourced_zone_recall` and nothing else.
+
+        `comparable_elements` drops every zone, so a credit on one cannot touch
+        `sourced_recall` — which leaves `sourced_zone_recall` as the only figure
+        a reader's ruling on a zone can move.
+        """
+        _, score = self.zoned({"boundary:public-internet": "boundary:internet"})
+
+        assert [credit.blessed for credit in score.aliased] == [
+            "boundary:public-internet"
+        ]
+        assert score.sourced_zone_recall > score.zone_recall
+        assert score.sourced_recall == score.endpoint_recall
+
+    def test_an_unruled_zone_reads_the_strict_zone_number(self):
+        _, score = self.zoned({"boundary:core-services": "boundary:middle-earth"})
+
+        assert score.aliased == ()
+        assert score.sourced_zone_recall == score.zone_recall
+
+    def test_the_zone_test_and_the_claim_comparison_name_one_population(self):
+        """Two readers of "is this a zone", held to each other.
+
+        `modes._is_zone` decides which credits reach the zone figure and
+        `identity.comparable_elements` decides which elements a claim can cite.
+        A disagreement would put a credited element in neither figure or both.
+        """
+        from evals.harness.reference import load_corpus
+
+        corpus = Path(__file__).resolve().parents[1] / "evals" / "corpus"
+        ids = [
+            element.id
+            for case in load_corpus(corpus)
+            for element in case.model.elements()
+        ]
+        assert ids
+
+        by_is_zone = {element_id for element_id in ids if modes._is_zone(element_id)}
+        by_comparison = set(ids) - set(comparable_elements(ids))
+
+        assert by_is_zone == by_comparison
 
     def test_a_case_nobody_ruled_on_reads_the_strict_number(self):
         """An absent ruling is not a ruling that every name is the only one.
