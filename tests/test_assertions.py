@@ -34,6 +34,7 @@ from analysis_service.assertions import (
     QuoteProposal,
     Subject,
     SubjectType,
+    _named,
     assertion_id,
     catalog_issues,
     conflicts,
@@ -1073,3 +1074,85 @@ def test_every_projection_reason_is_explained():
     which is the same guard ``REFUSALS`` puts on the gate's codes.
     """
     assert set(PROJECTIONS) == set(get_args(ProjectionReason))
+
+
+class TestWhatTheFirstLiveRunFound:
+    """Two defects a $0.002 pre-flight found that no fixture had.
+
+    Both are about the second spelling of one thing: a model writing a name
+    where code wanted an identifier, and code writing an identifier where a
+    field holds prose.
+    """
+
+    def model(self):
+        return TestResolvingAProposal().model()
+
+    def resolve(self, *rows):
+        return resolve_catalog(
+            CatalogProposal(assertions=list(rows)), self.model(), SOURCES
+        )
+
+    def test_a_reference_written_as_a_name_resolves(self):
+        """The live run wrote ``core services`` where the zone is ``boundary:...``.
+
+        An **Element ID** is the slug of the element's name, so comparing the
+        slugs asks the question the ID derivation already answers.
+        """
+        held, issues = self.resolve(
+            AssertionProposal(
+                subject_type="component",
+                subject="storefront API",
+                predicate="network-membership",
+                value="app",
+                basis="stated",
+                quotes=[
+                    QuoteProposal(source_label=SOURCE_LABEL, quote="Shoppers sign in")
+                ],
+            )
+        )
+
+        assert issues == []
+        assert held.entries[0].subject == "process:storefront-api"
+        assert held.entries[0].value == "boundary:app"
+
+    def test_an_ambiguous_name_resolves_to_nothing(self):
+        """Guessing which element a word meant is the thing this must not do."""
+        assert _named("shopper", {"a:one": "shopper", "b:two": "Shopper"}) == ""
+        assert _named("!!!", {"a:one": "shopper"}) == ""
+
+    def test_a_credential_reference_projects_its_label(self):
+        """``authentication`` holds prose, so an ID there is a value nobody writes."""
+        held, _ = self.resolve(
+            AssertionProposal(
+                subject_type="interaction",
+                subject=FLOW,
+                predicate="credential-presented",
+                value="session cookie",
+                basis="stated",
+                quotes=[QuoteProposal(source_label=SOURCE_LABEL, quote="a session")],
+            )
+        )
+
+        (projected,) = project(held)
+        assert (projected.attribute, projected.value) == (
+            "authentication",
+            "session cookie",
+        )
+
+    def test_a_zone_reference_projects_its_identifier(self):
+        """``trust_zone`` holds an Element ID by the validity gate's own rule."""
+        held, _ = self.resolve(
+            AssertionProposal(
+                subject_type="component",
+                subject="process:storefront-api",
+                predicate="network-membership",
+                value="boundary:app",
+                basis="stated",
+                quotes=[
+                    QuoteProposal(source_label=SOURCE_LABEL, quote="Shoppers sign in")
+                ],
+            )
+        )
+
+        (projected,) = project(held)
+        assert (projected.attribute, projected.value) == ("trust_zone", "boundary:app")

@@ -1288,7 +1288,7 @@ def _subject(
     """
     prefixes = SUBJECT_PREFIXES[subject_type]
     if subject_type in GRAPH_BOUND:
-        found = canonical(written, element_ids)
+        found = canonical(written, element_ids) or _named(written, labels)
         if not found or found.split(":", 1)[0] not in prefixes:
             return None
         return Subject(id=found, type=subject_type, label=labels[found])
@@ -1297,6 +1297,33 @@ def _subject(
     except ValueError:
         return None
     return Subject(id=identity, type=subject_type, label=written.strip())
+
+
+def _named(written: str, labels: Mapping[str, str]) -> str:
+    """The element whose *name* ``written`` is, or ``""`` where none is.
+
+    The second way a model names an element, and a real one: asked for the zone
+    a component sits in, a live run wrote ``core services`` where the model's
+    own boundary is ``boundary:core-services``. Both spellings name one thing,
+    because an **Element ID** is the slug of the element's name — so comparing
+    the slugs asks the same question the ID derivation already answers.
+
+    Empty where two elements share a name slug, for the reason
+    :func:`~analysis_service.references.canonical` refuses an ambiguous fold:
+    guessing which one a word meant is the thing this must not do.
+    """
+    try:
+        wanted = normalize_name(written)
+    except ValueError:
+        return ""
+    matches = []
+    for element_id, name in labels.items():
+        try:
+            if normalize_name(name) == wanted:
+                matches.append(element_id)
+        except ValueError:
+            continue
+    return matches[0] if len(matches) == 1 else ""
 
 
 def _spans(
@@ -1381,18 +1408,19 @@ def project(catalog: AssertionCatalog) -> tuple[Projection, ...]:
     order.
     """
     fields = projection_fields()
-    types = {subject.id: subject.type for subject in catalog.subjects}
+    subjects = {subject.id: subject for subject in catalog.subjects}
     grouped: dict[tuple[str, str], list[tuple[str, Assertion]]] = {}
     for entry in catalog.entries:
         attribute = fields.get(entry.predicate, "")
-        if types.get(entry.subject) not in GRAPH_BOUND:
+        held = subjects.get(entry.subject)
+        if held is None or held.type not in GRAPH_BOUND:
             continue
         if attribute and attribute in _attributes_of(entry.subject):
             grouped.setdefault((entry.subject, attribute), []).append(
                 (assertion_id(entry), entry)
             )
     return tuple(
-        _projected(element_id, attribute, rows)
+        _projected(element_id, attribute, rows, subjects)
         for (element_id, attribute), rows in sorted(grouped.items())
     )
 
@@ -1416,7 +1444,10 @@ def _attributes_of(element_id: str) -> frozenset[str]:
 
 
 def _projected(
-    element_id: str, attribute: str, rows: list[tuple[str, Assertion]]
+    element_id: str,
+    attribute: str,
+    rows: list[tuple[str, Assertion]],
+    subjects: Mapping[str, Subject],
 ) -> Projection:
     """One attribute's projected value, and the reason it reads that way."""
     ids = tuple(sorted(identity for identity, _ in rows))
@@ -1433,7 +1464,25 @@ def _projected(
         return projected(UNKNOWN, "several-values")
     if any(entry.scope for entry in stated):
         return projected(UNKNOWN, "scoped")
-    value = stated[0].value
+    value = _written(stated[0].value, subjects)
     if value == ABSENT:
         return projected(ABSENT_WORD, "absent")
     return projected(value, "stated")
+
+
+def _written(value: str, subjects: Mapping[str, Subject]) -> str:
+    """One value as the graph's own field spells it.
+
+    **A reference is spelled twice, and which spelling belongs in a field is a
+    property of the referent.** A zone reference names an element, and
+    ``trust_zone`` holds an **Element ID** by the validity gate's own rule, so
+    the ID is the value. A credential reference names a subject this layer
+    invented, and ``authentication`` holds prose, so a live run projected
+    ``credential:session-cookie`` into a field whose every other value is a
+    sentence. The subject's label is what the catalog holds for that, so
+    writing it invents nothing.
+    """
+    referent = subjects.get(value)
+    if referent is None or referent.type in GRAPH_BOUND:
+        return value
+    return referent.label
