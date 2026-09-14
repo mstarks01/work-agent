@@ -27,6 +27,7 @@ same reason, so a lint cannot rewrite an artifact an ADR points at.
 | `repository-evidence.md` | #484 | 2026-09-08 | repo `8085c43`, SARIF 2.1.0 errata 01, GitHub REST 2022-11-28 |
 | `openrouter-served-model.md` + `probe_openrouter_served_model.py` | #806 | 2026-09-11 | `litellm==1.97.0`, repo `d16a6c4`, OpenRouter live API |
 | `openrouter-pricing.md` + `probe_openrouter_pricing.py` | #822 | 2026-09-11 | `litellm==1.97.0`, repo `242ceb0`, OpenRouter live catalogue |
+| `assertion-readers.md` + `probe_assertion_facts.py` | #926 | 2026-09-14 | repo `b027793` |
 
 ## The one staleness you must know about
 
