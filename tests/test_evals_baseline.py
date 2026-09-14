@@ -309,6 +309,55 @@ class TestTheEndpointTheOperatorChose:
         assert manifest["identity"]["upstream_pins"] == {"strong": ["openai/flex"]}
         assert len(manifest["sweeps"]) == 2
 
+    @pytest.mark.parametrize(
+        "block",
+        [None, [], "openrouter", {"tiers": None}, {"tiers": []}],
+        ids=["null", "list", "string", "null-tiers", "list-tiers"],
+    )
+    def test_a_models_block_that_is_not_a_table_is_refused_by_name(
+        self, tmp_path, block
+    ):
+        """Every shape the value can take, not the one a sweep writes.
+
+        The block is JSON a contributor can hand-edit, and the stability
+        fixtures write every declared key as ``null``. ``.get`` on any of these
+        raises ``AttributeError`` through a Baseline read, which names neither
+        the file nor the field.
+        """
+        route = f"{vendor_for(self.AGGREGATED[0]).prefix}some-model"
+        path = write_sweep(
+            tmp_path,
+            sweep_document(strong_model=route, served_upstreams=("OpenAI",))
+            | {"models": block},
+        )
+
+        with pytest.raises(BaselineError, match="models"):
+            BaselineIdentity.from_artifact(load_artifact(path))
+
+    def test_a_tier_whose_pin_is_not_a_list_is_refused_by_name(self, tmp_path):
+        """``openrouter = "openai"`` is the line somebody writes first."""
+        route = f"{vendor_for(self.AGGREGATED[0]).prefix}some-model"
+        document = sweep_document(
+            strong_model=route, served_upstreams=("OpenAI",), upstream_pins=()
+        )
+        document["models"]["tiers"]["strong"]["upstreams"] = "openai/flex"
+        path = write_sweep(tmp_path, document)
+
+        with pytest.raises(BaselineError, match="not a list of upstream slugs"):
+            BaselineIdentity.from_artifact(load_artifact(path))
+
+    def test_a_tier_entry_that_is_not_a_table_records_no_pin(self, tmp_path):
+        """A scalar where a table was expected says nothing about a pin, and a
+        Baseline identity is not the reader that should rule on the rest of
+        that entry."""
+        route = f"{vendor_for(self.AGGREGATED[0]).prefix}some-model"
+        document = sweep_document(strong_model=route, served_upstreams=("OpenAI",))
+        document["models"]["tiers"]["strong"] = "openrouter/openai/gpt-5.6-terra"
+        path = write_sweep(tmp_path, document)
+        identity = BaselineIdentity.from_artifact(load_artifact(path))
+
+        assert identity.upstream_pins == ()
+
     def test_a_direct_route_carries_no_pin_however_the_record_reads(self, tmp_path):
         """A direct vendor is its own upstream and has no endpoint to choose,
         so the key stays off and every merged Baseline on one keeps its name."""

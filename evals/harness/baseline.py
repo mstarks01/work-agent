@@ -61,7 +61,7 @@ import json
 import math
 import re
 import subprocess
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, NamedTuple
@@ -290,16 +290,45 @@ def declared_pins(
     before the pin was recorded does not know what it ran under, and reading
     that as "the gateway chose" would give it an identity it cannot support.
     """
-    recorded = artifact.block("models").get("tiers", {})
+    recorded = _tiers_recorded(artifact)
     pins: dict[str, tuple[str, ...]] = {}
     for tier, route in models:
         if vendor_for_route(route).routes_to_one_provider:
             continue
-        declared = recorded.get(tier, {}).get("upstreams")
-        if declared is None:
+        entry = recorded.get(tier)
+        if not isinstance(entry, Mapping) or "upstreams" not in entry:
             continue
+        declared = entry["upstreams"]
+        if isinstance(declared, str) or not isinstance(declared, Sequence):
+            raise BaselineError(
+                f"{artifact.path}: tier {tier!r} records upstreams"
+                f" {declared!r}, which is not a list of upstream slugs"
+            )
         pins[tier] = tuple(sorted(str(name) for name in declared))
     return pins
+
+
+def _tiers_recorded(artifact: EvalArtifact) -> Mapping[str, Any]:
+    """The models block's per-tier table, or a refusal naming the artifact.
+
+    Every shape the value can take, rather than the one a sweep writes. The
+    block is JSON a contributor can hand-edit, and a stability fixture writes
+    every declared key as ``null``, so ``.get`` on it raises ``AttributeError``
+    through a Baseline read instead of refusing the file by name.
+    """
+    block = artifact.block("models")
+    if not isinstance(block, Mapping):
+        raise BaselineError(
+            f"{artifact.path}: the models block is {type(block).__name__},"
+            " not a table of what this run asked its providers for"
+        )
+    tiers = block.get("tiers", {})
+    if not isinstance(tiers, Mapping):
+        raise BaselineError(
+            f"{artifact.path}: models.tiers is {type(tiers).__name__}, not a"
+            " table keyed by tier"
+        )
+    return tiers
 
 
 def _unmet_one_provider(artifact: EvalArtifact, identity: BaselineIdentity) -> str:
