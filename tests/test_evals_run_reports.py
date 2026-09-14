@@ -18,11 +18,30 @@ from pathlib import Path
 
 import pytest
 
+from analysis_service.assertions import (
+    ABSENT,
+    AssertionCatalog,
+    AssertionProposal,
+    CatalogIssue,
+    CatalogProposal,
+    QuoteProposal,
+    resolve_catalog,
+)
 from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
 from analysis_service.validation import ValidationIssue, parse_and_validate
-from evals.harness.bundle import reports_dir, write_extractions, write_reports
-from evals.harness.modes import ExtractionResult, score_extraction
+from evals.harness.bundle import (
+    reports_dir,
+    write_assertions,
+    write_extractions,
+    write_reports,
+)
+from evals.harness.modes import (
+    AssertionResult,
+    ExtractionResult,
+    score_assertions,
+    score_extraction,
+)
 from evals.harness.reference import load_case
 from tests.test_evals_run_grounds import CASE_DIR, DEAD, sweep
 
@@ -199,3 +218,96 @@ class TestAnExtractionSweepKeepsItsModels:
 
         assert not reports_dir(out).exists()
         assert "no extractions written" in capsys.readouterr().out
+
+
+class TestTheAssertionsBesideTheArtifact:
+    """The assertion mode's sidecar, held to the same acceptance test.
+
+    Not "a file exists" — a file whose contents cannot reproduce the run's own
+    numbers keeps nothing worth keeping.
+    """
+
+    def result(self, case):
+        flow = next(flow for flow in case.model.data_flows if flow.source_excerpt)
+        sources = {source.label: source.text for source in case.sources}
+        proposal = CatalogProposal(
+            assertions=[
+                AssertionProposal(
+                    subject_type="interaction",
+                    subject=flow.id,
+                    predicate="mfa-requirement",
+                    value=ABSENT,
+                    basis="stated",
+                    quotes=[
+                        QuoteProposal(
+                            source_label=flow.source_label, quote=flow.source_excerpt
+                        )
+                    ],
+                ),
+                AssertionProposal(
+                    subject_type="interaction",
+                    subject="flow:nowhere:at-all",
+                    predicate="mfa-requirement",
+                    value="required",
+                    basis="stated",
+                    quotes=[],
+                ),
+            ]
+        )
+        catalog, issues = resolve_catalog(proposal, case.model, sources)
+        return AssertionResult(
+            case_id=case.id,
+            proposal=proposal.model_dump(mode="json"),
+            catalog=catalog,
+            issues=tuple(issues),
+        )
+
+    def written(self, case, tmp_path):
+        out = tmp_path / "artifact.json"
+        write_assertions(str(out), "assertions", {case.id: self.result(case)})
+        return json.loads(
+            (reports_dir(out) / f"{case.id}.assertions.json").read_text("utf-8")
+        )
+
+    def test_the_written_rows_re_score_to_what_the_sweep_reported(self, case, tmp_path):
+        live = score_assertions(case, self.result(case))
+        written = self.written(case, tmp_path)
+
+        offline = score_assertions(
+            case,
+            AssertionResult(
+                case_id=case.id,
+                proposal=written["proposal"],
+                catalog=AssertionCatalog.model_validate(written["catalog"]),
+                issues=tuple(
+                    CatalogIssue.model_validate(issue) for issue in written["issues"]
+                ),
+            ),
+        )
+
+        assert offline.to_json() == live.to_json()
+
+    def test_the_proposal_is_kept_beside_the_rows_code_built(self, case, tmp_path):
+        """Resolving drops rows and locates spans, so what arrived cannot be recomputed."""
+        written = self.written(case, tmp_path)
+
+        assert len(written["proposal"]["assertions"]) == 2
+        assert len(written["catalog"]["entries"]) == 1
+        assert [issue["code"] for issue in written["issues"]] == ["dangling-subject"]
+
+    def test_the_projection_is_kept_with_the_rows_behind_it(self, case, tmp_path):
+        """A degraded value is only explainable with the rows that would not fit.
+
+        This case's one row is an MFA absence, which projects into no graph
+        field at all — so the projection is empty, and that emptiness is the
+        record.
+        """
+        written = self.written(case, tmp_path)
+
+        assert written["projection"] == []
+
+    def test_no_file_is_written_in_another_mode(self, case, tmp_path):
+        out = tmp_path / "artifact.json"
+        write_assertions(str(out), "extraction", {case.id: self.result(case)})
+
+        assert not reports_dir(out).exists()

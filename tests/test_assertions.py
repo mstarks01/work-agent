@@ -28,6 +28,7 @@ from analysis_service.assertions import (
     AssertionProposal,
     CatalogIssueCode,
     CatalogProposal,
+    ProjectionReason,
     Qualifier,
     QualifierKind,
     QuoteProposal,
@@ -995,3 +996,80 @@ class TestTheProjection:
             "authentication",
             "encryption_in_transit",
         ]
+
+
+class TestWhatAProjectionWillNotReach:
+    """The two ways a legal row has no attribute to land in."""
+
+    def test_a_predicate_whose_field_belongs_to_another_element_type(self):
+        """``authentication-mechanism`` takes a component; only a flow has the field.
+
+        Without this the projection named an attribute the element does not
+        declare, and the comparison beside it read the absent field as
+        ``unknown``.
+        """
+        held = AssertionCatalog(
+            subjects=subjects(("process:order-service", "component", "order service")),
+            entries=[
+                Assertion(
+                    subject="process:order-service",
+                    predicate="authentication-mechanism",
+                    value="a service account",
+                    basis="stated",
+                    support=span_for("Shoppers sign in"),
+                )
+            ],
+        )
+        assert project(held) == ()
+
+    def test_a_store_predicate_on_a_store_does_reach_its_field(self):
+        """The positive control: the same predicate family, on the type that has it."""
+        held = AssertionCatalog(
+            subjects=subjects(("store:receipts", "component", "receipts")),
+            entries=[
+                Assertion(
+                    subject="store:receipts",
+                    predicate="storage-encryption",
+                    value="a customer-managed key",
+                    basis="stated",
+                    support=span_for("Shoppers sign in"),
+                )
+            ],
+        )
+        (projected,) = project(held)
+        assert projected.attribute == "encryption_at_rest"
+
+    def test_a_subject_the_catalog_does_not_type_reaches_nothing(self):
+        """Graph-bound is the subject table's answer, not a prefix's."""
+        held = AssertionCatalog(
+            subjects=[],
+            entries=[
+                Assertion(
+                    subject=FLOW,
+                    predicate="transport-encryption",
+                    value="TLS",
+                    basis="stated",
+                    support=span_for("Shoppers sign in"),
+                )
+            ],
+        )
+        assert project(held) == ()
+
+
+PROJECTIONS: dict[str, str] = {
+    "stated": "one unscoped value is the value it holds",
+    "absent": "a stated absence is the word the graph reads as absent",
+    "unknown": "only unknown rows leave the attribute unsettled",
+    "scoped": "a string cannot carry the qualifier the source attached",
+    "several-values": "picking between two values would drop one",
+    "several-predicates": "one string cannot carry two predicates' facts",
+}
+
+
+def test_every_projection_reason_is_explained():
+    """The table answers ``ProjectionReason``, with nothing left over.
+
+    A reason added to the enum fails here until somebody says what it means,
+    which is the same guard ``REFUSALS`` puts on the gate's codes.
+    """
+    assert set(PROJECTIONS) == set(get_args(ProjectionReason))

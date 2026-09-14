@@ -69,6 +69,7 @@ from typing import Literal, get_args
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from analysis_service.analysis import ABSENT_WORD
 from analysis_service.grounding import (
     IndexedSource,
     index_source,
@@ -97,7 +98,6 @@ __all__ = [
     "MAX_QUOTE_CHARS",
     "MAX_SPANS",
     "MAX_SUBJECTS",
-    "NONE",
     "REGISTRY",
     "REGISTRY_VERSION",
     "UNIVERSAL_TERMS",
@@ -202,10 +202,13 @@ SUBJECT_PREFIXES: Mapping[str, frozenset[str]] = MappingProxyType(
     }
 )
 
-#: Every prefix the element schema uses, read off the five element classes.
-_ELEMENT_PREFIXES: frozenset[str] = frozenset(
-    element_type.id_prefix for element_type in get_args(Element)
+#: Which element class each ID prefix names, read off the five element classes.
+_ELEMENT_TYPES: Mapping[str, type[BaseModel]] = MappingProxyType(
+    {element_type.id_prefix: element_type for element_type in get_args(Element)}
 )
+
+#: Every prefix the element schema uses.
+_ELEMENT_PREFIXES: frozenset[str] = frozenset(_ELEMENT_TYPES)
 
 #: The subject types whose ID is an **Element ID**, and whose subject the model
 #: must therefore hold. Derived rather than listed again: a type is graph-bound
@@ -1359,12 +1362,6 @@ class Projection:
     rows: tuple[str, ...]
 
 
-#: The word a **System Model** control attribute carries for a stated absence.
-#: ``control_state`` reads it as ``absent``; the catalog spells the same fact
-#: :data:`ABSENT`, and this is the one place the two spellings meet.
-NONE = "none"
-
-
 def project(catalog: AssertionCatalog) -> tuple[Projection, ...]:
     """What each graph attribute the catalog reaches would hold.
 
@@ -1384,10 +1381,13 @@ def project(catalog: AssertionCatalog) -> tuple[Projection, ...]:
     order.
     """
     fields = projection_fields()
+    types = {subject.id: subject.type for subject in catalog.subjects}
     grouped: dict[tuple[str, str], list[tuple[str, Assertion]]] = {}
     for entry in catalog.entries:
         attribute = fields.get(entry.predicate, "")
-        if attribute and entry.subject.split(":", 1)[0] in _ELEMENT_PREFIXES:
+        if types.get(entry.subject) not in GRAPH_BOUND:
+            continue
+        if attribute and attribute in _attributes_of(entry.subject):
             grouped.setdefault((entry.subject, attribute), []).append(
                 (assertion_id(entry), entry)
             )
@@ -1395,6 +1395,24 @@ def project(catalog: AssertionCatalog) -> tuple[Projection, ...]:
         _projected(element_id, attribute, rows)
         for (element_id, attribute), rows in sorted(grouped.items())
     )
+
+
+def _attributes_of(element_id: str) -> frozenset[str]:
+    """Every attribute the element type behind ``element_id`` declares.
+
+    **A predicate projects into a field, and a field belongs to one element
+    type.** ``authentication-mechanism`` takes a ``component`` subject as well
+    as an ``interaction`` one, and only a **Data Flow** carries
+    ``authentication``; ``storage-encryption`` takes any component and only a
+    **Data Store** carries ``encryption_at_rest``. Without this, a legal row
+    projected a value onto an element with no such field, and the comparison
+    beside it read the absent attribute as ``unknown``.
+
+    Read off the element classes by ID prefix, so a field moved between types
+    moves this with it.
+    """
+    element_type = _ELEMENT_TYPES.get(element_id.split(":", 1)[0])
+    return frozenset(element_type.model_fields) if element_type else frozenset()
 
 
 def _projected(
@@ -1417,5 +1435,5 @@ def _projected(
         return projected(UNKNOWN, "scoped")
     value = stated[0].value
     if value == ABSENT:
-        return projected(NONE, "absent")
+        return projected(ABSENT_WORD, "absent")
     return projected(value, "stated")
