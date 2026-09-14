@@ -261,6 +261,26 @@ def _endpoint_keys(ids: Iterable[str]) -> frozenset[str]:
     return frozenset(_endpoint_key(element_id) for element_id in ids)
 
 
+#: The element types a submitter's own text names, so a name absent from it is
+#: a component nobody described. A flow's name is a label the model coins for an
+#: interaction and a zone is one it invents per implied boundary, so neither is
+#: a name the source was ever going to hold. The one reader of that population:
+#: :func:`_unsourced` asks its question of these, and
+#: :attr:`ExtractionScore.named_extra` reports the split over them.
+NAMED_TYPES: tuple[str, ...] = ("entity", "process", "store")
+
+
+def _element_type(element_id: str) -> str:
+    """An element ID's type prefix — ``store`` of ``store:feature-store``.
+
+    The whole ID where it carries no prefix, which no model this scores
+    produces: the type is part of the derived ID. Returning the ID itself keeps
+    a malformed one comparable only to itself, rather than pooling every
+    malformed ID under one empty type.
+    """
+    return element_id.split(":", 1)[0] if ":" in element_id else element_id
+
+
 @dataclass(frozen=True)
 class ExtractionScore:
     """Agreement between an extraction and the blessed model.
@@ -351,6 +371,64 @@ class ExtractionScore:
     def precision(self) -> float:
         total = len(self.matched) + len(self.extra)
         return len(self.matched) / total if total else 0.0
+
+    @property
+    def possible_renames(self) -> tuple[str, ...]:
+        """Extra elements that could be a blessed element under another name.
+
+        An extra element is one of three things and :attr:`precision` counts
+        all three alike: a component the model invented, a component the corpus
+        omits, and the model's own name for a component the corpus paraphrased.
+        Only the first is the model's error. On the sweep of 2026-09-13 all 35
+        extra non-flow elements a run were named word for word in the source,
+        so precision was reading the corpus rather than the model (#882).
+
+        Which blessed element an extra one renames needs a fuzzy comparison,
+        which this repository refuses in graded code for the reason
+        :mod:`analysis_service.evidence` states. Whether it renames *anything*
+        does not: a rename displaces a blessed element of its own type, so an
+        extra element of a type the extraction matched completely has nothing
+        to be a rename of. That is the split, and it is set arithmetic.
+
+        This is a **bound and not an attribution**. An element here may still be
+        an invention; what :attr:`additions` holds cannot be a rename.
+        """
+        displaced = {_element_type(element_id) for element_id in self.missing}
+        return tuple(
+            element_id
+            for element_id in self.extra
+            if _element_type(element_id) in displaced
+        )
+
+    @property
+    def named_extra(self) -> tuple[str, ...]:
+        """Extra elements of a type a submitter's own text names.
+
+        The flow labels the model coins swamp ``extra`` — 107 of the 136 a run
+        on the sweep of 2026-09-13 — and rule 2 of ``extract.md`` has it invent
+        a zone per implied boundary. Neither is a name the source holds, so the
+        split over :data:`NAMED_TYPES` is the reading that answers a question
+        about the corpus.
+        """
+        return tuple(
+            element_id
+            for element_id in self.extra
+            if _element_type(element_id) in NAMED_TYPES
+        )
+
+    @property
+    def additions(self) -> tuple[str, ...]:
+        """Extra elements no rename explains: their type is fully accounted for.
+
+        The complement of :attr:`possible_renames` over ``extra``, so the two
+        partition it. Each one is a component the extraction holds and the
+        blessed model does not: an invention, which :attr:`unsourced` names
+        where the source never mentions it, or a component the corpus omits.
+        """
+        renames = frozenset(self.possible_renames)
+        return tuple(
+            element_id for element_id in self.extra if element_id not in renames
+        )
 
     @property
     def initiators_missing(self) -> frozenset[str]:
@@ -476,6 +554,8 @@ class ExtractionScore:
             "endpoint_missing": sorted(self.endpoint_missing),
             "endpoint_extra": sorted(self.endpoint_extra),
             "unsourced": list(self.unsourced),
+            "possible_renames": list(self.possible_renames),
+            "additions": list(self.additions),
             "initiator_recall": round(self.initiator_recall, 3),
             "initiators_missing": sorted(self.initiators_missing),
             "crossings_match": self.crossings_match,
@@ -796,9 +876,7 @@ def _unsourced(
     out = []
     for element_id in extra:
         element = by_id.get(element_id)
-        if element is None or not element_id.startswith(
-            ("entity:", "process:", "store:")
-        ):
+        if element is None or _element_type(element_id) not in NAMED_TYPES:
             continue
         tokens = [
             w for w in re.split(r"[^a-z0-9]+", element.name.lower()) if len(w) > 2
@@ -1086,10 +1164,23 @@ def render_extraction(scores: Sequence[ExtractionScore]) -> None:
     )
     invented = sum(len(s.unsourced) for s in scores)
     extra = sum(len(s.extra) for s in scores)
+    renames = sum(len(s.possible_renames) for s in scores)
     print(
         f"invention: {invented} of {extra} extra element(s) are named nowhere in"
-        f" their source — the rest are the corpus's own gap or its own paraphrase,"
-        f" which precision cannot tell apart (#882)"
+        f" their source — the rest are the corpus's own gap or its own paraphrase"
+    )
+    print(
+        f"extra: {renames} of {extra} could be a blessed element of the same"
+        f" type under another name — precision counts every one as the model's"
+        f" error (#882)"
+    )
+    named = sum(len(s.named_extra) for s in scores)
+    named_renames = sum(
+        len(set(s.named_extra) & set(s.possible_renames)) for s in scores
+    )
+    print(
+        f"  of the {named} an entity, a process or a store: {named_renames} could,"
+        f" {named - named_renames} could not — the rest are coined flow labels"
     )
     undrivable = [s.case_id for s in scores if not s.crossings_derivable]
     crossings = sum(s.crossings_recall for s in scores) / len(scores)
