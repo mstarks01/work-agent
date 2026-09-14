@@ -52,6 +52,7 @@ IssueCode = Literal[
     "illegal-asset-tag",
     "too-many-elements",
     "unverifiable-excerpt",
+    "missing-citation",
     "assumption-on-unknown",
     "blank-control",
     "ambiguous-control",
@@ -395,10 +396,21 @@ def _assumption_issues(
 def _citation_issues(
     elements: Collection[Element], sources: Mapping[str, str]
 ) -> list[ValidationIssue]:
-    """The traceability chain resolves *and* leads somewhere, or the model fails.
+    """The traceability chain exists, resolves *and* leads somewhere, or the model fails.
 
-    Excerpt and label are **coupled**: a quote with no label cites nothing, and
-    a label naming a source the job never carried asserts a chain that is not
+    Three rungs, and the first one is what lets the other two mean anything.
+    **An element with no excerpt cites nothing**, so it asserts its facts on the
+    model's own authority; ``prompts/extract.md`` rule 7 asks for an excerpt on
+    every element, and this is the rung that holds it. Skipping an empty excerpt
+    rather than refusing it makes erasure the cheapest way through the whole
+    gate — quieter than a wrong citation, because a rule that only inspects the
+    citations it is given says nothing about the ones nobody wrote. It also
+    takes :func:`~analysis_service.basis.stated_controls` with it, since that
+    diagnostic passes over an element whose label resolves to nothing *on the
+    stated grounds that this rule refuses that shape* (#925).
+
+    Excerpt and label are then **coupled**: a quote with no label cites nothing,
+    and a label naming a source the job never carried asserts a chain that is not
     there — which is worse than no citation at all, because a reader who
     follows it finds a source that does not exist. Set membership is
     mechanical, so it belongs here rather than in a prompt.
@@ -418,10 +430,14 @@ def _citation_issues(
     seam, where the same failure has nowhere to go.
 
     This is the one gate rule taking data from outside the model. Where no
-    sources are supplied neither half runs: a hand-authored model checked
-    without a job has nothing to check against, and inventing it would fail
-    every such model on a citation that is not wrong. A source carried with
-    empty text skips the text half alone, for the same reason.
+    sources are supplied none of the three rungs runs: a hand-authored model
+    checked without a job has nothing to check against, and inventing it would
+    fail every such model on a citation that is not wrong. **Presence rides
+    with them** rather than running always, because the population this rule
+    exists to hold is a model that came out of a job — the message names the
+    job's labels, which is the repair the writer can act on, and a model with
+    no job has no such list. A source carried with empty text skips the
+    verbatim rung alone, for the same reason.
     """
     if not sources:
         return []
@@ -432,6 +448,16 @@ def _citation_issues(
     issues: list[ValidationIssue] = []
     for element in elements:
         if not element.source_excerpt:
+            issues.append(
+                ValidationIssue(
+                    code="missing-citation",
+                    message="the element carries no source_excerpt, so nothing"
+                    " ties it to the submitted text; quote the shortest span of"
+                    f" one of this job's sources {sorted(sources)} that names it",
+                    element_id=element.id,
+                    field="source_excerpt",
+                )
+            )
             continue
         if not element.source_label:
             issues.append(

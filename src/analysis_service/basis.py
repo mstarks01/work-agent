@@ -125,7 +125,7 @@ import logging
 import re
 from collections.abc import Iterator, Mapping
 from types import MappingProxyType
-from typing import NamedTuple
+from typing import Literal, NamedTuple
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -142,9 +142,14 @@ __all__ = [
     "FUNCTION_WORDS",
     "IN_SCOPE",
     "MAX_SCAN_WORK",
+    "Coverage",
+    "Disposition",
     "StatedControl",
     "UnbasedControl",
     "content_tokens",
+    "coverage",
+    "dispositions",
+    "read_controls",
     "stated_controls",
     "unbased_controls",
 ]
@@ -256,6 +261,13 @@ def content_tokens(value: str) -> tuple[str, ...]:
     )
 
 
+#: Why one stated in-scope control is or is not something this can read.
+#: ``measurable`` is the only one the scan sees; the other two name a control
+#: this diagnostic has nothing to say about, which is a different answer from
+#: "looked and found no problem".
+Disposition = Literal["measurable", "uncited", "tokenless"]
+
+
 class StatedControl(NamedTuple):
     """One stated in-scope control, with the tokens to look for and where.
 
@@ -272,41 +284,145 @@ class StatedControl(NamedTuple):
     tokens: tuple[str, ...]
 
 
+class Coverage(BaseModel):
+    """What this diagnostic read, and what it could not read at all.
+
+    **An empty list of flags is not a clean bill.** Three different things
+    produce one: every value echoed its source, or no value was readable, or
+    there were no stated values to read. A caller holding only
+    :func:`unbased_controls` cannot tell those apart, and the middle one is the
+    shape an erased citation or a function-word value arrives in (#925).
+
+    ``flagged`` is a subset of ``measured``, so ``measured - flagged`` is what
+    the diagnostic looked at and let through. ``uncited`` and ``tokenless``
+    are outside it entirely: nothing was searched, so nothing is claimed.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    #: Stated in-scope controls the model carries, whatever came of them.
+    stated: int = Field(ge=0)
+    #: Those the scan searched a source for.
+    measured: int = Field(ge=0)
+    #: Those whose element cites no source this job carried.
+    uncited: int = Field(ge=0)
+    #: Those whose value holds no content token to look for.
+    tokenless: int = Field(ge=0)
+    #: The measured ones whose cited source echoed none of their tokens.
+    flagged: int = Field(ge=0)
+
+    @classmethod
+    def empty(cls) -> Coverage:
+        """A model nothing was read from, which is not a model that read clean."""
+        return cls(stated=0, measured=0, uncited=0, tokenless=0, flagged=0)
+
+    @property
+    def unmeasured(self) -> int:
+        return self.uncited + self.tokenless
+
+    def to_json(self) -> dict[str, int]:
+        return {
+            "stated": self.stated,
+            "measured": self.measured,
+            "uncited": self.uncited,
+            "tokenless": self.tokenless,
+            "flagged": self.flagged,
+        }
+
+
+def dispositions(
+    model: SystemModel, sources: Mapping[str, str]
+) -> Iterator[tuple[StatedControl, Disposition]]:
+    """Every stated in-scope control, each with whether this can read it.
+
+    Walks elements in :meth:`SystemModel.elements` order and attributes in
+    :data:`IN_SCOPE` order, so the output is stable and complete.
+
+    **The one walk.** :func:`stated_controls` filters it and :func:`coverage`
+    counts it, so the rate and the denominator cannot be taken over two
+    different sets. A control that is not ``stated`` is not here at all: there
+    is no assertion to have a basis, which is not the same as an assertion
+    nobody could check.
+
+    Two dispositions are outside the measurement, each for a reason that is not
+    a pass:
+
+    * ``uncited`` — the element's ``source_label`` names no source the job
+      carried, so there is no text to search. An element citing nothing is a
+      different failure from one citing a source that does not support it, and
+      the validity gate refuses both shapes
+      (:func:`~analysis_service.validation.validate`).
+    * ``tokenless`` — the value holds no content token, so there is nothing to
+      look for. A value of function words alone is one; so is one written in a
+      script :data:`_TOKEN` does not read, since the token rule is ASCII.
+    """
+    for element in model.elements():
+        cited = bool(sources.get(element.source_label))
+        for attribute in IN_SCOPE:
+            value = getattr(element, attribute, None)
+            if not isinstance(value, str) or control_state(value) != "stated":
+                continue
+            tokens = content_tokens(value)
+            control = StatedControl(
+                element_id=element.id,
+                attribute=attribute,
+                value=value[:CONTROL_VALUE_MAX_CHARS],
+                source_label=element.source_label,
+                tokens=tokens,
+            )
+            if not cited:
+                yield control, "uncited"
+            elif not tokens:
+                yield control, "tokenless"
+            else:
+                yield control, "measurable"
+
+
 def stated_controls(
     model: SystemModel, sources: Mapping[str, str]
 ) -> Iterator[StatedControl]:
     """Every control this diagnostic has something to say about.
 
-    Walks elements in :meth:`SystemModel.elements` order and attributes in
-    :data:`IN_SCOPE` order, so the output is stable and complete.
-
-    Three values are passed over, each for a reason that is not a pass:
-
-    * a control that is not ``stated`` — there is no assertion to have a basis.
-    * a value with no content token, so there is nothing to look for. A value
-      of function words alone is one; so is one written in a script
-      :data:`_TOKEN` does not read, since the token rule is ASCII.
-    * an element whose ``source_label`` names no source the job carried. The
-      validity gate already refuses that shape
-      (:func:`~analysis_service.validation.validate`), and an element citing
-      nothing is a different failure from one citing a source that does not
-      support it.
+    The measurable half of :func:`dispositions`. What the other half holds is
+    :func:`coverage`'s to report, and a caller reading this alone is reading a
+    denominator rather than a population.
     """
-    for element in model.elements():
-        if not sources.get(element.source_label):
-            continue
-        for attribute in IN_SCOPE:
-            value = getattr(element, attribute, None)
-            if not isinstance(value, str) or control_state(value) != "stated":
-                continue
-            if tokens := content_tokens(value):
-                yield StatedControl(
-                    element_id=element.id,
-                    attribute=attribute,
-                    value=value[:CONTROL_VALUE_MAX_CHARS],
-                    source_label=element.source_label,
-                    tokens=tokens,
+    for control, disposition in dispositions(model, sources):
+        if disposition == "measurable":
+            yield control
+
+
+def read_controls(
+    model: SystemModel, sources: Mapping[str, str]
+) -> tuple[list[UnbasedControl], Coverage]:
+    """One walk and one budget: the flags, and what they were drawn from.
+
+    Every other reading here comes from this one, so a report cannot pair a
+    flag count with a denominator taken over a second walk. A caller wanting
+    both takes this and pays :data:`MAX_SCAN_WORK` once.
+    """
+    scan = _Scan(sources)
+    flags: list[UnbasedControl] = []
+    counts = {"measurable": 0, "uncited": 0, "tokenless": 0}
+    for control, disposition in dispositions(model, sources):
+        counts[disposition] += 1
+        if disposition == "measurable" and scan.echoes_none(control):
+            flags.append(
+                UnbasedControl(
+                    element_id=control.element_id,
+                    attribute=control.attribute,
+                    value=control.value,
+                    source_label=control.source_label,
+                    tokens=control.tokens,
                 )
+            )
+    return flags, Coverage(
+        stated=sum(counts.values()),
+        measured=counts["measurable"],
+        uncited=counts["uncited"],
+        tokenless=counts["tokenless"],
+        flagged=len(flags),
+    )
 
 
 def unbased_controls(
@@ -317,19 +433,22 @@ def unbased_controls(
     Spends :data:`MAX_SCAN_WORK` and then stops, which is why this returns a
     list rather than a generator: the budget is the whole job's, and a caller
     that abandoned the walk part-way would leave it half spent.
+
+    **A short list is not a clean model.** :func:`coverage` says how much of the
+    model this was able to read at all, and a caller reporting the flags
+    without it reports a rate with no denominator.
     """
-    scan = _Scan(sources)
-    return [
-        UnbasedControl(
-            element_id=control.element_id,
-            attribute=control.attribute,
-            value=control.value,
-            source_label=control.source_label,
-            tokens=control.tokens,
-        )
-        for control in stated_controls(model, sources)
-        if scan.echoes_none(control)
-    ]
+    return read_controls(model, sources)[0]
+
+
+def coverage(model: SystemModel, sources: Mapping[str, str]) -> Coverage:
+    """What the diagnostic read of this model, and what it could not read.
+
+    Spends the same :data:`MAX_SCAN_WORK` as :func:`unbased_controls`, because
+    it is the same scan: a caller wanting both takes this and reads
+    :attr:`Coverage.flagged`, rather than paying the budget twice.
+    """
+    return read_controls(model, sources)[1]
 
 
 class _Scan:
