@@ -39,6 +39,12 @@ The System Model already extracted from that text, whose element IDs you name:
 
 Do not write an `unknown` row for every predicate of every subject. Write one where the text **raises** the question and does not answer it, which is what a reader needs to see. A predicate nobody raised is simply absent from your output.
 
+### When the source says the set is complete
+
+A source sometimes says a thing is the **only** one of its kind: "it is the only service we expose to the internet", "that is the one encrypted link". Write the row as usual and set `exclusive` on it. That is a claim about every other subject as well as this one, so it needs the words that make it — a row with `exclusive` set and no quote is refused.
+
+Set it only where the source says so. A source that happens to mention one encrypted link has not said it is the only one.
+
 ### Reading what a source says
 
 1. **Facts come from assertions, not questions.** "Is that behind the WAF?" states nothing, whoever asked it.

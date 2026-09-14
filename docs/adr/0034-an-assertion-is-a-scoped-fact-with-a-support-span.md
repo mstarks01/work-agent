@@ -181,6 +181,26 @@ with no `unknown` in it, and rule 9 needs an `unknown` to write when a
 projection cannot fit. So the zone kind stays the graph's own, and Phase 4 rules
 on it with the projection in front of it.
 
+### Registry version 2
+
+The first live run of the assertion node, on `01-payments-checkout`, read two
+facts out of one source that the table above has nowhere to put. *"The password
+comes from an environment variable on the worker"* is where a credential is
+kept, and *"it is the only thing we expose to the internet"* is a claim about
+every other component as well as that one. Version 2 answers both.
+
+- **`credential-custody`** — where a credential is kept. Subject `credential`,
+  free text, no graph field.
+- **`internet-exposure`** — whether a component can be reached from the
+  internet. Subject `component`, the terms `internet-facing` and `internal`,
+  projecting into `exposure`.
+- **`exclusive`**, a field on an assertion rather than a predicate. It says the
+  source states **no other subject** holds this predicate at this value, which
+  is what lets a reader close the world for one predicate. It is a claim, so the
+  gate refuses it on a row that is not `stated` or carries no span.
+
+Sixteen predicates now, **ten of which project into no graph field**.
+
 **A fact outside the registry stays source material.** Extraction does not
 invent a predicate and does not force a fact into the nearest wrong one. That is
 the same rule the asset vocabulary and the **Ground** kinds already follow.
