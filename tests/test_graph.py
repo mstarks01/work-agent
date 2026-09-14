@@ -348,7 +348,11 @@ def test_every_canonical_llm_node_is_a_graph_node(pipeline):
     them.
     """
     assert set(TIER_NODES.values()) <= set(LLM_NODES)
-    assert set(TIER_NODES) <= set(nodes_by_name(pipeline))
+    # And every LLM node this graph built has a key in the map. A subset in
+    # this direction too, because the map names every node any *entry* of this
+    # build can build: the assertion graph's node is in it and in no graph of
+    # this shape.
+    assert set(pipeline.node_models) <= set(TIER_NODES)
 
 
 def test_llm_nodes_bind_their_resolved_model(pipeline):

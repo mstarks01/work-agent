@@ -268,16 +268,21 @@ def test_the_pipeline_binds_the_pinned_models_from_config():
 
     assert pipeline.node_models[graph.EXTRACT_NODE] == "vertex_ai/gemini-2.5-flash"
     assert pipeline.node_models[CRITIC_NODE] == "vertex_ai/gemini-2.5-pro"
-    assert set(pipeline.node_models) == set(TIER_NODES)
+    # Every node this graph built has a tier key. A subset rather than an
+    # equality, because the correspondence names every node any *entry* of this
+    # build can build, and the production entry builds its own: the assertion
+    # graph's node is in the map and in no graph of this shape.
+    assert set(pipeline.node_models) <= set(TIER_NODES)
+    assert graph.ASSERT_NODE not in pipeline.node_models
 
 
-def test_the_ten_llm_nodes_share_two_adapters_one_per_tier():
+def test_the_llm_nodes_share_two_adapters_one_per_tier():
     """#6: the binding is per tier, so the build-time checks fire twice, not ten times."""
     pipeline = Deployment.from_env(env=VERTEX_ENV).pipeline(DEFAULT_FRAMEWORKS)
     nodes = {node.name: node for node in pipeline.workflow.graph.nodes}
 
-    adapters = {id(nodes[name].model) for name in TIER_NODES}
-    assert len(TIER_NODES) == 10
+    adapters = {id(nodes[name].model) for name in pipeline.node_models}
+    assert len(pipeline.node_models) == 10
     assert len(adapters) == 2
 
 
@@ -286,7 +291,7 @@ def test_every_llm_node_carries_the_retry_loop():
     pipeline = Deployment.from_env(env=VERTEX_ENV).pipeline(DEFAULT_FRAMEWORKS)
     nodes = {node.name: node for node in pipeline.workflow.graph.nodes}
 
-    for name in TIER_NODES:
+    for name in pipeline.node_models:
         policy = getattr(nodes[name].model, "retry_policy", None)
         assert policy is not None, f"{name} has no retry loop"
         assert policy.attempts == 3
@@ -302,7 +307,9 @@ def test_both_tiers_draw_on_one_shared_retry_budget():
     pipeline = Deployment.from_env(env=VERTEX_ENV).pipeline(DEFAULT_FRAMEWORKS)
     nodes = {node.name: node for node in pipeline.workflow.graph.nodes}
 
-    budgets = {id(nodes[name].model.retry_policy.budget) for name in TIER_NODES}
+    budgets = {
+        id(nodes[name].model.retry_policy.budget) for name in pipeline.node_models
+    }
     assert len(budgets) == 1
     # Capacity is one retry per LLM node in the graph: what one job may spend
     # from a cold bucket.

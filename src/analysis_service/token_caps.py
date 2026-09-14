@@ -85,6 +85,10 @@ TOKEN_CAPS: dict[str, int] = {
     # contract rather than in the code.
     "prompts/extract": 3600,
     "prompts/repair": 900,
+    # The assertion body alone. The predicate table beside it is rendered from
+    # `assertions.REGISTRY` rather than written here, so a predicate added
+    # tomorrow moves the composed instruction and never this file.
+    "prompts/assert": 1700,
     # One package's own text, under ``frameworks/<name>/``.
     f"package/{CRITIC_DOC}": 1200,
     f"package/{DISCLAIMER_DOC}": 200,

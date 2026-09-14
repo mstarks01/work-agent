@@ -34,6 +34,7 @@ therefore share the longest possible cacheable prefix.
 
 from __future__ import annotations
 
+from analysis_service.assertions import REGISTRY, Predicate
 from analysis_service.frameworks import OUTPUT_DOC
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.skills import lane_exemplars_doc
@@ -48,9 +49,11 @@ CRITIC_PROMPT_NAME = "critic"
 RECRITIC_PROMPT_NAME = "recritic"
 EXTRACT_PROMPT_NAME = "extract"
 REPAIR_PROMPT_NAME = "repair"
+ASSERT_PROMPT_NAME = "assert"
 PROMPT_BODY_NAMES: tuple[str, ...] = (
     EXTRACT_PROMPT_NAME,
     REPAIR_PROMPT_NAME,
+    ASSERT_PROMPT_NAME,
     ANALYZE_PROMPT_NAME,
     CRITIC_PROMPT_NAME,
     RECRITIC_PROMPT_NAME,
@@ -121,3 +124,60 @@ def compose_extract_prompt(loader: MarkdownLoader) -> str:
 def compose_repair_prompt(loader: MarkdownLoader) -> str:
     """The one-shot repair prompt: validator issues plus the original input."""
     return loader.load(REPAIR_PROMPT_NAME).strip() + "\n"
+
+
+def compose_assert_prompt(loader: MarkdownLoader) -> str:
+    """The assertion prompt: the body, then the predicate registry rendered.
+
+    **The table is rendered from the registry, never written in the prompt.**
+    A predicate's meaning, the subjects it takes and the shape of its value are
+    facts :data:`~analysis_service.assertions.REGISTRY` already holds, and the
+    gate reads them from there. A second copy in prose would be a second reader
+    of one rule, and the prompt's copy is the one nothing checks.
+    """
+    parts = [loader.load(ASSERT_PROMPT_NAME), render_predicates()]
+    return "\n\n".join(part.strip() for part in parts) + "\n"
+
+
+def render_predicates() -> str:
+    """The predicate registry as the table a model reads.
+
+    One row per predicate, in registry order: what it means, which subjects it
+    takes, and what its value may be. A ``term`` predicate lists its own words
+    beside the two every predicate admits; a ``reference`` one names what it
+    points at; free text says so.
+    """
+    rows = [
+        "## The predicates",
+        "",
+        (
+            "Every predicate also admits `absent` — the source says the thing is"
+            " not there — and `unknown`, which takes a `reason`."
+        ),
+        "",
+        "| Predicate | Subjects | Value | Means |",
+        "| --- | --- | --- | --- |",
+    ]
+    for name, predicate in REGISTRY.items():
+        subjects = ", ".join(sorted(predicate.subjects))
+        rows.append(
+            f"| `{name}` | {subjects} | {_value_form(predicate)} |"
+            f" {predicate.meaning} |"
+        )
+    scoped = [
+        f"`{name}` needs a scope naming its " + " and ".join(predicate.requires)
+        for name, predicate in REGISTRY.items()
+        if predicate.requires
+    ]
+    if scoped:
+        rows += ["", "Scope requirements: " + "; ".join(scoped) + "."]
+    return "\n".join(rows)
+
+
+def _value_form(predicate: Predicate) -> str:
+    """How one predicate's value is written, for the rendered table."""
+    if predicate.value == "term":
+        return ", ".join(f"`{term}`" for term in sorted(predicate.terms))
+    if predicate.value == "reference":
+        return f"the name of a {next(iter(predicate.refers_to))}"
+    return "what the source says, in a few words"

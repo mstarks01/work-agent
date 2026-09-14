@@ -236,6 +236,9 @@ review_independence = "shared"
 [nodes]
 extract = "base"
 repair = "base"
+# The assertion pass reads the same sources extraction read and writes rows
+# rather than judgements, so it is transcription on the workhorse tier.
+assert = "base"
 # Three keys per framework. Every lane of one framework runs the same judgement
 # on the same tier, so this is one knob per framework rather than one per lane —
 # an operator choosing to run one framework cheaper than another is the choice

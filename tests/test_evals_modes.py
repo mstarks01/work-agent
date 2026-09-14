@@ -25,6 +25,7 @@ from evals.harness.structural import report_issues
 
 CORPUS = Path(__file__).resolve().parents[1] / "evals" / "corpus"
 from analysis_service.analysis import control_state, states_a_protocol
+from analysis_service.assertions import ABSENT, projection_fields
 from analysis_service.certification import fingerprints_of
 from analysis_service.claims import (
     AnalysisMarks,
@@ -39,6 +40,7 @@ from analysis_service.frameworks.stride.record import (
     STRIDE_CATEGORIES,
 )
 from analysis_service.graph import (
+    ENTRY_ASSERT_ONLY,
     ENTRY_EXTRACT,
     ENTRY_EXTRACT_ONLY,
     ENTRY_PREPARE,
@@ -48,6 +50,7 @@ from analysis_service.graph import (
     analyze_node_name,
     tier_node_by_graph_node,
 )
+from analysis_service.grounding import verify_quote
 from analysis_service.report import Report
 from analysis_service.sampling import load_sampling
 from analysis_service.system_model import ZONE_ATTRIBUTE, normalize_element_ids
@@ -234,7 +237,50 @@ def _lane_replies(case, graph_node: str) -> dict[str, str]:
     }
 
 
+def scripted_assertions(case) -> str:
+    """Two rows a model could emit for this case, quoting its own excerpts.
+
+    An element's ``source_excerpt`` verifies against its source by
+    construction, so scripting the quotes from the blessed model exercises the
+    span locator on real corpus text rather than on a fixture nobody submitted.
+    """
+    flow = next(flow for flow in case.model.data_flows if flow.source_excerpt)
+    quote = {"source_label": flow.source_label, "quote": flow.source_excerpt}
+    return json.dumps(
+        {
+            "assertions": [
+                {
+                    "subject_type": "interaction",
+                    "subject": flow.id,
+                    "predicate": "authentication-mechanism",
+                    "value": "a shared account",
+                    "basis": "stated",
+                    "quotes": [quote],
+                },
+                {
+                    "subject_type": "interaction",
+                    "subject": flow.id,
+                    "predicate": "mfa-requirement",
+                    "value": "absent",
+                    "basis": "stated",
+                    "quotes": [quote],
+                },
+                {
+                    "subject_type": "interaction",
+                    "subject": "flow:nowhere:at-all",
+                    "predicate": "mfa-requirement",
+                    "value": "required",
+                    "basis": "stated",
+                    "quotes": [quote],
+                },
+            ]
+        }
+    )
+
+
 def _reply_for(case, graph_node: str) -> str:
+    if graph_node == "assert":
+        return scripted_assertions(case)
     if graph_node == "extract":
         return json.dumps(case.model.model_dump(mode="json"))
     if graph_node == "critic_stride":
@@ -358,6 +404,72 @@ def test_end_to_end_mode_surfaces_the_pre_critic_drafts(case):
     run = asyncio.run(modes.run_end_to_end(case, pipeline))
 
     assert len(run.merged_drafts) == len(STRIDE_CATEGORIES)
+
+
+class TestTheAssertionMode:
+    """Mode 4, end to end offline: the node, the resolver, and the counts."""
+
+    def run(self, case, models=None):
+        pipeline = build(case, ENTRY_ASSERT_ONLY, {} if models is None else models)
+        return asyncio.run(modes.run_assertions(case, pipeline))
+
+    def test_it_runs_assert_alone_over_the_blessed_model(self, case):
+        models: dict[str, ScriptedLlm] = {}
+        self.run(case, models)
+
+        assert set(models) == {"assert"}
+
+    def test_the_node_reads_the_model_it_is_asked_about(self, case):
+        """The seeded model reaches the instruction, rendered by ``read``."""
+        models: dict[str, ScriptedLlm] = {}
+        self.run(case, models)
+
+        instruction = models["assert"].seen[0]
+        assert case.model.data_flows[0].id in instruction
+
+    def test_a_row_the_model_does_not_hold_drops_and_says_so(self, case):
+        result = self.run(case)
+
+        assert len(result.catalog.entries) == 2
+        assert [issue.code for issue in result.issues] == ["dangling-subject"]
+
+    def test_every_kept_row_carries_a_located_span(self, case):
+        result = self.run(case)
+
+        for entry in result.catalog.entries:
+            assert entry.support
+            span = entry.support[0]
+            text = next(
+                source.text
+                for source in case.sources
+                if source.label == span.source_label
+            )
+            assert verify_quote(span.quote, text[span.start : span.end])
+
+    def test_the_counts_are_taken_over_what_resolved(self, case):
+        result = self.run(case)
+
+        score = modes.score_assertions(case, result)
+
+        assert (score.proposed, score.kept) == (3, 2)
+        assert score.absences == 1
+        assert score.supported == 2
+        assert score.dropped == {"dangling-subject": 1}
+        assert score.to_json()["predicates"] == [
+            "authentication-mechanism",
+            "mfa-requirement",
+        ]
+
+    def test_a_stated_absence_is_the_number_the_graph_cannot_carry(self, case):
+        """The audit's own fact: ten corpus values hide one of these (#925)."""
+        result = self.run(case)
+        (absence,) = [
+            entry for entry in result.catalog.entries if entry.value == ABSENT
+        ]
+
+        assert absence.predicate == "mfa-requirement"
+        assert absence.basis == "stated"
+        assert absence.predicate not in projection_fields()
 
 
 def test_extraction_mode_runs_extract_alone(case):
@@ -677,6 +789,7 @@ def test_extraction_mode_observes_its_one_node(case):
 def test_every_mode_maps_to_a_graph_entry():
     assert modes.MODE_ENTRIES == {
         "extraction": ENTRY_EXTRACT_ONLY,
+        "assertions": ENTRY_ASSERT_ONLY,
         "analysis": ENTRY_PREPARE,
         "end-to-end": ENTRY_EXTRACT,
     }

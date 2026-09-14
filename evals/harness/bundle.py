@@ -143,6 +143,54 @@ def write_reports(out: str, mode: str, runs: Mapping[str, modes.AnalysisRun]) ->
     print(f"{len(runs)} report(s) written to {directory} ({total_bytes / 1024:.0f} KB)")
 
 
+def write_assertions(
+    out: str, mode: str, resolved: Mapping[str, modes.AssertionResult]
+) -> None:
+    """Persist every assertion run beside the artifact, so it can be re-read.
+
+    :func:`write_extractions`'s counterpart for the assertion mode, and it
+    keeps the same three things for the same reason: what the model emitted,
+    what code built from it, and why each dropped row dropped.
+
+    * ``proposal`` — what ``assert`` emitted. The only one that cannot be
+      recomputed: resolving has already located spans and dropped rows, and a
+      resolver change needs the rows that arrived.
+    * ``catalog`` — the rows code built, which every count was taken over.
+    * ``issues`` — why each dropped row dropped, structured as a repair pass
+      would receive it.
+
+    **These files are publishable** on the same reading the reports are: they
+    carry quotes of corpus source text, which is in this repository. The same
+    path carries a submitter's own words the moment it runs outside the corpus.
+    """
+    if mode != "assertions":
+        return
+    directory = reports_dir(out)
+    directory.mkdir(parents=True, exist_ok=True)
+    total_bytes = 0
+    for case_id, result in sorted(resolved.items()):
+        path = directory / f"{case_id}.assertions.json"
+        path.write_text(
+            archive_bytes(
+                "assertions",
+                {
+                    "proposal": dict(result.proposal),
+                    "catalog": result.catalog.model_dump(mode="json"),
+                    "issues": [
+                        issue.model_dump(mode="json") for issue in result.issues
+                    ],
+                },
+            ),
+            "utf-8",
+        )
+        total_bytes += path.stat().st_size
+    if resolved:
+        print(
+            f"{len(resolved)} assertion runs written to {directory}"
+            f" ({total_bytes / 1024:.0f} KiB)"
+        )
+
+
 def write_extractions(
     out: str, mode: str, extracted: Mapping[str, modes.ExtractionResult]
 ) -> None:
