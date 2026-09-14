@@ -70,6 +70,7 @@ from typing import Literal, get_args
 from pydantic import BaseModel, ConfigDict, Field
 
 from analysis_service.grounding import (
+    IndexedSource,
     index_source,
     locate_quote,
     normalize,
@@ -92,6 +93,7 @@ __all__ = [
     "MAX_ASSERTIONS",
     "MAX_PREMISES",
     "MAX_QUALIFIERS",
+    "MAX_QUOTE_CHARS",
     "MAX_SPANS",
     "MAX_SUBJECTS",
     "REGISTRY",
@@ -106,6 +108,7 @@ __all__ = [
     "Predicate",
     "Qualifier",
     "QualifierKind",
+    "SpanSource",
     "Subject",
     "SubjectType",
     "SupportSpan",
@@ -114,6 +117,8 @@ __all__ = [
     "catalog_issues",
     "conflicts",
     "projection_fields",
+    "span_source",
+    "spans_for",
     "subject_id",
     "support_span",
 ]
@@ -417,6 +422,11 @@ class Subject(BaseModel):
     assertions: the label is a word somebody chose, and the ID is what every
     row points at.
 
+    There is no alias list. The question aliases answer is whether two runs
+    named one thing twice, and ADR 0034 rules that identity is local to one
+    artifact and alignment across runs is an explicit step. A field for that
+    step belongs with the step.
+
     A graph-bound subject's ``id`` is the **Element ID** itself, so the binding
     cannot drift from the thing it binds.
     """
@@ -426,7 +436,6 @@ class Subject(BaseModel):
     id: str = Field(max_length=300, pattern=ELEMENT_ID)
     type: SubjectType
     label: str = Field(min_length=1, max_length=200)
-    aliases: list[str] = Field(default_factory=list, max_length=8)
 
 
 class Assertion(BaseModel):
@@ -595,41 +604,80 @@ def _digest(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:12]
 
 
+@dataclass(frozen=True)
+class SpanSource:
+    """One source folded once, ready for every quote taken from it.
+
+    Named apart from :class:`~analysis_service.grounding.PreparedSource`, which
+    is the repair scan's own preparation of a source. One word, one meaning.
+
+    A catalog carries many quotes and a job carries few sources, so the fold
+    belongs to the source rather than to the quote: :func:`index_source` reads
+    every character of the submission, and doing it per quote spends the whole
+    submission once for each row. A body building spans prepares each source
+    once and hands this to :func:`spans_for`.
+
+    Built by :func:`span_source`, which answers ``None`` for a source whose
+    two folds disagree — see :func:`~analysis_service.grounding.index_source`.
+    """
+
+    label: str
+    digest: str
+    indexed: IndexedSource
+
+
+def span_source(source_label: str, source_text: str) -> SpanSource | None:
+    """Fold one source and digest it, once, for every span taken from it."""
+    indexed = index_source(source_text)
+    if indexed is None:
+        return None
+    return SpanSource(source_label, text_digest(source_text), indexed)
+
+
 def support_span(quote: str, source_label: str, source_text: str) -> SupportSpan | None:
     """The span ``quote`` occupies in ``source_text``, or ``None`` if it is absent.
 
-    **The only way to build a span.** The offsets come from
-    :func:`~analysis_service.grounding.locate_quote`, which reads the same
+    **The only way to build a span, with :func:`spans_for`.** The offsets come
+    from :func:`~analysis_service.grounding.locate_quote`, which reads the same
     matcher :func:`~analysis_service.grounding.verify_quote` reads, so a span
     and a **Ground** can never disagree about one quote.
 
-    A quote marking a cut with ``…`` covers several spans of the source. This
-    answers the first, and a caller that needs each fragment separately calls
-    :func:`spans_for` instead — the two are the same lookup, and this is the
-    common case named once.
+    The convenience form, for a caller holding one quote and one text. It folds
+    the whole source to answer, exactly as
+    :meth:`~analysis_service.system_model.SystemModel.get` builds a whole index
+    to answer one ID. A caller taking several quotes from one source calls
+    :func:`span_source` first, or it spends the submission once per quote.
+
+    A quote marking a cut with ``…`` covers several spans. This answers the
+    first, and :func:`spans_for` answers each.
     """
-    spans = spans_for(quote, source_label, source_text)
+    prepared = span_source(source_label, source_text)
+    if prepared is None:
+        return None
+    spans = spans_for(quote, prepared)
     return spans[0] if spans else None
 
 
-def spans_for(
-    quote: str, source_label: str, source_text: str
-) -> tuple[SupportSpan, ...]:
-    """Every span ``quote`` occupies, one per fragment, or empty when absent."""
-    indexed = index_source(source_text)
-    if indexed is None:
+def spans_for(quote: str, prepared: SpanSource) -> tuple[SupportSpan, ...]:
+    """Every span ``quote`` occupies, one per fragment, or empty when absent.
+
+    **A quote past :data:`MAX_QUOTE_CHARS` takes no span.** Refused rather than
+    cut: a truncated quote beside the offsets of the whole one is a span that
+    does not hold what it says it holds, and a citation is bounded but never
+    rewritten — the rule a **Source**'s label already follows.
+    """
+    if len(quote) > MAX_QUOTE_CHARS:
         return ()
-    located = locate_quote(quote, indexed)
+    located = locate_quote(quote, prepared.indexed)
     if located is None:
         return ()
-    digest = text_digest(source_text)
     return tuple(
         SupportSpan(
-            source_label=source_label,
-            digest=digest,
+            source_label=prepared.label,
+            digest=prepared.digest,
             start=span.start,
             end=span.end,
-            quote=quote[:MAX_QUOTE_CHARS],
+            quote=quote,
         )
         for span in located
     )
