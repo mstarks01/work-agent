@@ -25,15 +25,19 @@ from analysis_service.assertions import (
     UNIVERSAL_TERMS,
     Assertion,
     AssertionCatalog,
+    AssertionProposal,
     CatalogIssueCode,
+    CatalogProposal,
     Qualifier,
     QualifierKind,
+    QuoteProposal,
     Subject,
     SubjectType,
     assertion_id,
     catalog_issues,
     conflicts,
     projection_fields,
+    resolve_catalog,
     span_source,
     spans_for,
     subject_id,
@@ -89,6 +93,16 @@ class TestTheRegistryAnswersItsVocabularies:
     @pytest.mark.parametrize("name", sorted(REGISTRY))
     def test_a_predicate_scope_requirement_names_declared_kinds(self, name):
         assert set(REGISTRY[name].requires) <= set(get_args(QualifierKind))
+
+    @pytest.mark.parametrize("name", sorted(REGISTRY))
+    def test_a_reference_predicate_points_at_exactly_one_type(self, name):
+        """Two would leave the resolver guessing which one a name meant.
+
+        A model writes a name and code builds the subject ID from it, so the
+        predicate has to settle the type on its own.
+        """
+        predicate = REGISTRY[name]
+        assert len(predicate.refers_to) <= 1
 
     @pytest.mark.parametrize("name", sorted(REGISTRY))
     def test_a_value_kind_brings_what_it_needs(self, name):
@@ -667,3 +681,211 @@ class TestTheCatalogRoundTrips:
     def test_an_unexpected_field_is_refused(self):
         with pytest.raises(ValidationError):
             AssertionCatalog.model_validate({"entries": [], "notes": "hello"})
+
+
+class TestResolvingAProposal:
+    """What a model proposes, and what code builds from it.
+
+    The property that carries the rest: **a resolved catalog raises nothing at
+    the gate.** The resolver constructs, so every row it keeps is one
+    ``catalog_issues`` passes, and every row it drops comes back as an issue
+    naming why.
+    """
+
+    def model(self):
+        return SystemModel.model_validate(
+            {
+                "external_entities": [
+                    {
+                        "id": "entity:shopper",
+                        "name": "shopper",
+                        "kind": "human",
+                        "trust_zone": "boundary:internet",
+                    }
+                ],
+                "processes": [
+                    {
+                        "id": "process:storefront-api",
+                        "name": "storefront API",
+                        "technology": "web",
+                        "trust_zone": "boundary:app",
+                        "exposure": "internet-facing",
+                        "interface_kind": "web",
+                    }
+                ],
+                "trust_boundaries": [
+                    {"id": "boundary:internet", "name": "internet", "kind": "network"},
+                    {"id": "boundary:app", "name": "app", "kind": "network"},
+                ],
+                "data_flows": [
+                    {
+                        "id": FLOW,
+                        "name": "place order",
+                        "source": "entity:shopper",
+                        "destination": "process:storefront-api",
+                        "protocol": "https",
+                        "authentication": "session cookie",
+                        "data_description": "an order",
+                        "encryption_in_transit": "TLS",
+                    }
+                ],
+            }
+        )
+
+    def row(self, **overrides):
+        fields = {
+            "subject_type": "interaction",
+            "subject": FLOW,
+            "predicate": "authentication-mechanism",
+            "value": "email and password",
+            "basis": "stated",
+            "quotes": [
+                QuoteProposal(
+                    source_label=SOURCE_LABEL, quote="sign in with email and password"
+                )
+            ],
+        }
+        return AssertionProposal(**{**fields, **overrides})
+
+    def resolve(self, *rows):
+        return resolve_catalog(
+            CatalogProposal(assertions=list(rows)), self.model(), SOURCES
+        )
+
+    def test_a_resolved_catalog_raises_nothing_at_the_gate(self):
+        held, issues = self.resolve(self.row())
+        assert issues == []
+        assert catalog_issues(held, model=self.model(), sources=SOURCES) == []
+
+    def test_the_subject_table_is_derived_from_the_rows(self):
+        """A model that listed subjects too would have two places to spell one."""
+        held, _ = self.resolve(self.row())
+        assert [(s.id, s.type, s.label) for s in held.subjects] == [
+            (FLOW, "interaction", "place order")
+        ]
+
+    def test_two_rows_of_one_identity_become_one_row_with_both_spans(self):
+        """Two sources for one fact keep both provenances."""
+        other = self.row(
+            value="Email and  password",
+            quotes=[
+                QuoteProposal(source_label=SOURCE_LABEL, quote="email and password")
+            ],
+        )
+        held, issues = self.resolve(self.row(), other)
+        assert issues == []
+        assert len(held.entries) == 1
+        assert len(held.entries[0].support) == 2
+
+    def test_a_repeated_quote_is_not_repeated_support(self):
+        held, _ = self.resolve(self.row(), self.row())
+        assert len(held.entries[0].support) == 1
+
+    def test_a_stated_row_whose_quote_is_not_in_the_source_drops(self):
+        """Never a fabricated span. The issue is what repair reads."""
+        invented = self.row(
+            predicate="transport-encryption",
+            value="TLS 1.3",
+            quotes=[
+                QuoteProposal(source_label=SOURCE_LABEL, quote="everything is TLS 1.3")
+            ],
+        )
+        held, issues = self.resolve(invented)
+        assert held.entries == []
+        assert codes(issues) == ["unsupported-assertion"]
+
+    def test_a_quote_naming_a_source_the_job_does_not_carry_drops_its_row(self):
+        held, issues = self.resolve(
+            self.row(quotes=[QuoteProposal(source_label="Other", quote="anything")])
+        )
+        assert held.entries == []
+        assert codes(issues) == ["unsupported-assertion"]
+
+    def test_an_unregistered_predicate_drops(self):
+        held, issues = self.resolve(self.row(predicate="vibes"))
+        assert held.entries == []
+        assert codes(issues) == ["unknown-predicate"]
+
+    def test_a_subject_the_model_does_not_hold_drops(self):
+        held, issues = self.resolve(self.row(subject="flow:nowhere:at-all"))
+        assert held.entries == []
+        assert codes(issues) == ["dangling-subject"]
+
+    def test_a_near_spelling_of_an_element_id_snaps(self):
+        """The same resolution a lane agent's element reference gets."""
+        held, issues = self.resolve(self.row(subject=FLOW.upper()))
+        assert issues == []
+        assert held.entries[0].subject == FLOW
+
+    def test_a_predicate_on_the_wrong_kind_of_subject_drops(self):
+        held, issues = self.resolve(
+            self.row(subject_type="credential", subject="session cookie")
+        )
+        assert held.entries == []
+        assert codes(issues) == ["wrong-subject-type"]
+
+    def test_a_subject_of_this_layer_s_own_is_slugged_from_its_name(self):
+        """Two spellings of one principal are one subject, by the same slug."""
+        grant = {
+            "subject_type": "principal",
+            "predicate": "authorization-grant",
+            "value": "reads every column",
+            "basis": "stated",
+            "scope": [
+                Qualifier(kind="resource", value="the warehouse"),
+                Qualifier(kind="operation", value="read"),
+            ],
+            "quotes": [
+                QuoteProposal(source_label=SOURCE_LABEL, quote="Shoppers sign in")
+            ],
+        }
+        held, issues = self.resolve(
+            AssertionProposal(subject="Shopper accounts", **grant),
+            AssertionProposal(subject="shopper  accounts", **grant),
+        )
+        assert issues == []
+        assert [s.id for s in held.subjects] == ["principal:shopper-accounts"]
+        assert len(held.entries) == 1
+
+    def test_a_reference_value_resolves_into_a_subject_the_catalog_declares(self):
+        """The model writes a name; code builds the ID and declares the referent."""
+        held, issues = self.resolve(
+            self.row(
+                predicate="credential-presented",
+                value="session cookie",
+                quotes=[QuoteProposal(source_label=SOURCE_LABEL, quote="a session")],
+            )
+        )
+        assert issues == []
+        assert held.entries[0].value == "credential:session-cookie"
+        assert "credential:session-cookie" in {s.id for s in held.subjects}
+        assert catalog_issues(held, model=self.model(), sources=SOURCES) == []
+
+    def test_an_unknown_row_needs_no_quote(self):
+        held, issues = self.resolve(
+            self.row(
+                predicate="storage-encryption",
+                subject_type="component",
+                subject="process:storefront-api",
+                value=UNKNOWN,
+                reason="silent",
+                quotes=[],
+            )
+        )
+        assert issues == []
+        assert held.entries[0].reason == "silent"
+
+    def test_a_reason_on_a_stated_value_is_dropped_rather_than_refused(self):
+        """The row is right and the reason is noise, so the noise goes."""
+        held, issues = self.resolve(self.row(reason="silent"))
+        assert issues == []
+        assert held.entries[0].reason is None
+
+    def test_a_scope_survives_resolution(self):
+        scoped = self.row(scope=[Qualifier(kind="principal", value="shoppers")])
+        held, _ = self.resolve(scoped)
+        assert held.entries[0].scope == [Qualifier(kind="principal", value="shoppers")]
+
+    def test_a_dropped_row_names_what_it_was_about(self):
+        _, issues = self.resolve(self.row(predicate="vibes"))
+        assert issues[0].subject == FLOW
