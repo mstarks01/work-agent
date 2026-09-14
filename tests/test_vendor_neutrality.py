@@ -99,6 +99,7 @@ from analysis_service.vendors import (
     Vendor,
     VendorName,
 )
+from tests.source_tree import parse, source_files
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SEARCHED = ("src", "evals", "webapp")
@@ -507,8 +508,10 @@ def _named_identifiers(tree: ast.AST) -> set[str]:
 
 
 def _searched_files():
+    """Every file the two scans below read, from the one enumerator every lint
+    shares — so a local run's artifacts cannot fail this suite (#942)."""
     for root in SEARCHED:
-        for path in sorted((REPO_ROOT / root).rglob("*.py")):
+        for path in source_files(root):
             yield path.relative_to(REPO_ROOT).as_posix(), path
 
 
@@ -738,19 +741,16 @@ def test_no_document_counts_the_registry(path):
 # that route, so the nullable judgement fields the critic record argues for cost
 # nothing here.
 
-#: Model-facing schemas that still cap a root-level array of objects, with what
-#: it costs. Each is a node that cannot run on a vendor refusing the shape.
-#: Emptying this table is
-#: [#942](https://github.com/mstarks01/work-agent/issues/942).
-ROOT_CAPPED_SCHEMAS: dict[str, str] = {
-    "ThreatProposals": (
-        "claims carries MAX_CLAIMS_PER_BATCH, so every STRIDE lane agent is"
-        " refused by a vendor that will not take a capped root array"
-    ),
-    "RequirementProposals": (
-        "claims carries the same cap, so every ASVS lane agent is refused too"
-    ),
-}
+#: Model-facing schemas that cap a root-level array of objects, with what it
+#: costs. Each would be a node that cannot run on a vendor refusing the shape.
+#:
+#: **Empty, and meant to stay that way** (#942). A bound on what a model may
+#: emit belongs where code reads the output —
+#: :func:`~analysis_service.fan_in.fan_in` carries the lane-emission cap, and
+#: :func:`~analysis_service.assertions.resolve_catalog` carries the catalog's.
+#: An entry here is a node that has lost a vendor, so this declaration is where
+#: the trade has to be argued.
+ROOT_CAPPED_SCHEMAS: dict[str, str] = {}
 
 
 def _root_capped_object_arrays(cls: type[BaseModel]) -> list[str]:
@@ -766,8 +766,49 @@ def _root_capped_object_arrays(cls: type[BaseModel]) -> list[str]:
     return found
 
 
+#: Every expression the graph passes as ``output_schema=``, against what
+#: :func:`_model_facing_schemas` reaches it by. The enumerator below is a
+#: hand-written list, so this table is what holds it to the nodes that exist: a
+#: node built with a schema spelled any other way adds a key here and fails
+#: until the enumerator reaches it too.
+NODE_OUTPUT_SCHEMAS: dict[str, str] = {
+    "output_schema": "the `_llm_node` parameter every node below it passes through",
+    "SystemModel": "named directly: SystemModel",
+    "CatalogProposal": "named directly: CatalogProposal",
+    "schemas.proposals": "every package's `proposals`, read from SCHEMAS",
+    "schemas.rulings": "every package's `rulings`, read from SCHEMAS",
+}
+
+
+def test_every_node_s_output_schema_is_one_the_enumerator_reaches():
+    """The graph builds no node this file's scan cannot see.
+
+    A vendor refuses a shape, not a node, so a scan that misses one schema
+    reports a portability the tree does not have.
+    """
+    graph = source_files("src")
+    (path,) = [one for one in graph if one.name == "graph.py"]
+    passed = {
+        ast.unparse(keyword.value)
+        for node in ast.walk(parse(path))
+        if isinstance(node, ast.Call)
+        for keyword in node.keywords
+        if keyword.arg == "output_schema"
+    }
+
+    assert passed == set(NODE_OUTPUT_SCHEMAS), (
+        f"the graph passes these as output_schema and nothing here says which"
+        f" schema they are: {sorted(passed - set(NODE_OUTPUT_SCHEMAS))}. Declared"
+        f" but no longer passed: {sorted(set(NODE_OUTPUT_SCHEMAS) - passed)}."
+    )
+
+
 def _model_facing_schemas() -> dict[str, type[BaseModel]]:
-    """Every schema a node asks a model to fill, keyed by class name."""
+    """Every schema a node asks a model to fill, keyed by class name.
+
+    Held to the graph's own nodes by
+    :func:`test_every_node_s_output_schema_is_one_the_enumerator_reaches`.
+    """
     from analysis_service.assertions import CatalogProposal
     from analysis_service.frameworks import PACKAGES, schemas_for
     from analysis_service.system_model import SystemModel
@@ -805,7 +846,12 @@ def test_every_schema_that_caps_a_root_array_is_declared():
     )
 
 
-def test_the_two_extraction_side_schemas_take_every_vendor_s_shape():
-    """The schemas that have run live on more than one vendor, kept portable."""
-    for name in ("SystemModel", "CatalogProposal"):
-        assert _root_capped_object_arrays(_model_facing_schemas()[name]) == [], name
+def test_every_model_facing_schema_takes_every_vendor_s_shape():
+    """No node asks a model for a shape a vendor refuses.
+
+    The positive statement of the table above, which is empty. Separate from it
+    so that adding a declaration cannot make this pass: a reader of the table
+    alone would be satisfied by a documented regression.
+    """
+    for name, cls in _model_facing_schemas().items():
+        assert _root_capped_object_arrays(cls) == [], name

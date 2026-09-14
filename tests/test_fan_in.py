@@ -6,6 +6,7 @@ import pytest
 
 from analysis_service import critic, fan_in
 from analysis_service.claims import (
+    MAX_CLAIMS_PER_BATCH,
     MENTION_MAX_CHARS,
     Ground,
     Mitigation,
@@ -1012,3 +1013,55 @@ class TestFanIn:
         by_lane = {row.lane: row.drafts for row in merged.coverage}
         assert set(by_lane) == set(STRIDE.lanes)
         assert (by_lane["spoofing"], by_lane["tampering"]) == (1, 1)
+
+
+class TestTheEmissionBound:
+    """``MAX_CLAIMS_PER_BATCH``, carried here rather than by the model schema.
+
+    A root-level array of objects carrying ``maxItems`` is a shape at least one
+    vendor's structured output refuses outright, so the bound sits where code
+    reads the output (#942). ``tests/test_framework_neutrality.py`` asks the same
+    question of every registered package; these three drive the boundary.
+    """
+
+    def _batch(self, kept: int, malformed: int):
+        rows = [
+            sample_proposal(f"S-{number:02d}").model_dump(mode="json")
+            for number in range(1, 4)
+        ]
+        return SCHEMAS.proposals.model_validate(
+            {"claims": (rows * kept)[:kept] + [{"junk": 1}] * malformed}
+        )
+
+    def test_a_batch_at_the_cap_is_analyzed(self, model):
+        batch = self._batch(MAX_CLAIMS_PER_BATCH, 0)
+
+        assert len(batch.claims) == MAX_CLAIMS_PER_BATCH
+        assert fan_in.fan_in({"spoofing": batch}, STRIDE, model).drafts
+
+    def test_a_batch_one_over_the_cap_is_refused_with_the_lane_and_the_count(
+        self, model
+    ):
+        batch = self._batch(MAX_CLAIMS_PER_BATCH + 1, 0)
+
+        with pytest.raises(
+            fan_in.DraftJoinError,
+            match=f"spoofing emitted {MAX_CLAIMS_PER_BATCH + 1}",
+        ):
+            fan_in.fan_in({"spoofing": batch}, STRIDE, model)
+
+    def test_the_bound_counts_what_the_agent_wrote_not_what_survived(self, model):
+        """The case a bound on ``claims`` alone cannot see.
+
+        The salvage validator files a malformed proposal under ``invalid``, so
+        an emission that straddles the cap leaves neither list over it. Both
+        halves are work: ``invalid_proposal_marks`` walks every entry of the
+        malformed one.
+        """
+        half = MAX_CLAIMS_PER_BATCH // 2 + 1
+        batch = self._batch(half, half)
+
+        assert len(batch.claims) == half
+        assert len(batch.invalid) == half
+        with pytest.raises(fan_in.DraftJoinError, match=f"emitted {half * 2}"):
+            fan_in.fan_in({"spoofing": batch}, STRIDE, model)

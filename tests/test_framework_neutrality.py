@@ -69,6 +69,7 @@ from analysis_service.frameworks import CONTENT_LICENSE, PACKAGES, SCHEMAS
 from evals.harness.calibration import IDENTITY_VALIDATION
 from evals.harness.instruments import INSTRUMENTS, PACKAGE_SCORERS
 from tests.factories import SCRIPTED_FRAMEWORKS
+from tests.source_tree import source_files
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SEARCHED = ("src", "evals", "webapp")
@@ -335,7 +336,7 @@ def framework_named_identifiers() -> dict[str, set[str]]:
     """Every framework-named name or value outside a package, by file."""
     found: dict[str, set[str]] = {}
     for root in SEARCHED:
-        for path in sorted((REPO_ROOT / root).rglob("*.py")):
+        for path in source_files(root):
             relative = path.relative_to(REPO_ROOT).as_posix()
             if any(f"/frameworks/{name}/" in relative for name in PACKAGES):
                 continue
@@ -371,11 +372,11 @@ def page_text() -> dict[str, list[tuple[int, str]]]:
     """
     found: dict[str, list[tuple[int, str]]] = {}
     for root in PAGES:
-        for path in sorted((REPO_ROOT / root).rglob("*.py")):
+        for path in source_files(root):
             lines = _rendered_lines(path)
             if lines:
                 found[path.relative_to(REPO_ROOT).as_posix()] = lines
-        for path in sorted((REPO_ROOT / root).rglob("*.html")):
+        for path in source_files(root, suffixes=(".html",)):
             relative = path.relative_to(REPO_ROOT).as_posix()
             found[relative] = list(
                 enumerate(path.read_text(encoding="utf-8").splitlines(), 1)
@@ -412,7 +413,7 @@ def framework_literals() -> dict[str, list[tuple[int, str]]]:
     """Every non-test, non-package-local framework literal, by file."""
     found: dict[str, list[tuple[int, str]]] = {}
     for root in SEARCHED:
-        for path in sorted((REPO_ROOT / root).rglob("*.py")):
+        for path in source_files(root):
             relative = path.relative_to(REPO_ROOT).as_posix()
             if "/frameworks/stride/" in relative or "/frameworks/asvs/" in relative:
                 continue
@@ -443,7 +444,7 @@ def package_importers() -> dict[str, list[str]]:
     """
     found: dict[str, list[str]] = {}
     for root in SEARCHED:
-        for path in sorted((REPO_ROOT / root).rglob("*.py")):
+        for path in source_files(root):
             relative = path.relative_to(REPO_ROOT).as_posix()
             if any(f"/frameworks/{name}/" in relative for name in PACKAGES):
                 continue
@@ -1023,7 +1024,7 @@ def shared_markdown() -> list[Path]:
     found = [
         path
         for root in SHARED_MARKDOWN
-        for path in sorted((REPO_ROOT / root).rglob("*.md"))
+        for path in source_files(root, suffixes=(".md",))
     ]
     assert found, "the shared-markdown scan found no files, so it proves nothing"
     return found
@@ -1123,33 +1124,36 @@ def test_no_shared_instruction_file_counts_a_packages_lanes():
     )
 
 
-def test_every_package_caps_the_drafts_one_lane_may_emit():
-    """A package narrows ``claims`` to its own draft type, and a redeclared
-    field carries none of the base's constraints.
+def test_one_reader_bounds_every_package_s_emission():
+    """The cap on a lane's emission holds for every package, from one place.
 
-    So the cap that bounds a lane's emission is not inherited: it is a line each
-    package writes, and a package that narrows the field and forgets it gets the
-    unbounded list back with nothing to say so. Checked against the registry
-    rather than a fixed pair, because the gap this closes is a package nobody
-    has written yet.
+    ``fan_in`` carries the bound and no ``claims`` field carries one. Two
+    reasons, and the field version fails both: narrowing a field drops the
+    base's constraints in silence, so a package that narrows and omits the cap
+    gets the unbounded list back with nothing to say so; and a root-level array
+    of objects carrying ``maxItems`` is a shape at least one vendor's structured
+    output refuses outright (#942).
+
+    Driven with proposals no package can validate, which is the point: the
+    salvage validator files each one under ``invalid``, so the batch is legal,
+    and the guard still has to see 401 of them. It counts what the agent wrote,
+    not what survived.
     """
-    import annotated_types
-
     from analysis_service.claims import MAX_CLAIMS_PER_BATCH
-    from analysis_service.frameworks import SCHEMAS
+    from analysis_service.fan_in import DraftJoinError, fan_in
+    from tests.factories import valid_model
 
-    for name, schemas in SCHEMAS.items():
-        field = schemas.proposals.model_fields["claims"]
-        caps = [
-            constraint.max_length
-            for constraint in field.metadata
-            if isinstance(constraint, annotated_types.MaxLen)
-        ]
-        assert caps == [MAX_CLAIMS_PER_BATCH], (
-            f"{name}'s {schemas.proposals.__name__}.claims does not cap its"
-            " length. Narrowing the field drops the base's cap silently, so the"
-            " package has to spell MAX_CLAIMS_PER_BATCH itself."
+    model = valid_model()
+    emitted = MAX_CLAIMS_PER_BATCH + 1
+    for name, package in PACKAGES.items():
+        batch = SCHEMAS[name].proposals.model_validate(
+            {"claims": [{"no": "field a package declares"}] * emitted}
         )
+        assert len(batch.claims) == 0, name
+        assert len(batch.invalid) == emitted, name
+        lane = package.lanes[0]
+        with pytest.raises(DraftJoinError, match=f"{lane} emitted {emitted}"):
+            fan_in({lane: batch}, package, model)
 
 
 #: The heading under which a package's ``output.md`` counts the fields a draft

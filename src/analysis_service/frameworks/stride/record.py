@@ -22,7 +22,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from analysis_service.actions import ActionVerb
 from analysis_service.claims import (
-    MAX_CLAIMS_PER_BATCH,
     MAX_ELEMENTS_PER_PROPOSAL,
     REASON_MAX_CHARS,
     AnalysisMarks,
@@ -406,9 +405,10 @@ class ThreatProposals(ProposalBatch):
     # an incompatible override because `list` is invariant. Sound here: these
     # models are built by validation and read, never handed to base-class code
     # that would append a wider element to them.
-    claims: list[ThreatProposal] = Field(  # type: ignore[assignment]
-        max_length=MAX_CLAIMS_PER_BATCH
-    )
+    #
+    # No length bound, for the reason `ProposalBatch` gives: `fan_in` carries
+    # MAX_CLAIMS_PER_BATCH, so a narrowing cannot drop it.
+    claims: list[ThreatProposal]  # type: ignore[assignment]
 
 
 class ThreatRuling(Ruling):
