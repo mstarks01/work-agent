@@ -561,6 +561,10 @@ def test_stability_reads_the_applicability_block_too():
                     "matched": ["V1.2.4", "V6.2.1"],
                     "expected": 4,
                     "recall": 0.5,
+                    # Named by this package rather than marked on a matched
+                    # row, which is the half of a must-find fate its record
+                    # carries and the claim scorer's does not.
+                    "must_find_missed": ["V16.2.1"],
                 }
             ],
         },
