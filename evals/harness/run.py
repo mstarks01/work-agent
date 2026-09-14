@@ -53,6 +53,7 @@ from analysis_service.deployment import Deployment
 from analysis_service.frameworks import PACKAGES
 from analysis_service.graph import Pipeline
 from analysis_service.identity import build_identity
+from analysis_service.model_tiers import ModelTierConfig, TierSelection
 from analysis_service.report import (
     NodeLatency,
     NodeRun,
@@ -617,10 +618,32 @@ def _models_record(deployment: Deployment) -> dict[str, Any]:
         # one. Nothing offline caught that, because the artifact is only built
         # on a live sweep.
         "tiers": {
-            tier: selection.model_dump(mode="json")
+            tier: selection.model_dump(mode="json") | _pin_record(tiers, selection)
             for tier, selection in tiers.tiers.items()
         },
     }
+
+
+def _pin_record(tiers: ModelTierConfig, selection: TierSelection) -> dict[str, Any]:
+    """One tier's upstream pin, where the question applies to it.
+
+    The pin is what the operator chose and the gateway is not asked about, so
+    it is known before the call and recorded whether or not any response names
+    an upstream. Two endpoints of one provider — a flex endpoint and a standard
+    one — were measured 2.1x apart in price and 46% apart in latency, and both
+    report the same served organisation, so the served name alone reads two
+    configurations as one.
+
+    Written only for a tier whose vendor reaches more than one provider. A
+    direct vendor is its own upstream and has no choice to record; the key is
+    absent there, exactly as the served upstream is. An aggregator tier the
+    deployment left unpinned records ``[]``, which says the gateway chose —
+    a different fact from a sweep taken before this was recorded, which
+    carries no key at all.
+    """
+    if selection.vendor_entry.routes_to_one_provider:
+        return {}
+    return {"upstreams": list(tiers.upstreams_for(selection.vendor))}
 
 
 def _contribution_note(commit: Any) -> tuple[str, ...]:
@@ -679,6 +702,12 @@ def _would_be_identity(
         for case in cases
         for name in modes.select_frameworks(case, tuple(args.framework))
     }
+    tiers = deployment.tiers
+    pins = {
+        tier: sorted(tiers.upstreams_for(selection.vendor))
+        for tier, selection in tiers.tiers.items()
+        if not selection.vendor_entry.routes_to_one_provider
+    }
     return {
         "repo_commit": commit.commit,
         "corpus_digest": corpus,
@@ -688,6 +717,11 @@ def _would_be_identity(
             for tier, block in deployment.sampling.tiers.items()
         },
         "frameworks": sorted(frameworks),
+        # The seventh identity part, where the deployment has one to state.
+        # Composed here rather than read back off an artifact this sweep has
+        # not written yet, and shaped to compare equal to the stored identity
+        # a merged Baseline carries.
+        **({"upstream_pins": pins} if pins else {}),
     }
 
 

@@ -232,6 +232,95 @@ class TestARouteHasToSayWhichWeightsAnswered:
             assemble(tmp_path, "someone", [path])
 
 
+class TestTheEndpointTheOperatorChose:
+    """The seventh part: which endpoint of the served provider was asked for.
+
+    Measured on 2026-09-13 over eight single-case runs: ``openai/flex`` at
+    22.6s and $0.24/M, ``openai`` at 33.0s and $0.51/M, and every one of the
+    eight recorded ``served_upstream: "OpenAI"``. The served name is the
+    organisation, and the identity has to carry the endpoint beside it, or two
+    configurations 2.1x apart in price pool into one directory.
+    """
+
+    AGGREGATED = TestARouteHasToSayWhichWeightsAnswered.AGGREGATED
+
+    def sweep(self, tmp_path, name, pins, label):
+        route = f"{vendor_for(name).prefix}some-model"
+        return load_artifact(
+            write_sweep(
+                tmp_path,
+                sweep_document(
+                    strong_model=route,
+                    served_upstreams=("OpenAI",),
+                    upstream_pins=pins,
+                ),
+                label,
+            )
+        )
+
+    @pytest.mark.parametrize("name", AGGREGATED)
+    def test_two_endpoints_of_one_provider_are_two_baselines(self, name, tmp_path):
+        flex = self.sweep(tmp_path, name, ("openai/flex",), "flex")
+        standard = self.sweep(tmp_path, name, ("openai",), "standard")
+        identity = BaselineIdentity.from_artifact(flex)
+        other = BaselineIdentity.from_artifact(standard)
+
+        # The served names agree, which is exactly why one cannot do this alone.
+        assert identity.upstreams == other.upstreams == (("strong", "OpenAI"),)
+        assert identity.upstream_pins == (("strong", ("openai/flex",)),)
+        assert identity.to_json()["upstream_pins"] == {"strong": ["openai/flex"]}
+        assert identity != other
+        assert identity.name != other.name
+
+    @pytest.mark.parametrize("name", AGGREGATED)
+    def test_an_unpinned_gateway_is_not_a_sweep_that_recorded_no_pin(
+        self, name, tmp_path
+    ):
+        """``[]`` is a deployment that let the gateway choose. No key at all is
+        a sweep taken before the pin was recorded, which says nothing."""
+        unpinned = BaselineIdentity.from_artifact(self.sweep(tmp_path, name, (), "u"))
+        unrecorded = BaselineIdentity.from_artifact(
+            self.sweep(tmp_path, name, None, "n")
+        )
+
+        assert unpinned.to_json()["upstream_pins"] == {"strong": []}
+        assert "upstream_pins" not in unrecorded.to_json()
+        assert unpinned != unrecorded
+
+    @pytest.mark.parametrize("name", AGGREGATED)
+    def test_two_sweeps_on_one_pin_are_one_baseline(self, name, tmp_path):
+        route = f"{vendor_for(name).prefix}some-model"
+        paths = [
+            write_sweep(
+                tmp_path,
+                sweep_document(
+                    strong_model=route,
+                    served_upstreams=("OpenAI",),
+                    upstream_pins=("openai/flex",),
+                    seed=seed,
+                ),
+                f"run{seed}",
+            )
+            for seed in (1, 2)
+        ]
+        directory = assemble(tmp_path, "someone", paths)
+        manifest = json.loads((directory / "baseline.json").read_text())
+
+        assert manifest["identity"]["upstream_pins"] == {"strong": ["openai/flex"]}
+        assert len(manifest["sweeps"]) == 2
+
+    def test_a_direct_route_carries_no_pin_however_the_record_reads(self, tmp_path):
+        """A direct vendor is its own upstream and has no endpoint to choose,
+        so the key stays off and every merged Baseline on one keeps its name."""
+        artifact = load_artifact(
+            write_sweep(tmp_path, sweep_document(upstream_pins=("openai/flex",)))
+        )
+        identity = BaselineIdentity.from_artifact(artifact)
+
+        assert identity.upstream_pins == ()
+        assert "upstream_pins" not in identity.to_json()
+
+
 class TestTheConfigurationLabel:
     """What a vote records about the sweep that produced the finding (#802)."""
 

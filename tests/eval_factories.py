@@ -30,6 +30,7 @@ from analysis_service.frameworks.stride.record import (
 )
 from analysis_service.identity import IDENTITY_VERSION, build_identity
 from analysis_service.sampling import TierSampling
+from analysis_service.vendors import vendor_for_route
 from evals import verify_corpus
 from evals.harness import ledger
 from evals.harness.artifact import ARTIFACT_VERSION
@@ -64,6 +65,7 @@ def sweep_document(
     seed: int = 1,
     charges: dict[str, float] | None = None,
     served_upstreams: tuple[str, ...] = (),
+    upstream_pins: tuple[str, ...] | None = None,
 ) -> dict:
     """One admissible artifact document; ``seed`` varies the bytes only.
 
@@ -79,6 +81,12 @@ def sweep_document(
     ``served_upstreams`` is what a gateway said about who answered the strong
     node, one execution per entry, so two entries are one node served twice
     from two places. Empty by default, which is what a direct vendor records.
+
+    ``upstream_pins`` is what the deployment pinned the strong tier's requests
+    to, which the models block records for every tier on an aggregator route.
+    ``None`` is a sweep taken before the pin was recorded and carries no key;
+    ``()`` is an aggregator the deployment left unpinned. The two are different
+    identities, so the factory keeps them apart.
     """
     tiers = sweep_sampling(temperature)
     runs = {
@@ -130,11 +138,35 @@ def sweep_document(
         "repo_commit": {"commit": SWEEP_COMMIT, "clean": clean},
         "corpus_digest": SWEEP_CORPUS,
         "frameworks": list(frameworks),
+        "models": _models_block(runs, upstream_pins),
         "certification": {"verdict": "uncertified", "seed": seed},
         "node_usage": usage,
         "node_charges": dict(charges or {}),
         "provenance": provenance.to_json(),
     }
+
+
+def _models_block(
+    runs: dict[str, tuple[str, str, str]], upstream_pins: tuple[str, ...] | None
+) -> dict:
+    """The models block a sweep writes, for the tiers this document ran.
+
+    The vendor comes from the route through ``vendor_for_route``, the same join
+    the harness composes it with, so a fixture cannot name a vendor the route
+    does not reach. The pin key is written only for a tier on an aggregator
+    route, which is where the deployment has an endpoint to choose.
+    """
+    tiers = {}
+    for tier, requested, _ in runs.values():
+        vendor = vendor_for_route(requested)
+        entry: dict = {
+            "vendor": vendor.name,
+            "model": requested.removeprefix(vendor.prefix),
+        }
+        if not vendor.routes_to_one_provider and upstream_pins is not None:
+            entry["upstreams"] = list(upstream_pins)
+        tiers[tier] = entry
+    return {"tiers_config_version": 1, "tiers": tiers}
 
 
 def write_sweep_document(path: Path, document: dict | None = None) -> Path:

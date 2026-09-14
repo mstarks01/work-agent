@@ -309,15 +309,44 @@ def _inline(value: object) -> str:
     return str(value).translate(_MARKDOWN_STRUCTURE)
 
 
+def models_phrase(identity: Mapping[str, Any], *, code: bool = True) -> str:
+    """One identity's per-tier configuration, as a reader sees it.
+
+    The one reader of the phrase, for the comparison table and for the
+    contribution summary ``submit`` writes. Two spellings would describe one
+    Baseline two ways, and the second one is where a part added later goes
+    missing — which is what happened to the upstream pin.
+
+    Each tier names its requested model, the upstream that served it where the
+    route reaches more than one provider, and the endpoint the deployment
+    pinned it to. The pin is a separate clause from the served name because it
+    is a separate fact: ``openai/flex`` and ``openai`` both report ``OpenAI``.
+
+    ``code`` wraps each value in a code span, which the markdown table needs
+    and the plain summary does not. Every value is escaped either way: these
+    come out of a contributor's own artifact.
+    """
+    mark = "`" if code else ""
+
+    def span(value: Any) -> str:
+        return f"{mark}{_inline(value)}{mark}"
+
+    upstreams = identity.get("upstreams", {})
+    pins = identity.get("upstream_pins", {})
+    parts = []
+    for tier, model in sorted(identity.get("models", {}).items()):
+        phrase = f"{span(tier)}: {span(model)}"
+        if tier in upstreams:
+            phrase += f" via {span(upstreams[tier])}"
+        if tier in pins:
+            chosen = ", ".join(span(name) for name in pins[tier]) or "no pin"
+            phrase += f" pinned to {chosen}"
+        parts.append(phrase)
+    return ", ".join(parts)
+
+
 def _render_row(row: Row) -> str:
-    # A tier on an aggregator route names the upstream that served it, because
-    # the route alone is not the configuration the numbers came from.
-    upstreams = row.identity.get("upstreams", {})
-    models = ", ".join(
-        f"`{_inline(tier)}`: `{_inline(model)}`"
-        + (f" via `{_inline(upstreams[tier])}`" if tier in upstreams else "")
-        for tier, model in sorted(row.identity.get("models", {}).items())
-    )
+    models = models_phrase(row.identity)
     frameworks = (
         ", ".join(_inline(name) for name in row.identity.get("frameworks", []))
         or "none"

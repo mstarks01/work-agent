@@ -156,6 +156,9 @@ openrouter = ["openai"]
 ```
 
 Pin `openai/flex` for the same weights at half the price and slower responses.
+The pin is part of a Baseline's identity, beside the upstream the record says
+served the tier: both endpoints report the same organisation, so the served
+name alone would publish two configurations as one.
 A request pinned there reads the flex row in `config/resilience.toml`: a
 thirty-minute request timeout and a thirty-minute job deadline, in place of the
 five and fifteen every other request and job reads.
