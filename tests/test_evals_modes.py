@@ -53,7 +53,11 @@ from analysis_service.graph import (
 from analysis_service.grounding import verify_quote
 from analysis_service.report import Report
 from analysis_service.sampling import load_sampling
-from analysis_service.system_model import ZONE_ATTRIBUTE, normalize_element_ids
+from analysis_service.system_model import (
+    ZONE_ATTRIBUTE,
+    ModelIndex,
+    normalize_element_ids,
+)
 from analysis_service.validation import validate
 from tests.factories import DEFAULT_FRAMEWORKS, EVAL_MODEL, ScriptedLlm
 
@@ -473,9 +477,38 @@ class TestTheAssertionMode:
         score = modes.score_assertions(case, result)
 
         assert (score.kept, score.projected) == (2, 1)
-        assert score.projection_agrees == 1
+        assert score.agrees_stated == 1
+        assert score.agrees_unstated == 0
         assert score.projection_degraded == 0
-        assert score.to_json()["projection_agrees"] == 1
+        assert score.to_json()["agrees_stated"] == 1
+
+    def test_the_projection_is_counted_against_a_denominator(self, case):
+        """What was there to reach, not only what the catalog reached.
+
+        The one row that projects lands on the flow's ``authentication``, which
+        this fixture's model states, so it is one of one. ``reachable`` is what
+        the whole model offers, which is more than one row can reach.
+        """
+        score = modes.score_assertions(case, self.run(case))
+        reachable = modes.reachable_controls(case.model)
+
+        assert score.reached == 1
+        assert score.reachable == len(reachable)
+        assert score.reachable > score.reached
+        assert (case.model.data_flows[0].id, "authentication") in reachable
+
+    def test_agreeing_that_nothing_is_stated_is_counted_apart(self, case):
+        """The #891 split: a free agreement is not a measured one.
+
+        Every pair in the denominator has a blessed value ``control_state``
+        reads as ``stated``, so an attribute the model leaves unverified is
+        outside it and an agreement there lands in ``agrees_unstated``.
+        """
+        reachable = modes.reachable_controls(case.model)
+
+        for element_id, attribute in reachable:
+            element = ModelIndex.of(case.model).get(element_id)
+            assert control_state(str(getattr(element, attribute))) == "stated"
 
     def test_a_stated_absence_is_the_number_the_graph_cannot_carry(self, case):
         """The audit's own fact: ten corpus values hide one of these (#925)."""
