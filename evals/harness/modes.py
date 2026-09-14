@@ -31,6 +31,7 @@ from collections import Counter
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
+from types import MappingProxyType
 from typing import Any, NamedTuple, get_args
 
 from analysis_service.analysis import (
@@ -125,6 +126,12 @@ class ExtractionResult:
     extracted: SystemModel | None
     issues: tuple[ValidationIssue, ...]
     node_runs: tuple[NodeRun, ...] = ()
+    #: What the ``extract`` node emitted, before IDs were derived and before
+    #: the gate ran. Kept because it is the only thing a re-score cannot
+    #: recompute: a normalized model has already had a slug decision made for
+    #: it, and a scorer change that reads IDs differently needs what arrived
+    #: (#925). Empty on a run that produced nothing.
+    raw: Mapping[str, Any] = MappingProxyType({})
 
 
 @dataclass(frozen=True)
@@ -1120,6 +1127,7 @@ async def run_extraction(case: GoldenCase, pipeline: Pipeline) -> ExtractionResu
         extracted=model,
         issues=tuple(issues),
         node_runs=tuple(graph_run.node_runs),
+        raw=state[STATE_EXTRACTED_MODEL],
     )
 
 

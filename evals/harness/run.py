@@ -96,6 +96,7 @@ from evals.harness.bundle import (
     optional_block,
     runs_from_reports,
     stride_threats,
+    write_extractions,
     write_reports,
 )
 from evals.harness.calibration import (
@@ -197,6 +198,9 @@ class _CaseOutcome:
     executions: tuple[NodeRun, ...] = ()
     run: modes.AnalysisRun | None = None
     extraction: modes.ExtractionScore | None = None
+    #: The extraction the score above was taken over, carried so the sweep can
+    #: write it beside the artifact. ``None`` outside the extraction mode.
+    result: modes.ExtractionResult | None = None
     #: The extraction's own validity issues, which the fold reads apart: the
     #: citation half is scored and every other one is a malformed model.
     issues: tuple[Any, ...] = ()
@@ -289,6 +293,7 @@ async def _run_mode(
     failures: list[str] = []
     payloads: list[dict[str, Any]] = []
     runs: dict[str, modes.AnalysisRun] = {}
+    extracted: dict[str, modes.ExtractionResult] = {}
     # Every execution the sweep performed, kept flat so the per-node totals,
     # the certification verdict and the artifact's provenance are three views
     # of one list rather than three folds that could disagree.
@@ -362,6 +367,7 @@ async def _run_mode(
                     executions=tuple(result.node_runs),
                     extraction=modes.score_extraction(case, result),
                     issues=tuple(result.issues),
+                    result=result,
                 )
             run = (
                 await modes.run_analysis(case, pipeline)
@@ -405,6 +411,8 @@ async def _run_mode(
         if outcome.extraction is not None:
             extractions.append(outcome.extraction)
             payloads.append(outcome.extraction.to_json())
+            if outcome.result is not None:
+                extracted[case.id] = outcome.result
             # The citation half is scored, not failed. It fires when the model
             # quotes a source wrongly, which production hands to ``repair`` and
             # this mode stops before; ``score.uncited`` carries every one into
@@ -494,6 +502,7 @@ async def _run_mode(
         payloads=payloads,
         failures=failures,
         runs=runs,
+        extracted=extracted,
         provenance=provenance_of(
             executions,
             tier_of=deployment.tier_of,
@@ -942,6 +951,7 @@ def command_run(args: argparse.Namespace) -> int:
         Path(args.out).write_text(archive_bytes("artifact", artifact), "utf-8")
         print(f"artifact written to {args.out}")
         write_reports(args.out, args.mode, mode_run.runs)
+        write_extractions(args.out, args.mode, mode_run.extracted)
 
     for failure in failures:
         print(f"TIER 1 FAILURE: {failure}", file=sys.stderr)

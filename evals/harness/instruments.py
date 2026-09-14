@@ -133,6 +133,8 @@ class ModeRun:
     leaves empty. It is kept beside its own payloads because the sweep prints
     an aggregate over it, and folding a printed number out of JSON already
     written is how the printed line and the artifact come to disagree.
+    ``extracted`` is the models those scores were taken over, which the scores
+    do not carry and no later reader can recompute.
     """
 
     payloads: list[dict[str, Any]]
@@ -154,6 +156,11 @@ class ModeRun:
     #: can report a package whose every lane went silent rather than drop it.
     frameworks: tuple[FrameworkName, ...]
     extractions: list[modes.ExtractionScore]
+    #: The extractions themselves, keyed by case, which the scores beside them
+    #: do not carry. Written beside the artifact so a finished sweep can be
+    #: re-scored offline by a figure invented after it ran (#925). Empty in
+    #: every other mode, which keeps its models inside its reports.
+    extracted: dict[str, modes.ExtractionResult]
     #: Per-case rows from the package scorers, keyed by the instrument that
     #: reads each one. The neutral instruments above keep their own fields
     #: because they read every block and need no per-package declaration; these
@@ -182,6 +189,7 @@ class ModeRun:
             payloads=[],
             failures=[],
             runs={},
+            extracted={},
             provenance=RunProvenance(
                 identity_version=IDENTITY_VERSION,
                 build={},
