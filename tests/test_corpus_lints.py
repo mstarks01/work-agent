@@ -547,3 +547,72 @@ def test_a_case_a_merged_sitting_covers_still_gets_a_document(tmp_path):
     )
 
     assert case_dir in build_review_docs.documents(corpus)
+
+
+class TestTheReviewedAliases:
+    """The reader's ruling of 2026-09-14, as the corpus carries it.
+
+    Eleven corpus element names never appear in the source they came from. A
+    reader ruled all eleven defensible: their absence as exact phrases does not
+    establish an extraction error, so a name the source supports is a naming
+    difference rather than a missed component (#882). These pin what that
+    ruling put in the files.
+    """
+
+    def aliases(self):
+        from evals.harness.reference import load_corpus
+
+        return {
+            (case.id, alias.element): alias
+            for case in load_corpus(verify_corpus.CORPUS_DIR)
+            for alias in case.meta.aliases
+        }
+
+    def test_every_alias_names_an_element_its_case_holds(self):
+        from evals.harness.reference import load_corpus
+
+        for case in load_corpus(verify_corpus.CORPUS_DIR):
+            held = {element.id for element in case.model.elements()}
+            for alias in case.meta.aliases:
+                assert alias.element in held, f"{case.id}: {alias.element}"
+
+    def test_every_alias_excerpt_is_in_its_own_case_s_sources(self):
+        """The load-bearing check: an alias is supported by the case's own words
+        or it is somebody's preference. `verify_corpus` refuses one that is not,
+        and this says the shipped corpus satisfies it."""
+        from evals.harness.reference import load_corpus
+
+        for case in load_corpus(verify_corpus.CORPUS_DIR):
+            text = "\n".join(source.text for source in case.sources)
+            for alias in case.meta.aliases:
+                assert alias.excerpt in text, f"{case.id}: {alias.name}"
+
+    def test_the_document_store_carries_no_alias_and_says_why(self):
+        """The one qualification the reader made. Naming it after the platform
+        would collapse the store into `boundary:vendor-platform`, the zone that
+        contains it, and the model wrote exactly that in four runs of six."""
+        from evals.harness.reference import load_case
+
+        case = load_case(verify_corpus.CORPUS_DIR / "12-overclaiming-supplier-portal")
+        store = next(
+            element
+            for element in case.model.elements()
+            if element.id == "store:document-store"
+        )
+
+        assert not [a for a in case.meta.aliases if a.element == store.id]
+        assert "logical store" in store.notes
+        assert "not a separately identified" in store.notes
+        assert "boundary:vendor-platform" in {
+            zone.id for zone in case.model.trust_boundaries
+        }
+
+    def test_an_alias_keeps_its_element_s_type(self):
+        """An extraction that files the catalogue spreadsheet as a store has made
+        a different judgement about what the thing is. Crediting that as a
+        naming difference would erase the disagreement."""
+        for (case_id, element), alias in self.aliases().items():
+            from analysis_service.system_model import make_element_id
+
+            derived = make_element_id(element.split(":", 1)[0], alias.name)
+            assert derived.split(":", 1)[0] == element.split(":", 1)[0], case_id

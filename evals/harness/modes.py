@@ -76,6 +76,7 @@ from analysis_service.system_model import (
     Element,
     SystemModel,
     TrustBoundary,
+    make_element_id,
 )
 from analysis_service.validation import ValidationIssue, parse_and_validate
 from evals.harness.identity import comparable_elements
@@ -352,6 +353,9 @@ class ExtractionScore:
     #: and some are elements the corpus omits (#882). Precision counts all
     #: three the same, so it answers no question on its own.
     unsourced: tuple[str, ...] = ()
+    #: Every element the extraction found under a name a reader ruled
+    #: supported. Empty on a case nobody has ruled on.
+    aliased: tuple[AliasCredit, ...] = ()
     #: The blessed model's pure initiators — elements that only ever start an
     #: interaction. Carried so the reading below needs no second model walk.
     blessed_initiators: tuple[str, ...] = ()
@@ -388,6 +392,48 @@ class ExtractionScore:
     def precision(self) -> float:
         total = len(self.matched) + len(self.extra)
         return len(self.matched) / total if total else 0.0
+
+    @property
+    def sourced_recall(self) -> float:
+        """Recall over citable elements, crediting a name a reader ruled supported.
+
+        **The second of two standards, and it does not replace the first.**
+        :attr:`endpoint_recall` asks naming-policy conformity: did the
+        extraction write the name ``extract.md`` asks for, which is the source's
+        own wording. This asks semantic fidelity: does the name identify the
+        described thing at all.
+
+        The gap between them is the whole reading, the way the gap between
+        strict and endpoint recall is. A wide gap is an extraction that found
+        the architecture and named it its own way; a narrow one at a low number
+        is an extraction that found different things.
+
+        A pair only counts where a person ruled it — see
+        :class:`~evals.harness.reference.ElementAlias`. Nothing here infers a
+        rename, so a case nobody has ruled on reads exactly
+        :attr:`endpoint_recall`.
+        """
+        credited = comparable_elements(
+            frozenset(credit.blessed for credit in self.aliased)
+        )
+        found = len(comparable_elements(self.endpoint_matched)) + len(
+            comparable_elements(
+                _endpoint_keys(self.extra) & _endpoint_keys(self.missing)
+            )
+        )
+        total = found + len(comparable_elements(self.endpoint_missing))
+        return (found + len(credited)) / total if total else 0.0
+
+    @property
+    def naming_departures(self) -> int:
+        """Elements found under a supported name that is not the source's wording.
+
+        The cost of the gap above, as a count rather than a rate: each one is a
+        component the extraction identified correctly and named its own way.
+        ``extract.md`` rule 3 asks for the source's word, so this is the number
+        an edit to that rule moves.
+        """
+        return len(self.aliased)
 
     @property
     def possible_renames(self) -> tuple[str, ...]:
@@ -571,6 +617,8 @@ class ExtractionScore:
             "endpoint_missing": sorted(self.endpoint_missing),
             "endpoint_extra": sorted(self.endpoint_extra),
             "unsourced": list(self.unsourced),
+            "sourced_recall": round(self.sourced_recall, 3),
+            "aliased": [credit.to_json() for credit in self.aliased],
             "possible_renames": list(self.possible_renames),
             "additions": list(self.additions),
             "initiator_recall": round(self.initiator_recall, 3),
@@ -829,7 +877,72 @@ def score_extraction(case: GoldenCase, result: ExtractionResult) -> ExtractionSc
         unsourced=_unsourced(
             case, sorted(extracted_ids - blessed_ids), result.extracted
         ),
+        aliased=_aliased(
+            case, blessed_ids - extracted_ids, extracted_ids - blessed_ids
+        ),
     )
+
+
+@dataclass(frozen=True)
+class AliasCredit:
+    """One element found under a name a reader ruled supported.
+
+    Carries the excerpt as well as the pair, so the artifact says on whose
+    authority the credit was given. A reader meeting ``sourced_recall`` above
+    ``endpoint_recall`` can check the ruling from the artifact rather than
+    having to open the corpus at the commit the sweep ran from.
+    """
+
+    blessed: str
+    extracted: str
+    excerpt: str
+
+    def to_json(self) -> dict[str, str]:
+        return {
+            "blessed": self.blessed,
+            "extracted": self.extracted,
+            "excerpt": self.excerpt,
+        }
+
+
+def _slug_key(element_id: str) -> str:
+    """One element ID with each slug segment singularised.
+
+    ``entity:analysts`` and ``entity:analyst`` are one key. Which of the two an
+    extraction should write is ``extract.md``'s rule and is measured as naming
+    conformity; charging it as a different component would count one
+    disagreement twice. :func:`singular` is the one reader of that rule, shared
+    with the invention question.
+    """
+    prefix, _, slug = element_id.partition(":")
+    return f"{prefix}:{'-'.join(singular(part) for part in slug.split('-'))}"
+
+
+def _aliased(
+    case: GoldenCase, missing: set[str], extra: set[str]
+) -> tuple[AliasCredit, ...]:
+    """Every element found under a name a reader ruled supported.
+
+    **Not a fuzzy match, and not a rename detector.** Each pair rests on an
+    entry in the case's own ``aliases``, which a person ruled and
+    :mod:`evals.verify_corpus` holds to a quotation from the source. A case
+    nobody has ruled on produces none, so the reading is empty rather than
+    guessed.
+
+    Only a blessed element the extraction missed can be aliased, and only by an
+    extra element it wrote. An alias that matched an element already found
+    would credit one component twice.
+    """
+    by_key = {_slug_key(element_id): element_id for element_id in extra}
+    credits = []
+    for alias in case.meta.aliases:
+        if alias.element not in missing:
+            continue
+        prefix = alias.element.split(":", 1)[0]
+        found = by_key.get(_slug_key(make_element_id(prefix, alias.name)))
+        if found is not None:
+            credits.append(AliasCredit(alias.element, found, alias.excerpt))
+    return tuple(sorted(credits, key=lambda credit: credit.blessed))
 
 
 def singular(word: str) -> str:
@@ -1168,6 +1281,14 @@ def render_extraction(scores: Sequence[ExtractionScore]) -> None:
         f" dropping the zones a claim cannot cite"
         f" — the gap is naming, not extraction (instrument, non-gating)"
     )
+    if any(score.aliased for score in scores):
+        sourced = sum(score.sourced_recall for score in scores) / len(scores)
+        departures = sum(score.naming_departures for score in scores)
+        print(
+            f"  {sourced:.2f} crediting a name a reader ruled supported"
+            f" — {departures} element(s) found and named another way, which is"
+            f" naming policy rather than a component the extraction missed"
+        )
     zones = sum(score.zone_recall for score in scores) / len(scores)
     print(
         f"zones: {zones:.2f} recall — no claim cites one, so this scores the"

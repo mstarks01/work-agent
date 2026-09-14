@@ -105,6 +105,10 @@ Not part of the question, but the records cite these names, so you need them.
 - `store:firmware-bucket` — The firmware bucket accepts unauthenticated reads from anywhere. (basis: Described as "public read" and polled by devices that hold no credential for it.)
 - `store:telemetry-lake` — The telemetry lake holds personal data about customer sites. (basis: Stated to contain "site addresses and occupancy patterns", described as customer data.)
 
+**Reviewed aliases** — other names a reader ruled identify the same element, each with the words in the source that support it. An extraction using one is named differently, not wrong.
+
+- `store:firmware-bucket — Cloud Storage bucket` — Supported shorthand for the bucket supplying firmware images. Source: > nodes poll a Cloud Storage bucket
+
 ### Your list
 
 Write what could go wrong. Anything: an attack, a missing control, a question

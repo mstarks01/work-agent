@@ -500,6 +500,43 @@ def is_submitted_for(value: str) -> bool:
     )
 
 
+class ElementAlias(BaseModel):
+    """Another name for one blessed element, ruled supported by a reader.
+
+    **Two standards, and this field is the seam between them.** *Semantic
+    fidelity* asks whether a name accurately identifies the described thing;
+    *naming-policy conformity* asks whether it follows ``extract.md``'s
+    instruction to keep the source's own wording. An extraction that writes
+    ``process:airflow-scheduler`` where the corpus wrote
+    ``process:ingest-scheduler`` passes the first and fails the second, and a
+    score with one number charges it as if it had found nothing.
+
+    Not a fuzzy match. Each entry is an exact name a **person** ruled supported,
+    and ``excerpt`` is the words in the case's own source that support it, which
+    :mod:`evals.verify_corpus` checks. Where no rule decides, the answer is a
+    human judgement in a field the lint reads.
+
+    The alias keeps the element's own type. An extraction that files the
+    catalogue spreadsheet as a store rather than a process has made a different
+    judgement about what the thing *is*, and crediting that as a naming
+    difference would erase the disagreement.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    #: The blessed element this is another name for.
+    element: str = Field(min_length=1, max_length=300)
+    #: The supported name, as the source words it. The ID is derived from it,
+    #: through the same function that derives every element ID.
+    name: str = Field(min_length=1, max_length=200)
+    #: The words in the case's own source that support the name. Checked, so an
+    #: alias cannot drift into a name the text never offered.
+    excerpt: str = Field(min_length=1, max_length=1000)
+    #: Why it is supported, in the reader's words. Prose for a person; nothing
+    #: computes on it.
+    ruling: str = Field(default="", max_length=1000)
+
+
 class CaseMetadata(BaseModel):
     """``case.json``: what the case is, where it came from, and who grades it."""
 
@@ -516,6 +553,11 @@ class CaseMetadata(BaseModel):
     # Non-empty: a case no framework grades is a case that scores nothing, and
     # a corpus quietly carrying one lowers no denominator visibly.
     frameworks: list[CaseFramework] = Field(min_length=1)
+    #: Names other than the blessed one that a reader ruled identify the same
+    #: element. Empty on a case nobody has ruled on, which is not the same as a
+    #: case whose every name is the only supported one — the absence says the
+    #: question was not asked.
+    aliases: list[ElementAlias] = Field(default_factory=list)
     notes: str = ""
 
 

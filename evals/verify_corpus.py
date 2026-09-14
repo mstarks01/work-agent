@@ -50,7 +50,7 @@ from analysis_service.report import (
     SourceRef,
 )
 from analysis_service.sources import SourceKind
-from analysis_service.system_model import SystemModel
+from analysis_service.system_model import SystemModel, make_element_id
 from analysis_service.validation import parse_and_validate
 from evals.harness.calibration import SCORED_LABELS, Label, LabelAnnotation
 from evals.harness.reference import MUST_FIND, AsvsDisposition, Tier
@@ -141,12 +141,17 @@ CASE_FIELDS = frozenset(
         "notes",
     )
 )
-#: Fields a case may carry and need not. Empty: a **Case Sitting** merges as
-#: one file under ``evals/review/submissions/`` and writes nothing into a case,
-#: so ``case.json`` has no optional field. ``CaseMetadata`` in
+#: Fields a case may carry and need not. ``CaseMetadata`` in
 #: ``harness/reference.py`` refuses an unknown key, and this set is what keeps
 #: this lint from admitting one that loader refuses.
-OPTIONAL_CASE_FIELDS: frozenset[str] = frozenset()
+#:
+#: ``aliases`` is optional because an absent list and an empty one say different
+#: things: a case nobody has ruled on carries no key, and a case whose every
+#: blessed name is the only supported one carries an empty list. A **Case
+#: Sitting** still merges as one file under ``evals/review/submissions/`` and
+#: writes nothing into a case; a ruling on the names arrives as an ordinary
+#: corpus edit, which ADR 0024 made ordinary.
+OPTIONAL_CASE_FIELDS: frozenset[str] = frozenset(("aliases",))
 CASE_FRAMEWORK_FIELDS = frozenset(("name", "options", "exemplar_proximity"))
 #: What every framework's reference record carries, whatever it grades with.
 CLAIM_FIELDS = frozenset(("claim", "tier", "affected_element_ids", "notes"))
@@ -487,6 +492,81 @@ def _check_case_metadata(case_dir: Path, meta: dict) -> Iterator[str]:
         yield f"case.json id {meta.get('id')!r} does not match directory name"
     yield from _check_declared_frameworks(meta)
     yield from _check_sources(case_dir, meta)
+    yield from _check_aliases(case_dir, meta)
+
+
+def _check_aliases(case_dir: Path, meta: dict) -> Iterator[str]:
+    """Every reviewed alias names a real element, keeps its type, and is sourced.
+
+    An alias credits an extraction that the strict reading marks wrong, so it
+    is the one place a name nobody wrote into the model can move a number.
+    Each of these refuses a way it could do that dishonestly.
+
+    The excerpt check is the load-bearing one: an alias is supported by the
+    case's own words or it is somebody's preference. Matched as a substring of
+    the joined sources, the way the evidence gate matches a quotation.
+    """
+    aliases = meta.get("aliases", [])
+    if not isinstance(aliases, list):
+        yield "case.json aliases must be a list"
+        return
+    model_path = case_dir / "model.json"
+    if not model_path.is_file():
+        return
+    model = _load_json_object(model_path)
+    known = {
+        element["id"]: element
+        for collection in (
+            "external_entities",
+            "processes",
+            "data_stores",
+            "data_flows",
+            "trust_boundaries",
+        )
+        for element in model.get(collection, [])
+        if isinstance(element, dict) and isinstance(element.get("id"), str)
+    }
+    text = "\n".join(
+        (case_dir / source["file"]).read_text(encoding="utf-8")
+        for source in meta.get("sources", [])
+        if isinstance(source, dict)
+        and isinstance(source.get("file"), str)
+        and (case_dir / source["file"]).is_file()
+    )
+    seen: set[tuple[str, str]] = set()
+    for index, entry in enumerate(aliases):
+        where = f"case.json aliases[{index}]"
+        if not isinstance(entry, dict):
+            yield f"{where} is not a table"
+            continue
+        element, name = entry.get("element"), entry.get("name")
+        if not isinstance(element, str) or not isinstance(name, str):
+            yield f"{where} needs an element and a name"
+            continue
+        if element not in known:
+            yield f"{where} names {element!r}, which model.json does not hold"
+            continue
+        try:
+            alias_id = make_element_id(element.split(":", 1)[0], name)
+        except ValueError as exc:
+            yield f"{where}: {name!r} is not a usable element name: {exc}"
+            continue
+        if alias_id == element:
+            yield f"{where}: {name!r} derives the element's own ID, so it is no alias"
+        if alias_id in known:
+            yield (
+                f"{where}: {name!r} derives {alias_id!r}, which is another element"
+                " this model holds; an alias may not name one element as another"
+            )
+        if (element, alias_id) in seen:
+            yield f"{where}: {alias_id!r} is listed twice for {element!r}"
+        seen.add((element, alias_id))
+        excerpt = entry.get("excerpt")
+        if not isinstance(excerpt, str) or excerpt not in text:
+            yield (
+                f"{where}: the excerpt is not in this case's sources, so nothing"
+                " shows the name is one the text offers"
+            )
 
 
 def _check_declared_frameworks(meta: dict) -> Iterator[str]:

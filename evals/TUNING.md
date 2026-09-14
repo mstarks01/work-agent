@@ -286,6 +286,32 @@ It writes copies, never in place, and never inside `evals/baselines`. A file it
 cannot help — a sweep from before execution identities were recorded — is named
 and skipped rather than stopping the rest.
 
+### Two standards for a name
+
+Extraction is graded on element IDs, which are derived from names, so a model
+that identifies a component correctly and names it its own way scores as though
+it found nothing. Those are two different questions and the score now asks both:
+
+- **Naming-policy conformity** — `endpoint_recall`. Did the extraction keep the
+  source's wording, which is what `extract.md` rule 3 asks for?
+- **Semantic fidelity** — `sourced_recall`. Does the name identify the thing the
+  source describes at all?
+
+The gap between them is `naming_departures`, and it reads the way the gap
+between strict and endpoint recall reads: wide means an extraction that found
+the architecture and named it its own way, narrow at a low number means one that
+found different things.
+
+Nothing infers a rename. A case's `aliases` in `case.json` lists the other names
+a **reader** ruled supported, each with the excerpt from the case's own source
+that supports it — `verify_corpus` refuses one whose excerpt the text does not
+carry, one that crosses its element's type, and one that derives another
+element's ID. A case nobody has ruled on reads exactly the strict number.
+
+Read over the six archived runs of 2026-09-13, on the ten elements a reader has
+ruled: 9.2 absent a run by exact ID, of which **7.3 were found under the ruled
+name** and 1.8 were genuinely absent.
+
 **Price your own fix, not the corpus.** `--row <case>:<reference>` narrows the
 band to the references a fix targets, which is the reading step 3 asks for. The
 nine rows #867 targets read sd 1.27, so its ceiling of 9 needs **one run each

@@ -122,6 +122,10 @@ Not part of the question, but the records cite these names, so you need them.
 - `entity:franchise-identity-provider` — The franchise identity provider is a separate trust party from everywhere else outside the corporate network. (basis: The source introduces the franchise stores as a distinct group let in on distinct terms; it does not say where the provider runs, so the zone is drawn on the party rather than on a network.)
 - `entity:hr-system` — The HR system sits outside the corporate network. (basis: The source names it as the system of record the broker pulls from and never places it; grouped with the other unplaced parties rather than assumed internal.)
 
+**Reviewed aliases** — other names a reader ruled identify the same element, each with the words in the source that support it. An extraction using one is named differently, not wrong.
+
+- `entity:franchise-identity-provider — own identity provider` — Supported; the provider vouches for franchise colleagues. Source: > their own identity provider vouches for them
+
 ### Your list
 
 Write what could go wrong. Anything: an attack, a missing control, a question
