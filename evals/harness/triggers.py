@@ -56,7 +56,7 @@ from analysis_service.candidates import generate_candidates
 from analysis_service.claims import FrameworkName
 from analysis_service.frameworks import package_for
 from analysis_service.system_model import SystemModel
-from evals.harness.reference import GoldenCase, ReferenceClaim
+from evals.harness.reference import MUST_FIND, GoldenCase, ReferenceClaim
 
 __all__ = [
     "CaseTriggerRecall",
@@ -91,6 +91,11 @@ class TriggerHit:
     def triggered(self) -> bool:
         return bool(self.rule_ids)
 
+    @property
+    def must_find(self) -> bool:
+        """Whether this reference drives the hard recall gate."""
+        return self.tier == MUST_FIND
+
 
 @dataclass(frozen=True)
 class CaseTriggerRecall:
@@ -119,13 +124,11 @@ class CaseTriggerRecall:
 
     @property
     def must_find_triggered(self) -> int:
-        return sum(
-            1 for hit in self.scoreable if hit.triggered and hit.tier == "must-find"
-        )
+        return sum(1 for hit in self.scoreable if hit.triggered and hit.must_find)
 
     @property
     def must_find_total(self) -> int:
-        return sum(1 for hit in self.scoreable if hit.tier == "must-find")
+        return sum(1 for hit in self.scoreable if hit.must_find)
 
 
 def case_trigger_recall(

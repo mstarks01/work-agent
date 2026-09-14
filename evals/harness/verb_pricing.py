@@ -226,7 +226,7 @@ def _gain(
             continue
         score = score_case(case, produced[case.id], matcher, Ledger())
         matched += len(score.matched)
-        must_find += sum(1 for pair in score.matched if pair.tier == "must-find")
+        must_find += sum(1 for pair in score.matched if pair.must_find)
     return matched, must_find
 
 

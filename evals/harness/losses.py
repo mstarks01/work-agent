@@ -285,9 +285,7 @@ def attribute_case(
     """
     references = case.stride_claims()
     must_find = {
-        index
-        for index, reference in enumerate(references)
-        if reference.tier == "must-find"
+        index for index, reference in enumerate(references) if reference.must_find
     }
     hits = case_trigger_recall(case, "stride").hits
     surviving = {claim.id for claim in produced}

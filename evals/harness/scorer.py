@@ -121,6 +121,16 @@ class MatchedPair:
     likelihood_agrees: bool
     impact_agrees: bool
 
+    @property
+    def must_find(self) -> bool:
+        """Whether the reference behind this pair drives the hard recall gate.
+
+        The same property :class:`~evals.harness.reference.ReferenceThreat`
+        carries, on the pair the scorer emits, so a reader holding either one
+        asks the question rather than comparing the string.
+        """
+        return self.tier == MUST_FIND
+
     def to_json(self) -> dict[str, Any]:
         return {
             "reference_index": self.reference_index,
@@ -241,7 +251,7 @@ class CaseScore:
 
     @property
     def must_find_matched(self) -> int:
-        return sum(1 for pair in self.matched if pair.tier == MUST_FIND)
+        return sum(1 for pair in self.matched if pair.must_find)
 
     @property
     def must_find_coverage(self) -> float:
