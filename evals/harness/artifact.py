@@ -216,6 +216,23 @@ class EvalArtifact:
     corpus_digest: str
     raw: dict[str, Any]
 
+    def carries(self, key: str) -> bool:
+        """Whether the artifact holds this declared block.
+
+        The reader for "is the block there", so a reader that treats an absent
+        block as an absent measurement asks this instead of catching what
+        :meth:`block` raises. The two refusals below are different facts and
+        only one of them is about the file: an undeclared key is a defect in
+        the caller, and a declared key the file omits is an older sweep. A
+        handler around :meth:`block` cannot tell them apart.
+        """
+        if key not in DECLARED_KEYS:
+            raise ProvenanceError(
+                f"{key!r} is not a key an artifact declares; the declared set is"
+                f" {sorted(DECLARED_KEYS)}"
+            )
+        return key in self.raw
+
     def block(self, key: str) -> Any:
         """One declared block of the artifact, by key.
 
@@ -228,15 +245,11 @@ class EvalArtifact:
         and is credential-free by design, so holding every artifact to every
         key would refuse the files promotion exists to read.
         """
-        if key not in DECLARED_KEYS:
+        if not self.carries(key):
             raise ProvenanceError(
-                f"{key!r} is not a key an artifact declares; the declared set is"
-                f" {sorted(DECLARED_KEYS)}"
-            )
-        if key not in self.raw:
-            raise ProvenanceError(
-                f"{self.path}: carries no {key!r} block, though an"
-                f" artifact_version {ARTIFACT_VERSION} sweep writes one"
+                f"{self.path}: carries no {key!r} block, so it predates the"
+                f" instrument that writes one; a sweep today writes it at"
+                f" artifact_version {ARTIFACT_VERSION}"
             )
         return self.raw[key]
 
