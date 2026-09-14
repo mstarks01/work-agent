@@ -66,7 +66,7 @@ from evals.harness.content import structural
 from evals.harness.fingerprint import key_claim
 from evals.harness.identity import ClaimPair, Matcher
 from evals.harness.ledger import Ledger, Vote
-from evals.harness.reference import GoldenCase, ReferenceThreat
+from evals.harness.reference import MUST_FIND, GoldenCase, ReferenceThreat
 
 
 def candidate_claim(threat: DraftThreat) -> str:
@@ -241,7 +241,7 @@ class CaseScore:
 
     @property
     def must_find_matched(self) -> int:
-        return sum(1 for pair in self.matched if pair.tier == "must-find")
+        return sum(1 for pair in self.matched if pair.tier == MUST_FIND)
 
     @property
     def must_find_coverage(self) -> float:

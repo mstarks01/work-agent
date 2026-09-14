@@ -13,7 +13,9 @@ import pytest
 from evals.harness.artifact import ARTIFACT_VERSION, DECLARED_KEYS, load_artifact
 from evals.harness.provenance import ProvenanceError
 from evals.harness.stability import (
+    Band,
     aggregate_stability,
+    band,
     comparability_warnings,
     compare_runs,
     load_runs,
@@ -21,15 +23,46 @@ from evals.harness.stability import (
 from tests.test_evals_provenance import provenance, sampling  # noqa: F401
 
 
-def score(case: str, references: int, matched: list[int]) -> dict:
-    """One case's score block, as ``CaseScore.to_json`` writes it."""
+def score(
+    case: str, references: int, matched: list[int], must_find: set[int] | None = None
+) -> dict:
+    """One case's score block, as ``CaseScore.to_json`` writes it.
+
+    ``must_find`` names the reference indices this package counts as must-find.
+    It marks the tier on each matched row and names no missed reference, which
+    is the half of a must-find fate this record carries.
+    """
+    tiers = must_find if must_find is not None else set(matched)
     return {
         "case": case,
         "counts": {"references": references, "matched": len(matched)},
         "metrics": {"reference_coverage": round(len(matched) / references, 3)},
         "matched": [
-            {"reference_index": index, "threat_id": f"T-{index}"} for index in matched
+            {
+                "reference_index": index,
+                "threat_id": f"T-{index}",
+                "tier": "must-find" if index in tiers else "expected",
+            }
+            for index in matched
         ],
+    }
+
+
+def applicability(
+    case: str, expected: int, matched: list[str], must_find_missed: list[str]
+) -> dict:
+    """One case's applicability block, as a catalog-identified package writes it.
+
+    The other half of the answer: no tier on a matched row, and the missed
+    must-finds named by catalog identifier.
+    """
+    return {
+        "case": case,
+        "framework": "asvs",
+        "expected": expected,
+        "recall": round(len(matched) / expected, 3),
+        "matched": matched,
+        "must_find_missed": must_find_missed,
     }
 
 
@@ -569,3 +602,223 @@ def test_a_second_composed_package_is_not_reported_as_a_malformed_artifact(tmp_p
 
     assert "malformed" not in str(raised.value)
     assert "needs a framework field" in str(raised.value)
+
+
+class TestTheBandIsReadOffTheFates:
+    """The spread of the must-find total, from runs already paid for.
+
+    The expensive reading is five sweeps of one configuration and the sample
+    deviation of five totals, which buys a deviation on four degrees of
+    freedom. This sums each reference's own variance instead, so a pair of
+    sweeps answers — the sum is over the references, not over the runs (#879).
+    """
+
+    CASE = "01-payments-checkout"
+
+    def runs(self, tmp_path, sampling, matched_per_run, must_find):  # noqa: F811
+        record = provenance(sampling)
+        return load_runs(
+            [
+                write_run(
+                    tmp_path,
+                    f"r{n}.json",
+                    record,
+                    [score(self.CASE, 10, matched, must_find)],
+                )
+                for n, matched in enumerate(matched_per_run)
+            ]
+        )
+
+    def test_runs_that_agree_on_every_must_find_have_no_spread(
+        self,
+        tmp_path,
+        sampling,  # noqa: F811
+    ):
+        """Nothing moved, so nothing can be attributed to movement."""
+        measured = band(self.runs(tmp_path, sampling, [[0, 1], [0, 1]], {0, 1}))
+
+        assert measured.volatile == 0
+        assert measured.floor_variance == 0.0
+        assert measured.sd == 0.0
+
+    def test_one_reference_moving_between_two_runs_is_half_a_variance(
+        self,
+        tmp_path,
+        sampling,  # noqa: F811
+    ):
+        """``m(k-m)/(k(k-1))`` at k=2, m=1. Two runs are enough because the sum
+        runs over the references rather than over the runs."""
+        measured = band(self.runs(tmp_path, sampling, [[0, 1], [0]], {0, 1}))
+
+        assert (measured.references, measured.volatile) == (2, 1)
+        assert measured.floor_variance == pytest.approx(0.5)
+        assert measured.sd == pytest.approx(0.5**0.5)
+
+    def test_an_expected_reference_is_not_in_the_band(
+        self,
+        tmp_path,
+        sampling,  # noqa: F811
+    ):
+        """The gate is on the must-find tier, so the band is over that tier."""
+        measured = band(self.runs(tmp_path, sampling, [[0, 1], [0]], {0}))
+
+        assert measured.references == 1
+        assert measured.floor_variance == 0.0
+
+    def test_five_runs_sum_each_reference_s_own_variance(
+        self,
+        tmp_path,
+        sampling,  # noqa: F811
+    ):
+        """One reference matched in 3 of 5 and one in 5 of 5:
+        3*2/(5*4) = 0.3, and nothing from the one that never moved."""
+        runs = self.runs(
+            tmp_path,
+            sampling,
+            [[0, 1], [0, 1], [0, 1], [0], [0]],
+            {0, 1},
+        )
+        measured = band(runs)
+
+        assert measured.floor_variance == pytest.approx(0.3)
+
+    def test_the_floor_and_the_observed_spread_are_read_against_each_other(
+        self,
+        tmp_path,
+        sampling,  # noqa: F811
+    ):
+        """The two readings of one question, which is what makes the inflation
+        a measurement rather than an assumption.
+
+        Three runs where two references move together: every run matches both
+        or neither. The totals are 2, 2, 0, whose variance is 4/3. The floor
+        treats the two as independent and reads 2 * (2*1/(3*2)) = 2/3, so the
+        inflation is exactly 2.
+        """
+        runs = self.runs(tmp_path, sampling, [[0, 1], [0, 1], []], {0, 1})
+        measured = band(runs, calibration=[runs])
+
+        assert measured.floor_variance == pytest.approx(2 / 3)
+        assert measured.observed_variance == pytest.approx(4 / 3)
+        assert measured.inflation == pytest.approx(2.0)
+        assert measured.sd == pytest.approx((4 / 3) ** 0.5)
+        assert measured.calibration_freedom == 2
+
+    def test_a_pair_calibrates_nothing(self, tmp_path, sampling):  # noqa: F811
+        """Two runs give a variance on one degree of freedom, which says
+        nothing. Ignored rather than counted as agreement."""
+        runs = self.runs(tmp_path, sampling, [[0, 1], [0]], {0, 1})
+        measured = band(runs, calibration=[runs])
+
+        assert measured.inflation is None
+        assert measured.calibration_freedom == 0
+        assert measured.sd == pytest.approx(0.5**0.5)  # the floor, unmultiplied
+
+    def test_naming_rows_prices_them_and_not_the_corpus(
+        self,
+        tmp_path,
+        sampling,  # noqa: F811
+    ):
+        """What the guide asks for: a fix that targets known references is
+        measured on them, because the corpus total is the noisiest reading."""
+        runs = self.runs(tmp_path, sampling, [[0, 1, 2], [0]], {0, 1, 2})
+        whole = band(runs)
+        narrowed = band(runs, rows={(self.CASE, "1")})
+
+        assert whole.floor_variance == pytest.approx(1.0)
+        assert narrowed.references == 1
+        assert narrowed.floor_variance == pytest.approx(0.5)
+
+    def test_the_calibration_reads_everything_even_when_rows_narrow(
+        self,
+        tmp_path,
+        sampling,  # noqa: F811
+    ):
+        """How much the references co-move is a property of a run, not of the
+        rows being priced. Narrowing the calibration read it as absent."""
+        repeat = self.runs(tmp_path, sampling, [[0, 1], [0, 1], []], {0, 1})
+        narrowed = band(repeat, calibration=[repeat], rows={(self.CASE, "0")})
+
+        assert narrowed.references == 1
+        assert narrowed.inflation == pytest.approx(2.0)
+
+    def test_a_lone_run_is_refused(self, tmp_path, sampling):  # noqa: F811
+        with pytest.raises(ValueError, match="two runs or more"):
+            band(self.runs(tmp_path, sampling, [[0]], {0}))
+
+    @pytest.mark.parametrize(
+        ("variance", "effect", "expected"),
+        [(4.0, 4.0, 2), (4.0, 10.0, 1), (16.0, 4.0, 8), (0.0, 1.0, 1)],
+    )
+    def test_runs_needed_is_eight_variances_over_the_effect_squared(
+        self, variance, effect, expected
+    ):
+        """``n >= 8v/effect**2``, and never fewer than one: a comparison needs
+        a before and an after however small the spread."""
+        measured = Band(references=1, volatile=1, runs=2, floor_variance=variance)
+
+        assert measured.runs_needed(effect) == expected
+
+    def test_an_effect_of_nothing_is_refused(self):
+        measured = Band(references=1, volatile=1, runs=2, floor_variance=1.0)
+
+        with pytest.raises(ValueError, match="an effect of nothing"):
+            measured.runs_needed(0)
+
+
+class TestBothPackagesAnswerTheBand:
+    """Two packages name different halves of a must-find fate, and both answer.
+
+    One marks the tier on each matched row and cannot name a reference nobody
+    matched. The other marks no tier and lists the missed must-finds by catalog
+    identifier. Neither half has to be complete, because a reference every run
+    agreed on contributes no spread.
+    """
+
+    CASE = "01-payments-checkout"
+
+    def test_a_package_that_marks_the_tier_answers(self, tmp_path, sampling):  # noqa: F811
+        record = provenance(sampling)
+        runs = load_runs(
+            [
+                write_run(tmp_path, "a.json", record, [score(self.CASE, 4, [0, 1])]),
+                write_run(tmp_path, "b.json", record, [score(self.CASE, 4, [0])]),
+            ]
+        )
+
+        assert band(runs).floor_variance == pytest.approx(0.5)
+
+    def test_a_package_that_names_the_missed_ones_answers(
+        self,
+        tmp_path,
+        sampling,  # noqa: F811
+    ):
+        """``V1.2.4`` matched in one run and named as missed in the other is
+        the same movement, read from the other side of the record."""
+        record = provenance(sampling)
+        runs = load_runs(
+            [
+                write_run(
+                    tmp_path,
+                    "a.json",
+                    record,
+                    [],
+                    applicability=[
+                        applicability(self.CASE, 4, ["V1.2.4", "V2.1.1"], [])
+                    ],
+                ),
+                write_run(
+                    tmp_path,
+                    "b.json",
+                    record,
+                    [],
+                    applicability=[applicability(self.CASE, 4, ["V2.1.1"], ["V1.2.4"])],
+                ),
+            ]
+        )
+        measured = band(runs)
+
+        # V2.1.1 matched in both and is never named a must-find, so it is not
+        # in the population; V1.2.4 is, and it moved.
+        assert (measured.references, measured.volatile) == (1, 1)
+        assert measured.floor_variance == pytest.approx(0.5)
