@@ -13,12 +13,16 @@ shipped graph without a provider call.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
 
 from analysis_service.report import Report
-from evals.harness.bundle import reports_dir, write_reports
+from analysis_service.system_model import SystemModel
+from analysis_service.validation import ValidationIssue, parse_and_validate
+from evals.harness.bundle import reports_dir, write_extractions, write_reports
+from evals.harness.modes import ExtractionResult, score_extraction
 from evals.harness.reference import load_case
 from tests.test_evals_run_grounds import CASE_DIR, DEAD, sweep
 
@@ -92,3 +96,106 @@ def test_extraction_says_it_has_no_reports(tmp_path, capsys):
 
     assert "produces none" in capsys.readouterr().out
     assert not reports_dir(out).exists()
+
+
+class TestAnExtractionSweepKeepsItsModels:
+    """The same question of the mode that produces no report.
+
+    An extraction sweep's figures are computed offline from two models and the
+    case's own sources, so a scorer change can be answered from a finished run
+    — but only by a run that kept the model it scored. One that kept its scores
+    alone has to be paid for again to answer a figure invented after it ran
+    (#925).
+    """
+
+    def result(self, case):
+        """One extraction, as ``run_extraction`` returns it, with no provider."""
+        raw = case.model.model_dump(mode="json")
+        model, issues = parse_and_validate(
+            raw,
+            normalize_ids=True,
+            sources={source.label: source.text for source in case.sources},
+        )
+        return ExtractionResult(
+            case_id=case.id, extracted=model, issues=tuple(issues), raw=raw
+        )
+
+    def test_the_written_model_re_scores_to_what_the_sweep_reported(
+        self, case, tmp_path
+    ):
+        """The acceptance test for the whole file: read it back and score it.
+
+        Not "a file exists" — a file whose contents cannot reproduce the run's
+        own numbers keeps nothing worth keeping.
+        """
+        out = tmp_path / "artifact.json"
+        result = self.result(case)
+        live = score_extraction(case, result)
+
+        write_extractions(str(out), "extraction", {case.id: result})
+
+        written = json.loads(
+            (reports_dir(out) / f"{case.id}.extraction.json").read_text("utf-8")
+        )
+        offline = score_extraction(
+            case,
+            ExtractionResult(
+                case_id=case.id,
+                extracted=SystemModel.model_validate(written["normalized"]),
+                issues=tuple(
+                    ValidationIssue.model_validate(issue) for issue in written["issues"]
+                ),
+            ),
+        )
+
+        assert offline.to_json() == live.to_json()
+
+    def test_the_raw_output_is_kept_beside_the_normalized_one(self, case, tmp_path):
+        """Normalizing makes a slug decision, and a re-score may want to remake it.
+
+        It is the one part of a run that cannot be recomputed from what else is
+        written: the normalized model has already had its IDs derived.
+        """
+        out = tmp_path / "artifact.json"
+        result = self.result(case)
+        write_extractions(str(out), "extraction", {case.id: result})
+
+        written = json.loads(
+            (reports_dir(out) / f"{case.id}.extraction.json").read_text("utf-8")
+        )
+
+        assert written["raw"] == case.model.model_dump(mode="json")
+
+    def test_a_model_the_gate_refused_is_kept_with_its_issues(self, case, tmp_path):
+        """A refused extraction is the one most worth reading back."""
+        out = tmp_path / "artifact.json"
+        raw = case.model.model_dump(mode="json")
+        for element in raw["processes"]:
+            element["source_excerpt"] = ""
+            element["source_label"] = ""
+        model, issues = parse_and_validate(
+            raw,
+            normalize_ids=True,
+            sources={source.label: source.text for source in case.sources},
+        )
+        result = ExtractionResult(
+            case_id=case.id, extracted=model, issues=tuple(issues), raw=raw
+        )
+
+        write_extractions(str(out), "extraction", {case.id: result})
+
+        written = json.loads(
+            (reports_dir(out) / f"{case.id}.extraction.json").read_text("utf-8")
+        )
+        assert [issue["code"] for issue in written["issues"]] == [
+            "missing-citation"
+        ] * (len(raw["processes"]))
+
+    def test_another_mode_writes_none_and_says_so(self, case, tmp_path, capsys):
+        """An analysis sweep keeps its model inside its report, not here."""
+        out = tmp_path / "artifact.json"
+
+        write_extractions(str(out), "analysis", {})
+
+        assert not reports_dir(out).exists()
+        assert "no extractions written" in capsys.readouterr().out
