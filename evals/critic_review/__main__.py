@@ -2,7 +2,7 @@
 
     python -m evals.critic_review --accept-cost unknown
 
-One model call. The set is eight drafts and a critic reads them together, which
+One model call. The set is nine drafts and a critic reads them together, which
 is also how it reads a real job — so this costs about what one critic node of
 one case costs, and is the narrowest instrument that can see the review change.
 
@@ -178,15 +178,15 @@ def main(argv: list[str] | None = None) -> int:
             "  survived with the advice unread: "
             + ", ".join(o.fixture_id for o in score.recommendation_unread)
         )
-    if score.unknown_unjudged:
-        # The other question a surviving ruling can leave alone. A draft
-        # citing an unknown that the ruling neither confirms nor dismisses is
-        # a critic that never answered "does this claim depend on it" — which
-        # is the state #894 asks the instrument to make visible, and which no
-        # score above moves.
+    if score.unknown_not_dismissed:
+        # Printed, never scored. A draft that rests on the fact it cites
+        # deserves a needs-info dismissing nothing, so a correct critic appears
+        # here. What a reader checks is the row whose unknown the reader ruled
+        # immaterial: an empty dismissal there is a critic that never answered
+        # "does this claim depend on it".
         print(
-            "  survived with the unknown unjudged: "
-            + ", ".join(o.fixture_id for o in score.unknown_unjudged)
+            "  survived citing an unknown, none set aside: "
+            + ", ".join(o.fixture_id for o in score.unknown_not_dismissed)
         )
     if score.rejected_without_engaging:
         print(

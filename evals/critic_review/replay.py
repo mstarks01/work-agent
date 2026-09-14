@@ -292,17 +292,25 @@ class ReplayScore:
         )
 
     @property
-    def unknown_unjudged(self) -> tuple[FixtureOutcome, ...]:
-        """Surviving drafts citing an unknown that the ruling never ruled on.
+    def unknown_not_dismissed(self) -> tuple[FixtureOutcome, ...]:
+        """Surviving drafts citing an unknown that the ruling set none aside.
 
-        The other half of what ``immaterial_unknowns`` made observable. A
-        ``needs-info`` that dismisses no pair is a critic that produced a
-        verdict without touching the question ``prompts/critic.md`` asks it —
-        does this claim depend on the unknown it names — and before the field
-        existed that state could not be told from a critic that weighed
-        relevance and said no. Counted apart for the reason
-        :attr:`recommendation_unread` is: a question left alone is not a wrong
-        answer, and averaging the two hides both.
+        **A state, never a fault.** A draft that genuinely rests on the fact it
+        cites deserves a ``needs-info`` dismissing nothing, and on the first
+        live run both ``credible-conditional`` fixtures landed here having been
+        ruled exactly right. Reading this list as a score would mark a correct
+        critic down twice.
+
+        What it is for is the row where the reader ruled the unknown
+        immaterial. There, an empty dismissal is the critic #894 is about — one
+        that produced a verdict without touching the question
+        ``prompts/critic.md`` asks it. The ruling cannot tell the two apart on
+        its own: ``immaterial_unknowns`` makes a **dismissal** observable and
+        leaves a considered-and-kept unknown looking like an unconsidered one,
+        so #894 is half closed and the reader's expectation is the other half.
+
+        Printed rather than scored for that reason, and counted apart from
+        :attr:`recommendation_unread`, which is a fault on every row it names.
         """
         return tuple(
             o
@@ -352,7 +360,7 @@ class ReplayScore:
                 "set_carries_both_answers": self.set_carries_both_answers,
             },
             "recommendation_unread": [o.fixture_id for o in self.recommendation_unread],
-            "unknown_unjudged": [o.fixture_id for o in self.unknown_unjudged],
+            "unknown_not_dismissed": [o.fixture_id for o in self.unknown_not_dismissed],
             "rejected_without_engaging": [
                 o.fixture_id for o in self.rejected_without_engaging
             ],
