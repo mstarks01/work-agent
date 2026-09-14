@@ -212,6 +212,43 @@ If a metric's spread across the five runs is wider than any change you'd hope to
 see, that metric simply isn't sensitive enough to gate on — note it and rely on
 the others.
 
+### The band, measured, at each scale
+
+The spread is a property of the instrument you read it on, and the corpus total
+is the widest one available. Measured on the STRIDE corpus, 2026-09-13:
+
+| instrument | band |
+| --- | --- |
+| one case, five runs | sd 0.89 must-finds on each strong case, 1.52 on the weak one |
+| the corpus total, derived from those | sd about 4.0 must-finds of 129 |
+| two corpus sweeps of one configuration | 6 must-finds apart, which is 1.1 sd |
+
+The two sweeps ran on one corpus digest, one route and one model, and moved
+−7 matched and −6 must-find across nine of thirteen cases. The commits between
+them touch the extraction scorer, the loss instrument and `extract.md`, none of
+which analysis mode reads.
+
+**The weak case is the noisy one.** Case 03 read 5, 2, 6, 4, 5 of 9 — 17% of
+its own total, against 9% for the two strong cases. The cases with the most
+headroom are the hardest to measure, which is the opposite of convenient.
+
+What that costs to see, at two standard deviations:
+
+| effect, in must-finds | sweeps each side | approximate cost |
+| --- | ---: | ---: |
+| 3 | ~14 | ~$78 |
+| 5 | ~5 | ~$28 |
+| 8 | ~2 | ~$11 |
+| 10 or more | 1 | ~$6 |
+
+So **an effect has to exceed about 11 must-finds to show in a single
+before-and-after pair of corpus sweeps.** Every prompt-edit ceiling priced in
+the week to 2026-09-13 — 3, 4, 5, 9 and 14 — is at or under that line. That is
+the reasoning behind step 3's rule, and #879 is where the measurement lives.
+
+ASVS has its own band and nobody has measured it. It has 17 lanes and its own
+scorer, so nothing here carries across.
+
 ### Which numbers matter
 
 The run prints and records several metrics ([`README.md`](README.md) has the full
@@ -356,7 +393,14 @@ gets no run of its own. Batch it with the next fixes until the batch clears the
 band, because a Baseline is per commit and every merge makes the next run an
 estimate rather than a recorded number. Spend on the narrowest instrument that
 can see the change: one case first, five runs of that case next, and the corpus
-only for a batch. What is decidable offline — a verb pair against the frontier,
+only for a batch.
+
+**Do not price a targeted fix against the corpus total.** The total's band is
+about 4 must-finds of 129, and no ceiling written so far clears it. A fix that
+targets named rows is measured on those rows: the case-09 spread on 2026-09-12
+read 9, 7, 9, 9, 8 of 10 against a Baseline's 6, and the per-reference fates
+named exactly which rows moved. That cost $0.76 and answered more than the
+$2.41 sweep beside it did. What is decidable offline — a verb pair against the frontier,
 a corpus label, a scorer rule — is decided offline first, and the run confirms
 rather than discovers.
 
