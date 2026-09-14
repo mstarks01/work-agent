@@ -114,6 +114,11 @@ Not part of the question, but the records cite these names, so you need them.
 - `process:mobile-app` — The customer and the mobile app sit outside Sokify's own systems, in a customer-device zone. (basis: The app is the channel through which customers browse and order, and it reaches the web API over HTTP; the source names no other placement for it.)
 - `process:catalogue-spreadsheet` — The marketing laptop and its spreadsheet sit in a separate office zone from the server-side systems. (basis: "The spreadsheet lives on a marketing laptop in the office", distinct from where the web API and SIMS are described as running.)
 
+**Reviewed aliases** — other names a reader ruled identify the same element, each with the words in the source that support it. An extraction using one is named differently, not wrong.
+
+- `process:catalogue-spreadsheet — spreadsheet` — Supported explicitly across the sentence describing where marketing keeps the catalogue. Its macros justify modeling executable behaviour, so the alias keeps the process type. Source: > Marketing keep the catalogue in a spreadsheet.
+- `store:delivery-address-flat-file — flat file` — Supported; the source expressly says the file contains delivery addresses. Source: > the flat file are encrypted
+
 ### Your list
 
 Write what could go wrong. Anything: an attack, a missing control, a question

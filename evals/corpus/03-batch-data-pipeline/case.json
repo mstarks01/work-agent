@@ -20,5 +20,25 @@
       "exemplar_proximity": "far"
     }
   ],
-  "notes": "Far-domain case (ticket 009 decision 6). Batch rather than request/response: there is no user session anywhere, the trust decision is about a file's provenance rather than a caller's identity, availability failures are silent staleness inside a nightly window rather than visible downtime, and the sensitive data is health-related. Carries the one element type the payments exemplar has no analogue for — a scheduler's own metadata store acting as a control plane."
+  "aliases": [
+    {
+      "element": "entity:data-analyst",
+      "name": "Analysts",
+      "excerpt": "Analysts query the warehouse directly.",
+      "ruling": "Supported; the source describes analysts querying the warehouse."
+    },
+    {
+      "element": "process:ingest-scheduler",
+      "name": "Airflow scheduler",
+      "excerpt": "An Airflow scheduler running in the landing network",
+      "ruling": "Accurate functional description, though Airflow scheduler follows the source more closely."
+    },
+    {
+      "element": "store:claims-warehouse",
+      "name": "BigQuery",
+      "excerpt": "loads them into BigQuery",
+      "ruling": "Supported; the warehouse holds normalized insurance claim records, and the source names the store the transform loads them into."
+    }
+  ],
+  "notes": "Far-domain case (ticket 009 decision 6). Batch rather than request/response: there is no user session anywhere, the trust decision is about a file's provenance rather than a caller's identity, availability failures are silent staleness inside a nightly window rather than visible downtime, and the sensitive data is health-related. Carries the one element type the payments exemplar has no analogue for \u2014 a scheduler's own metadata store acting as a control plane."
 }

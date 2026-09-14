@@ -518,7 +518,42 @@ def part_one_blocks(case_dir: Path) -> list[dict]:
         }
         for source in meta["sources"]
     ]
-    return blocks + model_blocks(load_meta(case_dir / "model.json"))
+    return (
+        blocks + model_blocks(load_meta(case_dir / "model.json")) + alias_blocks(meta)
+    )
+
+
+def alias_blocks(meta: dict) -> list[dict]:
+    """The names a reader has already ruled supported, and what supports each.
+
+    Shown to the next reader before the sets, because a ruling nobody can see
+    gets made again. Each line carries the excerpt the ruling rests on, so the
+    reader checks the evidence rather than taking the ruling on trust —
+    ``evals/verify_corpus.py`` holds the same excerpt to the same source.
+
+    Absent where nobody has ruled, which is not the same as a case whose every
+    name is the only supported one.
+    """
+    aliases = meta.get("aliases") or []
+    if not aliases:
+        return []
+    return [
+        {
+            "kind": "terms",
+            "caption": "Reviewed aliases",
+            "hint": "other names a reader ruled identify the same element, each"
+            " with the words in the source that support it. An extraction"
+            " using one is named differently, not wrong.",
+            "items": [
+                {
+                    "term": f"{entry['element']} — {entry['name']}",
+                    "text": f"{entry.get('ruling', '')} "
+                    f"Source: {quoted(entry['excerpt'])}".strip(),
+                }
+                for entry in aliases
+            ],
+        }
+    ]
 
 
 def part_one_markdown(blocks: list[dict]) -> str:

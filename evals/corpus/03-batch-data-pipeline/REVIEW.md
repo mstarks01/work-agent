@@ -98,6 +98,12 @@ Not part of the question, but the records cite these names, so you need them.
 - `flow:insurance-partner-to-landing-bucket:push-daily-extract` — SFTP traffic from partners is protected by the SSH transport it runs over. (basis: The text names SFTP, whose transport encryption is intrinsic to the protocol; no other transport claim is made.)
 - `store:claims-warehouse` — The claims data is health-related personal data. (basis: Described as insurance claim records carrying member names and dates of birth.)
 
+**Reviewed aliases** — other names a reader ruled identify the same element, each with the words in the source that support it. An extraction using one is named differently, not wrong.
+
+- `entity:data-analyst — Analysts` — Supported; the source describes analysts querying the warehouse. Source: > Analysts query the warehouse directly.
+- `process:ingest-scheduler — Airflow scheduler` — Accurate functional description, though Airflow scheduler follows the source more closely. Source: > An Airflow scheduler running in the landing network
+- `store:claims-warehouse — BigQuery` — Supported; the warehouse holds normalized insurance claim records, and the source names the store the transform loads them into. Source: > loads them into BigQuery
+
 ### Your list
 
 Write what could go wrong. Anything: an attack, a missing control, a question
