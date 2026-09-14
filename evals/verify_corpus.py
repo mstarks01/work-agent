@@ -503,8 +503,11 @@ def _check_aliases(case_dir: Path, meta: dict) -> Iterator[str]:
     Each of these refuses a way it could do that dishonestly.
 
     The excerpt check is the load-bearing one: an alias is supported by the
-    case's own words or it is somebody's preference. Matched as a substring of
-    the joined sources, the way the evidence gate matches a quotation.
+    case's own words or it is somebody's preference. :func:`verify_quote` is
+    the one reader of "does this source carry this quotation", so an excerpt
+    here is held to what a ``model.json`` excerpt and the evidence gate are
+    held to. A raw substring test is a second reader, and it disagrees on a
+    sentence the source wraps across two lines.
     """
     aliases = meta.get("aliases", [])
     if not isinstance(aliases, list):
@@ -562,7 +565,7 @@ def _check_aliases(case_dir: Path, meta: dict) -> Iterator[str]:
             yield f"{where}: {alias_id!r} is listed twice for {element!r}"
         seen.add((element, alias_id))
         excerpt = entry.get("excerpt")
-        if not isinstance(excerpt, str) or excerpt not in text:
+        if not isinstance(excerpt, str) or not verify_quote(excerpt, text):
             yield (
                 f"{where}: the excerpt is not in this case's sources, so nothing"
                 " shows the name is one the text offers"
