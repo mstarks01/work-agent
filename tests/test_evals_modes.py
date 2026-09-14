@@ -1159,6 +1159,26 @@ class TestInventionIsScoredApartFromTheCorpusGap:
         assert score.unsourced == ()
 
 
+def test_the_named_types_are_the_registry_less_flows_and_zones():
+    """A table nobody compares to its registry fails as quietly as a branch.
+
+    ``Element`` is the closed set and each type carries its own ``id_prefix``,
+    so a sixth added tomorrow belongs to this population unless somebody rules
+    it out. Listed by hand it would sit silently outside both readers — the
+    invention question and the extra-element split.
+    """
+    from typing import get_args
+
+    from analysis_service.system_model import DataFlow, Element, TrustBoundary
+    from evals.harness.modes import NAMED_TYPES
+
+    every = {element.id_prefix for element in get_args(Element)}
+    coined = {DataFlow.id_prefix, TrustBoundary.id_prefix}
+
+    assert set(NAMED_TYPES) == every - coined
+    assert coined <= every, "the two coined types are element types"
+
+
 class TestAnExtraElementSplitsByWhetherARenameCanExplainIt:
     """Precision counts a rename and an addition alike; these are two facts.
 

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 
@@ -339,3 +340,51 @@ class TestAValueCannotBecomeStructure:
         assert comparison._inline("vertex_ai/gemini-2.5-pro") == (
             "vertex_ai/gemini-2.5-pro"
         )
+
+
+class TestTheModelsPhraseReadsAManifestAsItSits:
+    """`read_baseline` parses `baseline.json` and checks nothing, so every shape
+    a hand-edited or truncated identity can hold reaches the renderer.
+
+    It renders what it can and skips what it cannot, which is the decision
+    `read_baseline` already made about a malformed sweep entry: one bad row may
+    not take the published table down. `baseline.declared_pins` refuses the
+    same shapes by name instead, because that one computes an identity, where a
+    wrong value silently renames a Baseline.
+    """
+
+    IDENTITY: ClassVar[dict] = {"models": {"strong": "openrouter/openai/gpt-5.6-terra"}}
+
+    def phrase(self, **parts):
+        return comparison.models_phrase(self.IDENTITY | parts)
+
+    def test_a_pin_written_as_a_string_is_the_name_it_plainly_is(self):
+        """`openrouter = "openai/flex"` is the line somebody writes first, and
+        a string is a sequence of characters: iterating it rendered one code
+        span per letter."""
+        rendered = self.phrase(upstream_pins={"strong": "openai/flex"})
+
+        assert "pinned to `openai/flex`" in rendered
+        assert "`o`, `p`, `e`" not in rendered
+
+    def test_an_empty_pin_says_the_gateway_chose(self):
+        """`[]` is a deployment that pinned nothing, which is a configuration.
+        It read "pinned to no pin"."""
+        assert "unpinned" in self.phrase(upstream_pins={"strong": []})
+        assert "no pin" not in self.phrase(upstream_pins={"strong": []})
+
+    @pytest.mark.parametrize("part", ["models", "upstreams", "upstream_pins"])
+    @pytest.mark.parametrize("shape", [None, [], "openrouter", 3])
+    def test_a_part_that_is_not_a_table_renders_rather_than_raising(self, part, shape):
+        """`null` is the shape that reaches this: an artifact fixture writes
+        every declared key as `None`, and `tier in None` raises TypeError
+        naming neither the file nor the field."""
+        rendered = comparison.models_phrase(self.IDENTITY | {part: shape})
+
+        assert isinstance(rendered, str)
+
+    def test_a_pin_still_cannot_close_its_own_code_span(self):
+        """The escaping property of the class above, over the new clause."""
+        rendered = self.phrase(upstream_pins={"strong": ["a`b"]})
+
+        assert "a`b" not in rendered

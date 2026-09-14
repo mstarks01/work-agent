@@ -325,24 +325,63 @@ def models_phrase(identity: Mapping[str, Any], *, code: bool = True) -> str:
     ``code`` wraps each value in a code span, which the markdown table needs
     and the plain summary does not. Every value is escaped either way: these
     come out of a contributor's own artifact.
+
+    **Every shape a manifest can hold, and none of them raises.** This reads
+    ``baseline.json`` as it sits on disk — :func:`read_baseline` parses it and
+    checks nothing — so a hand-edited or truncated identity reaches here. It
+    renders what it can and skips what it cannot, which is the decision
+    :func:`read_baseline` already made about a malformed sweep entry: a
+    published table is not the place to explain one, and one bad row may not
+    take the table down. :func:`~evals.harness.baseline.declared_pins` refuses
+    the same shapes by name instead, and the two differ on purpose — that one
+    computes an identity, where a wrong value silently renames a Baseline.
     """
     mark = "`" if code else ""
 
     def span(value: Any) -> str:
         return f"{mark}{_inline(value)}{mark}"
 
-    upstreams = identity.get("upstreams", {})
-    pins = identity.get("upstream_pins", {})
+    upstreams = _table(identity.get("upstreams"))
+    pins = _table(identity.get("upstream_pins"))
     parts = []
-    for tier, model in sorted(identity.get("models", {}).items()):
+    for tier, model in sorted(_table(identity.get("models")).items()):
         phrase = f"{span(tier)}: {span(model)}"
         if tier in upstreams:
             phrase += f" via {span(upstreams[tier])}"
         if tier in pins:
-            chosen = ", ".join(span(name) for name in pins[tier]) or "no pin"
-            phrase += f" pinned to {chosen}"
+            named = _names(pins[tier])
+            phrase += (
+                f" pinned to {', '.join(span(name) for name in named)}"
+                if named
+                else " unpinned"
+            )
         parts.append(phrase)
     return ", ".join(parts)
+
+
+def _table(value: Any) -> Mapping[str, Any]:
+    """One identity part as a table, or an empty one where it is not.
+
+    ``null`` is the shape that reaches this: an artifact fixture writes every
+    declared key as ``None``, and ``tier in None`` raises ``TypeError`` rather
+    than naming a file or a field.
+    """
+    return value if isinstance(value, Mapping) else {}
+
+
+def _names(value: Any) -> tuple[str, ...]:
+    """One tier's pins as the names it holds.
+
+    A string is the shape to name: a table entry written as one endpoint slug
+    rather than as a list of them is the line somebody writes first, and a
+    string is a sequence of characters, so iterating it renders one code span
+    per letter. Taken as the single name it plainly is, rather than refused —
+    this renders a description, and a reader of the table is better served by
+    the name than by a gap.
+    """
+    if isinstance(value, str):
+        return (value,)
+    return tuple(str(name) for name in value) if isinstance(value, Sequence) else ()
 
 
 def _render_row(row: Row) -> str:

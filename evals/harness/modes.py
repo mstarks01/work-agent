@@ -31,7 +31,7 @@ from collections import Counter
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, get_args
 
 from analysis_service.analysis import (
     CONSEQUENCE_ASSET_TAGS,
@@ -71,7 +71,12 @@ from analysis_service.sampling import (
     SamplingConfig,
 )
 from analysis_service.sources import Source
-from analysis_service.system_model import SystemModel
+from analysis_service.system_model import (
+    DataFlow,
+    Element,
+    SystemModel,
+    TrustBoundary,
+)
 from analysis_service.validation import ValidationIssue, parse_and_validate
 from evals.harness.identity import comparable_elements
 from evals.harness.reference import GoldenCase
@@ -267,7 +272,19 @@ def _endpoint_keys(ids: Iterable[str]) -> frozenset[str]:
 #: a name the source was ever going to hold. The one reader of that population:
 #: :func:`_unsourced` asks its question of these, and
 #: :attr:`ExtractionScore.named_extra` reports the split over them.
-NAMED_TYPES: tuple[str, ...] = ("entity", "process", "store")
+#:
+#: **Subtracted from the registry, never listed.** ``Element`` is the closed set
+#: of element types and each one carries its own ``id_prefix``, so a sixth type
+#: added tomorrow is in this population unless somebody rules it out — the
+#: direction that fails loudly. A hand-typed triple would have left it silently
+#: outside both readers.
+NAMED_TYPES: tuple[str, ...] = tuple(
+    sorted(
+        element.id_prefix
+        for element in get_args(Element)
+        if element not in (DataFlow, TrustBoundary)
+    )
+)
 
 
 def _element_type(element_id: str) -> str:

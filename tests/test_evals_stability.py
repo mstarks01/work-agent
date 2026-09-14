@@ -742,6 +742,52 @@ class TestTheBandIsReadOffTheFates:
         assert narrowed.references == 1
         assert narrowed.inflation == pytest.approx(2.0)
 
+    def test_a_case_one_run_skipped_is_left_out(self, tmp_path, sampling):  # noqa: F811
+        """The rule ``compare_runs`` states, applied here for its own reason.
+
+        Reproduced from the shape that found it: three runs where the third
+        skipped case 02, which the other two agree on completely. Folding it in
+        read the third as a run that found nothing there, so the totals went
+        4, 3, 2 instead of 2, 1, 2 — an observed variance of 1.0 against a
+        floor of 0.33, an inflation of **3.0** where the truth is 1.0, and a
+        band of 1.00 where it is 0.58.
+        """
+        record = provenance(sampling)
+
+        def both(matched):
+            return [
+                score("01", 4, matched, {0, 1}),
+                score("02", 4, [0, 1], {0, 1}),
+            ]
+
+        runs = load_runs(
+            [
+                write_run(tmp_path, "a.json", record, both([0, 1])),
+                write_run(tmp_path, "b.json", record, both([0])),
+                write_run(tmp_path, "c.json", record, [score("01", 4, [0, 1], {0, 1})]),
+            ]
+        )
+        measured = band(runs, calibration=[runs])
+
+        # Only case 01's two must-finds are in the population.
+        assert measured.references == 2
+        assert measured.floor_variance == pytest.approx(1 / 3)
+        assert measured.observed_variance == pytest.approx(1 / 3)
+        assert measured.inflation == pytest.approx(1.0)
+
+    def test_runs_sharing_no_case_are_refused(self, tmp_path, sampling):  # noqa: F811
+        """An empty intersection is not a spread of zero."""
+        record = provenance(sampling)
+        runs = load_runs(
+            [
+                write_run(tmp_path, "a.json", record, [score("01", 4, [0], {0})]),
+                write_run(tmp_path, "b.json", record, [score("02", 4, [0], {0})]),
+            ]
+        )
+
+        with pytest.raises(ValueError, match="share no scored case"):
+            band(runs)
+
     def test_a_lone_run_is_refused(self, tmp_path, sampling):  # noqa: F811
         with pytest.raises(ValueError, match="two runs or more"):
             band(self.runs(tmp_path, sampling, [[0]], {0}))
