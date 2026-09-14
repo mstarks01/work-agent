@@ -329,6 +329,16 @@ reference catalog: the counts say what the run produced, and `absences` is the
 one that answers the audit directly, because a control the sources say is *not
 there* has nowhere to live in a System Model attribute.
 
+One pair of counts does compare the two representations. `projected` is how
+many graph attributes the catalog's rows reach, and `projection_agrees` how
+many of those read the same **control state** as the blessed model's own value
+— through `control_state`, the reader both sides already go through.
+`projection_degraded` counts the attributes whose projected value falls back to
+`unknown` because a scope, a second value or a second predicate would not fit
+one string. A degraded projection is the compatibility layer reporting its loss
+rather than picking, which is what [ADR 0034](../docs/adr/0034-an-assertion-is-a-scoped-fact-with-a-support-span.md)
+rule 9 requires of it.
+
 An `extraction` run prints element recall and precision per case, then the
 attribute agreement split by attribute. Read the split first when the element
 numbers look clean: an extraction that names every element and types none of

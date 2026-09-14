@@ -45,8 +45,10 @@ from analysis_service.assertions import (
     AssertionCatalog,
     CatalogIssue,
     CatalogProposal,
+    ProjectionReason,
     catalog_issues,
     conflicts,
+    project,
     resolve_catalog,
 )
 from analysis_service.basis import (
@@ -94,6 +96,7 @@ from analysis_service.system_model import (
     UNKNOWN,
     DataFlow,
     Element,
+    ModelIndex,
     SystemModel,
     TrustBoundary,
     make_element_id,
@@ -1191,6 +1194,16 @@ class AssertionScore:
     inferred: int
     conflicts: int
     subjects_reached: float
+    #: The graph attributes the catalog reaches, and what projecting them costs.
+    #: ``agrees`` counts the attributes whose projected value reads the same
+    #: **control state** as the blessed model's own — the one reader both sides
+    #: go through. ``degraded`` counts the ones that read ``unknown`` because a
+    #: scope, a second value or a second predicate would not fit one string,
+    #: which is the loss the compatibility projection is *supposed* to report
+    #: rather than hide.
+    projected: int
+    projection_agrees: int
+    projection_degraded: int
 
     def to_json(self) -> dict[str, Any]:
         """The per-case payload a sweep carries in the artifact's mode output."""
@@ -1209,6 +1222,9 @@ class AssertionScore:
             "inferred": self.inferred,
             "conflicts": self.conflicts,
             "subjects_reached": round(self.subjects_reached, 3),
+            "projected": self.projected,
+            "projection_agrees": self.projection_agrees,
+            "projection_degraded": self.projection_degraded,
         }
 
 
@@ -1271,7 +1287,46 @@ def score_assertions(case: GoldenCase, result: AssertionResult) -> AssertionScor
         inferred=sum(1 for entry in entries if entry.basis == "inferred"),
         conflicts=len(conflicts(catalog)),
         subjects_reached=len(reached) / len(element_ids) if element_ids else 0.0,
+        **_projection_counts(case, catalog),
     )
+
+
+#: Why a projected value degraded rather than carrying the catalog's answer.
+#: Read off the projection's own reasons rather than listed again, so a reason
+#: added to :data:`~analysis_service.assertions.ProjectionReason` is counted the
+#: day it lands.
+_DEGRADED: frozenset[str] = frozenset(get_args(ProjectionReason)) - {
+    "stated",
+    "absent",
+    "unknown",
+}
+
+
+def _projection_counts(case: GoldenCase, catalog: AssertionCatalog) -> dict[str, int]:
+    """How much of the blessed graph the catalog's own rows reproduce.
+
+    **Through ``control_state``, the reader both sides already go through.**
+    Comparing the strings would report a disagreement wherever two correct
+    readings of one sentence are worded differently, which is the mistake the
+    extraction scorer makes nowhere else.
+    """
+    index = ModelIndex.of(case.model)
+    agrees = 0
+    projections = project(catalog)
+    for projection in projections:
+        element = index.get(projection.element_id)
+        if element is None:
+            continue
+        blessed = getattr(element, projection.attribute, UNKNOWN)
+        if control_state(projection.value) == control_state(str(blessed)):
+            agrees += 1
+    return {
+        "projected": len(projections),
+        "projection_agrees": agrees,
+        "projection_degraded": sum(
+            1 for projection in projections if projection.reason in _DEGRADED
+        ),
+    }
 
 
 def render_assertions(scores: Sequence[AssertionScore]) -> None:
@@ -1287,6 +1342,8 @@ def render_assertions(scores: Sequence[AssertionScore]) -> None:
             f" spans {score.spans:>3} absences {score.absences:>2}"
             f" unknowns {score.unknowns:>2} conflicts {score.conflicts:>2}"
             f" elements reached {score.subjects_reached:.0%}"
+            f" projected {score.projection_agrees}/{score.projected}"
+            f" degraded {score.projection_degraded}"
         )
     if not scores:
         return

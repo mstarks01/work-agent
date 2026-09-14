@@ -460,6 +460,23 @@ class TestTheAssertionMode:
             "mfa-requirement",
         ]
 
+    def test_the_projection_is_measured_against_the_blessed_model(self, case):
+        """What the catalog's rows would put back into the graph, and what they cannot.
+
+        Two rows resolved. One projects into the flow's ``authentication`` and
+        reads the same control state the blessed model does. The other is the
+        stated absence of MFA, and **it projects into nothing at all** — the
+        graph has no field for it, which is the whole of the audit's finding.
+        """
+        result = self.run(case)
+
+        score = modes.score_assertions(case, result)
+
+        assert (score.kept, score.projected) == (2, 1)
+        assert score.projection_agrees == 1
+        assert score.projection_degraded == 0
+        assert score.to_json()["projection_agrees"] == 1
+
     def test_a_stated_absence_is_the_number_the_graph_cannot_carry(self, case):
         """The audit's own fact: ten corpus values hide one of these (#925)."""
         result = self.run(case)
