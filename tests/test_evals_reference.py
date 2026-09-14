@@ -14,6 +14,7 @@ import pytest
 
 from analysis_service.claims import derive_severity_level
 from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
+from evals import verify_corpus
 from evals.harness import envelope as envelopes
 from evals.harness import sitting as sittings
 from evals.harness.reference import (
@@ -95,10 +96,20 @@ def test_reference_severity_band_uses_shipped_arithmetic(corpus):
 
 
 def test_blessed_models_are_small_enough_to_enumerate(corpus):
-    # Ground truth is only exhaustively enumerable by a human on small systems;
-    # non-exhaustive references silently corrupt precision.
+    """Ground truth is only exhaustively enumerable by a person on small systems.
+
+    The band comes from ``verify_corpus`` rather than being spelled again here.
+    Two readers of one rule disagree eventually, and a ceiling written in both
+    places is the shape that lets them: move one and the corpus is legal to one
+    reader and illegal to the other, with each reader's own test agreeing with
+    it.
+    """
     for case in corpus:
-        assert 8 <= len(case.model.elements()) <= 20
+        assert (
+            verify_corpus.MIN_ELEMENTS
+            <= len(case.model.elements())
+            <= verify_corpus.MAX_ELEMENTS
+        )
 
 
 def test_reference_threat_rejects_unknown_fields():

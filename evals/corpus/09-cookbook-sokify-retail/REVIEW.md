@@ -75,8 +75,8 @@ Not part of the question, but the records cite these names, so you need them.
 
 | id | zone | at rest | classification |
 |---|---|---|---|
-| store:user-database | boundary:sokify-internal-systems | unknown | Customer name, address, and the card they paid with |
-| store:delivery-address-flat-file | boundary:sokify-internal-systems | unknown | Delivery addresses only |
+| store:user-database | boundary:sokify-internal-systems | unknown | confidential |
+| store:delivery-address-flat-file | boundary:sokify-internal-systems | unknown | confidential |
 
 **Data flows**
 
@@ -113,6 +113,8 @@ Not part of the question, but the records cite these names, so you need them.
 - `process:web-api` — The web API is reachable from the internet. (basis: The mobile app is the only customer channel and talks to the web API over HTTP from customers' own devices.)
 - `process:mobile-app` — The customer and the mobile app sit outside Sokify's own systems, in a customer-device zone. (basis: The app is the channel through which customers browse and order, and it reaches the web API over HTTP; the source names no other placement for it.)
 - `process:catalogue-spreadsheet` — The marketing laptop and its spreadsheet sit in a separate office zone from the server-side systems. (basis: "The spreadsheet lives on a marketing laptop in the office", distinct from where the web API and SIMS are described as running.)
+- `store:user-database` — The user database holds confidential data under the scheme in prompts/extract.md. (basis: The source says it holds the customer's name, address, and the card they paid with, which is personal and payment data.)
+- `store:delivery-address-flat-file` — The delivery address file holds confidential data under the scheme in prompts/extract.md. (basis: The source says only delivery addresses go in the file. A postal address identifies where a named customer lives.)
 
 **Reviewed aliases** — other names a reader ruled identify the same element, each with the words in the source that support it. An extraction using one is named differently, not wrong.
 
@@ -446,7 +448,7 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "603873a0d569ba3f0ac4a91a363086b54bae022cf432862d17be9eec9465e4ea",
-      "model.json": "f6fa157c61944d3001eb3323ccaeb77c32aeba5181e39ffd372d90168e4457ea",
+      "model.json": "c89187291f44434f293cb803279ae083871fd0890d535ca35d18f8b71020b80b",
       "claims/asvs.json": "fa211c11c2a82bf649b5518b6d7120ece7720af93b570fdcfb1a56b15a0b0adb",
       "claims/stride.json": "33f48cb7d16f23f0d627279af76e3c66acdf37011ca3fbd319b9a9965af07c2a"
       }

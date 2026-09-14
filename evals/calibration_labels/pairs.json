@@ -1497,13 +1497,13 @@
     "category": "spoofing",
     "reference_claim": "An attacker connects directly to a game server on its exposed port, bypassing the lobby, as a player who was never assigned to that match.",
     "reference_element_ids": [
-      "flow:game-client-to-game-servers:gameplay-traffic",
-      "process:game-servers"
+      "flow:game-client-to-game-server:gameplay-traffic",
+      "process:game-server"
     ],
     "candidate_claim": "An attacker connects straight to a game server without going through matchmaking and joins a match they were not assigned to.",
     "candidate_element_ids": [
-      "flow:game-client-to-game-servers:gameplay-traffic",
-      "process:game-servers"
+      "flow:game-client-to-game-server:gameplay-traffic",
+      "process:game-server"
     ],
     "reference_verb": "impersonate",
     "candidate_verb": "impersonate",
@@ -1515,12 +1515,12 @@
     "category": "spoofing",
     "reference_claim": "An attacker connects directly to a game server on its exposed port, bypassing the lobby, as a player who was never assigned to that match.",
     "reference_element_ids": [
-      "flow:game-client-to-game-servers:gameplay-traffic",
-      "process:game-servers"
+      "flow:game-client-to-game-server:gameplay-traffic",
+      "process:game-server"
     ],
     "candidate_claim": "An attacker floods a game server's port so the match cannot proceed.",
     "candidate_element_ids": [
-      "process:game-servers"
+      "process:game-server"
     ],
     "reference_verb": "impersonate",
     "candidate_verb": "flood",
@@ -1535,12 +1535,12 @@
     "category": "tampering",
     "reference_claim": "A player modifies the game client on their own machine and sends manipulated gameplay actions that the servers accept.",
     "reference_element_ids": [
-      "flow:game-client-to-game-servers:gameplay-traffic",
+      "flow:game-client-to-game-server:gameplay-traffic",
       "process:game-client"
     ],
     "candidate_claim": "A player patches their local game client and sends gameplay messages the server accepts as valid.",
     "candidate_element_ids": [
-      "flow:game-client-to-game-servers:gameplay-traffic",
+      "flow:game-client-to-game-server:gameplay-traffic",
       "process:game-client"
     ],
     "reference_verb": "forge",
@@ -1553,7 +1553,7 @@
     "category": "tampering",
     "reference_claim": "A player modifies the game client on their own machine and sends manipulated gameplay actions that the servers accept.",
     "reference_element_ids": [
-      "flow:game-client-to-game-servers:gameplay-traffic",
+      "flow:game-client-to-game-server:gameplay-traffic",
       "process:game-client"
     ],
     "candidate_claim": "A player uses their modified client to see other players' positions through walls.",
@@ -1570,7 +1570,7 @@
     "category": "tampering",
     "reference_claim": "An attacker alters match statistics in the stats database to change rankings or rewards.",
     "reference_element_ids": [
-      "flow:game-servers-to-stats-database:read-write-stats",
+      "flow:game-server-to-stats-database:read-write-stats",
       "store:stats-database"
     ],
     "candidate_claim": "An attacker rewrites entries in the stats database to inflate their ranking.",
@@ -1639,12 +1639,12 @@
     "category": "information-disclosure",
     "reference_claim": "An attacker on the network path reads matchmaking and gameplay traffic, including player identifiers, because encryption on both client links is unverified.",
     "reference_element_ids": [
-      "flow:game-client-to-game-servers:gameplay-traffic",
+      "flow:game-client-to-game-server:gameplay-traffic",
       "flow:game-client-to-lobby:matchmaking"
     ],
     "candidate_claim": "An attacker capturing traffic on the client's connections reads player identifiers, because neither client link is stated to be encrypted.",
     "candidate_element_ids": [
-      "flow:game-client-to-game-servers:gameplay-traffic",
+      "flow:game-client-to-game-server:gameplay-traffic",
       "flow:game-client-to-lobby:matchmaking"
     ],
     "reference_verb": "intercept",
@@ -1658,11 +1658,11 @@
     "reference_claim": "A player extracts information from their own client that the server sends but should not reveal, such as other players' positions.",
     "reference_element_ids": [
       "process:game-client",
-      "process:game-servers"
+      "process:game-server"
     ],
     "candidate_claim": "A player reads state from their own client that the server sent but should not have exposed, such as opponents' locations.",
     "candidate_element_ids": [
-      "flow:game-client-to-game-servers:gameplay-traffic",
+      "flow:game-client-to-game-server:gameplay-traffic",
       "process:game-client"
     ],
     "reference_verb": "elicit",
@@ -1710,12 +1710,12 @@
     "category": "denial-of-service",
     "reference_claim": "An attacker floods a game server's exposed port and disrupts a match in progress for every player in it.",
     "reference_element_ids": [
-      "flow:game-client-to-game-servers:gameplay-traffic",
-      "process:game-servers"
+      "flow:game-client-to-game-server:gameplay-traffic",
+      "process:game-server"
     ],
     "candidate_claim": "An attacker floods a game server mid-match and disrupts play for everyone in that match.",
     "candidate_element_ids": [
-      "process:game-servers"
+      "process:game-server"
     ],
     "reference_verb": "flood",
     "candidate_verb": "flood",
@@ -1727,13 +1727,13 @@
     "category": "elevation-of-privilege",
     "reference_claim": "An attacker who compromises an internet-exposed game server gains write access to player records across the production network.",
     "reference_element_ids": [
-      "process:game-servers",
+      "process:game-server",
       "store:player-database"
     ],
     "candidate_claim": "An attacker who takes over a game server writes to player records across production.",
     "candidate_element_ids": [
-      "flow:game-servers-to-player-database:update-players",
-      "process:game-servers"
+      "flow:game-server-to-player-database:update-players",
+      "process:game-server"
     ],
     "reference_verb": "escalate",
     "candidate_verb": "escalate",
@@ -1745,12 +1745,12 @@
     "category": "elevation-of-privilege",
     "reference_claim": "An attacker who compromises an internet-exposed game server gains write access to player records across the production network.",
     "reference_element_ids": [
-      "process:game-servers",
+      "process:game-server",
       "store:player-database"
     ],
     "candidate_claim": "An attacker who takes over a game server reads match statistics.",
     "candidate_element_ids": [
-      "process:game-servers",
+      "process:game-server",
       "store:stats-database"
     ],
     "reference_verb": "escalate",
@@ -1943,7 +1943,7 @@
     ],
     "candidate_claim": "An attacker disables the Pub/Sub topic so readings never reach the normalizer.",
     "candidate_element_ids": [
-      "flow:device-gateway-to-telemetry-normalizer:forward-readings"
+      "store:pub-sub"
     ],
     "reference_verb": "flood",
     "candidate_verb": "disable",
@@ -2194,12 +2194,12 @@
     "category": "tampering",
     "reference_claim": "An attacker who influences a game server writes fabricated progression onto player records.",
     "reference_element_ids": [
-      "flow:game-servers-to-player-database:update-players",
+      "flow:game-server-to-player-database:update-players",
       "store:player-database"
     ],
     "candidate_claim": "An attacker modifies the game client to report fabricated match results.",
     "candidate_element_ids": [
-      "flow:game-client-to-game-servers:gameplay-traffic",
+      "flow:game-client-to-game-server:gameplay-traffic",
       "process:game-client"
     ],
     "reference_verb": "forge",
@@ -2212,7 +2212,7 @@
     "category": "repudiation",
     "reference_claim": "A player disputes a change to their record and no log distinguishes whether the lobby, a game server or the moderation website made it.",
     "reference_element_ids": [
-      "process:game-servers",
+      "process:game-server",
       "store:player-database"
     ],
     "candidate_claim": "A player disputes a moderation decision and no record shows which agent made it.",

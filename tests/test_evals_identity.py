@@ -132,9 +132,15 @@ FRONTIER = {
     "subset": {"splits": 42, "candidate_merges": 64, "reference_merges": 8},
     "endpoint subset": {"splits": 14, "candidate_merges": 81, "reference_merges": 24},
     "overlap": {"splits": 4, "candidate_merges": 83, "reference_merges": 35},
+    # 99 before the reference corrections of #925. Case 02's calibration pair
+    # about disabling the Pub/Sub topic named the gateway-to-normalizer flow,
+    # because the broker was not an element to name; it now names
+    # ``store:pub-sub``, which is one fewer candidate that merges under the
+    # loosest rung. The frontier's shape is unchanged and so is the argument
+    # drawn from it.
     "endpoint overlap": {
         "splits": 1,
-        "candidate_merges": 99,
+        "candidate_merges": 98,
         "reference_merges": 129,
     },
 }

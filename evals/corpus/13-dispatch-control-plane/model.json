@@ -67,6 +67,18 @@
       "trust_zone": "boundary:corporate-network",
       "exposure": "unknown",
       "interface_kind": "non-web"
+    },
+    {
+      "id": "process:corporate-web-host",
+      "name": "corporate web host",
+      "description": "Serves the dispatch console's single-page application to an engineer's browser.",
+      "assets": [],
+      "source_excerpt": "The console is a single-page JavaScript app and our corporate web host serves it",
+      "source_label": "System description",
+      "technology": "unknown",
+      "trust_zone": "boundary:corporate-network",
+      "exposure": "unknown",
+      "interface_kind": "web"
     }
   ],
   "data_stores": [
@@ -225,6 +237,21 @@
       "data_description": "job orders, crew names and crew mobile numbers",
       "encryption_in_transit": "unknown",
       "operations": "read-write"
+    },
+    {
+      "id": "flow:duty-engineer-to-corporate-web-host:load-console",
+      "name": "load console",
+      "description": "The engineer's browser fetches the console application from the host that serves it.",
+      "assets": [],
+      "source_excerpt": "The console is a single-page JavaScript app and our corporate web host serves it",
+      "source_label": "System description",
+      "source": "entity:duty-engineer",
+      "destination": "process:corporate-web-host",
+      "protocol": "unknown",
+      "authentication": "unknown",
+      "data_description": "the console application itself",
+      "encryption_in_transit": "unknown",
+      "operations": "read"
     }
   ],
   "trust_boundaries": [

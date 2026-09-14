@@ -106,7 +106,7 @@
       "notes": "",
       "technology": "unknown",
       "trust_zone": "boundary:sokify-internal-systems",
-      "data_classification": "Customer name, address, and the card they paid with",
+      "data_classification": "confidential",
       "encryption_at_rest": "unknown"
     },
     {
@@ -121,7 +121,7 @@
       "notes": "",
       "technology": "flat file",
       "trust_zone": "boundary:sokify-internal-systems",
-      "data_classification": "Delivery addresses only",
+      "data_classification": "confidential",
       "encryption_at_rest": "unknown"
     }
   ],
@@ -323,6 +323,18 @@
       "element_id": "process:catalogue-spreadsheet",
       "attribute": "trust_zone",
       "basis": "\"The spreadsheet lives on a marketing laptop in the office\", distinct from where the web API and SIMS are described as running."
+    },
+    {
+      "assumption": "The user database holds confidential data under the scheme in prompts/extract.md.",
+      "element_id": "store:user-database",
+      "attribute": "data_classification",
+      "basis": "The source says it holds the customer's name, address, and the card they paid with, which is personal and payment data."
+    },
+    {
+      "assumption": "The delivery address file holds confidential data under the scheme in prompts/extract.md.",
+      "element_id": "store:delivery-address-flat-file",
+      "attribute": "data_classification",
+      "basis": "The source says only delivery addresses go in the file. A postal address identifies where a named customer lives."
     }
   ]
 }
