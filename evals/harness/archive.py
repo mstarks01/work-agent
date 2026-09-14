@@ -80,6 +80,7 @@ ARCHIVE_SPELLINGS: dict[str, Callable[[Any], str]] = {
     "report": _utf8,
     "drafts": _escaped,
     "proposals": _escaped,
+    "extraction": _escaped,
     "artifact": _escaped,
     "manifest": _sorted_utf8,
 }
@@ -99,6 +100,7 @@ KIND_SUFFIXES: dict[str, str] = {
     ".report.json": "report",
     ".drafts.json": "drafts",
     ".proposals.json": "proposals",
+    ".extraction.json": "extraction",
 }
 
 

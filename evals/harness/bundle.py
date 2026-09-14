@@ -143,6 +143,70 @@ def write_reports(out: str, mode: str, runs: Mapping[str, modes.AnalysisRun]) ->
     print(f"{len(runs)} report(s) written to {directory} ({total_bytes / 1024:.0f} KB)")
 
 
+def write_extractions(
+    out: str, mode: str, extracted: Mapping[str, modes.ExtractionResult]
+) -> None:
+    """Persist every extraction beside the artifact, so it can be re-scored.
+
+    The extraction mode's counterpart to :func:`write_reports`, and it exists
+    for the same reason (#180): the artifact holds the measurements somebody
+    thought of in advance, and every other question about a finished sweep
+    costs a second sweep. A scorer change is exactly that kind of question —
+    the figures are recomputed offline from two models, so a sweep that kept
+    its models can answer a figure invented after it ran, and one that kept
+    only its scores cannot (#925).
+
+    Three things per case, because a re-score needs all three:
+
+    * ``raw`` — what ``extract`` emitted. The only one that cannot be
+      recomputed: normalizing has already made a slug decision, and a rule that
+      derives IDs differently needs the names that arrived.
+    * ``normalized`` — the model the scores were taken over, or ``null`` where
+      the output would not parse.
+    * ``issues`` — the gate's verdict on it, structured as the repair pass
+      would have received it.
+
+    **No post-repair model, because this mode does not produce one.** It stops
+    at the gate by design, so what is written here is the first pass. An
+    analysis or end-to-end sweep carries its repaired model inside the report
+    :func:`write_reports` writes, under ``system_model`` beside ``model_repair``.
+
+    **These files are publishable** on the same reading the reports are: they
+    carry a model of corpus source text, which is in this repository. The same
+    path carries a submitter's own system the moment it runs outside the corpus.
+    """
+    if mode != "extraction":
+        print(f"no extractions written: {mode} mode keeps its models in its reports")
+        return
+    directory = reports_dir(out)
+    directory.mkdir(parents=True, exist_ok=True)
+    total_bytes = 0
+    for case_id, result in sorted(extracted.items()):
+        path = directory / f"{case_id}.extraction.json"
+        path.write_text(
+            archive_bytes(
+                "extraction",
+                {
+                    "raw": dict(result.raw),
+                    "normalized": (
+                        result.extracted.model_dump(mode="json")
+                        if result.extracted
+                        else None
+                    ),
+                    "issues": [
+                        issue.model_dump(mode="json") for issue in result.issues
+                    ],
+                },
+            ),
+            "utf-8",
+        )
+        total_bytes += path.stat().st_size
+    print(
+        f"{len(extracted)} extraction(s) written to {directory}"
+        f" ({total_bytes / 1024:.0f} KB)"
+    )
+
+
 def runs_from_reports(artifact: Path, cases: Sequence[GoldenCase]) -> dict[str, Any]:
     """Read a finished sweep's saved reports and drafts back into runs.
 
