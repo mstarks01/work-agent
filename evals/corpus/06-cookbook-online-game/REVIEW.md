@@ -55,23 +55,23 @@ Not part of the question, but the records cite these names, so you need them.
 | id | kind | zone |
 |---|---|---|
 | entity:player | human | boundary:player-local-machine |
-| entity:customer-support-staff | human | boundary:corp-network |
+| entity:customer-support-staff | human | boundary:corporate-network |
 
 **Processes**
 
 | id | exposure | interface | zone | technology |
 |---|---|---|---|---|
 | process:game-client | unknown | non-web | boundary:player-local-machine | unknown |
-| process:lobby | internet-facing | unknown | boundary:prod-network | unknown |
-| process:game-servers | internet-facing | unknown | boundary:prod-network | unknown |
-| process:moderation-website | unknown | web | boundary:prod-network | unknown |
+| process:lobby | internet-facing | unknown | boundary:production-network | unknown |
+| process:game-server | internet-facing | unknown | boundary:production-network | unknown |
+| process:moderation-website | unknown | web | boundary:production-network | unknown |
 
 **Data stores**
 
 | id | zone | at rest | classification |
 |---|---|---|---|
-| store:player-database | boundary:prod-network | unknown | unknown |
-| store:stats-database | boundary:prod-network | unknown | unknown |
+| store:player-database | boundary:production-network | unknown | unknown |
+| store:stats-database | boundary:production-network | unknown | unknown |
 
 **Data flows**
 
@@ -79,11 +79,11 @@ Not part of the question, but the records cite these names, so you need them.
 |---|---|---|---|---|---|
 | flow:player-to-game-client:launch-and-play | entity:player | process:game-client | local | unknown | unknown |
 | flow:game-client-to-lobby:matchmaking | process:game-client | process:lobby | TCP 1234 | unknown | unknown |
-| flow:game-client-to-game-servers:gameplay-traffic | process:game-client | process:game-servers | TCP 1235 | unknown | unknown |
-| flow:lobby-to-game-servers:hand-over-match | process:lobby | process:game-servers | unknown | unknown | unknown |
+| flow:game-client-to-game-server:gameplay-traffic | process:game-client | process:game-server | TCP 1235 | unknown | unknown |
+| flow:lobby-to-game-server:hand-over-match | process:lobby | process:game-server | unknown | unknown | unknown |
 | flow:lobby-to-player-database:read-players | process:lobby | store:player-database | unknown | unknown | unknown |
-| flow:game-servers-to-stats-database:read-write-stats | process:game-servers | store:stats-database | unknown | unknown | unknown |
-| flow:game-servers-to-player-database:update-players | process:game-servers | store:player-database | unknown | unknown | unknown |
+| flow:game-server-to-stats-database:read-write-stats | process:game-server | store:stats-database | unknown | unknown | unknown |
+| flow:game-server-to-player-database:update-players | process:game-server | store:player-database | unknown | unknown | unknown |
 | flow:customer-support-staff-to-moderation-website:moderate-accounts | entity:customer-support-staff | process:moderation-website | unknown | unknown | unknown |
 | flow:moderation-website-to-player-database:read-write-players | process:moderation-website | store:player-database | unknown | unknown | unknown |
 
@@ -92,18 +92,13 @@ Not part of the question, but the records cite these names, so you need them.
 | id | kind |
 |---|---|
 | boundary:player-local-machine | tenant |
-| boundary:corp-network | network |
-| boundary:prod-network | network |
+| boundary:corporate-network | network |
+| boundary:production-network | network |
 
 **Assumptions**
 
 - `process:lobby` — The lobby and the game servers accept connections from arbitrary networks. (basis: Stated to be reachable "from wherever a player is, so they are exposed".)
 - `store:player-database` — Player records constitute personal data. (basis: Described as player accounts acted on by customer support moderation.)
-
-**Reviewed aliases** — other names a reader ruled identify the same element, each with the words in the source that support it. An extraction using one is named differently, not wrong.
-
-- `boundary:corp-network — corporate network` — The source spells out corporate network; the corpus abbreviates corporate. Source: > our customer support staff work from the corporate network
-- `boundary:prod-network — production network` — The source spells out production network; the corpus abbreviates production. Source: > The client connects out to two things in our production network.
 
 ### Your list
 
@@ -208,7 +203,7 @@ on either of them. That is the finding this sitting exists for.
 
 **2.** An attacker connects directly to a game server on its exposed port, bypassing the lobby, as a player who was never assigned to that match.
 
-- `flow:game-client-to-game-servers:gameplay-traffic`, `process:game-servers`
+- `flow:game-client-to-game-server:gameplay-traffic`, `process:game-server`
 - severity: high/high · verb: `impersonate`
 - The direct client-to-server path is a second entry point that skips whatever matchmaking establishes.
 
@@ -227,7 +222,7 @@ on either of them. That is the finding this sitting exists for.
 
 **4.** A player modifies the game client on their own machine and sends manipulated gameplay actions that the servers accept.
 
-- `process:game-client`, `flow:game-client-to-game-servers:gameplay-traffic`
+- `process:game-client`, `flow:game-client-to-game-server:gameplay-traffic`
 - severity: high/high · verb: `forge`
 - The defining threat of this domain: the client runs on hardware the operator explicitly does not control, so client-side state is attacker-controlled input.
 
@@ -235,7 +230,7 @@ on either of them. That is the finding this sitting exists for.
 
 **5.** An attacker alters match statistics in the stats database to change rankings or rewards.
 
-- `store:stats-database`, `flow:game-servers-to-stats-database:read-write-stats`
+- `store:stats-database`, `flow:game-server-to-stats-database:read-write-stats`
 - severity: medium/medium · verb: `alter`
 - Competitive integrity is the business asset; write authentication on this path is unverified.
 
@@ -243,7 +238,7 @@ on either of them. That is the finding this sitting exists for.
 
 **6.** An attacker who influences a game server writes fabricated progression onto player records.
 
-- `store:player-database`, `flow:game-servers-to-player-database:update-players`
+- `store:player-database`, `flow:game-server-to-player-database:update-players`
 - severity: medium/medium · verb: `forge`
 - Three separate writers reach this store, each with unverified authentication.
 
@@ -262,7 +257,7 @@ on either of them. That is the finding this sitting exists for.
 
 **8.** A player disputes a change to their record and no log distinguishes whether the lobby, a game server or the moderation website made it.
 
-- `store:player-database`, `process:game-servers`
+- `store:player-database`, `process:game-server`
 - severity: medium/medium · verb: `unattributable`
 - Multiple writers, one store, no recorded provenance.
 
@@ -281,7 +276,7 @@ on either of them. That is the finding this sitting exists for.
 
 **10.** An attacker on the network path reads matchmaking and gameplay traffic, including player identifiers, because encryption on both client links is unverified.
 
-- `flow:game-client-to-lobby:matchmaking`, `flow:game-client-to-game-servers:gameplay-traffic`
+- `flow:game-client-to-lobby:matchmaking`, `flow:game-client-to-game-server:gameplay-traffic`
 - severity: medium/medium · verb: `intercept`
 - Both links are recorded as bare port numbers — the model gives no transport protection at all.
 
@@ -289,7 +284,7 @@ on either of them. That is the finding this sitting exists for.
 
 **11.** A player extracts information from their own client that the server sends but should not reveal, such as other players' positions.
 
-- `process:game-client`, `process:game-servers`
+- `process:game-client`, `process:game-server`
 - severity: high/medium · verb: `elicit`
 - Domain-specific and grounded in the untrusted-client fact; the classic wallhack shape.
 
@@ -316,7 +311,7 @@ on either of them. That is the finding this sitting exists for.
 
 **14.** An attacker floods a game server's exposed port and disrupts a match in progress for every player in it.
 
-- `process:game-servers`, `flow:game-client-to-game-servers:gameplay-traffic`
+- `process:game-server`, `flow:game-client-to-game-server:gameplay-traffic`
 - severity: high/medium · verb: `flood`
 - Directly reachable match servers are the domain's signature availability problem; a disrupted match cannot be retried.
 
@@ -335,7 +330,7 @@ on either of them. That is the finding this sitting exists for.
 
 **16.** An attacker who compromises an internet-exposed game server gains write access to player records across the production network.
 
-- `process:game-servers`, `store:player-database`
+- `process:game-server`, `store:player-database`
 - severity: medium/high · verb: `escalate`
 - The exposed element writes the sensitive store directly, with no intermediary and unverified authentication.
 
@@ -402,9 +397,9 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "17e797d0315fdd53d5acf05962ca0ae8a23e08f84779f8528ade6422c34577a3",
-      "model.json": "c5d6a0c86b453217b8ac9e72fe4c79051511b299948844a6ecf777799fda1d97",
+      "model.json": "2ec1e0cc0bc8e5b70e8b7f07f517c9785daf71713d20b3c0594f4ea4152648d6",
       "claims/asvs.json": "972c7e0fb0ac301ed91e04d9d13461c5687ef21f80ffd84dbd93610c854fc2aa",
-      "claims/stride.json": "81ae038c68d7717ab5c29570c7fce609f940882eb44085367c9ecae375371f57"
+      "claims/stride.json": "c065371d928c804a3f2a5e85ee6f406968c5a166ecbbcc1e2a1e4daa440c9fa7"
       }
     }
   }

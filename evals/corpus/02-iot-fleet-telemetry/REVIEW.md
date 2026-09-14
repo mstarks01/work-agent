@@ -76,8 +76,9 @@ Not part of the question, but the records cite these names, so you need them.
 | id | zone | at rest | classification |
 |---|---|---|---|
 | store:device-registry | boundary:ingest-edge | unknown | confidential |
-| store:telemetry-lake | boundary:analytics-core | unknown | customer data |
+| store:telemetry-lake | boundary:analytics-core | unknown | confidential |
 | store:firmware-bucket | boundary:ingest-edge | unknown | public |
+| store:pub-sub | boundary:ingest-edge | unknown | unknown |
 
 **Data flows**
 
@@ -85,11 +86,12 @@ Not part of the question, but the records cite these names, so you need them.
 |---|---|---|---|---|---|
 | flow:sensor-node-to-device-gateway:publish-readings | entity:sensor-node | process:device-gateway | MQTT | fleet-wide pre-shared key, shared by every device and never rotated | unknown |
 | flow:device-gateway-to-device-registry:look-up-device | process:device-gateway | store:device-registry | Firestore API | unknown | unknown |
-| flow:device-gateway-to-telemetry-normalizer:forward-readings | process:device-gateway | process:telemetry-normalizer | Pub/Sub | unknown | unknown |
 | flow:telemetry-normalizer-to-telemetry-lake:load-readings | process:telemetry-normalizer | store:telemetry-lake | BigQuery API | unknown | unknown |
 | flow:sensor-node-to-firmware-bucket:poll-firmware | entity:sensor-node | store:firmware-bucket | HTTPS | none; the bucket is public read | unknown |
 | flow:field-technician-to-sensor-node:local-service-session | entity:field-technician | entity:sensor-node | local serial console | unknown | unknown |
 | flow:fleet-operator-to-telemetry-lake:query-dashboards | entity:fleet-operator | store:telemetry-lake | BigQuery API | company SSO | unknown |
+| flow:device-gateway-to-pub-sub:forward-readings | process:device-gateway | store:pub-sub | unknown | unknown | unknown |
+| flow:telemetry-normalizer-to-pub-sub:pick-up-readings | process:telemetry-normalizer | store:pub-sub | unknown | unknown | unknown |
 
 **Trust boundaries**
 
@@ -104,6 +106,8 @@ Not part of the question, but the records cite these names, so you need them.
 
 - `store:firmware-bucket` — The firmware bucket accepts unauthenticated reads from anywhere. (basis: Described as "public read" and polled by devices that hold no credential for it.)
 - `store:telemetry-lake` — The telemetry lake holds personal data about customer sites. (basis: Stated to contain "site addresses and occupancy patterns", described as customer data.)
+- `store:telemetry-lake` — The telemetry lake holds confidential data under the scheme in prompts/extract.md. (basis: The source says the lake has "site addresses and occupancy patterns" in it and calls it customer data. Both describe identifiable customer premises and when they are occupied, so disclosure harms the customers described.)
+- `store:pub-sub` — Pub/Sub sits in the ingest edge rather than the analytics network. (basis: The source places the normalizer "in our analytics network" and places the broker nowhere. It associates the broker with the gateway's onward hop — "Readings the gateway accepts are forwarded onto Pub/Sub" — so it takes the gateway's zone. Either placement leaves exactly one crossing on this path.)
 
 **Reviewed aliases** — other names a reader ruled identify the same element, each with the words in the source that support it. An extraction using one is named differently, not wrong.
 
@@ -346,7 +350,7 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "fc745e273aff8be740a814f0a9b4a45d6f3c6fe39dc7c8efa2b879d4f270ac74",
-      "model.json": "72cd6e017da3a53ea67530013be257ea4ed360932f86a0e9419be6273c4588eb",
+      "model.json": "6a956e155cf39c92c9021f5f5ed386c858d4788a2a20d9d717d428b76ea0747a",
       "claims/stride.json": "bde9c43b971a6a77370e399214b273d8b005ef4a01e2fe7ca99b62a47c35729e"
       }
     }

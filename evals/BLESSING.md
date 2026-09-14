@@ -105,7 +105,7 @@ wrongly-confident attribute would suppress, dropping recall. Write each
 assertion so it fires through that or through `ExtractionScore`, or it will not
 be measured at all.
 
-Size the system so the finished model lands at **8–20 elements**. That's not a
+Size the system so the finished model lands at **8–22 elements**. That's not a
 style preference: the reference threat set has to be exhaustively enumerable by a
 human, because any real threat the author forgets to write down will score
 against the tool as a false positive.
@@ -119,7 +119,7 @@ write the text down, not after.
 
 For a case converted from the OWASP Threat Model Cookbook (CC-BY 4.0), record the
 source entry and its licence in `case.json`. If the source diagram is larger than
-the 8–20 band, convert a **scoped subset** whose removal doesn't change any
+the 8–22 band, convert a **scoped subset** whose removal doesn't change any
 remaining element's attributes, and note what you dropped.
 
 ### 2. Draft the model

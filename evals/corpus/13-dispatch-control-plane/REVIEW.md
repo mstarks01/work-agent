@@ -84,6 +84,7 @@ Not part of the question, but the records cite these names, so you need them.
 | process:dispatch-console | unknown | web | boundary:corporate-network | single-page JavaScript app in the browser |
 | process:dispatch-api | internal | web | boundary:production-control-plane | unknown |
 | process:schedule-importer | unknown | non-web | boundary:corporate-network | parses the partner's SOAP feed as an XML document; no product named |
+| process:corporate-web-host | unknown | web | boundary:corporate-network | unknown |
 
 **Data stores**
 
@@ -103,6 +104,7 @@ Not part of the question, but the records cite these names, so you need them.
 | flow:schedule-importer-to-schedule-archive:store-schedule-documents | process:schedule-importer | store:schedule-archive | unknown | unknown | unknown |
 | flow:schedule-importer-to-dispatch-api:post-work-orders | process:schedule-importer | process:dispatch-api | unknown | an API token issued when the importer was built and never rotated since | unknown |
 | flow:dispatch-api-to-dispatch-database:read-write-job-orders | process:dispatch-api | store:dispatch-database | unknown | unknown | unknown |
+| flow:duty-engineer-to-corporate-web-host:load-console | entity:duty-engineer | process:corporate-web-host | unknown | unknown | unknown |
 
 **Trust boundaries**
 
@@ -433,7 +435,7 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
-      "model.json": "6175c8ee1086669d62bc72ac43f8e5421cee4608575e24e6ecd92ef7dbc26fe7",
+      "model.json": "1182e6b88d0295052c2e70f1e1419d29e9645792efba9e27151739238bf7d992",
       "claims/asvs.json": "21223b93d65a21e5b8de043940250783cfd9408246e5c1825bef5b8cf4c3ec45",
       "claims/stride.json": "07a43e4387e0f3d490edbdf732259e37957f4a09394d4e23e5203fca2d4558f3"
       }

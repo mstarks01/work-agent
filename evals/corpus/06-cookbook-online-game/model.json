@@ -20,7 +20,7 @@
       "source_excerpt": "our customer support staff work from the corporate network and use a moderation website",
       "source_label": "System description",
       "kind": "human",
-      "trust_zone": "boundary:corp-network"
+      "trust_zone": "boundary:corporate-network"
     }
   ],
   "processes": [
@@ -46,13 +46,13 @@
       "source_excerpt": "It talks to the lobby on TCP 1234 for matchmaking",
       "source_label": "System description",
       "technology": "unknown",
-      "trust_zone": "boundary:prod-network",
+      "trust_zone": "boundary:production-network",
       "exposure": "internet-facing",
       "interface_kind": "unknown"
     },
     {
-      "id": "process:game-servers",
-      "name": "game servers",
+      "id": "process:game-server",
+      "name": "game server",
       "description": "Match servers that clients connect to directly and that record match outcomes.",
       "assets": [
         "availability-critical",
@@ -61,7 +61,7 @@
       "source_excerpt": "once a match starts it talks directly to the game servers on TCP 1235",
       "source_label": "System description",
       "technology": "unknown",
-      "trust_zone": "boundary:prod-network",
+      "trust_zone": "boundary:production-network",
       "exposure": "internet-facing",
       "interface_kind": "unknown"
     },
@@ -75,7 +75,7 @@
       "source_excerpt": "use a moderation website to look at and act on player accounts",
       "source_label": "System description",
       "technology": "unknown",
-      "trust_zone": "boundary:prod-network",
+      "trust_zone": "boundary:production-network",
       "exposure": "unknown",
       "interface_kind": "web"
     }
@@ -92,7 +92,7 @@
       "source_excerpt": "The lobby reads the player database to set up a match",
       "source_label": "System description",
       "technology": "unknown",
-      "trust_zone": "boundary:prod-network",
+      "trust_zone": "boundary:production-network",
       "data_classification": "unknown",
       "encryption_at_rest": "unknown"
     },
@@ -106,7 +106,7 @@
       "source_excerpt": "The game servers read and write the stats database during and after a match",
       "source_label": "System description",
       "technology": "unknown",
-      "trust_zone": "boundary:prod-network",
+      "trust_zone": "boundary:production-network",
       "data_classification": "unknown",
       "encryption_at_rest": "unknown"
     }
@@ -143,14 +143,14 @@
       "operations": "unknown"
     },
     {
-      "id": "flow:game-client-to-game-servers:gameplay-traffic",
+      "id": "flow:game-client-to-game-server:gameplay-traffic",
       "name": "gameplay traffic",
       "description": "Client connects directly to the match server for the duration of a match.",
       "assets": [],
       "source_excerpt": "once a match starts it talks directly to the game servers on TCP 1235",
       "source_label": "System description",
       "source": "process:game-client",
-      "destination": "process:game-servers",
+      "destination": "process:game-server",
       "protocol": "TCP 1235",
       "authentication": "unknown",
       "data_description": "gameplay actions and state updates",
@@ -158,14 +158,14 @@
       "operations": "unknown"
     },
     {
-      "id": "flow:lobby-to-game-servers:hand-over-match",
+      "id": "flow:lobby-to-game-server:hand-over-match",
       "name": "hand over match",
       "description": "Lobby hands a formed match to a game server.",
       "assets": [],
       "source_excerpt": "hands the match over to the game servers",
       "source_label": "System description",
       "source": "process:lobby",
-      "destination": "process:game-servers",
+      "destination": "process:game-server",
       "protocol": "unknown",
       "authentication": "unknown",
       "data_description": "match composition and player identifiers",
@@ -190,7 +190,7 @@
       "operations": "read"
     },
     {
-      "id": "flow:game-servers-to-stats-database:read-write-stats",
+      "id": "flow:game-server-to-stats-database:read-write-stats",
       "name": "read write stats",
       "description": "Game servers record match statistics.",
       "assets": [
@@ -198,7 +198,7 @@
       ],
       "source_excerpt": "The game servers read and write the stats database during and after a match",
       "source_label": "System description",
-      "source": "process:game-servers",
+      "source": "process:game-server",
       "destination": "store:stats-database",
       "protocol": "unknown",
       "authentication": "unknown",
@@ -207,7 +207,7 @@
       "operations": "read-write"
     },
     {
-      "id": "flow:game-servers-to-player-database:update-players",
+      "id": "flow:game-server-to-player-database:update-players",
       "name": "update players",
       "description": "Game servers write match outcomes back onto player records.",
       "assets": [
@@ -216,7 +216,7 @@
       ],
       "source_excerpt": "they also write back to the player database",
       "source_label": "System description",
-      "source": "process:game-servers",
+      "source": "process:game-server",
       "destination": "store:player-database",
       "protocol": "unknown",
       "authentication": "unknown",
@@ -269,16 +269,16 @@
       "kind": "tenant"
     },
     {
-      "id": "boundary:corp-network",
-      "name": "corp network",
+      "id": "boundary:corporate-network",
+      "name": "corporate network",
       "description": "Corporate network where customer support staff work.",
       "source_excerpt": "our customer support staff work from the corporate network",
       "source_label": "System description",
       "kind": "network"
     },
     {
-      "id": "boundary:prod-network",
-      "name": "prod network",
+      "id": "boundary:production-network",
+      "name": "production network",
       "description": "Production network holding the lobby, the game servers, the moderation website and both databases.",
       "source_excerpt": "The client connects out to two things in our production network.",
       "source_label": "System description",

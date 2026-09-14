@@ -91,7 +91,7 @@
       "source_label": "System description",
       "technology": "BigQuery",
       "trust_zone": "boundary:analytics-core",
-      "data_classification": "customer data",
+      "data_classification": "confidential",
       "encryption_at_rest": "unknown"
     },
     {
@@ -106,6 +106,20 @@
       "technology": "Cloud Storage bucket",
       "trust_zone": "boundary:ingest-edge",
       "data_classification": "public",
+      "encryption_at_rest": "unknown"
+    },
+    {
+      "id": "store:pub-sub",
+      "name": "Pub/Sub",
+      "description": "The broker the gateway publishes accepted readings onto and the normalizer consumes them from.",
+      "assets": [
+        "pii"
+      ],
+      "source_excerpt": "Readings the gateway accepts are forwarded onto Pub/Sub and picked up by the telemetry normalizer",
+      "source_label": "System description",
+      "technology": "Pub/Sub",
+      "trust_zone": "boundary:ingest-edge",
+      "data_classification": "unknown",
       "encryption_at_rest": "unknown"
     }
   ],
@@ -143,23 +157,6 @@
       "data_description": "device identifier, key material, customer assignment",
       "encryption_in_transit": "unknown",
       "operations": "read"
-    },
-    {
-      "id": "flow:device-gateway-to-telemetry-normalizer:forward-readings",
-      "name": "forward readings",
-      "description": "Accepted readings are published onto Pub/Sub for the normalizer.",
-      "assets": [
-        "pii"
-      ],
-      "source_excerpt": "Readings the gateway accepts are forwarded onto Pub/Sub and picked up by the telemetry normalizer",
-      "source_label": "System description",
-      "source": "process:device-gateway",
-      "destination": "process:telemetry-normalizer",
-      "protocol": "Pub/Sub",
-      "authentication": "unknown",
-      "data_description": "normalized sensor readings",
-      "encryption_in_transit": "unknown",
-      "operations": "write"
     },
     {
       "id": "flow:telemetry-normalizer-to-telemetry-lake:load-readings",
@@ -226,6 +223,40 @@
       "data_description": "aggregated and raw customer readings",
       "encryption_in_transit": "unknown",
       "operations": "read"
+    },
+    {
+      "id": "flow:device-gateway-to-pub-sub:forward-readings",
+      "name": "forward readings",
+      "description": "The gateway publishes accepted readings onto the broker.",
+      "authentication": "unknown",
+      "encryption_in_transit": "unknown",
+      "assets": [
+        "pii"
+      ],
+      "source_excerpt": "Readings the gateway accepts are forwarded onto Pub/Sub and picked up by the telemetry normalizer",
+      "source_label": "System description",
+      "source": "process:device-gateway",
+      "destination": "store:pub-sub",
+      "protocol": "unknown",
+      "data_description": "normalized sensor readings",
+      "operations": "write"
+    },
+    {
+      "id": "flow:telemetry-normalizer-to-pub-sub:pick-up-readings",
+      "name": "pick up readings",
+      "description": "The normalizer consumes readings from the broker.",
+      "authentication": "unknown",
+      "encryption_in_transit": "unknown",
+      "assets": [
+        "pii"
+      ],
+      "source_excerpt": "Readings the gateway accepts are forwarded onto Pub/Sub and picked up by the telemetry normalizer",
+      "source_label": "System description",
+      "source": "process:telemetry-normalizer",
+      "destination": "store:pub-sub",
+      "protocol": "unknown",
+      "data_description": "normalized sensor readings",
+      "operations": "read"
     }
   ],
   "trust_boundaries": [
@@ -274,6 +305,18 @@
       "element_id": "store:telemetry-lake",
       "attribute": "assets",
       "basis": "Stated to contain \"site addresses and occupancy patterns\", described as customer data."
+    },
+    {
+      "assumption": "The telemetry lake holds confidential data under the scheme in prompts/extract.md.",
+      "element_id": "store:telemetry-lake",
+      "attribute": "data_classification",
+      "basis": "The source says the lake has \"site addresses and occupancy patterns\" in it and calls it customer data. Both describe identifiable customer premises and when they are occupied, so disclosure harms the customers described."
+    },
+    {
+      "assumption": "Pub/Sub sits in the ingest edge rather than the analytics network.",
+      "element_id": "store:pub-sub",
+      "attribute": "trust_zone",
+      "basis": "The source places the normalizer \"in our analytics network\" and places the broker nowhere. It associates the broker with the gateway's onward hop \u2014 \"Readings the gateway accepts are forwarded onto Pub/Sub\" \u2014 so it takes the gateway's zone. Either placement leaves exactly one crossing on this path."
     }
   ]
 }
