@@ -825,6 +825,74 @@ class TestTheSweepLoopPassesTheCasesThatRan:
             )
         return float(prompts[-1].split("(")[1].split(")")[0])
 
+    def first_hold(self, monkeypatch, capsys, cases, in_flight):
+        """Sweep ``cases`` cases at a batch size; return what the first hold said.
+
+        The hold prints what it has spent and which cases have not run, and
+        asks only for the amount, so the fact under test is on stdout.
+
+        Every case spends the same amount and the accepted figure covers none
+        of it, so the hold fires at the first boundary it reaches. Which
+        boundary that is, is the fact under test.
+        """
+        made = [SimpleNamespace(id=f"{index:02d}") for index in range(cases)]
+        monkeypatch.setattr(
+            modes, "select_frameworks", lambda case, only=(): ("stride",)
+        )
+        monkeypatch.setattr(
+            modes, "build_eval_pipeline", lambda *args, **kwargs: SimpleNamespace()
+        )
+        monkeypatch.setattr(
+            modes,
+            "score_extraction",
+            lambda case, result: SimpleNamespace(to_json=dict),
+        )
+
+        async def one_extraction(case, pipeline):
+            return modes.ExtractionResult(
+                case_id=case.id,
+                extracted=None,
+                issues=(),
+                node_runs=(node(completion=1_000_000),),
+            )
+
+        monkeypatch.setattr(modes, "run_extraction", one_extraction)
+        prompts: list[str] = []
+
+        def ask(prompt: str) -> str:
+            prompts.append(prompt)
+            raise self.Stop
+
+        with pytest.raises(self.Stop):
+            asyncio.run(
+                run._run_mode(
+                    made,
+                    "extraction",
+                    deployment=SimpleNamespace(),
+                    accepted=0.0001,
+                    ask=ask,
+                    in_flight=in_flight,
+                )
+            )
+        assert prompts, "the hold never fired"
+        return capsys.readouterr().out
+
+    def test_the_hold_runs_between_batches_rather_than_between_cases(
+        self, priced, monkeypatch, capsys
+    ):
+        """The guarantee the batch knob weakens, stated as a test.
+
+        One case at a time, the first hold sits after one case has run. Four at
+        a time, it sits after four have — so a sweep may pass what was accepted
+        by a batch rather than by a case, which is why the knob is off unless
+        somebody asks for it.
+        """
+        one = self.first_hold(monkeypatch, capsys, cases=5, in_flight=1)
+        four = self.first_hold(monkeypatch, capsys, cases=5, in_flight=4)
+
+        assert "4 case(s) have not run: 01, 02, 03, 04" in one
+        assert "1 case(s) have not run: 04" in four
+
     def test_a_skipped_case_does_not_dilute_the_rate(self, priced, monkeypatch):
         """Two cases skipped, then one that spends, with one still to run.
 

@@ -9,8 +9,10 @@ nothing came to announce "all node fingerprints blessed" and write
 
 from __future__ import annotations
 
+import argparse
 import dataclasses
 import json
+from types import SimpleNamespace
 
 import pytest
 
@@ -163,6 +165,44 @@ class TestTheArtifactCanActuallyBeWritten:
             record["tiers"]["strong"]["model"]
             == TEST_TIER_ENV["ANALYSIS_MODEL_STRONG_MODEL"]
         )
+
+
+class TestHowManyCasesRunAtOnce:
+    """The batch size, and the bound it is refused above.
+
+    A sweep is one caller driving one job per case, so the ceiling is the
+    deployment's own ``max_active_jobs`` rather than a number of the harness's.
+    Reading it there keeps the ceiling in the file an operator turns down
+    mid-incident (#876).
+    """
+
+    def deployment(self, ceiling: int):
+        return SimpleNamespace(resilience=SimpleNamespace(max_active_jobs=ceiling))
+
+    def test_one_at_a_time_is_the_default(self):
+        parser = argparse.ArgumentParser()
+        run._run_arguments(parser)
+        parsed = parser.parse_args(["--mode", "analysis"])
+
+        assert parsed.cases_in_flight == 1
+        assert run._cases_in_flight(parsed, self.deployment(3)) == 1
+
+    def test_a_value_the_deployment_allows_is_taken(self):
+        parsed = SimpleNamespace(cases_in_flight=3)
+
+        assert run._cases_in_flight(parsed, self.deployment(3)) == 3
+
+    def test_a_value_over_the_deployment_s_bound_is_refused_by_name(self):
+        parsed = SimpleNamespace(cases_in_flight=4)
+
+        with pytest.raises(SystemExit, match="max_active_jobs is 3"):
+            run._cases_in_flight(parsed, self.deployment(3))
+
+    def test_nothing_in_flight_is_refused(self):
+        parsed = SimpleNamespace(cases_in_flight=0)
+
+        with pytest.raises(SystemExit, match="at least one case"):
+            run._cases_in_flight(parsed, self.deployment(3))
 
 
 class TestTheCommandTable:

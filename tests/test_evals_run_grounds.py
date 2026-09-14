@@ -140,7 +140,12 @@ DEAD: dict[str, Any] = {"dead": True}
 
 
 def sweep(
-    monkeypatch, case, spoofing_first: dict[str, Any] | None, *, trailing: int = 0
+    monkeypatch,
+    case,
+    spoofing_first: dict[str, Any] | None,
+    *,
+    trailing: int = 0,
+    in_flight: int = 1,
 ) -> Any:
     """Two cases through one pipeline: the first optionally broken, then a clean one.
 
@@ -197,7 +202,9 @@ def sweep(
     # each execution's tier and sampling into its provenance record, and both
     # come from the deployment rather than from the graph.
     deployment = Deployment.from_env(env=TEST_TIER_ENV)
-    return asyncio.run(_run_mode([case, second, *later], "analysis", deployment))
+    return asyncio.run(
+        _run_mode([case, second, *later], "analysis", deployment, in_flight=in_flight)
+    )
 
 
 def _reply_for(case, graph_node: str) -> str:
@@ -457,3 +464,131 @@ def test_every_measured_fault_is_one_the_failure_recorder_can_classify():
     from evals.harness.run import MEASURED
 
     assert set(MEASURED) == {modes.EvalRunError, *CAUGHT}
+
+
+class TestCasesInFlight:
+    """A sweep may run several cases at once, and the artifact may not know.
+
+    The extraction mode is what asks for this: it has one node, so its wall
+    clock is its model time, where an analysis sweep already fans six lanes out
+    per case. Thirteen cases took 6.7 minutes of pure waiting, and a five-run
+    spread — the unit that measures an ``extract.md`` edit honestly — took 33
+    (#876).
+    """
+
+    def payload_of(self, run) -> str:
+        """One sweep's measured output as bytes, which is the acceptance test.
+
+        A byte-identical dump is what a risky refactor is held to here (#763),
+        and the accumulators this change touches are the ones a concurrent loop
+        could reorder: the payloads, the grounds, the coverage rows and the
+        per-node execution counts.
+        """
+        return json.dumps(
+            {
+                "payloads": run.payloads,
+                "failures": run.failures,
+                "grounds": [entry.case_id for entry in run.grounds],
+                "coverage": [list(row) for row in run.coverage],
+                "executions": {
+                    node: usage.executions for node, usage in run.latency.items()
+                },
+                "stopped_before": list(run.stopped_before),
+            },
+            sort_keys=True,
+            default=str,
+        )
+
+    def test_a_batched_sweep_writes_what_a_sequential_one_writes(
+        self, monkeypatch, case
+    ):
+        one = sweep(monkeypatch, case, None, trailing=2)
+        many = sweep(monkeypatch, case, None, trailing=2, in_flight=4)
+
+        assert self.payload_of(many) == self.payload_of(one)
+
+    def test_the_cases_are_folded_in_corpus_order_whatever_order_they_finish(
+        self, monkeypatch, case
+    ):
+        """The point of folding after the batch rather than as each case lands."""
+        run = sweep(monkeypatch, case, None, trailing=2, in_flight=4)
+
+        assert [payload["case"] for payload in run.payloads] == [
+            case.id,
+            "case-second",
+            "case-3",
+            "case-4",
+        ]
+
+    def test_the_cases_of_one_batch_really_do_overlap(self, monkeypatch, case):
+        """The point of the change, and the only thing the artifact cannot show.
+
+        Every other test here proves the loop still writes what it wrote, which
+        a sweep that batched nothing would also pass. This one counts how many
+        cases are inside ``run_analysis`` at once.
+        """
+        peak = 0
+        live = 0
+        real = modes.run_analysis
+
+        async def counted(*args, **kwargs):
+            nonlocal peak, live
+            live += 1
+            peak = max(peak, live)
+            try:
+                # A yield to the loop, so a sibling can start. Without one the
+                # coroutine could run to completion before the next is created,
+                # and this would count 1 on a correctly batched sweep.
+                await asyncio.sleep(0)
+                return await real(*args, **kwargs)
+            finally:
+                live -= 1
+
+        monkeypatch.setattr(modes, "run_analysis", counted)
+
+        sweep(monkeypatch, case, None, trailing=2, in_flight=4)
+
+        assert peak == 4
+
+    def test_one_in_flight_runs_one_case_at_a_time(self, monkeypatch, case):
+        """The default, and what every published sweep and the spend hold assume."""
+        peak = 0
+        live = 0
+        real = modes.run_analysis
+
+        async def counted(*args, **kwargs):
+            nonlocal peak, live
+            live += 1
+            peak = max(peak, live)
+            try:
+                await asyncio.sleep(0)
+                return await real(*args, **kwargs)
+            finally:
+                live -= 1
+
+        monkeypatch.setattr(modes, "run_analysis", counted)
+
+        sweep(monkeypatch, case, None, trailing=2)
+
+        assert peak == 1
+
+    def test_a_stopping_fault_keeps_every_case_of_its_own_batch(
+        self, monkeypatch, case
+    ):
+        """A batch's cases all ran and the provider billed them all, so a fault
+        in one may not discard the others. What stops is the batch after it."""
+        _raise_on_second_report(
+            monkeypatch, RuntimeError("This request requires more credits")
+        )
+
+        run = sweep(monkeypatch, case, None, trailing=2, in_flight=2)
+
+        # Cases one and two are the first batch. One of them stopped the sweep
+        # — which one is up to the order they finished in — and the other is
+        # measured whole rather than discarded with it.
+        measured = [entry.case_id for entry in run.grounds]
+        assert len(measured) == 1
+        assert set(measured) <= {case.id, "case-second"}
+        assert any("more credits" in failure for failure in run.failures)
+        # Three and four are the batch nobody attempted.
+        assert run.stopped_before == ("case-3", "case-4")
