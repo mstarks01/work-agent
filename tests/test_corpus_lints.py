@@ -18,8 +18,10 @@ from analysis_service.report import (
     InputRef,
     SourceRef,
 )
-from analysis_service.validation import parse_and_validate
+from analysis_service.system_model import ELEMENT_GROUPS
+from analysis_service.validation import parse_and_validate, validate
 from evals import build_review_docs, verify_corpus
+from tests.factories import valid_model
 
 
 @pytest.mark.parametrize(
@@ -262,6 +264,70 @@ def test_a_source_declared_with_no_readable_text_skips_the_excerpt_half():
         "processes": [{"id": "process:x", "source_excerpt": "q", "source_label": "Doc"}]
     }
     assert list(verify_corpus._check_citations(model, {"Doc": ""})) == []
+
+
+#: Every shape a citation can arrive in, and whether a reader must refuse it.
+#: Read by the two readers below, which is the whole point: the corpus lint
+#: re-asserts the gate's rule rather than calling it, so the only thing that
+#: keeps them one rule is a table they both answer.
+CITATION_SHAPES: tuple[tuple[str, str, str, bool], ...] = (
+    ("quoted and resolvable", "a quote", "Doc", False),
+    ("no excerpt at all", "", "", True),
+    ("no excerpt, label given", "", "Doc", True),
+    ("excerpt with no label", "a quote", "", True),
+    ("label naming no source", "a quote", "Elsewhere", True),
+    ("excerpt absent from its source", "never written", "Doc", True),
+)
+
+
+@pytest.mark.parametrize(
+    "shape,excerpt,label,refused",
+    CITATION_SHAPES,
+    ids=[row[0] for row in CITATION_SHAPES],
+)
+def test_the_gate_and_the_corpus_lint_refuse_the_same_citation_shapes(
+    shape, excerpt, label, refused
+):
+    """Two readers of one rule, held to each other rather than each to itself.
+
+    ``verify_corpus._check_citations`` deliberately does not call
+    :func:`~analysis_service.validation.validate`: a check that would weaken
+    the moment somebody relaxed the shipped gate is not a check. That decision
+    buys independence and costs agreement, and agreement is what this pays for.
+    Both readers once passed an element carrying no excerpt at all, each with a
+    test that agreed with it (#925).
+    """
+    sources = {"Doc": "a quote lives here"}
+    model = valid_model()
+    for element in model.elements():
+        element.source_excerpt = "a quote"
+        element.source_label = "Doc"
+    model.processes[0].source_excerpt = excerpt
+    model.processes[0].source_label = label
+
+    gate = [issue for issue in validate(model, sources=sources) if issue.is_citation]
+    lint = list(verify_corpus._check_citations(model.model_dump(mode="json"), sources))
+
+    assert bool(gate) is refused, f"the service gate disagrees about {shape}"
+    assert bool(lint) is refused, f"the corpus lint disagrees about {shape}"
+
+
+def test_no_corpus_element_asserts_a_fact_on_its_own_authority():
+    """Every element of every case cites a span of that case's own sources.
+
+    The reference is what extraction is graded against, so an uncited element
+    in it would grade a model through a rule the yardstick itself breaks.
+    """
+    for case_dir in verify_corpus.case_dirs():
+        model = verify_corpus._load_json(case_dir / "model.json")
+        assert isinstance(model, dict)
+        uncited = [
+            element.get("id")
+            for group in ELEMENT_GROUPS
+            for element in model.get(group, [])
+            if not element.get("source_excerpt") or not element.get("source_label")
+        ]
+        assert uncited == [], f"{case_dir.name}: {uncited}"
 
 
 #: The corpus table in ``evals/README.md``: one row per case, and a single

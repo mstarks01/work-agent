@@ -272,10 +272,17 @@ class TestCitationsResolve:
     }
 
     def model_citing(self, label: str, excerpt: str = "a quote") -> SystemModel:
+        """One element cites ``label``; every other one cites a source that works.
+
+        The rest of the model carries a citation the gate accepts rather than no
+        citation at all, because an absent excerpt is its own failure
+        (``missing-citation``) and a test of the label rules would otherwise read
+        one issue per element and never reach the shape it is about.
+        """
         model = valid_model()
         for element in model.elements():
-            element.source_excerpt = ""
-            element.source_label = ""
+            element.source_excerpt = "a quote"
+            element.source_label = "Kickoff call"
         model.processes[0].source_excerpt = excerpt
         model.processes[0].source_label = label
         return model
@@ -296,10 +303,41 @@ class TestCitationsResolve:
         issues = validate(self.model_citing(""), sources=self.SOURCES)
         assert [issue.code for issue in issues] == ["invalid-reference"]
 
-    def test_an_element_with_no_excerpt_needs_no_label(self):
+    def test_an_element_with_no_excerpt_at_all_is_invalid(self):
+        """Citation erasure is a failure, not a way past the rule (#925).
+
+        The cheapest attack on the whole gate: an element that quotes nothing
+        cites nothing, so a rule reading only the citations it is given has
+        nothing to say about it. It fails here, and one issue names the element
+        rather than two — the missing label is the missing excerpt's
+        consequence, not a second defect.
+        """
         model = self.model_citing("Kickoff call", excerpt="")
         model.processes[0].source_label = ""
-        assert validate(model, sources=self.SOURCES) == []
+        issues = validate(model, sources=self.SOURCES)
+        assert [issue.code for issue in issues] == ["missing-citation"]
+        assert issues[0].element_id == "process:web-app"
+        assert issues[0].field == "source_excerpt"
+
+    def test_an_excerpt_missing_while_a_label_is_given_is_still_invalid(self):
+        # The label is not the chain: it names a source that says nothing about
+        # which words this element came from.
+        model = self.model_citing("Kickoff call", excerpt="")
+        issues = validate(model, sources=self.SOURCES)
+        assert [issue.code for issue in issues] == ["missing-citation"]
+
+    def test_the_message_names_the_jobs_sources_so_repair_can_act(self):
+        model = self.model_citing("Kickoff call", excerpt="")
+        message = validate(model, sources=self.SOURCES)[0].message
+        assert "Kickoff call" in message and "Payments doc" in message
+
+    def test_every_element_is_asked_not_only_the_first(self):
+        model = self.model_citing("Kickoff call")
+        for element in model.elements():
+            element.source_excerpt = ""
+        issues = validate(model, sources=self.SOURCES)
+        assert {issue.code for issue in issues} == {"missing-citation"}
+        assert len(issues) == len(model.elements())
 
     def test_the_rule_does_not_run_without_the_jobs_sources(self):
         # A hand-authored model checked outside a job has nothing to check

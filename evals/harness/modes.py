@@ -38,7 +38,13 @@ from analysis_service.analysis import (
     control_state,
     states_a_protocol,
 )
-from analysis_service.basis import UnbasedControl, unbased_controls
+from analysis_service.basis import (
+    Coverage as BasisCoverage,
+)
+from analysis_service.basis import (
+    UnbasedControl,
+    read_controls,
+)
 from analysis_service.claims import (
     Claim,
     FrameworkName,
@@ -392,6 +398,13 @@ class ExtractionScore:
     #: a malformed model would fail every run for doing its job. Non-gating,
     #: like every number here.
     uncited: tuple[ValidationIssue, ...] = ()
+    #: How much of this extraction the stated-control diagnostic could read at
+    #: all. ``unbased`` is a count of problems found, and on its own an empty
+    #: one is three different facts: every value echoed its source, no value
+    #: was readable, or there were no stated values. A run whose citations are
+    #: blank or whose mechanisms carry no content token reads clean on every
+    #: other figure here, and this is where it stops reading clean (#925).
+    basis_coverage: BasisCoverage = field(default_factory=BasisCoverage.empty)
 
     @property
     def recall(self) -> float:
@@ -696,6 +709,9 @@ class ExtractionScore:
             # few lines a reader opens this file for.
             "attributes_differing": [check.to_json() for check in self.differing],
             "unbased_controls": [flag.model_dump(mode="json") for flag in self.unbased],
+            # The denominator beside the flags: how many stated controls this
+            # model carried, and how many of them the scan could read at all.
+            "basis_coverage": self.basis_coverage.to_json(),
             "uncited": [issue.model_dump(mode="json") for issue in self.uncited],
         }
 
@@ -920,6 +936,7 @@ def score_extraction(case: GoldenCase, result: ExtractionResult) -> ExtractionSc
         else set()
     )
     crossings_match = _crossings_match(case.model, result.extracted)
+    unbased, read = _basis(case, result.extracted)
     return ExtractionScore(
         case_id=case.id,
         matched=tuple(sorted(blessed_ids & extracted_ids)),
@@ -930,8 +947,9 @@ def score_extraction(case: GoldenCase, result: ExtractionResult) -> ExtractionSc
         blessed_initiators=tuple(sorted(pure_initiators(case.model))),
         blessed_crossings=crossing_keys(case.model) or (),
         extracted_crossings=crossing_keys(result.extracted),
-        unbased=_unbased(case, result.extracted),
         uncited=tuple(issue for issue in result.issues if issue.is_citation),
+        unbased=unbased,
+        basis_coverage=read,
         unsourced=_unsourced(
             case, sorted(extracted_ids - blessed_ids), result.extracted
         ),
@@ -1074,20 +1092,25 @@ def _unsourced(
     return tuple(out)
 
 
-def _unbased(
+def _basis(
     case: GoldenCase, extracted: SystemModel | None
-) -> tuple[UnbasedControl, ...]:
-    """The extraction's stated controls that the case's own sources do not echo.
+) -> tuple[tuple[UnbasedControl, ...], BasisCoverage]:
+    """The extraction's unechoed stated controls, and what was read to find them.
 
     Read against the **extracted** model, not the blessed one: the question is
     what this run asserted about the text it was given. The blessed model's own
     rate is the false-rejection figure published in
     :mod:`analysis_service.basis`, and ``tests/test_basis.py`` re-derives it.
+
+    Both halves come from one call, which is one walk and one scan budget: a
+    flag count paired with a denominator taken over a second walk is the defect
+    the single reader in that module exists to prevent.
     """
     if extracted is None:
-        return ()
+        return (), BasisCoverage.empty()
     sources = {source.label: source.text for source in case.sources}
-    return tuple(unbased_controls(extracted, sources))
+    flags, read = read_controls(extracted, sources)
+    return tuple(flags), read
 
 
 def _check_attributes(
