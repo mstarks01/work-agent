@@ -1154,9 +1154,14 @@ class CatalogProposal(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    assertions: list[AssertionProposal] = Field(
-        default_factory=list, max_length=MAX_ASSERTIONS
-    )
+    #: **No cap on the schema, and the bound is in :func:`resolve_catalog`.**
+    #: A root-level array of objects carrying ``maxItems`` is a shape Google's
+    #: structured output refuses — measured, and the only feature separating
+    #: this schema from the extraction schema that runs on the same route. A
+    #: model's output schema is a vendor-neutral surface, so a bound that costs
+    #: a vendor belongs where code enforces it rather than where a provider has
+    #: to accept it.
+    assertions: list[AssertionProposal] = Field(default_factory=list)
 
 
 def resolve_catalog(
@@ -1182,7 +1187,19 @@ def resolve_catalog(
 
     A dropped row is not a lost fact. The issues are what the repair pass reads,
     and repair has the sources in front of it.
+
+    The count is checked first and returns alone, as the gate's is: this is
+    where :data:`MAX_ASSERTIONS` is enforced, because the schema cannot carry
+    it without costing a vendor.
     """
+    if len(proposal.assertions) > MAX_ASSERTIONS:
+        return AssertionCatalog(), [
+            CatalogIssue(
+                code="too-many-assertions",
+                message=f"{len(proposal.assertions)} assertions proposed;"
+                f" the cap is {MAX_ASSERTIONS}",
+            )
+        ]
     prepared = _prepare(sources)
     element_ids = [element.id for element in model.elements()]
     labels = {element.id: element.name for element in model.elements()}

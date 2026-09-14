@@ -87,6 +87,7 @@ from pathlib import Path
 from typing import get_args, get_type_hints
 
 import pytest
+from pydantic import BaseModel
 
 # Imported first so the model-cost map is pinned before anything reaches
 # litellm; `vendor_keyed_tables` imports every shipped module.
@@ -704,3 +705,107 @@ def test_no_document_counts_the_registry(path):
         ' "every registered vendor" — so the sentence cannot go stale when the'
         " next row lands."
     )
+
+
+# ---------------------------------------------------------------------------
+# A node's output schema is a vendor-neutral surface.
+#
+# Every LLM node that asks for structured output hands one JSON Schema to
+# whichever vendor its tier selects, so a shape one vendor refuses is a node
+# that cannot run there. **Measured rather than reasoned**: on
+# ``google/gemini-3.5-flash-lite`` through OpenRouter an extraction run
+# succeeded while an assertion run returned ``INVALID_ARGUMENT``, and a bisect
+# over the schema found the one difference that decides it.
+#
+# ====================================  ===========================  =======
+# schema                                root capped object arrays    route
+# ====================================  ===========================  =======
+# ``SystemModel``                       none                         OK
+# ``CatalogProposal`` (before the fix)  ``assertions`` maxItems 500  refused
+# ``stride.proposals``                  ``claims`` maxItems 400      refused
+# ``asvs.proposals``                    ``claims`` maxItems 400      refused
+# ``stride.rulings``                    none                         OK
+# ``asvs.rulings``                      none                         OK
+# ====================================  ===========================  =======
+#
+# The cap is refused at every value tried, from 8 to 500, and only at the root:
+# the same cap on a *nested* array of objects is accepted, and so is a cap on a
+# root array of strings — which is why ``SystemModel`` runs there with five
+# capped ``assets`` lists.
+#
+# ``anyOf`` was the first suspect and is **not** the cause. A nullable enum, a
+# nullable nested object and both critics' whole ruling schemas are accepted on
+# that route, so the nullable judgement fields the critic record argues for cost
+# nothing here.
+
+#: Model-facing schemas that still cap a root-level array of objects, with what
+#: it costs. Each is a node that cannot run on a vendor refusing the shape.
+#: Emptying this table is
+#: [#942](https://github.com/mstarks01/work-agent/issues/942).
+ROOT_CAPPED_SCHEMAS: dict[str, str] = {
+    "ThreatProposals": (
+        "claims carries MAX_CLAIMS_PER_BATCH, so every STRIDE lane agent is"
+        " refused by a vendor that will not take a capped root array"
+    ),
+    "RequirementProposals": (
+        "claims carries the same cap, so every ASVS lane agent is refused too"
+    ),
+}
+
+
+def _root_capped_object_arrays(cls: type[BaseModel]) -> list[str]:
+    """Root properties that are an array of objects carrying ``maxItems``."""
+    schema = cls.model_json_schema()
+    found = []
+    for name, prop in schema.get("properties", {}).items():
+        if prop.get("type") != "array" or "maxItems" not in prop:
+            continue
+        items = prop.get("items", {})
+        if "$ref" in items or items.get("type") == "object":
+            found.append(name)
+    return found
+
+
+def _model_facing_schemas() -> dict[str, type[BaseModel]]:
+    """Every schema a node asks a model to fill, keyed by class name."""
+    from analysis_service.assertions import CatalogProposal
+    from analysis_service.frameworks import PACKAGES, schemas_for
+    from analysis_service.system_model import SystemModel
+
+    found: dict[str, type[BaseModel]] = {
+        "SystemModel": SystemModel,
+        "CatalogProposal": CatalogProposal,
+    }
+    for name in PACKAGES:
+        schemas = schemas_for(name)
+        for role in ("proposals", "rulings"):
+            cls = getattr(schemas, role)
+            found[cls.__name__] = cls
+    return found
+
+
+def test_every_schema_that_caps_a_root_array_is_declared():
+    """The table answers the schemas, with nothing left over.
+
+    A new ``max_length`` on a root list of objects fails here. That is the
+    point: the alternative is finding out from a node that dies on one vendor
+    and runs everywhere else, which is what this table was written from.
+    """
+    capping = {
+        name
+        for name, cls in _model_facing_schemas().items()
+        if _root_capped_object_arrays(cls)
+    }
+
+    assert capping == set(ROOT_CAPPED_SCHEMAS), (
+        f"these model-facing schemas cap a root array of objects and are not"
+        f" declared: {sorted(capping - set(ROOT_CAPPED_SCHEMAS))}. Enforce the"
+        f" bound where code reads the output instead. Declared but no longer"
+        f" capping: {sorted(set(ROOT_CAPPED_SCHEMAS) - capping)}."
+    )
+
+
+def test_the_two_extraction_side_schemas_take_every_vendor_s_shape():
+    """The schemas that have run live on more than one vendor, kept portable."""
+    for name in ("SystemModel", "CatalogProposal"):
+        assert _root_capped_object_arrays(_model_facing_schemas()[name]) == [], name
