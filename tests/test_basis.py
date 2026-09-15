@@ -16,6 +16,7 @@ from analysis_service.basis import (
     content_tokens,
     coverage,
     dispositions,
+    read_controls,
     stated_controls,
     unbased_controls,
 )
@@ -308,7 +309,7 @@ def test_the_corpus_is_read_in_full_so_its_clean_rate_means_something(
     to lose its citations, ``measured`` would fall and the 0 would stop meaning
     what the table says it means.
     """
-    totals = {"stated": 0, "measured": 0, "uncited": 0, "tokenless": 0, "flagged": 0}
+    totals = dict.fromkeys(coverage(_model(), WORKED_EXAMPLE).to_json(), 0)
     for case_dir in verify_corpus.case_dirs():
         case = load_case(case_dir)
         sources = {source.label: source.text for source in case.sources}
@@ -320,6 +321,7 @@ def test_the_corpus_is_read_in_full_so_its_clean_rate_means_something(
         "measured": CORPUS_VALUES,
         "uncited": 0,
         "tokenless": 0,
+        "exhausted": 0,
         "flagged": CORPUS_FLAGGED_WEAK,
     }
     assert len(corpus_values) == totals["measured"]
@@ -383,6 +385,44 @@ def test_the_scan_stops_at_the_budget_and_says_so(caplog):
     ]
     assert budgeted == []
     assert "the rest of this model is unmeasured" in caplog.text
+
+
+def test_a_control_the_stopped_scan_reaches_is_unmeasured_not_clean():
+    """The probe from #961: a zero budget read as five measured, none flagged.
+
+    Two values, no budget at all. Nothing is flagged, which was already true,
+    and now nothing is measured either: both controls are ``exhausted``, and
+    ``unmeasured`` says so, where before the coverage claimed a clean read of
+    two controls no search ever touched.
+    """
+    source = "quaternary " * 200
+    model = _model(authentication="zeta", encryption_in_transit="kappa")
+
+    with mock.patch.object(basis, "MAX_SCAN_WORK", 0):
+        flags, read = read_controls(model, {"System description": source})
+
+    assert flags == []
+    assert (read.stated, read.measured, read.exhausted) == (2, 0, 2)
+    assert read.unmeasured == 2
+    assert read.to_json()["exhausted"] == 2
+
+
+def test_a_control_is_undecided_when_one_of_its_tokens_went_unsearched():
+    """A memo answers what it holds; the first token it does not hold stops the read.
+
+    The first value spends the budget on ``zeta`` and is flagged. The second
+    carries ``zeta``, answered absent from the memo, and ``kappa``, which no
+    search can reach — so it is exhausted rather than flagged, because an
+    unsearched token could have echoed.
+    """
+    source = "quaternary " * 200
+    model = _model(authentication="zeta", encryption_in_transit="zeta kappa")
+
+    with mock.patch.object(basis, "MAX_SCAN_WORK", len(source)):
+        flags, read = read_controls(model, {"System description": source})
+
+    assert [flag.attribute for flag in flags] == ["authentication"]
+    assert (read.measured, read.exhausted, read.flagged) == (1, 1, 1)
 
 
 def test_one_token_is_searched_once_however_many_values_carry_it():
