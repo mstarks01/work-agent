@@ -1363,12 +1363,21 @@ class AssertionScore:
     #: projection had none of**: ``projected`` counts what the catalog emitted,
     #: so a catalog reaching one attribute and getting it right read 1/1.
     #:
-    #: Only pairs whose blessed value reads as ``stated`` are counted, because
-    #: reaching an attribute the blessed model leaves unverified asks nothing of
-    #: the model. Registry version 2 can reach five attributes; on corpus case
-    #: 01 that is 20 pairs, 13 of them stated.
+    #: Only pairs whose blessed value reads as ``stated`` are counted here,
+    #: because reaching an attribute the blessed model leaves unverified asks
+    #: nothing of the model. Registry version 2 can reach five attributes; on
+    #: corpus case 01 that is 20 pairs, 13 of them stated.
     reachable: int
     reached: int
+    #: The same pair of counts over the facts the blessed model states as
+    #: **absent** — a control the sources say is not there, which
+    #: :func:`~analysis_service.analysis.control_state` reads as ``absent``.
+    #: A second stratum rather than a share of the first, because omitting an
+    #: explicit absence is the loss this layer exists to prevent and a
+    #: denominator of stated facts alone could not see it: seven such pairs
+    #: across the corpus were outside every count (#961).
+    reachable_absent: int
+    reached_absent: int
     #: The graph attributes the catalog reaches, and what projecting them costs.
     #: ``degraded`` counts the ones that read ``unknown`` because a scope, a
     #: second value or a second predicate would not fit one string, which is the
@@ -1376,17 +1385,20 @@ class AssertionScore:
     #: hide.
     projected: int
     projection_degraded: int
-    #: Agreement through **control state**, the one reader both sides go
-    #: through, **split by what was agreed about**. ``agrees_stated`` is an
-    #: agreement about a fact the blessed model states. ``agrees_unstated`` is
-    #: an agreement that the blessed model states nothing — both sides reading
-    #: ``unknown`` or both reading ``absent``.
+    #: Agreement, each field compared the way :data:`PROJECTION_COMPARED`
+    #: says — a closed vocabulary by its value, a zone by its identity, a
+    #: mechanism by its state — and **split by what was agreed about**.
+    #: ``agrees_stated`` is an agreement about a fact the blessed model states.
+    #: ``agrees_absent`` is an agreement that a control is absent, which the
+    #: blessed model states too. ``agrees_unstated`` is an agreement that the
+    #: blessed model states nothing — both sides reading ``unknown``.
     #:
-    #: Two fields rather than one, because pooling them is the #891 mistake:
+    #: Three fields rather than one, because pooling them is the #891 mistake:
     #: agreeing that an unstated control is unknown is free, and on the first
     #: assertion benchmark two of luna's eight agreements were of that kind.
     #: Their sum is the single figure they replace, so no reader loses one.
     agrees_stated: int
+    agrees_absent: int
     agrees_unstated: int
 
     def to_json(self) -> dict[str, Any]:
@@ -1410,9 +1422,12 @@ class AssertionScore:
             "subjects_reached": round(self.subjects_reached, 3),
             "reachable": self.reachable,
             "reached": self.reached,
+            "reachable_absent": self.reachable_absent,
+            "reached_absent": self.reached_absent,
             "projected": self.projected,
             "projection_degraded": self.projection_degraded,
             "agrees_stated": self.agrees_stated,
+            "agrees_absent": self.agrees_absent,
             "agrees_unstated": self.agrees_unstated,
         }
 
@@ -1496,18 +1511,46 @@ _DEGRADED: frozenset[str] = frozenset(get_args(ProjectionReason)) - {
 }
 
 
-def reachable_controls(model: SystemModel) -> tuple[tuple[str, str], ...]:
-    """Every ``(element, attribute)`` pair a catalog can be asked to reproduce.
+#: How a projected value is compared with the blessed attribute, keyed by the
+#: graph field it projects into. :data:`_SCORED_ATTRIBUTES` is the one reader of
+#: how a scored field reduces — a closed vocabulary such as ``exposure`` by its
+#: value, a mechanism by its state — so those entries are taken off it rather
+#: than spelled again. ``trust_zone`` is the one projected field the extraction
+#: scorer does not score, because it reads zones through the crossings; it
+#: holds an **Element ID** and compares by identity.
+#:
+#: Reducing every field to a control state made ``internal`` agree with
+#: ``internet-facing``: both are stated (#961). A field a predicate projects
+#: into that has no entry here raises at the first projection, which
+#: ``tests/test_evals_modes.py`` holds against
+#: :func:`~analysis_service.assertions.projection_fields`.
+PROJECTION_COMPARED: Mapping[str, Callable[[Any], str]] = {
+    **{name: scored.reduce for name, scored in _SCORED_ATTRIBUTES.items()},
+    "trust_zone": str,
+}
+
+#: The blessed states a catalog can be asked to reproduce. ``unverified`` is
+#: outside: reaching an attribute the blessed model leaves unverified asks
+#: nothing of a model, and both sides reading ``unknown`` agree for free.
+Stratum = Literal["stated", "absent"]
+
+
+def reachable_controls(model: SystemModel) -> Mapping[tuple[str, str], Stratum]:
+    """Every ``(element, attribute)`` pair a catalog can be asked to reproduce, by stratum.
 
     The projection's denominator, derived from the blessed model rather than
     authored: an attribute is reachable when some predicate in
     :data:`~analysis_service.assertions.REGISTRY` projects into it, the element
-    carries it, and the blessed value reads as ``stated``.
+    carries it, and the blessed value reads as ``stated`` or ``absent``.
 
-    **Stated only.** Reaching an attribute the blessed model leaves unverified
-    asks nothing of a model — both sides read ``unknown`` and agree for free —
-    so counting those pairs in the denominator would make a sparse case look
-    harder than it is and a thorough one look worse.
+    **Two strata, and never a pooled one.** A stated fact and a stated absence
+    are both facts the sources establish, and omitting either is a loss. They
+    are counted apart because the layer exists for the second: the graph's own
+    attributes read "session cookie; no MFA" as a stated control, and a
+    denominator of stated facts alone left every explicit absence — case 01's
+    unauthenticated gRPC, case 09's unencrypted HTTP — outside every count
+    (#961). ``unverified`` pairs are outside both, for the reason
+    :data:`Stratum` gives.
 
     No human review is needed for this to be ground truth, because the blessed
     control attributes are the same reviewed facts the extraction scorer already
@@ -1521,57 +1564,65 @@ def reachable_controls(model: SystemModel) -> tuple[tuple[str, str], ...]:
     :data:`~analysis_service.assertions.REGISTRY` a second time here.
     """
     attributes = sorted(set(projection_fields().values()))
-    return tuple(
-        (element.id, attribute)
-        for element in model.elements()
-        for attribute in attributes
-        if hasattr(element, attribute)
-        and control_state(str(getattr(element, attribute))) == "stated"
-    )
+    strata: dict[tuple[str, str], Stratum] = {}
+    for element in model.elements():
+        for attribute in attributes:
+            if not hasattr(element, attribute):
+                continue
+            state = control_state(str(getattr(element, attribute)))
+            if state == "unverified":
+                continue
+            strata[element.id, attribute] = state
+    return strata
 
 
 def _projection_counts(case: GoldenCase, catalog: AssertionCatalog) -> dict[str, int]:
     """How much of the blessed graph the catalog's own rows reproduce.
 
-    **Through ``control_state``, the reader both sides already go through.**
-    Comparing the strings would report a disagreement wherever two correct
-    readings of one sentence are worded differently, which is the mistake the
-    extraction scorer makes nowhere else.
+    **Each field compared the way :data:`PROJECTION_COMPARED` says.** A
+    mechanism is compared as a state, because comparing the strings would
+    report a disagreement wherever two correct readings of one sentence are
+    worded differently; a closed vocabulary and a zone are compared as
+    written, because reducing ``internal`` to a state made it agree with
+    ``internet-facing`` (#961).
 
     Agreement is split by what was agreed about. A projection landing on an
-    attribute the blessed model states is counted apart from one landing where
-    it states nothing, because the second costs a model nothing to get right.
+    attribute the blessed model states, one landing on an absence it states,
+    and one landing where it states nothing are three counts, because the
+    third costs a model nothing to get right and the second is the fact the
+    layer exists for.
     """
     index = ModelIndex.of(case.model)
     reachable = reachable_controls(case.model)
-    stated = set(reachable)
-    reached: set[tuple[str, str]] = set()
-    agrees_stated = 0
-    agrees_unstated = 0
+    reached: dict[Stratum, set[tuple[str, str]]] = {"stated": set(), "absent": set()}
+    agrees: Counter[str] = Counter()
     projections = project(catalog)
     for projection in projections:
         element = index.get(projection.element_id)
         if element is None:
             continue
         key = (projection.element_id, projection.attribute)
-        if key in stated:
-            reached.add(key)
+        stratum = reachable.get(key)
+        if stratum is not None:
+            reached[stratum].add(key)
+        compared = PROJECTION_COMPARED[projection.attribute]
         blessed = getattr(element, projection.attribute, UNKNOWN)
-        if control_state(projection.value) != control_state(str(blessed)):
-            continue
-        if key in stated:
-            agrees_stated += 1
-        else:
-            agrees_unstated += 1
+        if compared(projection.value) == compared(str(blessed)):
+            agrees[stratum or "unstated"] += 1
     return {
-        "reachable": len(reachable),
-        "reached": len(reached),
+        "reachable": sum(1 for stratum in reachable.values() if stratum == "stated"),
+        "reached": len(reached["stated"]),
+        "reachable_absent": sum(
+            1 for stratum in reachable.values() if stratum == "absent"
+        ),
+        "reached_absent": len(reached["absent"]),
         "projected": len(projections),
         "projection_degraded": sum(
             1 for projection in projections if projection.reason in _DEGRADED
         ),
-        "agrees_stated": agrees_stated,
-        "agrees_unstated": agrees_unstated,
+        "agrees_stated": agrees["stated"],
+        "agrees_absent": agrees["absent"],
+        "agrees_unstated": agrees["unstated"],
     }
 
 
@@ -1589,7 +1640,9 @@ def render_assertions(scores: Sequence[AssertionScore]) -> None:
             f" unknowns {score.unknowns:>2} conflicts {score.conflicts:>2}"
             f" elements reached {score.subjects_reached:.0%}"
             f" reached {score.reached}/{score.reachable}"
-            f" agrees {score.agrees_stated} (+{score.agrees_unstated} unstated)"
+            f" (+{score.reached_absent}/{score.reachable_absent} absent)"
+            f" agrees {score.agrees_stated} (+{score.agrees_absent} absent,"
+            f" +{score.agrees_unstated} unstated)"
             f" degraded {score.projection_degraded} of {score.projected}"
         )
     if not scores:
