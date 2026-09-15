@@ -479,10 +479,11 @@ class ExtractionScore:
     #: from the reference, because the score does not keep the model and a
     #: denominator recovered later would be a second reader of it.
     blessed_scored_fields: int = 0
-    #: ``(agreed, total)`` over every pair of zoned elements both models carry,
-    #: asked whether the pair shares a zone. Computed at scoring time for the
-    #: reason the field above is: the score does not keep either model.
-    zone_pairs: tuple[int, int] | None = None
+    #: Every pair of zoned elements the alignment paired, asked whether the
+    #: pair shares a zone, split by the blessed answer. Computed at scoring
+    #: time for the reason the field above is: the score does not keep either
+    #: model.
+    zone_pairs: ZonePairs | None = None
 
     @property
     def recall(self) -> float:
@@ -904,19 +905,65 @@ class ExtractionScore:
         crossing figure holds at 1.0 (#925).
 
         So this reads the *partition* and never a name. Over the zoned elements
-        both models carry, every pair is asked one question — do these two share
-        a zone? — and the score is the share of pairs the two models answer the
-        same way. A renaming moves it not at all, which is the point: it is the
-        one zone figure a naming difference cannot reach.
+        the alignment paired, every pair is asked one question — do these two
+        share a zone? — and the score is the share of pairs the two models
+        answer the same way. A renaming moves it not at all, which is the
+        point: it is the one zone figure a naming difference cannot reach.
 
-        ``0.0`` where fewer than two zoned elements are shared, because there is
-        no pair to ask and an empty agreement is not a perfect one.
+        **Not a whole-system guarantee, and it credits two kinds of pair
+        alike.** A pair correctly kept apart counts as much as a pair correctly
+        kept together, and a pair with an unaligned element is asked nothing,
+        so a high value can sit over omitted nodes and a missed co-membership
+        (#961). :attr:`same_zone_recall`, :attr:`different_zone_agreement` and
+        :attr:`zone_pair_coverage` are the three readings beside it.
+
+        ``0.0`` where fewer than two zoned elements are paired, because there
+        is no pair to ask and an empty agreement is not a perfect one.
         """
         pairs = self.zone_pairs
-        if not pairs:
+        if pairs is None or not pairs.compared:
             return 0.0
-        agreed, total = pairs
-        return agreed / total
+        return (pairs.same_agreed + pairs.apart_agreed) / pairs.compared
+
+    @property
+    def same_zone_recall(self) -> float:
+        """Of the aligned pairs the blessed model puts together, the share the extraction does too.
+
+        The co-memberships, on their own. Case 01's elements split into a zone
+        each leaves every apart pair agreeing and every together pair not, and
+        the pooled figure reads the average; this reads the loss.
+        """
+        pairs = self.zone_pairs
+        if pairs is None or not pairs.same_total:
+            return 0.0
+        return pairs.same_agreed / pairs.same_total
+
+    @property
+    def different_zone_agreement(self) -> float:
+        """Of the aligned pairs the blessed model keeps apart, the share the extraction does too.
+
+        The separations, on their own: one zone for everything leaves every
+        together pair agreeing and this at zero.
+        """
+        pairs = self.zone_pairs
+        if pairs is None or not pairs.apart_total:
+            return 0.0
+        return pairs.apart_agreed / pairs.apart_total
+
+    @property
+    def zone_pair_coverage(self) -> float:
+        """What share of the blessed model's zoned pairs the partition figures were asked over.
+
+        A pair with an unaligned element is outside every figure above, so a
+        model that dropped half the zoned elements can read a perfect
+        partition over the half it kept; this is the denominator beside that
+        reading, the way :attr:`comparison_coverage` sits beside the attribute
+        agreement.
+        """
+        pairs = self.zone_pairs
+        if pairs is None or not pairs.reference_total:
+            return 0.0
+        return pairs.compared / pairs.reference_total
 
     @property
     def differing(self) -> tuple[AttributeCheck, ...]:
@@ -1029,6 +1076,12 @@ class ExtractionScore:
             # The zone figure a naming difference cannot reach: do the same
             # elements sit together, whatever the zones are called (#925).
             "zone_partition_agreement": round(self.zone_partition_agreement, 3),
+            # The partition figure's three readings: the co-memberships alone,
+            # the separations alone, and how much of the reference either was
+            # asked over (#961).
+            "same_zone_recall": round(self.same_zone_recall, 3),
+            "different_zone_agreement": round(self.different_zone_agreement, 3),
+            "zone_pair_coverage": round(self.zone_pair_coverage, 3),
             "endpoint_missing": sorted(self.endpoint_missing),
             "endpoint_extra": sorted(self.endpoint_extra),
             "name_tokens_absent_from_source": list(self.name_tokens_absent_from_source),
@@ -1770,9 +1823,40 @@ def _basis(
     return tuple(flags), read
 
 
+@dataclass(frozen=True)
+class ZonePairs:
+    """Every pair of zoned elements, asked whether the pair shares a zone.
+
+    Split by the blessed answer, because the two answers are two different
+    failures: ``same_*`` counts the pairs the blessed model puts together and
+    how many the extraction does too, ``apart_*`` the pairs it keeps apart.
+    ``reference_total`` is every pair of blessed zoned elements, paired or not,
+    which is what the compared count is a coverage of.
+    """
+
+    same_agreed: int
+    same_total: int
+    apart_agreed: int
+    apart_total: int
+    reference_total: int
+
+    @property
+    def compared(self) -> int:
+        return self.same_total + self.apart_total
+
+    def to_json(self) -> dict[str, int]:
+        return {
+            "same_agreed": self.same_agreed,
+            "same_total": self.same_total,
+            "apart_agreed": self.apart_agreed,
+            "apart_total": self.apart_total,
+            "reference_total": self.reference_total,
+        }
+
+
 def _zone_pairs(
     blessed: SystemModel, extracted: SystemModel | None, alignment: Alignment
-) -> tuple[int, int] | None:
+) -> ZonePairs | None:
     """Every pair of aligned zoned elements, and how many the models agree about.
 
     Agreement on one pair is "both models put these two together" or "both put
@@ -1780,29 +1864,37 @@ def _zone_pairs(
     Over the elements the alignment paired, because an unpaired element is
     already counted as a miss and reading it here would charge one omission
     twice; an element found under a reader's alias is paired and so is read.
+    The pairs a dropped element takes with it are still in ``reference_total``,
+    so the coverage beside the figure says how many were never asked.
 
-    ``None`` where fewer than two elements are paired: no pair exists, which is
+    ``None`` where no extraction was handed in: nothing was measured, which is
     a different fact from every pair agreeing.
     """
     if extracted is None:
         return None
     theirs = {element.id: element.trust_zone for element in extracted.zoned_elements()}
     produced_of = alignment.produced_of
+    zoned = blessed.zoned_elements()
     shared = [
         (produced_of[element.id], element.trust_zone)
-        for element in blessed.zoned_elements()
+        for element in zoned
         if produced_of.get(element.id) in theirs
     ]
-    if len(shared) < 2:
-        return None
-    agreed = 0
-    total = 0
+    agreed = Counter[bool]()
+    total = Counter[bool]()
     for index, (one_id, one_zone) in enumerate(shared):
         for other_id, other_zone in shared[index + 1 :]:
-            total += 1
-            if (one_zone == other_zone) == (theirs[one_id] == theirs[other_id]):
-                agreed += 1
-    return agreed, total
+            together = one_zone == other_zone
+            total[together] += 1
+            if together == (theirs[one_id] == theirs[other_id]):
+                agreed[together] += 1
+    return ZonePairs(
+        same_agreed=agreed[True],
+        same_total=total[True],
+        apart_agreed=agreed[False],
+        apart_total=total[False],
+        reference_total=len(zoned) * (len(zoned) - 1) // 2,
+    )
 
 
 def _scored_fields(model: SystemModel) -> int:
@@ -2098,9 +2190,15 @@ def render_extraction(scores: Sequence[ExtractionScore]) -> None:
         f" structure the crossings derive from rather than the identity rule"
     )
     partition = sum(score.zone_partition_agreement for score in scores) / len(scores)
+    together = sum(score.same_zone_recall for score in scores) / len(scores)
+    apart = sum(score.different_zone_agreement for score in scores) / len(scores)
+    asked = sum(score.zone_pair_coverage for score in scores) / len(scores)
     print(
-        f"  {partition:.2f} of element pairs sit together in both models — the"
-        f" one zone figure a naming difference cannot reach (#925)"
+        f"  {partition:.2f} of element pairs are placed alike in both models —"
+        f" the one zone figure a naming difference cannot reach (#925);"
+        f" {together:.2f} of the pairs the reference puts together,"
+        f" {apart:.2f} of the pairs it keeps apart, asked over {asked:.2f} of"
+        f" its pairs (#961)"
     )
     zone_credits = sum(
         1 for score in scores for credit in score.aliased if _is_zone(credit.reference)
