@@ -40,7 +40,7 @@ from analysis_service.prompts import compose_critic_prompt
 from analysis_service.skills import compose_critic_skills
 from analysis_service.system_model import SystemModel
 from evals.critic_review.model import CriticFixture
-from evals.harness.modes import singular
+from evals.harness.alignment import singular
 
 #: The placeholders this module fills, and the whole of what ``critic.md``
 #: declares. Held to the prompt file by a test rather than trusted: an unfilled
@@ -391,7 +391,7 @@ def carries_both_answers(rows: Iterable[tuple[bool, bool | None]]) -> bool:
 def _words(text: str) -> list[str]:
     """One text as its words, singular and lowercased.
 
-    Through :func:`~evals.harness.modes.singular`, which is the rule this
+    Through :func:`~evals.harness.alignment.singular`, which is the rule this
     repository already measured for exactly this: a plural on one side and a
     singular on the other are one word, and two readers of that question
     disagree. On the first live run the critic rejected a draft for the right

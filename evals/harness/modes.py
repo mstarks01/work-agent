@@ -32,12 +32,11 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from types import MappingProxyType
-from typing import Any, NamedTuple, get_args
+from typing import Any, Literal, NamedTuple, get_args
 
 from analysis_service.analysis import (
     CONSEQUENCE_ASSET_TAGS,
     control_state,
-    states_a_protocol,
 )
 from analysis_service.assertions import (
     ABSENT,
@@ -100,12 +99,20 @@ from analysis_service.system_model import (
     UNKNOWN,
     DataFlow,
     Element,
+    ExternalEntity,
     ModelIndex,
     SystemModel,
     TrustBoundary,
-    make_element_id,
 )
 from analysis_service.validation import ValidationIssue
+from evals.harness.alignment import (
+    Alignment,
+    Pair,
+    align,
+    element_type,
+    protocol_state,
+    singular,
+)
 from evals.harness.identity import comparable_elements
 from evals.harness.reference import GoldenCase
 
@@ -250,17 +257,13 @@ class _Scored(NamedTuple):
     states: bool
 
 
-def _protocol_state(value: Any) -> str:
-    return "stated" if states_a_protocol(value) else "silent"
-
-
 _SCORED_ATTRIBUTES: Mapping[str, _Scored] = {
     "kind": _Scored(str, states=False),
     "exposure": _Scored(str, states=False),
     "interface_kind": _Scored(str, states=False),
     "assets": _Scored(_tags, states=False),
     "operations": _Scored(str, states=False),
-    "protocol": _Scored(_protocol_state, states=True),
+    "protocol": _Scored(protocol_state, states=True),
     "authentication": _Scored(control_state, states=True),
     "encryption_in_transit": _Scored(control_state, states=True),
     "encryption_at_rest": _Scored(control_state, states=True),
@@ -356,7 +359,7 @@ def _endpoint_keys(ids: Iterable[str]) -> frozenset[str]:
 #: a component nobody described. A flow's name is a label the model coins for an
 #: interaction and a zone is one it invents per implied boundary, so neither is
 #: a name the source was ever going to hold. The one reader of that population:
-#: :func:`_unsourced` asks its question of these, and
+#: :func:`_name_tokens_absent` asks its question of these, and
 #: :attr:`ExtractionScore.named_extra` reports the split over them.
 #:
 #: **Subtracted from the registry, never listed.** ``Element`` is the closed set
@@ -373,15 +376,12 @@ NAMED_TYPES: tuple[str, ...] = tuple(
 )
 
 
-def _element_type(element_id: str) -> str:
-    """An element ID's type prefix — ``store`` of ``store:feature-store``.
-
-    The whole ID where it carries no prefix, which no model this scores
-    produces: the type is part of the derived ID. Returning the ID itself keeps
-    a malformed one comparable only to itself, rather than pooling every
-    malformed ID under one empty type.
-    """
-    return element_id.split(":", 1)[0] if ":" in element_id else element_id
+#: What a score knows about one extra element. ``equivalent`` is the
+#: alignment's word; ``unreviewed`` is every other extra, and it is the honest
+#: word for what no figure here can decide (#961). A reader's rulings —
+#: supported, unsupported, ambiguous — join this literal when a field carries
+#: them.
+ExtraStatus = Literal["equivalent", "unreviewed"]
 
 
 @dataclass(frozen=True)
@@ -428,19 +428,19 @@ class ExtractionScore:
     extra: tuple[str, ...]
     crossings_match: bool
     attributes: tuple[AttributeCheck, ...]
-    #: The extra elements whose name the submitted text does not contain, so
-    #: the model wrote a component nobody described. Carried rather than
-    #: recomputed, because it reads the case's source bytes.
-    #:
-    #: The rest of ``extra`` is not invention. On the sweep of 2026-09-13 every
-    #: one of the 35 extra elements a run was named word for word in the
-    #: source: some are the model's word for an element the corpus paraphrased,
-    #: and some are elements the corpus omits (#882). Precision counts all
-    #: three the same, so it answers no question on its own.
-    unsourced: tuple[str, ...] = ()
-    #: Every element the extraction found under a name a reader ruled
-    #: supported. Empty on a case nobody has ruled on.
-    aliased: tuple[AliasCredit, ...] = ()
+    #: Which produced element stands for which blessed one, and on what
+    #: evidence — :mod:`evals.harness.alignment` is the one reader of that
+    #: question, and every figure below that asks it reads this. ``matched``,
+    #: ``missing`` and ``extra`` are the strict reading by exact ID, kept beside
+    #: it so no archived number changes meaning.
+    alignment: Alignment = field(default_factory=Alignment.empty)
+    #: The extra elements with a name token the submitted text does not
+    #: contain — a word-presence diagnostic and nothing more. It says the model
+    #: used a word nobody wrote; it does not say the element is invented, and
+    #: an element absent from this list is not thereby real: a component
+    #: assembled from the source's own vocabulary passes it (#961). Carried
+    #: rather than recomputed, because it reads the case's source bytes.
+    name_tokens_absent_from_source: tuple[str, ...] = ()
     #: The blessed model's pure initiators — elements that only ever start an
     #: interaction. Carried so the reading below needs no second model walk.
     blessed_initiators: tuple[str, ...] = ()
@@ -495,6 +495,85 @@ class ExtractionScore:
         return len(self.matched) / total if total else 0.0
 
     @property
+    def aliased(self) -> tuple[Pair, ...]:
+        """Every element found under a name a reader ruled supported.
+
+        The alignment's ``alias`` pairs, each carrying the excerpt the ruling
+        rests on. Empty on a case nobody has ruled on.
+        """
+        return self.alignment.by_evidence("alias")
+
+    def _reference_of_type(self, prefix: str) -> frozenset[str]:
+        """The blessed elements of one type, from the strict reading's two halves."""
+        return frozenset(
+            element_id
+            for element_id in (*self.matched, *self.missing)
+            if element_type(element_id) == prefix
+        )
+
+    @property
+    def aligned_recall(self) -> float:
+        """Of the citable blessed elements, the share some produced element stands for.
+
+        The alignment's reading beside :attr:`endpoint_recall` and
+        :attr:`sourced_recall`. It credits an exact ID, a reader's alias, a
+        flow under its own label between aligned endpoints, and a flow the
+        discriminators single out — and nothing else, so an interaction the
+        model drew between two real elements with a different operation is
+        missed here and matched by the endpoint fold. Zones sit outside it as
+        they sit outside every citable figure.
+        """
+        reference = comparable_elements((*self.matched, *self.missing))
+        found = reference & self.alignment.aligned_reference
+        return len(found) / len(reference) if reference else 0.0
+
+    @property
+    def aligned_precision(self) -> float:
+        """Of the citable produced elements, the share that stands for a blessed one."""
+        produced = comparable_elements((*self.matched, *self.extra))
+        found = produced & frozenset(self.alignment.reference_of)
+        return len(found) / len(produced) if produced else 0.0
+
+    @property
+    def aligned_interaction_recall(self) -> float:
+        """Of the blessed interactions, the share the alignment paired.
+
+        One to one, unlike :attr:`interaction_recall`, which counts flows per
+        endpoint pair and so credits an invented interaction that replaced a
+        real one between the same two elements (#961). A pair here rests on
+        the label or on the discriminators, so that replacement is a miss and
+        an extra, and two flows the rules cannot tell apart are neither.
+        """
+        flows = self._reference_of_type(DataFlow.id_prefix)
+        found = flows & self.alignment.aligned_reference
+        return len(found) / len(flows) if flows else 0.0
+
+    @property
+    def aligned_interaction_precision(self) -> float:
+        """Of the produced interactions, the share that stands for a blessed one."""
+        produced = frozenset(
+            element_id
+            for element_id in (*self.matched, *self.extra)
+            if element_type(element_id) == DataFlow.id_prefix
+        )
+        found = produced & frozenset(self.alignment.reference_of)
+        return len(found) / len(produced) if produced else 0.0
+
+    @property
+    def actor_recall(self) -> float:
+        """Of the blessed external entities, the share the alignment paired.
+
+        Actor retention on its own, apart from :attr:`initiator_recall`: that
+        figure reads the graph's pure source nodes, and an actor that also
+        receives a callback is outside it (#961). This asks the plainer
+        question — is each actor the source describes present under some
+        aligned identity — and a reader's alias counts.
+        """
+        actors = self._reference_of_type(ExternalEntity.id_prefix)
+        found = actors & self.alignment.aligned_reference
+        return len(found) / len(actors) if actors else 0.0
+
+    @property
     def sourced_recall(self) -> float:
         """Recall over citable elements, crediting a name a reader ruled supported.
 
@@ -523,7 +602,7 @@ class ExtractionScore:
         question the excerpt can answer.
         """
         credited = comparable_elements(
-            frozenset(credit.blessed for credit in self.aliased)
+            frozenset(credit.reference for credit in self.aliased)
         )
         found = len(comparable_elements(self.endpoint_matched)) + len(
             comparable_elements(
@@ -545,32 +624,50 @@ class ExtractionScore:
         return len(self.aliased)
 
     @property
-    def possible_renames(self) -> tuple[str, ...]:
-        """Extra elements that could be a blessed element under another name.
+    def same_type_unmatched_candidates(self) -> tuple[str, ...]:
+        """Unaligned extra elements of a type some blessed element is unaligned in.
 
-        An extra element is one of three things and :attr:`precision` counts
-        all three alike: a component the model invented, a component the corpus
-        omits, and the model's own name for a component the corpus paraphrased.
-        Only the first is the model's error. On the sweep of 2026-09-13 all 35
-        extra non-flow elements a run were named word for word in the source,
-        so precision was reading the corpus rather than the model (#882).
+        **A candidate list, and not a count of renames.** One unaligned
+        blessed store and twenty unaligned extra stores put all twenty here,
+        and twenty elements cannot all be one store under another name; the
+        list says only that a rename is not ruled out by type (#961). Which
+        blessed element an extra one renames is a reader's ruling, recorded as
+        an alias and read by the alignment, and an extra the alignment already
+        paired is outside this list.
 
-        Which blessed element an extra one renames needs a fuzzy comparison,
-        which this repository refuses in graded code for the reason
-        :mod:`analysis_service.evidence` states. Whether it renames *anything*
-        does not: a rename displaces a blessed element of its own type, so an
-        extra element of a type the extraction matched completely has nothing
-        to be a rename of. That is the split, and it is set arithmetic.
-
-        This is a **bound and not an attribution**. An element here may still be
-        an invention; what :attr:`additions` holds cannot be a rename.
+        An extra element of a type the alignment paired completely has nothing
+        to be a rename of, so it is outside this list too — but that is the
+        whole of what its absence says. It is not thereby an invention and not
+        thereby a component the corpus omits; :attr:`extra_status` leaves it
+        ``unreviewed``.
         """
-        displaced = {_element_type(element_id) for element_id in self.missing}
+        unaligned = frozenset(self.alignment.unaligned_reference)
+        displaced = {element_type(element_id) for element_id in unaligned}
+        found = self.alignment.reference_of
         return tuple(
             element_id
             for element_id in self.extra
-            if _element_type(element_id) in displaced
+            if element_id not in found and element_type(element_id) in displaced
         )
+
+    @property
+    def extra_status(self) -> Mapping[str, ExtraStatus]:
+        """What is known about each extra element, and it is usually nothing.
+
+        ``equivalent`` where the alignment paired it with a blessed element —
+        on a reader's alias, or as a flow under its own label or the
+        discriminators between aligned endpoints. ``unreviewed`` for every
+        other extra: it may be a supported component the corpus omits, an
+        unsupported one the model invented, or a name for a blessed element
+        nobody has ruled on, and no figure here can tell those apart. The
+        statuses a reader can assign — supported, unsupported, ambiguous —
+        wait on a ruling field somebody fills (#961 step 3).
+        """
+        found = self.alignment.reference_of
+        return {
+            element_id: "equivalent" if element_id in found else "unreviewed"
+            for element_id in self.extra
+        }
 
     @property
     def named_extra(self) -> tuple[str, ...]:
@@ -585,27 +682,18 @@ class ExtractionScore:
         return tuple(
             element_id
             for element_id in self.extra
-            if _element_type(element_id) in NAMED_TYPES
-        )
-
-    @property
-    def additions(self) -> tuple[str, ...]:
-        """Extra elements no rename explains: their type is fully accounted for.
-
-        The complement of :attr:`possible_renames` over ``extra``, so the two
-        partition it. Each one is a component the extraction holds and the
-        blessed model does not: an invention, which :attr:`unsourced` names
-        where the source never mentions it, or a component the corpus omits.
-        """
-        renames = frozenset(self.possible_renames)
-        return tuple(
-            element_id for element_id in self.extra if element_id not in renames
+            if element_type(element_id) in NAMED_TYPES
         )
 
     @property
     def initiators_missing(self) -> frozenset[str]:
-        """Pure initiators the blessed model holds and the extraction dropped."""
-        return frozenset(self.blessed_initiators) & frozenset(self.missing)
+        """Pure initiators the blessed model holds that no produced element stands for.
+
+        Read off the alignment, so an initiator found under a reader's alias
+        is kept: on corpus case 09 the approved name for the catalogue
+        spreadsheet read here as a dropped initiator (#961).
+        """
+        return frozenset(self.blessed_initiators) - self.alignment.aligned_reference
 
     @property
     def initiator_recall(self) -> float:
@@ -615,6 +703,12 @@ class ExtractionScore:
         two together say whether an extraction is uniformly thin or is dropping
         one *kind* of element. A case with no pure initiator reads 0.0, for the
         reason every other empty denominator here does.
+
+        **A pure initiator is a graph source node**, an element that starts an
+        interaction and never receives one, and that is narrower than an actor
+        that initiates an action: case 09's customer places orders and
+        receives a fax, so it is outside this denominator. :attr:`actor_recall`
+        is the reading over every external entity.
         """
         if not self.blessed_initiators:
             return 0.0
@@ -687,14 +781,14 @@ class ExtractionScore:
         blessed = Counter(
             _endpoint_key(element_id)
             for element_id in (*self.matched, *self.missing)
-            if _element_type(element_id) == DataFlow.id_prefix
+            if element_type(element_id) == DataFlow.id_prefix
         )
         if not blessed:
             return 0.0
         extracted = Counter(
             _endpoint_key(element_id)
             for element_id in (*self.matched, *self.extra)
-            if _element_type(element_id) == DataFlow.id_prefix
+            if element_type(element_id) == DataFlow.id_prefix
         )
         kept = sum(min(count, extracted[pair]) for pair, count in blessed.items())
         return kept / sum(blessed.values())
@@ -794,7 +888,7 @@ class ExtractionScore:
         if not blessed:
             return 0.0
         credited = gone & frozenset(
-            credit.blessed for credit in self.aliased if _is_zone(credit.blessed)
+            credit.reference for credit in self.aliased if _is_zone(credit.reference)
         )
         return (len(blessed) - len(gone) + len(credited)) / len(blessed)
 
@@ -937,11 +1031,22 @@ class ExtractionScore:
             "zone_partition_agreement": round(self.zone_partition_agreement, 3),
             "endpoint_missing": sorted(self.endpoint_missing),
             "endpoint_extra": sorted(self.endpoint_extra),
-            "unsourced": list(self.unsourced),
+            "name_tokens_absent_from_source": list(self.name_tokens_absent_from_source),
             "sourced_recall": round(self.sourced_recall, 3),
             "aliased": [credit.to_json() for credit in self.aliased],
-            "possible_renames": list(self.possible_renames),
-            "additions": list(self.additions),
+            # The alignment's own reading, beside the strict and folded ones:
+            # one produced element per blessed one, on recorded evidence, and
+            # what it left unpaired (#961).
+            "alignment": self.alignment.to_json(),
+            "aligned_recall": round(self.aligned_recall, 3),
+            "aligned_precision": round(self.aligned_precision, 3),
+            "aligned_interaction_recall": round(self.aligned_interaction_recall, 3),
+            "aligned_interaction_precision": round(
+                self.aligned_interaction_precision, 3
+            ),
+            "actor_recall": round(self.actor_recall, 3),
+            "same_type_unmatched_candidates": list(self.same_type_unmatched_candidates),
+            "extra_status": dict(self.extra_status),
             "initiator_recall": round(self.initiator_recall, 3),
             "initiators_missing": sorted(self.initiators_missing),
             "crossings_match": self.crossings_match,
@@ -1516,120 +1621,40 @@ def score_extraction(case: GoldenCase, result: ExtractionResult) -> ExtractionSc
     )
     crossings_match = _crossings_match(case.model, result.extracted)
     unbased, read = _basis(case, result.extracted)
+    alignment = align(case, result.extracted)
     return ExtractionScore(
         case_id=case.id,
         matched=tuple(sorted(blessed_ids & extracted_ids)),
         missing=tuple(sorted(blessed_ids - extracted_ids)),
         extra=tuple(sorted(extracted_ids - blessed_ids)),
         crossings_match=crossings_match,
-        attributes=_check_attributes(case.model, result.extracted),
+        alignment=alignment,
+        attributes=_check_attributes(case.model, result.extracted, alignment),
         blessed_scored_fields=_scored_fields(case.model),
-        zone_pairs=_zone_pairs(case.model, result.extracted),
+        zone_pairs=_zone_pairs(case.model, result.extracted, alignment),
         blessed_initiators=tuple(sorted(pure_initiators(case.model))),
         blessed_crossings=crossing_keys(case.model) or (),
         extracted_crossings=crossing_keys(result.extracted),
         uncited=tuple(issue for issue in result.issues if issue.is_citation),
         unbased=unbased,
         basis_coverage=read,
-        unsourced=_unsourced(
+        name_tokens_absent_from_source=_name_tokens_absent(
             case, sorted(extracted_ids - blessed_ids), result.extracted
         ),
-        aliased=_aliased(
-            case, blessed_ids - extracted_ids, extracted_ids - blessed_ids
-        ),
     )
 
 
-@dataclass(frozen=True)
-class AliasCredit:
-    """One element found under a name a reader ruled supported.
-
-    Carries the excerpt as well as the pair, so the artifact says on whose
-    authority the credit was given. A reader meeting ``sourced_recall`` above
-    ``endpoint_recall`` can check the ruling from the artifact rather than
-    having to open the corpus at the commit the sweep ran from.
-    """
-
-    blessed: str
-    extracted: str
-    excerpt: str
-
-    def to_json(self) -> dict[str, str]:
-        return {
-            "blessed": self.blessed,
-            "extracted": self.extracted,
-            "excerpt": self.excerpt,
-        }
-
-
-def _slug_key(element_id: str) -> str:
-    """One element ID with each slug segment singularised.
-
-    ``entity:analysts`` and ``entity:analyst`` are one key. Which of the two an
-    extraction should write is ``extract.md``'s rule and is measured as naming
-    conformity; charging it as a different component would count one
-    disagreement twice. :func:`singular` is the one reader of that rule, shared
-    with the invention question.
-    """
-    prefix, _, slug = element_id.partition(":")
-    return f"{prefix}:{'-'.join(singular(part) for part in slug.split('-'))}"
-
-
-def _aliased(
-    case: GoldenCase, missing: set[str], extra: set[str]
-) -> tuple[AliasCredit, ...]:
-    """Every element found under a name a reader ruled supported.
-
-    **Not a fuzzy match, and not a rename detector.** Each pair rests on an
-    entry in the case's own ``aliases``, which a person ruled and
-    :mod:`evals.verify_corpus` holds to a quotation from the source. A case
-    nobody has ruled on produces none, so the reading is empty rather than
-    guessed.
-
-    Only a blessed element the extraction missed can be aliased, and only by an
-    extra element it wrote. An alias that matched an element already found
-    would credit one component twice.
-    """
-    by_key = {_slug_key(element_id): element_id for element_id in extra}
-    credits = []
-    for alias in case.meta.aliases:
-        if alias.element not in missing:
-            continue
-        prefix = alias.element.split(":", 1)[0]
-        found = by_key.get(_slug_key(make_element_id(prefix, alias.name)))
-        if found is not None:
-            credits.append(AliasCredit(alias.element, found, alias.excerpt))
-    return tuple(sorted(credits, key=lambda credit: credit.blessed))
-
-
-def singular(word: str) -> str:
-    """One word with a plural ``s`` dropped, so ``servers`` and ``server`` are one.
-
-    Public because it has a second reader: ``evals/critic_review/replay.py``
-    matches a rejection reason against the anchors a reader named, and a critic
-    writing "queues" where the anchor says "queue" engaged with the fact
-    either way.
-
-    Deliberately crude: three letters of stem before the ``s``, and no other
-    ending. It serves a check that must not accuse, so under-stemming leaves a
-    pair looking different and over-stemming never invents a match that a
-    reader would dispute.
-    """
-    return (
-        word[:-1] if len(word) > 3 and word.endswith("s") and word[-2] != "s" else word
-    )
-
-
-def _unsourced(
+def _name_tokens_absent(
     case: GoldenCase, extra: Sequence[str], extracted: SystemModel | None
 ) -> tuple[str, ...]:
-    """The extra elements the submitted text does not name, in element order.
+    """The extra elements with a name token the submitted text never uses.
 
-    **Conservative by construction, and deliberately so.** A name counts as
-    sourced when every one of its words of three letters or more appears in the
-    case's own source text, which over-credits a model that assembled a name
-    from scattered words. The question this answers is whether the model
-    *invented* a component, and a check that accuses one should be sure.
+    **A word-presence diagnostic, named for what it reads.** A name passes
+    when every one of its words of three letters or more appears somewhere in
+    the case's own source text. That over-credits a model that assembled a
+    name from scattered words, and it does not ask whether the words refer to
+    this component, so it neither measures invention nor rules it out (#961).
+    What it does is name the elements a reader should open first.
 
     Singular and plural are one word here. A source writing "game servers",
     "Analysts" and "dashboards" had a model's ``game server``, ``analyst`` and
@@ -1649,11 +1674,9 @@ def _unsourced(
     that used this.
 
     What it is not is a rename test. Deciding that an extra element is a
-    blessed one under another name needs a fuzzy comparison, which this
-    repository refuses in graded code for the reason
-    :mod:`analysis_service.evidence` states: there is no fuzzy match and no
-    repair, because inferring what an agent meant is the guess the mechanism
-    exists to remove.
+    blessed one under another name is a reader's ruling, which
+    :mod:`evals.harness.alignment` reads from the case's aliases; nothing here
+    guesses at one.
     """
     if extracted is None:
         return ()
@@ -1663,7 +1686,7 @@ def _unsourced(
     out = []
     for element_id in extra:
         element = by_id.get(element_id)
-        if element is None or _element_type(element_id) not in NAMED_TYPES:
+        if element is None or element_type(element_id) not in NAMED_TYPES:
             continue
         tokens = [
             w for w in re.split(r"[^a-z0-9]+", element.name.lower()) if len(w) > 2
@@ -1695,25 +1718,27 @@ def _basis(
 
 
 def _zone_pairs(
-    blessed: SystemModel, extracted: SystemModel | None
+    blessed: SystemModel, extracted: SystemModel | None, alignment: Alignment
 ) -> tuple[int, int] | None:
-    """Every pair of shared zoned elements, and how many the models agree about.
+    """Every pair of aligned zoned elements, and how many the models agree about.
 
     Agreement on one pair is "both models put these two together" or "both put
     them apart" — the question a zone *name* cannot answer and a partition can.
-    Over the elements both models carry, because a missing element is already
-    counted as a miss and reading it here would charge one omission twice.
+    Over the elements the alignment paired, because an unpaired element is
+    already counted as a miss and reading it here would charge one omission
+    twice; an element found under a reader's alias is paired and so is read.
 
-    ``None`` where fewer than two elements are shared: no pair exists, which is
+    ``None`` where fewer than two elements are paired: no pair exists, which is
     a different fact from every pair agreeing.
     """
     if extracted is None:
         return None
     theirs = {element.id: element.trust_zone for element in extracted.zoned_elements()}
+    produced_of = alignment.produced_of
     shared = [
-        (element.id, element.trust_zone)
+        (produced_of[element.id], element.trust_zone)
         for element in blessed.zoned_elements()
-        if element.id in theirs
+        if produced_of.get(element.id) in theirs
     ]
     if len(shared) < 2:
         return None
@@ -1743,24 +1768,28 @@ def _scored_fields(model: SystemModel) -> int:
 
 
 def _check_attributes(
-    blessed: SystemModel, extracted: SystemModel | None
+    blessed: SystemModel, extracted: SystemModel | None, alignment: Alignment
 ) -> tuple[AttributeCheck, ...]:
-    """Compare every scored attribute of the elements both models carry.
+    """Compare every scored attribute of the elements the alignment paired.
 
-    Matched elements only. An attribute of a missing element is already
+    Aligned elements only. An attribute of an unpaired element is already
     counted, as the miss, and reading it a second time here would charge one
-    dropped element twice.
+    dropped element twice. Reading the pairs rather than the exact IDs is what
+    keeps an element found under a reader's alias inside
+    :attr:`ExtractionScore.comparison_coverage` (#961); the check is keyed by
+    the blessed ID either way.
 
-    A matched ID implies a matched type — an element ID leads with its type
-    prefix — so the attributes one side declares are the attributes the other
-    declares, and the walk needs no per-type branch.
+    Every rule in :mod:`evals.harness.alignment` keeps an element's type, so
+    the attributes one side declares are the attributes the other declares,
+    and the walk needs no per-type branch.
     """
     if extracted is None:
         return ()
     counterparts = {element.id: element for element in extracted.elements()}
+    produced_of = alignment.produced_of
     checks = []
     for element in blessed.elements():
-        counterpart = counterparts.get(element.id)
+        counterpart = counterparts.get(produced_of.get(element.id, ""))
         if counterpart is None:
             continue
         for attribute, scored in _SCORED_ATTRIBUTES.items():
@@ -2021,7 +2050,7 @@ def render_extraction(scores: Sequence[ExtractionScore]) -> None:
         f" one zone figure a naming difference cannot reach (#925)"
     )
     zone_credits = sum(
-        1 for score in scores for credit in score.aliased if _is_zone(credit.blessed)
+        1 for score in scores for credit in score.aliased if _is_zone(credit.reference)
     )
     if zone_credits:
         sourced_zones = sum(score.sourced_zone_recall for score in scores) / len(scores)
@@ -2029,31 +2058,42 @@ def render_extraction(scores: Sequence[ExtractionScore]) -> None:
             f"  {sourced_zones:.2f} crediting a zone a reader ruled supported"
             f" — {zone_credits} credit(s), which no other figure reads"
         )
+    aligned = sum(s.aligned_recall for s in scores) / len(scores)
+    aligned_interactions = sum(s.aligned_interaction_recall for s in scores) / len(
+        scores
+    )
+    ambiguous = sum(len(s.alignment.ambiguous) for s in scores)
+    print(
+        f"aligned: {aligned:.2f} recall over one produced element per blessed"
+        f" one, {aligned_interactions:.2f} over interactions — an exact ID, a"
+        f" reader's alias, a flow's own label or its discriminators, and"
+        f" nothing guessed; {ambiguous} ambiguity(ies) left unpaired (#961)"
+    )
+    actors = sum(s.actor_recall for s in scores) / len(scores)
     initiator = sum(s.initiator_recall for s in scores) / len(scores)
     dropped = sum(len(s.initiators_missing) for s in scores)
     print(
-        f"initiators: {initiator:.2f} recall, {dropped} dropped — an element the"
-        f" text describes by what it does rather than where it sits"
+        f"actors: {actors:.2f} recall over external entities;"
+        f" initiators {initiator:.2f}, {dropped} dropped — an element the text"
+        f" describes by what it does rather than where it sits"
     )
-    invented = sum(len(s.unsourced) for s in scores)
+    absent = sum(len(s.name_tokens_absent_from_source) for s in scores)
     extra = sum(len(s.extra) for s in scores)
-    renames = sum(len(s.possible_renames) for s in scores)
+    equivalent = sum(
+        sum(1 for status in s.extra_status.values() if status == "equivalent")
+        for s in scores
+    )
+    candidates = sum(len(s.same_type_unmatched_candidates) for s in scores)
     print(
-        f"invention: {invented} of {extra} extra element(s) are named nowhere in"
-        f" their source — the rest are the corpus's own gap or its own paraphrase"
+        f"extra: {extra} element(s) the blessed model does not hold by ID —"
+        f" {equivalent} aligned to a blessed element, {extra - equivalent}"
+        f" unreviewed; precision counts every one as the model's error"
     )
     print(
-        f"extra: {renames} of {extra} could be a blessed element of the same"
-        f" type under another name — precision counts every one as the model's"
-        f" error (#882)"
-    )
-    named = sum(len(s.named_extra) for s in scores)
-    named_renames = sum(
-        len(set(s.named_extra) & set(s.possible_renames)) for s in scores
-    )
-    print(
-        f"  of the {named} an entity, a process or a store: {named_renames} could,"
-        f" {named - named_renames} could not — the rest are coined flow labels"
+        f"  {absent} carry a name token the source never uses, a word-presence"
+        f" diagnostic and not an invention count; {candidates} are of a type"
+        f" some blessed element is unaligned in, a candidate list and not a"
+        f" rename count (#961)"
     )
     undrivable = [s.case_id for s in scores if not s.crossings_derivable]
     crossings = sum(s.crossings_recall for s in scores) / len(scores)
