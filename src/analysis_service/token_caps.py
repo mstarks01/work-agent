@@ -23,6 +23,7 @@ from analysis_service.frameworks import (
 
 __all__ = [
     "COMPOSED_ANALYZE_CAP",
+    "COMPOSED_EXTRACT_COMPACT_CAP",
     "JOB_VARYING_DIRS",
     "TOKEN_CAPS",
     "alarm_at",
@@ -84,6 +85,11 @@ TOKEN_CAPS: dict[str, int] = {
     # against rules it was never given — the defect the audit is about, in the
     # contract rather than in the code.
     "prompts/extract": 3600,
+    # The compact transport's delta, appended after the body above. It is the
+    # whole cost of the route on the input side, paid on every extraction call
+    # and cacheable, against the output it removes — see
+    # :mod:`analysis_service.compact`.
+    "prompts/extract-compact": 500,
     "prompts/repair": 900,
     # The assertion body alone. The predicate table beside it is rendered from
     # `assertions.REGISTRY` rather than written here, so a predicate added
@@ -134,6 +140,14 @@ def covered_assets(frameworks_dir: Path) -> Iterator[tuple[Path, str]]:
                 raise KeyError(f"{path} resolves to uncapped kind {key!r}")
             yield path, key
 
+
+#: The whole instruction the compact extraction route reads: the shared body
+#: plus its transport delta. Derived rather than written down, for the reason
+#: :data:`COMPOSED_ANALYZE_CAP` is: a hand-set number would have to be argued
+#: below the sum of its parts, and then one part's cap could never be reached.
+COMPOSED_EXTRACT_COMPACT_CAP = (
+    TOKEN_CAPS[prompt_key("extract")] + TOKEN_CAPS[prompt_key("extract-compact")]
+)
 
 #: The whole instruction one lane agent reads, as the caps bound it: the shared
 #: body, the package's output contract, then that lane's exemplars.

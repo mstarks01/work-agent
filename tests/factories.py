@@ -47,6 +47,7 @@ from analysis_service.claims import (
     Severity,
     Verdict,
 )
+from analysis_service.compact import FULL_FORMAT, ExtractionFormat
 from analysis_service.conformance import REFERENCE_MODELS
 from analysis_service.frameworks import PACKAGES, FrameworkName, FrameworkPackage
 from analysis_service.frameworks.asvs.record import (
@@ -1025,6 +1026,7 @@ def scripted_pipeline(
     *,
     llm_class: type[ScriptedLlm] = ScriptedLlm,
     entry: Entry = ENTRY_EXTRACT,
+    extraction_format: ExtractionFormat = FULL_FORMAT,
     sampling: SamplingConfig | None = None,
     frameworks: Sequence[FrameworkName] = DEFAULT_FRAMEWORKS,
 ) -> tuple[Pipeline, dict[str, ScriptedLlm]]:
@@ -1080,6 +1082,7 @@ def scripted_pipeline(
         binding=NodeBinding.from_configs(tiers, sampling, resolve),
         frameworks=frameworks,
         entry=entry,
+        extraction_format=extraction_format,
     )
 
     graph = pipeline.workflow.graph

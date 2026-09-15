@@ -31,6 +31,7 @@ from analysis_service.claims import (
     UnresolvedMention,
     Verdict,
 )
+from analysis_service.compact import COMPACT_FORMAT
 from analysis_service.critic import CriticOutputError
 from analysis_service.frameworks import (
     PRECONDITION_RESULTS,
@@ -53,7 +54,7 @@ from analysis_service.report import (
 )
 from analysis_service.sampling import load_sampling
 from analysis_service.sources import DEFAULT_DESCRIPTION_LABEL, Source
-from analysis_service.system_model import SystemModel
+from analysis_service.system_model import SystemModel, normalize_element_ids
 from analysis_service.validation import ValidationIssue
 from tests.factories import (
     DEFAULT_FRAMEWORKS,
@@ -68,6 +69,7 @@ from tests.factories import (
     sample_selection,
     valid_model,
 )
+from tests.test_compact import compact_fixture
 
 PROJECT_ROOT = __import__("pathlib").Path(__file__).resolve().parents[1]
 
@@ -532,10 +534,19 @@ def test_six_category_agents_fan_out_from_prepare_and_join(pipeline):
 
 
 def test_one_repair_pass_then_rejection(pipeline):
-    """Invalid twice ends at reject: the graph cannot spend a second repair."""
+    """Invalid twice ends at reject: the graph cannot spend a second repair.
+
+    ``validate`` carries a third edge and ``revalidate`` does not.
+    ``unconvertible`` is the compact transport's own refusal — an emission that
+    is not a compact model in any shape ``repair`` could read — and it goes
+    straight to the rejection rather than spending the one repair pass on a
+    format conversion. ``repair`` writes a full System Model whichever transport
+    extraction used, so the second gate can never raise it.
+    """
     assert routed_targets(pipeline, graph.VALIDATE_NODE) == {
         graph.ROUTE_VALID: graph.PREPARE_NODE,
         graph.ROUTE_INVALID: graph.REPAIR_NODE,
+        graph.ROUTE_UNCONVERTIBLE: graph.REJECT_NODE,
     }
     assert routed_targets(pipeline, graph.REVALIDATE_NODE) == {
         graph.ROUTE_VALID: graph.PREPARE_NODE,
@@ -888,6 +899,53 @@ def test_validate_routes_invalid_and_feeds_the_repair_prompt():
     assert "process:does-not-exist" in ctx.state[graph.STATE_PREVIOUS_MODEL]
     assert "process:does-not-exist" in ctx.state[graph.STATE_VALIDATION_ISSUES]
     assert graph.STATE_VALID_MODEL not in ctx.state
+
+
+def test_validate_expands_a_compact_emission_before_the_gate():
+    """The compact route reaches ``prepare`` with the same model the full one does."""
+    ctx = FakeContext()
+    event = graph.validate_extraction(
+        ctx, KEYS, compact_fixture(), None, COMPACT_FORMAT
+    )
+
+    assert event.actions.route == graph.ROUTE_VALID
+    assert ctx.state[graph.STATE_VALID_MODEL] == (
+        normalize_element_ids(valid_model()).model_dump(mode="json")
+    )
+
+
+def test_validate_sends_an_expanded_model_that_fails_the_gate_to_repair():
+    """Expansion succeeding and the gate failing is the ordinary invalid path.
+
+    The repair pass is spent on a full System Model with resolvable issues,
+    exactly as on the full route — the transport does not cost the route its
+    one repair.
+    """
+    payload = compact_fixture()
+    payload["data_flows"][0]["destination"] = "nowhere"
+    ctx = FakeContext()
+    event = graph.validate_extraction(ctx, KEYS, payload, None, COMPACT_FORMAT)
+
+    assert event.actions.route == graph.ROUTE_INVALID
+    assert "nowhere" in ctx.state[graph.STATE_VALIDATION_ISSUES]
+    assert "ref_" not in ctx.state[graph.STATE_PREVIOUS_MODEL]
+
+
+def test_validate_rejects_an_emission_that_is_not_a_compact_model():
+    """A conversion failure never reaches ``repair``, and never reaches ``prepare``.
+
+    ``repair`` is written for a full System Model, so handing it a payload that
+    did not expand would ask its one pass to perform a format conversion. The
+    rejection carries the conversion issues and parks what arrived.
+    """
+    payload = compact_fixture()
+    del payload["data_flows"][0]["operations"]
+    ctx = FakeContext()
+    event = graph.validate_extraction(ctx, KEYS, payload, None, COMPACT_FORMAT)
+
+    assert event.actions.route == graph.ROUTE_UNCONVERTIBLE
+    assert graph.STATE_VALID_MODEL not in ctx.state
+    assert "operations" in ctx.state[graph.STATE_VALIDATION_ISSUES]
 
 
 def test_validate_derives_ids_rather_than_spending_the_repair_pass():

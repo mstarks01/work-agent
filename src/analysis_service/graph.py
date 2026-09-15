@@ -124,7 +124,7 @@ from google.adk.events.event import Event
 from google.adk.models.base_llm import BaseLlm
 from google.adk.workflow import START, FunctionNode, JoinNode, Workflow
 from google.genai import types
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from analysis_service.assertions import CatalogProposal
 from analysis_service.basis import unbased_controls
@@ -138,6 +138,14 @@ from analysis_service.claims import (
     Refusal,
     Ruling,
     SharedElementName,
+)
+from analysis_service.compact import (
+    COMPACT_FORMAT,
+    EXTRACTION_FORMATS,
+    FULL_FORMAT,
+    CompactSystemModel,
+    ExtractionFormat,
+    parse_extraction,
 )
 from analysis_service.coverage import lane_scope
 from analysis_service.critic import (
@@ -498,6 +506,20 @@ what the sources *state*, not whether two calls named one component alike."""
 
 ROUTE_VALID = "valid"
 ROUTE_INVALID = "invalid"
+ROUTE_UNCONVERTIBLE = "unconvertible"
+"""The compact transport's own refusal route, from ``validate`` to ``reject``.
+
+Only the compact route can take it, and only when the emission is not a
+well-formed compact model at all. It is separate from :data:`ROUTE_INVALID`
+because the two failures have different answers: an invalid model is one
+``repair`` can read, and a payload that did not expand is not a System Model in
+any shape ``prompts/repair.md`` was written for. Sending it there would ask a
+repair pass to perform a format conversion, and #938 rules that out — the
+conversion rate is a number the rollout measures rather than a fault a second
+model call hides.
+
+``revalidate`` never emits it: ``repair`` writes a full System Model whichever
+transport extraction used."""
 SKIP_ROUTE = "skip"
 """The run-time precondition gate's refusal route, shared by every framework.
 
@@ -947,6 +969,7 @@ class Analysis:
                 identity_version=IDENTITY_VERSION,
                 build=dict(build_identity()),
                 review_independence=pipeline.review_independence,
+                extraction_format=pipeline.extraction_format,
             ),
             analyses=list(self.analyses),
         )
@@ -1131,6 +1154,7 @@ def validate_extraction(
     keys: GraphKeys,
     extracted_model: dict | None = None,
     source_texts: dict | None = None,
+    extraction_format: str = FULL_FORMAT,
 ) -> Event:
     """Run the mechanical validity gate and route on the result.
 
@@ -1145,6 +1169,16 @@ def validate_extraction(
     repair the pre-normalization IDs would cite elements it cannot find.
     Both validate nodes run this same function — what differs is where their
     ``invalid`` edge points.
+
+    ``extraction_format`` is the transport the node ahead of this one wrote in,
+    and it is bound to the node rather than read from state: ``validate`` sits
+    behind ``extract`` and ``revalidate`` behind ``repair``, which writes a full
+    System Model whichever transport extraction used. Reading the shape to
+    decide would be exactly the inference #938 forbids — the route a run took
+    has to be a fact the build recorded, not a guess about whichever payload
+    happened to parse. Both go through :func:`~analysis_service.compact.parse_extraction`,
+    which is also what the eval harness calls, so no run is graded against a
+    gate production never applied.
 
     ``extracted_model`` defaults so that a silent extraction is named rather
     than hitting ADK's parameter binding, which would report a missing argument
@@ -1161,9 +1195,20 @@ def validate_extraction(
             f" model to validate. {_TRUNCATION_HINT}"
         )
     state = keys.state(ctx)
-    model, issues = parse_and_validate(
-        extracted_model, normalize_ids=True, sources=source_texts or {}
+    model, issues = parse_extraction(
+        extracted_model, extraction_format, sources=source_texts or {}
     )
+    if model is None and extraction_format != FULL_FORMAT:
+        # The emission was not a compact model at all, so there is nothing for
+        # ``repair`` to repair: see :data:`ROUTE_UNCONVERTIBLE`. The rejection
+        # carries the conversion issues, and the payload is parked beside them
+        # so a reader can see what arrived.
+        state.prompt(STATE_PREVIOUS_MODEL, render_fenced(extracted_model))
+        state.prompt(
+            STATE_VALIDATION_ISSUES,
+            render_fenced([issue.model_dump(mode="json") for issue in issues]),
+        )
+        return _routed(ROUTE_UNCONVERTIBLE, {"issue_count": len(issues)})
     # The second pass, over what ``repair`` returned: every element the
     # issues did not name is put back as it was, then the whole is validated
     # again, so a "while I'm here" edit never reaches the report and the
@@ -2185,6 +2230,24 @@ class Pipeline:
     #: is stamped, because the tier config is what enforced it and the driver
     #: holds no config — the same reason ``instruction_sha256`` rides here.
     review_independence: ReviewIndependence = "shared"
+    #: Which transport ``extract`` wrote in, and therefore which schema it was
+    #: given and which prompt described it. Recorded rather than inferred: #938
+    #: requires the selected route to be a fact of the build, because a reader
+    #: who works it out from whichever shape parsed cannot tell a compact run
+    #: from a full run whose output happened to be compatible. It rides on the
+    #: built graph for the reason ``review_independence`` does — the config
+    #: decided it and the driver holds no config.
+    #:
+    #: It is not in the execution fingerprint, and it does not need to be: the
+    #: two routes read different composed instructions, so ``instruction_sha256``
+    #: already separates them, and ``prompts/extract-compact.md`` names the
+    #: format version so a transport change cannot leave that digest standing.
+    #:
+    #: ``None`` on a graph with no ``extract`` node — the analysis and assertion
+    #: eval entries, which are seeded a model rather than extracting one. A
+    #: default of ``"full"`` there would be a fact with no reader: the report
+    #: would name a transport nothing in that run used.
+    extraction_format: ExtractionFormat | None = FULL_FORMAT
 
 
 def _generate_content_config(sampling: TierSampling) -> types.GenerateContentConfig:
@@ -2238,17 +2301,33 @@ def _llm_node(
     )
 
 
+#: The schema each extraction transport asks the model to fill. A table rather
+#: than a branch, so a third transport is a row here and a row in
+#: ``prompts.compose_extract_prompt``, and ``tests/test_compact.py`` holds this
+#: one against :data:`~analysis_service.compact.EXTRACTION_FORMATS`.
+EXTRACTION_SCHEMAS: dict[str, type[BaseModel]] = {
+    FULL_FORMAT: SystemModel,
+    COMPACT_FORMAT: CompactSystemModel,
+}
+
+
 def _extract_node(
     prompt_loader: MarkdownLoader,
     resolve_model: ModelResolver,
     resolve_sampling: SamplingResolver,
+    extraction_format: str = FULL_FORMAT,
 ) -> LlmAgent:
-    """The extraction node, shared by the production graph and eval mode 1."""
+    """The extraction node, shared by the production graph and eval mode 1.
+
+    The transport decides two things together — the schema the model fills and
+    the prompt that describes it — and both are read off ``extraction_format``
+    here, so a run cannot be asked for one shape and told about another.
+    """
     return _llm_node(
         name=EXTRACT_NODE,
         tier_node="extract",
-        instruction=compose_extract_prompt(prompt_loader),
-        output_schema=SystemModel,
+        instruction=compose_extract_prompt(prompt_loader, extraction_format),
+        output_schema=EXTRACTION_SCHEMAS[extraction_format],
         output_key=STATE_EXTRACTED_MODEL,
         resolve_model=resolve_model,
         resolve_sampling=resolve_sampling,
@@ -2471,6 +2550,7 @@ def build_pipeline(
     binding: NodeBinding,
     frameworks: Sequence[FrameworkName],
     entry: Entry = ENTRY_EXTRACT,
+    extraction_format: ExtractionFormat = FULL_FORMAT,
     name: str = "analysis_pipeline",
 ) -> Pipeline:
     """Wire the whole graph: prompts, skills, and models onto the topology.
@@ -2510,6 +2590,14 @@ def build_pipeline(
         ENTRY_ASSERT_ONLY,
     ):
         raise ValueError(f"unknown graph entry point: {entry!r}")
+    if extraction_format not in EXTRACTION_FORMATS:
+        raise ValueError(f"unknown extraction format: {extraction_format!r}")
+    extracts = entry in (ENTRY_EXTRACT, ENTRY_EXTRACT_ONLY)
+    if not extracts and extraction_format != FULL_FORMAT:
+        raise ValueError(
+            f"entry {entry!r} builds no extract node, so it cannot be built for"
+            f" the {extraction_format!r} transport"
+        )
     if not frameworks:
         raise ValueError("a graph must be built for at least one framework")
 
@@ -2529,10 +2617,13 @@ def build_pipeline(
             frameworks=tuple(frameworks),
             tier_nodes=tier_nodes,
             review_independence=binding.review_independence,
+            extraction_format=extraction_format if extracts else None,
         )
 
     if entry == ENTRY_EXTRACT_ONLY:
-        extract = _extract_node(prompt_loader, resolve_model, resolve_sampling)
+        extract = _extract_node(
+            prompt_loader, resolve_model, resolve_sampling, extraction_format
+        )
         return pipeline(Workflow(name=name, edges=[(START, extract)]), [extract])
 
     if entry == ENTRY_ASSERT_ONLY:
@@ -2564,7 +2655,9 @@ def build_pipeline(
 
     extraction_nodes: list[LlmAgent] = []
     if entry == ENTRY_EXTRACT:
-        extract = _extract_node(prompt_loader, resolve_model, resolve_sampling)
+        extract = _extract_node(
+            prompt_loader, resolve_model, resolve_sampling, extraction_format
+        )
         repair = _llm_node(
             name=REPAIR_NODE,
             tier_node="repair",
@@ -2574,8 +2667,10 @@ def build_pipeline(
             resolve_model=resolve_model,
             resolve_sampling=resolve_sampling,
         )
-        validate = _node(_validate_node_func(keys), VALIDATE_NODE)
-        revalidate = _node(_validate_node_func(keys), REVALIDATE_NODE)
+        validate = _node(_validate_node_func(keys, extraction_format), VALIDATE_NODE)
+        # ``repair`` emits a full System Model whichever transport ``extract``
+        # used, so the second gate is always the full-model one.
+        revalidate = _node(_validate_node_func(keys, FULL_FORMAT), REVALIDATE_NODE)
         reject = _node(_reject_node_func(keys), REJECT_NODE)
         extraction_nodes = [extract, repair]
         # ``list[tuple[Any, ...]]`` because ADK does not export the alias for
@@ -2583,7 +2678,14 @@ def build_pipeline(
         # key type under an expected type -- which a bare local has none of.
         head_edges: list[tuple[Any, ...]] = [
             (START, extract, validate),
-            (validate, {ROUTE_VALID: prepare, ROUTE_INVALID: repair}),
+            (
+                validate,
+                {
+                    ROUTE_VALID: prepare,
+                    ROUTE_INVALID: repair,
+                    ROUTE_UNCONVERTIBLE: reject,
+                },
+            ),
             (repair, revalidate),
             (revalidate, {ROUTE_VALID: prepare, ROUTE_INVALID: reject}),
         ]
@@ -2615,19 +2717,24 @@ def build_pipeline(
     return pipeline(workflow, llm_nodes)
 
 
-def _validate_node_func(keys: GraphKeys) -> Callable[..., Any]:
+def _validate_node_func(
+    keys: GraphKeys, extraction_format: str = FULL_FORMAT
+) -> Callable[..., Any]:
     """The validity gate, with this graph's key families bound to it.
 
     ADK binds a FunctionNode's parameters from session state, so ``keys`` — a
     fact about the built graph rather than about the job — is closed over rather
-    than declared. Both validate nodes share this function; what differs is
-    where their ``invalid`` edge points.
+    than declared, and ``extraction_format`` rides with it for the same reason.
+    Both validate nodes share this function; what differs is where their
+    ``invalid`` edge points and which transport each was built for.
     """
 
     def validate(
         ctx, extracted_model: dict | None = None, source_texts: dict | None = None
     ) -> Event:
-        return validate_extraction(ctx, keys, extracted_model, source_texts)
+        return validate_extraction(
+            ctx, keys, extracted_model, source_texts, extraction_format
+        )
 
     return validate
 

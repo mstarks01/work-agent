@@ -63,6 +63,7 @@ from google.adk.workflow import FunctionNode
 
 from analysis_service import evidence, fan_in, graph
 from analysis_service.claims import Ground
+from analysis_service.compact import OMITTABLE_FIELDS, REFERENCE_FIELDS
 from analysis_service.critic import duplicate_groups
 from analysis_service.execution import GraphExecutor
 from analysis_service.fan_in import _bound_element_references, _verify_quotes
@@ -73,7 +74,12 @@ from analysis_service.frameworks import (
 )
 from analysis_service.grounding import PreparedSource, prepare_source
 from analysis_service.sources import Source
-from analysis_service.system_model import ModelIndex, SystemModel
+from analysis_service.system_model import (
+    ELEMENT_GROUPS,
+    UNKNOWN,
+    ModelIndex,
+    SystemModel,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CORPUS = REPO_ROOT / "evals" / "corpus"
@@ -558,6 +564,101 @@ def repaired_spans() -> list[list]:
     return sorted(rows, key=lambda row: (row[0], row[1]))
 
 
+# --- The extraction transport (#938) ----------------------------------------
+
+
+def as_compact(model: dict) -> dict:
+    """One full model as the compact transport would carry it.
+
+    The measurement's own converter, and the fixture generator
+    ``tests/test_compact.py`` drives the equivalence sweep with. Nothing in the
+    service converts this way round — the adapter only expands — so this is the
+    one place the inverse is written, and both readers of it share it.
+
+    Refs are positional and meaningless on purpose. An expansion that recognised
+    a ref rather than rebuilding every identifier from the names would pass a
+    sweep whose refs were the names.
+    """
+    refs: dict[str, str] = {}
+    for group in ELEMENT_GROUPS:
+        for index, element in enumerate(model.get(group, ())):
+            refs[element["id"]] = f"r{len(refs)}-{index}"
+    compact: dict = {}
+    for group in ELEMENT_GROUPS:
+        rows = []
+        for element in model.get(group, ()):
+            row = {
+                key: value
+                for key, value in element.items()
+                if key != "id" and not _is_omitted(key, value)
+            }
+            row["ref"] = refs[element["id"]]
+            for field in REFERENCE_FIELDS:
+                if field in row:
+                    row[field] = refs[row[field]]
+            if group == "data_flows":
+                row.setdefault("operations", UNKNOWN)
+            rows.append(row)
+        compact[group] = rows
+    compact["assumptions"] = [
+        {
+            "assumption": entry["assumption"],
+            "element": refs[entry["element_id"]],
+            "attribute": entry["attribute"],
+            "basis": entry["basis"],
+        }
+        for entry in model.get("assumptions", ())
+    ]
+    return compact
+
+
+def _is_omitted(field: str, value: object) -> bool:
+    """Would a compliant emission leave this field out?
+
+    An omittable field holding its own default, which is what
+    ``prompts/extract-compact.md`` asks for. The allowlist is read off the
+    schema, so this measures the transport that ships rather than one somebody
+    described.
+    """
+    if field not in OMITTABLE_FIELDS:
+        return False
+    return value in ("", [])
+
+
+def _serialized(payload: dict) -> int:
+    """Characters of compact JSON — no indentation, no spaces after separators."""
+    return len(json.dumps(payload, separators=(",", ":")))
+
+
+def case_transport() -> None:
+    """How much of an extraction's emission the compact transport removes.
+
+    **Characters, not tokens.** Nothing offline here tokenizes, and a character
+    count is a proxy: an identifier like ``process:payment-api`` tokenizes worse
+    per character than the prose beside it, so the token saving is probably a
+    little larger than what this prints. What it is *not* is a latency figure —
+    #938 stage 4 is the paired live comparison that turns emitted tokens into a
+    claim about how long a job takes.
+
+    The blessed corpus models stand in for real emissions because they are the
+    only extraction-shaped data in the repo. They are hand-corrected, so they
+    carry fewer empty optional fields than a live extraction does, which makes
+    this a conservative reading of the third column.
+    """
+    total_full = total_compact = 0
+    print(f"{'case':34}{'full':>9}{'compact':>9}{'saved':>8}")
+    for path in sorted(CORPUS.glob("*/model.json")):
+        blessed = json.loads(path.read_text(encoding="utf-8"))
+        full = _serialized(blessed)
+        compact = _serialized(as_compact(blessed))
+        total_full += full
+        total_compact += compact
+        saved = 100 * (1 - compact / full)
+        print(f"{path.parent.name:34}{full:9}{compact:9}{saved:7.1f}%")
+    saved = 100 * (1 - total_compact / total_full)
+    print(f"{'TOTAL':34}{total_full:9}{total_compact:9}{saved:7.1f}%")
+
+
 #: Every case, by the name the command line takes. A table rather than a
 #: dispatch chain, so a case added here is runnable without a second edit.
 CASES: dict[str, Callable[[], None]] = {
@@ -568,6 +669,7 @@ CASES: dict[str, Callable[[], None]] = {
     "index": case_index,
     "catalog": case_catalog,
     "pipeline": case_pipeline,
+    "transport": case_transport,
 }
 
 
