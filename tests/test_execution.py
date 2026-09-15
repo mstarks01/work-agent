@@ -11,12 +11,14 @@ exercised without a live call.
 from __future__ import annotations
 
 import asyncio
+import json
 from datetime import UTC, datetime
 
 import pytest
 from google.adk.sessions import InMemorySessionService
 
 from analysis_service import graph
+from analysis_service.compact import COMPACT_FORMAT, FULL_FORMAT
 from analysis_service.execution import GraphExecutor, GraphFailed, GraphRun, _NodeFinish
 from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES, DraftThreat
 from analysis_service.report import (
@@ -32,6 +34,7 @@ from analysis_service.sampling import (
     load_sampling,
 )
 from analysis_service.sources import Source, render_sources
+from analysis_service.system_model import normalize_element_ids
 from tests.factories import (
     BASE_MODEL,
     DESCRIPTION_TEXT,
@@ -55,6 +58,7 @@ from tests.factories import (
     served_route,
     valid_model,
 )
+from tests.test_compact import compact_fixture
 
 # This install's one package's own nodes: every per-framework role carries its
 # framework, since two packages may declare a lane of the same name.
@@ -694,6 +698,37 @@ class TestTheRunCompletesItself:
         assert isinstance(report, Report)
         assert [block.framework for block in report.analyses] == ["stride"]
         assert report.job.revise_rounds == 0
+
+    def test_a_compact_run_reports_the_transport_and_the_same_model(self):
+        """The whole route, end to end, against the full route's own answer.
+
+        The compact node emits a wire form, the adapter expands it, the gate
+        passes it, and every block downstream reads the System Model the full
+        route would have produced from the same facts. The report says which
+        transport wrote it, because nothing in the model itself can.
+        """
+        pipeline, _ = scripted_pipeline(
+            happy_replies() | {"extract": json.dumps(compact_fixture())},
+            extraction_format=COMPACT_FORMAT,
+        )
+        run = drive(pipeline)
+
+        report = run.report(
+            job=self.job(), input_ref=self.input_ref(), pipeline=pipeline
+        )
+
+        assert report.execution.extraction_format == COMPACT_FORMAT
+        assert report.system_model == normalize_element_ids(valid_model())
+
+    def test_a_full_run_says_so_too(self, graph_run):
+        """The field is a statement on both routes, never a mark on one."""
+        pipeline, _ = scripted_pipeline(happy_replies())
+
+        report = graph_run.report(
+            job=self.job(), input_ref=self.input_ref(), pipeline=pipeline
+        )
+
+        assert report.execution.extraction_format == FULL_FORMAT
 
     def test_the_re_ask_count_is_stamped_from_the_runs_own_nodes(self, graph_run):
         """A driver that built the Job forgot the count; the run cannot."""

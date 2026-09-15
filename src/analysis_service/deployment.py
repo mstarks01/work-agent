@@ -67,11 +67,13 @@ from analysis_service.certification import (
     load_manifest,
 )
 from analysis_service.claims import FrameworkName
+from analysis_service.compact import COMPACT_FORMAT, FULL_FORMAT, ExtractionFormat
 from analysis_service.errors import ConfigError
 from analysis_service.framework_config import load_frameworks
 from analysis_service.frameworks import validate_packages
 from analysis_service.graph import (
     ENTRY_EXTRACT,
+    ENTRY_EXTRACT_ONLY,
     Entry,
     ModelResolver,
     Pipeline,
@@ -132,6 +134,12 @@ RESILIENCE_VAR = "ANALYSIS_RESILIENCE"
 BLESSED_FINGERPRINTS_VAR = "ANALYSIS_BLESSED_FINGERPRINTS"
 FRAMEWORKS_VAR = "ANALYSIS_FRAMEWORKS_FILE"
 REQUIRE_CERTIFIED_VAR = "ANALYSIS_REQUIRE_CERTIFIED"
+#: Select the compact extraction transport (:mod:`analysis_service.compact`).
+#: Off by default, so an install that sets nothing runs the full-model route it
+#: always ran. One variable and one restart is the whole rollback, which is what
+#: #938 asks of it: nothing persisted changes shape, because every artifact
+#: downstream of the adapter is the same ``SystemModel`` either way.
+COMPACT_EXTRACTION_VAR = "ANALYSIS_COMPACT_EXTRACTION"
 
 
 def _path(env: Mapping[str, str], var: str, default: Path) -> Path:
@@ -206,6 +214,11 @@ class Deployment:
     frameworks: tuple[FrameworkName, ...]
     paths: ConfigPaths
     require_certified: bool = False
+    #: Which transport this install asks ``extract`` to write in. A property of
+    #: the deployment rather than of a job: the two routes are compared with
+    #: everything else held fixed, so letting a submission pick one would make
+    #: two reports incomparable for a reason neither of them records.
+    extraction_format: ExtractionFormat = FULL_FORMAT
     # Held only to derive each vendor's credentials when the adapters are built.
     # Out of repr and equality: a deployment in a log must not carry a key. A
     # copy taken by :meth:`from_env`, never the caller's live mapping: a
@@ -259,6 +272,9 @@ class Deployment:
             frameworks=frameworks,
             paths=paths,
             require_certified=_flag(env, REQUIRE_CERTIFIED_VAR),
+            extraction_format=(
+                COMPACT_FORMAT if _flag(env, COMPACT_EXTRACTION_VAR) else FULL_FORMAT
+            ),
             env=MappingProxyType(dict(env)),
         )
 
@@ -341,6 +357,7 @@ class Deployment:
         entry, which is the one a job pays for twice.
         """
         selection = self.selection(frameworks)
+        extracts = entry in (ENTRY_EXTRACT, ENTRY_EXTRACT_ONLY)
         if resolve_model is None:
             adapters = build_tier_adapters(
                 self.tiers, self.sampling, self.resilience, env=self.env
@@ -355,6 +372,11 @@ class Deployment:
             binding=NodeBinding.from_configs(self.tiers, self.sampling, resolve_model),
             frameworks=selection,
             entry=entry,
+            # The analysis and assertion eval entries build no ``extract`` node,
+            # and the builder refuses a transport for a graph that does not
+            # extract — so this install's choice reaches the graphs that have one
+            # and the others are built for the route they actually run.
+            extraction_format=self.extraction_format if extracts else FULL_FORMAT,
         )
 
     @cached_property

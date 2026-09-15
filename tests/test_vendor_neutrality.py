@@ -761,7 +761,10 @@ def _root_capped_object_arrays(cls: type[BaseModel]) -> list[str]:
 #: until the enumerator reaches it too.
 NODE_OUTPUT_SCHEMAS: dict[str, str] = {
     "output_schema": "the `_llm_node` parameter every node below it passes through",
-    "SystemModel": "named directly: SystemModel",
+    "SystemModel": "named directly: SystemModel, by `repair`",
+    "EXTRACTION_SCHEMAS[extraction_format]": (
+        "every extraction transport's schema, read from EXTRACTION_SCHEMAS"
+    ),
     "CatalogProposal": "named directly: CatalogProposal",
     "schemas.proposals": "every package's `proposals`, read from SCHEMAS",
     "schemas.rulings": "every package's `rulings`, read from SCHEMAS",
@@ -799,12 +802,12 @@ def _model_facing_schemas() -> dict[str, type[BaseModel]]:
     """
     from analysis_service.assertions import CatalogProposal
     from analysis_service.frameworks import PACKAGES, schemas_for
-    from analysis_service.system_model import SystemModel
+    from analysis_service.graph import EXTRACTION_SCHEMAS
 
     found: dict[str, type[BaseModel]] = {
-        "SystemModel": SystemModel,
-        "CatalogProposal": CatalogProposal,
+        cls.__name__: cls for cls in EXTRACTION_SCHEMAS.values()
     }
+    found["CatalogProposal"] = CatalogProposal
     for name in PACKAGES:
         schemas = schemas_for(name)
         for role in ("proposals", "rulings"):

@@ -35,6 +35,7 @@ therefore share the longest possible cacheable prefix.
 from __future__ import annotations
 
 from analysis_service.assertions import REGISTRY, Predicate
+from analysis_service.compact import COMPACT_FORMAT, FULL_FORMAT
 from analysis_service.frameworks import OUTPUT_DOC
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.skills import lane_exemplars_doc
@@ -48,6 +49,11 @@ ANALYZE_PROMPT_NAME = "analyze"
 CRITIC_PROMPT_NAME = "critic"
 RECRITIC_PROMPT_NAME = "recritic"
 EXTRACT_PROMPT_NAME = "extract"
+#: The compact transport's delta, appended after ``extract.md``. Not a prompt
+#: body: it carries no Role, Input or Procedure of its own, because the whole
+#: point is that both extraction routes read one body and differ only in what
+#: they are asked to write. See :mod:`analysis_service.compact`.
+EXTRACT_COMPACT_PROMPT_NAME = "extract-compact"
 REPAIR_PROMPT_NAME = "repair"
 ASSERT_PROMPT_NAME = "assert"
 PROMPT_BODY_NAMES: tuple[str, ...] = (
@@ -58,6 +64,22 @@ PROMPT_BODY_NAMES: tuple[str, ...] = (
     CRITIC_PROMPT_NAME,
     RECRITIC_PROMPT_NAME,
 )
+
+#: The parts of ``prompts/`` that are appended to a body rather than loaded as
+#: one. A delta answers the same lints a body does for size and for content; it
+#: answers none of the ones about section structure, which it deliberately has
+#: none of.
+PROMPT_DELTA_NAMES: tuple[str, ...] = (EXTRACT_COMPACT_PROMPT_NAME,)
+
+#: What each extraction transport appends to ``extract.md``, in order. A table
+#: rather than a branch, and the twin of
+#: :data:`~analysis_service.graph.EXTRACTION_SCHEMAS`: a transport is a schema
+#: and the text that describes it, and a missing key raises here rather than
+#: quietly composing the prompt for the other route.
+EXTRACTION_DELTAS: dict[str, tuple[str, ...]] = {
+    FULL_FORMAT: (),
+    COMPACT_FORMAT: (EXTRACT_COMPACT_PROMPT_NAME,),
+}
 
 # The token caps over these bodies are drift alarms rather than a budget, and
 # they live in one table with every other one: ``analysis_service.token_caps``.
@@ -116,9 +138,28 @@ def compose_recritic_prompt(loader: MarkdownLoader) -> str:
     return loader.load(RECRITIC_PROMPT_NAME).strip() + "\n"
 
 
-def compose_extract_prompt(loader: MarkdownLoader) -> str:
-    """The extraction prompt: semi-structured input text to a System Model."""
-    return loader.load(EXTRACT_PROMPT_NAME).strip() + "\n"
+def compose_extract_prompt(
+    loader: MarkdownLoader, extraction_format: str = FULL_FORMAT
+) -> str:
+    """The extraction prompt: semi-structured input text to a System Model.
+
+    One body for both transports. ``extract.md`` says what to read and what to
+    write down; the compact route appends ``extract-compact.md``, which says
+    only how the answer is spelled on the wire. A second full prompt would be a
+    second copy of the reading rules, and the two would answer the transcription
+    question differently the first time one of them was edited.
+
+    The delta goes last for the reason the package parts do: the body is the
+    longer text and the one both routes share, so the cacheable prefix is as
+    long as it can be either way.
+    """
+    if extraction_format not in EXTRACTION_DELTAS:
+        raise ValueError(f"unknown extraction format: {extraction_format!r}")
+    parts = [
+        loader.load(name)
+        for name in (EXTRACT_PROMPT_NAME, *EXTRACTION_DELTAS[extraction_format])
+    ]
+    return "\n\n".join(part.strip() for part in parts) + "\n"
 
 
 def compose_repair_prompt(loader: MarkdownLoader) -> str:

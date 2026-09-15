@@ -55,6 +55,11 @@ from analysis_service.claims import (
     Proposal,
     RejectionStep,
 )
+from analysis_service.compact import (
+    COMPACT_FORMAT,
+    OMITTABLE_FIELDS,
+    REFERENCE_FIELDS,
+)
 from analysis_service.evidence import (
     _RESOLVED_AWAY,
     ABSENT_PREFIX,
@@ -68,16 +73,20 @@ from analysis_service.markdown_loader import MarkdownLoader, split_sections
 from analysis_service.prompts import (
     ANALYZE_PROMPT_NAME,
     CRITIC_PROMPT_NAME,
+    EXTRACT_COMPACT_PROMPT_NAME,
     EXTRACT_PROMPT_NAME,
     PROMPT_BODY_NAMES,
+    PROMPT_DELTA_NAMES,
     PROMPT_SECTION_HEADINGS,
     compose_analyze_prompt,
+    compose_extract_prompt,
     lane_exemplars_doc,
 )
 from analysis_service.skills import estimate_tokens
 from analysis_service.system_model import mentioned_ids
 from analysis_service.token_caps import (
     COMPOSED_ANALYZE_CAP,
+    COMPOSED_EXTRACT_COMPACT_CAP,
     TOKEN_CAPS,
     prompt_key,
 )
@@ -339,9 +348,70 @@ def test_every_prompt_body_has_a_cap():
     A body with no key would raise on lookup, which the parametrized alarms
     already catch. The direction this adds is the quiet one: a key for a body
     that no longer exists, which reads as coverage and checks nothing.
+
+    Deltas are in the registry too. A delta rides on every call of the route
+    that reads it, so an unalarmed one is exactly the drift the table exists to
+    make visible.
     """
     keyed = {key.split("/", 1)[1] for key in TOKEN_CAPS if key.startswith("prompts/")}
-    assert keyed == set(PROMPT_BODY_NAMES)
+    assert keyed == set(PROMPT_BODY_NAMES) | set(PROMPT_DELTA_NAMES)
+
+
+@pytest.mark.parametrize("name", PROMPT_DELTA_NAMES)
+def test_prompt_delta_within_token_cap(name):
+    """A delta alarms on size exactly as a body does."""
+    assert estimate_tokens(loader.load(name)) <= TOKEN_CAPS[prompt_key(name)]
+
+
+@pytest.mark.parametrize("name", PROMPT_DELTA_NAMES)
+def test_prompt_delta_cap_still_alarms(name):
+    """A cap more than twice its delta has stopped measuring anything."""
+    tokens = estimate_tokens(loader.load(name))
+    assert TOKEN_CAPS[prompt_key(name)] <= 2 * tokens
+
+
+def test_the_compact_delta_names_the_format_it_describes():
+    """The wire format's version is in the text a model reads.
+
+    This is what keeps the transport inside the execution fingerprint. The
+    fingerprint hashes ``instruction_sha256`` and not the output schema, so a
+    version bump that moved the schema alone would leave two incompatible runs
+    hashing alike. Naming the version here makes a bump a prompt edit.
+    """
+    assert COMPACT_FORMAT in loader.load(EXTRACT_COMPACT_PROMPT_NAME)
+
+
+@pytest.mark.parametrize("field", OMITTABLE_FIELDS)
+def test_the_compact_delta_names_every_field_that_may_be_left_out(field):
+    """The allowlist a model reads is the allowlist the schema enforces.
+
+    A field that gained a default and never reached this text would be a field
+    the route pays for on every emission and nobody asked to drop.
+    """
+    assert f"`{field}`" in loader.load(EXTRACT_COMPACT_PROMPT_NAME)
+
+
+@pytest.mark.parametrize("field", (*REFERENCE_FIELDS, "element"))
+def test_the_compact_delta_names_every_field_that_holds_a_ref(field):
+    """A reference field the delta never mentions is one a model fills with a name."""
+    assert f"`{field}`" in loader.load(EXTRACT_COMPACT_PROMPT_NAME)
+
+
+def test_the_composed_compact_extract_prompt_is_the_body_plus_the_delta():
+    """Composition adds joins, not content, and the full route is untouched.
+
+    The second half matters more than the first. Stage 4 of #938 compares the
+    two routes with everything else held fixed, so a delta that reached
+    ``extract.md`` would move the full route's instruction digest and make
+    every run before it incomparable.
+    """
+    body = compose_extract_prompt(loader)
+    composed = compose_extract_prompt(loader, COMPACT_FORMAT)
+
+    assert body == loader.load(EXTRACT_PROMPT_NAME).strip() + "\n"
+    assert composed.startswith(body.strip())
+    assert loader.load(EXTRACT_COMPACT_PROMPT_NAME).strip() in composed
+    assert estimate_tokens(composed) <= COMPOSED_EXTRACT_COMPACT_CAP
 
 
 @pytest.mark.parametrize("framework", sorted(PACKAGES))
@@ -639,13 +709,17 @@ def test_exemplar_file_within_token_cap(framework, lane):
 
 
 def test_no_stray_prompt_files():
-    """The shared root is the five bodies and nothing else.
+    """The shared root is the bodies, their deltas, and nothing else.
 
     No exemplar sits here, because every exemplar is one package's. What is
     here is the text that genuinely serves every registered framework, which is
     what makes the shared root shared rather than merely first.
+
+    A delta is a body's own tail rather than a sixth body — ``extract-compact``
+    says how one transport spells its answer and nothing about what to read —
+    so it is declared beside them rather than passing as a stray.
     """
-    assert set(loader.names()) == set(PROMPT_BODY_NAMES)
+    assert set(loader.names()) == set(PROMPT_BODY_NAMES) | set(PROMPT_DELTA_NAMES)
 
 
 def test_no_non_markdown_files_under_prompts():
@@ -834,21 +908,38 @@ def test_the_critic_prompt_names_every_rejection_step(step):
 # The table is the decidable half. A code added to `IssueCode` fails here until
 # somebody says what the prompt does about it — which is the point, because the
 # alternative is finding out from a dead job on a live sweep.
-EXTRACTION_FAILURE_RULES: dict[str, str] = {
-    "schema": "Your output is validated mechanically",
-    "duplicate-id": "Two elements sharing a name share an ID",
-    "id-mismatch": "IDs are recomputed from the names you give",
-    "invalid-reference": "Both endpoints must be zoned elements you have "
-    "already created",
-    "no-trust-zones": "create one that covers the system as described",
-    "illegal-asset-tag": "`unknown` is not one of them",
-    "too-many-elements": "",  # a size ceiling no wording prevents; see below
-    "missing-citation": "Give every element a `source_excerpt`",
-    "unverifiable-excerpt": "a short verbatim quote",
-    "assumption-on-unknown": "An attribute you left `unknown` inferred nothing and "
-    "takes no entry",
-    "blank-control": "Never leave a security-relevant attribute empty",
-    "ambiguous-control": "never open a control with `no`, `not` or `without`",
+EXTRACTION_FAILURE_RULES: dict[str, tuple[str, str]] = {
+    "schema": ("Your output is validated mechanically", EXTRACT_PROMPT_NAME),
+    "duplicate-id": ("Two elements sharing a name share an ID", EXTRACT_PROMPT_NAME),
+    # The compact transport's own refusal, so its rule is in the compact
+    # transport's own text. A phrase checked against ``extract.md`` would be a
+    # rule the route that can trip this never reads.
+    "duplicate-ref": ("Give each element its own ref", EXTRACT_COMPACT_PROMPT_NAME),
+    "id-mismatch": ("IDs are recomputed from the names you give", EXTRACT_PROMPT_NAME),
+    "invalid-reference": (
+        "Both endpoints must be zoned elements you have already created",
+        EXTRACT_PROMPT_NAME,
+    ),
+    "no-trust-zones": (
+        "create one that covers the system as described",
+        EXTRACT_PROMPT_NAME,
+    ),
+    "illegal-asset-tag": ("`unknown` is not one of them", EXTRACT_PROMPT_NAME),
+    "too-many-elements": ("", EXTRACT_PROMPT_NAME),  # a size ceiling; see below
+    "missing-citation": ("Give every element a `source_excerpt`", EXTRACT_PROMPT_NAME),
+    "unverifiable-excerpt": ("a short verbatim quote", EXTRACT_PROMPT_NAME),
+    "assumption-on-unknown": (
+        "An attribute you left `unknown` inferred nothing and takes no entry",
+        EXTRACT_PROMPT_NAME,
+    ),
+    "blank-control": (
+        "Never leave a security-relevant attribute empty",
+        EXTRACT_PROMPT_NAME,
+    ),
+    "ambiguous-control": (
+        "never open a control with `no`, `not` or `without`",
+        EXTRACT_PROMPT_NAME,
+    ),
 }
 
 
@@ -864,19 +955,25 @@ def test_every_extraction_failure_mode_is_declared():
     assert set(EXTRACTION_FAILURE_RULES) == set(get_args(IssueCode))
 
 
-@pytest.mark.parametrize("code,phrase", sorted(EXTRACTION_FAILURE_RULES.items()))
-def test_the_prompt_carries_the_rule_that_prevents_each_failure(code, phrase):
+@pytest.mark.parametrize("code,rule", sorted(EXTRACTION_FAILURE_RULES.items()))
+def test_the_prompt_carries_the_rule_that_prevents_each_failure(code, rule):
     """The rule that keeps a job alive is in the prompt the job reads.
+
+    The table names the prompt as well as the phrase, because the two
+    extraction transports read different text: a rule only the compact route
+    can trip belongs in the compact route's own delta, and checking it against
+    ``extract.md`` would pass while the route that needs it read nothing.
 
     ``too-many-elements`` carries an empty phrase deliberately: it is an
     admission cap on model *size*, and no instruction stops a genuinely large
     system from being large. Every other code is a mistake wording can prevent.
     """
+    phrase, prompt = rule
     if not phrase:
         pytest.skip(f"{code} is a size ceiling rather than a rule a model can follow")
 
-    assert phrase in loader.load(EXTRACT_PROMPT_NAME), (
-        f"extract.md carries no rule against {code!r}. A model that trips it "
+    assert phrase in loader.load(prompt), (
+        f"{prompt}.md carries no rule against {code!r}. A model that trips it "
         f"kills the job and spends its one repair pass."
     )
 
