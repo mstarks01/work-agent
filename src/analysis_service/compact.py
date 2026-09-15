@@ -99,7 +99,6 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from analysis_service.system_model import (
     CORE_ASSET_TAGS,
     ELEMENT_GROUPS,
-    ZONE_ATTRIBUTE,
     DataFlow,
     DataStore,
     Element,
@@ -118,29 +117,59 @@ from analysis_service.validation import (
 #: re-spelled once, in :class:`~analysis_service.report.ExecutionEnvelope`, which
 #: holds no import from this module; ``tests/test_compact.py`` holds the two to
 #: each other.
-ExtractionFormat = Literal["full", "compact-v2"]
+ExtractionFormat = Literal["full", "compact-v3"]
 
 #: The full-model route: the model writes a :class:`SystemModel` itself.
 FULL_FORMAT: ExtractionFormat = "full"
 
-#: The compact route, version 2 — version 1 put assumptions in a top-level list
-#: that named its subject by ref, which is the one reference the format could
-#: not resolve (see :class:`CompactAssumption`). There is no version 1 in the
-#: tree: nothing persisted is in this format, so the change is a cutover rather
-#: than a migration. **Versioned in its name**, because a reader of
+#: The compact route, version 3. Each earlier version is out of the tree, and
+#: each was retired by a measurement rather than an argument — nothing persisted
+#: is in this format, so every change is a cutover rather than a migration.
+#:
+#: Version 1 wrote an untyped ref, so an element and its own trust zone sharing
+#: a name made every use of that ref ambiguous. Version 2 kept the untyped ref
+#: and moved the assumption inside its element to dodge the one reference no
+#: scope could decide; that removed the `duplicate-ref` it was aimed at and
+#: **caused nine failures of a kind neither the full route nor version 1 ever
+#: produced** — an inference written on the flow carrying the data rather than
+#: the store holding it. Version 3 puts the type back in the ref, which is what
+#: a full-model ID's prefix always was, and puts the assumption back where it
+#: never failed.
+#:
+#: **Versioned in its name**, because a reader of
 #: an archived report has to be able to tell which wire form produced it, and
 #: because ``prompts/extract-compact.md`` names this string — so a format change
 #: moves the composed instruction and therefore every node's fingerprint.
-COMPACT_FORMAT: ExtractionFormat = "compact-v2"
+COMPACT_FORMAT: ExtractionFormat = "compact-v3"
 
 #: Every extraction transport a graph can be built for.
 EXTRACTION_FORMATS: tuple[ExtractionFormat, ...] = (FULL_FORMAT, COMPACT_FORMAT)
 
-#: A response-local reference, as the model writes it: a lowercase slug.
+#: Each element group's ref tag: the first letter of the element class's own
+#: ``id_prefix``. Derived rather than invented, so the tag a model writes is the
+#: type the full model would have spelled out, and a sixth element type brings
+#: its own. ``tests/test_compact.py`` holds the five to being distinct — two
+#: types sharing a letter would put the ambiguity straight back.
+REF_TAGS: Mapping[str, str] = MappingProxyType(
+    {
+        group: get_args(SystemModel.model_fields[group].annotation)[0].id_prefix[0]
+        for group in ELEMENT_GROUPS
+    }
+)
+
+#: A response-local reference, as the model writes it: a type tag, a colon and a
+#: lowercase slug — ``p:api``, ``s:orders-db``.
 #:
-#: The pattern is the bound, not a tidiness rule, and it is on **every field
-#: that holds a ref** rather than only on the declaration. An unresolved ref
-#: survives expansion verbatim into a flow endpoint, where
+#: **The tag is what a full-model ID's prefix always was**, and leaving it out
+#: is what cost versions 1 and 2. An element and its own trust zone share a name
+#: routinely, and ``entity:card-processor`` and ``boundary:card-processor`` are
+#: two IDs; two untyped refs spelled ``card-processor`` are one handle naming
+#: neither. Measured at 1.1 percentage points of the saving — 10.1% of the
+#: corpus emission against 9.2% — which is what the type is worth.
+#:
+#: The pattern is also the bound, not a tidiness rule, and it is on **every
+#: field that holds a ref** rather than only on the declaration. An unresolved
+#: ref survives expansion verbatim into a flow endpoint, where
 #: :func:`~analysis_service.system_model.make_flow_id` splices it into an
 #: element ID that is later rendered into a lane agent's prompt table. Holding a
 #: ref to ``[a-z0-9-]`` is what keeps a newline or a backtick run out of that
@@ -148,7 +177,7 @@ EXTRACTION_FORMATS: tuple[ExtractionFormat, ...] = (FULL_FORMAT, COMPACT_FORMAT)
 #: table's neighbours cannot fence it. A pattern on the declaration alone would
 #: bound every ref that resolves and none of the ones that do not, which is
 #: exactly backwards.
-REF = r"^[a-z0-9]+(?:-[a-z0-9]+)*$"
+REF = rf"^[{''.join(sorted(REF_TAGS.values()))}]:[a-z0-9]+(?:-[a-z0-9]+)*$"
 
 #: The prefix every provisional element ID carries, ahead of the element class's
 #: own ``id_prefix``. No element type declares a prefix holding ``_``, so a
@@ -182,17 +211,6 @@ def _ref_field() -> Any:
     return Field(max_length=40, pattern=REF)
 
 
-#: The groups whose elements a flow may run between: everything that carries a
-#: trust zone. Named here from the model's own fields rather than spelled, so it
-#: follows a sixth element type that carries one.
-ZONED_GROUPS: tuple[str, ...] = tuple(
-    name
-    for name in ELEMENT_GROUPS
-    if ZONE_ATTRIBUTE
-    in get_args(SystemModel.model_fields[name].annotation)[0].model_fields
-)
-
-
 class _CompactElement(BaseModel):
     """What every compact element carries: its ref, its name, its provenance.
 
@@ -213,10 +231,6 @@ class _CompactElement(BaseModel):
     source_label: str = Field(default="", max_length=200)
     source_speaker: str = Field(default="", max_length=200)
     notes: str = Field(default="", max_length=2000)
-    #: What extraction inferred about *this* element, one entry per attribute.
-    #: Nested rather than pointed at: see :class:`CompactAssumption`. Uncapped,
-    #: like every other list here — the bound on model size is the gate's.
-    assumptions: list[CompactAssumption] = Field(default_factory=list)
 
 
 class CompactExternalEntity(_CompactElement):
@@ -268,28 +282,25 @@ class CompactTrustBoundary(_CompactElement):
 class CompactAssumption(BaseModel):
     """An :class:`~analysis_service.system_model.Assumption` on the wire.
 
-    **It names no element.** It sits inside the element it is about, so the
-    subject is where it is written rather than something it points at, and the
-    adapter lifts it to the full model's top-level list with that element's
-    derived ID.
+    ``element`` is a typed ref, and ``element`` rather than ``element_id``
+    because it holds one: a reader who sees ``element_id`` beside a value of
+    ``"p:api"`` has to guess which naming scheme is in play.
 
-    That is the correction the first corpus sweep bought. Every one of the
-    sixteen ``duplicate-ref`` failures in five compact sweeps was an assumption
-    subject, and none was anything else. A model names a zone after the thing
-    inside it — thirty-four shared refs in five sweeps, so it is the norm — and
-    a ``kind`` is a legal attribute of an external entity *and* of a trust
-    boundary, so a subject ref shared between the two names neither. Every other
-    reference field is decided by its own scope (:data:`REFERENCE_SCOPES`); this
-    one had no scope to be decided by, because an assumption may be about any
-    element.
-
-    A reference that does not exist cannot be ambiguous, cannot dangle, and
-    costs no tokens.
+    **Naming the subject is what keeps the pairing honest.** Version 2 wrote
+    this entry inside its element instead, so the subject was where the entry
+    sat and no reference could dangle. It cost more than it saved: across five
+    corpus sweeps the model wrote nine ``data_classification`` inferences on a
+    flow or a process — an attribute only a Data Store declares — where the full
+    route and version 1 wrote none in five sweeps each. Naming the element
+    beside the attribute is the moment the model checks that the two go
+    together, and removing it moved the inference to whatever the model was
+    thinking about rather than what the fact is true of.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     assumption: str = Field(min_length=1, max_length=1000)
+    element: str = _ref_field()
     attribute: str = Field(min_length=1, max_length=100)
     basis: str = Field(min_length=1, max_length=1000)
 
@@ -315,6 +326,7 @@ class CompactSystemModel(BaseModel):
     data_stores: list[CompactDataStore] = Field(default_factory=list)
     data_flows: list[CompactDataFlow] = Field(default_factory=list)
     trust_boundaries: list[CompactTrustBoundary] = Field(default_factory=list)
+    assumptions: list[CompactAssumption] = Field(default_factory=list)
 
 
 #: Each compact element class against the full-model class it expands into, in
@@ -351,35 +363,23 @@ OMITTABLE_FIELDS: tuple[str, ...] = tuple(
     if not field.is_required()
 )
 
-#: Every field that holds a ref, against the element groups that field may name.
-#:
-#: **A ref is resolved inside the scope of the field that reads it**, which is
-#: what gives the transport back the type a full-model ID carries in its prefix.
-#: A live extraction of ``01-payments-checkout`` gave ``card-processor`` to both
-#: the external entity and its own trust zone, which is ordinary naming and
-#: legal in the full model — ``entity:card-processor`` and
-#: ``boundary:card-processor`` are different IDs. A flat namespace made every use
-#: of that ref ambiguous, and a whole extraction failed the gate over a name a
-#: reader would call correct.
-#:
-#: The scopes are the gate's own reference rules, and the gate stays the reader
-#: that *rules* on them: a ref found nowhere in its scope is looked up across
-#: every group, so a ``trust_zone`` naming a process still resolves and still
-#: fails the gate with a message naming a real element. Widening only where the
-#: scope is empty is what keeps that diagnostic without letting a wide lookup
-#: overrule a narrow hit.
-REFERENCE_SCOPES: Mapping[str, tuple[str, ...]] = MappingProxyType(
-    {
-        "trust_zone": ("trust_boundaries",),
-        "source": ZONED_GROUPS,
-        "destination": ZONED_GROUPS,
-    }
-)
+#: The name an assumption holds its subject's ref under.
+ASSUMPTION_SUBJECT = "element"
 
-#: The reference fields an element carries, as :func:`_expand_element` walks
-#: them. Every reference in this format is one, because an assumption names its
-#: subject by sitting inside it.
-REFERENCE_FIELDS: tuple[str, ...] = tuple(REFERENCE_SCOPES)
+#: Every field that holds a ref.
+#:
+#: **There is no scope table any more, and that is the point of version 3.** A
+#: typed ref names exactly one element, so resolution is a lookup rather than a
+#: search narrowed by which field is reading. Version 1 had no way to tell an
+#: entity from its own trust zone; version 2 gave the three endpoint types one
+#: namespace still, so a process and a store both called ``orders-db`` remained
+#: ambiguous for a flow endpoint. The tag settles all of it.
+#:
+#: Reference *typing* stays the gate's rule, and the good diagnostic survives: a
+#: ``trust_zone`` written ``p:api`` resolves to ``process:api`` and fails the
+#: gate with a message naming a real element, rather than a token nobody can
+#: place.
+REFERENCE_FIELDS: tuple[str, ...] = ("trust_zone", "source", "destination")
 
 
 def parse_extraction(
@@ -451,84 +451,53 @@ def expand(payload: object) -> tuple[dict[str, Any] | None, list[ValidationIssue
             for error in exc.errors()
         ]
 
-    claims = _claims(compact)
-    ambiguous: set[str] = set()
-    assumptions: list[dict[str, Any]] = []
+    claims, ambiguous = _claims(compact)
     expanded: dict[str, Any] = {
-        group: [
-            _expand_element(group, row, claims, ambiguous, assumptions)
-            for row in getattr(compact, group)
-        ]
+        group: [_expand_element(group, row, claims) for row in getattr(compact, group)]
         for group in COMPACT_ELEMENTS
     }
-    # Lifted in element order, each row already carrying the ID its element was
-    # given. Order is presentation: the gate reads each entry's own pair, and
-    # nothing downstream reads the list's sequence.
-    expanded["assumptions"] = assumptions
+    expanded["assumptions"] = [
+        {
+            "assumption": entry.assumption,
+            "element_id": claims.get(entry.element, entry.element),
+            "attribute": entry.attribute,
+            "basis": entry.basis,
+        }
+        for entry in compact.assumptions
+    ]
     return expanded, [
         ValidationIssue(
             code="duplicate-ref",
-            message=f"reference {ref!r} is claimed by"
-            f" {len(claims[ref])} elements that the field reading it cannot tell"
-            " apart, so it resolved to none of them; a ref is unique among the"
-            " elements a reference could confuse it with",
+            message=f"reference {ref!r} is claimed by more than one element, so"
+            " every use of it is ambiguous and none was resolved; a ref is"
+            " unique among the elements of its own type",
         )
         for ref in sorted(ambiguous)
     ]
 
 
-def _claims(compact: CompactSystemModel) -> Mapping[str, list[tuple[str, str]]]:
-    """Every ref the payload declares, against the elements claiming it.
+def _claims(
+    compact: CompactSystemModel,
+) -> tuple[Mapping[str, str], set[str]]:
+    """Each ref against the provisional ID it names, and the refs that collide.
 
-    One entry per claim rather than a count, because which *group* an element
-    sits in is what a reference field uses to tell two same-named elements
-    apart — see :data:`REFERENCE_SCOPES`.
+    A typed ref names one element, so this is a plain map and resolution is a
+    lookup. A ref two elements claim can only be two elements of one *type* —
+    the tag rules out the cross-type case that cost versions 1 and 2 — and that
+    is a genuine ambiguity: it binds to neither, and the gate reports the
+    dangling reference beside the ``duplicate-ref`` that explains it.
     """
-    claims: dict[str, list[tuple[str, str]]] = {}
+    claims: dict[str, str] = {}
+    ambiguous: set[str] = set()
     for group, (_, element_type) in COMPACT_ELEMENTS.items():
         for row in getattr(compact, group):
-            claims.setdefault(row.ref, []).append(
-                (group, _provisional_id(element_type, row.ref))
-            )
-    return claims
-
-
-def _resolve(
-    ref: str,
-    field: str,
-    claims: Mapping[str, list[tuple[str, str]]],
-    ambiguous: set[str],
-) -> str:
-    """The provisional ID one reference names, or the ref itself if none does.
-
-    Two lookups, narrow then wide, and the order is the whole rule. The narrow
-    one is the field's own scope, which is what lets a trust zone and the
-    external entity inside it share a name the way the full model's type
-    prefixes let them. The wide one runs **only when the scope holds nothing**,
-    so a ref of the wrong type still resolves and the gate reports it against a
-    real element ID rather than against a token it cannot place.
-
-    A ref several elements of one scope claim resolves to none of them: picking
-    would be a silent wrong binding. It is recorded in ``ambiguous`` and left in
-    the field, so the gate reports the dangling reference beside the
-    ``duplicate-ref`` that explains it.
-    """
-    scoped = [
-        provisional
-        for group, provisional in claims.get(ref, ())
-        if group in REFERENCE_SCOPES[field]
-    ]
-    if len(scoped) == 1:
-        return scoped[0]
-    if scoped:
-        ambiguous.add(ref)
-        return ref
-    wide = [provisional for _, provisional in claims.get(ref, ())]
-    if len(wide) == 1:
-        return wide[0]
-    if wide:
-        ambiguous.add(ref)
-    return ref
+            if row.ref in claims:
+                ambiguous.add(row.ref)
+                continue
+            claims[row.ref] = _provisional_id(element_type, row.ref)
+    return {
+        ref: provisional for ref, provisional in claims.items() if ref not in ambiguous
+    }, ambiguous
 
 
 def _provisional_id(element_type: type[Element], ref: str) -> str:
@@ -538,35 +507,24 @@ def _provisional_id(element_type: type[Element], ref: str) -> str:
     it in the right group's rewrite, and prefixed with
     :data:`PROVISIONAL_PREFIX` so it cannot collide with any derived ID.
     """
-    return f"{PROVISIONAL_PREFIX}{element_type.id_prefix}:{ref}"
+    return f"{PROVISIONAL_PREFIX}{element_type.id_prefix}:{ref.split(':', 1)[-1]}"
 
 
 def _expand_element(
-    group: str,
-    row: BaseModel,
-    claims: Mapping[str, list[tuple[str, str]]],
-    ambiguous: set[str],
-    assumptions: list[dict[str, Any]],
+    group: str, row: BaseModel, claims: Mapping[str, str]
 ) -> dict[str, Any]:
     """One compact row as full-model JSON: ``ref`` becomes ``id``, refs resolve.
 
-    Every other field is copied unchanged. Each reference resolves in its own
-    field's scope (:func:`_resolve`), and one that resolves to nothing is left
-    as the model wrote it, so the gate reports ``invalid-reference`` quoting the
-    ref rather than an ID this function invented.
-
-    This element's own assumptions are appended to ``assumptions``, each one
-    given this element's ID. They come off the element rather than out of a
-    list, so the subject is where the entry was written and there is no
-    reference to resolve or to get wrong.
+    Every other field is copied unchanged. A ref naming no element is left as
+    the model wrote it, so the gate reports ``invalid-reference`` quoting the
+    ref rather than an ID this function invented. A ref of the wrong *type*
+    still resolves, and the gate reports it against a real element ID: which
+    types a field may name is the gate's rule and stays there.
     """
     _, element_type = COMPACT_ELEMENTS[group]
     expanded = row.model_dump(mode="json")
     expanded["id"] = _provisional_id(element_type, expanded.pop("ref"))
     for field in REFERENCE_FIELDS:
         if field in expanded:
-            expanded[field] = _resolve(expanded[field], field, claims, ambiguous)
-    assumptions.extend(
-        {**entry, "element_id": expanded["id"]} for entry in expanded.pop("assumptions")
-    )
+            expanded[field] = claims.get(expanded[field], expanded[field])
     return expanded

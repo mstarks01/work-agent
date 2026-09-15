@@ -968,7 +968,7 @@ class TokenUsage:
   its own policy fails to load, so no report exists to warn on. It is `null`
   only on a report with no LLM provenance at all. And it carries
   `extraction_format` — which transport `extract` wrote in, `full` or
-  `compact-v2`. The two produce the same `SystemModel` by construction, so a
+  `compact-v3`. The two produce the same `SystemModel` by construction, so a
   reader cannot tell them apart from the report's own model; this is the field
   that says. It is `null` when the run extracted nothing.
 
