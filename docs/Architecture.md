@@ -123,7 +123,7 @@ the same `SystemModel` before the validity gate runs.
 | Transport | What `extract` writes | Selected by |
 | --- | --- | --- |
 | full | a `SystemModel` | the default |
-| compact-v1 | a compact wire form, expanded in code | `ANALYSIS_COMPACT_EXTRACTION` |
+| compact-v2 | a compact wire form, expanded in code | `ANALYSIS_COMPACT_EXTRACTION` |
 
 Nothing downstream of the gate can tell the two apart, which is the point and
 also the reason the report records which one ran, in

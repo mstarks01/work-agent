@@ -1,7 +1,15 @@
 # 35. The compact transport promotes on a predeclared gate
 
-- **Status**: accepted
+- **Status**: accepted; applied once, 2026-09-15
 - **Date**: 2026-09-15
+- **Outcome so far**: the gate was applied to `compact-v1` and **failed**. The
+  primary figure passed decisively — 4.5% fewer emitted tokens, 2.69 standard
+  deviations — and every quality margin held. It failed on the failure-rate
+  ceiling, 16 `duplicate-ref` against a ceiling of 0, and on the per-case veto.
+  All 16 were the assumption subject, which `compact-v2` removes by writing an
+  assumption inside the element it is about. The route did not promote and the
+  flag stays off. The gate below is unchanged and is what `compact-v2` has to
+  clear.
 - **Effort**: [#938 — stage compact extraction output behind a SystemModel adapter](https://github.com/mstarks01/work-agent/issues/938),
   stage 4
 - **Builds on**: [ADR 0016](0016-token-caps-are-drift-alarms.md), which says a
