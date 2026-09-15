@@ -63,7 +63,11 @@ from google.adk.workflow import FunctionNode
 
 from analysis_service import evidence, fan_in, graph
 from analysis_service.claims import Ground
-from analysis_service.compact import OMITTABLE_FIELDS, REFERENCE_FIELDS
+from analysis_service.compact import (
+    OMITTABLE_FIELDS,
+    REF_TAGS,
+    REFERENCE_FIELDS,
+)
 from analysis_service.critic import duplicate_groups
 from analysis_service.execution import GraphExecutor
 from analysis_service.fan_in import _bound_element_references, _verify_quotes
@@ -579,15 +583,11 @@ def as_compact(model: dict) -> dict:
     a ref rather than rebuilding every identifier from the names would pass a
     sweep whose refs were the names.
 
-    The assumptions come back in element order rather than the full model's own,
-    which is why the equivalence sweep compares them as a set. Order is
-    presentation here: the gate reads each entry's own element-and-attribute
-    pair, and nothing downstream reads the list's sequence.
     """
     refs: dict[str, str] = {}
     for group in ELEMENT_GROUPS:
         for index, element in enumerate(model.get(group, ())):
-            refs[element["id"]] = f"r{len(refs)}-{index}"
+            refs[element["id"]] = f"{REF_TAGS[group]}:r{len(refs)}-{index}"
     compact: dict = {}
     for group in ELEMENT_GROUPS:
         rows = []
@@ -603,21 +603,17 @@ def as_compact(model: dict) -> dict:
                     row[field] = refs[row[field]]
             if group == "data_flows":
                 row.setdefault("operations", UNKNOWN)
-            # An assumption sits inside the element it is about, so it carries
-            # no reference at all.
-            nested = [
-                {
-                    "assumption": entry["assumption"],
-                    "attribute": entry["attribute"],
-                    "basis": entry["basis"],
-                }
-                for entry in model.get("assumptions", ())
-                if entry["element_id"] == element["id"]
-            ]
-            if nested:
-                row["assumptions"] = nested
             rows.append(row)
         compact[group] = rows
+    compact["assumptions"] = [
+        {
+            "assumption": entry["assumption"],
+            "element": refs[entry["element_id"]],
+            "attribute": entry["attribute"],
+            "basis": entry["basis"],
+        }
+        for entry in model.get("assumptions", ())
+    ]
     return compact
 
 

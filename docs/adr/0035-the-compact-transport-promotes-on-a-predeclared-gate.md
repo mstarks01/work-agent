@@ -2,14 +2,21 @@
 
 - **Status**: accepted; applied once, 2026-09-15
 - **Date**: 2026-09-15
-- **Outcome so far**: the gate was applied to `compact-v1` and **failed**. The
-  primary figure passed decisively — 4.5% fewer emitted tokens, 2.69 standard
-  deviations — and every quality margin held. It failed on the failure-rate
-  ceiling, 16 `duplicate-ref` against a ceiling of 0, and on the per-case veto.
-  All 16 were the assumption subject, which `compact-v2` removes by writing an
-  assumption inside the element it is about. The route did not promote and the
-  flag stays off. The gate below is unchanged and is what `compact-v2` has to
-  clear.
+- **Outcome so far**: applied twice, **failed twice**, and the route has not
+  promoted. The primary figure passes decisively each time — 4.5% then 4.8%
+  fewer emitted tokens, 2.69 then 2.87 standard deviations. Everything else is
+  the transport paying for it.
+  - `compact-v1` failed three criteria: `duplicate-ref` 16 against a ceiling of
+    0, first-pass validity 0.800 against a floor of 0.927, and the per-case veto
+    on three cases. Every quality margin held.
+  - `compact-v2` failed six. It fixed what it aimed at — `duplicate-ref` 16 → 2,
+    validity 0.800 → 0.923 — and **caused a failure class neither the full route
+    nor version 1 ever produced**: nine `data_classification` inferences written
+    on a flow or a process, against zero in five sweeps of each of the others.
+    Three quality margins went with it.
+  - `compact-v3` puts the type back in the ref and the assumption subject back
+    where it never failed. The gate below is unchanged and is what it has to
+    clear.
 - **Effort**: [#938 — stage compact extraction output behind a SystemModel adapter](https://github.com/mstarks01/work-agent/issues/938),
   stage 4
 - **Builds on**: [ADR 0016](0016-token-caps-are-drift-alarms.md), which says a
