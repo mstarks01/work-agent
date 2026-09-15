@@ -140,8 +140,11 @@ tokens and the compact schema is about 1,500 characters smaller, so the first
 live run measured 6,116 prompt tokens against the full route's 6,098 on the
 same case. What the trade buys on the output side is what
 [#938](https://github.com/mstarks01/work-agent/issues/938) stage 4 measures, and
-the first run could not resolve it. Until one does it is off, and turning it off
-again is one variable and a restart.
+the first run could not resolve it.
+[ADR 0035](adr/0035-the-compact-transport-promotes-on-a-predeclared-gate.md)
+fixes what the next run has to show, and says why latency is not in that gate.
+Until it passes the transport is off, and turning it off again is one variable
+and a restart.
 
 | Variable | Effect |
 | --- | --- |
