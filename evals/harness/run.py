@@ -655,7 +655,13 @@ def _scored_sweep(
             f"{len(unrostered)} voter(s) have no roster line and no series"
             f" reads them: {', '.join(unrostered)}"
         )
-    flow_maps = flows_by_case(cases)
+    # The analysed model per case, so a citation this sweep wrote resolves to
+    # its endpoints like the reference's does. In an injected mode it is the
+    # blessed model and the map is unchanged; in an end-to-end run it is the
+    # extraction, which names the same interaction differently (#949).
+    flow_maps = flows_by_case(
+        cases, {case: run.report.system_model for case, run in runs.items()}
+    )
     matcher = SubsetVerbIdentity(flow_maps)
     reports = {case: run.report for case, run in runs.items()}
 
@@ -1258,9 +1264,9 @@ def command_price_verbs(args: argparse.Namespace) -> int:
     table is what a decision on ``EQUIVALENT`` reads (#730).
     """
     corpus = load_corpus(args.corpus)
-    flow_maps = flows_by_case(corpus)
     pairs = load_pairs(args.pairs)
     produced = None
+    analysed: dict[str, Any] = {}
     if args.artifact is not None:
         path = Path(args.artifact)
         cases = [case for case in corpus if case.id in load_artifact(path).cases]
@@ -1270,6 +1276,10 @@ def command_price_verbs(args: argparse.Namespace) -> int:
             for case_id, run in runs.items()
             if optional_block(run.report, "stride")
         }
+        # Same reason as the sweep path: a re-scored claim cites the graph its
+        # own run analysed (#949).
+        analysed = {case_id: run.report.system_model for case_id, run in runs.items()}
+    flow_maps = flows_by_case(corpus, analysed)
     try:
         candidates = [
             verb_pricing.parse_groups([spelling]) for spelling in args.equivalent
