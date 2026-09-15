@@ -13,9 +13,19 @@ as a floor rather than a ceiling: the benchmark's refs run four to six character
 where a model writes two or three, and a hand-corrected corpus model carries
 fewer empty optional fields than a live emission does. Read it as *characters*,
 too — nothing offline here tokenizes — and as an emission size rather than a
-latency. The route costs about 412 tokens of instruction on the way in, which is
-cacheable and paid on every call. Whether the trade is worth making is #938
-stage 4, a paired live comparison, and until it runs this route is off.
+latency.
+
+**The input side is close to free.** The delta prompt is about 490 coarse
+tokens, and the compact schema is about 1,500 characters smaller than
+``SystemModel``'s, because six classes lose the ``id`` field and its long
+pattern. The first live run measured the whole request at 6,116 prompt tokens
+against 6,098 for the full route on the same case — **18 tokens**, where the
+prompt text alone would have predicted a few hundred.
+
+Whether the output saving is worth having is #938 stage 4, a paired live
+comparison. The first one could not resolve it: the emitted-token difference was
+under half the full route's own run-to-run spread on one case. Until a run
+settles it this route is off.
 
 **This is a transport, not an ontology.** The compact model carries exactly the
 facts a :class:`~analysis_service.system_model.SystemModel` carries, under the
@@ -44,10 +54,14 @@ Three properties make the expansion safe to put in front of the gate:
   the model wrote. Reference typing is the gate's rule and stays there: a
   ``trust_zone`` pointing at a process resolves to that process's ID and fails
   the gate with a message naming a real element.
-- **An ambiguous ref resolves to nothing.** Two elements claiming one ref make
-  every use of it ambiguous, so the adapter binds it nowhere and reports
-  ``duplicate-ref`` over the whole model. Picking one would be a silent wrong
-  binding, which is the failure this transport has to be incapable of.
+- **A reference resolves inside the scope of the field that reads it.** That is
+  what gives the transport back the type a full-model ID carries in its prefix,
+  and it is the correction the first live run bought: a model gave
+  ``card-processor`` to an external entity and to its own trust zone, which the
+  full model spells as two IDs and a flat namespace could not tell apart. A ref
+  several elements of one scope claim resolves to none of them, and the adapter
+  reports ``duplicate-ref`` rather than picking — picking would be a silent
+  wrong binding, which is the failure this transport has to be incapable of.
 
 The one deliberate divergence from :class:`~analysis_service.system_model.DataFlow`
 is ``operations``, which is required here and defaulted there. The default exists
@@ -58,15 +72,16 @@ output rather than an unknown fact.
 
 from __future__ import annotations
 
-from collections import Counter
 from collections.abc import Collection, Mapping
 from types import MappingProxyType
-from typing import Any, Literal
+from typing import Any, Literal, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from analysis_service.system_model import (
     CORE_ASSET_TAGS,
+    ELEMENT_GROUPS,
+    ZONE_ATTRIBUTE,
     DataFlow,
     DataStore,
     Element,
@@ -143,6 +158,17 @@ def _ref_field() -> Any:
     wrong one. Nothing downstream reads a ref at all.
     """
     return Field(max_length=40, pattern=REF)
+
+
+#: The groups whose elements a flow may run between: everything that carries a
+#: trust zone. Named here from the model's own fields rather than spelled, so it
+#: follows a sixth element type that carries one.
+ZONED_GROUPS: tuple[str, ...] = tuple(
+    name
+    for name in ELEMENT_GROUPS
+    if ZONE_ATTRIBUTE
+    in get_args(SystemModel.model_fields[name].annotation)[0].model_fields
+)
 
 
 class _CompactElement(BaseModel):
@@ -287,11 +313,44 @@ OMITTABLE_FIELDS: tuple[str, ...] = tuple(
     if not field.is_required()
 )
 
-#: The compact fields that hold a ref, against the full-model field each becomes.
-#: ``trust_zone``, a flow's two endpoints and an assumption's subject are the
-#: four places #938 names, and they are listed here so the resolver walks a table
-#: rather than a chain of ``if``\ s that a new reference field could miss.
-REFERENCE_FIELDS: tuple[str, ...] = ("trust_zone", "source", "destination")
+#: The name an assumption holds its subject's ref under.
+ASSUMPTION_SUBJECT = "element"
+
+#: Every field that holds a ref, against the element groups that field may name.
+#:
+#: **A ref is resolved inside the scope of the field that reads it**, which is
+#: what gives the transport back the type a full-model ID carries in its prefix.
+#: A live extraction of ``01-payments-checkout`` gave ``card-processor`` to both
+#: the external entity and its own trust zone, which is ordinary naming and
+#: legal in the full model — ``entity:card-processor`` and
+#: ``boundary:card-processor`` are different IDs. A flat namespace made every use
+#: of that ref ambiguous, and a whole extraction failed the gate over a name a
+#: reader would call correct.
+#:
+#: The scopes are the gate's own reference rules, and the gate stays the reader
+#: that *rules* on them: a ref found nowhere in its scope is looked up across
+#: every group, so a ``trust_zone`` naming a process still resolves and still
+#: fails the gate with a message naming a real element. Widening only where the
+#: scope is empty is what keeps that diagnostic without letting a wide lookup
+#: overrule a narrow hit.
+REFERENCE_SCOPES: Mapping[str, tuple[str, ...]] = MappingProxyType(
+    {
+        "trust_zone": ("trust_boundaries",),
+        "source": ZONED_GROUPS,
+        "destination": ZONED_GROUPS,
+        # An assumption may name any element, so its scope is every group and
+        # there is nothing to widen to. A ref two elements share is genuinely
+        # ambiguous here, and that is the one place it still is.
+        ASSUMPTION_SUBJECT: ELEMENT_GROUPS,
+    }
+)
+
+#: The reference fields an *element* carries, as :func:`_expand_element` walks
+#: them. Derived from the scopes table, so a fifth reference field joins both by
+#: being declared once.
+REFERENCE_FIELDS: tuple[str, ...] = tuple(
+    name for name in REFERENCE_SCOPES if name != ASSUMPTION_SUBJECT
+)
 
 
 def parse_extraction(
@@ -363,56 +422,90 @@ def expand(payload: object) -> tuple[dict[str, Any] | None, list[ValidationIssue
             for error in exc.errors()
         ]
 
-    bound, issues = _bind_refs(compact)
+    claims = _claims(compact)
+    ambiguous: set[str] = set()
     expanded: dict[str, Any] = {
-        group: [_expand_element(group, row, bound) for row in getattr(compact, group)]
+        group: [
+            _expand_element(group, row, claims, ambiguous)
+            for row in getattr(compact, group)
+        ]
         for group in COMPACT_ELEMENTS
     }
     expanded["assumptions"] = [
         {
             "assumption": entry.assumption,
-            "element_id": bound.get(entry.element, entry.element),
+            "element_id": _resolve(
+                entry.element, ASSUMPTION_SUBJECT, claims, ambiguous
+            ),
             "attribute": entry.attribute,
             "basis": entry.basis,
         }
         for entry in compact.assumptions
     ]
-    return expanded, issues
-
-
-def _bind_refs(
-    compact: CompactSystemModel,
-) -> tuple[dict[str, str], list[ValidationIssue]]:
-    """Each ref against the provisional ID it names, and what could not be bound.
-
-    A ref claimed by two elements binds to neither. The issue names no element,
-    so :func:`~analysis_service.validation.repair_scope` widens the repair to
-    the whole model — which is the honest reading of an ambiguous reference
-    table, exactly as it is for ``no-trust-zones``. A narrower scope would have
-    to name one of the two elements the ref points at, and which one it names is
-    the question nobody can answer.
-    """
-    claims: Counter[str] = Counter()
-    for group in COMPACT_ELEMENTS:
-        claims.update(row.ref for row in getattr(compact, group))
-
-    bound = {}
-    for group, (_, element_type) in COMPACT_ELEMENTS.items():
-        for row in getattr(compact, group):
-            if claims[row.ref] == 1:
-                bound[row.ref] = _provisional_id(element_type, row.ref)
-
-    issues = [
+    return expanded, [
         ValidationIssue(
             code="duplicate-ref",
-            message=f"reference {ref!r} is claimed by {count} elements, so every"
-            " use of it is ambiguous and none was resolved; give each element"
-            " its own ref",
+            message=f"reference {ref!r} is claimed by"
+            f" {len(claims[ref])} elements that the field reading it cannot tell"
+            " apart, so it resolved to none of them; a ref is unique among the"
+            " elements a reference could confuse it with",
         )
-        for ref, count in sorted(claims.items())
-        if count > 1
+        for ref in sorted(ambiguous)
     ]
-    return bound, issues
+
+
+def _claims(compact: CompactSystemModel) -> Mapping[str, list[tuple[str, str]]]:
+    """Every ref the payload declares, against the elements claiming it.
+
+    One entry per claim rather than a count, because which *group* an element
+    sits in is what a reference field uses to tell two same-named elements
+    apart — see :data:`REFERENCE_SCOPES`.
+    """
+    claims: dict[str, list[tuple[str, str]]] = {}
+    for group, (_, element_type) in COMPACT_ELEMENTS.items():
+        for row in getattr(compact, group):
+            claims.setdefault(row.ref, []).append(
+                (group, _provisional_id(element_type, row.ref))
+            )
+    return claims
+
+
+def _resolve(
+    ref: str,
+    field: str,
+    claims: Mapping[str, list[tuple[str, str]]],
+    ambiguous: set[str],
+) -> str:
+    """The provisional ID one reference names, or the ref itself if none does.
+
+    Two lookups, narrow then wide, and the order is the whole rule. The narrow
+    one is the field's own scope, which is what lets a trust zone and the
+    external entity inside it share a name the way the full model's type
+    prefixes let them. The wide one runs **only when the scope holds nothing**,
+    so a ref of the wrong type still resolves and the gate reports it against a
+    real element ID rather than against a token it cannot place.
+
+    A ref several elements of one scope claim resolves to none of them: picking
+    would be a silent wrong binding. It is recorded in ``ambiguous`` and left in
+    the field, so the gate reports the dangling reference beside the
+    ``duplicate-ref`` that explains it.
+    """
+    scoped = [
+        provisional
+        for group, provisional in claims.get(ref, ())
+        if group in REFERENCE_SCOPES[field]
+    ]
+    if len(scoped) == 1:
+        return scoped[0]
+    if scoped:
+        ambiguous.add(ref)
+        return ref
+    wide = [provisional for _, provisional in claims.get(ref, ())]
+    if len(wide) == 1:
+        return wide[0]
+    if wide:
+        ambiguous.add(ref)
+    return ref
 
 
 def _provisional_id(element_type: type[Element], ref: str) -> str:
@@ -426,19 +519,22 @@ def _provisional_id(element_type: type[Element], ref: str) -> str:
 
 
 def _expand_element(
-    group: str, row: BaseModel, bound: Mapping[str, str]
+    group: str,
+    row: BaseModel,
+    claims: Mapping[str, list[tuple[str, str]]],
+    ambiguous: set[str],
 ) -> dict[str, Any]:
     """One compact row as full-model JSON: ``ref`` becomes ``id``, refs resolve.
 
-    Every other field is copied unchanged. A ref that binds to nothing — because
-    no element claimed it, or because two did — is left in the field as the
-    model wrote it, so the gate reports ``invalid-reference`` quoting the ref
-    rather than an ID this function invented.
+    Every other field is copied unchanged. Each reference resolves in its own
+    field's scope (:func:`_resolve`), and one that resolves to nothing is left
+    as the model wrote it, so the gate reports ``invalid-reference`` quoting the
+    ref rather than an ID this function invented.
     """
     _, element_type = COMPACT_ELEMENTS[group]
     expanded = row.model_dump(mode="json")
     expanded["id"] = _provisional_id(element_type, expanded.pop("ref"))
     for field in REFERENCE_FIELDS:
         if field in expanded:
-            expanded[field] = bound.get(expanded[field], expanded[field])
+            expanded[field] = _resolve(expanded[field], field, claims, ambiguous)
     return expanded

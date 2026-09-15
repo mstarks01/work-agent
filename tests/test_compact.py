@@ -270,7 +270,8 @@ class TestAReferenceResolvesOrTheGateSaysSo:
 
         Resolving first is what makes the message actionable: repair is told
         that a ``trust_zone`` points at ``process:web-app``, not that some token
-        it no longer recognises went missing.
+        it no longer recognises went missing. The wide lookup runs only because
+        the field's own scope holds nothing — a narrow hit is never overruled.
         """
         payload = compact_fixture()
         payload["data_stores"][0]["trust_zone"] = "app"
@@ -279,6 +280,29 @@ class TestAReferenceResolvesOrTheGateSaysSo:
 
         assert codes(issues) == ["invalid-reference"]
         assert "process:web-app" in issues[0].message
+
+    def test_a_zone_and_the_element_inside_it_may_share_a_ref(self):
+        """The regression test for the first live compact run.
+
+        A live extraction of ``01-payments-checkout`` gave ``card-processor`` to
+        both the external entity and its own trust zone — ordinary naming, and
+        legal in the full model, where ``entity:card-processor`` and
+        ``boundary:card-processor`` are different IDs. A flat ref namespace made
+        every use of it ambiguous and failed the whole extraction.
+
+        Each field resolves in its own scope, so ``trust_zone`` reaches the
+        boundary and a flow endpoint reaches the entity, from one spelling.
+        """
+        payload = compact_fixture()
+        payload["trust_boundaries"][0]["ref"] = "cust"
+        payload["external_entities"][0]["trust_zone"] = "cust"
+
+        model, issues = parse_extraction(payload, COMPACT_FORMAT)
+
+        assert codes(issues) == []
+        assert model.external_entities[0].id == "entity:customer"
+        assert model.external_entities[0].trust_zone == "boundary:internet"
+        assert model.data_flows[0].source == "entity:customer"
 
     def test_a_ref_two_elements_claim_binds_to_neither(self):
         """The one thing the adapter must never do is pick.
