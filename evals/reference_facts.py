@@ -1,0 +1,177 @@
+"""The reference facts a corpus case's sources establish, one row per predicate.
+
+``evals/corpus/<case>/facts.json`` holds what a reader says a case's sources
+state, in the shape the assertion node proposes: a subject, a predicate, a
+value, a scope, a basis and the quotes that carry it. :func:`reference_catalog`
+resolves those rows through :func:`analysis_service.assertions.resolve_catalog`,
+the one reader of what a proposed row means, so a reference row is held to
+every rule a produced row is — its quote is located in the source, its subject
+snaps to the blessed model, its value is one the predicate admits — and a row
+the gate would refuse is a corpus error rather than a reference.
+
+**A row is a draft until a person signs it.** ``drafted_by`` names the agent
+that wrote the row and its proposed answer. ``reviewed_by`` names the person
+who ruled on it, and is ``None`` until one does. ``tests/test_reference_facts.py``
+reads both: the drafter may never sign, and a case whose rows are unsigned is
+named rather than trusted. Nothing here decides a fact. That is the reviewer's
+act, and the field records whose it was.
+
+The file carries a second list. ``disputed`` names each value the blessed
+model holds that the drafter reads the source as not establishing, with the
+value proposed instead and the kind of gap. It is the adjudication table
+issue #961 asks for, kept in a field so that an entry the model no longer
+matches fails a lint rather than lingering in prose. An entry waits until a
+person rules on it. A ruling to change the model removes the entry when the
+model changes, and a ruling to keep the model stays as a signed entry.
+
+Two conventions the rows follow, because the projection reads them. A fact
+that projects into a graph field — a mechanism, a transport, a zone, an
+exposure — sits on the graph subject, unscoped and under one predicate, so
+:func:`~analysis_service.assertions.project` writes a value rather than a
+degraded ``unknown``; a credential is recorded on the principal that presents
+it rather than as a second predicate on the interaction. An ``unknown`` row is
+written where the source raises the predicate and does not answer it, which is
+the ``hedged`` reason, and not for every predicate the source is silent about.
+That is the rule ``prompts/assert.md`` gives the producer, so the reference and
+the produced catalog enumerate the same questions.
+"""
+
+from __future__ import annotations
+
+import json
+from collections.abc import Mapping
+from pathlib import Path
+from typing import Final, Literal
+
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
+
+from analysis_service.assertions import (
+    AssertionCatalog,
+    AssertionProposal,
+    CatalogProposal,
+    catalog_issues,
+    resolve_catalog,
+)
+from analysis_service.system_model import SystemModel
+from evals.harness.reference import CorpusError
+
+#: The file a case carries its reference facts in, beside ``model.json``.
+FACTS_FILE = "facts.json"
+
+#: Who drafts a facts file. One value, because every draft in this repository
+#: is an agent's; the name is what ``reviewed_by`` may never equal.
+DRAFTER: Final = "agent-stand-in"
+
+#: What kind of gap a disputed value is, in the audit's own five classes:
+#: a fact the source states outright and the model misses or misstates, an
+#: inference the source supports but the model records as stated, a value the
+#: source never settles, a representation the source supports as well as the
+#: blessed one, and a value the source contradicts.
+DisputeKind = Literal[
+    "explicit-fact",
+    "defensible-inference",
+    "unknown",
+    "alternate-representation",
+    "error",
+]
+
+#: What a reviewer may rule on a dispute: change the model as proposed, or
+#: keep it as it stands.
+Ruling = Literal["change", "keep"]
+
+
+class FactRow(BaseModel):
+    """One reference fact, its rationale, and who has signed it."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    assertion: AssertionProposal
+    #: Why the drafter read the source this way, in words a reviewer weighs.
+    #: Read by a person, never by code, and required because a row nobody
+    #: can argue with is a row nobody checked.
+    rationale: str = Field(min_length=1)
+    #: Who ruled that this row states what the source states. ``None`` until
+    #: a person does.
+    reviewed_by: str | None = None
+
+
+class Dispute(BaseModel):
+    """One blessed value the drafter reads the source as not establishing."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    element_id: str = Field(min_length=1)
+    attribute: str = Field(min_length=1)
+    #: The value ``model.json`` holds now, so the entry stops matching the
+    #: moment the model changes.
+    blessed: str = Field(min_length=1)
+    #: What the drafter proposes: a value, or the change to record.
+    proposed: str = Field(min_length=1)
+    kind: DisputeKind
+    #: The source's words, or their absence, that the dispute rests on.
+    basis: str = Field(min_length=1)
+    ruling: Ruling | None = None
+    reviewed_by: str | None = None
+
+
+class ReferenceFacts(BaseModel):
+    """One case's reference facts and its disputed values, as drafted or signed."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    case: str = Field(min_length=1)
+    drafted_by: Literal["agent-stand-in"] = DRAFTER
+    rows: list[FactRow] = Field(min_length=1)
+    disputed: list[Dispute] = Field(default_factory=list)
+
+
+def facts_path(case_dir: Path) -> Path:
+    """Where this case's reference facts live, whether or not the file exists."""
+    return case_dir / FACTS_FILE
+
+
+def load_facts(case_dir: Path) -> ReferenceFacts:
+    """This case's reference facts, validated, or a corpus error naming why not."""
+    path = facts_path(case_dir)
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        return ReferenceFacts.model_validate(raw)
+    except (OSError, ValueError, ValidationError) as exc:
+        raise CorpusError(f"{path}: {exc}") from exc
+
+
+def drafted_cases(corpus_dir: Path) -> list[Path]:
+    """Every case directory carrying a facts file, in corpus order."""
+    return sorted(
+        path.parent for path in corpus_dir.glob(f"*/{FACTS_FILE}") if path.is_file()
+    )
+
+
+def reference_catalog(
+    facts: ReferenceFacts, model: SystemModel, sources: Mapping[str, str]
+) -> AssertionCatalog:
+    """The rows resolved against the case's own blessed model and sources.
+
+    Through the same resolver a produced proposal goes through, so a reference
+    row that would not survive as a produced row cannot stand as a reference.
+    Any refusal — a quote the source does not carry, a subject the model does
+    not hold, a value the predicate does not admit — is a corpus error here,
+    because a reference the gate would refuse measures nothing.
+
+    ``sources`` is label to text, which is what the resolver reads; the caller
+    supplies it so the corpus lint can pass the raw files it already holds
+    rather than go through the harness loader it refuses to check the corpus
+    through.
+    """
+    proposal = CatalogProposal(assertions=[row.assertion for row in facts.rows])
+    catalog, issues = resolve_catalog(proposal, model, sources)
+    issues = [*issues, *catalog_issues(catalog, model=model, sources=sources)]
+    if issues:
+        listed = "; ".join(
+            f"row {issue.row}: {issue.code}: {issue.message}"
+            if issue.row is not None
+            else f"{issue.code}: {issue.message}"
+            for issue in issues
+        )
+        raise CorpusError(f"{facts.case}: {FACTS_FILE} does not resolve: {listed}")
+    return catalog

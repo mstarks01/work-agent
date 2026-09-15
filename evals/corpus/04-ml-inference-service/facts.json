@@ -1,0 +1,524 @@
+{
+  "case": "04-ml-inference-service",
+  "drafted_by": "agent-stand-in",
+  "rows": [
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:inference-gateway",
+        "predicate": "internet-exposure",
+        "value": "internet-facing",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "a FastAPI service on GKE that we expose on the internet"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Stated outright, with the reason.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:calling-service-to-inference-gateway:submit-inference-request",
+        "predicate": "authentication-mechanism",
+        "value": "API key in a header",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Callers pass an API key in a header."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Stated mechanism. The key's lifecycle is recorded on the credential below.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "principal",
+        "subject": "calling team",
+        "predicate": "credential-presented",
+        "value": "API key",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Callers pass an API key in a header. Keys are issued per calling team"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Keys are issued per calling team, so the team is the principal that holds one.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "credential",
+        "subject": "API key",
+        "predicate": "credential-sharing",
+        "value": "per-principal",
+        "reason": null,
+        "scope": [
+          {
+            "kind": "principal",
+            "value": "calling team"
+          }
+        ],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Keys are issued per calling team"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Per team. The reviewer decides whether a team counts as one principal; the scope records the granularity the source gives.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "credential",
+        "subject": "API key",
+        "predicate": "credential-expiry",
+        "value": "does-not-expire",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "we have never expired one"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "'We have never expired one' is a statement about what the operator has done, and no key has stopped working. Weak reading: the reviewer may prefer unknown, hedged.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "credential",
+        "subject": "API key",
+        "predicate": "credential-rotation",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Keys are issued per calling team and we have never expired one."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The source speaks about the keys' lifecycle and never mentions rotation. model.json writes 'never expired or rotated'; see disputed.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:inference-gateway-to-model-server:forward-request",
+        "predicate": "authentication-mechanism",
+        "value": "absent",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "There is no auth between the gateway and the model server"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "An explicit absence, stated.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:model-server",
+        "predicate": "network-membership",
+        "value": "boundary:model-network",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "runs the actual model on GPU nodes in our model network"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Stated placement.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:model-server",
+        "predicate": "internet-exposure",
+        "value": "internal",
+        "reason": null,
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [],
+        "explanation": "The source says the model network is meant to be reachable only from the gateway, and places the model server in that network.",
+        "exclusive": false
+      },
+      "rationale": "'Meant to be reachable only from the gateway' is intent, so the value is inferred. model.json holds internal with no assumption; see disputed.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:model-server-to-model-registry-bucket:load-artifact",
+        "predicate": "authentication-mechanism",
+        "value": "the model server's own service account",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "It uses its own service account for that."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Stated mechanism on the artifact load.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "artifact",
+        "subject": "model artifact",
+        "predicate": "signature-verification",
+        "value": "absent",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "I don't believe anything verifies the artifact hasn't been swapped — we just trust the bucket."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "'I don't believe anything verifies' is a hedge and 'we just trust the bucket' is a statement. Drafted as a stated absence because the second clause settles it; the reviewer may rule unknown, hedged. Weakest reading in this file.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:model-server-to-redis-feature-store:read-features",
+        "predicate": "authentication-mechanism",
+        "value": "absent",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Redis has no password on it"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "An explicit absence, stated: no password on Redis.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:redis-feature-store",
+        "predicate": "network-membership",
+        "value": "boundary:model-network",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "it is only reachable inside the model network"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Stated placement.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:redis-feature-store",
+        "predicate": "internet-exposure",
+        "value": "internal",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "it is only reachable inside the model network"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Stated reach. A store carries no exposure field, so this projects nowhere and is kept because the source states it.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:model-registry-bucket",
+        "predicate": "network-membership",
+        "value": "boundary:model-network",
+        "reason": null,
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [],
+        "explanation": "The model server, which the source places in the model network, loads artifacts from the bucket at startup; the source places the bucket nowhere.",
+        "exclusive": false
+      },
+      "rationale": "The source never places the bucket. model.json's assumption on the ML engineer says the registry 'is stated to sit in the model network'; it is not. See disputed.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "entity:ml-engineer",
+        "predicate": "network-membership",
+        "value": "boundary:model-network",
+        "reason": null,
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [],
+        "explanation": "No remote-access path is described for publishing artifacts, and the bucket is inferred to sit in the model network.",
+        "exclusive": false
+      },
+      "rationale": "Inferred, as model.json's assumption records.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "entity:calling-service",
+        "predicate": "network-membership",
+        "value": "boundary:public-internet",
+        "reason": null,
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [],
+        "explanation": "The gateway is exposed on the internet because two calling services are in a different cloud, so callers reach it over the internet.",
+        "exclusive": false
+      },
+      "rationale": "Two of the calling services are in a different cloud and the gateway is exposed to reach them.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:inference-gateway",
+        "predicate": "network-membership",
+        "value": "boundary:serving-edge",
+        "reason": null,
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [],
+        "explanation": "The gateway is the internet-exposed component and the model gives that tier its own zone.",
+        "exclusive": false
+      },
+      "rationale": "The source names no zone for the gateway; the serving edge is the model's tier for the exposed component.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:inference-log",
+        "predicate": "network-membership",
+        "value": "boundary:serving-edge",
+        "reason": null,
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [],
+        "explanation": "The gateway writes the inference log, and the model places the gateway in the serving edge.",
+        "exclusive": false
+      },
+      "rationale": "The source never places the log; the gateway writes it.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:ml-engineer-to-model-registry-bucket:publish-artifact",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "I'm not sure what governs who can push — I think it is a shared group account."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The speaker is unsure: a hedged unknown with the words hedged.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "credential",
+        "subject": "group account",
+        "predicate": "credential-sharing",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "I think it is a shared group account"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "'I think it is a shared group account' voices a value without stating it. A produced catalog that writes shared here has upgraded a hedge.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "principal",
+        "subject": "ML engineers",
+        "predicate": "authorization-grant",
+        "value": "publish new model artifacts",
+        "reason": null,
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "model registry bucket"
+          },
+          {
+            "kind": "operation",
+            "value": "write"
+          }
+        ],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "ML engineers publish new model artifacts to the registry bucket."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The grant the source states, to the registry bucket.",
+      "reviewed_by": null
+    }
+  ],
+  "disputed": [
+    {
+      "element_id": "flow:calling-service-to-inference-gateway:submit-inference-request",
+      "attribute": "authentication",
+      "blessed": "per-team API key in a header, never expired or rotated",
+      "proposed": "per-team API key in a header, never expired",
+      "kind": "error",
+      "basis": "The source says 'we have never expired one'. Rotation is a separate fact and the source does not mention it.",
+      "ruling": null,
+      "reviewed_by": null
+    },
+    {
+      "element_id": "flow:calling-service-to-inference-gateway:submit-inference-request",
+      "attribute": "protocol",
+      "blessed": "HTTPS",
+      "proposed": "unknown, or record an assumption naming the inference",
+      "kind": "defensible-inference",
+      "basis": "FastAPI, internet exposure and an API key in a header do not state HTTPS. encryption_in_transit already reads unknown on this flow.",
+      "ruling": null,
+      "reviewed_by": null
+    },
+    {
+      "element_id": "process:model-server",
+      "attribute": "exposure",
+      "blessed": "internal",
+      "proposed": "keep internal and record an assumption",
+      "kind": "defensible-inference",
+      "basis": "'The model network is meant to be reachable only from the gateway' is intent; case 01 records the same shape as an assumption and this case does not.",
+      "ruling": null,
+      "reviewed_by": null
+    },
+    {
+      "element_id": "entity:ml-engineer",
+      "attribute": "trust_zone",
+      "blessed": "boundary:model-network",
+      "proposed": "keep the value; rewrite the assumption's basis, which says the registry is stated to sit in the model network",
+      "kind": "error",
+      "basis": "The source never places the model registry bucket. The assumption's basis claims a statement the text does not carry.",
+      "ruling": null,
+      "reviewed_by": null
+    },
+    {
+      "element_id": "store:model-registry-bucket",
+      "attribute": "data_classification",
+      "blessed": "internal",
+      "proposed": "keep and record a classification assumption, or set unknown",
+      "kind": "defensible-inference",
+      "basis": "The source states no classification. prompts/extract.md requires a recorded basis for one that is inferred; seven stores across cases 02, 03 and 04 carry none (#961 finding 7).",
+      "ruling": null,
+      "reviewed_by": null
+    },
+    {
+      "element_id": "store:redis-feature-store",
+      "attribute": "data_classification",
+      "blessed": "confidential",
+      "proposed": "keep and record a classification assumption, or set unknown",
+      "kind": "defensible-inference",
+      "basis": "The source says the store holds account age and spend bands per customer and states no classification.",
+      "ruling": null,
+      "reviewed_by": null
+    },
+    {
+      "element_id": "store:inference-log",
+      "attribute": "data_classification",
+      "blessed": "confidential",
+      "proposed": "keep and record a classification assumption, or set unknown",
+      "kind": "defensible-inference",
+      "basis": "The source says the log holds raw prompts carrying whatever users typed and states no classification.",
+      "ruling": null,
+      "reviewed_by": null
+    }
+  ]
+}

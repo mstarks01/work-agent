@@ -42,6 +42,14 @@ the case (ADR 24).
 `tests/test_case_review.py` fails a new case that arrives without a sitting, and
 fails a read file that changes under its recorded digest.
 
+**The reference facts are drafts.** Five cases carry a `facts.json`, one row per
+fact the sources state, in the shape the assertion node proposes, plus the
+blessed values the drafter disputes. An agent drafted every row, and no row is
+signed; `tests/test_reference_facts.py` skips its gate while one is unsigned.
+`python evals/verify_corpus.py` prints how many rows each file holds and how
+many are unsigned. Until a person signs them, no required-fact recall or
+unsupported-assertion figure exists (`BLESSING.md` step 7).
+
 So every agreement figure the suite produces is **self-consistency, not
 accuracy**: it measures how closely a rule reproduces the recorded
 dispositions. That includes the 90% bar. A rule at 94.2% agrees with those
@@ -128,6 +136,7 @@ evals/
     model.json                  the blessed System Model (passes the shipped validator)
     claims/<framework>.json     that framework's reference set, keyed to model.json's IDs
     corrections.md              notes on how the model was corrected, and why
+    facts.json                  the reference facts, per predicate; a draft until signed (five cases)
     case.json                   metadata, provenance, and the declared sources
   calibration_labels/
     build_pairs.py              the match fixtures and their labels (edit this)

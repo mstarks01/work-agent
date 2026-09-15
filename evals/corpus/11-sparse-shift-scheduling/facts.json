@@ -1,0 +1,550 @@
+{
+  "case": "11-sparse-shift-scheduling",
+  "drafted_by": "agent-stand-in",
+  "rows": [
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:colleague-to-scheduling-web-app:view-shifts",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Nobody has documented how colleagues or managers sign in"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Raised and unanswered: how colleagues sign in.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:store-manager-to-scheduling-web-app:build-rota",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Nobody has documented how colleagues or managers sign in"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Raised and unanswered: how managers sign in.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:scheduling-web-app-to-scheduling-service:rota-requests",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "how the web app and the scheduling service identify each other"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Raised and unanswered: how the two services identify each other.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:payroll-system-to-file-share:collect-payroll-export",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "how the payroll system is identified when it collects the export"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Raised and unanswered: how the payroll system is identified.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:colleague-to-scheduling-web-app:view-shifts",
+        "predicate": "transport-encryption",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "or whether any of it is encrypted"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "'Whether any of it is encrypted' raises transport protection on every interaction and answers none.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:store-manager-to-scheduling-web-app:build-rota",
+        "predicate": "transport-encryption",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "or whether any of it is encrypted"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "'Whether any of it is encrypted' raises transport protection on every interaction and answers none.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:scheduling-web-app-to-scheduling-service:rota-requests",
+        "predicate": "transport-encryption",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "or whether any of it is encrypted"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "'Whether any of it is encrypted' raises transport protection on every interaction and answers none.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:scheduling-service-to-rota-database:read-write-rotas",
+        "predicate": "transport-encryption",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "or whether any of it is encrypted"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "'Whether any of it is encrypted' raises transport protection on every interaction and answers none.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:scheduling-service-to-file-share:write-payroll-export",
+        "predicate": "transport-encryption",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "or whether any of it is encrypted"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "'Whether any of it is encrypted' raises transport protection on every interaction and answers none.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:payroll-system-to-file-share:collect-payroll-export",
+        "predicate": "transport-encryption",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "or whether any of it is encrypted"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "'Whether any of it is encrypted' raises transport protection on every interaction and answers none.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:rota-database",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "or whether any of it is encrypted"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "'Whether any of it is encrypted' raises protection at rest on both stores and answers neither.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:file-share",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "or whether any of it is encrypted"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "'Whether any of it is encrypted' raises protection at rest on both stores and answers neither.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:scheduling-service",
+        "predicate": "network-membership",
+        "value": "boundary:internal-network",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The scheduling service, the rota database and the file share are on the internal network."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Stated placement.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:rota-database",
+        "predicate": "network-membership",
+        "value": "boundary:internal-network",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The scheduling service, the rota database and the file share are on the internal network."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Stated placement.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:file-share",
+        "predicate": "network-membership",
+        "value": "boundary:internal-network",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The scheduling service, the rota database and the file share are on the internal network."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Stated placement.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:scheduling-web-app",
+        "predicate": "network-membership",
+        "value": "boundary:internal-network",
+        "reason": null,
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [],
+        "explanation": "The source lists the service, the database and the share as internal and places the web app nowhere; it is grouped with them.",
+        "exclusive": false
+      },
+      "rationale": "Inferred, as model.json's assumption records: the source places the web app nowhere.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "entity:colleague",
+        "predicate": "network-membership",
+        "value": "boundary:public-internet",
+        "reason": null,
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [],
+        "explanation": "Colleagues reach the app from their own phones, which the source does not place on the internal network.",
+        "exclusive": false
+      },
+      "rationale": "Colleagues reach the app from their own phones, which the source does not place on the internal network.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "entity:store-manager",
+        "predicate": "network-membership",
+        "value": "boundary:public-internet",
+        "reason": null,
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [],
+        "explanation": "Store managers use the same app colleagues reach from their own phones, and the source places managers nowhere.",
+        "exclusive": false
+      },
+      "rationale": "The source places managers nowhere; the model puts them with colleagues, who use the same app.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "entity:payroll-system",
+        "predicate": "network-membership",
+        "value": "boundary:payroll-team-environment",
+        "reason": null,
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [],
+        "explanation": "The payroll system is run by another team, and the model draws that team's environment as its own zone.",
+        "exclusive": false
+      },
+      "rationale": "The source states who runs the payroll system and nothing about where it is; the zone is the model's drawing of that ownership.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "entity:payroll-system",
+        "predicate": "tenant-ownership",
+        "value": "another team",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The payroll system, which is run by another team"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The one stated fact about the payroll system: who runs it.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:scheduling-web-app",
+        "predicate": "internet-exposure",
+        "value": "internet-facing",
+        "reason": null,
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [],
+        "explanation": "Colleagues are stated to reach the app from their own phones, which the source does not place on the internal network.",
+        "exclusive": false
+      },
+      "rationale": "Inferred, as model.json's assumption records.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:scheduling-service",
+        "predicate": "internet-exposure",
+        "value": "internal",
+        "reason": null,
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [],
+        "explanation": "The source places the scheduling service on the internal network and states nothing about its exposure.",
+        "exclusive": false
+      },
+      "rationale": "Inferred from the zone: the source places the service on the internal network and says nothing about its reach. model.json holds internal with no assumption; see disputed.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "principal",
+        "subject": "store managers",
+        "predicate": "authorization-grant",
+        "value": "build the weekly rota for their store",
+        "reason": null,
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "the weekly rota for their store"
+          },
+          {
+            "kind": "operation",
+            "value": "write"
+          }
+        ],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Store managers use a scheduling web app to build the weekly rota for their store."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The grant the source states, scoped to the manager's own store.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "principal",
+        "subject": "colleagues",
+        "predicate": "authorization-grant",
+        "value": "look at the shifts they have been given",
+        "reason": null,
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "the shifts they have been given"
+          },
+          {
+            "kind": "operation",
+            "value": "read"
+          }
+        ],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Colleagues use the same app to look at the shifts they have been given."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The grant the source states, scoped to the colleague's own shifts.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "principal",
+        "subject": "payroll system",
+        "predicate": "authorization-grant",
+        "value": "collect the payroll export from the file share",
+        "reason": null,
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "payroll export"
+          },
+          {
+            "kind": "operation",
+            "value": "read"
+          }
+        ],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The payroll system, which is run by another team, collects the export from the file share."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The read the source states the payroll system performs.",
+      "reviewed_by": null
+    }
+  ],
+  "disputed": [
+    {
+      "element_id": "flow:scheduling-web-app-to-scheduling-service:rota-requests",
+      "attribute": "operations",
+      "blessed": "read-write",
+      "proposed": "keep read-write and record an assumption, or set unknown",
+      "kind": "defensible-inference",
+      "basis": "The interaction is described only as 'talks to'; the reads and writes are attributed to the service. The app is the only stated path for the managers' writes and the colleagues' reads, so read-write is defensible and unrecorded.",
+      "ruling": null,
+      "reviewed_by": null
+    },
+    {
+      "element_id": "process:scheduling-service",
+      "attribute": "exposure",
+      "blessed": "internal",
+      "proposed": "keep internal and record an assumption",
+      "kind": "defensible-inference",
+      "basis": "The source places the service on the internal network and says nothing about its reach; case 13 records the same shape as an assumption.",
+      "ruling": null,
+      "reviewed_by": null
+    }
+  ]
+}

@@ -1,0 +1,539 @@
+{
+  "case": "01-payments-checkout",
+  "drafted_by": "agent-stand-in",
+  "rows": [
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:storefront-api",
+        "predicate": "internet-exposure",
+        "value": "internet-facing",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "It is the only thing we expose to the internet."
+          }
+        ],
+        "explanation": "",
+        "exclusive": true
+      },
+      "rationale": "The source states it outright and states that nothing else is exposed, so the row is exclusive: a catalog that reads it may close the world on exposure.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:order-service",
+        "predicate": "internet-exposure",
+        "value": "internal",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "it is not exposed outside"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The source says the order service is not exposed outside. model.json records the same value with an assumption calling it a statement of intent; an assertion says what the source states and nothing about the deployed system, so the basis is stated. Weakest reading in this file: the reviewer may prefer inferred.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:order-service",
+        "predicate": "network-membership",
+        "value": "boundary:core-services",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The order service is a Python worker in our core network"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The source places the order service in the core network, which the model's core-services zone stands for (case.json holds the alias).",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:storefront-api",
+        "predicate": "network-membership",
+        "value": "boundary:storefront-dmz",
+        "reason": null,
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [],
+        "explanation": "The storefront API is the only component the source exposes to the internet, and the model gives that tier its own zone.",
+        "exclusive": false
+      },
+      "rationale": "The source names no zone for the storefront API; the DMZ is the model's placement of the one internet-exposed component.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:orders-db",
+        "predicate": "network-membership",
+        "value": "boundary:core-services",
+        "reason": null,
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [],
+        "explanation": "The order service reads and writes orders-db, and the source places the order service in the core network.",
+        "exclusive": false
+      },
+      "rationale": "The source never places the database; the order service, which is in the core network, reads and writes it.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:receipt-archive",
+        "predicate": "network-membership",
+        "value": "boundary:core-services",
+        "reason": null,
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [],
+        "explanation": "The order service writes the receipt archive, and the source places the order service in the core network.",
+        "exclusive": false
+      },
+      "rationale": "The source never places the bucket; the order service writes it.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "entity:shopper",
+        "predicate": "network-membership",
+        "value": "boundary:public-internet",
+        "reason": null,
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [],
+        "explanation": "Shoppers reach the storefront API, which the source exposes to the internet and nothing else.",
+        "exclusive": false
+      },
+      "rationale": "Shoppers reach the storefront API, the one component exposed to the internet.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "entity:card-processor",
+        "predicate": "network-membership",
+        "value": "boundary:public-internet",
+        "reason": null,
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [],
+        "explanation": "The source calls the card processor a third party, and its webhook reaches the storefront API, the one internet-exposed component.",
+        "exclusive": false
+      },
+      "rationale": "A third party that calls back over the internet to the exposed component.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "entity:card-processor",
+        "predicate": "tenant-ownership",
+        "value": "third party",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Our card processor is a third party."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The source states the processor is a third party, which is the one ownership fact in the text.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:shopper-to-storefront-api:place-order",
+        "predicate": "authentication-mechanism",
+        "value": "email and password sign-in issuing a session cookie",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Shoppers sign in with email and password and get a session cookie"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Stated mechanism on the shopper's interaction. The cookie is recorded on the principal below rather than as a second predicate here, so the projection into authentication stays a value.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "principal",
+        "subject": "shopper accounts",
+        "predicate": "credential-presented",
+        "value": "session cookie",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "get a session cookie"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "What a signed-in shopper presents after sign-in.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "principal",
+        "subject": "shopper accounts",
+        "predicate": "mfa-requirement",
+        "value": "absent",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "we have not rolled out MFA for shopper accounts yet"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "An explicit absence, stated: the fact the assertion layer exists to keep.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:storefront-api-to-order-service:submit-order",
+        "predicate": "authentication-mechanism",
+        "value": "absent",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "There is no auth on that gRPC call"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "An explicit absence, stated. model.json reads it as 'none; accepted by network position'.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "principal",
+        "subject": "anything that can reach the order service",
+        "predicate": "authorization-grant",
+        "value": "accepted without authentication",
+        "reason": null,
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "order service"
+          },
+          {
+            "kind": "operation",
+            "value": "submit order"
+          }
+        ],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "the order service accepts anything that can reach it"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The source states the whole check is reachability. 'Meant to be only the storefront API' is intent and is not a grant, so the principal is what the source names: anything that can reach it. The reviewer may prefer to name the storefront API.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:order-service-to-orders-db:read-write-orders",
+        "predicate": "authentication-mechanism",
+        "value": "a single application account with a password",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "the order service reads and writes with a single application account"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Stated mechanism. The source says 'single'; whether the account is shared between principals is the disputed reading below.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "principal",
+        "subject": "application account",
+        "predicate": "authorization-grant",
+        "value": "full read/write",
+        "reason": null,
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "orders-db"
+          },
+          {
+            "kind": "operation",
+            "value": "read-write"
+          }
+        ],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "a single application account that has full read/write"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The grant the source states, with its resource and operation.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "principal",
+        "subject": "application account",
+        "predicate": "credential-presented",
+        "value": "application account password",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The password comes from an environment variable on the worker."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The source names the password as the credential the worker holds.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "credential",
+        "subject": "application account password",
+        "predicate": "credential-custody",
+        "value": "an environment variable on the worker",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The password comes from an environment variable on the worker."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Stated custody; registry version 2 added the predicate for this sentence.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "credential",
+        "subject": "application account password",
+        "predicate": "credential-sharing",
+        "value": "shared",
+        "reason": null,
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [],
+        "explanation": "The source says the order service reads and writes with a single application account, so every instance and every operation presents one password.",
+        "exclusive": false
+      },
+      "rationale": "Inferred, not stated: one account serves every operation and every instance of the order service. The source says 'single', which is not 'shared'. model.json writes 'shared' into the attribute as if stated; see disputed.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:order-service-to-receipt-archive:append-receipt",
+        "predicate": "transport-encryption",
+        "value": "TLS",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "That is on TLS with the order service's own service account"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Stated transport protection.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:order-service-to-receipt-archive:append-receipt",
+        "predicate": "authentication-mechanism",
+        "value": "the order service's own service account",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "That is on TLS with the order service's own service account"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Stated mechanism on the archive write.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "principal",
+        "subject": "order service",
+        "predicate": "authorization-grant",
+        "value": "write receipts",
+        "reason": null,
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "receipt archive"
+          },
+          {
+            "kind": "operation",
+            "value": "write"
+          }
+        ],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Every completed order also gets a receipt written to a Cloud Storage bucket"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The write the source states the order service performs.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:receipt-archive",
+        "predicate": "storage-encryption",
+        "value": "customer-managed key",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "the bucket is encrypted with a customer-managed key"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Stated protection at rest.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:card-processor-to-storefront-api:settlement-webhook",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "I would have to check how that callback is authenticated."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The speaker raises the question and does not answer it: a hedged unknown, which a produced catalog must retain rather than fill.",
+      "reviewed_by": null
+    }
+  ],
+  "disputed": [
+    {
+      "element_id": "flow:order-service-to-receipt-archive:append-receipt",
+      "attribute": "protocol",
+      "blessed": "HTTPS",
+      "proposed": "keep HTTPS and record an assumption on this flow, or set unknown",
+      "kind": "defensible-inference",
+      "basis": "The source says 'That is on TLS' to a Cloud Storage bucket. TLS is stated and sits in encryption_in_transit; HTTPS is the transport a bucket write over TLS uses, which the source does not say. No assumption records the inference.",
+      "ruling": null,
+      "reviewed_by": null
+    },
+    {
+      "element_id": "flow:order-service-to-orders-db:read-write-orders",
+      "attribute": "protocol",
+      "blessed": "PostgreSQL wire protocol",
+      "proposed": "keep the value and record an assumption on this flow, or set unknown",
+      "kind": "defensible-inference",
+      "basis": "The source says the data lives in a PostgreSQL database that the order service reads and writes. The wire protocol follows from the product and is not stated. No assumption records the inference.",
+      "ruling": null,
+      "reviewed_by": null
+    },
+    {
+      "element_id": "flow:order-service-to-orders-db:read-write-orders",
+      "attribute": "authentication",
+      "blessed": "single shared application account with full read/write; password from an environment variable",
+      "proposed": "single application account with full read/write; password from an environment variable",
+      "kind": "defensible-inference",
+      "basis": "The source says 'a single application account'. 'Shared' is the drafter's reading that one account serves every instance and operation; it is not the source's word, and corrections.md records it as one of the two facts that carry the threat. The catalog keeps it as an inferred credential-sharing row.",
+      "ruling": null,
+      "reviewed_by": null
+    }
+  ]
+}
