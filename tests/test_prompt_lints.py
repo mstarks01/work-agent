@@ -915,7 +915,7 @@ EXTRACTION_FAILURE_RULES: dict[str, tuple[str, str]] = {
     # transport's own text. A phrase checked against ``extract.md`` would be a
     # rule the route that can trip this never reads.
     "duplicate-ref": (
-        "A ref is unique among the elements a reference could confuse it with",
+        "A ref is unique among the elements of its own type",
         EXTRACT_COMPACT_PROMPT_NAME,
     ),
     "id-mismatch": ("IDs are recomputed from the names you give", EXTRACT_PROMPT_NAME),

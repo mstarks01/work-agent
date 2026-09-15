@@ -16,6 +16,7 @@ repo that looks like real extraction output.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import get_args
 
@@ -27,6 +28,8 @@ from analysis_service.compact import (
     EXTRACTION_FORMATS,
     FULL_FORMAT,
     PROVISIONAL_PREFIX,
+    REF,
+    REF_TAGS,
     REFERENCE_FIELDS,
     CompactSystemModel,
     ExtractionFormat,
@@ -70,10 +73,10 @@ def compact_fixture() -> dict:
     return {
         "external_entities": [
             {
-                "ref": "cust",
+                "ref": "e:cust",
                 "name": "Customer",
                 "kind": "human",
-                "trust_zone": "net",
+                "trust_zone": "b:net",
                 "source_excerpt": "customers log in from the browser",
                 "source_label": label,
                 "assets": ["pii"],
@@ -81,29 +84,22 @@ def compact_fixture() -> dict:
         ],
         "processes": [
             {
-                "ref": "app",
+                "ref": "p:app",
                 "name": "Web App",
                 "technology": "Python/FastAPI on Cloud Run",
-                "trust_zone": "corp",
+                "trust_zone": "b:corp",
                 "exposure": "internet-facing",
                 "interface_kind": "web",
                 "source_excerpt": "the web app runs on Cloud Run",
                 "source_label": label,
-                "assumptions": [
-                    {
-                        "assumption": "web app is internet-facing",
-                        "attribute": "exposure",
-                        "basis": "customers reach it directly from the browser",
-                    }
-                ],
             }
         ],
         "data_stores": [
             {
-                "ref": "db",
+                "ref": "s:db",
                 "name": "Orders DB",
                 "technology": "Cloud SQL Postgres",
-                "trust_zone": "corp",
+                "trust_zone": "b:corp",
                 "data_classification": "confidential",
                 "encryption_at_rest": "unknown",
                 "source_excerpt": "orders are stored in Postgres",
@@ -113,10 +109,10 @@ def compact_fixture() -> dict:
         ],
         "data_flows": [
             {
-                "ref": "login",
+                "ref": "f:login",
                 "name": "Login",
-                "source": "cust",
-                "destination": "app",
+                "source": "e:cust",
+                "destination": "p:app",
                 "protocol": "HTTPS",
                 "authentication": "session cookie",
                 "data_description": "credentials in, session out",
@@ -126,10 +122,10 @@ def compact_fixture() -> dict:
                 "source_label": label,
             },
             {
-                "ref": "store",
+                "ref": "f:store",
                 "name": "Store Order",
-                "source": "app",
-                "destination": "db",
+                "source": "p:app",
+                "destination": "s:db",
                 "protocol": "Postgres wire protocol",
                 "authentication": "IAM database auth",
                 "data_description": "order rows",
@@ -141,19 +137,27 @@ def compact_fixture() -> dict:
         ],
         "trust_boundaries": [
             {
-                "ref": "net",
+                "ref": "b:net",
                 "name": "Internet",
                 "kind": "network",
                 "source_excerpt": "customers log in from the browser",
                 "source_label": label,
             },
             {
-                "ref": "corp",
+                "ref": "b:corp",
                 "name": "Internal Network",
                 "kind": "network",
                 "source_excerpt": "the web app runs on Cloud Run",
                 "source_label": label,
             },
+        ],
+        "assumptions": [
+            {
+                "assumption": "web app is internet-facing",
+                "element": "p:app",
+                "attribute": "exposure",
+                "basis": "customers reach it directly from the browser",
+            }
         ],
     }
 
@@ -208,7 +212,7 @@ class TestTheTransportCarriesTheSameFacts:
         the rota" into one arrow and delete a threat with it.
         """
         payload = compact_fixture()
-        second = dict(payload["data_flows"][1], ref="read", name="Read Order")
+        second = dict(payload["data_flows"][1], ref="f:read", name="Read Order")
         second["operations"] = "read"
         payload["data_flows"].append(second)
 
@@ -266,13 +270,13 @@ class TestAReferenceResolvesOrTheGateSaysSo:
     def test_a_dangling_ref_survives_as_itself_and_the_gate_reports_it(self):
         """The adapter invents no endpoint; the gate quotes what the model wrote."""
         payload = compact_fixture()
-        payload["data_flows"][0]["destination"] = "nowhere"
+        payload["data_flows"][0]["destination"] = "p:nowhere"
 
         model, issues = parse_extraction(payload, COMPACT_FORMAT)
 
         assert model is not None
         assert codes(issues) == ["invalid-reference"]
-        assert "'nowhere'" in issues[0].message
+        assert "'p:nowhere'" in issues[0].message
 
     def test_a_ref_of_the_wrong_type_resolves_and_then_fails_the_gate(self):
         """Reference typing is the gate's rule, so the diagnostic names a real element.
@@ -283,7 +287,7 @@ class TestAReferenceResolvesOrTheGateSaysSo:
         the field's own scope holds nothing — a narrow hit is never overruled.
         """
         payload = compact_fixture()
-        payload["data_stores"][0]["trust_zone"] = "app"
+        payload["data_stores"][0]["trust_zone"] = "p:app"
 
         _, issues = parse_extraction(payload, COMPACT_FORMAT)
 
@@ -303,8 +307,9 @@ class TestAReferenceResolvesOrTheGateSaysSo:
         boundary and a flow endpoint reaches the entity, from one spelling.
         """
         payload = compact_fixture()
-        payload["trust_boundaries"][0]["ref"] = "cust"
-        payload["external_entities"][0]["trust_zone"] = "cust"
+        payload["trust_boundaries"][0]["ref"] = "b:cust"
+        payload["external_entities"][0]["trust_zone"] = "b:cust"
+        payload["external_entities"][0]["ref"] = "e:cust"
 
         model, issues = parse_extraction(payload, COMPACT_FORMAT)
 
@@ -320,16 +325,14 @@ class TestAReferenceResolvesOrTheGateSaysSo:
         without it a reader sees two dangling references and no cause.
         """
         payload = compact_fixture()
-        payload["processes"].append(dict(payload["processes"][0], ref="db"))
+        payload["processes"].append(dict(payload["processes"][0], ref="p:app"))
 
         model, issues = parse_extraction(payload, COMPACT_FORMAT)
 
         assert model is not None
         assert "duplicate-ref" in codes(issues)
-        # The one flow that pointed at ``db`` now points at nothing.
-        assert codes(issues).count("invalid-reference") == 1
         duplicate = next(issue for issue in issues if issue.code == "duplicate-ref")
-        assert "'db'" in duplicate.message
+        assert "'p:app'" in duplicate.message
 
     def test_a_duplicate_ref_widens_the_repair_to_the_whole_model(self):
         """An ambiguous reference table has no narrower patch than the whole.
@@ -338,32 +341,35 @@ class TestAReferenceResolvesOrTheGateSaysSo:
         points at, which is the question nobody can answer.
         """
         payload = compact_fixture()
-        payload["processes"].append(dict(payload["processes"][0], ref="db"))
+        payload["processes"].append(dict(payload["processes"][0], ref="p:app"))
 
         _, issues = parse_extraction(payload, COMPACT_FORMAT)
         scope, implicated = repair_scope(issues)
 
         assert (scope, implicated) == ("whole", [])
 
-    def test_an_assumption_names_its_element_by_sitting_in_it(self):
-        """The reference that cannot dangle, because it does not exist.
+    def test_an_assumption_names_its_element_and_the_tag_decides_which(self):
+        """The subject is named, and typed, so nothing has to guess.
 
-        Every one of the sixteen ``duplicate-ref`` failures in the first corpus
-        sweep was an assumption subject, and an assumption is the one reference
-        no scope can decide: it may be about any element, and ``kind`` is a
-        legal attribute of an external entity *and* of a trust boundary. So the
-        entry moved inside the element it is about.
+        Version 1 left this untyped and it was the only reference no scope
+        could decide. Version 2 removed the reference by nesting the entry in
+        its element, and across five corpus sweeps the model wrote nine
+        ``data_classification`` inferences on a flow or a process — an
+        attribute only a Data Store declares — where the full route and version
+        1 wrote none in five sweeps each. Naming the element beside the
+        attribute is the check; the tag is what makes the name unambiguous.
         """
         payload = compact_fixture()
-        payload["trust_boundaries"][0]["ref"] = "app"
-        payload["external_entities"][0]["trust_zone"] = "app"
-        payload["trust_boundaries"][0]["assumptions"] = [
+        payload["trust_boundaries"][0]["ref"] = "b:app"
+        payload["external_entities"][0]["trust_zone"] = "b:app"
+        payload["assumptions"].append(
             {
                 "assumption": "the internet is a tenant zone",
+                "element": "b:app",
                 "attribute": "kind",
                 "basis": "nobody here controls it",
             }
-        ]
+        )
 
         model, issues = parse_extraction(payload, COMPACT_FORMAT)
 
@@ -372,6 +378,15 @@ class TestAReferenceResolvesOrTheGateSaysSo:
             ("process:web-app", "exposure"),
             ("boundary:internet", "kind"),
         ]
+
+    def test_an_assumption_ref_that_names_nothing_is_the_gate_s_to_report(self):
+        """A named subject can dangle, which is the cost of naming it."""
+        payload = compact_fixture()
+        payload["assumptions"][0]["element"] = "s:gone"
+
+        _, issues = parse_extraction(payload, COMPACT_FORMAT)
+
+        assert "invalid-reference" in codes(issues)
 
 
 class TestMalformedOutputFailsExplicitly:
@@ -456,20 +471,13 @@ class TestTheTablesAnswerTheirRegistries:
     def test_a_compact_row_carries_its_full_row_s_fields(self, group):
         """Field for field, with ``id`` replaced by ``ref``.
 
-        The transport renames an identifier and moves the assumption list; it
-        adds nothing else. A field added to an element type and forgotten here
-        would be a fact the compact route cannot express, and the only sign of
-        it would be a quieter extraction.
-
-        ``assumptions`` is the one addition, and it is a move rather than an
-        addition: the full model holds one list at the root, and the wire form
-        writes each entry inside the element it is about so that the subject
-        needs no reference. :meth:`test_the_root_lists_are_the_full_model_s_own`
-        is the other half.
+        The transport renames an identifier and adds nothing. A field added to
+        an element type and forgotten here would be a fact the compact route
+        cannot express, and the only sign of it would be a quieter extraction.
         """
         compact_type, element_type = COMPACT_ELEMENTS[group]
 
-        expected = set(element_type.model_fields) - {"id"} | {"ref", "assumptions"}
+        expected = set(element_type.model_fields) - {"id"} | {"ref"}
         assert set(compact_type.model_fields) == expected
 
     def test_a_compact_row_keeps_every_optional_default_the_full_row_has(self):
@@ -484,23 +492,14 @@ class TestTheTablesAnswerTheirRegistries:
             for name, field in element_type.model_fields.items():
                 if name == "id" or name not in compact_type.model_fields:
                     continue
-                if name == "assumptions":  # this format's own, not the row's
-                    continue
                 if field.is_required() != compact_type.model_fields[name].is_required():
                     diverging[f"{group}.{name}"] = field.default
 
         assert set(diverging) == {"data_flows.operations"}
 
     def test_the_root_lists_are_the_full_model_s_own(self):
-        """One vocabulary for both routes, so expansion is a row-by-row copy.
-
-        Every element group, and ``assumptions`` deliberately absent: it lives
-        on each element here, which is what leaves this format with no reference
-        a scope cannot decide.
-        """
-        assert set(CompactSystemModel.model_fields) == set(SystemModel.model_fields) - {
-            "assumptions"
-        }
+        """One vocabulary for both routes, so expansion is a row-by-row copy."""
+        assert set(CompactSystemModel.model_fields) == set(SystemModel.model_fields)
 
     def test_the_reference_fields_are_every_reference_an_element_carries(self):
         """The resolver walks a table, and the table answers the schema.
@@ -518,6 +517,24 @@ class TestTheTablesAnswerTheirRegistries:
         }
 
         assert set(REFERENCE_FIELDS) == carried
+
+    def test_every_element_type_has_its_own_ref_tag(self):
+        """Two types sharing a letter would put the ambiguity straight back.
+
+        The tags are the first letter of each class's ``id_prefix``, so they
+        are the full model's own types rather than a second vocabulary — and a
+        sixth element type that collided would fail here rather than silently
+        make two kinds of element one namespace again.
+        """
+        assert len(set(REF_TAGS.values())) == len(ELEMENT_GROUPS)
+        assert set(REF_TAGS) == set(ELEMENT_GROUPS)
+
+    def test_the_ref_pattern_admits_every_tag_and_nothing_else(self):
+        """The schema refuses an untyped ref, which is what versions 1 and 2 took."""
+        for group, tag in REF_TAGS.items():
+            assert re.match(REF, f"{tag}:orders-db"), group
+        for bad in ("orders-db", "x:orders-db", ":orders-db", "p:", "p:Orders"):
+            assert not re.match(REF, bad), bad
 
     def test_the_format_literal_answers_the_registry(self):
         """The report re-spells these strings, so the two have to agree."""

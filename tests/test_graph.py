@@ -922,12 +922,12 @@ def test_validate_sends_an_expanded_model_that_fails_the_gate_to_repair():
     one repair.
     """
     payload = compact_fixture()
-    payload["data_flows"][0]["destination"] = "nowhere"
+    payload["data_flows"][0]["destination"] = "p:nowhere"
     ctx = FakeContext()
     event = graph.validate_extraction(ctx, KEYS, payload, None, COMPACT_FORMAT)
 
     assert event.actions.route == graph.ROUTE_INVALID
-    assert "nowhere" in ctx.state[graph.STATE_VALIDATION_ISSUES]
+    assert "p:nowhere" in ctx.state[graph.STATE_VALIDATION_ISSUES]
     assert "ref_" not in ctx.state[graph.STATE_PREVIOUS_MODEL]
 
 
