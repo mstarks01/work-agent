@@ -324,7 +324,11 @@ row per statement the sources make: subject, predicate, value, and the span of
 the source that says so. It writes
 `artifact.reports/<case>.assertions.json` — what the node proposed, the rows
 code built from it, and why each dropped row dropped — and prints counts per
-case. **There is no agreement figure**, because no corpus case carries a
+case. `rejected` counts the dropped rows and `refused` the reasons by code, and
+one row can draw several. `span_backed` counts kept rows whose quotes located
+in a source, which is not a judgement that the words support the value;
+`assessed` counts the rows somebody judged, and an extractor leaves every row
+`unchecked`. **There is no agreement figure**, because no corpus case carries a
 reference catalog: the counts say what the run produced, and `absences` is the
 one that answers the audit directly, because a control the sources say is *not
 there* has nowhere to live in a System Model attribute.

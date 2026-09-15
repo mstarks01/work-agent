@@ -295,6 +295,19 @@ def verify_normalized(quote: str, haystack: str) -> bool:
     return match_normalized(quote, haystack) is not None
 
 
+def fragments(quote: str) -> tuple[str, ...]:
+    """The verbatim pieces of ``quote``, in order, one per span it can take.
+
+    ``…`` marks a cut, however the model spelled it, and a piece that
+    normalizes to nothing is not a fragment. **The one reader of that
+    split**: :func:`match_normalized` searches these, and a support span
+    carries one of them, so a span's quote is the words its offsets hold
+    rather than the whole quote they were cut from (#961). Before this, every
+    fragment span carried the whole quote, and the gate refused every one.
+    """
+    return tuple(raw.strip() for raw in _ELLIPSIS.split(quote) if normalize(raw))
+
+
 def match_normalized(quote: str, haystack: str) -> tuple[tuple[int, int], ...] | None:
     """Where each of ``quote``'s fragments sits in ``haystack``, or ``None``.
 
@@ -319,10 +332,8 @@ def match_normalized(quote: str, haystack: str) -> tuple[tuple[int, int], ...] |
     """
     found_at: list[tuple[int, int]] = []
     cursor = 0
-    for raw in _ELLIPSIS.split(quote):
+    for raw in fragments(quote):
         fragment = normalize(raw)
-        if not fragment:
-            continue
         found = haystack.find(fragment, cursor)
         if found < 0:
             return None

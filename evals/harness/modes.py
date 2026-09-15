@@ -43,6 +43,7 @@ from analysis_service.assertions import (
     ABSENT,
     REGISTRY,
     AssertionCatalog,
+    Assessment,
     CatalogIssue,
     CatalogProposal,
     ProjectionReason,
@@ -1226,16 +1227,25 @@ class AssertionScore:
     rows whose value is ``absent`` — a control the sources say is **not there**
     — which is the fact the graph's own attributes read as a stated control in
     ten of the corpus's 21 stated mechanism values.
+
+    Four outcomes are kept apart (#961). ``rejected`` is rows the resolver
+    dropped, counted by row; ``refused`` is the reasons, by code, and one row
+    can draw several. ``span_backed`` is kept rows whose quotes located, which
+    is not a judgement that the words support the value; ``assessed`` is the
+    rows somebody judged, by assessment, and an extractor leaves every row
+    ``unchecked``, so a run reads all zero there until a reviewer sits.
     """
 
     case_id: str
     proposed: int
     kept: int
-    dropped: Mapping[str, int]
+    rejected: int
+    refused: Mapping[str, int]
     subjects: int
     bound_subjects: int
     predicates: tuple[str, ...]
-    supported: int
+    span_backed: int
+    assessed: Mapping[str, int]
     spans: int
     absences: int
     unknowns: int
@@ -1280,11 +1290,13 @@ class AssertionScore:
             "case": self.case_id,
             "proposed": self.proposed,
             "kept": self.kept,
-            "dropped": dict(sorted(self.dropped.items())),
+            "rejected": self.rejected,
+            "refused": dict(sorted(self.refused.items())),
             "subjects": self.subjects,
             "bound_subjects": self.bound_subjects,
             "predicates": list(self.predicates),
-            "supported": self.supported,
+            "span_backed": self.span_backed,
+            "assessed": dict(self.assessed),
             "spans": self.spans,
             "absences": self.absences,
             "unknowns": self.unknowns,
@@ -1348,11 +1360,16 @@ def score_assertions(case: GoldenCase, result: AssertionResult) -> AssertionScor
         case_id=result.case_id,
         proposed=len(result.proposal.get("assertions", ())),
         kept=len(entries),
-        dropped=Counter(issue.code for issue in result.issues),
+        rejected=len({issue.row for issue in result.issues if issue.row is not None}),
+        refused=Counter(issue.code for issue in result.issues),
         subjects=len(catalog.subjects),
         bound_subjects=len(bound & element_ids),
         predicates=tuple(sorted({entry.predicate for entry in entries})),
-        supported=sum(1 for entry in entries if entry.support),
+        span_backed=sum(1 for entry in entries if entry.support),
+        assessed={
+            assessment: sum(1 for entry in entries if entry.assessment == assessment)
+            for assessment in get_args(Assessment)
+        },
         spans=sum(len(entry.support) for entry in entries),
         absences=sum(1 for entry in entries if entry.value == ABSENT),
         unknowns=sum(1 for entry in entries if entry.value == UNKNOWN),
@@ -1472,17 +1489,18 @@ def render_assertions(scores: Sequence[AssertionScore]) -> None:
         )
     if not scores:
         return
-    dropped: Counter[str] = Counter()
+    refused: Counter[str] = Counter()
     for score in scores:
-        dropped.update(score.dropped)
+        refused.update(score.refused)
     covered = sorted({name for score in scores for name in score.predicates})
     print(
         f"\n{sum(s.kept for s in scores)} rows kept of"
         f" {sum(s.proposed for s in scores)} proposed,"
+        f" {sum(s.rejected for s in scores)} rejected,"
         f" {len(covered)} of {len(REGISTRY)} predicates covered"
     )
-    for code, count in sorted(dropped.items()):
-        print(f"  dropped {code:<24} {count}")
+    for code, count in sorted(refused.items()):
+        print(f"  refused {code:<24} {count}")
     print(
         "  predicates with no row: " + ", ".join(sorted(set(REGISTRY) - set(covered)))
     )
