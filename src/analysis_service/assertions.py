@@ -72,6 +72,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from analysis_service.analysis import ABSENT_WORD
 from analysis_service.grounding import (
     IndexedSource,
+    fragments,
     index_source,
     locate_quote,
     normalize,
@@ -428,7 +429,10 @@ class SupportSpan(BaseModel):
     ``start`` and ``end`` are half-open Unicode code-point offsets into the
     source's **exact retained text**, and ``source[start:end]`` is the
     submitter's own words. ``digest`` pins the text they were taken from, so a
-    changed source is visible rather than silently re-read.
+    changed source is visible rather than silently re-read. ``quote`` is those
+    words as the model spelled them: one fragment of a quote that marks a cut,
+    never the whole quote, so the gate can hold each span to what its offsets
+    hold.
 
     Built by :func:`support_span` and by nothing else.
     """
@@ -483,7 +487,10 @@ class Assertion(BaseModel):
     basis: Basis
     #: Required when ``value`` is :data:`UNKNOWN`, refused otherwise.
     reason: UnknownReason | None = None
-    support: list[SupportSpan] = Field(default_factory=list, max_length=MAX_SPANS)
+    #: Bounded at :data:`MAX_SPANS` by the gate rather than here, so the rule
+    #: has one reader and a row over it is a reported refusal, not a schema
+    #: error the resolver would have to pre-empt with a copy of the rule.
+    support: list[SupportSpan] = Field(default_factory=list)
     #: The assertion IDs an ``inferred`` value rests on.
     premises: list[str] = Field(default_factory=list, max_length=MAX_PREMISES)
     #: What an ``inferred`` value was inferred from, or what a ``derived`` rule
@@ -531,6 +538,7 @@ CatalogIssueCode = Literal[
     "unwanted-reason",
     "missing-scope",
     "unsupported-assertion",
+    "too-many-spans",
     "legacy-with-support",
     "missing-premise",
     "dangling-premise",
@@ -552,6 +560,11 @@ class CatalogIssue(BaseModel):
     message: str
     subject: str | None = None
     assertion: str | None = None
+    #: The index of the proposed row this refusal is about, set by
+    #: :func:`resolve_catalog` and by nothing else. One row can draw several
+    #: refusals, so **rows dropped is the count of distinct values here**, and
+    #: a count of issues is a count of reasons (#961).
+    row: int | None = None
 
 
 @dataclass(frozen=True)
@@ -700,6 +713,10 @@ def support_span(quote: str, source_label: str, source_text: str) -> SupportSpan
 def spans_for(quote: str, prepared: SpanSource) -> tuple[SupportSpan, ...]:
     """Every span ``quote`` occupies, one per fragment, or empty when absent.
 
+    Each span carries its own fragment, paired with its offsets by the one
+    split :func:`~analysis_service.grounding.fragments` makes — ``strict``,
+    so the two readers cannot silently drift apart.
+
     **A quote past :data:`MAX_QUOTE_CHARS` takes no span.** Refused rather than
     cut: a truncated quote beside the offsets of the whole one is a span that
     does not hold what it says it holds, and a citation is bounded but never
@@ -716,9 +733,9 @@ def spans_for(quote: str, prepared: SpanSource) -> tuple[SupportSpan, ...]:
             digest=prepared.digest,
             start=span.start,
             end=span.end,
-            quote=quote,
+            quote=fragment,
         )
-        for span in located
+        for fragment, span in zip(fragments(quote), located, strict=True)
     )
 
 
@@ -937,7 +954,20 @@ def _entry_issues(
     # words somebody hedged with, which is why the span is optional rather than
     # refused.
     if entry.basis == "stated" and entry.value != UNKNOWN and not entry.support:
-        refuse("unsupported-assertion", "a stated value cites the words that state it")
+        refuse(
+            "unsupported-assertion",
+            "a stated value cites the words that state it, and a quote not"
+            " found in the source it names takes no span",
+        )
+    if len(entry.support) > MAX_SPANS:
+        # Refused rather than cut: a row that kept its first eight spans and
+        # dropped the rest would claim less support than it cited and say
+        # nothing about the difference.
+        refuse(
+            "too-many-spans",
+            f"{len(entry.support)} support spans, and a row carries at most"
+            f" {MAX_SPANS}; a statement resting on more is a summary",
+        )
     if entry.basis == "legacy" and entry.support:
         refuse("legacy-with-support", "a legacy value is never support-backed")
     # An inference says what it rests on, in words a person reads and, where
@@ -1176,17 +1206,23 @@ def resolve_catalog(
     back as an issue naming why — the shape a **Proposal** already has, where
     an agent selects and the service builds.
 
-    Four things happen to a row, in order. Its predicate is looked up, and an
+    Five things happen to a row, in order. Its predicate is looked up, and an
     unregistered one drops it. Its subject is resolved: a graph-bound one is
     snapped against the model's element IDs, and one of this layer's own is
     slugged from the name written. Its quotes are located in the sources they
     name, and a ``stated`` row left with no span drops rather than take a
-    fabricated one. Its identity is computed, and two rows that share one are
-    **one row carrying both spans** — which is how two sources for one fact keep
+    fabricated one. **The built row is then put through the gate's own per-row
+    rules**, and one the gate would refuse drops with the gate's reasons — so
+    the contract above holds by construction, where a copy of the rules here
+    once let a grant with no scope through to be counted and refused later
+    (#961). Its identity is computed, and two rows that share one are **one
+    row carrying both spans** — which is how two sources for one fact keep
     both provenances, rather than becoming a duplicate the gate refuses.
 
     A dropped row is not a lost fact. The issues are what the repair pass reads,
-    and repair has the sources in front of it.
+    and repair has the sources in front of it. Each issue names the proposed
+    row it refused by :attr:`CatalogIssue.row`, so rows dropped is a count of
+    distinct rows and never a count of issues.
 
     The count is checked first and returns alone, as the gate's is: this is
     where :data:`MAX_ASSERTIONS` is enforced, because the schema cannot carry
@@ -1208,8 +1244,10 @@ def resolve_catalog(
     subjects: dict[str, Subject] = {}
     issues: list[CatalogIssue] = []
 
-    for row in proposal.assertions:
-        resolved = _resolve_row(row, element_ids, labels, subjects, prepared, issues)
+    for index, row in enumerate(proposal.assertions):
+        resolved = _resolve_row(
+            index, row, element_ids, labels, subjects, prepared, sources, issues
+        )
         if resolved is None:
             continue
         identity, entry = resolved
@@ -1239,30 +1277,36 @@ def _prepare(sources: Mapping[str, str]) -> Mapping[str, SpanSource]:
 
 
 def _resolve_row(
+    index: int,
     row: AssertionProposal,
     element_ids: Collection[str],
     labels: Mapping[str, str],
     subjects: dict[str, Subject],
     prepared: Mapping[str, SpanSource],
+    sources: Mapping[str, str],
     issues: list[CatalogIssue],
 ) -> tuple[str, Assertion] | None:
-    """One proposed row as an assertion, or ``None`` with the reason recorded."""
+    """One proposed row as an assertion, or ``None`` with the reasons recorded.
+
+    Only what construction needs is decided here: the predicate has to be
+    registered for an identity to exist, and the subject and a referent value
+    have to resolve for the row to name them. Everything else is the gate's
+    call, made on the built row, so no rule is written twice.
+
+    A subject is declared only for a row that is kept, so a dropped row leaves
+    no subject behind that no row names.
+    """
 
     def drop(code: CatalogIssueCode, message: str) -> None:
         issues.append(
-            CatalogIssue(code=code, message=message, subject=row.subject or None)
+            CatalogIssue(
+                code=code, message=message, subject=row.subject or None, row=index
+            )
         )
 
     predicate = REGISTRY.get(row.predicate)
     if predicate is None:
         drop("unknown-predicate", f"{row.predicate!r} is not a registered predicate")
-        return None
-    if row.subject_type not in predicate.subjects:
-        drop(
-            "wrong-subject-type",
-            f"{row.predicate!r} accepts {', '.join(sorted(predicate.subjects))},"
-            f" not {row.subject_type!r}",
-        )
         return None
 
     subject = _subject(row.subject_type, row.subject, element_ids, labels)
@@ -1271,6 +1315,7 @@ def _resolve_row(
         return None
 
     value = row.value
+    referent = None
     if predicate.value == "reference" and value not in UNIVERSAL_TERMS:
         referent = _subject(_referent_type(predicate), value, element_ids, labels)
         if referent is None:
@@ -1279,23 +1324,9 @@ def _resolve_row(
                 f"{value!r} names no {predicate.value} this predicate takes",
             )
             return None
-        subjects.setdefault(referent.id, referent)
         value = referent.id
-    elif not predicate.admits(value, ()):
-        drop("illegal-value", f"{value!r} is not a legal value for {row.predicate!r}")
-        return None
 
-    spans = [span for quote in row.quotes for span in _spans(quote, prepared)][
-        :MAX_SPANS
-    ]
-    if row.basis == "stated" and value != UNKNOWN and not spans:
-        drop(
-            "unsupported-assertion",
-            f"no quote for {row.predicate!r} on {subject.id!r} is in the source"
-            " it names, and a span is never fabricated",
-        )
-        return None
-
+    spans = [span for quote in row.quotes for span in _spans(quote, prepared)]
     entry = Assertion(
         subject=subject.id,
         predicate=row.predicate,
@@ -1307,8 +1338,19 @@ def _resolve_row(
         explanation=row.explanation,
         exclusive=row.exclusive,
     )
+    declared = {**subjects, subject.id: subject}
+    if referent is not None:
+        declared[referent.id] = referent
+    identity = assertion_id(entry)
+    refused = _entry_issues(entry, identity, declared, sources)
+    if refused:
+        for issue in refused:
+            drop(issue.code, issue.message)
+        return None
     subjects.setdefault(subject.id, subject)
-    return assertion_id(entry), entry
+    if referent is not None:
+        subjects.setdefault(referent.id, referent)
+    return identity, entry
 
 
 def _referent_type(predicate: Predicate) -> SubjectType:
@@ -1337,7 +1379,7 @@ def _subject(
     """
     prefixes = SUBJECT_PREFIXES[subject_type]
     if subject_type in GRAPH_BOUND:
-        found = canonical(written, element_ids) or _named(written, labels)
+        found = canonical(written, element_ids) or _named(written, labels, prefixes)
         if not found or found.split(":", 1)[0] not in prefixes:
             return None
         return Subject(id=found, type=subject_type, label=labels[found])
@@ -1348,8 +1390,8 @@ def _subject(
     return Subject(id=identity, type=subject_type, label=written.strip())
 
 
-def _named(written: str, labels: Mapping[str, str]) -> str:
-    """The element whose *name* ``written`` is, or ``""`` where none is.
+def _named(written: str, labels: Mapping[str, str], prefixes: Collection[str]) -> str:
+    """The element of an accepted type whose *name* ``written`` is, or ``""``.
 
     The second way a model names an element, and a real one: asked for the zone
     a component sits in, a live run wrote ``core services`` where the model's
@@ -1357,7 +1399,12 @@ def _named(written: str, labels: Mapping[str, str]) -> str:
     because an **Element ID** is the slug of the element's name — so comparing
     the slugs asks the same question the ID derivation already answers.
 
-    Empty where two elements share a name slug, for the reason
+    Only elements whose ID prefix is in ``prefixes`` are candidates, because
+    the subject type asked for is part of the question: a zone named after
+    the entity inside it is ordinary, and asked for the *zone* ``card
+    processor``, the one boundary of that name is not made ambiguous by the
+    entity of that name (#961). Empty where two elements of an accepted type
+    share a name slug, for the reason
     :func:`~analysis_service.references.canonical` refuses an ambiguous fold:
     guessing which one a word meant is the thing this must not do.
     """
@@ -1367,6 +1414,8 @@ def _named(written: str, labels: Mapping[str, str]) -> str:
         return ""
     matches = []
     for element_id, name in labels.items():
+        if element_id.split(":", 1)[0] not in prefixes:
+            continue
         try:
             if normalize_name(name) == wanted:
                 matches.append(element_id)
@@ -1385,26 +1434,50 @@ def _spans(
     return spans_for(quote.quote, source)
 
 
-def _merge(held: Assertion, found: Assertion) -> Assertion:
-    """Two rows of one identity as one row carrying both rows' spans.
+#: Which of two rows of one identity stands when their bases differ, lowest
+#: first: a source that states the value outranks a rule that derived it,
+#: which outranks a reader that inferred it, which outranks an attribute
+#: imported from before this layer. A table over :data:`Basis`, held to it by
+#: ``tests/test_assertions.py``, so a fifth basis fails there rather than
+#: raising in a merge.
+BASIS_RANK: Mapping[str, int] = MappingProxyType(
+    {
+        basis: rank
+        for rank, basis in enumerate(("stated", "derived", "inferred", "legacy"))
+    }
+)
 
-    Identity settles the subject, the predicate, the scope and the value, so
-    what differs is the support and the words behind it. The spans join,
-    deduplicated and bounded; the first row's basis and explanation stand,
-    because a second row cannot change what the first rests on without being a
-    different assertion.
+
+def _merge(held: Assertion, found: Assertion) -> Assertion:
+    """Two rows of one identity as one row, by a rule that ignores their order.
+
+    Identity settles the subject, the predicate, the scope and the value. The
+    spans join, deduplicated and bounded, and either row stating the set is
+    complete states it for the merged row. Everything else — basis,
+    explanation, reason — comes from **one** of the two rows, the one that
+    ranks first: by :data:`BASIS_RANK`, and on a tie by the row's own
+    serialized form, so two orderings of one proposal build one catalog.
+    Before this rule the first row's basis stood, and one pair of rows read
+    ``inferred`` or ``stated`` by arrival order (#961).
+
+    The joined spans are cut at :data:`MAX_SPANS`, the one bound a merge can
+    cross: each row passed it alone, and the first row's spans come first.
     """
-    spans = list(held.support)
-    for span in found.support:
+    first, second = sorted((held, found), key=_merge_rank)
+    spans = list(first.support)
+    for span in second.support:
         if span not in spans:
             spans.append(span)
-    return held.model_copy(
+    return first.model_copy(
         update={
             "support": spans[:MAX_SPANS],
-            # Either source stating the set is complete states it for the row.
             "exclusive": held.exclusive or found.exclusive,
         }
     )
+
+
+def _merge_rank(entry: Assertion) -> tuple[int, str]:
+    return BASIS_RANK[entry.basis], entry.model_dump_json()
 
 
 # --- What the graph's own fields would say ----------------------------------
@@ -1421,7 +1494,20 @@ ProjectionReason = Literal[
     "scoped",
     "several-values",
     "several-predicates",
+    "unsupported",
 ]
+
+#: Whether a row under each :data:`Assessment` states its value for the graph.
+#: Nobody having checked is the default, and the only state an extractor
+#: leaves, so it stands; a row somebody found supported stands. A row found
+#: unsupported, or left unresolved by whoever looked, states nothing: before
+#: this table a row assessed ``unsupported`` projected as a definite stated
+#: value (#961). Keyed by every assessment and held to the literal by
+#: ``tests/test_assertions.py``, so a fifth assessment fails there rather than
+#: projecting by default.
+PROJECTS_UNDER: Mapping[str, bool] = MappingProxyType(
+    {"unchecked": True, "supported": True, "unsupported": False, "unresolved": False}
+)
 
 
 @dataclass(frozen=True)
@@ -1458,6 +1544,11 @@ def project(catalog: AssertionCatalog) -> tuple[Projection, ...]:
     An attribute no row reaches is **absent from the result**, not ``unknown``:
     the catalog says nothing about it, and a projection that filled it would be
     asserting silence rather than reporting it.
+
+    A row whose assessment is one :data:`PROJECTS_UNDER` refuses is set aside:
+    it neither supplies the value nor counts as a second one. An attribute
+    only such rows reach writes ``unknown`` with the reason ``unsupported``,
+    and the rows are still named, so a reader sees what was set aside.
 
     Sorted by element then attribute, so two readings of one catalog agree on
     order.
@@ -1506,13 +1597,16 @@ def _projected(
 ) -> Projection:
     """One attribute's projected value, and the reason it reads that way."""
     ids = tuple(sorted(identity for identity, _ in rows))
-    stated = [entry for _, entry in rows if entry.value != UNKNOWN]
+    valued = [entry for _, entry in rows if entry.value != UNKNOWN]
+    stated = [entry for entry in valued if PROJECTS_UNDER[entry.assessment]]
 
     def projected(value: str, reason: ProjectionReason) -> Projection:
         return Projection(element_id, attribute, value, reason, ids)
 
-    if not stated:
+    if not valued:
         return projected(UNKNOWN, "unknown")
+    if not stated:
+        return projected(UNKNOWN, "unsupported")
     if len({entry.predicate for entry in stated}) > 1:
         return projected(UNKNOWN, "several-predicates")
     if len({entry.value for entry in stated}) > 1:

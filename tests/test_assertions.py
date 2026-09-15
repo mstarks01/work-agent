@@ -15,10 +15,13 @@ from pydantic import ValidationError
 
 from analysis_service.assertions import (
     ABSENT,
+    BASIS_RANK,
     GRAPH_BOUND,
     MAX_ASSERTIONS,
     MAX_QUOTE_CHARS,
+    MAX_SPANS,
     MAX_SUBJECTS,
+    PROJECTS_UNDER,
     REGISTRY,
     REGISTRY_VERSION,
     SUBJECT_PREFIXES,
@@ -26,6 +29,8 @@ from analysis_service.assertions import (
     Assertion,
     AssertionCatalog,
     AssertionProposal,
+    Assessment,
+    Basis,
     CatalogIssueCode,
     CatalogProposal,
     ProjectionReason,
@@ -515,6 +520,14 @@ REFUSALS: dict[str, tuple[str, AssertionCatalog, dict]] = {
         catalog([stated(assessment="supported")]),
         {"sources": SOURCES},
     ),
+    "too-many-spans": (
+        (
+            "a statement resting on more spans than the cap is a summary, and a"
+            " row cut to the cap would claim less support than it cited"
+        ),
+        catalog([stated(support=span_for("Shoppers sign in") * (MAX_SPANS + 1))]),
+        {"sources": SOURCES},
+    ),
 }
 
 
@@ -904,6 +917,79 @@ class TestResolvingAProposal:
     def test_a_dropped_row_names_what_it_was_about(self):
         _, issues = self.resolve(self.row(predicate="vibes"))
         assert issues[0].subject == FLOW
+        assert issues[0].row == 0
+
+    def test_a_row_the_gate_would_refuse_never_enters_the_catalog(self):
+        """The probe from #961: a grant with no scope was kept, then refused.
+
+        The resolver built the row, the catalog counted it, and only a later
+        ``catalog_issues`` said ``missing-scope``. Now the gate's own rules
+        run on the built row, and the drop is recorded against the proposed
+        row — so no subject is declared for it either.
+        """
+        grant = self.row(
+            subject_type="principal",
+            subject="Shopper",
+            predicate="authorization-grant",
+            value="write all orders",
+        )
+        held, issues = self.resolve(grant)
+
+        assert held.entries == []
+        assert held.subjects == []
+        assert codes(issues) == ["missing-scope"]
+        assert issues[0].row == 0
+        assert catalog_issues(held, model=self.model(), sources=SOURCES) == []
+
+    def test_one_row_can_draw_several_refusals_and_is_one_dropped_row(self):
+        """Issues are reasons; rows dropped are distinct ``row`` values."""
+        twice = self.row(
+            subject_type="principal",
+            subject="Shopper",
+            predicate="authorization-grant",
+            value="write all orders",
+            basis="inferred",
+            quotes=[],
+        )
+        held, issues = self.resolve(twice, self.row())
+
+        assert len(held.entries) == 1
+        assert codes(issues) == ["missing-premise", "missing-scope"]
+        assert {issue.row for issue in issues} == {0}
+
+    def test_a_row_citing_more_spans_than_the_cap_drops_rather_than_cut(self):
+        """Five quotes of two fragments each locate ten spans; the cap is eight."""
+        cut = self.row(
+            quotes=[
+                QuoteProposal(source_label=SOURCE_LABEL, quote=quote)
+                for quote in (
+                    "Shoppers … password",
+                    "sign in … session",
+                    "email … cookie",
+                    "card processor … webhook",
+                    "rolled out … accounts",
+                )
+            ]
+        )
+        held, issues = self.resolve(cut)
+
+        assert held.entries == []
+        assert codes(issues) == ["too-many-spans"]
+
+    def test_two_orderings_of_one_proposal_build_one_catalog(self):
+        """The probe from #961: the merged basis followed arrival order.
+
+        An inferred row and a stated row of one identity merge to one row.
+        It reads ``stated`` whichever arrived first, because a source that
+        states the value outranks a reader that inferred it, and the two
+        catalogs are equal.
+        """
+        inferred = self.row(basis="inferred", quotes=[], explanation="from the flow")
+        first, _ = self.resolve(inferred, self.row())
+        second, _ = self.resolve(self.row(), inferred)
+
+        assert first.entries[0].basis == "stated"
+        assert first == second
 
     def test_a_proposal_over_the_cap_is_refused_before_a_row_is_read(self):
         """The bound lives here, because the schema cannot carry it.
@@ -1002,6 +1088,24 @@ class TestTheProjection:
         assert len(projected.rows) == 2
         assert all(one.startswith("assertion:") for one in projected.rows)
 
+    def test_a_row_found_unsupported_projects_no_value(self):
+        """The probe from #961: an unsupported row projected as stated."""
+        judged = self.row(assessment="unsupported", assessor="audit")
+        (projected,) = project(self.rows(judged))
+        assert (projected.value, projected.reason) == (UNKNOWN, "unsupported")
+        assert projected.rows == (assertion_id(judged),)
+
+    def test_a_row_left_unresolved_projects_no_value(self):
+        judged = self.row(assessment="unresolved", assessor="audit")
+        (projected,) = project(self.rows(judged))
+        assert (projected.value, projected.reason) == (UNKNOWN, "unsupported")
+
+    def test_a_set_aside_row_is_not_a_second_value(self):
+        """The standing row's value projects; the refused one neither adds nor blocks."""
+        refused = self.row(value="none", assessment="unsupported", assessor="audit")
+        (projected,) = project(self.rows(self.row(), refused))
+        assert (projected.value, projected.reason) == ("TLS", "stated")
+
     def test_a_subject_of_this_layer_s_own_projects_into_nothing(self):
         """A principal has no element, so no attribute of one can hold its facts."""
         held = AssertionCatalog(
@@ -1091,7 +1195,18 @@ PROJECTIONS: dict[str, str] = {
     "scoped": "a string cannot carry the qualifier the source attached",
     "several-values": "picking between two values would drop one",
     "several-predicates": "one string cannot carry two predicates' facts",
+    "unsupported": "a row found unsupported, or left unresolved, states nothing",
 }
+
+
+def test_every_assessment_says_whether_it_projects():
+    """``PROJECTS_UNDER`` answers ``Assessment``, with nothing left over."""
+    assert set(PROJECTS_UNDER) == set(get_args(Assessment))
+
+
+def test_every_basis_has_a_merge_rank():
+    """``BASIS_RANK`` answers ``Basis``, with nothing left over."""
+    assert set(BASIS_RANK) == set(get_args(Basis))
 
 
 def test_every_projection_reason_is_explained():
@@ -1144,8 +1259,25 @@ class TestWhatTheFirstLiveRunFound:
 
     def test_an_ambiguous_name_resolves_to_nothing(self):
         """Guessing which element a word meant is the thing this must not do."""
-        assert _named("shopper", {"a:one": "shopper", "b:two": "Shopper"}) == ""
-        assert _named("!!!", {"a:one": "shopper"}) == ""
+        labels = {"a:one": "shopper", "b:two": "Shopper"}
+        assert _named("shopper", labels, {"a", "b"}) == ""
+        assert _named("!!!", {"a:one": "shopper"}, {"a"}) == ""
+
+    def test_a_name_is_ambiguous_only_among_the_types_asked_for(self):
+        """A zone named after the entity inside it is ordinary (#961).
+
+        Asked for the *zone* ``card processor``, the entity of that name is
+        not a candidate, so the one boundary resolves. Asked across both
+        types, the same word is ambiguous and resolves to nothing.
+        """
+        labels = {
+            "entity:card-processor": "card processor",
+            "boundary:card-processor": "card processor",
+        }
+        assert _named("card processor", labels, {"boundary"}) == (
+            "boundary:card-processor"
+        )
+        assert _named("card processor", labels, {"entity", "boundary"}) == ""
 
     def test_a_credential_reference_projects_its_label(self):
         """``authentication`` holds prose, so an ID there is a value nobody writes."""
