@@ -772,16 +772,27 @@ def _baseline_selects(root: Path, changed: Sequence[str]) -> bool:
     checklist, not a check that was protecting anything: the digests still
     recompute under the offline suite, and the diff is in the history.
 
-    Fails closed: more than one Baseline directory, or a manifest this cannot
-    read, selects the kind so the checks report it in their own words.
+    **The question is asked of every Baseline the diff touches**, not only of a
+    diff that touches exactly one. An archive migration catches the whole
+    archive up at once — version 7 moved all three — so a selector that read
+    ``_baseline_dir`` alone saw "more than one" and failed closed into selecting
+    the kind, which is the case with no passing diff that #893 reports. Adding a
+    sweep to *any* of them is still a contribution and still selects.
+
+    Nothing the multi-directory refusal protected is lost: a submission that
+    touches two Baseline directories adds a sweep to one of them, so it selects
+    here and :func:`_check_subject_count` refuses it by name.
+
+    Fails closed on a manifest this cannot read, and on a diff that touches the
+    tree while naming no Baseline directory at all.
     """
     if not any(rel.startswith(KINDS["baseline"].prefix) for rel in changed):
         return False
-    name = _baseline_dir(root)
-    if name is None:
+    names = _subdirs(root, KINDS["baseline"].prefix)
+    if not names:
         return True
     try:
-        return bool(added_sweeps(root, name))
+        return any(added_sweeps(root, name) for name in names)
     except SubmitError:
         return True
 
