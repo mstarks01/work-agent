@@ -132,19 +132,23 @@ references and copies fields; it decides no fact. `repair` writes a full
 `SystemModel` on either transport, so the one repair pass is never spent on a
 format conversion.
 
-Whether the compact transport is worth running is a measurement, not a claim.
-Over the thirteen blessed corpus models it removes 10.1% of the emitted
-characters — `uv run python -m evals.bench.deterministic transport` re-derives
-that. The input side is close to free: the delta prompt is about 490 coarse
-tokens and the compact schema is about 1,500 characters smaller, so the first
-live run measured 6,116 prompt tokens against the full route's 6,098 on the
-same case. What the trade buys on the output side is what
-[#938](https://github.com/mstarks01/work-agent/issues/938) stage 4 measures, and
-the first run could not resolve it.
+Whether the compact transport is worth running is a measurement, not a claim,
+and the measurement has been made three times. Five corpus sweeps per route put
+the saving at **3.3% of emitted tokens** for `compact-v3`, 4.5% and 4.8% for the
+two versions before it — each safer version saved less. `uv run python -m
+evals.bench.deterministic transport` prints 5.0% of *characters*, which is an
+upper bound.
+
+The input side is close to free: the first live run measured 6,116 prompt tokens
+against the full route's 6,098 on the same case, because the compact schema is
+smaller by about what the delta prompt adds.
+
+The route has failed its own predeclared gate three times —
 [ADR 0035](adr/0035-the-compact-transport-promotes-on-a-predeclared-gate.md)
-fixes what the next run has to show, and says why latency is not in that gate.
-Until it passes the transport is off, and turning it off again is one variable
-and a restart.
+records each application and what it cost. Latency is not in that gate and
+remains unmeasured: this deployment's pinned upstream has a per-call spread
+larger than the whole effect. The transport is off, and turning it off again is
+one variable and a restart.
 
 | Variable | Effect |
 | --- | --- |
