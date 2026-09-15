@@ -297,15 +297,19 @@ class StatedControl(NamedTuple):
 class Coverage(BaseModel):
     """What this diagnostic read, and what it could not read at all.
 
-    **An empty list of flags is not a clean bill.** Three different things
+    **An empty list of flags is not a clean bill.** Four different things
     produce one: every value echoed its source, or no value was readable, or
-    there were no stated values to read. A caller holding only
-    :func:`unbased_controls` cannot tell those apart, and the middle one is the
-    shape an erased citation or a function-word value arrives in (#925).
+    there were no stated values to read, or the scan budget ran out before
+    the values were searched. A caller holding only :func:`unbased_controls`
+    cannot tell those apart; the second is the shape an erased citation or a
+    function-word value arrives in (#925), and the last was counted as
+    ``measured`` until #961 — a budget set to zero read as five controls
+    measured and none flagged.
 
     ``flagged`` is a subset of ``measured``, so ``measured - flagged`` is what
-    the diagnostic looked at and let through. ``uncited`` and ``tokenless``
-    are outside it entirely: nothing was searched, so nothing is claimed.
+    the diagnostic looked at and let through. ``uncited``, ``tokenless`` and
+    ``exhausted`` are outside it entirely: no search decided them, so nothing
+    is claimed.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -318,17 +322,20 @@ class Coverage(BaseModel):
     uncited: int = Field(ge=0)
     #: Those whose value holds no content token to look for.
     tokenless: int = Field(ge=0)
+    #: Those the scan reached after :data:`MAX_SCAN_WORK` was spent, so no
+    #: search decided them either way.
+    exhausted: int = Field(ge=0)
     #: The measured ones whose cited source echoed none of their tokens.
     flagged: int = Field(ge=0)
 
     @classmethod
     def empty(cls) -> Coverage:
         """A model nothing was read from, which is not a model that read clean."""
-        return cls(stated=0, measured=0, uncited=0, tokenless=0, flagged=0)
+        return cls(stated=0, measured=0, uncited=0, tokenless=0, exhausted=0, flagged=0)
 
     @property
     def unmeasured(self) -> int:
-        return self.uncited + self.tokenless
+        return self.uncited + self.tokenless + self.exhausted
 
     def to_json(self) -> dict[str, int]:
         return {
@@ -336,6 +343,7 @@ class Coverage(BaseModel):
             "measured": self.measured,
             "uncited": self.uncited,
             "tokenless": self.tokenless,
+            "exhausted": self.exhausted,
             "flagged": self.flagged,
         }
 
@@ -414,9 +422,15 @@ def read_controls(
     scan = _Scan(sources)
     flags: list[UnbasedControl] = []
     counts = {"measurable": 0, "uncited": 0, "tokenless": 0}
+    exhausted = 0
     for control, disposition in dispositions(model, sources):
         counts[disposition] += 1
-        if disposition == "measurable" and scan.echoes_none(control):
+        if disposition != "measurable":
+            continue
+        echoes_none = scan.echoes_none(control)
+        if echoes_none is None:
+            exhausted += 1
+        elif echoes_none:
             flags.append(
                 UnbasedControl(
                     element_id=control.element_id,
@@ -428,9 +442,10 @@ def read_controls(
             )
     return flags, Coverage(
         stated=sum(counts.values()),
-        measured=counts["measurable"],
+        measured=counts["measurable"] - exhausted,
         uncited=counts["uncited"],
         tokenless=counts["tokenless"],
+        exhausted=exhausted,
         flagged=len(flags),
     )
 
@@ -476,7 +491,8 @@ class _Scan:
     submitted text. :data:`MAX_SCAN_WORK` is the bound, and the fact that this
     is a diagnostic is what makes stopping affordable. Nothing downstream reads
     the result, so a job that runs out of budget loses a log line and keeps
-    every guarantee it had.
+    every guarantee it had — and every control the stopped scan reaches is
+    reported as unmeasured, never as read clean.
     """
 
     def __init__(self, sources: Mapping[str, str]) -> None:
@@ -486,13 +502,24 @@ class _Scan:
         self._work = 0
         self._stopped = False
 
-    def echoes_none(self, control: StatedControl) -> bool:
-        """Whether the cited source carries none of this value's tokens."""
-        return not any(
-            self._present_in(token, control.source_label) for token in control.tokens
-        )
+    def echoes_none(self, control: StatedControl) -> bool | None:
+        """Whether the cited source carries none of this value's tokens.
 
-    def _present_in(self, token: str, label: str) -> bool:
+        ``None`` where the budget ran out before a search settled it: a
+        token found present decides the control as echoed, every token
+        searched and absent decides it as flagged, and a token the scan
+        could not search leaves it undecided. A memoized token costs nothing
+        and still decides, because it was searched once.
+        """
+        for token in control.tokens:
+            present = self._present_in(token, control.source_label)
+            if present is None:
+                return None
+            if present:
+                return False
+        return True
+
+    def _present_in(self, token: str, label: str) -> bool | None:
         key = (token, label)
         if key in self._present:
             return self._present[key]
@@ -501,9 +528,10 @@ class _Scan:
         source = self._lowered[label]
         if self._work + len(source) > MAX_SCAN_WORK:
             self._stop()
-            # True, so the control reads as echoed and nothing is flagged: a
-            # diagnostic that ran out of budget must not start accusing.
-            return True
+            # Undecided, so the control is counted as unmeasured and never
+            # flagged: a diagnostic that ran out of budget must not start
+            # accusing, and must not claim to have read what it did not.
+            return None
         self._work += len(source)
         self._present[key] = matches_term(token, source)
         return self._present[key]
