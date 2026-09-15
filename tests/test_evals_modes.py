@@ -457,10 +457,16 @@ class TestTheAssertionMode:
 
         score = modes.score_assertions(case, result)
 
-        assert (score.proposed, score.kept) == (3, 2)
+        assert (score.proposed, score.kept, score.rejected) == (3, 2, 1)
         assert score.absences == 1
-        assert score.supported == 2
-        assert score.dropped == {"dangling-subject": 1}
+        assert score.span_backed == 2
+        assert score.refused == {"dangling-subject": 1}
+        assert score.assessed == {
+            "unchecked": 2,
+            "supported": 0,
+            "unsupported": 0,
+            "unresolved": 0,
+        }
         assert score.to_json()["predicates"] == [
             "authentication-mechanism",
             "mfa-requirement",
