@@ -2111,6 +2111,104 @@ class TestTheFalsificationFixtures:
         assert score.basis_coverage.flagged == 5
 
 
+class TestThePartitionFigureIsReadThreeWays:
+    """Finding 6 of #961: one pooled agreement hid which kind of pair was lost.
+
+    A pair correctly kept apart and a pair correctly kept together count alike
+    in ``zone_partition_agreement``, and a pair with a dropped element is
+    asked nothing. The three readings beside it are the co-memberships alone,
+    the separations alone, and how much of the reference either was asked
+    over.
+    """
+
+    def score(self, case, model):
+        return TestTheFalsificationFixtures().score(case, model)
+
+    def case_01(self):
+        return load_case(CORPUS / "01-payments-checkout")
+
+    def test_one_zone_for_everything_loses_the_separations_alone(self):
+        case = self.case_01()
+        model = case.model.model_copy(deep=True)
+        for element in model.zoned_elements():
+            element.trust_zone = "boundary:public-internet"
+
+        score = self.score(case, model)
+
+        assert score.same_zone_recall == 1.0
+        assert score.different_zone_agreement == 0.0
+        assert score.zone_pair_coverage == 1.0
+
+    def test_a_zone_for_every_element_loses_the_co_memberships_alone(self):
+        case = self.case_01()
+        model = case.model.model_copy(deep=True)
+        for index, element in enumerate(model.zoned_elements()):
+            zone = model.trust_boundaries[0].model_copy(deep=True)
+            zone.name = f"zone {index}"
+            zone.id = f"boundary:zone-{index}"
+            model.trust_boundaries.append(zone)
+            element.trust_zone = zone.id
+
+        score = self.score(case, model)
+
+        assert score.same_zone_recall == 0.0
+        assert score.different_zone_agreement == 1.0
+
+    def test_dropping_elements_reads_as_lost_coverage_not_lost_agreement(self):
+        """Half the zoned elements gone: a perfect partition over the rest."""
+        case = self.case_01()
+        model = case.model.model_copy(deep=True)
+        zoned = model.zoned_elements()
+        dropped = {element.id for element in zoned[: len(zoned) // 2]}
+        model.external_entities = [
+            e for e in model.external_entities if e.id not in dropped
+        ]
+        model.processes = [e for e in model.processes if e.id not in dropped]
+        model.data_stores = [e for e in model.data_stores if e.id not in dropped]
+        model.data_flows = [
+            f for f in model.data_flows if not dropped & {f.source, f.destination}
+        ]
+
+        score = self.score(case, model)
+
+        assert score.zone_partition_agreement == 1.0
+        assert score.zone_pair_coverage < 0.5
+        assert score.zone_pairs is not None
+        assert score.zone_pairs.reference_total > score.zone_pairs.compared
+
+    def test_an_aliased_element_is_still_asked(self):
+        """The alignment reaches the partition too: case 09's ruled name."""
+        case = load_case(CORPUS / "09-cookbook-sokify-retail")
+        model = case.model.model_copy(deep=True)
+        next(
+            e for e in model.processes if e.id == "process:catalogue-spreadsheet"
+        ).name = "Spreadsheet"
+        model = normalize_element_ids(model)
+
+        score = self.score(case, model)
+
+        assert score.zone_pair_coverage == 1.0
+        assert score.zone_partition_agreement == 1.0
+
+    def test_the_three_readings_are_serialised_beside_the_pooled_one(self):
+        case = self.case_01()
+        payload = self.score(case, case.model).to_json()
+
+        assert payload["zone_partition_agreement"] == 1.0
+        assert payload["same_zone_recall"] == 1.0
+        assert payload["different_zone_agreement"] == 1.0
+        assert payload["zone_pair_coverage"] == 1.0
+
+    def test_no_extraction_reads_zero_on_every_reading(self):
+        score = modes.ExtractionScore("x", (), (), (), False, ())
+
+        assert score.zone_pairs is None
+        assert score.zone_partition_agreement == 0.0
+        assert score.same_zone_recall == 0.0
+        assert score.different_zone_agreement == 0.0
+        assert score.zone_pair_coverage == 0.0
+
+
 class TestWhatNoFigureHereReaches:
     """Three mutations every number in this module scores as perfect.
 
