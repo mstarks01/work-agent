@@ -792,6 +792,95 @@ class TestOnlyAnAddedSweepIsABaselineSubmission:
         assert not check.passed
         assert "not a table" in " ".join(check.problems)
 
+    @staticmethod
+    def _merged_named(repo, name, sweeps):
+        """One merged Baseline directory called ``name``, with those sweeps."""
+        directory = repo / "evals" / "baselines" / name
+        directory.mkdir(parents=True, exist_ok=True)
+        manifest = {
+            "name": name,
+            "identity": {"repo_commit": "0" * 40},
+            "sweeps": [
+                {"artifact": stem, "submitted_by": "mstarks01", "files": {}}
+                for stem in sweeps
+            ],
+        }
+        (directory / "baseline.json").write_text(
+            json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
+        )
+        for stem in sweeps:
+            (directory / stem).write_text("{}\n", encoding="utf-8")
+        return directory
+
+    def test_a_migration_across_every_baseline_selects_no_kind(self, repo):
+        """#893: an archive migration catches the whole archive up at once.
+
+        Three merged Baselines, all rewritten, none gaining a sweep. Read
+        through ``_baseline_dir`` alone this was "more than one directory" and
+        failed closed into selecting the kind, so the code half of the diff was
+        a stray with no diff that could pass.
+        """
+        directories = [
+            self._merged_named(repo, name, [f"mstarks01-{n}.json"])
+            for n, name in enumerate(("first", "second", "third"))
+        ]
+        git(repo, "add", "-A")
+        git(repo, "commit", "-m", "three merged Baselines")
+        git(repo, "push", "origin", "main")
+
+        for n, directory in enumerate(directories):
+            (directory / f"mstarks01-{n}.json").write_text(
+                '{"migrated": true}\n', encoding="utf-8"
+            )
+
+        assert submit.detect_kind(repo) is None
+
+    def test_a_sweep_added_to_any_of_several_still_selects(self, repo):
+        """Contributing to one of them is still a contribution."""
+        directories = [
+            self._merged_named(repo, name, [f"mstarks01-{n}.json"])
+            for n, name in enumerate(("first", "second"))
+        ]
+        git(repo, "add", "-A")
+        git(repo, "commit", "-m", "two merged Baselines")
+        git(repo, "push", "origin", "main")
+
+        (directories[0] / "mstarks01-0.json").write_text(
+            '{"migrated": true}\n', encoding="utf-8"
+        )
+        manifest = json.loads((directories[1] / "baseline.json").read_text("utf-8"))
+        manifest["sweeps"].append(
+            {"artifact": "ada-new.json", "submitted_by": "ada", "files": {}}
+        )
+        (directories[1] / "baseline.json").write_text(
+            json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
+        )
+
+        assert submit.detect_kind(repo) == "baseline"
+
+    def test_the_multi_directory_refusal_still_names_it(self, repo):
+        """A two-directory submission is refused, and by the check that owns it.
+
+        The selector answers whether a diff contributes; the cardinality check
+        answers how many directories one submission may hold. Two questions, two
+        readers, and this is the second one saying which rule was broken.
+        """
+        for n, name in enumerate(("first", "second")):
+            self._merged_named(repo, name, [f"mstarks01-{n}.json"])
+
+        assert submit.detect_kind(repo) == "baseline"
+        check = submit._check_subject_count(repo, "mstarks01", "baseline")
+        assert not check.passed
+        assert "exactly one Baseline directory" in " ".join(check.problems)
+
+    def test_a_diff_naming_no_baseline_directory_fails_closed(self, repo):
+        """A file directly under the prefix names no Baseline, so it selects."""
+        prefix = repo / "evals" / "baselines"
+        prefix.mkdir(parents=True, exist_ok=True)
+        (prefix / "stray.json").write_text("{}\n", encoding="utf-8")
+
+        assert submit.detect_kind(repo) == "baseline"
+
     def test_a_kind_cannot_stay_silent_about_how_it_is_selected(self):
         """``selects`` carries no default, so a kind added tomorrow answers."""
         with pytest.raises(TypeError, match="selects"):
