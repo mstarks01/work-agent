@@ -89,6 +89,13 @@ def compact_fixture() -> dict:
                 "interface_kind": "web",
                 "source_excerpt": "the web app runs on Cloud Run",
                 "source_label": label,
+                "assumptions": [
+                    {
+                        "assumption": "web app is internet-facing",
+                        "attribute": "exposure",
+                        "basis": "customers reach it directly from the browser",
+                    }
+                ],
             }
         ],
         "data_stores": [
@@ -148,14 +155,6 @@ def compact_fixture() -> dict:
                 "source_label": label,
             },
         ],
-        "assumptions": [
-            {
-                "assumption": "web app is internet-facing",
-                "element": "app",
-                "attribute": "exposure",
-                "basis": "customers reach it directly from the browser",
-            }
-        ],
     }
 
 
@@ -181,7 +180,17 @@ class TestTheTransportCarriesTheSameFacts:
         through_the_wire, issues = parse_extraction(as_compact(blessed), COMPACT_FORMAT)
 
         assert codes(issues) == []
-        assert through_the_wire == expected
+        # Assumptions come back in element order rather than the blessed file's,
+        # because each one is written inside the element it is about. Order is
+        # presentation: the gate reads each entry's own element-and-attribute
+        # pair, and nothing downstream reads the sequence. Everything else is
+        # compared in order, including every element list.
+        assert through_the_wire.model_copy(
+            update={"assumptions": []}
+        ) == expected.model_copy(update={"assumptions": []})
+        assert sorted(
+            a.model_dump_json() for a in through_the_wire.assumptions
+        ) == sorted(a.model_dump_json() for a in expected.assumptions)
 
     def test_expansion_is_deterministic(self):
         """No model call, no clock, no set iteration: the same bytes each time."""
@@ -336,14 +345,33 @@ class TestAReferenceResolvesOrTheGateSaysSo:
 
         assert (scope, implicated) == ("whole", [])
 
-    def test_an_assumption_subject_resolves_through_the_same_table(self):
-        """The fourth reference field, and it points at any element type."""
+    def test_an_assumption_names_its_element_by_sitting_in_it(self):
+        """The reference that cannot dangle, because it does not exist.
+
+        Every one of the sixteen ``duplicate-ref`` failures in the first corpus
+        sweep was an assumption subject, and an assumption is the one reference
+        no scope can decide: it may be about any element, and ``kind`` is a
+        legal attribute of an external entity *and* of a trust boundary. So the
+        entry moved inside the element it is about.
+        """
         payload = compact_fixture()
-        payload["assumptions"][0]["element"] = "gone"
+        payload["trust_boundaries"][0]["ref"] = "app"
+        payload["external_entities"][0]["trust_zone"] = "app"
+        payload["trust_boundaries"][0]["assumptions"] = [
+            {
+                "assumption": "the internet is a tenant zone",
+                "attribute": "kind",
+                "basis": "nobody here controls it",
+            }
+        ]
 
-        _, issues = parse_extraction(payload, COMPACT_FORMAT)
+        model, issues = parse_extraction(payload, COMPACT_FORMAT)
 
-        assert "invalid-reference" in codes(issues)
+        assert codes(issues) == []
+        assert [(a.element_id, a.attribute) for a in model.assumptions] == [
+            ("process:web-app", "exposure"),
+            ("boundary:internet", "kind"),
+        ]
 
 
 class TestMalformedOutputFailsExplicitly:
@@ -428,16 +456,20 @@ class TestTheTablesAnswerTheirRegistries:
     def test_a_compact_row_carries_its_full_row_s_fields(self, group):
         """Field for field, with ``id`` replaced by ``ref``.
 
-        The transport is allowed to rename an identifier and nothing else. A
-        field added to an element type and forgotten here would be a fact the
-        compact route cannot express, and the only sign of it would be a
-        quieter extraction.
+        The transport renames an identifier and moves the assumption list; it
+        adds nothing else. A field added to an element type and forgotten here
+        would be a fact the compact route cannot express, and the only sign of
+        it would be a quieter extraction.
+
+        ``assumptions`` is the one addition, and it is a move rather than an
+        addition: the full model holds one list at the root, and the wire form
+        writes each entry inside the element it is about so that the subject
+        needs no reference. :meth:`test_the_root_lists_are_the_full_model_s_own`
+        is the other half.
         """
         compact_type, element_type = COMPACT_ELEMENTS[group]
-        renamed = {"element_id": "element"}
 
-        expected = {renamed.get(name, name) for name in element_type.model_fields}
-        expected = expected - {"id"} | {"ref"}
+        expected = set(element_type.model_fields) - {"id"} | {"ref", "assumptions"}
         assert set(compact_type.model_fields) == expected
 
     def test_a_compact_row_keeps_every_optional_default_the_full_row_has(self):
@@ -452,14 +484,23 @@ class TestTheTablesAnswerTheirRegistries:
             for name, field in element_type.model_fields.items():
                 if name == "id" or name not in compact_type.model_fields:
                     continue
+                if name == "assumptions":  # this format's own, not the row's
+                    continue
                 if field.is_required() != compact_type.model_fields[name].is_required():
                     diverging[f"{group}.{name}"] = field.default
 
         assert set(diverging) == {"data_flows.operations"}
 
     def test_the_root_lists_are_the_full_model_s_own(self):
-        """One vocabulary for both routes, so expansion is a row-by-row copy."""
-        assert set(CompactSystemModel.model_fields) == set(SystemModel.model_fields)
+        """One vocabulary for both routes, so expansion is a row-by-row copy.
+
+        Every element group, and ``assumptions`` deliberately absent: it lives
+        on each element here, which is what leaves this format with no reference
+        a scope cannot decide.
+        """
+        assert set(CompactSystemModel.model_fields) == set(SystemModel.model_fields) - {
+            "assumptions"
+        }
 
     def test_the_reference_fields_are_every_reference_an_element_carries(self):
         """The resolver walks a table, and the table answers the schema.
@@ -497,9 +538,9 @@ class TestTheTablesAnswerTheirRegistries:
         loader = MarkdownLoader(PROJECT_ROOT / "prompts")
 
         with pytest.raises(ValueError, match="unknown extraction format"):
-            parse_extraction(compact_fixture(), "compact-v2")
+            parse_extraction(compact_fixture(), "compact-v9")
         with pytest.raises(ValueError, match="unknown extraction format"):
-            compose_extract_prompt(loader, "compact-v2")
+            compose_extract_prompt(loader, "compact-v9")
 
 
 class TestTheFullRouteIsUntouched:
