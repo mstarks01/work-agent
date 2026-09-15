@@ -14,9 +14,20 @@
     nor version 1 ever produced**: nine `data_classification` inferences written
     on a flow or a process, against zero in five sweeps of each of the others.
     Three quality margins went with it.
-  - `compact-v3` puts the type back in the ref and the assumption subject back
-    where it never failed. The gate below is unchanged and is what it has to
-    clear.
+  - `compact-v3` put the type back in the ref and the assumption subject back
+    where it never failed, and **failed two** — the best of the three. Every
+    quality margin held and first-pass validity passed for the first time
+    (0.954 against a 0.927 floor). It failed on `duplicate-ref` (2, both flow
+    refs a model derived from endpoints, so parallel flows collided) and on the
+    per-case veto, which rests on case 11: recall 0.450 against a 0.562 floor,
+    endpoint recall 0.769 against a flat 1.000.
+- **What three applications settled.** The primary figure passed every time and
+  shrank every time — 4.5%, 4.8%, then **3.3%** — because each version that made
+  the format safer put identifier text back. The quality cost is element naming,
+  it is caused by dropping the `id` field, and dropping `id` is what the saving
+  *is*. A fourth version could clear `duplicate-ref` with one sentence about flow
+  refs; nothing in reach touches case 11. #938's definition of done covers this
+  case: retain the benchmark findings and do not promote the route.
 - **Effort**: [#938 — stage compact extraction output behind a SystemModel adapter](https://github.com/mstarks01/work-agent/issues/938),
   stage 4
 - **Builds on**: [ADR 0016](0016-token-caps-are-drift-alarms.md), which says a

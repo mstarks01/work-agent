@@ -83,6 +83,7 @@ from analysis_service.system_model import (
     UNKNOWN,
     ModelIndex,
     SystemModel,
+    normalize_name,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -579,15 +580,34 @@ def as_compact(model: dict) -> dict:
     service converts this way round — the adapter only expands — so this is the
     one place the inverse is written, and both readers of it share it.
 
-    Refs are positional and meaningless on purpose. An expansion that recognised
-    a ref rather than rebuilding every identifier from the names would pass a
-    sweep whose refs were the names.
+    **The ref is the element's own name slug behind its tag, because that is what
+    a model writes.** A positional ref would be shorter and would make this
+    figure look better; five live sweeps put the mean ref at 20.8 characters,
+    which is a name. Pricing against a six-character ref overstated the saving by
+    nearly double — 9.6% against 5.0% — and that overstatement stood in this
+    file, in :mod:`analysis_service.compact` and in ADR 0035 until the third
+    live sweep exposed it.
 
+    The cost is that the expansion is handed refs that *look* like names. It
+    still rebuilds every identifier from the ``name`` field rather than from the
+    ref, and ``tests/test_compact.py`` holds that property with a hand-written
+    fixture whose refs are nothing like its names.
     """
     refs: dict[str, str] = {}
+    taken: set[str] = set()
     for group in ELEMENT_GROUPS:
-        for index, element in enumerate(model.get(group, ())):
-            refs[element["id"]] = f"{REF_TAGS[group]}:r{len(refs)}-{index}"
+        for element in model.get(group, ()):
+            ref = f"{REF_TAGS[group]}:{normalize_name(element['name'])}"
+            # A compliant emission disambiguates, so this does too. Two flows
+            # can share a label and two elements of a type can share a name;
+            # the prompt tells the model its refs must differ, and a bench that
+            # silently collided would price a payload the gate would refuse.
+            suffix = 2
+            while ref in taken:
+                ref = f"{REF_TAGS[group]}:{normalize_name(element['name'])}-{suffix}"
+                suffix += 1
+            taken.add(ref)
+            refs[element["id"]] = ref
     compact: dict = {}
     for group in ELEMENT_GROUPS:
         rows = []
@@ -638,17 +658,15 @@ def _serialized(payload: dict) -> int:
 def case_transport() -> None:
     """How much of an extraction's emission the compact transport removes.
 
-    **Characters, not tokens.** Nothing offline here tokenizes, and a character
-    count is a proxy: an identifier like ``process:payment-api`` tokenizes worse
-    per character than the prose beside it, so the token saving is probably a
-    little larger than what this prints. What it is *not* is a latency figure —
-    #938 stage 4 is the paired live comparison that turns emitted tokens into a
-    claim about how long a job takes.
+    **Characters, not tokens, and an upper bound on both.** Five live sweeps of
+    ``compact-v3`` measured the token saving at **3.3%** where this prints 5.0%.
+    Read what this prints as the most the transport could save, and the live
+    number as what it does save. What it is *not* is a latency figure — #938
+    stage 4 is the paired live comparison, and on this deployment's pinned
+    upstream it could not resolve one.
 
     The blessed corpus models stand in for real emissions because they are the
-    only extraction-shaped data in the repo. They are hand-corrected, so they
-    carry fewer empty optional fields than a live extraction does, which makes
-    this a conservative reading of the third column.
+    only extraction-shaped data in the repo.
     """
     total_full = total_compact = 0
     print(f"{'case':34}{'full':>9}{'compact':>9}{'saved':>8}")
