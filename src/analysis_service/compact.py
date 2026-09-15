@@ -7,20 +7,24 @@ so every ``"id": "process:payment-api"`` a model writes is a field
 :func:`~analysis_service.system_model.normalize_element_ids` overwrites, and every
 reference to it is the same long string again.
 
-**Measured at 10.1% of the emitted characters over the thirteen blessed corpus
-models**, by ``uv run python -m evals.bench.deterministic transport``. Read that
-as a floor rather than a ceiling: the benchmark's refs run four to six characters
-where a model writes two or three, and a hand-corrected corpus model carries
-fewer empty optional fields than a live emission does. Read it as *characters*,
-too — nothing offline here tokenizes — and as an emission size rather than a
-latency.
+**Measured at 3.3% of the emitted tokens**, over five corpus sweeps per route
+on 2026-09-15, and that is the figure to use. ``uv run python -m
+evals.bench.deterministic transport`` prints 5.0% of *characters*, which is an
+upper bound: the corpus models are hand-corrected, and characters are not
+tokens.
 
-**The input side is close to free.** The delta prompt is about 490 coarse
-tokens, and the compact schema is about 1,500 characters smaller than
-``SystemModel``'s, because six classes lose the ``id`` field and its long
-pattern. The first live run measured the whole request at 6,116 prompt tokens
-against 6,098 for the full route on the same case — **18 tokens**, where the
-prompt text alone would have predicted a few hundred.
+Both numbers were nearly double this until the third live sweep. The bench
+priced against a six-character ref; five sweeps put the mean ref a model
+actually writes at 20.8 characters, because a model names a ref after the thing
+it points at. The bench now uses a name-slug ref and the earlier 10.1% figure
+is gone from this tree.
+
+**The input side is close to free.** The delta prompt is about 500 coarse
+tokens, and the compact schema is smaller than ``SystemModel``'s because six
+classes lose the ``id`` field and its long pattern. The first live run measured
+the whole request at 6,116 prompt tokens against 6,098 for the full route on the
+same case — **18 tokens**, where the prompt text alone would have predicted a
+few hundred.
 
 **What the saving costs is element naming, and not the facts.** Five corpus
 sweeps per route, 2026-09-15: every figure reading an *attribute* is unmoved at
