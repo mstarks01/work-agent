@@ -58,9 +58,16 @@ written before the run that answers it.**
 ### The unit and the repetitions
 
 Five sweeps per arm, each over the whole thirteen-case corpus, in
-`--mode extraction`. Sixty-five extractions an arm. A 13-case extraction sweep
-is about $0.04 and takes 6.7 minutes at `--cases-in-flight 13`, so the pair is
-about **$0.33 and half an hour**.
+`--mode extraction`. Sixty-five extractions an arm, about **$0.33**.
+
+It takes about **90 minutes**, not the 33 `evals/TUNING.md` quotes for a
+five-run extraction spread. Two things that figure does not carry.
+`config/resilience.toml` sets `max_active_jobs = 3` and `--cases-in-flight` is
+refused above it, so a sweep runs five batches rather than one. And the pinned
+`openai/flex` upstream answered the first run's single extraction in 85 to 160
+seconds, where TUNING's figure was measured on a route that answered faster.
+Both arms wait the same, so the cost is the operator's patience rather than the
+comparison's validity.
 
 One case cannot answer this. The first run's spread is the reason: a per-case
 reading of a 10% effect needs an n the corpus gives for free.
