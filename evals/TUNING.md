@@ -308,6 +308,28 @@ that supports it — `verify_corpus` refuses one whose excerpt the text does not
 carry, one that crosses its element's type, and one that derives another
 element's ID. A case nobody has ruled on reads exactly the strict number.
 
+**One alignment, read by every figure.** `evals/harness/alignment.py` pairs
+each blessed element with one produced element and records the evidence: an
+exact ID, a reader's alias, a flow under its own label between aligned
+endpoints, or a flow the discriminators (`operations` and whether a protocol is
+stated) single out between them. Two flows the rules cannot tell apart are
+listed as an ambiguity and paired with nothing. `aligned_recall`,
+`aligned_interaction_recall`, `actor_recall`, `initiator_recall`, the attribute
+comparison and `extraction-losses` all read that one object, so a ruling on a
+name reaches every figure: before it, the reader's alias on case 09's
+spreadsheet moved `sourced_recall` and left `initiator_recall` at 0.0 (#961).
+The strict figures stay beside the aligned ones.
+
+The score says little about an extra element, on purpose. `extra_status` reads
+`equivalent` where the alignment paired it and `unreviewed` everywhere else — an
+unreviewed extra may be a component the corpus omits, one the model invented, or
+a name nobody has ruled on, and no figure can tell those apart. Two diagnostics
+are named for exactly what they read: `same_type_unmatched_candidates` lists the
+extras whose type has an unaligned blessed element, which one missing store and
+twenty unrelated extra stores fills with twenty candidates, and
+`name_tokens_absent_from_source` lists the extras with a name word the source
+never uses. Neither is an invention count and neither is a rename count.
+
 Read over the six archived runs of 2026-09-13, on the ten elements a reader has
 ruled: 9.2 absent a run by exact ID, of which **7.3 were found under the ruled
 name** and 1.8 were genuinely absent.
@@ -559,7 +581,10 @@ uses, and never declares the store server. It is not a naming problem and not a
 misunderstanding. A source describes an initiator by what it does — "every store
 server asks the deploy controller once a minute" — so it reads as behaviour and
 never reaches an inventory of structure. `initiator_recall` is the reading that
-isolates it.
+isolates it. It reads the graph's pure source nodes, so an actor that also
+receives a callback sits outside its denominator; `actor_recall` is the plain
+count over external entities, and both credit an element found under a reader's
+alias, through the alignment.
 
 **Models follow a contradiction rather than resolving it.** `extract.md` said
 "write `unknown` where the text is silent" a dozen times, then gave `assets` a

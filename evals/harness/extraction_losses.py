@@ -27,7 +27,8 @@ never off a name, so a package added tomorrow answers by its own declaration —
 the row says what the extracted model lacked at that place, read through
 :func:`evals.harness.modes.score_extraction` over the end-to-end report's own
 embedded model, so the same reader that scores an extraction sweep scores this
-one: the reference's elements absent from the model, and the scored
+one: the reference's elements no element of the model stands for, read off
+:mod:`evals.harness.alignment` so a reader's alias is carried, and the scored
 attributes that differ on the elements it did carry. A row with neither is
 the sharper finding — the lane lost on a model that held the place — and it
 is counted as its own kind rather than folded into either.
@@ -95,7 +96,9 @@ class ReferenceFate:
     fate: Fate
     #: ``None`` for a package whose references carry no tier.
     must_find: bool | None
-    #: The reference's elements the extracted model does not carry. Only on an
+    #: The reference's elements no element of the extracted model stands for,
+    #: read off the alignment rather than the exact ID, so an element found
+    #: under a reader's alias is carried and not missing (#961). Only on an
     #: ``extraction`` fate of a package whose references name elements.
     missing_elements: tuple[str, ...] = ()
     #: ``<element>.<attribute>: <blessed> -> <extracted>`` for every scored
@@ -183,7 +186,9 @@ class CaseHandoff:
                 self.extraction.crossings_match if self.extraction else None
             ),
             "missing_elements": (
-                list(self.extraction.missing) if self.extraction else []
+                list(self.extraction.alignment.unaligned_reference)
+                if self.extraction
+                else []
             ),
             "fates": [entry.to_json() for entry in self.fates],
             "warnings": list(self.warnings),
@@ -243,7 +248,7 @@ def _lacked(
     reference_elements: Sequence[str], extraction: ExtractionScore
 ) -> tuple[tuple[str, ...], tuple[str, ...]]:
     named = set(reference_elements)
-    missing = tuple(sorted(named & set(extraction.missing)))
+    missing = tuple(sorted(named & set(extraction.alignment.unaligned_reference)))
     differing = tuple(
         f"{check.element_id}.{check.attribute}: {check.blessed} -> {check.extracted}"
         for check in extraction.differing

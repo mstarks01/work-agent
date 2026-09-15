@@ -19,6 +19,7 @@ from google.adk.models.base_llm import BaseLlm
 from pydantic import Field
 
 from evals.harness import modes
+from evals.harness.alignment import Alignment, Pair
 from evals.harness.identity import comparable_elements
 from evals.harness.reference import load_case, load_corpus
 from evals.harness.structural import report_issues
@@ -1146,11 +1147,16 @@ class TestTheInitiatorReadingOfAnExtraction:
         """
         score = modes.ExtractionScore(
             case_id="07",
-            matched=(),
+            matched=("entity:developer",),
             missing=("process:store-server",),
             extra=(),
             crossings_match=False,
             attributes=(),
+            alignment=Alignment(
+                (Pair("entity:developer", "entity:developer", "exact"),),
+                ("process:store-server",),
+                (),
+            ),
             blessed_initiators=("entity:developer", "process:store-server"),
         )
 
@@ -1337,14 +1343,14 @@ class TestInventionIsScoredApartFromTheCorpusGap:
         )
         assert score.extra, "the widened model should carry an extra element"
         # "replica" appears in no corpus source, so this one is invention.
-        assert score.unsourced == score.extra
+        assert score.name_tokens_absent_from_source == score.extra
 
     def test_the_reading_is_empty_when_nothing_was_added(self, case):
         score = modes.score_extraction(
             case, modes.ExtractionResult(case.id, case.model, ())
         )
         assert score.extra == ()
-        assert score.unsourced == ()
+        assert score.name_tokens_absent_from_source == ()
 
 
 def test_the_named_types_are_the_registry_less_flows_and_zones():
@@ -1367,13 +1373,15 @@ def test_the_named_types_are_the_registry_less_flows_and_zones():
     assert coined <= every, "the two coined types are element types"
 
 
-class TestAnExtraElementSplitsByWhetherARenameCanExplainIt:
-    """Precision counts a rename and an addition alike; these are two facts.
+class TestAnExtraElementIsACandidateOrUnreviewedAndNeverARename:
+    """Precision counts every extra alike; what a figure may say about one is little.
 
-    Which blessed element an extra one renames needs a fuzzy comparison and is
-    refused. Whether it renames anything is set arithmetic: a rename displaces
-    a blessed element of its own type, so an extra element of a type the
-    extraction matched completely has nothing to be a rename of (#882).
+    Which blessed element an extra one renames is a reader's ruling, read by
+    the alignment. Without one, the most a figure can say is that an extra's
+    type has an unaligned blessed element, which makes it a *candidate* — and
+    one unaligned store licenses twenty candidates, which is why the list is
+    not a count (#961). Every extra the alignment did not pair is
+    ``unreviewed``; nothing here calls it an invention or a corpus gap.
     """
 
     def widened(self, case, collection, element):
@@ -1384,8 +1392,8 @@ class TestAnExtraElementSplitsByWhetherARenameCanExplainIt:
             modes.ExtractionResult(case.id, type(case.model).model_validate(raw), ()),
         )
 
-    def test_an_extra_of_a_fully_matched_type_cannot_be_a_rename(self, case):
-        """Every blessed process is present, so an extra process is an addition."""
+    def test_an_extra_of_a_fully_aligned_type_is_no_candidate(self, case):
+        """Every blessed process is present, so an extra process renames nothing."""
         first = case.model.model_dump()["processes"][0]
         score = self.widened(
             case,
@@ -1394,12 +1402,13 @@ class TestAnExtraElementSplitsByWhetherARenameCanExplainIt:
         )
 
         assert score.missing == ()
-        assert score.additions == score.extra
-        assert score.possible_renames == ()
+        assert score.same_type_unmatched_candidates == ()
+        assert score.extra_status == {"process:added": "unreviewed"}
 
-    def test_an_extra_of_a_displaced_type_could_be_one(self, case):
+    def test_an_extra_of_a_displaced_type_is_a_candidate(self, case):
         """One blessed process dropped and another added: the second could be
-        the first under a name this scorer may not guess at."""
+        the first under a name this scorer may not guess at, and stays
+        unreviewed until a reader rules."""
         raw = case.model.model_dump()
         dropped = raw["processes"][0]["id"]
         model = type(case.model).model_validate(raw)
@@ -1408,19 +1417,32 @@ class TestAnExtraElementSplitsByWhetherARenameCanExplainIt:
             modes.ExtractionResult(case.id, _renamed_process(model, dropped), ()),
         )
 
-        assert dropped in score.missing
-        assert score.possible_renames == score.extra
-        assert score.additions == ()
+        assert dropped in score.alignment.unaligned_reference
+        assert score.same_type_unmatched_candidates == score.extra
+        assert set(score.extra_status.values()) == {"unreviewed"}
 
-    def test_the_two_partition_the_extra_elements(self, case):
-        """One reading, split two ways: neither loses an element nor repeats one."""
-        first = case.model.model_dump()["processes"][0]
-        score = self.widened(
-            case, "processes", dict(first, id="process:added", name="added thing")
+    def test_one_unaligned_element_licenses_every_same_type_extra(self):
+        """The audit's probe: one missing store, twenty unrelated extra stores.
+
+        Twenty candidates, because type is all the list reads; and twenty
+        ``unreviewed``, because nothing here may call them renames or
+        additions (#961 finding 1).
+        """
+        extras = tuple(f"store:invented-{index}" for index in range(20))
+        score = modes.ExtractionScore(
+            "synthetic",
+            (),
+            ("store:real",),
+            extras,
+            False,
+            (),
+            alignment=Alignment((), ("store:real",), extras),
         )
 
-        assert sorted(score.possible_renames + score.additions) == sorted(score.extra)
-        assert not set(score.possible_renames) & set(score.additions)
+        assert len(score.same_type_unmatched_candidates) == 20
+        assert set(score.extra_status.values()) == {"unreviewed"}
+        assert "additions" not in score.to_json()
+        assert "possible_renames" not in score.to_json()
 
     def test_a_displaced_type_does_not_excuse_another_type(self, case):
         """A missing process says nothing about an extra store."""
@@ -1436,11 +1458,30 @@ class TestAnExtraElementSplitsByWhetherARenameCanExplainIt:
             modes.ExtractionResult(case.id, type(case.model).model_validate(raw), ()),
         )
 
-        assert "store:added" in score.additions
-        assert "store:added" not in score.possible_renames
+        assert "store:added" not in score.same_type_unmatched_candidates
+        assert score.extra_status["store:added"] == "unreviewed"
+
+    def test_an_aligned_extra_is_equivalent_and_no_candidate(self):
+        """An extra the alignment paired is a blessed element under another name."""
+        case = load_case(CORPUS / "03-batch-data-pipeline")
+        raw = case.model.model_dump()
+        for process in raw["processes"]:
+            if process["id"] == "process:ingest-scheduler":
+                process["id"] = "process:airflow-scheduler"
+        for flow in raw["data_flows"]:
+            for end in ("source", "destination"):
+                if flow[end] == "process:ingest-scheduler":
+                    flow[end] = "process:airflow-scheduler"
+        score = modes.score_extraction(
+            case,
+            modes.ExtractionResult(case.id, type(case.model).model_validate(raw), ()),
+        )
+
+        assert score.extra_status["process:airflow-scheduler"] == "equivalent"
+        assert "process:airflow-scheduler" not in score.same_type_unmatched_candidates
 
     def test_a_coined_flow_label_is_not_a_name_a_submitter_writes(self, case):
-        """``named_extra`` and ``_unsourced`` ask one population, one reader.
+        """``named_extra`` and ``_name_tokens_absent`` ask one population, one reader.
 
         107 of the 136 extra elements a run were flows on the sweep of
         2026-09-13, so a split over the whole of ``extra`` reads the labels the
@@ -1458,7 +1499,7 @@ class TestAnExtraElementSplitsByWhetherARenameCanExplainIt:
 
         assert flow["id"] in score.extra
         assert flow["id"] not in score.named_extra
-        assert score.unsourced == ()
+        assert score.name_tokens_absent_from_source == ()
 
 
 def _renamed_process(model, element_id):
@@ -1491,7 +1532,7 @@ def test_a_coined_flow_label_is_never_invention(case):
     score = modes.score_extraction(case, modes.ExtractionResult(case.id, widened, ()))
 
     assert score.extra, "the widened model should carry an extra flow"
-    assert score.unsourced == ()
+    assert score.name_tokens_absent_from_source == ()
 
 
 def test_a_plural_in_the_source_covers_a_singular_name(case):
@@ -1510,7 +1551,7 @@ def test_a_plural_in_the_source_covers_a_singular_name(case):
     score = modes.score_extraction(case, modes.ExtractionResult(case.id, widened, ()))
 
     assert score.extra, "the widened model should carry an extra process"
-    assert score.unsourced == ()
+    assert score.name_tokens_absent_from_source == ()
 
 
 # --- The citation half of the gate, which this mode runs with its sources -----
@@ -1640,7 +1681,7 @@ class TestASupportedNameIsNamedDifferentlyRatherThanMissed:
 
         assert "process:ingest-scheduler" in score.missing
         assert score.sourced_recall > score.endpoint_recall
-        assert [credit.blessed for credit in score.aliased] == [
+        assert [credit.reference for credit in score.aliased] == [
             "process:ingest-scheduler"
         ]
         assert score.naming_departures == 1
@@ -1689,7 +1730,7 @@ class TestASupportedNameIsNamedDifferentlyRatherThanMissed:
         """
         _, score = self.zoned({"boundary:public-internet": "boundary:internet"})
 
-        assert [credit.blessed for credit in score.aliased] == [
+        assert [credit.reference for credit in score.aliased] == [
             "boundary:public-internet"
         ]
         assert score.sourced_zone_recall > score.zone_recall
