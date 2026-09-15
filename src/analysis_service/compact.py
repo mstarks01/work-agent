@@ -22,6 +22,22 @@ pattern. The first live run measured the whole request at 6,116 prompt tokens
 against 6,098 for the full route on the same case — **18 tokens**, where the
 prompt text alone would have predicted a few hundred.
 
+**What the saving costs is element naming, and not the facts.** Five corpus
+sweeps per route, 2026-09-15: every figure reading an *attribute* is unmoved at
+two decimal places of a standard deviation — control-state agreement +0.02 sd,
+scored-field agreement −0.05 sd — while every figure reading an *identity* moves
+2 to 4 sd against, and rename candidates rise 5.7 sd. The compact route finds
+the same system and names its parts differently more often. It also invents
+fewer elements out of nothing.
+
+There is a mechanism to test rather than a cause to state. The full route writes
+``"id": "process:scheduling-web-app"`` beside ``"name": "Scheduling web app"``,
+and ``prompts/extract.md`` rule 3 spends its longest passage on what that slug
+costs — an abbreviated ID is replaced by the name's slug, and one word added to
+an element renames every flow through it. This route removes that field, which
+is exactly where the saving comes from. The remedy, if the mechanism holds, is
+to restate rule 3's discipline in the delta where the ref is introduced.
+
 Whether the output saving is worth having is #938 stage 4, a paired live
 comparison. The first one could not resolve it: the emitted-token difference was
 under half the full route's own run-to-run spread on one case.
