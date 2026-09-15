@@ -58,8 +58,11 @@ run's three outcomes.
 
 - **extract** turns the untrusted text into a canonical system model (five DFD
   element types: external entity, process, data store, data flow, trust
-  boundary).
-- **validate** is a mechanical gate. Failures route to **repair** (one bounded
+  boundary). It writes that model in one of two **transports**, selected by the
+  deployment — see [The extraction transport](#the-extraction-transport).
+- **validate** is a mechanical gate. On the compact transport it expands the
+  wire form into the same canonical model first, and an emission that is not a
+  compact model at all is rejected rather than repaired. Failures route to **repair** (one bounded
   pass over the original text) and revalidate; a model that still fails, or is
   over the [150-element cap](Configuration.md), ends as a **rejection**.
   Revalidate puts every element the issues did not name back as it was before
@@ -107,6 +110,39 @@ Untrusted input is placed in fenced prompt sections that tell the model to treat
 it as data. This is an instruction-level defense, not a proof that prompt
 injection is impossible. Every model output is validated before code relies on
 it.
+
+### The extraction transport
+
+`extract` produces the largest artifact any node here writes, and a measurable
+share of it is text the code throws away: an element ID is derived from the
+element's type and name, so every ID a model writes is overwritten, and every
+reference repeats it. The **compact transport** replaces each identifier with a
+short response-local `ref`, and a deterministic adapter expands the result into
+the same `SystemModel` before the validity gate runs.
+
+| Transport | What `extract` writes | Selected by |
+| --- | --- | --- |
+| full | a `SystemModel` | the default |
+| compact-v1 | a compact wire form, expanded in code | `ANALYSIS_COMPACT_EXTRACTION` |
+
+Nothing downstream of the gate can tell the two apart, which is the point and
+also the reason the report records which one ran, in
+[`execution.extraction_format`](Report-Schema.md#execution). The adapter resolves
+references and copies fields; it decides no fact. `repair` writes a full
+`SystemModel` on either transport, so the one repair pass is never spent on a
+format conversion.
+
+Whether the compact transport is worth running is a measurement, not a claim.
+Over the thirteen blessed corpus models it removes 10.1% of the emitted
+characters — `uv run python -m evals.bench.deterministic transport` re-derives
+that — against about 412 tokens of extra instruction on the way in. What the
+trade buys in latency is what
+[#938](https://github.com/mstarks01/work-agent/issues/938) stage 4 measures.
+Until then it is off, and turning it off again is one variable and a restart.
+
+| Variable | Effect |
+| --- | --- |
+| `ANALYSIS_COMPACT_EXTRACTION` | Ask `extract` for the compact wire form. Off by default. |
 
 ## Models
 

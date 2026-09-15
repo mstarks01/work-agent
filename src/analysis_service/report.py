@@ -543,6 +543,17 @@ class ExecutionEnvelope(BaseModel):
     Deliberately **not** in the fingerprint. The policy decides nothing at run
     time — the loader has already enforced it — so hashing it would re-baseline
     every blessed identity on a policy edit that moved no model.
+
+    ``extraction_format`` is which transport ``extract`` wrote in: the full
+    System Model, or the compact wire form an adapter expands into one
+    (:mod:`analysis_service.compact`). It is recorded because a comparison
+    between the two routes is the only thing that says whether the compact one
+    is worth running, and a reader who infers the route from the report's own
+    System Model would find the two identical by construction. ``None`` means
+    the run extracted nothing — the analysis and assertion eval entries are
+    seeded a model instead. It is outside the fingerprint because the two routes
+    read different composed instructions, so ``instruction_sha256`` already
+    tells them apart.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -552,6 +563,7 @@ class ExecutionEnvelope(BaseModel):
     review_independence: Literal["shared", "distinct_model", "distinct_provider"] = (
         "shared"
     )
+    extraction_format: Literal["full", "compact-v1"] | None = "full"
 
 
 class ModelRepair(BaseModel):

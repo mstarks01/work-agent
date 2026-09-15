@@ -966,7 +966,11 @@ class TokenUsage:
   than inferring it from two node rows naming one model. That field is a
   statement and never a warning: a deployment whose selections do not satisfy
   its own policy fails to load, so no report exists to warn on. It is `null`
-  only on a report with no LLM provenance at all.
+  only on a report with no LLM provenance at all. And it carries
+  `extraction_format` — which transport `extract` wrote in, `full` or
+  `compact-v1`. The two produce the same `SystemModel` by construction, so a
+  reader cannot tell them apart from the report's own model; this is the field
+  that says. It is `null` when the run extracted nothing.
 
 - **`usage`** is what the provider reported the call cost, in vendor-neutral
   field names. `null` for code-only nodes, and for any LLM node whose provider

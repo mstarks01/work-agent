@@ -15,8 +15,14 @@ import pytest
 from analysis_service import graph
 from analysis_service.api import create_app
 from analysis_service.certification import MANIFEST_VERSION
+from analysis_service.compact import (
+    COMPACT_FORMAT,
+    FULL_FORMAT,
+    CompactSystemModel,
+)
 from analysis_service.deployment import (
     BLESSED_FINGERPRINTS_VAR,
+    COMPACT_EXTRACTION_VAR,
     MODEL_TIERS_VAR,
     RESILIENCE_VAR,
     SAMPLING_VAR,
@@ -33,6 +39,7 @@ from analysis_service.model_gate import (
 )
 from analysis_service.model_tiers import LLM_NODES, ModelConfigError
 from analysis_service.model_tiers import SUPPORTED_VERSION as TIERS_SUPPORTED_VERSION
+from analysis_service.system_model import SystemModel
 from analysis_service.vendors import ProviderAuthError, vendor_for
 from tests.factories import DEFAULT_FRAMEWORKS, PROJECT_ROOT, translator_of
 
@@ -274,6 +281,57 @@ def test_the_pipeline_binds_the_pinned_models_from_config():
     # graph's node is in the map and in no graph of this shape.
     assert set(pipeline.node_models) <= set(TIER_NODES)
     assert graph.ASSERT_NODE not in pipeline.node_models
+
+
+# --- The extraction transport -----------------------------------------------
+#
+# One variable selects which wire form ``extract`` writes in, and one restart is
+# the whole rollback (#938). What these check is that the choice reaches both
+# halves of the node — the schema and the prompt — and that leaving the variable
+# unset changes nothing at all.
+
+
+def test_the_full_route_is_what_an_install_that_sets_nothing_runs():
+    deployment = Deployment.from_env(env=VERTEX_ENV)
+    pipeline = deployment.pipeline(DEFAULT_FRAMEWORKS)
+    nodes = {node.name: node for node in pipeline.workflow.graph.nodes}
+
+    assert deployment.extraction_format == FULL_FORMAT
+    assert pipeline.extraction_format == FULL_FORMAT
+    assert nodes[graph.EXTRACT_NODE].output_schema is SystemModel
+
+
+def test_the_flag_selects_the_compact_schema_and_the_prompt_that_describes_it():
+    """Both halves, because a schema described by the wrong prompt is a dead job."""
+    env = VERTEX_ENV | {COMPACT_EXTRACTION_VAR: "true"}
+    pipeline = Deployment.from_env(env=env).pipeline(DEFAULT_FRAMEWORKS)
+    nodes = {node.name: node for node in pipeline.workflow.graph.nodes}
+
+    assert pipeline.extraction_format == COMPACT_FORMAT
+    assert nodes[graph.EXTRACT_NODE].output_schema is CompactSystemModel
+    assert "compact-v1" in nodes[graph.EXTRACT_NODE].instruction
+
+
+def test_the_repair_node_writes_a_full_model_on_either_route():
+    """The repair schema is unchanged, so its one pass is never a conversion."""
+    env = VERTEX_ENV | {COMPACT_EXTRACTION_VAR: "true"}
+    pipeline = Deployment.from_env(env=env).pipeline(DEFAULT_FRAMEWORKS)
+    nodes = {node.name: node for node in pipeline.workflow.graph.nodes}
+
+    assert nodes[graph.REPAIR_NODE].output_schema is SystemModel
+    assert "compact-v1" not in nodes[graph.REPAIR_NODE].instruction
+
+
+def test_an_entry_that_extracts_nothing_records_no_transport():
+    """A graph seeded a model states no wire form, rather than the default one."""
+    env = VERTEX_ENV | {COMPACT_EXTRACTION_VAR: "true"}
+    deployment = Deployment.from_env(env=env)
+
+    seeded = deployment.pipeline(DEFAULT_FRAMEWORKS, entry=graph.ENTRY_PREPARE)
+    extracting = deployment.pipeline(DEFAULT_FRAMEWORKS, entry=graph.ENTRY_EXTRACT_ONLY)
+
+    assert seeded.extraction_format is None
+    assert extracting.extraction_format == COMPACT_FORMAT
 
 
 def test_the_llm_nodes_share_two_adapters_one_per_tier():

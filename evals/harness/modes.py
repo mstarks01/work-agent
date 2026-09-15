@@ -64,6 +64,7 @@ from analysis_service.claims import (
     Claim,
     FrameworkName,
 )
+from analysis_service.compact import FULL_FORMAT, parse_extraction
 from analysis_service.deployment import Deployment
 from analysis_service.execution import GraphExecutor, GraphFailed, GraphRun
 from analysis_service.frameworks.stride.record import DraftThreat
@@ -103,7 +104,7 @@ from analysis_service.system_model import (
     TrustBoundary,
     make_element_id,
 )
-from analysis_service.validation import ValidationIssue, parse_and_validate
+from analysis_service.validation import ValidationIssue
 from evals.harness.identity import comparable_elements
 from evals.harness.reference import GoldenCase
 
@@ -1162,6 +1163,13 @@ async def run_extraction(case: GoldenCase, pipeline: Pipeline) -> ExtractionResu
     state = graph_run.final_state
     if STATE_EXTRACTED_MODEL not in state:
         raise EvalRunError(f"{case.id}: extract produced no model")
+    # The transport is read off the built graph rather than guessed from the
+    # payload, and the expansion runs through the same
+    # :func:`~analysis_service.compact.parse_extraction` the ``validate`` node
+    # calls — so a compact run is graded on the model production would have
+    # built from the same emission, not on a second reading of the wire form.
+    # First-pass semantics are unchanged: this mode still runs no repair.
+    #
     # normalize_ids mirrors the ``validate`` node: blessed models already carry
     # derived IDs, so scoring a candidate's raw IDs by set membership would
     # count an abbreviated slug as one missing element and one extra, on a
@@ -1173,9 +1181,9 @@ async def run_extraction(case: GoldenCase, pipeline: Pipeline) -> ExtractionResu
     # excerpt that passes here fails inside a job. The mapping is read off the
     # state the executor seeded rather than rebuilt from ``case.sources``, so
     # the gate sees the labels the run actually carried.
-    model, issues = parse_and_validate(
+    model, issues = parse_extraction(
         state[STATE_EXTRACTED_MODEL],
-        normalize_ids=True,
+        pipeline.extraction_format or FULL_FORMAT,
         sources=state.get(STATE_SOURCE_TEXTS, {}),
     )
     return ExtractionResult(

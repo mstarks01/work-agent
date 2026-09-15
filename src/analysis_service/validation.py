@@ -43,9 +43,14 @@ from analysis_service.system_model import (
     normalize_element_ids,
 )
 
+#: Every way an extraction is refused. All but one are this gate's own rules;
+#: ``duplicate-ref`` belongs to the compact transport
+#: (:mod:`analysis_service.compact`) and is reported in this shape because the
+#: repair pass reads one list of issues, not one per stage it came from.
 IssueCode = Literal[
     "schema",
     "duplicate-id",
+    "duplicate-ref",
     "id-mismatch",
     "invalid-reference",
     "no-trust-zones",
