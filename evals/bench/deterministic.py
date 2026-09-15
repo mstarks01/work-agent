@@ -578,6 +578,11 @@ def as_compact(model: dict) -> dict:
     Refs are positional and meaningless on purpose. An expansion that recognised
     a ref rather than rebuilding every identifier from the names would pass a
     sweep whose refs were the names.
+
+    The assumptions come back in element order rather than the full model's own,
+    which is why the equivalence sweep compares them as a set. Order is
+    presentation here: the gate reads each entry's own element-and-attribute
+    pair, and nothing downstream reads the list's sequence.
     """
     refs: dict[str, str] = {}
     for group in ELEMENT_GROUPS:
@@ -598,17 +603,21 @@ def as_compact(model: dict) -> dict:
                     row[field] = refs[row[field]]
             if group == "data_flows":
                 row.setdefault("operations", UNKNOWN)
+            # An assumption sits inside the element it is about, so it carries
+            # no reference at all.
+            nested = [
+                {
+                    "assumption": entry["assumption"],
+                    "attribute": entry["attribute"],
+                    "basis": entry["basis"],
+                }
+                for entry in model.get("assumptions", ())
+                if entry["element_id"] == element["id"]
+            ]
+            if nested:
+                row["assumptions"] = nested
             rows.append(row)
         compact[group] = rows
-    compact["assumptions"] = [
-        {
-            "assumption": entry["assumption"],
-            "element": refs[entry["element_id"]],
-            "attribute": entry["attribute"],
-            "basis": entry["basis"],
-        }
-        for entry in model.get("assumptions", ())
-    ]
     return compact
 
 

@@ -102,16 +102,20 @@ from analysis_service.validation import (
 #: re-spelled once, in :class:`~analysis_service.report.ExecutionEnvelope`, which
 #: holds no import from this module; ``tests/test_compact.py`` holds the two to
 #: each other.
-ExtractionFormat = Literal["full", "compact-v1"]
+ExtractionFormat = Literal["full", "compact-v2"]
 
 #: The full-model route: the model writes a :class:`SystemModel` itself.
 FULL_FORMAT: ExtractionFormat = "full"
 
-#: The compact route, version 1. **Versioned in its name**, because a reader of
+#: The compact route, version 2 — version 1 put assumptions in a top-level list
+#: that named its subject by ref, which is the one reference the format could
+#: not resolve (see :class:`CompactAssumption`). There is no version 1 in the
+#: tree: nothing persisted is in this format, so the change is a cutover rather
+#: than a migration. **Versioned in its name**, because a reader of
 #: an archived report has to be able to tell which wire form produced it, and
 #: because ``prompts/extract-compact.md`` names this string — so a format change
 #: moves the composed instruction and therefore every node's fingerprint.
-COMPACT_FORMAT: ExtractionFormat = "compact-v1"
+COMPACT_FORMAT: ExtractionFormat = "compact-v2"
 
 #: Every extraction transport a graph can be built for.
 EXTRACTION_FORMATS: tuple[ExtractionFormat, ...] = (FULL_FORMAT, COMPACT_FORMAT)
@@ -193,6 +197,10 @@ class _CompactElement(BaseModel):
     source_label: str = Field(default="", max_length=200)
     source_speaker: str = Field(default="", max_length=200)
     notes: str = Field(default="", max_length=2000)
+    #: What extraction inferred about *this* element, one entry per attribute.
+    #: Nested rather than pointed at: see :class:`CompactAssumption`. Uncapped,
+    #: like every other list here — the bound on model size is the gate's.
+    assumptions: list[CompactAssumption] = Field(default_factory=list)
 
 
 class CompactExternalEntity(_CompactElement):
@@ -244,15 +252,28 @@ class CompactTrustBoundary(_CompactElement):
 class CompactAssumption(BaseModel):
     """An :class:`~analysis_service.system_model.Assumption` on the wire.
 
-    ``element`` rather than ``element_id``, because it holds a ref. The field is
-    named for what it carries: a reader who sees ``element_id`` beside a value
-    of ``"api"`` has to guess which naming scheme is in play.
+    **It names no element.** It sits inside the element it is about, so the
+    subject is where it is written rather than something it points at, and the
+    adapter lifts it to the full model's top-level list with that element's
+    derived ID.
+
+    That is the correction the first corpus sweep bought. Every one of the
+    sixteen ``duplicate-ref`` failures in five compact sweeps was an assumption
+    subject, and none was anything else. A model names a zone after the thing
+    inside it — thirty-four shared refs in five sweeps, so it is the norm — and
+    a ``kind`` is a legal attribute of an external entity *and* of a trust
+    boundary, so a subject ref shared between the two names neither. Every other
+    reference field is decided by its own scope (:data:`REFERENCE_SCOPES`); this
+    one had no scope to be decided by, because an assumption may be about any
+    element.
+
+    A reference that does not exist cannot be ambiguous, cannot dangle, and
+    costs no tokens.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     assumption: str = Field(min_length=1, max_length=1000)
-    element: str = _ref_field()
     attribute: str = Field(min_length=1, max_length=100)
     basis: str = Field(min_length=1, max_length=1000)
 
@@ -278,7 +299,6 @@ class CompactSystemModel(BaseModel):
     data_stores: list[CompactDataStore] = Field(default_factory=list)
     data_flows: list[CompactDataFlow] = Field(default_factory=list)
     trust_boundaries: list[CompactTrustBoundary] = Field(default_factory=list)
-    assumptions: list[CompactAssumption] = Field(default_factory=list)
 
 
 #: Each compact element class against the full-model class it expands into, in
@@ -315,9 +335,6 @@ OMITTABLE_FIELDS: tuple[str, ...] = tuple(
     if not field.is_required()
 )
 
-#: The name an assumption holds its subject's ref under.
-ASSUMPTION_SUBJECT = "element"
-
 #: Every field that holds a ref, against the element groups that field may name.
 #:
 #: **A ref is resolved inside the scope of the field that reads it**, which is
@@ -340,19 +357,13 @@ REFERENCE_SCOPES: Mapping[str, tuple[str, ...]] = MappingProxyType(
         "trust_zone": ("trust_boundaries",),
         "source": ZONED_GROUPS,
         "destination": ZONED_GROUPS,
-        # An assumption may name any element, so its scope is every group and
-        # there is nothing to widen to. A ref two elements share is genuinely
-        # ambiguous here, and that is the one place it still is.
-        ASSUMPTION_SUBJECT: ELEMENT_GROUPS,
     }
 )
 
-#: The reference fields an *element* carries, as :func:`_expand_element` walks
-#: them. Derived from the scopes table, so a fifth reference field joins both by
-#: being declared once.
-REFERENCE_FIELDS: tuple[str, ...] = tuple(
-    name for name in REFERENCE_SCOPES if name != ASSUMPTION_SUBJECT
-)
+#: The reference fields an element carries, as :func:`_expand_element` walks
+#: them. Every reference in this format is one, because an assumption names its
+#: subject by sitting inside it.
+REFERENCE_FIELDS: tuple[str, ...] = tuple(REFERENCE_SCOPES)
 
 
 def parse_extraction(
@@ -426,24 +437,18 @@ def expand(payload: object) -> tuple[dict[str, Any] | None, list[ValidationIssue
 
     claims = _claims(compact)
     ambiguous: set[str] = set()
+    assumptions: list[dict[str, Any]] = []
     expanded: dict[str, Any] = {
         group: [
-            _expand_element(group, row, claims, ambiguous)
+            _expand_element(group, row, claims, ambiguous, assumptions)
             for row in getattr(compact, group)
         ]
         for group in COMPACT_ELEMENTS
     }
-    expanded["assumptions"] = [
-        {
-            "assumption": entry.assumption,
-            "element_id": _resolve(
-                entry.element, ASSUMPTION_SUBJECT, claims, ambiguous
-            ),
-            "attribute": entry.attribute,
-            "basis": entry.basis,
-        }
-        for entry in compact.assumptions
-    ]
+    # Lifted in element order, each row already carrying the ID its element was
+    # given. Order is presentation: the gate reads each entry's own pair, and
+    # nothing downstream reads the list's sequence.
+    expanded["assumptions"] = assumptions
     return expanded, [
         ValidationIssue(
             code="duplicate-ref",
@@ -525,6 +530,7 @@ def _expand_element(
     row: BaseModel,
     claims: Mapping[str, list[tuple[str, str]]],
     ambiguous: set[str],
+    assumptions: list[dict[str, Any]],
 ) -> dict[str, Any]:
     """One compact row as full-model JSON: ``ref`` becomes ``id``, refs resolve.
 
@@ -532,6 +538,11 @@ def _expand_element(
     field's scope (:func:`_resolve`), and one that resolves to nothing is left
     as the model wrote it, so the gate reports ``invalid-reference`` quoting the
     ref rather than an ID this function invented.
+
+    This element's own assumptions are appended to ``assumptions``, each one
+    given this element's ID. They come off the element rather than out of a
+    list, so the subject is where the entry was written and there is no
+    reference to resolve or to get wrong.
     """
     _, element_type = COMPACT_ELEMENTS[group]
     expanded = row.model_dump(mode="json")
@@ -539,4 +550,7 @@ def _expand_element(
     for field in REFERENCE_FIELDS:
         if field in expanded:
             expanded[field] = _resolve(expanded[field], field, claims, ambiguous)
+    assumptions.extend(
+        {**entry, "element_id": expanded["id"]} for entry in expanded.pop("assumptions")
+    )
     return expanded

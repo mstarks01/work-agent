@@ -391,7 +391,7 @@ def test_the_compact_delta_names_every_field_that_may_be_left_out(field):
     assert f"`{field}`" in loader.load(EXTRACT_COMPACT_PROMPT_NAME)
 
 
-@pytest.mark.parametrize("field", (*REFERENCE_FIELDS, "element"))
+@pytest.mark.parametrize("field", REFERENCE_FIELDS)
 def test_the_compact_delta_names_every_field_that_holds_a_ref(field):
     """A reference field the delta never mentions is one a model fills with a name."""
     assert f"`{field}`" in loader.load(EXTRACT_COMPACT_PROMPT_NAME)
