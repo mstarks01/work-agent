@@ -53,11 +53,12 @@ from analysis_service.assertions import (
     resolve_catalog,
 )
 from analysis_service.basis import (
-    Coverage as BasisCoverage,
-)
-from analysis_service.basis import (
+    IN_SCOPE,
     UnbasedControl,
     read_controls,
+)
+from analysis_service.basis import (
+    Coverage as BasisCoverage,
 )
 from analysis_service.claims import (
     Claim,
@@ -270,6 +271,16 @@ _SCORED_ATTRIBUTES: Mapping[str, _Scored] = {
 STATE_REDUCED: frozenset[str] = frozenset(
     name for name, scored in _SCORED_ATTRIBUTES.items() if scored.states
 )
+
+#: The state-reduced fields no basis check can answer for, derived from the two
+#: registries rather than listed. A state agreement on one of these is reported
+#: with nothing beside it, and that is a property of the field rather than an
+#: omission: ``analysis_service.basis`` is out of scope on
+#: ``data_classification`` because it holds *schema* words where the source holds
+#: its own — "not exposed outside the cluster" is correctly written ``internal``
+#: and shares no word with it — and ``protocol`` is not a control attribute at
+#: all, so that module never walks it.
+STATE_UNCHECKED: frozenset[str] = STATE_REDUCED - frozenset(IN_SCOPE)
 
 
 @dataclass(frozen=True)
@@ -831,6 +842,33 @@ class ExtractionScore:
         return agreed / len(self.attributes) if self.attributes else 0.0
 
     @property
+    def state_agrees_unbased(self) -> int:
+        """State agreements whose extracted value its own cited source never echoes.
+
+        **The join the two figures lacked.** A state-reduced comparison folds a
+        whole mechanism to one of three words, so ``arbitrary nonsense`` reads
+        ``stated`` and agrees with a real control; the ``unbased`` diagnostic
+        sees exactly that and nothing tied the two together (#891). Replacing
+        every stated scored value in corpus case 01 with that literal reads
+        agreement 1.000 and five here.
+
+        Counted over the fields a basis check can answer, so
+        :data:`STATE_UNCHECKED` is outside it and a reader needs both numbers.
+        It reads the flags this run's own extraction produced, which is the
+        model the agreement was taken over.
+
+        A diagnostic, gating nothing, like the flags it reads.
+        """
+        flagged = {(flag.element_id, flag.attribute) for flag in self.unbased}
+        return sum(
+            1
+            for check in self.attributes
+            if check.attribute in STATE_REDUCED
+            and check.agrees
+            and (check.element_id, check.attribute) in flagged
+        )
+
+    @property
     def control_state_agreement(self) -> float:
         """The :data:`STATE_REDUCED` fields alone, named for what they compare.
 
@@ -918,6 +956,7 @@ class ExtractionScore:
             # a state rather than as the fact they hold, so this is agreement
             # over scored fields and never an extraction accuracy (#891).
             "scored_field_agreement": round(self.scored_field_agreement, 3),
+            "state_agrees_unbased": self.state_agrees_unbased,
             "control_state_agreement": round(self.control_state_agreement, 3),
             "attributes_compared": self.attributes_compared,
             # The denominator beside the count, so a figure taken over half the
@@ -2006,6 +2045,17 @@ def render_extraction(scores: Sequence[ExtractionScore]) -> None:
         f"unbased controls: {unbased} stated with no word in the cited source,"
         f" out of {read} read of {stated} stated"
         f" — a diagnostic, gating nothing (analysis_service.basis)"
+    )
+    # Beside the agreement rather than under the flags, because the number it
+    # qualifies is the agreement: a state comparison folds the mechanism away,
+    # so an agreement on a value the source never echoes is an agreement about
+    # nothing (#891).
+    agreed_unbased = sum(score.state_agrees_unbased for score in scores)
+    print(
+        f"  of which {agreed_unbased} sit under a control state this run"
+        f" *agreed* about, so that agreement reads a value its own source does"
+        f" not support; {', '.join(sorted(STATE_UNCHECKED))} carry no basis"
+        f" check at all"
     )
     totals = aggregate_attributes(scores)
     comparable = sum(score.attributes_comparable for score in scores)
