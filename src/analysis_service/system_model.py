@@ -16,7 +16,8 @@ boundary iff its endpoints' zones differ.
 from __future__ import annotations
 
 import re
-from collections.abc import Collection, Mapping
+from collections import Counter
+from collections.abc import Collection, Iterable, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import ClassVar, Literal, get_args, get_origin
@@ -634,19 +635,42 @@ ELEMENT_GROUPS: tuple[str, ...] = tuple(
 )
 
 
-def _rewrite_id(element: Element, rewrites: dict[str, str]) -> None:
+def duplicate_ids(elements: Iterable[Element]) -> dict[str, int]:
+    """Each element ID more than one element carries, with how many carry it.
+
+    The one reader of "is this ID unique": the validity gate reports each
+    entry as ``duplicate-id``, and :func:`normalize_element_ids` refuses to
+    rewrite a reference through one, because an ID two elements carry names
+    neither of them.
+    """
+    counts = Counter(element.id for element in elements)
+    return {
+        element_id: count for element_id, count in sorted(counts.items()) if count > 1
+    }
+
+
+def _rewrite_id(
+    element: Element, rewrites: dict[str, str], ambiguous: Collection[str]
+) -> None:
     """Overwrite one element's ID with its derived form, recording the change.
 
     A name that normalizes to an empty slug has no derived form; the emitted ID
     is left alone so the validity gate reports it rather than this pass
     guessing at it.
+
+    An emitted ID in ``ambiguous`` — one more than one element arrived with —
+    still gives way to the derived ID, because the name is authoritative, but
+    the change is **not recorded**: a rewrite table entry for it would bind
+    every reference to whichever element was rewritten last, and a reference
+    to an ID two elements carried is a reference the source left ambiguous.
     """
     try:
         derived = derive_element_id(element)
     except ValueError:
         return
     if derived != element.id:
-        rewrites[element.id] = derived
+        if element.id not in ambiguous:
+            rewrites[element.id] = derived
         element.id = derived
 
 
@@ -672,6 +696,15 @@ def normalize_element_ids(
     the class/instance duplication the gate's ``duplicate-id`` rule exists to
     catch.
 
+    The reverse collision — two elements that *arrived* with one ID and
+    different names — is never resolved here. Each element takes its own
+    derived ID, and every reference to the shared emitted ID is left as it
+    was, so the gate reports it dangling beside the ``duplicate-id`` that
+    :func:`~analysis_service.validation.parse_and_validate` raises for the
+    emitted ID. Rewriting through that ID would bind ``A calls B`` to
+    ``B calls B`` and report nothing, which is the silent wrong binding this
+    pass has to be incapable of (#961).
+
     ``source_labels`` extends the same idea to the one reference an element
     carries that points *outside* the model: a ``source_label`` naming one of
     the job's sources. It is snapped to the job's own spelling
@@ -684,10 +717,13 @@ def normalize_element_ids(
     normalized = model.model_copy(deep=True)
     zoned = normalized.zoned_elements()
     rewrites: dict[str, str] = {}
+    # Read before any ID moves, over every element: a flow can be referenced
+    # too, by an assumption, so its emitted ID is held to the same rule.
+    ambiguous = duplicate_ids(normalized.elements())
 
     non_flows: list[Element] = [*zoned, *normalized.trust_boundaries]
     for element in non_flows:
-        _rewrite_id(element, rewrites)
+        _rewrite_id(element, rewrites, ambiguous)
 
     for element in zoned:
         element.trust_zone = rewrites.get(element.trust_zone, element.trust_zone)
@@ -697,7 +733,7 @@ def normalize_element_ids(
     for flow in normalized.data_flows:
         flow.source = rewrites.get(flow.source, flow.source)
         flow.destination = rewrites.get(flow.destination, flow.destination)
-        _rewrite_id(flow, rewrites)
+        _rewrite_id(flow, rewrites, ambiguous)
 
     for assumption in normalized.assumptions:
         assumption.element_id = rewrites.get(
