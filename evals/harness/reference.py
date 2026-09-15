@@ -66,7 +66,7 @@ from analysis_service.frameworks.asvs.record import AsvsChapter
 from analysis_service.frameworks.stride.record import StrideCategory
 from analysis_service.markdown_loader import RESOLVE_ERRORS
 from analysis_service.sources import MAX_LABEL_CHARS, Source, SourceKind
-from analysis_service.system_model import SystemModel
+from analysis_service.system_model import DataFlow, SystemModel
 from analysis_service.validation import parse_and_validate
 from evals.harness.verbs import check_verb
 
@@ -846,15 +846,44 @@ def load_corpus(corpus_dir: Path | str) -> tuple[GoldenCase, ...]:
 
 def flows_by_case(
     cases: Sequence[GoldenCase],
+    analysed: Mapping[str, SystemModel] = MappingProxyType({}),
 ) -> dict[str, dict[str, tuple[str, str]]]:
     """Each case's **Data Flow** map, which the identity rule resolves against.
 
     Per case rather than pooled: two cases may spell one flow ID differently,
     and a shared map would resolve one case's citation against another's graph.
+
+    ``analysed`` is each case's *analysed* model — the graph the claims being
+    scored were written against. It is the blessed model in every mode that
+    injects one, and the extraction in an end-to-end run, where the two graphs
+    name the same interaction differently.
+    :func:`~evals.harness.identity.endpoint_form` resolves a cited flow by
+    looking its ID up here and keeps the raw ID when the lookup misses, so a map
+    holding only blessed flows leaves an end-to-end candidate's citation opaque
+    and it matches nothing (#949). Measured: 46.6 blessed flows a run are
+    produced at the right endpoints under a different label.
+
+    **A blessed entry wins a shared ID.** The map's job is to resolve the
+    reference's own citations, and a collision means two graphs disagree about
+    what that ID runs between — resolving the reference against the extraction's
+    answer is the substitution this module exists to refuse. An analysed flow
+    therefore fills a gap and never replaces an entry.
     """
     return {
         case.id: {
-            flow.id: (flow.source, flow.destination) for flow in case.model.data_flows
+            **{
+                flow.id: (flow.source, flow.destination)
+                for flow in _data_flows(analysed.get(case.id))
+            },
+            **{
+                flow.id: (flow.source, flow.destination)
+                for flow in case.model.data_flows
+            },
         }
         for case in cases
     }
+
+
+def _data_flows(model: SystemModel | None) -> tuple[DataFlow, ...]:
+    """A model's flows, or none where no analysed model was handed in."""
+    return tuple(model.data_flows) if model is not None else ()

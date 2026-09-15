@@ -14,14 +14,17 @@ import pytest
 
 from analysis_service.claims import derive_severity_level
 from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
+from analysis_service.system_model import SystemModel, normalize_element_ids
 from evals import verify_corpus
 from evals.harness import envelope as envelopes
 from evals.harness import sitting as sittings
+from evals.harness.identity import endpoint_form
 from evals.harness.reference import (
     MAX_CORPUS_SOURCE_BYTES,
     RETIRED_FIELDS,
     CorpusError,
     ReferenceThreat,
+    flows_by_case,
     load_case,
     load_corpus,
 )
@@ -300,3 +303,88 @@ def test_the_retired_field_names_a_path_the_code_writes():
     assert str(sittings.draft_root()) in RETIRED_FIELDS["reviews"].replace(
         "~", str(Path.home())
     )
+
+
+class TestTheFlowMapServesTheCitationsItIsAskedAbout:
+    """``flows_by_case`` against an analysed model that renames a flow (#949).
+
+    ``endpoint_form`` resolves a cited flow by looking its ID up in this map and
+    keeps the raw ID when the lookup misses. A map holding only blessed flows
+    therefore leaves an end-to-end candidate's citation opaque, so it matches
+    nothing — and that is invisible in every mode that injects the blessed
+    model, which is every scored sweep to date.
+    """
+
+    @staticmethod
+    def _renamed(case):
+        """The case's model with one flow's label changed and nothing else."""
+        raw = case.model.model_dump(mode="json")
+        blessed = raw["data_flows"][0]
+        original = blessed["id"]
+        source, destination = blessed["source"], blessed["destination"]
+        blessed["name"] = f"{blessed['name']} differently put"
+        model = normalize_element_ids(SystemModel.model_validate(raw))
+        moved = next(
+            flow
+            for flow in model.data_flows
+            if (flow.source, flow.destination) == (source, destination)
+        )
+        assert moved.id != original, "the fixture must actually move the ID"
+        return model, original, moved.id
+
+    def test_a_renamed_flow_resolves_to_the_same_endpoints_as_the_blessed_one(self):
+        corpus = load_corpus(CORPUS_DIR)
+        case = corpus[0]
+        analysed, blessed_id, renamed_id = self._renamed(case)
+
+        flows = flows_by_case(corpus, {case.id: analysed})[case.id]
+
+        assert flows[renamed_id] == flows[blessed_id]
+
+    def test_without_the_analysed_model_the_renamed_id_is_unknown(self):
+        """The defect, driven: the map cannot answer for the citation."""
+        corpus = load_corpus(CORPUS_DIR)
+        case = corpus[0]
+        _, _, renamed_id = self._renamed(case)
+
+        assert renamed_id not in flows_by_case(corpus)[case.id]
+
+    def test_the_two_citations_then_carry_one_resolved_place(self):
+        """What the identity rule reads, rather than what this function returns."""
+        corpus = load_corpus(CORPUS_DIR)
+        case = corpus[0]
+        analysed, blessed_id, renamed_id = self._renamed(case)
+        flows = flows_by_case(corpus, {case.id: analysed})[case.id]
+
+        assert endpoint_form([blessed_id], flows) == endpoint_form([renamed_id], flows)
+        # And without it, the candidate's citation stays opaque and cannot match.
+        bare = flows_by_case(corpus)[case.id]
+        assert endpoint_form([renamed_id], bare) == frozenset({renamed_id})
+
+    def test_a_blessed_entry_wins_a_shared_id(self):
+        """A collision resolves the reference against its own graph, never the
+        extraction's — the substitution the identity module refuses."""
+        corpus = load_corpus(CORPUS_DIR)
+        case = corpus[0]
+        blessed = case.model.data_flows[0]
+        raw = case.model.model_dump(mode="json")
+        # Same ID, endpoints swapped: a graph that disagrees about the flow.
+        raw["data_flows"][0]["source"] = blessed.destination
+        raw["data_flows"][0]["destination"] = blessed.source
+        conflicting = SystemModel.model_validate(raw)
+
+        flows = flows_by_case(corpus, {case.id: conflicting})[case.id]
+
+        assert flows[blessed.id] == (blessed.source, blessed.destination)
+
+    def test_a_case_with_no_analysed_model_is_unchanged(self):
+        """Every other case's map is what it was, so one run cannot reach another."""
+        corpus = load_corpus(CORPUS_DIR)
+        analysed, _, _ = self._renamed(corpus[0])
+
+        widened = flows_by_case(corpus, {corpus[0].id: analysed})
+        bare = flows_by_case(corpus)
+
+        assert [case.id for case in corpus[1:]]
+        for case in corpus[1:]:
+            assert widened[case.id] == bare[case.id]
