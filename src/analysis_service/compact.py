@@ -24,8 +24,10 @@ prompt text alone would have predicted a few hundred.
 
 Whether the output saving is worth having is #938 stage 4, a paired live
 comparison. The first one could not resolve it: the emitted-token difference was
-under half the full route's own run-to-run spread on one case. Until a run
-settles it this route is off.
+under half the full route's own run-to-run spread on one case.
+``docs/adr/0035-the-compact-transport-promotes-on-a-predeclared-gate.md`` fixes
+what the next run has to show, and it was written before that run. Until it
+passes, this route is off.
 
 **This is a transport, not an ontology.** The compact model carries exactly the
 facts a :class:`~analysis_service.system_model.SystemModel` carries, under the
