@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from dataclasses import fields
+from dataclasses import fields, replace
 from pathlib import Path
 
 import pytest
@@ -20,12 +20,13 @@ from pydantic import Field
 
 from evals.harness import modes
 from evals.harness.identity import comparable_elements
-from evals.harness.reference import load_case
+from evals.harness.reference import load_case, load_corpus
 from evals.harness.structural import report_issues
 
 CORPUS = Path(__file__).resolve().parents[1] / "evals" / "corpus"
 from analysis_service.analysis import control_state, states_a_protocol
 from analysis_service.assertions import ABSENT, projection_fields
+from analysis_service.basis import IN_SCOPE
 from analysis_service.certification import fingerprints_of
 from analysis_service.claims import (
     AnalysisMarks,
@@ -56,6 +57,7 @@ from analysis_service.sampling import load_sampling
 from analysis_service.system_model import (
     ZONE_ATTRIBUTE,
     ModelIndex,
+    SystemModel,
     normalize_element_ids,
 )
 from analysis_service.validation import validate
@@ -2017,3 +2019,86 @@ class TestWhatNoFigureHereReaches:
         assert score.uncited == ()
         assert len(score.differing) == 2
         assert len(lost) == 2
+
+
+class TestAStateAgreementIsJoinedToItsBasis:
+    """#891's reproduction, driven: nonsense agrees, and the join says so.
+
+    A state-reduced comparison folds a whole mechanism to one of three words, so
+    a literal string reads ``stated`` and agrees with a real control. The
+    ``unbased`` diagnostic already saw that and no figure tied the two together.
+    """
+
+    NONSENSE = "arbitrary nonsense"
+
+    def _nonsense_model(self, case):
+        """The case's own model with every stated scored value replaced."""
+        raw = case.model.model_dump(mode="json")
+        replaced = 0
+        for group in (
+            "external_entities",
+            "processes",
+            "data_stores",
+            "data_flows",
+        ):
+            for element in raw.get(group, []):
+                for field in modes.STATE_REDUCED:
+                    if field in element and control_state(str(element[field])) == (
+                        "stated"
+                    ):
+                        element[field] = self.NONSENSE
+                        replaced += 1
+        assert replaced, "the fixture must replace something"
+        return SystemModel.model_validate(raw), replaced
+
+    def _score(self, case, extracted):
+        unbased, coverage = modes._basis(case, extracted)
+        return replace(
+            modes.score_extraction(
+                case,
+                modes.ExtractionResult(case_id=case.id, extracted=extracted, issues=()),
+            ),
+            unbased=unbased,
+            basis_coverage=coverage,
+        )
+
+    def test_the_agreement_still_reads_one(self, case):
+        """The defect, kept: a state comparison cannot see the nonsense."""
+        nonsense, _ = self._nonsense_model(case)
+
+        score = self._score(case, nonsense)
+
+        assert score.scored_field_agreement == 1.0
+        assert score.control_state_agreement == 1.0
+
+    def test_the_join_charges_every_agreement_the_source_does_not_support(self, case):
+        nonsense, _ = self._nonsense_model(case)
+
+        score = self._score(case, nonsense)
+
+        assert score.state_agrees_unbased == len(score.unbased)
+        assert score.state_agrees_unbased > 0
+        assert score.to_json()["state_agrees_unbased"] == score.state_agrees_unbased
+
+    def test_the_blessed_model_charges_nothing(self):
+        """A positive control: the reference agrees with itself and is based."""
+        for case in load_corpus(CORPUS):
+            score = self._score(case, case.model)
+
+            assert score.state_agrees_unbased == 0, case.id
+
+    def test_the_unchecked_fields_are_derived_from_both_registries(self):
+        """Named nowhere: a field leaving either registry moves this with it."""
+        assert modes.STATE_UNCHECKED == modes.STATE_REDUCED - frozenset(IN_SCOPE)
+        assert modes.STATE_UNCHECKED, "a blind spot nobody can see is not reportable"
+        assert not modes.STATE_UNCHECKED & frozenset(IN_SCOPE)
+
+    def test_a_field_with_no_basis_check_is_outside_the_join(self):
+        """So the count cannot imply a coverage the diagnostic does not have."""
+        case = load_corpus(CORPUS)[0]
+        nonsense, replaced = self._nonsense_model(case)
+
+        score = self._score(case, nonsense)
+
+        # Every replaced value agreed; only the checkable ones can be charged.
+        assert score.state_agrees_unbased < replaced
