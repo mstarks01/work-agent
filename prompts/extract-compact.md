@@ -4,7 +4,7 @@ This job's schema replaces every element ID with a **ref**: a short handle you i
 
 Write a ref in lowercase letters, digits and hyphens — `api`, `orders-db`, `edge` — and keep it short. It is a handle for this response only, and expansion throws it away.
 
-**Give each element its own ref.** A ref that two elements claim points at neither of them, so every reference to it fails and the whole model goes back for repair. Refs are unique across all five lists together, not inside one list.
+**A ref is unique among the elements a reference could confuse it with.** Two elements of the same kind never share one. A trust boundary and a thing inside it may: `card-processor` for both the external entity and its zone is fine, because a `trust_zone` can only mean the boundary and a flow endpoint can only mean the entity. A process and a data store may not, because a flow endpoint could mean either. A ref two elements claim that a field cannot tell apart points at neither, so every reference to it fails and the whole model goes back for repair.
 
 Four fields hold a ref and nothing else:
 

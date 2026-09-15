@@ -914,7 +914,10 @@ EXTRACTION_FAILURE_RULES: dict[str, tuple[str, str]] = {
     # The compact transport's own refusal, so its rule is in the compact
     # transport's own text. A phrase checked against ``extract.md`` would be a
     # rule the route that can trip this never reads.
-    "duplicate-ref": ("Give each element its own ref", EXTRACT_COMPACT_PROMPT_NAME),
+    "duplicate-ref": (
+        "A ref is unique among the elements a reference could confuse it with",
+        EXTRACT_COMPACT_PROMPT_NAME,
+    ),
     "id-mismatch": ("IDs are recomputed from the names you give", EXTRACT_PROMPT_NAME),
     "invalid-reference": (
         "Both endpoints must be zoned elements you have already created",

@@ -135,10 +135,13 @@ format conversion.
 Whether the compact transport is worth running is a measurement, not a claim.
 Over the thirteen blessed corpus models it removes 10.1% of the emitted
 characters — `uv run python -m evals.bench.deterministic transport` re-derives
-that — against about 412 tokens of extra instruction on the way in. What the
-trade buys in latency is what
-[#938](https://github.com/mstarks01/work-agent/issues/938) stage 4 measures.
-Until then it is off, and turning it off again is one variable and a restart.
+that. The input side is close to free: the delta prompt is about 490 coarse
+tokens and the compact schema is about 1,500 characters smaller, so the first
+live run measured 6,116 prompt tokens against the full route's 6,098 on the
+same case. What the trade buys on the output side is what
+[#938](https://github.com/mstarks01/work-agent/issues/938) stage 4 measures, and
+the first run could not resolve it. Until one does it is off, and turning it off
+again is one variable and a restart.
 
 | Variable | Effect |
 | --- | --- |

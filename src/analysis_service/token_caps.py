@@ -89,7 +89,7 @@ TOKEN_CAPS: dict[str, int] = {
     # whole cost of the route on the input side, paid on every extraction call
     # and cacheable, against the output it removes — see
     # :mod:`analysis_service.compact`.
-    "prompts/extract-compact": 500,
+    "prompts/extract-compact": 600,
     "prompts/repair": 900,
     # The assertion body alone. The predicate table beside it is rendered from
     # `assertions.REGISTRY` rather than written here, so a predicate added
