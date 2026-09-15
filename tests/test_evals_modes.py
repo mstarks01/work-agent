@@ -500,24 +500,28 @@ class TestTheAssertionMode:
         """
         score = modes.score_assertions(case, self.run(case))
         reachable = modes.reachable_controls(case.model)
+        stated = [key for key, stratum in reachable.items() if stratum == "stated"]
 
         assert score.reached == 1
-        assert score.reachable == len(reachable)
+        assert score.reachable == len(stated)
         assert score.reachable > score.reached
-        assert (case.model.data_flows[0].id, "authentication") in reachable
+        assert reachable[case.model.data_flows[0].id, "authentication"] == "stated"
 
     def test_agreeing_that_nothing_is_stated_is_counted_apart(self, case):
         """The #891 split: a free agreement is not a measured one.
 
         Every pair in the denominator has a blessed value ``control_state``
-        reads as ``stated``, so an attribute the model leaves unverified is
-        outside it and an agreement there lands in ``agrees_unstated``.
+        reads as ``stated`` or ``absent``, and its stratum is that reading; an
+        attribute the model leaves unverified is outside both and an agreement
+        there lands in ``agrees_unstated``.
         """
         reachable = modes.reachable_controls(case.model)
 
-        for element_id, attribute in reachable:
+        assert reachable
+        for (element_id, attribute), stratum in reachable.items():
             element = ModelIndex.of(case.model).get(element_id)
-            assert control_state(str(getattr(element, attribute))) == "stated"
+            assert control_state(str(getattr(element, attribute))) == stratum
+            assert stratum != "unverified"
 
     def test_a_stated_absence_is_the_number_the_graph_cannot_carry(self, case):
         """The audit's own fact: ten corpus values hide one of these (#925)."""
@@ -529,6 +533,133 @@ class TestTheAssertionMode:
         assert absence.predicate == "mfa-requirement"
         assert absence.basis == "stated"
         assert absence.predicate not in projection_fields()
+
+
+class TestAProjectionIsComparedTheWayItsFieldSays:
+    """Finding 10 of #961: a state reduction erased the value of an enum.
+
+    ``exposure`` and ``trust_zone`` are compared as written; a mechanism is
+    still compared as a state, because no reviewed semantic label exists to
+    compare it under. An explicit absence is a second denominator, not a
+    share of the stated one and not outside both.
+    """
+
+    CASE = "01-payments-checkout"
+
+    def resolved(self, golden, rows):
+        from analysis_service.assertions import CatalogProposal, resolve_catalog
+
+        sources = {source.label: source.text for source in golden.sources}
+        catalog, _ = resolve_catalog(
+            CatalogProposal(assertions=rows), golden.model, sources
+        )
+        return catalog
+
+    def quoted(self, golden, subject_id):
+        element = next(e for e in golden.model.elements() if e.id == subject_id)
+        return [{"source_label": element.source_label, "quote": element.source_excerpt}]
+
+    def test_the_opposite_exposure_does_not_agree(self):
+        """The audit's probe: the internet-facing storefront asserted internal."""
+        golden = load_case(CORPUS / self.CASE)
+        subject = "process:storefront-api"
+        assert next(e.exposure for e in golden.model.processes if e.id == subject) == (
+            "internet-facing"
+        )
+        catalog = self.resolved(
+            golden,
+            [
+                {
+                    "subject_type": "component",
+                    "subject": subject,
+                    "predicate": "internet-exposure",
+                    "value": "internal",
+                    "basis": "stated",
+                    "quotes": self.quoted(golden, subject),
+                }
+            ],
+        )
+
+        counts = modes._projection_counts(golden, catalog)
+
+        assert counts["reached"] == 1
+        assert counts["agrees_stated"] == 0
+        assert counts["agrees_unstated"] == 0
+
+    def test_the_stated_exposure_agrees(self):
+        golden = load_case(CORPUS / self.CASE)
+        subject = "process:storefront-api"
+        catalog = self.resolved(
+            golden,
+            [
+                {
+                    "subject_type": "component",
+                    "subject": subject,
+                    "predicate": "internet-exposure",
+                    "value": "internet-facing",
+                    "basis": "stated",
+                    "quotes": self.quoted(golden, subject),
+                }
+            ],
+        )
+
+        assert modes._projection_counts(golden, catalog)["agrees_stated"] == 1
+
+    def test_an_explicit_absence_is_its_own_denominator(self):
+        """Case 01's gRPC hop is unauthenticated, and the sources say so."""
+        golden = load_case(CORPUS / self.CASE)
+        flow = "flow:storefront-api-to-order-service:submit-order"
+        reachable = modes.reachable_controls(golden.model)
+
+        assert reachable[flow, "authentication"] == "absent"
+        counts = modes._projection_counts(golden, self.resolved(golden, []))
+        assert counts["reachable_absent"] >= 1
+        assert counts["reached_absent"] == 0
+        assert counts["agrees_absent"] == 0
+
+    def test_asserting_the_absence_agrees_in_the_absent_stratum(self):
+        golden = load_case(CORPUS / self.CASE)
+        flow = "flow:storefront-api-to-order-service:submit-order"
+        catalog = self.resolved(
+            golden,
+            [
+                {
+                    "subject_type": "interaction",
+                    "subject": flow,
+                    "predicate": "authentication-mechanism",
+                    "value": ABSENT,
+                    "basis": "stated",
+                    "quotes": self.quoted(golden, flow),
+                }
+            ],
+        )
+
+        counts = modes._projection_counts(golden, catalog)
+
+        assert counts["reached_absent"] == 1
+        assert counts["agrees_absent"] == 1
+        assert counts["agrees_stated"] == counts["agrees_unstated"] == 0
+
+    def test_the_corpus_holds_seven_explicit_absences(self):
+        """The audit's count, pinned: a corpus edit that moves it is the alarm."""
+        absent = sum(
+            1
+            for golden in load_corpus(CORPUS)
+            for stratum in modes.reachable_controls(golden.model).values()
+            if stratum == "absent"
+        )
+
+        assert absent == 7
+
+    def test_every_projected_field_has_a_comparison(self):
+        """The table is held to the registry, so a sixth field raises here."""
+        assert set(projection_fields().values()) <= set(modes.PROJECTION_COMPARED)
+
+    def test_a_closed_vocabulary_compares_by_value_and_a_mechanism_by_state(self):
+        assert modes.PROJECTION_COMPARED["exposure"]("internal") == "internal"
+        assert modes.PROJECTION_COMPARED["trust_zone"]("boundary:x") == "boundary:x"
+        assert modes.PROJECTION_COMPARED["authentication"]("mTLS") == "stated"
+        assert modes.PROJECTION_COMPARED["authentication"] is control_state
 
 
 def test_extraction_mode_runs_extract_alone(case):
