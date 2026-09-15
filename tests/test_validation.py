@@ -256,6 +256,42 @@ class TestNormalizeIds:
         assert model is None
         assert codes(issues) == ["schema"]
 
+    def test_an_id_two_elements_arrived_with_is_refused_under_each_of_them(self):
+        """A duplicate emitted ID is an explicit issue, never a silent binding (#961).
+
+        Before this, normalization rewrote both elements, kept the last
+        rewrite in its table, and the flow ``A calls B`` came out of the gate
+        as ``B calls B`` with no issue at all. Now each element that carried
+        the shared ID is reported under its derived ID, so the repair is
+        scoped to the two elements and the references, and the references
+        arrive dangling rather than bound.
+        """
+        model = valid_model()
+        first, second = model.processes[0], model.processes[0].model_copy(deep=True)
+        first.name, second.name = "A", "B"
+        first.id = second.id = "process:shared"
+        model.processes.append(second)
+        model.data_flows = [model.data_flows[0]]
+        model.data_flows[0].source = model.data_flows[0].destination = "process:shared"
+        model.assumptions = []
+
+        normalized, issues = parse_and_validate(model.model_dump(), normalize_ids=True)
+
+        duplicates = [i for i in issues if i.code == "duplicate-id"]
+        assert [i.element_id for i in duplicates] == ["process:a", "process:b"]
+        assert all("'process:shared'" in i.message for i in duplicates)
+        assert codes(issues).count("invalid-reference") == 2
+        flow = normalized.data_flows[0]
+        assert (flow.source, flow.destination) == ("process:shared", "process:shared")
+
+    def test_a_unique_emitted_id_still_carries_its_references(self):
+        """The rule bites only on a shared ID; an ordinary rename follows through."""
+        normalized, issues = parse_and_validate(self.abbreviated(), normalize_ids=True)
+        assert issues == []
+        assert normalized.data_flows[0].destination == (
+            "process:web-app-frontend-service"
+        )
+
 
 class TestCitationsResolve:
     """The fifth invalid-reference rule (#56), and the excerpt check beside it.

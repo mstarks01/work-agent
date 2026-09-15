@@ -317,6 +317,56 @@ class TestNormalizeElementIds:
         assert "duplicate-id" not in {i.code for i in validate(model)}
         assert "duplicate-id" in {i.code for i in validate(normalized)}
 
+    def test_an_id_two_elements_arrived_with_rewrites_no_reference(self):
+        """The probe that found it (#961): ``A calls B`` must not become ``B calls B``.
+
+        Two processes arrive as ``process:shared`` with the names ``A`` and
+        ``B``. Each takes its own derived ID; the flow between them, which
+        named the shared ID at both ends, is left naming it, so the gate can
+        say the reference resolved to nothing rather than binding it to
+        whichever element was rewritten last.
+        """
+        model = valid_model()
+        first, second = model.processes[0], model.processes[0].model_copy(deep=True)
+        first.name, second.name = "A", "B"
+        first.id = second.id = "process:shared"
+        model.processes.append(second)
+        model.data_flows = [model.data_flows[0]]
+        model.data_flows[0].source = model.data_flows[0].destination = "process:shared"
+        model.assumptions = []
+        normalized = normalize_element_ids(model)
+        assert [p.id for p in normalized.processes] == ["process:a", "process:b"]
+        flow = normalized.data_flows[0]
+        assert (flow.source, flow.destination) == ("process:shared", "process:shared")
+        assert "invalid-reference" in {i.code for i in validate(normalized)}
+
+    def test_a_rewrite_chain_binds_each_reference_to_the_element_it_named(self):
+        """One element's derived ID is another's emitted ID, and neither is confused.
+
+        ``process:web-app`` is renamed ``Gateway`` and so derives to
+        ``process:gateway``, which a second element *arrived* as while being
+        named ``Relay``. A flow that named ``process:gateway`` meant the
+        second element, and follows it to ``process:relay``; a flow that named
+        ``process:web-app`` meant the first, and follows it to
+        ``process:gateway``. Each reference is rewritten once, through the ID
+        it held, never through the ID that replaced it.
+        """
+        model = valid_model()
+        model.processes[0].name = "Gateway"
+        relay = model.processes[0].model_copy(deep=True)
+        relay.id, relay.name = "process:gateway", "Relay"
+        model.processes.append(relay)
+        to_relay = model.data_flows[0].model_copy(deep=True)
+        to_relay.destination = "process:gateway"
+        model.data_flows.append(to_relay)
+        normalized = normalize_element_ids(model)
+        assert [p.id for p in normalized.processes] == [
+            "process:gateway",
+            "process:relay",
+        ]
+        assert normalized.data_flows[0].destination == "process:gateway"
+        assert normalized.data_flows[-1].destination == "process:relay"
+
 
 class TestModelIndex:
     """The lookups a validated model answers repeatedly, computed once.

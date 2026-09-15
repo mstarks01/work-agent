@@ -21,7 +21,6 @@ and denies — never silently auto-repairs.
 
 from __future__ import annotations
 
-from collections import Counter
 from collections.abc import Collection, Mapping, Sequence
 from types import MappingProxyType
 from typing import Any, Literal
@@ -40,6 +39,7 @@ from analysis_service.system_model import (
     SystemModel,
     assumable_attributes,
     derive_element_id,
+    duplicate_ids,
     normalize_element_ids,
 )
 
@@ -142,18 +142,16 @@ def validate(
     issues: list[ValidationIssue] = []
     legal_tags = allowed_asset_tags(extra_asset_tags)
 
-    id_counts = Counter(element.id for element in elements)
-    for element_id, count in sorted(id_counts.items()):
-        if count > 1:
-            issues.append(
-                ValidationIssue(
-                    code="duplicate-id",
-                    message=f"element ID {element_id!r} is used by {count} elements;"
-                    " IDs must be unique within one System Model",
-                    element_id=element_id,
-                    field="id",
-                )
+    for element_id, count in duplicate_ids(elements).items():
+        issues.append(
+            ValidationIssue(
+                code="duplicate-id",
+                message=f"element ID {element_id!r} is used by {count} elements;"
+                " IDs must be unique within one System Model",
+                element_id=element_id,
+                field="id",
             )
+        )
 
     zoned_ids = {
         element.id
@@ -533,6 +531,16 @@ def parse_and_validate(
     keys are what a ``source_label`` must name; the values are what a
     ``source_excerpt`` must be found in. Empty — the default — runs neither
     half, which is what a hand-authored model checked outside a job wants.
+
+    **An ID two elements arrived with is refused before it is derived away.**
+    Normalization gives each of them its own derived ID, and with the emitted
+    ID gone the gate alone would see two well-formed elements and a dangling
+    reference, with nothing to say why. So each element that carried a
+    shared emitted ID is reported here as ``duplicate-id`` under its derived
+    ID, ahead of the gate's own issues, and the references normalization left
+    unresolved arrive beside it as ``invalid-reference``. Naming the elements
+    rather than the ID they shared keeps the repair scoped to them and the
+    references, which is the narrowest repair that can answer it (#961).
     """
     try:
         model = SystemModel.model_validate(data)
@@ -546,9 +554,26 @@ def parse_and_validate(
             for error in exc.errors()
         ]
         return None, issues
+    issues = []
     if normalize_ids:
+        emitted = model.elements()
+        shared = duplicate_ids(emitted)
         model = normalize_element_ids(model, sources)
-    return model, validate(model, extra_asset_tags, max_elements, sources)
+        # The deep copy keeps the walk order, so the two walks pair by position.
+        issues = [
+            ValidationIssue(
+                code="duplicate-id",
+                message=f"element {element.id!r} ({element.name!r}) arrived with"
+                f" ID {before.id!r}, which {shared[before.id]} elements carried;"
+                " every reference to that ID names none of them and was left"
+                " unresolved, so name the element each reference means",
+                element_id=element.id,
+                field="id",
+            )
+            for before, element in zip(emitted, model.elements(), strict=True)
+            if before.id in shared
+        ]
+    return model, issues + validate(model, extra_asset_tags, max_elements, sources)
 
 
 def repair_scope(issues: Sequence[ValidationIssue]) -> tuple[str, list[str]]:
