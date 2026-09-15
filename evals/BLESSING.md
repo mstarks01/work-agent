@@ -40,6 +40,7 @@ evals/corpus/<NN>-<slug>/
   claims/<framework>.json
                   that framework's reference set, written against model.json's IDs
   corrections.md  how the model was corrected against the source, and what that says
+  facts.json      the reference facts a reader signed, per predicate (step 7); absent until drafted
   case.json       metadata, plus the sources array declaring the case's input
 ```
 
@@ -521,6 +522,32 @@ uv run python webapp/sitting.py --submitted-for anonymous
 
 Then the filled document opens with `Read by anonymous, submitted by <login>.`,
 so nobody later reads the file name as the author.
+
+### 7. Sign the reference facts
+
+A case may carry `facts.json` beside `model.json`: one row per fact the
+sources state, in the shape the assertion node proposes — a subject, a
+predicate, a value, a scope, a basis and the quotes that carry it — and a
+`disputed` list naming each blessed value the drafter reads the source as
+not establishing. An agent drafts both, and `drafted_by` says so. Nothing
+in the file is a reference until a person rules on it.
+
+Read the source, then rule on each row: does the source state this, about
+this subject, at this scope, with this basis? Write your GitHub login into
+the row's `reviewed_by` where it does. Correct the row first where it does
+not, or delete it. A row you are not sure about stays unsigned, and the
+lint names it rather than counting it. Then rule on each disputed value:
+set `ruling` to `change` or `keep` and sign it. Apply a `change` ruling to
+`model.json` and delete the entry; a `keep` ruling stays as a signed entry
+that says the question was asked.
+
+`python evals/verify_corpus.py` resolves every row through the assertion
+gate and prints how many rows each file holds and how many are unsigned.
+`tests/test_reference_facts.py` holds the rows to the blessed model: every
+control the model states or states absent must be reached by a row that
+agrees with it, and every row that states a control must land on one the
+model states, unless the pair is disputed. A file with an unsigned row skips
+that gate rather than passing it, so no figure can rest on a draft.
 
 ### A reader with no clone: one page out, one pull request back
 

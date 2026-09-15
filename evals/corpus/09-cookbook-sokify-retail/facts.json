@@ -1,0 +1,302 @@
+{
+  "case": "09-cookbook-sokify-retail",
+  "drafted_by": "agent-stand-in",
+  "rows": [
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:mobile-app-to-web-api:api-traffic",
+        "predicate": "transport-encryption",
+        "value": "absent",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The app talks to the web API over HTTP — not HTTPS"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "An explicit absence, stated: HTTP, not HTTPS.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:web-api",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Nobody here can tell me what the API does about authentication"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The speaker asked and nobody could answer: a hedged unknown on the API itself, which covers every inbound interaction. model.json holds unknown on each flow.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:fax-gateway-to-customer:confirmation-fax",
+        "predicate": "destination-verification",
+        "value": "absent",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The gateway dials the number stored against the order and nobody checks it arrived at the right place."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "An explicit absence, stated, and the one fact in the corpus that grades this predicate. It is not an authentication absence: the source says nothing about how the leg authenticates.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:user-database",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "whether the user database and the flat file are encrypted"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Raised and unanswered: hedged.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:delivery-address-flat-file",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "whether the user database and the flat file are encrypted"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Raised and unanswered: hedged.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "principal",
+        "subject": "catalogue spreadsheet macros",
+        "predicate": "authorization-grant",
+        "value": "send SQL statements that change prices and product copy",
+        "reason": null,
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "web API"
+          },
+          {
+            "kind": "operation",
+            "value": "write"
+          }
+        ],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The macros in it send SQL statements straight to the web API to change prices and product copy"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The source states writes: prices and product copy change. It states no reads, which is why the flow's operations value is disputed below.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:web-api",
+        "predicate": "internet-exposure",
+        "value": "internet-facing",
+        "reason": null,
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [],
+        "explanation": "Customers browse and order through the mobile app, there is no website, and the app talks to the web API over HTTP from customers' own devices.",
+        "exclusive": false
+      },
+      "rationale": "Inferred, as model.json's assumption records: the app on customers' own devices is the only channel and it reaches the API over HTTP.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:catalogue-spreadsheet",
+        "predicate": "network-membership",
+        "value": "boundary:marketing-office",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The spreadsheet lives on a marketing laptop in the office."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Stated placement: a marketing laptop in the office.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "entity:customer",
+        "predicate": "network-membership",
+        "value": "boundary:customer-device",
+        "reason": null,
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [],
+        "explanation": "Customers browse and order through the mobile app, and the model places the customer with the app on their own device.",
+        "exclusive": false
+      },
+      "rationale": "Inferred: the customer orders through an app on their own device.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:mobile-app",
+        "predicate": "network-membership",
+        "value": "boundary:customer-device",
+        "reason": null,
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [],
+        "explanation": "The app is the channel through which customers browse and order, and it reaches the web API over HTTP; the source names no other placement.",
+        "exclusive": false
+      },
+      "rationale": "Inferred, as model.json's assumption records.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:web-api",
+        "predicate": "network-membership",
+        "value": "boundary:sokify-internal-systems",
+        "reason": null,
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [],
+        "explanation": "The web API is one of Sokify's own systems and the source names no network segments.",
+        "exclusive": false
+      },
+      "rationale": "The source names no segment; the zone groups Sokify's own systems.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:sims",
+        "predicate": "network-membership",
+        "value": "boundary:sokify-internal-systems",
+        "reason": null,
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [],
+        "explanation": "SIMS is Sokify's own stock and inventory system and the source names no network segments.",
+        "exclusive": false
+      },
+      "rationale": "'Our stock and inventory system' is Sokify's own; no segment is named.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:fax-gateway",
+        "predicate": "network-membership",
+        "value": "boundary:sokify-internal-systems",
+        "reason": null,
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [],
+        "explanation": "The gateway is described as part of what SIMS does with an order; the source does not say whether it is operated in-house.",
+        "exclusive": false
+      },
+      "rationale": "The source does not say whether the gateway is in-house; model.json's note says so.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:user-database",
+        "predicate": "network-membership",
+        "value": "boundary:sokify-internal-systems",
+        "reason": null,
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [],
+        "explanation": "The web API keeps customers in the user database, and the source names no network segments.",
+        "exclusive": false
+      },
+      "rationale": "The web API keeps customers in it; no segment is named.",
+      "reviewed_by": null
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:delivery-address-flat-file",
+        "predicate": "network-membership",
+        "value": "boundary:sokify-internal-systems",
+        "reason": null,
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [],
+        "explanation": "The flat file is kept alongside SIMS, one of Sokify's own systems.",
+        "exclusive": false
+      },
+      "rationale": "Kept alongside SIMS, which is Sokify's own.",
+      "reviewed_by": null
+    }
+  ],
+  "disputed": [
+    {
+      "element_id": "flow:catalogue-spreadsheet-to-web-api:sql-statements",
+      "attribute": "operations",
+      "blessed": "read-write",
+      "proposed": "write",
+      "kind": "explicit-fact",
+      "basis": "The stated actions are changing prices and product copy, which are writes. Reads are not stated.",
+      "ruling": null,
+      "reviewed_by": null
+    }
+  ]
+}
