@@ -70,11 +70,16 @@ UNREVIEWED: dict[str, str] = {
     "02-iot-fleet-telemetry": (
         "18 STRIDE claims, waiting on a re-sitting rather than on a first "
         "reading. The sitting of 2026-09-12 read this case and signed four "
-        "files, one of them claims/asvs.json. The case no longer declares "
-        "ASVS — its precondition refutes an MQTT fleet — so that file is gone "
-        "and the signature cannot match. Nothing the reader read has changed. "
-        "A sitting over the current three files clears it, and #887 tracks "
-        "the lane the removed records leave unmeasured."
+        "files. Two of them moved. claims/asvs.json is gone, because the case "
+        "no longer declares ASVS — its precondition refutes an MQTT fleet — "
+        "and #887 tracks the lane the removed records leave unmeasured. "
+        "model.json changed under #931: Pub/Sub is now a Data Store the "
+        "gateway writes and the normalizer reads, in place of one flow from "
+        "the gateway to the normalizer, and the telemetry lake's "
+        "classification reads confidential with an assumption. **Something "
+        "the reader read has changed**: two flows and a store are new, and "
+        "no recorded mark names them. A sitting over the current three files "
+        "clears it."
     ),
     "03-batch-data-pipeline": "17 STRIDE claims, unread. Declares STRIDE only.",
     "04-ml-inference-service": (

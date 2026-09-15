@@ -57,8 +57,15 @@ from analysis_service.system_model import (
 )
 from analysis_service.validation import parse_and_validate
 from evals.harness.calibration import SCORED_LABELS, Label, LabelAnnotation
-from evals.harness.reference import MUST_FIND, AsvsDisposition, Tier
+from evals.harness.reference import MUST_FIND, AsvsDisposition, CorpusError, Tier
 from evals.harness.verbs import unknown_verbs
+from evals.reference_facts import (
+    FACTS_FILE,
+    drafted_cases,
+    facts_path,
+    load_facts,
+    reference_catalog,
+)
 
 SOURCE_KINDS = frozenset(get_args(SourceKind))
 
@@ -912,6 +919,7 @@ def check_case(case_dir: Path) -> list[str]:
         problems.append("model.json derives no boundary crossing")
 
     problems.extend(framework_issues(case_dir, meta, model))
+    problems.extend(_check_facts(case_dir, model, declared_sources(case_dir, meta)))
 
     # Only the packages this build carries: a declaration naming something else
     # has no record shape to check against, and :func:`framework_issues` has
@@ -925,6 +933,25 @@ def check_case(case_dir: Path) -> list[str]:
                 _check_claims(name, _load_json(path), element_ids, options[name])
             )
     return problems
+
+
+def _check_facts(
+    case_dir: Path, model: SystemModel, sources: Mapping[str, str]
+) -> Iterator[str]:
+    """The reference facts, where a case carries them, resolve against the case.
+
+    Through :func:`evals.reference_facts.reference_catalog`, which runs the
+    rows through the assertion resolver, so a quote the source does not carry
+    or a subject the model does not hold fails here as it does in CI. A case
+    with no facts file is not checked: the file is a sitting's product, and
+    its absence says nobody has drafted one.
+    """
+    if not facts_path(case_dir).is_file():
+        return
+    try:
+        reference_catalog(load_facts(case_dir), model, sources)
+    except CorpusError as exc:
+        yield f"{FACTS_FILE}: {exc}"
 
 
 def calibration_inputs() -> tuple[
@@ -1144,6 +1171,13 @@ def main() -> int:
         return 0
 
     failures = 0
+    for case_dir in drafted_cases(CORPUS_DIR):
+        facts = load_facts(case_dir)
+        unsigned = sum(1 for row in facts.rows if row.reviewed_by is None)
+        print(
+            f"{case_dir.name}: {FACTS_FILE} holds {len(facts.rows)} rows,"
+            f" {unsigned} unsigned, {len(facts.disputed)} disputed"
+        )
     # Lane -> whether any case anywhere carries a must-find record for it. The
     # merge bar's second check is over the whole corpus, so it is accumulated
     # here rather than answered per case.
