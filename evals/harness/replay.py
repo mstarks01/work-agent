@@ -74,6 +74,7 @@ and a run confirms.
 
 from __future__ import annotations
 
+import statistics
 from collections import Counter, defaultdict
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -710,6 +711,12 @@ def pooled_extraction(sweeps: Sequence[SweepReplay]) -> dict[str, Any]:
     number of emissions in which it took a loss, with the losses it took. The
     count is the change's ceiling on that element, and the sum over a fate is
     its ceiling on the fate.
+
+    ``spread`` is what the ceiling is read against: the standard deviation of
+    each fate's per-sweep count, over the sweeps that ran every case the arm
+    holds, so a sweep the spend hold stopped short does not read as a loss.
+    A ceiling inside the spread gets no run (``evals/TUNING.md`` step 3).
+    ``None`` where fewer than two such sweeps exist.
     """
     counts: Counter[str] = Counter()
     by_type: dict[str, Counter[str]] = defaultdict(Counter)
@@ -738,6 +745,7 @@ def pooled_extraction(sweeps: Sequence[SweepReplay]) -> dict[str, Any]:
         "unparsed": unparsed,
         "extra": extra,
         "fates": {fate: counts[fate] for fate in FATES},
+        "spread": _spread(sweeps),
         # The same fates per element type, because the question a prompt
         # change asks is usually about one type: whether the actors were
         # dropped (#295), or the zones were invented.
@@ -750,6 +758,40 @@ def pooled_extraction(sweeps: Sequence[SweepReplay]) -> dict[str, Any]:
             {"element": element, "losses": sum(fates.values()), "by_fate": dict(fates)}
             for element, fates in targets
         ],
+    }
+
+
+def _spread(sweeps: Sequence[SweepReplay]) -> dict[str, Any]:
+    """Each fate's per-sweep standard deviation, whole and by element type."""
+    held = {replay.case_id for sweep in sweeps for replay in sweep.extractions}
+    full = [
+        sweep
+        for sweep in sweeps
+        if {replay.case_id for replay in sweep.extractions} == held
+    ]
+    totals: list[Counter[str]] = []
+    by_type: list[dict[str, Counter[str]]] = []
+    for sweep in full:
+        total: Counter[str] = Counter()
+        kinds: dict[str, Counter[str]] = defaultdict(Counter)
+        for replay in sweep.extractions:
+            for row in replay.fates:
+                total[row.fate] += 1
+                kinds[element_type(row.reference)][row.fate] += 1
+        totals.append(total)
+        by_type.append(kinds)
+
+    def sd(values: Sequence[int]) -> float | None:
+        return round(statistics.stdev(values), 2) if len(values) > 1 else None
+
+    kinds_seen = sorted({kind for kinds in by_type for kind in kinds})
+    return {
+        "sweeps": len(full),
+        "sd": {fate: sd([total[fate] for total in totals]) for fate in FATES},
+        "by_type": {
+            kind: {fate: sd([kinds[kind][fate] for kinds in by_type]) for fate in FATES}
+            for kind in kinds_seen
+        },
     }
 
 
@@ -934,6 +976,16 @@ def _render_extraction(pool: dict[str, Any], targets: int) -> None:
         per_kind = " ".join(f"{pool['by_type'][kind][fate]:>8}" for kind in kinds)
         total, mean = pool["fates"][fate], pool["fates"][fate] / per
         print(f"  {fate:<20} {total:>5} {mean:>9.1f}  {per_kind}")
+    spread = pool["spread"]
+    print(
+        f"  spread: sd of the per-sweep count over the {spread['sweeps']} sweep(s)"
+        " that ran every case; a ceiling inside it gets no run"
+    )
+    for fate in FATES:
+        per_kind = " ".join(
+            f"{_sd(spread['by_type'].get(kind, {}).get(fate)):>8}" for kind in kinds
+        )
+        print(f"  {fate:<20} {'':>5} {_sd(spread['sd'][fate]):>9}  {per_kind}")
     if pool["wrong_facts"]:
         listed = ", ".join(
             f"{key} {count}" for key, count in pool["wrong_facts"].items()
@@ -946,6 +998,10 @@ def _render_extraction(pool: dict[str, Any], targets: int) -> None:
                 f"{fate} {n}" for fate, n in sorted(target["by_fate"].items())
             )
             print(f"    {target['losses']:>3}  {target['element']}  ({fates})")
+
+
+def _sd(value: float | None) -> str:
+    return "-" if value is None else f"{value:.2f}"
 
 
 def _render_assertions(pool: dict[str, Any], targets: int) -> None:
