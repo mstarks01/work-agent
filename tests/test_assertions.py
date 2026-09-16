@@ -951,9 +951,19 @@ class TestResolvingAProposal:
         }
         return AssertionProposal(**{**fields, **overrides})
 
-    def resolve(self, *rows):
+    def resolve(self, *rows, sources=None):
         return resolve_catalog(
-            CatalogProposal(assertions=list(rows)), self.model(), SOURCES
+            CatalogProposal(assertions=list(rows)),
+            self.model(),
+            SOURCES if sources is None else sources,
+        )
+
+    def quoting(self, quote):
+        """One row quoting ``quote`` from :data:`REPEATED`, the twice-told source."""
+        return self.row(
+            predicate="transport-encryption",
+            value="TLS",
+            quotes=[QuoteProposal(source_label=REPEATED_LABEL, quote=quote)],
         )
 
     def test_a_resolved_catalog_raises_nothing_at_the_gate(self):
@@ -1093,46 +1103,17 @@ class TestResolvingAProposal:
         because "not found in the source" would send repair looking for a
         quote that is in there twice.
         """
-        held, issues = resolve_catalog(
-            CatalogProposal(
-                assertions=[
-                    self.row(
-                        predicate="transport-encryption",
-                        value="TLS",
-                        quotes=[
-                            QuoteProposal(
-                                source_label=REPEATED_LABEL,
-                                quote="the order service reads the bucket over TLS",
-                            )
-                        ],
-                    )
-                ]
-            ),
-            self.model(),
-            REPEATED_SOURCES,
+        held, issues = self.resolve(
+            self.quoting("the order service reads the bucket over TLS"),
+            sources=REPEATED_SOURCES,
         )
         assert held.entries == []
         assert codes(issues) == ["ambiguous-span"]
 
     def test_a_quote_the_source_holds_once_still_resolves(self):
         """The other half of the bound: one placement is not ambiguous."""
-        held, issues = resolve_catalog(
-            CatalogProposal(
-                assertions=[
-                    self.row(
-                        predicate="transport-encryption",
-                        value="TLS",
-                        quotes=[
-                            QuoteProposal(
-                                source_label=REPEATED_LABEL,
-                                quote="Receipts land in a bucket",
-                            )
-                        ],
-                    )
-                ]
-            ),
-            self.model(),
-            REPEATED_SOURCES,
+        held, issues = self.resolve(
+            self.quoting("Receipts land in a bucket"), sources=REPEATED_SOURCES
         )
         assert issues == []
         assert len(held.entries) == 1
