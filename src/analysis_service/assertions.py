@@ -76,6 +76,7 @@ from analysis_service.grounding import (
     index_source,
     locate_quote,
     normalize,
+    placements,
     verify_quote,
 )
 from analysis_service.references import canonical
@@ -271,8 +272,10 @@ class Predicate:
     ``meaning`` is the definition, held here rather than in a prompt or a guide
     so that schema validation, the consumers and the evaluation coverage all
     read one sentence. ``projects_into`` names the graph field this predicate
-    is authoritative for, or ``""`` where the graph has no field — which is
-    nine of the fourteen.
+    is authoritative for, or ``""`` where the graph has no field — which is the
+    majority of them, and :data:`UNPROJECTED` is the set rather than a count
+    written here. A count in this sentence went stale the day the registry
+    grew, and nothing read it (#941).
     """
 
     meaning: str
@@ -554,6 +557,7 @@ CatalogIssueCode = Literal[
     "dangling-source",
     "stale-digest",
     "unverifiable-span",
+    "ambiguous-span",
     "unassessed-assessor",
 ]
 
@@ -865,8 +869,8 @@ def projection_fields() -> Mapping[str, str]:
 
 #: The predicates the graph has no field for. **Where a fact is cited is a
 #: property of the predicate**: a predicate with a graph field reaches every
-#: reader through that field — ``control_state`` decides for eleven of the
-#: fifteen — so a second entry for it would be a second reader of one fact.
+#: reader through that field, so a second entry for it would be a second reader
+#: of one fact.
 #: A predicate here has no such field, so its rows are cited as themselves,
 #: through the **Evidence Catalog** (ADR 0036). Read off :data:`REGISTRY`, so
 #: a predicate added tomorrow is classified by its field and never listed.
@@ -1021,6 +1025,7 @@ def catalog_issues(
 
     issues = _subject_issues(catalog, model)
     by_id = {subject.id: subject for subject in catalog.subjects}
+    checked = _check(sources)
 
     # One identity per row, computed once. Four checks below read them, and
     # recomputing per check is how two of them would come to disagree.
@@ -1041,7 +1046,7 @@ def catalog_issues(
         if entry.predicate not in REGISTRY
     )
     for entry, identity in rows:
-        issues.extend(_entry_issues(entry, identity, by_id, sources))
+        issues.extend(_entry_issues(entry, identity, by_id, checked))
     issues.extend(_identity_issues(rows, identities))
     issues.extend(_cycle_issues(rows, identities))
     return issues
@@ -1095,7 +1100,7 @@ def _entry_issues(
     entry: Assertion,
     identity: str,
     by_id: Mapping[str, Subject],
-    sources: Mapping[str, str],
+    checked: Mapping[str, _Checked],
 ) -> list[CatalogIssue]:
     """Everything decidable about one assertion on its own."""
     predicate = REGISTRY[entry.predicate]
@@ -1171,7 +1176,7 @@ def _entry_issues(
     if entry.assessment != "unchecked" and not entry.assessor:
         refuse("unassessed-assessor", "an assessment names who made it")
 
-    issues.extend(_span_issues(entry, identity, sources))
+    issues.extend(_span_issues(entry, identity, checked))
     return issues
 
 
@@ -1180,22 +1185,65 @@ def _kinds(entry: Assertion) -> frozenset[str]:
     return frozenset(qualifier.kind for qualifier in entry.scope)
 
 
+@dataclass(frozen=True)
+class _Checked:
+    """One source digested and folded once, for every span checked against it.
+
+    A catalog carries many spans and a job carries few sources, so the work
+    belongs to the source — the argument :class:`SpanSource` already makes for
+    the resolver's side. A digest recomputed per span reads the whole
+    submission once per span: at :data:`MAX_ASSERTIONS` rows of
+    :data:`MAX_SPANS` spans that is 4000 reads of one text, measured at 0.77 s
+    against 0.00018 s for one, over the 100 KiB ``max_source_bytes`` admits.
+    """
+
+    text: str
+    digest: str
+    haystack: str
+
+
+def _check(sources: Mapping[str, str]) -> Mapping[str, _Checked]:
+    """Every source prepared once for the span checks."""
+    return {
+        label: _Checked(text, text_digest(text), normalize(text))
+        for label, text in sources.items()
+    }
+
+
 def _span_issues(
-    entry: Assertion, identity: str, sources: Mapping[str, str]
+    entry: Assertion, identity: str, checked: Mapping[str, _Checked]
 ) -> list[CatalogIssue]:
-    """Whether each span still names the words it was taken from.
+    """Whether each span still names the words it was taken from, and only them.
 
     Skipped where the caller supplied no sources, which is the one case a
     reader has to know about: without the text there is nothing to check a
     quote against, and inventing a pass would be the failure this module exists
     to prevent.
+
+    The last check is the one a reader does not expect. Offsets that hold the
+    quote are not yet offsets that *name* it: a submission that says one thing
+    twice holds the quote in both places, and a span into the first copy says
+    nothing about which copy the row rests on. #926 asks that such a quote keep
+    its ambiguity, so the gate refuses it rather than let the matcher's choice
+    of the first placement stand as a citation.
+
+    **It asks that of a span's own fragment, which is weaker than asking it of
+    the quote.** A quote that marks a cut takes one span per fragment, and the
+    cut's ordering — each fragment after the last — can pin a sequence whose
+    fragments repeat on their own. This sees the fragment, so it refuses that
+    row where the sequence had already resolved it. The stronger question
+    needs the whole quote, which only the resolver still holds; asking the
+    weaker one here and saying so beats a gate that passes what it cannot
+    check. Measured on 2026-09-16: **no assertion quote in the corpus or the
+    archive marks a cut**, over 79 signed and 829 archived, so the case is
+    unobserved rather than handled.
     """
-    if not sources:
+    if not checked:
         return []
     issues = []
     for span in entry.support:
-        text = sources.get(span.source_label)
-        if text is None:
+        source = checked.get(span.source_label)
+        if source is None:
             issues.append(
                 CatalogIssue(
                     code="dangling-source",
@@ -1204,7 +1252,7 @@ def _span_issues(
                 )
             )
             continue
-        if span.digest != text_digest(text):
+        if span.digest != source.digest:
             issues.append(
                 CatalogIssue(
                     code="stale-digest",
@@ -1214,13 +1262,24 @@ def _span_issues(
                 )
             )
             continue
-        window = text[span.start : span.end]
-        if span.end > len(text) or not verify_quote(span.quote, window):
+        window = source.text[span.start : span.end]
+        if span.end > len(source.text) or not verify_quote(span.quote, window):
             issues.append(
                 CatalogIssue(
                     code="unverifiable-span",
                     message=f"offsets {span.start}-{span.end} of"
                     f" {span.source_label!r} do not hold this quote",
+                    assertion=identity,
+                )
+            )
+            continue
+        if placements(span.quote, source.haystack) > 1:
+            issues.append(
+                CatalogIssue(
+                    code="ambiguous-span",
+                    message=f"source {span.source_label!r} holds this quote in more"
+                    " than one place, so these offsets name no one of them; quote"
+                    " enough of the source to say which",
                     assertion=identity,
                 )
             )
@@ -1422,6 +1481,7 @@ def resolve_catalog(
             )
         ]
     prepared = _prepare(sources)
+    checked = _check(sources)
     element_ids = [element.id for element in model.elements()]
     labels = {element.id: element.name for element in model.elements()}
 
@@ -1431,7 +1491,7 @@ def resolve_catalog(
 
     for index, row in enumerate(proposal.assertions):
         resolved = _resolve_row(
-            index, row, element_ids, labels, subjects, prepared, sources, issues
+            index, row, element_ids, labels, subjects, prepared, checked, issues
         )
         if resolved is None:
             continue
@@ -1468,7 +1528,7 @@ def _resolve_row(
     labels: Mapping[str, str],
     subjects: dict[str, Subject],
     prepared: Mapping[str, SpanSource],
-    sources: Mapping[str, str],
+    checked: Mapping[str, _Checked],
     issues: list[CatalogIssue],
 ) -> tuple[str, Assertion] | None:
     """One proposed row as an assertion, or ``None`` with the reasons recorded.
@@ -1506,7 +1566,7 @@ def _resolve_row(
         if referent is None:
             drop(
                 "illegal-value",
-                f"{value!r} names no {predicate.value} this predicate takes",
+                f"{value!r} names no {_referent_type(predicate)} this predicate takes",
             )
             return None
         value = referent.id
@@ -1527,7 +1587,7 @@ def _resolve_row(
     if referent is not None:
         declared[referent.id] = referent
     identity = assertion_id(entry)
-    refused = _entry_issues(entry, identity, declared, sources)
+    refused = _entry_issues(entry, identity, declared, checked)
     if refused:
         for issue in refused:
             drop(issue.code, issue.message)

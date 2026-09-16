@@ -308,13 +308,19 @@ def fragments(quote: str) -> tuple[str, ...]:
     return tuple(raw.strip() for raw in _ELLIPSIS.split(quote) if normalize(raw))
 
 
-def match_normalized(quote: str, haystack: str) -> tuple[tuple[int, int], ...] | None:
+def match_normalized(
+    quote: str, haystack: str, *, start: int = 0
+) -> tuple[tuple[int, int], ...] | None:
     """Where each of ``quote``'s fragments sits in ``haystack``, or ``None``.
 
-    **The one reader of "is this quote in this source", for both callers of
-    that question.** :func:`verify_normalized` asks whether the answer exists
-    and :func:`locate_quote` asks where it is, so neither can accept a quote
-    the other rejects.
+    **The one reader of "is this quote in this source", for every caller of
+    that question.** :func:`verify_normalized` asks whether the answer exists,
+    :func:`locate_quote` asks where it is, and :func:`placements` asks how many
+    answers there are, so no two of them can accept a quote a third rejects.
+
+    ``start`` is where the search opens, so :func:`placements` can ask for the
+    next placement without a matcher of its own. It defaults to the head of the
+    source, which is what the other two callers ask for.
 
     The fifth rung: ``…`` splits the quote into fragments, each of which must
     appear **in order, after the last**. A quote marking a cut is a *sequence*
@@ -331,7 +337,7 @@ def match_normalized(quote: str, haystack: str) -> tuple[tuple[int, int], ...] |
     normalization, in the order the quote wrote them.
     """
     found_at: list[tuple[int, int]] = []
-    cursor = 0
+    cursor = start
     for raw in fragments(quote):
         fragment = normalize(raw)
         found = haystack.find(fragment, cursor)
@@ -340,6 +346,43 @@ def match_normalized(quote: str, haystack: str) -> tuple[tuple[int, int], ...] |
         cursor = found + len(fragment)
         found_at.append((found, cursor))
     return tuple(found_at) or None
+
+
+def placements(quote: str, haystack: str, *, limit: int = 2) -> int:
+    """How many places in ``haystack`` the whole of ``quote`` can sit.
+
+    **A quote that fits in two places names neither of them.** The matcher
+    takes the first placement, which is an answer rather than the answer: a
+    sentence the submission repeats — a boilerplate line, a heading, a row
+    spelled the same way twice — yields offsets into the first copy and says
+    nothing about which copy the statement rests on. #926 asks that such a
+    quote keep its ambiguity rather than resolve it by position, and this is
+    the reader that sees it.
+
+    Counted through :func:`match_normalized` from a moving start rather than
+    by a search of its own, so a placement this counts is a placement that
+    function would accept. A quote marking a cut counts a placement per
+    position its **first** fragment can open at with the rest still following,
+    which is the question a span asks: where do these words begin.
+
+    ``limit`` stops the count, because every caller asks whether there is more
+    than one. It bounds the work at a repeated source rather than letting a
+    line repeated a thousand times cost a thousand scans.
+
+    Measured on 2026-09-16 over every quote this repository holds: **0 of the
+    79 signed corpus quotes and 0 of the 829 archived model-proposed quotes
+    sit in more than one place.** So the refusal built on this costs nothing
+    today, and it is the silent wrong citation it prevents that earns it.
+    """
+    found = 0
+    cursor = 0
+    while found < limit:
+        matched = match_normalized(quote, haystack, start=cursor)
+        if matched is None:
+            break
+        found += 1
+        cursor = matched[0][0] + 1
+    return found
 
 
 #: A word of a source, for the offset table :func:`index_source` builds. Nothing

@@ -58,10 +58,9 @@ from analysis_service.assertions import (
     SUBJECT_PREFIXES,
     AssertionCatalog,
     AssertionProposal,
+    AssertionRecord,
     CatalogProposal,
     QualifierKind,
-    catalog_issues,
-    resolve_catalog,
     subject_id,
 )
 from analysis_service.system_model import SystemModel
@@ -260,8 +259,14 @@ def reference_catalog(
 ) -> AssertionCatalog:
     """The rows resolved against the case's own blessed model and sources.
 
-    Through the same resolver a produced proposal goes through, so a reference
-    row that would not survive as a produced row cannot stand as a reference.
+    Through :meth:`~analysis_service.assertions.AssertionRecord.of`, which is
+    the one reader of what a proposal comes to: the production ``prepare``
+    node, the assertion eval mode and the offline replay all ask it, and a
+    reference row that would not survive as a produced row cannot stand as a
+    reference. This asked the resolver and the gate itself until a checkpoint
+    round found the two steps spelled here as well, where a third step added
+    to that rule would have reached production and missed the corpus.
+
     Any refusal — a quote the source does not carry, a subject the model does
     not hold, a value the predicate does not admit — is a corpus error here,
     because a reference the gate would refuse measures nothing.
@@ -272,14 +277,13 @@ def reference_catalog(
     through.
     """
     proposal = CatalogProposal(assertions=[row.assertion for row in facts.rows])
-    catalog, issues = resolve_catalog(proposal, model, sources)
-    issues = [*issues, *catalog_issues(catalog, model=model, sources=sources)]
-    if issues:
+    record = AssertionRecord.of(proposal, model, sources)
+    if record.issues:
         listed = "; ".join(
             f"row {issue.row}: {issue.code}: {issue.message}"
             if issue.row is not None
             else f"{issue.code}: {issue.message}"
-            for issue in issues
+            for issue in record.issues
         )
         raise CorpusError(f"{facts.case}: {FACTS_FILE} does not resolve: {listed}")
-    return catalog
+    return record.catalog
