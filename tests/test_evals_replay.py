@@ -489,6 +489,41 @@ class TestTheArchivedEmissionsReplay:
         )
         assert pool["by_type"]["flow"]["endpoint_unaligned"] > 0
 
+    def test_an_arm_is_the_model_that_answered_the_node_not_the_tier_table(
+        self, tmp_path
+    ):
+        """Two sweeps on one tier table are two arms when the node ran on two tiers."""
+        source = EMISSIONS / "20260914T201030Z-assert-model-benchmark" / "luna-r1.json"
+        luna = replay.arm_of(load_artifact(source))
+        raw = json.loads(source.read_text("utf-8"))
+        terra_model = "openrouter/openai/gpt-5.6-terra"
+        for execution in raw["provenance"]["node_runs"]["assert"]:
+            execution["tier"] = "strong"
+            execution["requested_model"] = terra_model
+            execution["served_model"] = terra_model
+        # The fingerprint the loader recomputes for that route and tier, so the
+        # edited copy is a consistent artifact rather than a refused one.
+        terra_fingerprint = (
+            "16dcff0b2bbb77672bdf209bd81bee3a2a4b78dd73b680ee1df2ada91013363f"
+        )
+        for execution in raw["provenance"]["node_runs"]["assert"]:
+            execution["generation_fingerprint"] = terra_fingerprint
+        identities = raw["provenance"]["generation_identities"]
+        identities["strong"] = identities.pop("base") | {
+            "requested_models": [terra_model],
+            "served_models": [terra_model],
+            "fingerprints": [terra_fingerprint],
+        }
+        moved = tmp_path / "terra-r1.json"
+        moved.write_text(json.dumps(raw), "utf-8")
+
+        terra = replay.arm_of(load_artifact(moved))
+
+        assert luna.models == ("openrouter/openai/gpt-5.6-luna",)
+        assert terra.models == ("openrouter/openai/gpt-5.6-terra",)
+        assert terra.instruction == luna.instruction
+        assert terra != luna
+
     def test_the_spread_is_read_over_the_sweeps_that_ran_every_case(self, corpus):
         """A ceiling is priced against the sd of the fate's per-sweep count."""
         sweeps = [
