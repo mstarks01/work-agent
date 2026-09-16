@@ -500,24 +500,27 @@
           "control-plane account",
           "accounts in the production control plane"
         ],
-        "ruling": "The same account class without the article, and its plural in the production control plane; the source names the rights an account in the control plane holds.",
-        "reviewed_by": null
+        "ruling": "The same account class without the article, and its plural in the production control plane; the source names the rights an account in the control plane holds. Accepted as names for the principal category; the plural is not proof that every account has the stated rights.",
+        "reviewed_by": "mstarks01"
       },
       {
         "subject": "principal:a-corporate-laptop",
         "names": [
           "corporate laptop"
         ],
-        "ruling": "The same laptop without the article; the source says 'A corporate laptop holds none of those rights'.",
-        "reviewed_by": null
+        "ruling": "The same laptop without the article; the source says 'A corporate laptop holds none of those rights'. Accepted.",
+        "reviewed_by": "mstarks01"
       },
       {
         "subject": "principal:another-company",
         "names": [
           "scheduling partner"
         ],
-        "ruling": "The source: 'A scheduling partner, which is another company'. The partner is the other company the platform's ownership points at.",
-        "reviewed_by": null
+        "ruling": "The source: 'A scheduling partner, which is another company'. The partner is the other company the platform's ownership points at. Accepted only for the ownership value on the scheduling partner's platform, where the source identifies that partner as another company; not a general alias for other 'another company' subjects or other ownership relationships.",
+        "reviewed_by": "mstarks01",
+        "within": [
+          "boundary:scheduling-partner-platform"
+        ]
       }
     ],
     "qualifiers": []

@@ -163,3 +163,7 @@ online shop through its web API, and HTTP alone establishes no exposure.
 `macros` and `spreadsheet macros` are aliases for `process:catalogue-spreadsheet`:
 the executable macros implement the spreadsheet's SQL writes, and a separate
 spreadsheet process is not required when they represent its behaviour.
+
+## Ruling of 2026-09-16 (#961 step 6): no alias for the macros' grant
+
+The model wrote the spreadsheet's grant on `marketing` and on `customers`. Marketing operates the macros and customers are different actors; neither is a subject alias for the macros, and no alias is drafted.
