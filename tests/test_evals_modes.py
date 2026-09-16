@@ -2043,14 +2043,14 @@ class TestTheFalsificationFixtures:
         assert score.interaction_recall < 1.0
         assert score.crossings_match is False
 
-    def test_renaming_the_hard_elements_shows_as_lost_coverage(self):
-        """Agreement can be bought by dropping the facts that are hard to get right.
+    def test_renaming_the_hard_elements_no_longer_buys_agreement(self):
+        """Agreement cannot be bought by renaming the facts that are hard to get right.
 
-        ``_check_attributes`` joins on the exact element ID, so renaming case
-        01's five flows takes all 25 of their scored fields out of the
-        numerator *and* the denominator. Agreement stays perfect over the 22
-        that are left, and ``comparison_coverage`` is what stops that reading
-        like a perfect model.
+        ``_check_attributes`` joins on the alignment. Renaming case 01's
+        five flows once took all 25 of their scored fields out of the
+        numerator *and* the denominator, and agreement read perfect over the
+        22 left. Rule 6 pairs each renamed flow as the sole flow between its
+        found endpoints, so the nonsense on it is compared and charged.
         """
         case = self.case_01()
         model = case.model.model_copy(deep=True)
@@ -2064,9 +2064,9 @@ class TestTheFalsificationFixtures:
 
         score = self.score(case, model)
 
-        assert score.scored_field_agreement == 1.0
-        assert score.attributes_compared < score.attributes_comparable
-        assert score.comparison_coverage < 0.5
+        assert score.scored_field_agreement < 1.0
+        assert score.attributes_compared == score.attributes_comparable
+        assert {pair.evidence for pair in score.alignment.pairs} == {"exact", "sole"}
 
     def test_collapsing_every_zone_moves_the_partition_not_the_name(self):
         """One zone for everything keeps every zone name the reference holds."""

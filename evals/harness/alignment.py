@@ -21,14 +21,29 @@ rather than guessing.
 2. **Alias.** A node or zone under a name a reader ruled supported, from the
    case's own ``aliases``. The alias keeps its element's type, and a produced
    element already paired exactly is not available to an alias.
-3. **Label.** A flow between aligned endpoints carrying the reference flow's
-   own label. The endpoints resolved through rules 1 and 2, so a flow whose
-   endpoint was renamed under a ruling is still that flow.
-4. **Discriminated.** A flow between aligned endpoints under a different label,
+3. **Membership.** A zone under any name, when one unpaired produced zone
+   holds more of the reference zone's paired members than any other. A zone's
+   name is a word the model coins for a partition; which elements sit in it
+   is the fact, and the partition-agreement figure already reads it that way.
+   A tie, or one produced zone that two reference zones both claim, is listed
+   and paired with nothing.
+4. **Label.** A flow between aligned endpoints carrying the reference flow's
+   own label, or a label a reader ruled an alias for that flow. The endpoints
+   resolved through rules 1 to 3, so a flow whose endpoint was renamed under a
+   ruling is still that flow.
+5. **Discriminated.** A flow between aligned endpoints under a different label,
    when exactly one reference flow and exactly one produced flow there agree
    on every discriminator in :data:`FLOW_DISCRIMINATORS`. A label is a word the
    model coins for an interaction; the operation and whether a protocol is
    stated are facts about it.
+6. **Sole.** The only reference flow and the only produced flow between an
+   aligned endpoint pair, when the labels and the discriminators both differ.
+   One interaction on each side between two found elements is one interaction
+   described twice, and the facts that differ are charged as wrong facts on
+   the pair rather than as an element lost and an element invented (#961 step
+   6). Only where each side holds one flow in all: a produced interaction
+   beside a paired one is not the sole flow, so a fabricated parallel stays
+   unpaired.
 
 Anything else stays unaligned. Two flows on either side that the discriminators
 cannot tell apart are recorded in :attr:`Alignment.ambiguous` and paired with
@@ -36,11 +51,13 @@ nothing, so a split or a merge is a listed fact rather than a silent choice.
 
 ## What this is not
 
-Not a fuzzy match. No rule reads name similarity, and no rule pairs two flows
-on their endpoints alone: an invented interaction between two real elements is
-an invention, and rule 4 says so by leaving it unpaired. The strict figures
-stay beside the aligned ones, so nothing here rewrites a number an archived
-sweep reported.
+Not a fuzzy match. No rule reads name similarity. Rules 3 and 6 read
+structure — who sits in a zone, what sits between two endpoints — and each
+pair records which rule made it, so a figure can be read with or without
+them. A produced interaction beside a real one between the same endpoints is
+still an invention: rule 6 pairs only where each side holds one in all. The
+strict figures stay beside the aligned ones, so nothing here rewrites a
+number an archived sweep reported.
 """
 
 from __future__ import annotations
@@ -60,8 +77,15 @@ from analysis_service.system_model import (
 from evals.harness.reference import GoldenCase
 
 #: What a pair rests on, in the order the rules run.
-Evidence = Literal["exact", "alias", "label", "discriminated"]
-EVIDENCE: tuple[Evidence, ...] = ("exact", "alias", "label", "discriminated")
+Evidence = Literal["exact", "alias", "membership", "label", "discriminated", "sole"]
+EVIDENCE: tuple[Evidence, ...] = (
+    "exact",
+    "alias",
+    "membership",
+    "label",
+    "discriminated",
+    "sole",
+)
 
 
 def protocol_state(value: Any) -> str:
@@ -216,6 +240,7 @@ def align(case: GoldenCase, produced: SystemModel | None) -> Alignment:
     pairs: list[Pair] = []
     ambiguous: list[Ambiguity] = []
     _align_nodes(case, reference_ids, produced_ids, pairs, ambiguous)
+    _align_zones(case.model, produced, pairs, ambiguous)
     _align_flows(case, produced, pairs, ambiguous)
     aligned = {pair.reference for pair in pairs}
     found = {pair.produced for pair in pairs}
@@ -275,6 +300,53 @@ def _nodes(element_ids: Iterable[str]) -> Iterable[str]:
     )
 
 
+def _align_zones(
+    reference: SystemModel,
+    produced: SystemModel,
+    pairs: list[Pair],
+    ambiguous: list[Ambiguity],
+) -> None:
+    """Rule 3: an unpaired zone by where its paired members sit."""
+    produced_of = {pair.reference: pair.produced for pair in pairs}
+    taken = {pair.produced for pair in pairs}
+    zone_of = {
+        element.id: element.trust_zone
+        for element in produced.zoned_elements()
+        if element.trust_zone
+    }
+    held = {zone.id for zone in produced.trust_boundaries} - taken
+    claims: dict[str, str] = {}
+    for zone in reference.trust_boundaries:
+        if zone.id in produced_of:
+            continue
+        votes = Counter(
+            zone_of[produced_of[member.id]]
+            for member in reference.zoned_elements()
+            if member.trust_zone == zone.id
+            and member.id in produced_of
+            and zone_of.get(produced_of[member.id]) in held
+        )
+        if not votes:
+            continue
+        ranked = votes.most_common()
+        top = [candidate for candidate, n in ranked if n == ranked[0][1]]
+        if len(top) == 1:
+            claims[zone.id] = top[0]
+        else:
+            ambiguous.append(Ambiguity((zone.id,), tuple(sorted(top))))
+    per_produced = Counter(claims.values())
+    for reference_id, produced_id in sorted(claims.items()):
+        if per_produced[produced_id] == 1:
+            pairs.append(Pair(reference_id, produced_id, "membership"))
+    for produced_id in sorted(p for p, n in per_produced.items() if n > 1):
+        ambiguous.append(
+            Ambiguity(
+                tuple(sorted(r for r, p in claims.items() if p == produced_id)),
+                (produced_id,),
+            )
+        )
+
+
 def _align_flows(
     case: GoldenCase,
     produced: SystemModel,
@@ -326,7 +398,17 @@ def _align_flows(
                 rest.append(flow)
             else:
                 pairs.append(Pair(flow.id, ruled[0].id, "alias", ruled[1]))
-        _discriminate(rest, list(by_label.values()), pairs, ambiguous)
+        left = list(by_label.values())
+        alone = len(reference_flows) == 1 and len(candidates) == 1
+        if alone and len(rest) == 1 and len(left) == 1:
+            evidence = (
+                "discriminated"
+                if _signature(rest[0]) == _signature(left[0])
+                else "sole"
+            )
+            pairs.append(Pair(rest[0].id, left[0].id, evidence))
+            continue
+        _discriminate(rest, left, pairs, ambiguous)
 
 
 def _label(flow: DataFlow) -> str:
