@@ -63,3 +63,7 @@ and removed the public-internet membership expectation. The zone stays in
 `model.json` because the schema requires one, and the colleague's and the
 store manager's placements are assumptions, so the replay reads the zone as a
 placeholder. `own-phones` may describe devices and does not establish a zone.
+
+## Alias rulings of 2026-09-16 (#961 step 6), signed in a session
+
+The maintainer ruled on five drafted qualifier rulings in `facts.json`: the rota, shift and export spellings accepted, bare `weekly rota` rejected because it drops the store restriction, and `view` and `collect` accepted as reads across the case's grants because each grant's resource and principal stay unchanged.

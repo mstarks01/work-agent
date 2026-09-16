@@ -396,15 +396,16 @@ def unsigned_rows(corpus_dir: Path, case: GoldenCase) -> int | None:
 
 @dataclass(frozen=True)
 class AliasTarget:
-    """What a signed subject alias rewrites to, and under which produced subjects.
+    """What a signed alias rewrites to, and under which produced subjects.
 
-    ``within`` bounds the rewrite of a *value* that names the alias: empty
-    means under any produced subject. A produced row whose own subject is
-    the alias is rewritten whatever its context, because the row is about
-    the thing itself.
+    ``within`` bounds the rewrite of a *value* that names a subject alias,
+    and of a scope qualifier under a qualifier alias: empty means under any
+    produced subject. A produced row whose own subject is the alias is
+    rewritten whatever its context, because the row is about the thing
+    itself.
     """
 
-    subject: str
+    to: str
     within: frozenset[str] = frozenset()
 
     def applies_under(self, produced_subject: str) -> bool:
@@ -417,14 +418,16 @@ class SignedReference:
 
     ``subject_aliases`` maps an alias subject ID to the reference's own and
     the context it holds under, and ``qualifier_aliases`` maps a qualifier's
-    kind and normalized alias spelling to the reference's value. Only a
-    signed alias is in either map: an unsigned one is a draft, and a draft
-    rewrites nothing.
+    kind and normalized alias spelling to the reference's value and its
+    context. Only a signed alias is in either map: an unsigned one is a
+    draft, and a draft rewrites nothing.
     """
 
     catalog: AssertionCatalog
     subject_aliases: Mapping[str, AliasTarget] = field(default_factory=dict)
-    qualifier_aliases: Mapping[tuple[str, str], str] = field(default_factory=dict)
+    qualifier_aliases: Mapping[tuple[str, str], AliasTarget] = field(
+        default_factory=dict
+    )
 
     @property
     def entries(self) -> list[Assertion]:
@@ -450,7 +453,9 @@ def signed_reference(corpus_dir: Path, case: GoldenCase) -> SignedReference | No
             for alias_id in ruling.alias_ids
         },
         qualifier_aliases={
-            (ruling.kind, normalize(name)): ruling.value
+            (ruling.kind, normalize(name)): AliasTarget(
+                ruling.value, frozenset(ruling.within)
+            )
             for ruling in facts.aliases.qualifiers
             if ruling.reviewed_by is not None
             for name in ruling.names
@@ -464,36 +469,30 @@ def under_aliases(produced: Assertion, reference: SignedReference) -> Assertion:
     The one place an alias is applied, before any comparison: the subject,
     a value that points at one of the layer's own subjects, and each scope
     qualifier are each rewritten to the reference's spelling where a signed
-    ruling names the produced one. A value is rewritten only under the
-    produced subjects the ruling holds for. Everything else is left as
-    written.
+    ruling names the produced one. A value and a qualifier are rewritten
+    only under the produced subjects the ruling holds for. Everything else
+    is left as written.
     """
     predicate = REGISTRY[produced.predicate]
     refers_to_own = predicate.value == "reference" and not (
         predicate.refers_to & GRAPH_BOUND
     )
     own = reference.subject_aliases.get(produced.subject)
-    subject = produced.subject if own is None else own.subject
+    subject = produced.subject if own is None else own.to
     value = produced.value
     target = reference.subject_aliases.get(value) if refers_to_own else None
     if target is not None and target.applies_under(subject):
-        value = target.subject
+        value = target.to
+    scope = []
+    for qualifier in produced.scope:
+        ruled = reference.qualifier_aliases.get(
+            (qualifier.kind, normalize(qualifier.value))
+        )
+        if ruled is not None and ruled.applies_under(subject):
+            qualifier = qualifier.model_copy(update={"value": ruled.to})
+        scope.append(qualifier)
     return produced.model_copy(
-        update={
-            "subject": subject,
-            "value": value,
-            "scope": [
-                qualifier.model_copy(
-                    update={
-                        "value": reference.qualifier_aliases.get(
-                            (qualifier.kind, normalize(qualifier.value)),
-                            qualifier.value,
-                        )
-                    }
-                )
-                for qualifier in produced.scope
-            ],
-        }
+        update={"subject": subject, "value": value, "scope": scope}
     )
 
 

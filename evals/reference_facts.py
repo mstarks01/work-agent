@@ -196,6 +196,10 @@ class QualifierAlias(BaseModel):
     kind: QualifierKind
     value: str = Field(min_length=1)
     names: list[str] = Field(min_length=1)
+    #: The produced subjects under which the spelling is rewritten; empty
+    #: means any row on the case. A reviewer who accepts "publish" as the
+    #: write in one principal's grant and not in another's states it here.
+    within: list[str] = Field(default_factory=list)
     ruling: str = Field(min_length=1)
     reviewed_by: str | None = None
 

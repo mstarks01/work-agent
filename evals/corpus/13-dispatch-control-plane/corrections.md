@@ -70,3 +70,7 @@ standing for the partner's organizational boundary.
 WebSocket flow `live-job-status` stands separately: the source explicitly adds
 a persistent WebSocket interaction, and one undifferentiated flow cannot
 receive credit for both reference flows.
+
+## Alias rulings of 2026-09-16 (#961 step 6), signed in a session
+
+The maintainer ruled on three drafted alias rulings in `facts.json`: the control-plane account and the corporate laptop under their names without the article, and `scheduling partner` for the other company only in the ownership value on the partner's platform (`within`).

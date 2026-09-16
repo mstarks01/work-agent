@@ -71,3 +71,7 @@ under a signed record; the case sitting for this case reads those claims.
 interaction zone; `external` is accepted only where its membership establishes
 the same meaning. `other team's backend` is an alias for `entity:calling-service`;
 `calling team's user` is not, because the backend makes the call.
+
+## Alias rulings of 2026-09-16 (#961 step 6), signed in a session
+
+The maintainer ruled on four drafted alias rulings in `facts.json`: `calling teams`, `shared group account` and `model artifacts` accepted with the caveats each ruling records, and the publish spellings accepted as the write under the ML engineers' grant only (`within`). Two candidates were not drafted: the API key under the group account's name, and the engineers under the model server's account.
