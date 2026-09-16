@@ -639,20 +639,23 @@ class TestCountingWhereAQuoteCanSit:
         assert placements("the same line", many) == 2
         assert placements("the same line", many, limit=5) == 5
 
-    def test_it_counts_only_placements_the_matcher_accepts(self):
+    @pytest.mark.parametrize(
+        "quote",
+        [
+            "Receipts land in a bucket",
+            "the order service reads over TLS",
+            "Nightly batch … over TLS",
+            "nothing like this",
+        ],
+    )
+    def test_it_counts_only_placements_the_matcher_accepts(self, quote):
         """One reader: a placement counted is a placement ``match_normalized`` takes.
 
         Counting with a search of its own is how the two would come to
         disagree about a quote that marks a cut.
         """
-        for quote in (
-            "Receipts land in a bucket",
-            "the order service reads over TLS",
-            "Nightly batch … over TLS",
-            "nothing like this",
-        ):
-            found = placements(quote, self.TWICE)
-            assert (found > 0) == (match_normalized(quote, self.TWICE) is not None)
+        counted = placements(quote, self.TWICE)
+        assert (counted > 0) == (match_normalized(quote, self.TWICE) is not None)
 
     def test_a_cut_quote_counts_where_its_first_fragment_opens(self):
         """A span asks where these words begin, so that is what is counted."""
