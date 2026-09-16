@@ -180,18 +180,19 @@ def repo_commit() -> RepoCommit:
     return RepoCommit(commit=commit, clean=clean)
 
 
-def corpus_digest() -> str:
+def corpus_digest(corpus_dir: Path = CORPUS_DIR) -> str:
     """One digest over every corpus file a number is computed from.
 
     Keyed on the path as well as the bytes, so a case renamed to another case's
     content moves the digest. Sorted, so it does not depend on how the
-    filesystem happened to walk.
+    filesystem happened to walk. ``corpus_dir`` is the shipped corpus unless a
+    replay names an earlier checkout of it, and the rule is the same either way.
     """
     digest = hashlib.sha256()
-    for path in sorted(CORPUS_DIR.rglob("*")):
+    for path in sorted(corpus_dir.rglob("*")):
         if not path.is_file() or _ungraded(path.name):
             continue
-        digest.update(path.relative_to(CORPUS_DIR).as_posix().encode("utf-8"))
+        digest.update(path.relative_to(corpus_dir).as_posix().encode("utf-8"))
         digest.update(hashlib.sha256(path.read_bytes()).digest())
     return digest.hexdigest()
 

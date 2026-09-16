@@ -1,0 +1,869 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:customer",
+        "name": "customer",
+        "description": "A customer who browses and places orders through the mobile app and receives a fax confirmation.",
+        "assets": [],
+        "source_excerpt": "Customers browse and order through our mobile app",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:customer-mobile-device"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:mobile-app",
+        "name": "mobile app",
+        "description": "Mobile application used by customers to browse and place orders.",
+        "assets": [],
+        "source_excerpt": "Customers browse and order through our mobile app",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "mobile application",
+        "trust_zone": "boundary:customer-mobile-device",
+        "exposure": "unknown",
+        "interface_kind": "non-web"
+      },
+      {
+        "id": "process:web-api",
+        "name": "web API",
+        "description": "API used by the mobile app, maintaining customer information and handing orders to SIMS.",
+        "assets": [
+          "pii",
+          "financial",
+          "business-critical-data"
+        ],
+        "source_excerpt": "The web API keeps customers in the user database",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "Nobody here can tell me what the API does about authentication.",
+        "technology": "API",
+        "trust_zone": "boundary:sokify",
+        "exposure": "internet-facing",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:sim",
+        "name": "SIMS",
+        "description": "Stock and inventory system that receives orders, writes delivery addresses, and sends dispatch notes.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "SIMS does two things with an order.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "stock and inventory system",
+        "trust_zone": "boundary:sokify",
+        "exposure": "unknown",
+        "interface_kind": "non-web"
+      },
+      {
+        "id": "process:fax-gateway",
+        "name": "fax gateway",
+        "description": "Gateway that receives dispatch notes and faxes customer confirmations.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "it sends a dispatch note to the fax gateway, which faxes the customer a confirmation",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The gateway dials the number stored against the order and nobody checks it arrived at the right place.",
+        "technology": "fax gateway",
+        "trust_zone": "boundary:sokify",
+        "exposure": "unknown",
+        "interface_kind": "non-web"
+      },
+      {
+        "id": "process:macros",
+        "name": "macros",
+        "description": "Macros in the marketing spreadsheet that send SQL statements to the web API to change prices and product copy.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "The macros in it send SQL statements straight to the web API to change prices and product copy",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "spreadsheet macros",
+        "trust_zone": "boundary:office",
+        "exposure": "unknown",
+        "interface_kind": "non-web"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:user-database",
+        "name": "user database",
+        "description": "Database containing customer names, addresses, and the cards they paid with.",
+        "assets": [
+          "pii",
+          "financial"
+        ],
+        "source_excerpt": "the user database: name, address, and the card they paid with",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "Nobody here can tell me whether the user database is encrypted.",
+        "technology": "database",
+        "trust_zone": "boundary:sokify",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:flat-file",
+        "name": "flat file",
+        "description": "Flat file kept alongside SIMS containing delivery addresses only.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "a flat file kept alongside it \u2014 only addresses go in that file, nothing else",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "Nobody here can tell me whether the flat file is encrypted.",
+        "technology": "flat file",
+        "trust_zone": "boundary:sokify",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:spreadsheet",
+        "name": "spreadsheet",
+        "description": "Marketing spreadsheet containing the catalogue and macros.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "Marketing keep the catalogue in a spreadsheet.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The spreadsheet lives on a marketing laptop in the office.",
+        "technology": "spreadsheet",
+        "trust_zone": "boundary:office",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:customer-to-mobile-app:browse-and-order",
+        "name": "browse and order",
+        "description": "Customer browsing and ordering through the mobile app.",
+        "assets": [],
+        "source_excerpt": "Customers browse and order through our mobile app",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:customer",
+        "destination": "process:mobile-app",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Browsing and order information",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:mobile-app-to-web-api:mobile-app-requests",
+        "name": "mobile app requests",
+        "description": "The mobile app communicates with the web API.",
+        "assets": [],
+        "source_excerpt": "The app talks to the web API over HTTP \u2014 not HTTPS",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:mobile-app",
+        "destination": "process:web-api",
+        "protocol": "HTTP",
+        "authentication": "unknown",
+        "data_description": "Browse and order requests",
+        "encryption_in_transit": "none",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:web-api-to-user-database:keep-customers",
+        "name": "keep customers",
+        "description": "The web API keeps customer records in the user database.",
+        "assets": [
+          "pii",
+          "financial"
+        ],
+        "source_excerpt": "The web API keeps customers in the user database",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:web-api",
+        "destination": "store:user-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Customer name, address, and payment card information",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:web-api-to-sims:hand-order",
+        "name": "hand order",
+        "description": "The web API hands an order over to SIMS.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "When an order is placed the API hands the order over to SIMS",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:web-api",
+        "destination": "process:sim",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Order",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:sims-to-flat-file:write-address",
+        "name": "write address",
+        "description": "SIMS writes the delivery address into the flat file.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "It writes the delivery address into a flat file",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:sim",
+        "destination": "store:flat-file",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Delivery address",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:sims-to-fax-gateway:send-dispatch-note",
+        "name": "send dispatch note",
+        "description": "SIMS sends a dispatch note to the fax gateway.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "it sends a dispatch note to the fax gateway",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:sim",
+        "destination": "process:fax-gateway",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Dispatch note containing customer name and address",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:fax-gateway-to-customer:fax-confirmation",
+        "name": "fax confirmation",
+        "description": "The fax gateway faxes the customer a confirmation containing their name and address.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "which faxes the customer a confirmation with their name and address on it",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The gateway dials the number stored against the order and nobody checks it arrived at the right place.",
+        "source": "process:fax-gateway",
+        "destination": "entity:customer",
+        "protocol": "fax",
+        "authentication": "none",
+        "data_description": "Confirmation with customer name and address",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:macros-to-web-api:change-catalogue",
+        "name": "change catalogue",
+        "description": "Spreadsheet macros send SQL statements to the web API to change prices and product copy.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "The macros in it send SQL statements straight to the web API to change prices and product copy",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:macros",
+        "destination": "process:web-api",
+        "protocol": "SQL",
+        "authentication": "unknown",
+        "data_description": "Price and product-copy changes",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:customer-mobile-device",
+        "name": "customer mobile device",
+        "description": "The customer-controlled mobile-device zone containing the customer and mobile app.",
+        "assets": [],
+        "source_excerpt": "Customers browse and order through our mobile app",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:sokify",
+        "name": "Sokify",
+        "description": "The Sokify-controlled system zone containing the web API, user database, SIMS, flat file, and fax gateway.",
+        "assets": [],
+        "source_excerpt": "Sokify sells socks online.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "other"
+      },
+      {
+        "id": "boundary:office",
+        "name": "office",
+        "description": "The office zone containing the marketing spreadsheet and its macros.",
+        "assets": [],
+        "source_excerpt": "The spreadsheet lives on a marketing laptop in the office.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The web API is internet-facing because the system sells socks online and the mobile app communicates with it.",
+        "element_id": "process:web-api",
+        "attribute": "exposure",
+        "basis": "The description says Sokify sells socks online and that the mobile app talks to the web API."
+      },
+      {
+        "assumption": "The customer and mobile app are in a customer-controlled device zone distinct from Sokify's systems.",
+        "element_id": "entity:customer",
+        "attribute": "trust_zone",
+        "basis": "The customer uses the mobile app, which is treated as running on the customer's mobile device."
+      },
+      {
+        "assumption": "The mobile app is in the customer-controlled device zone.",
+        "element_id": "process:mobile-app",
+        "attribute": "trust_zone",
+        "basis": "The app is described as a mobile app used by customers."
+      },
+      {
+        "assumption": "The mobile app presents a non-web interface.",
+        "element_id": "process:mobile-app",
+        "attribute": "interface_kind",
+        "basis": "The text describes it as a mobile app and separately identifies the web API as the web-facing interface."
+      },
+      {
+        "assumption": "The web API, user database, SIMS, flat file, and fax gateway are in the Sokify-controlled system zone.",
+        "element_id": "process:web-api",
+        "attribute": "trust_zone",
+        "basis": "These components are described as Sokify's internal order and dispatch components."
+      },
+      {
+        "assumption": "The user database is in the Sokify-controlled system zone.",
+        "element_id": "store:user-database",
+        "attribute": "trust_zone",
+        "basis": "It is described as the database kept by the web API."
+      },
+      {
+        "assumption": "SIMS is in the Sokify-controlled system zone.",
+        "element_id": "process:sim",
+        "attribute": "trust_zone",
+        "basis": "It is described as 'our stock and inventory system'."
+      },
+      {
+        "assumption": "The flat file is in the Sokify-controlled system zone.",
+        "element_id": "store:flat-file",
+        "attribute": "trust_zone",
+        "basis": "It is described as kept alongside SIMS."
+      },
+      {
+        "assumption": "The fax gateway is in the Sokify-controlled system zone.",
+        "element_id": "process:fax-gateway",
+        "attribute": "trust_zone",
+        "basis": "It is described as 'our fax gateway'."
+      },
+      {
+        "assumption": "The user database contains confidential data because it contains customer personal information and payment-card information.",
+        "element_id": "store:user-database",
+        "attribute": "data_classification",
+        "basis": "The stated contents are customer names, addresses, and the card they paid with."
+      },
+      {
+        "assumption": "The flat file contains confidential data because it contains delivery addresses.",
+        "element_id": "store:flat-file",
+        "attribute": "data_classification",
+        "basis": "The stated contents are delivery addresses."
+      },
+      {
+        "assumption": "The marketing spreadsheet and its macros are in the office network zone.",
+        "element_id": "store:spreadsheet",
+        "attribute": "trust_zone",
+        "basis": "The spreadsheet is stated to live on a marketing laptop in the office."
+      },
+      {
+        "assumption": "The spreadsheet macros are in the office network zone.",
+        "element_id": "process:macros",
+        "attribute": "trust_zone",
+        "basis": "The macros are stated to be in the spreadsheet, which lives on a marketing laptop in the office."
+      },
+      {
+        "assumption": "The spreadsheet macros present a non-web interface.",
+        "element_id": "process:macros",
+        "attribute": "interface_kind",
+        "basis": "They are spreadsheet macros that send SQL statements, not a web application."
+      },
+      {
+        "assumption": "SIMS presents a non-web interface.",
+        "element_id": "process:sim",
+        "attribute": "interface_kind",
+        "basis": "It is described as a stock and inventory system rather than a web application."
+      },
+      {
+        "assumption": "The fax gateway presents a non-web interface.",
+        "element_id": "process:fax-gateway",
+        "attribute": "interface_kind",
+        "basis": "It is described as a fax gateway."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:customer",
+        "name": "customer",
+        "description": "A customer who browses and places orders through the mobile app and receives a fax confirmation.",
+        "assets": [],
+        "source_excerpt": "Customers browse and order through our mobile app",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:customer-mobile-device"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:mobile-app",
+        "name": "mobile app",
+        "description": "Mobile application used by customers to browse and place orders.",
+        "assets": [],
+        "source_excerpt": "Customers browse and order through our mobile app",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "mobile application",
+        "trust_zone": "boundary:customer-mobile-device",
+        "exposure": "unknown",
+        "interface_kind": "non-web"
+      },
+      {
+        "id": "process:web-api",
+        "name": "web API",
+        "description": "API used by the mobile app, maintaining customer information and handing orders to SIMS.",
+        "assets": [
+          "pii",
+          "financial",
+          "business-critical-data"
+        ],
+        "source_excerpt": "The web API keeps customers in the user database",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "Nobody here can tell me what the API does about authentication.",
+        "technology": "API",
+        "trust_zone": "boundary:sokify",
+        "exposure": "internet-facing",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:sims",
+        "name": "SIMS",
+        "description": "Stock and inventory system that receives orders, writes delivery addresses, and sends dispatch notes.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "SIMS does two things with an order.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "stock and inventory system",
+        "trust_zone": "boundary:sokify",
+        "exposure": "unknown",
+        "interface_kind": "non-web"
+      },
+      {
+        "id": "process:fax-gateway",
+        "name": "fax gateway",
+        "description": "Gateway that receives dispatch notes and faxes customer confirmations.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "it sends a dispatch note to the fax gateway, which faxes the customer a confirmation",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The gateway dials the number stored against the order and nobody checks it arrived at the right place.",
+        "technology": "fax gateway",
+        "trust_zone": "boundary:sokify",
+        "exposure": "unknown",
+        "interface_kind": "non-web"
+      },
+      {
+        "id": "process:macros",
+        "name": "macros",
+        "description": "Macros in the marketing spreadsheet that send SQL statements to the web API to change prices and product copy.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "The macros in it send SQL statements straight to the web API to change prices and product copy",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "spreadsheet macros",
+        "trust_zone": "boundary:office",
+        "exposure": "unknown",
+        "interface_kind": "non-web"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:user-database",
+        "name": "user database",
+        "description": "Database containing customer names, addresses, and the cards they paid with.",
+        "assets": [
+          "pii",
+          "financial"
+        ],
+        "source_excerpt": "the user database: name, address, and the card they paid with",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "Nobody here can tell me whether the user database is encrypted.",
+        "technology": "database",
+        "trust_zone": "boundary:sokify",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:flat-file",
+        "name": "flat file",
+        "description": "Flat file kept alongside SIMS containing delivery addresses only.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "a flat file kept alongside it \u2014 only addresses go in that file, nothing else",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "Nobody here can tell me whether the flat file is encrypted.",
+        "technology": "flat file",
+        "trust_zone": "boundary:sokify",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:spreadsheet",
+        "name": "spreadsheet",
+        "description": "Marketing spreadsheet containing the catalogue and macros.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "Marketing keep the catalogue in a spreadsheet.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The spreadsheet lives on a marketing laptop in the office.",
+        "technology": "spreadsheet",
+        "trust_zone": "boundary:office",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:customer-to-mobile-app:browse-and-order",
+        "name": "browse and order",
+        "description": "Customer browsing and ordering through the mobile app.",
+        "assets": [],
+        "source_excerpt": "Customers browse and order through our mobile app",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:customer",
+        "destination": "process:mobile-app",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Browsing and order information",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:mobile-app-to-web-api:mobile-app-requests",
+        "name": "mobile app requests",
+        "description": "The mobile app communicates with the web API.",
+        "assets": [],
+        "source_excerpt": "The app talks to the web API over HTTP \u2014 not HTTPS",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:mobile-app",
+        "destination": "process:web-api",
+        "protocol": "HTTP",
+        "authentication": "unknown",
+        "data_description": "Browse and order requests",
+        "encryption_in_transit": "none",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:web-api-to-user-database:keep-customers",
+        "name": "keep customers",
+        "description": "The web API keeps customer records in the user database.",
+        "assets": [
+          "pii",
+          "financial"
+        ],
+        "source_excerpt": "The web API keeps customers in the user database",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:web-api",
+        "destination": "store:user-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Customer name, address, and payment card information",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:web-api-to-sims:hand-order",
+        "name": "hand order",
+        "description": "The web API hands an order over to SIMS.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "When an order is placed the API hands the order over to SIMS",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:web-api",
+        "destination": "process:sims",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Order",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:sims-to-flat-file:write-address",
+        "name": "write address",
+        "description": "SIMS writes the delivery address into the flat file.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "It writes the delivery address into a flat file",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:sims",
+        "destination": "store:flat-file",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Delivery address",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:sims-to-fax-gateway:send-dispatch-note",
+        "name": "send dispatch note",
+        "description": "SIMS sends a dispatch note to the fax gateway.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "it sends a dispatch note to the fax gateway",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:sims",
+        "destination": "process:fax-gateway",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Dispatch note containing customer name and address",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:fax-gateway-to-customer:fax-confirmation",
+        "name": "fax confirmation",
+        "description": "The fax gateway faxes the customer a confirmation containing their name and address.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "which faxes the customer a confirmation with their name and address on it",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The gateway dials the number stored against the order and nobody checks it arrived at the right place.",
+        "source": "process:fax-gateway",
+        "destination": "entity:customer",
+        "protocol": "fax",
+        "authentication": "none",
+        "data_description": "Confirmation with customer name and address",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:macros-to-web-api:change-catalogue",
+        "name": "change catalogue",
+        "description": "Spreadsheet macros send SQL statements to the web API to change prices and product copy.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "The macros in it send SQL statements straight to the web API to change prices and product copy",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:macros",
+        "destination": "process:web-api",
+        "protocol": "SQL",
+        "authentication": "unknown",
+        "data_description": "Price and product-copy changes",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:customer-mobile-device",
+        "name": "customer mobile device",
+        "description": "The customer-controlled mobile-device zone containing the customer and mobile app.",
+        "assets": [],
+        "source_excerpt": "Customers browse and order through our mobile app",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:sokify",
+        "name": "Sokify",
+        "description": "The Sokify-controlled system zone containing the web API, user database, SIMS, flat file, and fax gateway.",
+        "assets": [],
+        "source_excerpt": "Sokify sells socks online.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "other"
+      },
+      {
+        "id": "boundary:office",
+        "name": "office",
+        "description": "The office zone containing the marketing spreadsheet and its macros.",
+        "assets": [],
+        "source_excerpt": "The spreadsheet lives on a marketing laptop in the office.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The web API is internet-facing because the system sells socks online and the mobile app communicates with it.",
+        "element_id": "process:web-api",
+        "attribute": "exposure",
+        "basis": "The description says Sokify sells socks online and that the mobile app talks to the web API."
+      },
+      {
+        "assumption": "The customer and mobile app are in a customer-controlled device zone distinct from Sokify's systems.",
+        "element_id": "entity:customer",
+        "attribute": "trust_zone",
+        "basis": "The customer uses the mobile app, which is treated as running on the customer's mobile device."
+      },
+      {
+        "assumption": "The mobile app is in the customer-controlled device zone.",
+        "element_id": "process:mobile-app",
+        "attribute": "trust_zone",
+        "basis": "The app is described as a mobile app used by customers."
+      },
+      {
+        "assumption": "The mobile app presents a non-web interface.",
+        "element_id": "process:mobile-app",
+        "attribute": "interface_kind",
+        "basis": "The text describes it as a mobile app and separately identifies the web API as the web-facing interface."
+      },
+      {
+        "assumption": "The web API, user database, SIMS, flat file, and fax gateway are in the Sokify-controlled system zone.",
+        "element_id": "process:web-api",
+        "attribute": "trust_zone",
+        "basis": "These components are described as Sokify's internal order and dispatch components."
+      },
+      {
+        "assumption": "The user database is in the Sokify-controlled system zone.",
+        "element_id": "store:user-database",
+        "attribute": "trust_zone",
+        "basis": "It is described as the database kept by the web API."
+      },
+      {
+        "assumption": "SIMS is in the Sokify-controlled system zone.",
+        "element_id": "process:sims",
+        "attribute": "trust_zone",
+        "basis": "It is described as 'our stock and inventory system'."
+      },
+      {
+        "assumption": "The flat file is in the Sokify-controlled system zone.",
+        "element_id": "store:flat-file",
+        "attribute": "trust_zone",
+        "basis": "It is described as kept alongside SIMS."
+      },
+      {
+        "assumption": "The fax gateway is in the Sokify-controlled system zone.",
+        "element_id": "process:fax-gateway",
+        "attribute": "trust_zone",
+        "basis": "It is described as 'our fax gateway'."
+      },
+      {
+        "assumption": "The user database contains confidential data because it contains customer personal information and payment-card information.",
+        "element_id": "store:user-database",
+        "attribute": "data_classification",
+        "basis": "The stated contents are customer names, addresses, and the card they paid with."
+      },
+      {
+        "assumption": "The flat file contains confidential data because it contains delivery addresses.",
+        "element_id": "store:flat-file",
+        "attribute": "data_classification",
+        "basis": "The stated contents are delivery addresses."
+      },
+      {
+        "assumption": "The marketing spreadsheet and its macros are in the office network zone.",
+        "element_id": "store:spreadsheet",
+        "attribute": "trust_zone",
+        "basis": "The spreadsheet is stated to live on a marketing laptop in the office."
+      },
+      {
+        "assumption": "The spreadsheet macros are in the office network zone.",
+        "element_id": "process:macros",
+        "attribute": "trust_zone",
+        "basis": "The macros are stated to be in the spreadsheet, which lives on a marketing laptop in the office."
+      },
+      {
+        "assumption": "The spreadsheet macros present a non-web interface.",
+        "element_id": "process:macros",
+        "attribute": "interface_kind",
+        "basis": "They are spreadsheet macros that send SQL statements, not a web application."
+      },
+      {
+        "assumption": "SIMS presents a non-web interface.",
+        "element_id": "process:sims",
+        "attribute": "interface_kind",
+        "basis": "It is described as a stock and inventory system rather than a web application."
+      },
+      {
+        "assumption": "The fax gateway presents a non-web interface.",
+        "element_id": "process:fax-gateway",
+        "attribute": "interface_kind",
+        "basis": "It is described as a fax gateway."
+      }
+    ]
+  },
+  "issues": []
+}

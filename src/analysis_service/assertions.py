@@ -65,7 +65,7 @@ import json
 from collections.abc import Collection, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Literal, get_args
+from typing import Literal, NamedTuple, get_args
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -616,12 +616,38 @@ def assertion_id(assertion: Assertion) -> str:
     the value key depends on the predicate's value kind. :func:`catalog_issues`
     reports that case as ``unknown-predicate`` before anything asks for an ID.
     """
+    parts = identity_parts(assertion)
+    return f"assertion:{parts.predicate}~{parts.subject}~{parts.scope}~{parts.value}"
+
+
+class IdentityParts(NamedTuple):
+    """The four canonical parts :func:`assertion_id` composes, kept apart.
+
+    A reader matching rows across two catalogs asks about the parts one at a
+    time — the same subject and predicate at a different value is a
+    disagreement, at a different scope a narrower claim — and a composed ID
+    answers only whether all four agree. Read from here so the parts a match
+    reads are the parts the identity hashes.
+    """
+
+    predicate: str
+    subject: str
+    scope: str
+    value: str
+
+
+def identity_parts(assertion: Assertion) -> IdentityParts:
+    """One assertion's four identifying parts, each in its canonical key.
+
+    Raises ``KeyError`` for a predicate the registry does not hold, as
+    :func:`assertion_id` does and for the same reason.
+    """
     predicate = REGISTRY[assertion.predicate]
-    return (
-        f"assertion:{assertion.predicate}"
-        f"~{assertion.subject}"
-        f"~{_scope_key(assertion.scope)}"
-        f"~{_value_key(predicate, assertion.value)}"
+    return IdentityParts(
+        assertion.predicate,
+        assertion.subject,
+        _scope_key(assertion.scope),
+        _value_key(predicate, assertion.value),
     )
 
 

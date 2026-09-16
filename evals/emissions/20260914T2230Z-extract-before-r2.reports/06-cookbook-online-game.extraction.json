@@ -1,0 +1,739 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:players",
+        "name": "Players",
+        "description": "Players who run the game client on their own machines and play through it.",
+        "assets": [],
+        "source_excerpt": "Players run our game client on their own machines.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:player-machines"
+      },
+      {
+        "id": "entity:customer-support-staff",
+        "name": "customer support staff",
+        "description": "Customer support staff who use the moderation website to look at and act on player accounts.",
+        "assets": [],
+        "source_excerpt": "our customer support staff work from the corporate network",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:corporate-network"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:game-client",
+        "name": "game client",
+        "description": "The player-facing game client run by players on their own machines.",
+        "assets": [],
+        "source_excerpt": "Players run our game client on their own machines.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:player-machines",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:lobby",
+        "name": "lobby",
+        "description": "The production-network lobby used for matchmaking.",
+        "assets": [],
+        "source_excerpt": "It talks to the lobby on TCP 1234 for matchmaking",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:production-network",
+        "exposure": "internet-facing",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:game-servers",
+        "name": "game servers",
+        "description": "Production-network servers that handle matches.",
+        "assets": [],
+        "source_excerpt": "it talks directly to the game servers on TCP 1235",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:production-network",
+        "exposure": "internet-facing",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:moderation-website",
+        "name": "moderation website",
+        "description": "A website used by customer support staff to look at and act on player accounts.",
+        "assets": [],
+        "source_excerpt": "use a moderation website to look at and act on player accounts",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:player-database",
+        "name": "player database",
+        "description": "Database containing player account data.",
+        "assets": [],
+        "source_excerpt": "The lobby reads the player database to set up a match",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:production-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:stats-database",
+        "name": "stats database",
+        "description": "Database containing game statistics.",
+        "assets": [],
+        "source_excerpt": "The game servers read and write the stats database during and after a match",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:production-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:players-to-game-client:play",
+        "name": "player interaction with game client",
+        "description": "Players launch the client and play through it.",
+        "assets": [],
+        "source_excerpt": "The player launches the client and plays through it.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:players",
+        "destination": "process:game-client",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:game-client-to-lobby:matchmaking",
+        "name": "game client to lobby for matchmaking",
+        "description": "The game client connects to the lobby for matchmaking.",
+        "assets": [],
+        "source_excerpt": "It talks to the lobby on TCP 1234 for matchmaking",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:game-client",
+        "destination": "process:lobby",
+        "protocol": "TCP 1234",
+        "authentication": "unknown",
+        "data_description": "matchmaking",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:game-client-to-game-servers:match",
+        "name": "game client to game servers",
+        "description": "The game client connects directly to the game servers once a match starts.",
+        "assets": [],
+        "source_excerpt": "once a match starts it talks directly to the game servers on TCP 1235",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:game-client",
+        "destination": "process:game-servers",
+        "protocol": "TCP 1235",
+        "authentication": "unknown",
+        "data_description": "match gameplay",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:lobby-to-player-database:read",
+        "name": "lobby reads player database",
+        "description": "The lobby reads the player database to set up a match.",
+        "assets": [],
+        "source_excerpt": "The lobby reads the player database to set up a match",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:lobby",
+        "destination": "store:player-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "player data used to set up a match",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:lobby-to-game-servers:handoff",
+        "name": "lobby hands match to game servers",
+        "description": "The lobby hands the match over to the game servers.",
+        "assets": [],
+        "source_excerpt": "and hands the match over to the game servers.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:lobby",
+        "destination": "process:game-servers",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "match",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:game-servers-to-stats-database:stats",
+        "name": "game servers read and write stats database",
+        "description": "The game servers read and write the stats database during and after a match.",
+        "assets": [],
+        "source_excerpt": "The game servers read and write the stats database during and after a match",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:game-servers",
+        "destination": "store:stats-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "game statistics",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:game-servers-to-player-database:player-data",
+        "name": "game servers write player database",
+        "description": "The game servers write back to the player database.",
+        "assets": [],
+        "source_excerpt": "and they also write back to the player database.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:game-servers",
+        "destination": "store:player-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "player data",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:customer-support-staff-to-moderation-website:moderation",
+        "name": "customer support staff use moderation website",
+        "description": "Customer support staff use the moderation website to look at and act on player accounts.",
+        "assets": [],
+        "source_excerpt": "our customer support staff work from the corporate network and use a moderation website",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:customer-support-staff",
+        "destination": "process:moderation-website",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "player account activity",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:moderation-website-to-player-database:player-accounts",
+        "name": "moderation website reads and writes player database",
+        "description": "The moderation website reads and writes the player database directly.",
+        "assets": [],
+        "source_excerpt": "That website reads and writes the player database directly.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:moderation-website",
+        "destination": "store:player-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "player accounts",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:player-machines",
+        "name": "player machines",
+        "description": "Machines owned or controlled by players, outside the system operator's control.",
+        "assets": [],
+        "source_excerpt": "Players run our game client on their own machines. We do not control those machines.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:production-network",
+        "name": "production network",
+        "description": "The production network containing the lobby, game servers, and databases.",
+        "assets": [],
+        "source_excerpt": "two things in our production network",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:corporate-network",
+        "name": "corporate network",
+        "description": "The corporate network from which customer support staff work.",
+        "assets": [],
+        "source_excerpt": "our customer support staff work from the corporate network",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The players' own machines are a separate tenant-controlled trust zone because the text says the system operator does not control them.",
+        "element_id": "entity:players",
+        "attribute": "trust_zone",
+        "basis": "Players run the client on their own machines, and the text explicitly says, 'We do not control those machines.'"
+      },
+      {
+        "assumption": "The game client is in the player-machines trust zone because it runs on the players' own machines.",
+        "element_id": "process:game-client",
+        "attribute": "trust_zone",
+        "basis": "Players run our game client on their own machines."
+      },
+      {
+        "assumption": "The production network is a network trust boundary because the text identifies it as a distinct network location for production components.",
+        "element_id": "boundary:production-network",
+        "attribute": "kind",
+        "basis": "The text names a distinct 'production network'; no different controlling party or authority level is stated."
+      },
+      {
+        "assumption": "The lobby is in the production-network trust zone because it is one of the things in that network.",
+        "element_id": "process:lobby",
+        "attribute": "trust_zone",
+        "basis": "The client connects to 'two things in our production network,' including the lobby."
+      },
+      {
+        "assumption": "The game servers are in the production-network trust zone because they are one of the things in that network.",
+        "element_id": "process:game-servers",
+        "attribute": "trust_zone",
+        "basis": "The client connects to 'two things in our production network,' including the game servers."
+      },
+      {
+        "assumption": "The player database is in the production-network trust zone because the production services access it and the text does not identify another location.",
+        "element_id": "store:player-database",
+        "attribute": "trust_zone",
+        "basis": "The lobby and game servers access the player database; the described services are in the production network."
+      },
+      {
+        "assumption": "The stats database is in the production-network trust zone because the game servers access it and the text does not identify another location.",
+        "element_id": "store:stats-database",
+        "attribute": "trust_zone",
+        "basis": "The game servers read and write the stats database; the game servers are described as part of the production network."
+      },
+      {
+        "assumption": "The corporate network is a network trust boundary because the text identifies it as a distinct network location for support staff.",
+        "element_id": "boundary:corporate-network",
+        "attribute": "kind",
+        "basis": "The text names a distinct 'corporate network'; no different controlling party or authority level is stated."
+      },
+      {
+        "assumption": "The customer support staff are in the corporate-network trust zone because they work from that network.",
+        "element_id": "entity:customer-support-staff",
+        "attribute": "trust_zone",
+        "basis": "The text says customer support staff work from the corporate network."
+      },
+      {
+        "assumption": "The moderation website is in the corporate-network trust zone because it is used by staff working from that network and no other hosting location is stated.",
+        "element_id": "process:moderation-website",
+        "attribute": "trust_zone",
+        "basis": "The text says customer support staff work from the corporate network and use the moderation website."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:players",
+        "name": "Players",
+        "description": "Players who run the game client on their own machines and play through it.",
+        "assets": [],
+        "source_excerpt": "Players run our game client on their own machines.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:player-machines"
+      },
+      {
+        "id": "entity:customer-support-staff",
+        "name": "customer support staff",
+        "description": "Customer support staff who use the moderation website to look at and act on player accounts.",
+        "assets": [],
+        "source_excerpt": "our customer support staff work from the corporate network",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:corporate-network"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:game-client",
+        "name": "game client",
+        "description": "The player-facing game client run by players on their own machines.",
+        "assets": [],
+        "source_excerpt": "Players run our game client on their own machines.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:player-machines",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:lobby",
+        "name": "lobby",
+        "description": "The production-network lobby used for matchmaking.",
+        "assets": [],
+        "source_excerpt": "It talks to the lobby on TCP 1234 for matchmaking",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:production-network",
+        "exposure": "internet-facing",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:game-servers",
+        "name": "game servers",
+        "description": "Production-network servers that handle matches.",
+        "assets": [],
+        "source_excerpt": "it talks directly to the game servers on TCP 1235",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:production-network",
+        "exposure": "internet-facing",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:moderation-website",
+        "name": "moderation website",
+        "description": "A website used by customer support staff to look at and act on player accounts.",
+        "assets": [],
+        "source_excerpt": "use a moderation website to look at and act on player accounts",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:player-database",
+        "name": "player database",
+        "description": "Database containing player account data.",
+        "assets": [],
+        "source_excerpt": "The lobby reads the player database to set up a match",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:production-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:stats-database",
+        "name": "stats database",
+        "description": "Database containing game statistics.",
+        "assets": [],
+        "source_excerpt": "The game servers read and write the stats database during and after a match",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:production-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:players-to-game-client:player-interaction-with-game-client",
+        "name": "player interaction with game client",
+        "description": "Players launch the client and play through it.",
+        "assets": [],
+        "source_excerpt": "The player launches the client and plays through it.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:players",
+        "destination": "process:game-client",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:game-client-to-lobby:game-client-to-lobby-for-matchmaking",
+        "name": "game client to lobby for matchmaking",
+        "description": "The game client connects to the lobby for matchmaking.",
+        "assets": [],
+        "source_excerpt": "It talks to the lobby on TCP 1234 for matchmaking",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:game-client",
+        "destination": "process:lobby",
+        "protocol": "TCP 1234",
+        "authentication": "unknown",
+        "data_description": "matchmaking",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:game-client-to-game-servers:game-client-to-game-servers",
+        "name": "game client to game servers",
+        "description": "The game client connects directly to the game servers once a match starts.",
+        "assets": [],
+        "source_excerpt": "once a match starts it talks directly to the game servers on TCP 1235",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:game-client",
+        "destination": "process:game-servers",
+        "protocol": "TCP 1235",
+        "authentication": "unknown",
+        "data_description": "match gameplay",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:lobby-to-player-database:lobby-reads-player-database",
+        "name": "lobby reads player database",
+        "description": "The lobby reads the player database to set up a match.",
+        "assets": [],
+        "source_excerpt": "The lobby reads the player database to set up a match",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:lobby",
+        "destination": "store:player-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "player data used to set up a match",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:lobby-to-game-servers:lobby-hands-match-to-game-servers",
+        "name": "lobby hands match to game servers",
+        "description": "The lobby hands the match over to the game servers.",
+        "assets": [],
+        "source_excerpt": "and hands the match over to the game servers.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:lobby",
+        "destination": "process:game-servers",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "match",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:game-servers-to-stats-database:game-servers-read-and-write-stats-database",
+        "name": "game servers read and write stats database",
+        "description": "The game servers read and write the stats database during and after a match.",
+        "assets": [],
+        "source_excerpt": "The game servers read and write the stats database during and after a match",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:game-servers",
+        "destination": "store:stats-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "game statistics",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:game-servers-to-player-database:game-servers-write-player-database",
+        "name": "game servers write player database",
+        "description": "The game servers write back to the player database.",
+        "assets": [],
+        "source_excerpt": "and they also write back to the player database.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:game-servers",
+        "destination": "store:player-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "player data",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:customer-support-staff-to-moderation-website:customer-support-staff-use-moderation-website",
+        "name": "customer support staff use moderation website",
+        "description": "Customer support staff use the moderation website to look at and act on player accounts.",
+        "assets": [],
+        "source_excerpt": "our customer support staff work from the corporate network and use a moderation website",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:customer-support-staff",
+        "destination": "process:moderation-website",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "player account activity",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:moderation-website-to-player-database:moderation-website-reads-and-writes-player-database",
+        "name": "moderation website reads and writes player database",
+        "description": "The moderation website reads and writes the player database directly.",
+        "assets": [],
+        "source_excerpt": "That website reads and writes the player database directly.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:moderation-website",
+        "destination": "store:player-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "player accounts",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:player-machines",
+        "name": "player machines",
+        "description": "Machines owned or controlled by players, outside the system operator's control.",
+        "assets": [],
+        "source_excerpt": "Players run our game client on their own machines. We do not control those machines.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:production-network",
+        "name": "production network",
+        "description": "The production network containing the lobby, game servers, and databases.",
+        "assets": [],
+        "source_excerpt": "two things in our production network",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:corporate-network",
+        "name": "corporate network",
+        "description": "The corporate network from which customer support staff work.",
+        "assets": [],
+        "source_excerpt": "our customer support staff work from the corporate network",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The players' own machines are a separate tenant-controlled trust zone because the text says the system operator does not control them.",
+        "element_id": "entity:players",
+        "attribute": "trust_zone",
+        "basis": "Players run the client on their own machines, and the text explicitly says, 'We do not control those machines.'"
+      },
+      {
+        "assumption": "The game client is in the player-machines trust zone because it runs on the players' own machines.",
+        "element_id": "process:game-client",
+        "attribute": "trust_zone",
+        "basis": "Players run our game client on their own machines."
+      },
+      {
+        "assumption": "The production network is a network trust boundary because the text identifies it as a distinct network location for production components.",
+        "element_id": "boundary:production-network",
+        "attribute": "kind",
+        "basis": "The text names a distinct 'production network'; no different controlling party or authority level is stated."
+      },
+      {
+        "assumption": "The lobby is in the production-network trust zone because it is one of the things in that network.",
+        "element_id": "process:lobby",
+        "attribute": "trust_zone",
+        "basis": "The client connects to 'two things in our production network,' including the lobby."
+      },
+      {
+        "assumption": "The game servers are in the production-network trust zone because they are one of the things in that network.",
+        "element_id": "process:game-servers",
+        "attribute": "trust_zone",
+        "basis": "The client connects to 'two things in our production network,' including the game servers."
+      },
+      {
+        "assumption": "The player database is in the production-network trust zone because the production services access it and the text does not identify another location.",
+        "element_id": "store:player-database",
+        "attribute": "trust_zone",
+        "basis": "The lobby and game servers access the player database; the described services are in the production network."
+      },
+      {
+        "assumption": "The stats database is in the production-network trust zone because the game servers access it and the text does not identify another location.",
+        "element_id": "store:stats-database",
+        "attribute": "trust_zone",
+        "basis": "The game servers read and write the stats database; the game servers are described as part of the production network."
+      },
+      {
+        "assumption": "The corporate network is a network trust boundary because the text identifies it as a distinct network location for support staff.",
+        "element_id": "boundary:corporate-network",
+        "attribute": "kind",
+        "basis": "The text names a distinct 'corporate network'; no different controlling party or authority level is stated."
+      },
+      {
+        "assumption": "The customer support staff are in the corporate-network trust zone because they work from that network.",
+        "element_id": "entity:customer-support-staff",
+        "attribute": "trust_zone",
+        "basis": "The text says customer support staff work from the corporate network."
+      },
+      {
+        "assumption": "The moderation website is in the corporate-network trust zone because it is used by staff working from that network and no other hosting location is stated.",
+        "element_id": "process:moderation-website",
+        "attribute": "trust_zone",
+        "basis": "The text says customer support staff work from the corporate network and use the moderation website."
+      }
+    ]
+  },
+  "issues": []
+}

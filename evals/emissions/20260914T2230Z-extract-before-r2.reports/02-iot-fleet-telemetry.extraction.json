@@ -1,0 +1,796 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:sensor-node",
+        "name": "sensor node",
+        "description": "A deployed sensor node installed on a customer site that publishes readings and polls for firmware images.",
+        "assets": [],
+        "source_excerpt": "Each node publishes readings over MQTT to the device gateway",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The nodes are outside the system owner's physical control.",
+        "kind": "external-system",
+        "trust_zone": "boundary:customer-sites"
+      },
+      {
+        "id": "entity:field-technician",
+        "name": "field technician",
+        "description": "A technician who services sensor nodes over a local serial console.",
+        "assets": [],
+        "source_excerpt": "Field technicians service nodes over a local serial console.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:customer-sites"
+      },
+      {
+        "id": "entity:fleet-operator",
+        "name": "fleet operator",
+        "description": "An operator who views telemetry dashboards from the corporate network.",
+        "assets": [],
+        "source_excerpt": "Our own fleet operators look at dashboards over BigQuery from the corporate network",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:corporate-network"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:device-gateway",
+        "name": "device gateway",
+        "description": "An MQTT broker running on GKE that accepts readings from sensor nodes and forwards them to Pub/Sub.",
+        "assets": [
+          "credentials",
+          "availability-critical"
+        ],
+        "source_excerpt": "the device gateway, which is an MQTT broker we run on GKE and expose to the internet",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "MQTT broker on GKE",
+        "trust_zone": "boundary:gke",
+        "exposure": "internet-facing",
+        "interface_kind": "non-web"
+      },
+      {
+        "id": "process:telemetry-normalizer",
+        "name": "telemetry normalizer",
+        "description": "A Python consumer in the analytics network that picks up readings and writes them into the telemetry lake.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "the telemetry normalizer, a Python consumer in our analytics network",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "Python consumer",
+        "trust_zone": "boundary:analytics-network",
+        "exposure": "unknown",
+        "interface_kind": "non-web"
+      },
+      {
+        "id": "process:dashboard",
+        "name": "dashboard",
+        "description": "A dashboard used by fleet operators to view telemetry over BigQuery.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "Our own fleet operators look at dashboards over BigQuery",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:device-registry",
+        "name": "device registry",
+        "description": "A Firestore registry used by the device gateway to check a device key and identify the customer associated with a node.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "the device registry (Firestore) to check the key and to find out which customer the node belongs to",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "Firestore",
+        "trust_zone": "boundary:gke",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:pub-sub",
+        "name": "Pub/Sub",
+        "description": "A Pub/Sub service onto which the device gateway forwards accepted readings before they are picked up by the telemetry normalizer.",
+        "assets": [],
+        "source_excerpt": "Readings the gateway accepts are forwarded onto Pub/Sub",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "Pub/Sub",
+        "trust_zone": "boundary:gke",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:telemetry-lake",
+        "name": "telemetry lake",
+        "description": "A BigQuery data store containing readings, site addresses, and occupancy patterns.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "The lake has site addresses and occupancy patterns in it, so it is customer data.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "BigQuery",
+        "trust_zone": "boundary:analytics-network",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:cloud-storage-bucket",
+        "name": "Cloud Storage bucket",
+        "description": "A Cloud Storage bucket from which sensor nodes poll for firmware images.",
+        "assets": [
+          "availability-critical"
+        ],
+        "source_excerpt": "nodes poll a Cloud Storage bucket for a new image",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The bucket is public read.",
+        "technology": "Cloud Storage",
+        "trust_zone": "boundary:gke",
+        "data_classification": "public",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:sensor-node-to-device-gateway:readings",
+        "name": "sensor node to device gateway readings",
+        "description": "A sensor node publishes readings to the device gateway.",
+        "assets": [],
+        "source_excerpt": "Each node publishes readings over MQTT to the device gateway",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The pre-shared key is per fleet, not per device, and has not been rotated since deployment.",
+        "source": "entity:sensor-node",
+        "destination": "process:device-gateway",
+        "protocol": "MQTT",
+        "authentication": "pre-shared key",
+        "data_description": "sensor readings",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:device-gateway-to-device-registry:lookup",
+        "name": "device gateway to device registry lookup",
+        "description": "The device gateway looks up a device in the registry to check its key and determine its customer.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "The gateway looks up the device in a device registry (Firestore) to check the key",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:device-gateway",
+        "destination": "store:device-registry",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "device key and customer association",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:device-gateway-to-pub-sub:readings",
+        "name": "device gateway to Pub/Sub readings",
+        "description": "The device gateway forwards accepted readings onto Pub/Sub.",
+        "assets": [],
+        "source_excerpt": "Readings the gateway accepts are forwarded onto Pub/Sub",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:device-gateway",
+        "destination": "store:pub-sub",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "accepted sensor readings",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:pub-sub-to-telemetry-normalizer:readings",
+        "name": "Pub/Sub to telemetry normalizer readings",
+        "description": "The telemetry normalizer picks up readings from Pub/Sub.",
+        "assets": [],
+        "source_excerpt": "picked up by the telemetry normalizer",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:pub-sub",
+        "destination": "process:telemetry-normalizer",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "sensor readings",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:telemetry-normalizer-to-telemetry-lake:readings",
+        "name": "telemetry normalizer to telemetry lake readings",
+        "description": "The telemetry normalizer writes readings into the telemetry lake.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "which writes them into the telemetry lake in BigQuery",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:telemetry-normalizer",
+        "destination": "store:telemetry-lake",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "normalized sensor readings",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:sensor-node-to-cloud-storage-bucket:firmware",
+        "name": "sensor node to Cloud Storage bucket firmware",
+        "description": "A sensor node polls the Cloud Storage bucket for a firmware image.",
+        "assets": [
+          "availability-critical"
+        ],
+        "source_excerpt": "nodes poll a Cloud Storage bucket for a new image",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The bucket is public read. The source says: \"I do not know whether the nodes check a signature on the image before installing it.\"",
+        "source": "entity:sensor-node",
+        "destination": "store:cloud-storage-bucket",
+        "protocol": "unknown",
+        "authentication": "none",
+        "data_description": "firmware image",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:field-technician-to-sensor-node:serial-console",
+        "name": "field technician to sensor node serial console",
+        "description": "A field technician services a sensor node over its local serial console.",
+        "assets": [],
+        "source_excerpt": "Field technicians service nodes over a local serial console.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "I don't know what authentication that console has, if any.",
+        "source": "entity:field-technician",
+        "destination": "entity:sensor-node",
+        "protocol": "serial",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:fleet-operator-to-dashboard:view",
+        "name": "fleet operator to dashboard view",
+        "description": "A fleet operator views dashboards from the corporate network while signed in with company SSO.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "fleet operators look at dashboards over BigQuery from the corporate network, signed in with company SSO",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:fleet-operator",
+        "destination": "process:dashboard",
+        "protocol": "unknown",
+        "authentication": "company SSO",
+        "data_description": "telemetry dashboard data",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:dashboard-to-telemetry-lake:query",
+        "name": "dashboard to telemetry lake query",
+        "description": "The dashboard accesses telemetry over BigQuery for display to fleet operators.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "look at dashboards over BigQuery",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:dashboard",
+        "destination": "store:telemetry-lake",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "telemetry data",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:customer-sites",
+        "name": "customer sites",
+        "description": "Customer-site locations where sensor nodes are installed and field technicians service them.",
+        "assets": [],
+        "source_excerpt": "sensor nodes installed on customer sites",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:gke",
+        "name": "GKE",
+        "description": "The GKE-hosted device gateway and the named managed data services associated with the telemetry platform.",
+        "assets": [],
+        "source_excerpt": "an MQTT broker we run on GKE",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:analytics-network",
+        "name": "analytics network",
+        "description": "The network containing the telemetry normalizer and telemetry lake.",
+        "assets": [],
+        "source_excerpt": "the telemetry normalizer, a Python consumer in our analytics network",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:corporate-network",
+        "name": "corporate network",
+        "description": "The corporate network from which fleet operators access dashboards.",
+        "assets": [],
+        "source_excerpt": "from the corporate network",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The telemetry lake's contents are confidential.",
+        "element_id": "store:telemetry-lake",
+        "attribute": "data_classification",
+        "basis": "The lake contains site addresses and occupancy patterns and is described as customer data."
+      },
+      {
+        "assumption": "The device registry's key and customer association data are confidential.",
+        "element_id": "store:device-registry",
+        "attribute": "data_classification",
+        "basis": "The registry contains a device key and information about which customer a node belongs to."
+      },
+      {
+        "assumption": "The Cloud Storage bucket's firmware image is public in classification.",
+        "element_id": "store:cloud-storage-bucket",
+        "attribute": "data_classification",
+        "basis": "The source explicitly says the bucket is public read."
+      },
+      {
+        "assumption": "The dashboard presents a web interface.",
+        "element_id": "process:dashboard",
+        "attribute": "interface_kind",
+        "basis": "The source names a dashboard used by operators to view data; dashboards are treated as web-facing application interfaces."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:sensor-node",
+        "name": "sensor node",
+        "description": "A deployed sensor node installed on a customer site that publishes readings and polls for firmware images.",
+        "assets": [],
+        "source_excerpt": "Each node publishes readings over MQTT to the device gateway",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The nodes are outside the system owner's physical control.",
+        "kind": "external-system",
+        "trust_zone": "boundary:customer-sites"
+      },
+      {
+        "id": "entity:field-technician",
+        "name": "field technician",
+        "description": "A technician who services sensor nodes over a local serial console.",
+        "assets": [],
+        "source_excerpt": "Field technicians service nodes over a local serial console.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:customer-sites"
+      },
+      {
+        "id": "entity:fleet-operator",
+        "name": "fleet operator",
+        "description": "An operator who views telemetry dashboards from the corporate network.",
+        "assets": [],
+        "source_excerpt": "Our own fleet operators look at dashboards over BigQuery from the corporate network",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:corporate-network"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:device-gateway",
+        "name": "device gateway",
+        "description": "An MQTT broker running on GKE that accepts readings from sensor nodes and forwards them to Pub/Sub.",
+        "assets": [
+          "credentials",
+          "availability-critical"
+        ],
+        "source_excerpt": "the device gateway, which is an MQTT broker we run on GKE and expose to the internet",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "MQTT broker on GKE",
+        "trust_zone": "boundary:gke",
+        "exposure": "internet-facing",
+        "interface_kind": "non-web"
+      },
+      {
+        "id": "process:telemetry-normalizer",
+        "name": "telemetry normalizer",
+        "description": "A Python consumer in the analytics network that picks up readings and writes them into the telemetry lake.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "the telemetry normalizer, a Python consumer in our analytics network",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "Python consumer",
+        "trust_zone": "boundary:analytics-network",
+        "exposure": "unknown",
+        "interface_kind": "non-web"
+      },
+      {
+        "id": "process:dashboard",
+        "name": "dashboard",
+        "description": "A dashboard used by fleet operators to view telemetry over BigQuery.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "Our own fleet operators look at dashboards over BigQuery",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:device-registry",
+        "name": "device registry",
+        "description": "A Firestore registry used by the device gateway to check a device key and identify the customer associated with a node.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "the device registry (Firestore) to check the key and to find out which customer the node belongs to",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "Firestore",
+        "trust_zone": "boundary:gke",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:pub-sub",
+        "name": "Pub/Sub",
+        "description": "A Pub/Sub service onto which the device gateway forwards accepted readings before they are picked up by the telemetry normalizer.",
+        "assets": [],
+        "source_excerpt": "Readings the gateway accepts are forwarded onto Pub/Sub",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "Pub/Sub",
+        "trust_zone": "boundary:gke",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:telemetry-lake",
+        "name": "telemetry lake",
+        "description": "A BigQuery data store containing readings, site addresses, and occupancy patterns.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "The lake has site addresses and occupancy patterns in it, so it is customer data.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "BigQuery",
+        "trust_zone": "boundary:analytics-network",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:cloud-storage-bucket",
+        "name": "Cloud Storage bucket",
+        "description": "A Cloud Storage bucket from which sensor nodes poll for firmware images.",
+        "assets": [
+          "availability-critical"
+        ],
+        "source_excerpt": "nodes poll a Cloud Storage bucket for a new image",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The bucket is public read.",
+        "technology": "Cloud Storage",
+        "trust_zone": "boundary:gke",
+        "data_classification": "public",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:sensor-node-to-device-gateway:sensor-node-to-device-gateway-readings",
+        "name": "sensor node to device gateway readings",
+        "description": "A sensor node publishes readings to the device gateway.",
+        "assets": [],
+        "source_excerpt": "Each node publishes readings over MQTT to the device gateway",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The pre-shared key is per fleet, not per device, and has not been rotated since deployment.",
+        "source": "entity:sensor-node",
+        "destination": "process:device-gateway",
+        "protocol": "MQTT",
+        "authentication": "pre-shared key",
+        "data_description": "sensor readings",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:device-gateway-to-device-registry:device-gateway-to-device-registry-lookup",
+        "name": "device gateway to device registry lookup",
+        "description": "The device gateway looks up a device in the registry to check its key and determine its customer.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "The gateway looks up the device in a device registry (Firestore) to check the key",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:device-gateway",
+        "destination": "store:device-registry",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "device key and customer association",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:device-gateway-to-pub-sub:device-gateway-to-pub-sub-readings",
+        "name": "device gateway to Pub/Sub readings",
+        "description": "The device gateway forwards accepted readings onto Pub/Sub.",
+        "assets": [],
+        "source_excerpt": "Readings the gateway accepts are forwarded onto Pub/Sub",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:device-gateway",
+        "destination": "store:pub-sub",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "accepted sensor readings",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:pub-sub-to-telemetry-normalizer:pub-sub-to-telemetry-normalizer-readings",
+        "name": "Pub/Sub to telemetry normalizer readings",
+        "description": "The telemetry normalizer picks up readings from Pub/Sub.",
+        "assets": [],
+        "source_excerpt": "picked up by the telemetry normalizer",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:pub-sub",
+        "destination": "process:telemetry-normalizer",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "sensor readings",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:telemetry-normalizer-to-telemetry-lake:telemetry-normalizer-to-telemetry-lake-readings",
+        "name": "telemetry normalizer to telemetry lake readings",
+        "description": "The telemetry normalizer writes readings into the telemetry lake.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "which writes them into the telemetry lake in BigQuery",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:telemetry-normalizer",
+        "destination": "store:telemetry-lake",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "normalized sensor readings",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:sensor-node-to-cloud-storage-bucket:sensor-node-to-cloud-storage-bucket-firmware",
+        "name": "sensor node to Cloud Storage bucket firmware",
+        "description": "A sensor node polls the Cloud Storage bucket for a firmware image.",
+        "assets": [
+          "availability-critical"
+        ],
+        "source_excerpt": "nodes poll a Cloud Storage bucket for a new image",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The bucket is public read. The source says: \"I do not know whether the nodes check a signature on the image before installing it.\"",
+        "source": "entity:sensor-node",
+        "destination": "store:cloud-storage-bucket",
+        "protocol": "unknown",
+        "authentication": "none",
+        "data_description": "firmware image",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:field-technician-to-sensor-node:field-technician-to-sensor-node-serial-console",
+        "name": "field technician to sensor node serial console",
+        "description": "A field technician services a sensor node over its local serial console.",
+        "assets": [],
+        "source_excerpt": "Field technicians service nodes over a local serial console.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "I don't know what authentication that console has, if any.",
+        "source": "entity:field-technician",
+        "destination": "entity:sensor-node",
+        "protocol": "serial",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:fleet-operator-to-dashboard:fleet-operator-to-dashboard-view",
+        "name": "fleet operator to dashboard view",
+        "description": "A fleet operator views dashboards from the corporate network while signed in with company SSO.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "fleet operators look at dashboards over BigQuery from the corporate network, signed in with company SSO",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:fleet-operator",
+        "destination": "process:dashboard",
+        "protocol": "unknown",
+        "authentication": "company SSO",
+        "data_description": "telemetry dashboard data",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:dashboard-to-telemetry-lake:dashboard-to-telemetry-lake-query",
+        "name": "dashboard to telemetry lake query",
+        "description": "The dashboard accesses telemetry over BigQuery for display to fleet operators.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "look at dashboards over BigQuery",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:dashboard",
+        "destination": "store:telemetry-lake",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "telemetry data",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:customer-sites",
+        "name": "customer sites",
+        "description": "Customer-site locations where sensor nodes are installed and field technicians service them.",
+        "assets": [],
+        "source_excerpt": "sensor nodes installed on customer sites",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:gke",
+        "name": "GKE",
+        "description": "The GKE-hosted device gateway and the named managed data services associated with the telemetry platform.",
+        "assets": [],
+        "source_excerpt": "an MQTT broker we run on GKE",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:analytics-network",
+        "name": "analytics network",
+        "description": "The network containing the telemetry normalizer and telemetry lake.",
+        "assets": [],
+        "source_excerpt": "the telemetry normalizer, a Python consumer in our analytics network",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:corporate-network",
+        "name": "corporate network",
+        "description": "The corporate network from which fleet operators access dashboards.",
+        "assets": [],
+        "source_excerpt": "from the corporate network",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The telemetry lake's contents are confidential.",
+        "element_id": "store:telemetry-lake",
+        "attribute": "data_classification",
+        "basis": "The lake contains site addresses and occupancy patterns and is described as customer data."
+      },
+      {
+        "assumption": "The device registry's key and customer association data are confidential.",
+        "element_id": "store:device-registry",
+        "attribute": "data_classification",
+        "basis": "The registry contains a device key and information about which customer a node belongs to."
+      },
+      {
+        "assumption": "The Cloud Storage bucket's firmware image is public in classification.",
+        "element_id": "store:cloud-storage-bucket",
+        "attribute": "data_classification",
+        "basis": "The source explicitly says the bucket is public read."
+      },
+      {
+        "assumption": "The dashboard presents a web interface.",
+        "element_id": "process:dashboard",
+        "attribute": "interface_kind",
+        "basis": "The source names a dashboard used by operators to view data; dashboards are treated as web-facing application interfaces."
+      }
+    ]
+  },
+  "issues": [
+    {
+      "code": "unverifiable-excerpt",
+      "message": "source_excerpt 'the device registry (Firestore) to check the key and to find out which customer the node belongs to' is not found in the source it cites, 'System description'",
+      "element_id": "store:device-registry",
+      "field": "source_excerpt"
+    }
+  ]
+}

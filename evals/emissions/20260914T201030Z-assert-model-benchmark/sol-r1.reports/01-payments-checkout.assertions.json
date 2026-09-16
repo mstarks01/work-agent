@@ -1,0 +1,268 @@
+{
+  "proposal": {
+    "assertions": [
+      {
+        "subject_type": "component",
+        "subject": "process:storefront-api",
+        "predicate": "internet-exposure",
+        "value": "internet-facing",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "the storefront API, a\nNode service running on Cloud Run. It is the only thing we expose to the\ninternet."
+          }
+        ],
+        "explanation": "",
+        "exclusive": true
+      },
+      {
+        "subject_type": "component",
+        "subject": "process:order-service",
+        "predicate": "internet-exposure",
+        "value": "internal",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The order service is a Python worker in our core network; it is\nnot exposed outside."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "principal",
+        "subject": "shopper accounts",
+        "predicate": "mfa-requirement",
+        "value": "absent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "we have not rolled out MFA for shopper accounts yet."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:storefront-api-to-order-service:submit-order",
+        "predicate": "authentication-mechanism",
+        "value": "absent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "There is no auth on that gRPC call"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:card-processor-to-storefront-api:settlement-webhook",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "I would have\nto check how that callback is authenticated."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      }
+    ]
+  },
+  "catalog": {
+    "registry_version": 2,
+    "subjects": [
+      {
+        "id": "flow:card-processor-to-storefront-api:settlement-webhook",
+        "type": "interaction",
+        "label": "settlement webhook"
+      },
+      {
+        "id": "flow:storefront-api-to-order-service:submit-order",
+        "type": "interaction",
+        "label": "submit order"
+      },
+      {
+        "id": "principal:shopper-accounts",
+        "type": "principal",
+        "label": "shopper accounts"
+      },
+      {
+        "id": "process:order-service",
+        "type": "component",
+        "label": "order service"
+      },
+      {
+        "id": "process:storefront-api",
+        "type": "component",
+        "label": "storefront API"
+      }
+    ],
+    "entries": [
+      {
+        "subject": "process:storefront-api",
+        "predicate": "internet-exposure",
+        "value": "internet-facing",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08",
+            "start": 109,
+            "end": 213,
+            "quote": "the storefront API, a\nNode service running on Cloud Run. It is the only thing we expose to the\ninternet."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": true,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "process:order-service",
+        "predicate": "internet-exposure",
+        "value": "internal",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08",
+            "start": 421,
+            "end": 505,
+            "quote": "The order service is a Python worker in our core network; it is\nnot exposed outside."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "principal:shopper-accounts",
+        "predicate": "mfa-requirement",
+        "value": "absent",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08",
+            "start": 281,
+            "end": 333,
+            "quote": "we have not rolled out MFA for shopper accounts yet."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:storefront-api-to-order-service:submit-order",
+        "predicate": "authentication-mechanism",
+        "value": "absent",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08",
+            "start": 506,
+            "end": 540,
+            "quote": "There is no auth on that gRPC call"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:card-processor-to-storefront-api:settlement-webhook",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08",
+            "start": 1341,
+            "end": 1398,
+            "quote": "I would have\nto check how that callback is authenticated."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      }
+    ]
+  },
+  "issues": [],
+  "projection": [
+    {
+      "element_id": "flow:card-processor-to-storefront-api:settlement-webhook",
+      "attribute": "authentication",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:authentication-mechanism~flow:card-processor-to-storefront-api:settlement-webhook~any~unknown"
+      ]
+    },
+    {
+      "element_id": "flow:storefront-api-to-order-service:submit-order",
+      "attribute": "authentication",
+      "value": "none",
+      "reason": "absent",
+      "rows": [
+        "assertion:authentication-mechanism~flow:storefront-api-to-order-service:submit-order~any~absent"
+      ]
+    },
+    {
+      "element_id": "process:order-service",
+      "attribute": "exposure",
+      "value": "internal",
+      "reason": "stated",
+      "rows": [
+        "assertion:internet-exposure~process:order-service~any~internal"
+      ]
+    },
+    {
+      "element_id": "process:storefront-api",
+      "attribute": "exposure",
+      "value": "internet-facing",
+      "reason": "stated",
+      "rows": [
+        "assertion:internet-exposure~process:storefront-api~any~internet-facing"
+      ]
+    }
+  ]
+}
