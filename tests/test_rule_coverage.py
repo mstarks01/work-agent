@@ -30,6 +30,7 @@ from pathlib import Path
 
 import pytest
 
+from analysis_service.assertions import AssertionCatalog
 from analysis_service.candidates import generate_candidates
 from analysis_service.frameworks import PACKAGES
 from analysis_service.knowledge import MAX_CASES, MAX_NOTES, select_per_lane
@@ -56,6 +57,19 @@ UNEXERCISED: dict[str, str] = {
         " Golden Case carrying a call or screen-share feature, which is a"
         " reviewed human step under evals/BLESSING.md."
     ),
+    "spoofing-second-factor-stated-absent": (
+        "The rule reads the assertion catalog, and no corpus case carries one:"
+        " a catalog is what a live `assert` node produces, and a blessed case"
+        " is a model. So this sweep can only offer it an empty catalog, and an"
+        " empty catalog settles nothing for any subject. The shape it matches"
+        " is one extraction does produce — 3 of 18 archived `mfa-requirement`"
+        " rows sat on a flow, and one bound to an element with no ruling — so"
+        " this is the corpus lacking catalogs rather than the rule reading a"
+        " shape that never occurs. `tests/test_candidates.py` fires it"
+        " against a catalog directly. The remedy is a corpus that carries a"
+        " blessed catalog beside its model, which is #226's reviewed human"
+        " step and not this rule's to take."
+    ),
 }
 
 
@@ -77,12 +91,22 @@ def models() -> list[SystemModel]:
 
 
 def dead_rules(models: list[SystemModel]) -> set[str]:
-    """Every registered rule that fires on none of the models."""
+    """Every registered rule that fires on none of the models.
+
+    **The catalog is empty here, and that is the corpus's limit rather than a
+    choice.** A blessed case is a model; no case carries an assertion catalog,
+    because a catalog is what a live ``assert`` node produces. So a rule that
+    reads the catalog fires on nothing this sweep can build, and belongs in
+    :data:`UNEXERCISED` with that reason rather than being read as a rule that
+    matches a shape extraction never emits. Such a rule is exercised by its own
+    test instead.
+    """
+    empty = AssertionCatalog()
     return {
         rule.rule_id
         for package in PACKAGES.values()
         for rule in package.rules
-        if not any(rule.fire(model) for model in models)
+        if not any(rule.fire(model, empty) for model in models)
     }
 
 

@@ -264,11 +264,15 @@ def fan_in(
     for message in package.record.lane_diagnostics(merged):
         logger.warning(message)
     # The candidates are regenerated rather than read back from state: they are
-    # a pure function of the same validated model and the same package rules,
-    # so the two derivations cannot disagree.
+    # a pure function of the same validated model, the same package rules and
+    # the same catalog, so the two derivations cannot disagree. The catalog is
+    # the third input rather than the second, and it has to be passed here: a
+    # rule that reads the catalog would otherwise fire at the graph and not at
+    # the fan-in, and the coverage this builds would under-count exactly the
+    # lanes the assertion layer feeds.
     coverage = build_coverage(
         drafts_by_lane,
-        generate_candidates(model, package.lanes, package.rules),
+        generate_candidates(model, package.lanes, package.rules, assertions),
         model,
         package,
     )
