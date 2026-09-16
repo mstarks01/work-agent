@@ -81,6 +81,46 @@ def test_every_row_resolves_through_the_gate(drafted):
     assert len(catalog.entries) == len(facts.rows), "two rows share one identity"
 
 
+def test_no_alias_is_signed_by_whoever_drafted_it(drafted):
+    """An alias is a ruling like a row: the drafter's name cannot sign one."""
+    _, facts, _ = drafted
+    assert all(entry.reviewed_by != DRAFTER for entry in facts.aliases.entries)
+
+
+def test_an_alias_names_a_subject_of_the_layers_own(drafted):
+    """An element's other names live in case.json, where the alignment reads them."""
+    _, facts, catalog = drafted
+    held = {subject.id for subject in catalog.subjects}
+    for ruling in facts.aliases.subjects:
+        assert ruling.subject in held, (
+            f"{ruling.subject} is not a subject the rows name"
+        )
+        assert ruling.subject.split(":")[0] in {"principal", "credential", "artifact"}
+        assert all(alias != ruling.subject for alias in ruling.alias_ids)
+
+
+def test_a_qualifier_alias_names_a_scope_the_rows_carry(drafted):
+    _, facts, catalog = drafted
+    carried = {
+        (qualifier.kind, qualifier.value)
+        for entry in catalog.entries
+        for qualifier in entry.scope
+    }
+    for ruling in facts.aliases.qualifiers:
+        assert (ruling.kind, ruling.value) in carried, (
+            f"{ruling.kind}={ruling.value!r} scopes no reference row"
+        )
+
+
+def test_an_element_alias_is_refused_here():
+    from pydantic import ValidationError
+
+    from evals.reference_facts import SubjectAlias
+
+    with pytest.raises(ValidationError, match="belongs in case.json"):
+        SubjectAlias(subject="process:web-app", names=["app"], ruling="no")
+
+
 def test_no_row_is_signed_by_whoever_drafted_it(drafted):
     """The signature means a second reader, or it means nothing."""
     _, facts, _ = drafted
