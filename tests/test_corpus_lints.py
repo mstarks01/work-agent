@@ -662,7 +662,7 @@ class TestTheReviewedAliases:
 
         case_dir = verify_corpus.CORPUS_DIR / "04-ml-inference-service"
         meta = json.loads((case_dir / "case.json").read_text("utf-8"))
-        flow_id = "flow:model-server-to-model-registry-bucket:load-artifact"
+        flow_id = "flow:process:model-server>store:model-registry-bucket>load-artifact"
         excerpt = "The model server loads model artifacts from a model registry bucket"
         own = {"element": flow_id, "name": "load artifact", "excerpt": excerpt}
         other = {"element": flow_id, "name": "load artifacts", "excerpt": excerpt}

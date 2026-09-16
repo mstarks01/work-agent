@@ -166,7 +166,7 @@
     {
       "assertion": {
         "subject_type": "interaction",
-        "subject": "flow:shopper-to-storefront-api:place-order",
+        "subject": "flow:entity:shopper>process:storefront-api>place-order",
         "predicate": "authentication-mechanism",
         "value": "email and password sign-in issuing a session cookie",
         "reason": null,
@@ -229,7 +229,7 @@
     {
       "assertion": {
         "subject_type": "interaction",
-        "subject": "flow:storefront-api-to-order-service:submit-order",
+        "subject": "flow:process:storefront-api>process:order-service>submit-order",
         "predicate": "authentication-mechanism",
         "value": "absent",
         "reason": null,
@@ -280,7 +280,7 @@
     {
       "assertion": {
         "subject_type": "interaction",
-        "subject": "flow:order-service-to-orders-db:read-write-orders",
+        "subject": "flow:process:order-service>store:orders-db>read-write-orders",
         "predicate": "authentication-mechanism",
         "value": "a single application account with a password",
         "reason": null,
@@ -377,7 +377,7 @@
     {
       "assertion": {
         "subject_type": "interaction",
-        "subject": "flow:order-service-to-receipt-archive:append-receipt",
+        "subject": "flow:process:order-service>store:receipt-archive>append-receipt",
         "predicate": "transport-encryption",
         "value": "TLS",
         "reason": null,
@@ -398,7 +398,7 @@
     {
       "assertion": {
         "subject_type": "interaction",
-        "subject": "flow:order-service-to-receipt-archive:append-receipt",
+        "subject": "flow:process:order-service>store:receipt-archive>append-receipt",
         "predicate": "authentication-mechanism",
         "value": "the order service's own service account",
         "reason": null,
@@ -474,7 +474,7 @@
     {
       "assertion": {
         "subject_type": "interaction",
-        "subject": "flow:card-processor-to-storefront-api:settlement-webhook",
+        "subject": "flow:entity:card-processor>process:storefront-api>settlement-webhook",
         "predicate": "authentication-mechanism",
         "value": "unknown",
         "reason": "hedged",
@@ -522,7 +522,7 @@
         "reviewed_by": "assistant review requested by mstarks01 (#961, 2026-09-16)",
         "within": [
           "principal:application-account",
-          "flow:order-service-to-orders-db:read-write-orders"
+          "flow:process:order-service>store:orders-db>read-write-orders"
         ]
       }
     ],

@@ -419,7 +419,7 @@ def valid_model(source_label: str = DEFAULT_DESCRIPTION_LABEL) -> SystemModel:
         ],
         data_flows=[
             DataFlow(
-                id="flow:customer-to-web-app:login",
+                id="flow:entity:customer>process:web-app>login",
                 name="Login",
                 source="entity:customer",
                 destination="process:web-app",
@@ -432,7 +432,7 @@ def valid_model(source_label: str = DEFAULT_DESCRIPTION_LABEL) -> SystemModel:
                 source_label=source_label,
             ),
             DataFlow(
-                id="flow:web-app-to-orders-db:store-order",
+                id="flow:process:web-app>store:orders-db>store-order",
                 name="Store Order",
                 source="process:web-app",
                 destination="store:orders-db",
@@ -531,7 +531,7 @@ def sample_proposal(
             "source_label": DEFAULT_DESCRIPTION_LABEL,
         }
     ]
-    fields["evidence_refs"] = ["crossing:flow:customer-to-web-app:login"]
+    fields["evidence_refs"] = ["crossing:flow:entity:customer>process:web-app>login"]
     fields.update(overrides)
     return ThreatProposal.model_validate(fields)
 
@@ -571,7 +571,7 @@ def sample_threat(
         "title": "Session cookie theft enables account takeover",
         "description": "Stolen session cookies let an attacker impersonate"
         " the customer against the web app.",
-        "affected_element_ids": ["flow:customer-to-web-app:login"],
+        "affected_element_ids": ["flow:entity:customer>process:web-app>login"],
         # The default draft's action, matching its title: a stolen session used
         # against the web app. Tests that care about identity override it.
         "verb": "use-credential",
@@ -585,7 +585,10 @@ def sample_threat(
                 text="Customers log in to the web app",
                 source_label=DEFAULT_DESCRIPTION_LABEL,
             ),
-            Ground(kind="derived-fact", flow_id="flow:customer-to-web-app:login"),
+            Ground(
+                kind="derived-fact",
+                flow_id="flow:entity:customer>process:web-app>login",
+            ),
         ],
         "severity": Severity(
             likelihood="medium",
@@ -1154,7 +1157,9 @@ SCRIPTED_FRAMEWORKS: Mapping[FrameworkName, ScriptedFramework] = MappingProxyTyp
                     # scope entry.
                     needs_evidence="",
                     direction="gap",
-                    evidence_refs=["crossing:flow:customer-to-web-app:login"],
+                    evidence_refs=[
+                        "crossing:flow:entity:customer>process:web-app>login"
+                    ],
                 )
             ),
             ruling=claims_json(

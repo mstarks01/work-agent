@@ -6,7 +6,7 @@ Applying these in reverse to `model.json` reconstructs the bootstrap artifact.
 | # | Path | Bootstrap value | Blessed value | Why (source text) |
 |---|---|---|---|---|
 | 1 | `flow:scheduling-web-app-to-colleague:show-shifts` | present | removed | The candidate drew the colleague's request and the app's response as two flows. One interaction is one flow, direction = who initiates; the response rides implicitly. Third occurrence of this error in the corpus, after cases 05 and 06. |
-| 2 | `flow:payroll-system-to-file-share:collect-payroll-export` | source `store:file-share`, destination `entity:payroll-system` | reversed | The source says the payroll system *collects* the export. The candidate pointed the flow the way the bytes move rather than the way the interaction is initiated. Same error as case 02 correction 5 and case 05 correction 2; three occurrences now, and all three are pull interactions. |
+| 2 | `flow:entity:payroll-system>store:file-share>collect-payroll-export` | source `store:file-share`, destination `entity:payroll-system` | reversed | The source says the payroll system *collects* the export. The candidate pointed the flow the way the bytes move rather than the way the interaction is initiated. Same error as case 02 correction 5 and case 05 correction 2; three occurrences now, and all three are pull interactions. |
 | 3 | `process:scheduling-web-app.technology` | `web application` | `unknown` | The source names no technology anywhere. Restating the element's own name as its technology reads as a fact and is not one. |
 | 4 | `store:rota-database.data_classification` | `confidential` | `unknown` | The source states *what the database holds* — names, contact details, availability — and never states a classification. The candidate derived a label from the content, which is precisely the conflation this case exists to grade: the content drives the `pii` asset tag, and `data_classification` stays `unknown`. |
 | 5 | `store:file-share.assets` | `[]` | `["pii"]` | The export is built from the same colleague data the database is tagged for. The candidate tagged the database, whose contents are described, but not the file derived from it, whose contents are not — asset tags were driven by what the element is *called*. |
@@ -35,7 +35,7 @@ follows one ruling, and `facts.json` changed with it.
 
 | # | Path | Before | After | Ruling |
 |---|---|---|---|---|
-| 8 | `flow:scheduling-web-app-to-scheduling-service:rota-requests.operations` | `read-write`, no assumption | `read-write` + assumption | The interaction is described only as "talks to". Managers build rotas through the app and colleagues view shifts through it, and the service reads and writes the rotas, so the app's path carries both. A supported inference, and its basis is now visible. |
+| 8 | `flow:process:scheduling-web-app>process:scheduling-service>rota-requests.operations` | `read-write`, no assumption | `read-write` + assumption | The interaction is described only as "talks to". Managers build rotas through the app and colleagues view shifts through it, and the service reads and writes the rotas, so the app's path carries both. A supported inference, and its basis is now visible. |
 | 9 | `process:scheduling-service.exposure` | `internal` | `unknown` | Network placement alone does not establish the absence of internet ingress. The internal-network membership stays stated. |
 
 ## Signing of 2026-09-16 (#961 step 3)

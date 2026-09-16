@@ -16,7 +16,7 @@
     "affected_element_ids": [
       "entity:ml-engineer",
       "store:model-registry-bucket",
-      "flow:ml-engineer-to-model-registry-bucket:publish-artifact"
+      "flow:entity:ml-engineer>store:model-registry-bucket>publish-artifact"
     ],
     "claim": "Nothing limits the size or type of a model artifact published into the registry.",
     "tier": "must-find",
@@ -28,7 +28,7 @@
     "requirement": "V5.2.2",
     "affected_element_ids": [
       "store:model-registry-bucket",
-      "flow:ml-engineer-to-model-registry-bucket:publish-artifact"
+      "flow:entity:ml-engineer>store:model-registry-bucket>publish-artifact"
     ],
     "claim": "Nothing states what validates a published artifact before the model server loads it.",
     "tier": "expected",
@@ -41,7 +41,7 @@
     "affected_element_ids": [
       "entity:calling-service",
       "process:inference-gateway",
-      "flow:calling-service-to-inference-gateway:submit-inference-request"
+      "flow:entity:calling-service>process:inference-gateway>submit-inference-request"
     ],
     "claim": "The per-team API key carries no claims, so this chapter does not apply to the gateway.",
     "tier": "must-find",
@@ -53,7 +53,7 @@
     "requirement": "V13.2.1",
     "affected_element_ids": [
       "entity:calling-service",
-      "flow:calling-service-to-inference-gateway:submit-inference-request"
+      "flow:entity:calling-service>process:inference-gateway>submit-inference-request"
     ],
     "claim": "The calling service authenticates to the inference gateway with a per-team API key that the operator has never expired, an unchanging credential on a backend link.",
     "tier": "must-find",
@@ -66,7 +66,7 @@
     "affected_element_ids": [
       "process:inference-gateway",
       "process:model-server",
-      "flow:inference-gateway-to-model-server:forward-request"
+      "flow:process:inference-gateway>process:model-server>forward-request"
     ],
     "claim": "The model server accepts forwarded requests on network position with no stated permission check.",
     "tier": "expected",
@@ -91,7 +91,7 @@
     "affected_element_ids": [
       "process:inference-gateway",
       "process:model-server",
-      "flow:inference-gateway-to-model-server:forward-request"
+      "flow:process:inference-gateway>process:model-server>forward-request"
     ],
     "claim": "The gateway to model server link states neither a protocol nor transport protection.",
     "tier": "must-find",
@@ -104,7 +104,7 @@
     "affected_element_ids": [
       "process:inference-gateway",
       "store:inference-log",
-      "flow:inference-gateway-to-inference-log:write-request-log"
+      "flow:process:inference-gateway>store:inference-log>write-request-log"
     ],
     "claim": "Nothing states what of an inference request is written to the confidential request log.",
     "tier": "must-find",

@@ -2,7 +2,7 @@
   {
     "category": "spoofing",
     "affected_element_ids": [
-      "flow:game-client-to-lobby:matchmaking",
+      "flow:process:game-client>process:lobby>matchmaking",
       "process:lobby"
     ],
     "claim": "An attacker connects to the exposed lobby port as another player, because how the lobby authenticates a client is unverified.",
@@ -17,7 +17,7 @@
   {
     "category": "spoofing",
     "affected_element_ids": [
-      "flow:game-client-to-game-server:gameplay-traffic",
+      "flow:process:game-client>process:game-server>gameplay-traffic",
       "process:game-server"
     ],
     "claim": "An attacker connects directly to a game server on its exposed port, bypassing the lobby, as a player who was never assigned to that match.",
@@ -32,7 +32,7 @@
   {
     "category": "spoofing",
     "affected_element_ids": [
-      "flow:customer-support-staff-to-moderation-website:moderate-accounts",
+      "flow:entity:customer-support-staff>process:moderation-website>moderate-accounts",
       "process:moderation-website"
     ],
     "claim": "An attacker reaches the moderation website posing as a support agent, since its authentication is unverified.",
@@ -48,7 +48,7 @@
     "category": "tampering",
     "affected_element_ids": [
       "process:game-client",
-      "flow:game-client-to-game-server:gameplay-traffic"
+      "flow:process:game-client>process:game-server>gameplay-traffic"
     ],
     "claim": "A player modifies the game client on their own machine and sends manipulated gameplay actions that the servers accept.",
     "tier": "must-find",
@@ -63,7 +63,7 @@
     "category": "tampering",
     "affected_element_ids": [
       "store:stats-database",
-      "flow:game-server-to-stats-database:read-write-stats"
+      "flow:process:game-server>store:stats-database>read-write-stats"
     ],
     "claim": "An attacker alters match statistics in the stats database to change rankings or rewards.",
     "tier": "must-find",
@@ -78,7 +78,7 @@
     "category": "tampering",
     "affected_element_ids": [
       "store:player-database",
-      "flow:game-server-to-player-database:update-players"
+      "flow:process:game-server>store:player-database>update-players"
     ],
     "claim": "An attacker who influences a game server writes fabricated progression onto player records.",
     "tier": "expected",
@@ -136,8 +136,8 @@
   {
     "category": "information-disclosure",
     "affected_element_ids": [
-      "flow:game-client-to-lobby:matchmaking",
-      "flow:game-client-to-game-server:gameplay-traffic"
+      "flow:process:game-client>process:lobby>matchmaking",
+      "flow:process:game-client>process:game-server>gameplay-traffic"
     ],
     "claim": "An attacker on the network path reads matchmaking and gameplay traffic, including player identifiers, because encryption on both client links is unverified.",
     "tier": "must-find",
@@ -182,7 +182,7 @@
     "category": "denial-of-service",
     "affected_element_ids": [
       "process:lobby",
-      "flow:game-client-to-lobby:matchmaking"
+      "flow:process:game-client>process:lobby>matchmaking"
     ],
     "claim": "An attacker floods the exposed lobby until players can no longer be matched into games.",
     "tier": "must-find",
@@ -197,7 +197,7 @@
     "category": "denial-of-service",
     "affected_element_ids": [
       "process:game-server",
-      "flow:game-client-to-game-server:gameplay-traffic"
+      "flow:process:game-client>process:game-server>gameplay-traffic"
     ],
     "claim": "An attacker floods a game server's exposed port and disrupts a match in progress for every player in it.",
     "tier": "must-find",

@@ -5,7 +5,7 @@
     "affected_element_ids": [
       "process:order-service",
       "store:orders-db",
-      "flow:order-service-to-orders-db:read-write-orders"
+      "flow:process:order-service>store:orders-db>read-write-orders"
     ],
     "claim": "The order service reaches a PostgreSQL store and the input never says how its queries are built.",
     "tier": "must-find",
@@ -29,7 +29,7 @@
     "affected_element_ids": [
       "entity:shopper",
       "process:storefront-api",
-      "flow:shopper-to-storefront-api:place-order"
+      "flow:entity:shopper>process:storefront-api>place-order"
     ],
     "claim": "Nothing says which side enforces validation of the order the shopper submits.",
     "tier": "must-find",
@@ -42,7 +42,7 @@
     "affected_element_ids": [
       "entity:shopper",
       "process:storefront-api",
-      "flow:shopper-to-storefront-api:place-order"
+      "flow:entity:shopper>process:storefront-api>place-order"
     ],
     "claim": "The shopper session cookie is named and none of its attributes is stated.",
     "tier": "must-find",
@@ -80,7 +80,7 @@
     "requirement": "V6.3.1",
     "affected_element_ids": [
       "entity:shopper",
-      "flow:shopper-to-storefront-api:place-order"
+      "flow:entity:shopper>process:storefront-api>place-order"
     ],
     "claim": "The shopper login carries no stated control against credential stuffing or password brute force.",
     "tier": "must-find",
@@ -92,7 +92,7 @@
     "requirement": "V7.4.1",
     "affected_element_ids": [
       "process:storefront-api",
-      "flow:shopper-to-storefront-api:place-order"
+      "flow:entity:shopper>process:storefront-api>place-order"
     ],
     "claim": "Nothing states whether a terminated shopper session stops being accepted.",
     "tier": "must-find",
@@ -116,7 +116,7 @@
     "affected_element_ids": [
       "process:order-service",
       "store:orders-db",
-      "flow:order-service-to-orders-db:read-write-orders"
+      "flow:process:order-service>store:orders-db>read-write-orders"
     ],
     "claim": "The order service reaches the orders database through one application account holding full read and write on every table.",
     "tier": "must-find",
@@ -153,7 +153,7 @@
     "affected_element_ids": [
       "process:storefront-api",
       "process:order-service",
-      "flow:storefront-api-to-order-service:submit-order"
+      "flow:process:storefront-api>process:order-service>submit-order"
     ],
     "claim": "The gRPC link between the storefront API and the order service states no transport protection.",
     "tier": "must-find",
@@ -165,7 +165,7 @@
     "requirement": "V13.3.1",
     "affected_element_ids": [
       "process:order-service",
-      "flow:order-service-to-orders-db:read-write-orders"
+      "flow:process:order-service>store:orders-db>read-write-orders"
     ],
     "claim": "The database password reaches the worker through an environment variable, and nothing says whether a secrets manager holds or injects it.",
     "tier": "must-find",
@@ -200,7 +200,7 @@
     "requirement": "V16.2.1",
     "affected_element_ids": [
       "store:receipt-archive",
-      "flow:order-service-to-receipt-archive:append-receipt"
+      "flow:process:order-service>store:receipt-archive>append-receipt"
     ],
     "claim": "Receipt archive entries name the order service rather than the acting shopper.",
     "tier": "must-find",

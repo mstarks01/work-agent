@@ -12,14 +12,14 @@ The requirement asks which side enforces a validation rule. The model answers wh
   "direction": "question",
   "needs_evidence": "prose",
   "title": "No enforcement side is stated for input validation on the customer path",
-  "description": "V2.2.2 asks that validation is enforced on a trusted service layer rather than on the client. It applies here because `entity:customer` is a human external entity in `boundary:public-internet` and `flow:customer-to-web-api:submit-payment` is a derived boundary crossing into `boundary:dmz`, so an untrusted side exists and it submits payment instructions. The notes describe what the customer sends and never describe any validation of it, on either side. The requirement applies and the input does not settle it; naming which element rejects a malformed transfer would settle it.",
+  "description": "V2.2.2 asks that validation is enforced on a trusted service layer rather than on the client. It applies here because `entity:customer` is a human external entity in `boundary:public-internet` and `flow:entity:customer>process:web-api>submit-payment` is a derived boundary crossing into `boundary:dmz`, so an untrusted side exists and it submits payment instructions. The notes describe what the customer sends and never describe any validation of it, on either side. The requirement applies and the input does not settle it; naming which element rejects a malformed transfer would settle it.",
   "affected_element_ids": [
     "entity:customer",
     "process:web-api",
-    "flow:customer-to-web-api:submit-payment"
+    "flow:entity:customer>process:web-api>submit-payment"
   ],
   "evidence_refs": [
-    "crossing:flow:customer-to-web-api:submit-payment"
+    "crossing:flow:entity:customer>process:web-api>submit-payment"
   ],
   "quotes": []
 }
@@ -40,7 +40,7 @@ A documentation requirement. The subject is an artifact of the organization, not
     "process:web-api"
   ],
   "evidence_refs": [
-    "crossing:flow:customer-to-web-api:submit-payment"
+    "crossing:flow:entity:customer>process:web-api>submit-payment"
   ],
   "quotes": []
 }

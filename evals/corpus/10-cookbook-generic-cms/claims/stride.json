@@ -2,7 +2,7 @@
   {
     "category": "spoofing",
     "affected_element_ids": [
-      "flow:admin-to-mysql-database:direct-administration",
+      "flow:entity:admin>store:mysql-database>direct-administration",
       "entity:admin"
     ],
     "claim": "An attacker holding the admin's database credentials connects to MySQL as the admin from anywhere on the internet, since there is no jump host in the way.",
@@ -17,7 +17,7 @@
   {
     "category": "spoofing",
     "affected_element_ids": [
-      "flow:web-server-to-cdn-bucket:asset-publish",
+      "flow:process:web-server>store:cdn-bucket>asset-publish",
       "store:cdn-bucket"
     ],
     "claim": "An attacker publishes assets into the CDN bucket as if they came from the web server, because how that push is authenticated is unverified.",
@@ -32,7 +32,7 @@
   {
     "category": "spoofing",
     "affected_element_ids": [
-      "flow:reader-to-web-server:page-requests",
+      "flow:entity:reader>process:web-server>page-requests",
       "entity:reader"
     ],
     "claim": "An attacker takes over a signed-in reader's session, since nothing is stated about how those sessions are handled.",
@@ -47,7 +47,7 @@
   {
     "category": "tampering",
     "affected_element_ids": [
-      "flow:reader-to-cdn:asset-fetch"
+      "flow:entity:reader>entity:cdn>asset-fetch"
     ],
     "claim": "An attacker on the network path rewrites a stylesheet or script in flight before it reaches the reader, because assets are fetched over plain HTTP.",
     "tier": "must-find",
@@ -76,7 +76,7 @@
   {
     "category": "tampering",
     "affected_element_ids": [
-      "flow:admin-to-mysql-database:direct-administration"
+      "flow:entity:admin>store:mysql-database>direct-administration"
     ],
     "claim": "An attacker on the network path modifies the admin's statements in flight, because the connection carries no TLS.",
     "tier": "must-find",
@@ -105,7 +105,7 @@
   {
     "category": "repudiation",
     "affected_element_ids": [
-      "flow:admin-to-mysql-database:direct-administration",
+      "flow:entity:admin>store:mysql-database>direct-administration",
       "process:web-server"
     ],
     "claim": "Content is changed directly in the database and no CMS record shows who changed it, because that path bypasses the CMS entirely.",
@@ -121,7 +121,7 @@
     "category": "repudiation",
     "affected_element_ids": [
       "store:mysql-database",
-      "flow:reader-to-web-server:page-requests"
+      "flow:entity:reader>process:web-server>page-requests"
     ],
     "claim": "A reader disputes a comment recorded against their account and the site cannot show it came from their session, since nothing about how sign-in is handled is stated.",
     "tier": "expected",
@@ -135,7 +135,7 @@
   {
     "category": "information-disclosure",
     "affected_element_ids": [
-      "flow:admin-to-mysql-database:direct-administration"
+      "flow:entity:admin>store:mysql-database>direct-administration"
     ],
     "claim": "An attacker sniffing the admin's unsecured MySQL connection reads account and comment records in clear text.",
     "tier": "must-find",
@@ -163,7 +163,7 @@
   {
     "category": "information-disclosure",
     "affected_element_ids": [
-      "flow:reader-to-cdn:asset-fetch",
+      "flow:entity:reader>entity:cdn>asset-fetch",
       "entity:reader"
     ],
     "claim": "An attacker watching a reader's plain-HTTP asset fetches learns which pages that reader is viewing.",
@@ -207,7 +207,7 @@
     "category": "denial-of-service",
     "affected_element_ids": [
       "store:mysql-database",
-      "flow:admin-to-mysql-database:direct-administration"
+      "flow:entity:admin>store:mysql-database>direct-administration"
     ],
     "claim": "An attacker on the direct MySQL path runs queries expensive enough that the web server cannot serve pages.",
     "tier": "expected",
@@ -221,7 +221,7 @@
   {
     "category": "elevation-of-privilege",
     "affected_element_ids": [
-      "flow:admin-to-mysql-database:direct-administration",
+      "flow:entity:admin>store:mysql-database>direct-administration",
       "store:mysql-database"
     ],
     "claim": "An attacker who intercepts the admin's unencrypted session obtains database authority that bypasses every control the CMS applies.",
@@ -237,7 +237,7 @@
     "category": "elevation-of-privilege",
     "affected_element_ids": [
       "store:cdn-bucket",
-      "flow:reader-to-cdn:asset-fetch"
+      "flow:entity:reader>entity:cdn>asset-fetch"
     ],
     "claim": "An attacker who plants a script in the CDN bucket runs code in every reader's browser in the site's own context.",
     "tier": "must-find",

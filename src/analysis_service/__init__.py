@@ -123,6 +123,8 @@ from analysis_service.sources import (
 )
 from analysis_service.system_model import (
     CORE_ASSET_TAGS,
+    FLOW_ID_RULES,
+    FLOW_ID_VERSION,
     UNKNOWN,
     Assumption,
     BoundaryCrossing,
@@ -130,6 +132,8 @@ from analysis_service.system_model import (
     DataStore,
     Element,
     ExternalEntity,
+    FlowIdError,
+    FlowParts,
     Process,
     SystemModel,
     TrustBoundary,
@@ -139,6 +143,7 @@ from analysis_service.system_model import (
     make_flow_id,
     normalize_element_ids,
     normalize_name,
+    parse_flow_id,
 )
 from analysis_service.token_caps import TOKEN_CAPS, alarm_at
 from analysis_service.validation import (
@@ -152,6 +157,8 @@ __all__ = [
     "CORE_ASSET_TAGS",
     "DEFAULT_CALLER",
     "DEFAULT_DISCLAIMER",
+    "FLOW_ID_RULES",
+    "FLOW_ID_VERSION",
     "FRAMEWORK_NAMES",
     "FRAMEWORK_NODES",
     "GENERIC_FAILURE_MESSAGE",
@@ -183,6 +190,8 @@ __all__ = [
     "EngineDeadlineError",
     "EngineInputError",
     "ExternalEntity",
+    "FlowIdError",
+    "FlowParts",
     "FrameworkAnalysis",
     "FrameworkConfigError",
     "FrameworkName",
@@ -263,6 +272,7 @@ __all__ = [
     "normalize_name",
     "package_for",
     "parse_and_validate",
+    "parse_flow_id",
     "render_sources",
     "schemas_for",
     "split_sections",

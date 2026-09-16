@@ -36,7 +36,8 @@ from analysis_service.compact import FULL_FORMAT, parse_extraction
 from analysis_service.frameworks import PACKAGES
 from analysis_service.frameworks.stride.record import Threat
 from analysis_service.report import Report
-from evals.harness import modes
+from analysis_service.system_model import FLOW_ID_RULES
+from evals.harness import flow_ids, modes
 from evals.harness.archive import archive_bytes
 from evals.harness.reference import GoldenCase
 
@@ -399,18 +400,43 @@ def assertions_from_reports(
     node do over a live emission. The ``catalog`` beside it is what the sweep
     counted on the day; the resolver has moved since (#940, #964), and a
     replay grades the proposal under the resolver that stands.
+
+    A proposal's subjects are lifted to the flow identity version the case's
+    graph is at before it is resolved (#989, ADR 0037 rule 4). A row naming an
+    interaction spells the flow ID the way the version the sweep ran under
+    spelled it, and resolving that against a migrated graph binds nothing — the
+    row would read as a subject the graph refuses rather than as a reading taken
+    under another rule. The lift is derived from the graph's own endpoints and is
+    a no-op on a proposal already at this version.
     """
     results = {}
     for case, written in _case_files(artifact, cases, ".assertions.json"):
+        lifted = _lift_proposal(written["proposal"], case)
         record = AssertionRecord.of(
-            CatalogProposal.model_validate(written["proposal"]),
+            CatalogProposal.model_validate(lifted),
             case.model,
             _source_texts(case),
         )
         results[case.id] = modes.AssertionResult(
             case_id=case.id,
-            proposal=written["proposal"],
+            proposal=lifted,
             catalog=record.catalog,
             issues=tuple(record.issues),
         )
     return results
+
+
+def _lift_proposal(proposal: Any, case: GoldenCase) -> Any:
+    """One archived proposal with every flow ID moved to the graph's version.
+
+    Every version but the graph's own, so the lift is total rather than a guess
+    about which one an archive holds: each table is keyed by the ID that version
+    derives, and an archive at the current version contributes an empty one.
+    """
+    raw = case.model.model_dump(mode="json")
+    current = flow_ids.flow_id_version_of_graph(raw)
+    table: dict[str, str] = {}
+    for version in FLOW_ID_RULES:
+        if version != current:
+            table.update(flow_ids.table_between(raw, version, current))
+    return flow_ids.lift_value(proposal, table)

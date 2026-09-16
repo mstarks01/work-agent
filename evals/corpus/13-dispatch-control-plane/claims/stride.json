@@ -2,7 +2,7 @@
   {
     "category": "spoofing",
     "affected_element_ids": [
-      "flow:schedule-importer-to-dispatch-api:post-work-orders",
+      "flow:process:schedule-importer>process:dispatch-api>post-work-orders",
       "process:schedule-importer",
       "process:dispatch-api"
     ],
@@ -18,7 +18,7 @@
   {
     "category": "spoofing",
     "affected_element_ids": [
-      "flow:dispatch-console-to-dispatch-api:live-job-status",
+      "flow:process:dispatch-console>process:dispatch-api>live-job-status",
       "process:dispatch-api"
     ],
     "claim": "An attacker opens a WebSocket to the dispatch API in a duty engineer's name, because nothing states what the handshake checks.",
@@ -33,7 +33,7 @@
   {
     "category": "spoofing",
     "affected_element_ids": [
-      "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
+      "flow:process:schedule-importer>entity:scheduling-partner>pull-schedule-feed",
       "entity:scheduling-partner",
       "process:schedule-importer"
     ],
@@ -49,7 +49,7 @@
   {
     "category": "spoofing",
     "affected_element_ids": [
-      "flow:duty-engineer-to-dispatch-console:open-console",
+      "flow:entity:duty-engineer>process:dispatch-console>open-console",
       "process:dispatch-console"
     ],
     "claim": "An attacker signs in to the dispatch console as a duty engineer, because nothing states what the sign-in checks.",
@@ -64,7 +64,7 @@
   {
     "category": "tampering",
     "affected_element_ids": [
-      "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
+      "flow:process:schedule-importer>entity:scheduling-partner>pull-schedule-feed",
       "process:schedule-importer",
       "process:dispatch-api"
     ],
@@ -80,7 +80,7 @@
   {
     "category": "tampering",
     "affected_element_ids": [
-      "flow:dispatch-console-to-dispatch-api:dispatch-requests",
+      "flow:process:dispatch-console>process:dispatch-api>dispatch-requests",
       "process:dispatch-api"
     ],
     "claim": "An attacker on the corporate network alters a dispatch request on its way into the control plane, because nothing states the call is encrypted.",
@@ -96,7 +96,7 @@
     "category": "tampering",
     "affected_element_ids": [
       "store:dispatch-database",
-      "flow:dispatch-api-to-dispatch-database:read-write-job-orders"
+      "flow:process:dispatch-api>store:dispatch-database>read-write-job-orders"
     ],
     "claim": "An attacker inside the control plane writes job orders straight into the dispatch database, because nothing states what the connection checks.",
     "tier": "expected",
@@ -111,7 +111,7 @@
     "category": "tampering",
     "affected_element_ids": [
       "store:schedule-archive",
-      "flow:schedule-importer-to-schedule-archive:store-schedule-documents"
+      "flow:process:schedule-importer>store:schedule-archive>store-schedule-documents"
     ],
     "claim": "An attacker rewrites a document in the schedule archive so the kept copy no longer matches what the partner sent.",
     "tier": "expected",
@@ -141,7 +141,7 @@
     "category": "repudiation",
     "affected_element_ids": [
       "process:schedule-importer",
-      "flow:schedule-importer-to-dispatch-api:post-work-orders",
+      "flow:process:schedule-importer>process:dispatch-api>post-work-orders",
       "store:schedule-archive"
     ],
     "claim": "The scheduling partner denies sending a work order, and nothing ties the posted order to the archived document it was parsed from.",
@@ -156,7 +156,7 @@
   {
     "category": "information-disclosure",
     "affected_element_ids": [
-      "flow:dispatch-console-to-dispatch-api:live-job-status"
+      "flow:process:dispatch-console>process:dispatch-api>live-job-status"
     ],
     "claim": "An attacker on the corporate network reads the live job status stream, because nothing states the WebSocket runs over TLS.",
     "tier": "must-find",
@@ -185,7 +185,7 @@
     "category": "information-disclosure",
     "affected_element_ids": [
       "process:schedule-importer",
-      "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed"
+      "flow:process:schedule-importer>entity:scheduling-partner>pull-schedule-feed"
     ],
     "claim": "An attacker returns an XML document whose external entity makes the importer read a file off the corporate network and hand it back.",
     "tier": "expected",
@@ -200,7 +200,7 @@
     "category": "information-disclosure",
     "affected_element_ids": [
       "store:schedule-archive",
-      "flow:schedule-importer-to-schedule-archive:store-schedule-documents"
+      "flow:process:schedule-importer>store:schedule-archive>store-schedule-documents"
     ],
     "claim": "An attacker who reaches the corporate file store reads the partner's schedule documents out of the archive.",
     "tier": "expected",
@@ -215,7 +215,7 @@
     "category": "denial-of-service",
     "affected_element_ids": [
       "process:dispatch-api",
-      "flow:dispatch-console-to-dispatch-api:live-job-status"
+      "flow:process:dispatch-console>process:dispatch-api>live-job-status"
     ],
     "claim": "An attacker holds open enough WebSockets to the dispatch API that duty engineers lose live job status.",
     "tier": "must-find",
@@ -230,7 +230,7 @@
     "category": "denial-of-service",
     "affected_element_ids": [
       "process:schedule-importer",
-      "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed"
+      "flow:process:schedule-importer>entity:scheduling-partner>pull-schedule-feed"
     ],
     "claim": "An attacker returns an XML document large enough that the hourly import never finishes and tomorrow's work never reaches the control plane.",
     "tier": "expected",
@@ -244,7 +244,7 @@
   {
     "category": "elevation-of-privilege",
     "affected_element_ids": [
-      "flow:schedule-importer-to-dispatch-api:post-work-orders",
+      "flow:process:schedule-importer>process:dispatch-api>post-work-orders",
       "process:dispatch-api",
       "boundary:production-control-plane"
     ],
@@ -260,7 +260,7 @@
   {
     "category": "elevation-of-privilege",
     "affected_element_ids": [
-      "flow:dispatch-console-to-dispatch-api:dispatch-requests",
+      "flow:process:dispatch-console>process:dispatch-api>dispatch-requests",
       "process:dispatch-api"
     ],
     "claim": "An attacker gets a duty engineer's browser to dispatch a crew from a page the attacker controls, because the API's allowed origins and its credential rule are unrecorded.",
@@ -276,7 +276,7 @@
     "category": "elevation-of-privilege",
     "affected_element_ids": [
       "process:dispatch-console",
-      "flow:dispatch-console-to-dispatch-api:dispatch-requests"
+      "flow:process:dispatch-console>process:dispatch-api>dispatch-requests"
     ],
     "claim": "An attacker who can publish on the corporate web host serves script from the console's own origin and dispatches crews with it.",
     "tier": "expected",

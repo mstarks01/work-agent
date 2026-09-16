@@ -270,10 +270,10 @@ class TestGround:
             },
             {
                 "kind": "absent-attribute",
-                "element_id": "flow:a-to-b:x",
+                "element_id": "flow:process:a>process:b>x",
                 "attribute": "authentication",
             },
-            {"kind": "derived-fact", "flow_id": "flow:a-to-b:x"},
+            {"kind": "derived-fact", "flow_id": "flow:process:a>process:b>x"},
             {
                 "kind": "assertion",
                 "assertion": "assertion:mfa-requirement~principal:shoppers~any~absent",
@@ -290,7 +290,7 @@ class TestGround:
             {"kind": "quote", "source_label": "Doc"},  # no text
             {"kind": "unknown-attribute", "element_id": "store:orders-db"},
             {"kind": "unknown-attribute", "attribute": "exposure"},
-            {"kind": "absent-attribute", "element_id": "flow:a-to-b:x"},
+            {"kind": "absent-attribute", "element_id": "flow:process:a>process:b>x"},
             {"kind": "absent-attribute", "attribute": "authentication"},
             {"kind": "derived-fact"},
             {"kind": "assertion"},
@@ -315,7 +315,10 @@ class TestGround:
         shape check cannot separate them and is not asked to: what an attribute
         *states* is the branch, and a record where the two disagreed would be
         the thing this validator exists to make unreachable."""
-        fields = {"element_id": "flow:a-to-b:x", "attribute": "authentication"}
+        fields = {
+            "element_id": "flow:process:a>process:b>x",
+            "attribute": "authentication",
+        }
 
         unknown = Ground(kind="unknown-attribute", **fields)
         absent = Ground(kind="absent-attribute", **fields)
@@ -327,7 +330,11 @@ class TestGround:
 
     def test_unknown_fields_are_forbidden(self):
         with pytest.raises(ValidationError):
-            Ground(kind="derived-fact", flow_id="flow:a-to-b:x", fact="invented")
+            Ground(
+                kind="derived-fact",
+                flow_id="flow:process:a>process:b>x",
+                fact="invented",
+            )
 
     def test_a_pointer_spelled_attribute_arrives_bare(self):
         """``/exposure`` names the field ``exposure``, and is stored as it."""
@@ -458,7 +465,7 @@ class TestReportInvariants:
             grounds=[
                 Ground(
                     kind="derived-fact",
-                    flow_id="flow:web-app-to-orders-db:store-order",
+                    flow_id="flow:process:web-app>store:orders-db>store-order",
                 )
             ]
         )

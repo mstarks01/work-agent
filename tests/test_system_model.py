@@ -1,21 +1,30 @@
 """Tests for the canonical System Model schema and derived boundary crossings."""
 
+import re
+
 import pytest
 from pydantic import ValidationError
 
 from analysis_service.system_model import (
+    ELEMENT_ID,
+    FLOW_DELIMITER,
+    FLOW_ID_RULES,
     Assumption,
     DataFlow,
     ExternalEntity,
+    FlowIdError,
     ModelIndex,
     Process,
     SystemModel,
     TrustBoundary,
     derive_element_id,
+    flow_id_version,
+    flow_label,
     make_element_id,
     make_flow_id,
     normalize_element_ids,
     normalize_name,
+    parse_flow_id,
 )
 from analysis_service.validation import validate
 from tests.factories import valid_model
@@ -33,9 +42,113 @@ class TestIdentity:
     def test_make_element_id_is_deterministic_from_type_and_name(self):
         assert make_element_id("process", "Auth Service") == "process:auth-service"
 
-    def test_make_flow_id_strips_endpoint_prefixes(self):
+    def test_make_flow_id_carries_both_endpoints_whole(self):
         flow_id = make_flow_id("entity:user", "process:web-app", "Login")
-        assert flow_id == "flow:user-to-web-app:login"
+        assert flow_id == "flow:entity:user>process:web-app>login"
+
+    def test_two_same_named_endpoints_of_two_types_derive_two_flows(self):
+        """#961 finding 5, at the derivation rather than at the gate."""
+        entity = make_flow_id("entity:x", "store:y", "read")
+        process = make_flow_id("process:x", "store:y", "read")
+
+        assert entity != process
+
+
+class TestTheFlowIdentityIsVersioned:
+    """ADR 0037: an encoding with a decoder, a version, and disjoint shapes."""
+
+    @pytest.mark.parametrize("version", sorted(FLOW_ID_RULES))
+    def test_every_version_decodes_its_own_output(self, version):
+        """Asked of every entry in the table, over the parts every rule keeps.
+
+        The label is the part a version-blind caller asks for, so it is the part
+        held here. What the endpoint halves hold is the version's own business —
+        version 1 recovers name slugs because its derivation dropped the type —
+        and the two tests below hold each rule to what it actually keeps.
+        """
+        built = FLOW_ID_RULES[version].build(
+            "entity:card-processor", "store:orders-db", "Read Orders"
+        )
+
+        assert parse_flow_id(built, version).label == "read-orders"
+
+    def test_the_current_version_round_trips_its_typed_endpoints(self):
+        """What ADR 0037 rule 2 asks for: the ID decodes back to what built it."""
+        built = make_flow_id("entity:card-processor", "store:orders-db", "Read Orders")
+
+        parts = parse_flow_id(built)
+
+        assert (parts.source, parts.destination, parts.label) == (
+            "entity:card-processor",
+            "store:orders-db",
+            "read-orders",
+        )
+        assert make_flow_id(parts.source, parts.destination, parts.label) == built
+
+    def test_version_1_recovers_name_slugs_and_not_the_types(self):
+        """The fact the migration exists for, stated as a property of the rule."""
+        built = make_flow_id("entity:card-processor", "store:orders-db", "Read", 1)
+
+        parts = parse_flow_id(built, version=1)
+
+        assert (parts.source, parts.destination) == ("card-processor", "orders-db")
+
+    def test_the_delimiter_cannot_occur_inside_a_part(self):
+        """What makes the split into three fields sound.
+
+        Asked of the grammar and of the slug rule rather than of one example: a
+        part is a prefix and a slug, and neither admits the delimiter, so
+        splitting on it yields exactly the three fields that were joined.
+        """
+        assert not re.match(ELEMENT_ID, f"process:a{FLOW_DELIMITER}b")
+        assert not re.match(ELEMENT_ID, f"pro{FLOW_DELIMITER}cess:a")
+        assert FLOW_DELIMITER not in normalize_name(f"a{FLOW_DELIMITER}b")
+
+    def test_a_version_1_id_whose_slugs_carry_the_separator_is_undecidable(self):
+        """Why the migration reads the graph: version 1 cannot be decoded here."""
+        with pytest.raises(FlowIdError, match="splits 3 ways"):
+            parse_flow_id("flow:a-to-b-to-c:read", version=1)
+
+    def test_the_versions_shapes_are_disjoint(self):
+        """Each version's own output is read back as that version and no other."""
+        for version, rule in FLOW_ID_RULES.items():
+            built = rule.build("entity:user", "process:web-app", "Login")
+            assert flow_id_version(built) == version
+
+    def test_an_id_no_version_wrote_is_not_given_one(self):
+        with pytest.raises(FlowIdError, match="0 flow identity shapes"):
+            flow_id_version("entity:user")
+
+    def test_the_label_is_read_under_whichever_rule_wrote_the_id(self):
+        for rule in FLOW_ID_RULES.values():
+            built = rule.build("process:web-app", "store:orders-db", "Read Write")
+            assert flow_label(built) == "read-write"
+
+    def test_the_schema_admits_every_version_whose_decoder_ships(self):
+        """A version in the table is a shape the gate accepts, on one line.
+
+        Archived emissions and archived reports hold earlier shapes and are read
+        back through this schema, so a version dropped from the pattern would
+        make an archive unloadable rather than merely stale.
+        """
+        for rule in FLOW_ID_RULES.values():
+            built = rule.build("entity:user", "process:web-app", "Login")
+            assert re.match(ELEMENT_ID, built), built
+
+    def test_a_string_of_another_version_is_refused_rather_than_decoded(self):
+        """The decoder validates before it splits.
+
+        Three fields under the delimiter is not the same fact as three legal
+        parts: ``flow:a>b>c`` splits cleanly and names nothing.
+        """
+        with pytest.raises(FlowIdError, match="is not a version 2 flow ID"):
+            parse_flow_id("flow:a>b>c")
+        with pytest.raises(FlowIdError, match="is not a version 1 flow ID"):
+            parse_flow_id(make_flow_id("entity:x", "store:y", "read"), version=1)
+
+    def test_an_unknown_version_raises_rather_than_falling_back(self):
+        with pytest.raises(FlowIdError, match="no flow identity rule"):
+            make_flow_id("entity:user", "process:web-app", "Login", version=99)
 
 
 class TestSchema:
@@ -74,7 +187,9 @@ class TestLookups:
     def test_get_finds_elements_of_every_type(self):
         model = valid_model()
         assert isinstance(model.get("entity:customer"), ExternalEntity)
-        assert isinstance(model.get("flow:customer-to-web-app:login"), DataFlow)
+        assert isinstance(
+            model.get("flow:entity:customer>process:web-app>login"), DataFlow
+        )
         assert model.get("process:nonexistent") is None
 
     def test_elements_returns_all_in_stable_order(self):
@@ -89,14 +204,14 @@ class TestBoundaryCrossings:
     def test_cross_zone_flow_is_derived_as_crossing(self):
         crossings = valid_model().boundary_crossings()
         assert [crossing.flow_id for crossing in crossings] == [
-            "flow:customer-to-web-app:login"
+            "flow:entity:customer>process:web-app>login"
         ]
         assert crossings[0].source_zone == "boundary:internet"
         assert crossings[0].destination_zone == "boundary:internal-network"
 
     def test_same_zone_flow_is_not_a_crossing(self):
         crossing_ids = {c.flow_id for c in valid_model().boundary_crossings()}
-        assert "flow:web-app-to-orders-db:store-order" not in crossing_ids
+        assert "flow:process:web-app>store:orders-db>store-order" not in crossing_ids
 
     def test_dangling_endpoint_fails_closed(self):
         model = valid_model()
@@ -253,7 +368,8 @@ class TestNormalizeElementIds:
         model = valid_model()
         assert derive_element_id(model.processes[0]) == "process:web-app"
         assert (
-            derive_element_id(model.data_flows[0]) == "flow:customer-to-web-app:login"
+            derive_element_id(model.data_flows[0])
+            == "flow:entity:customer>process:web-app>login"
         )
 
     def test_abbreviated_id_is_replaced_by_the_name_slug(self):
@@ -270,7 +386,7 @@ class TestNormalizeElementIds:
     def test_flow_ids_are_rebuilt_from_the_derived_endpoints(self):
         normalized = normalize_element_ids(self.abbreviated())
         assert normalized.data_flows[0].id == (
-            "flow:customer-to-web-app-frontend-service:login"
+            "flow:entity:customer>process:web-app-frontend-service>login"
         )
 
     def test_normalizing_an_abbreviated_model_makes_it_valid(self):

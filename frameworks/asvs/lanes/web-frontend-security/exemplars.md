@@ -12,14 +12,14 @@ A session cookie is named outright. Its attributes and its name are not, and eac
   "direction": "question",
   "needs_evidence": "config",
   "title": "The customer session cookie's Secure attribute and prefix are never stated",
-  "description": "V3.3.1 asks that a cookie carries the `Secure` attribute and that its name carries the `__Host-` prefix, or failing that the `__Secure-` prefix. It applies here because `flow:customer-to-web-api:submit-payment` authenticates `entity:customer` with a session cookie issued after a password login, which is a browser-delivered credential and puts this system inside the chapter's scope. The notes name the cookie and say nothing about its attributes or its name; `HttpOnly` and `SameSite` are other requirements in this section and are not ruled here. The requirement applies and the input does not settle it. The `Set-Cookie` header the web API actually emits would settle it.",
+  "description": "V3.3.1 asks that a cookie carries the `Secure` attribute and that its name carries the `__Host-` prefix, or failing that the `__Secure-` prefix. It applies here because `flow:entity:customer>process:web-api>submit-payment` authenticates `entity:customer` with a session cookie issued after a password login, which is a browser-delivered credential and puts this system inside the chapter's scope. The notes name the cookie and say nothing about its attributes or its name; `HttpOnly` and `SameSite` are other requirements in this section and are not ruled here. The requirement applies and the input does not settle it. The `Set-Cookie` header the web API actually emits would settle it.",
   "affected_element_ids": [
     "entity:customer",
     "process:web-api",
-    "flow:customer-to-web-api:submit-payment"
+    "flow:entity:customer>process:web-api>submit-payment"
   ],
   "evidence_refs": [
-    "crossing:flow:customer-to-web-api:submit-payment"
+    "crossing:flow:entity:customer>process:web-api>submit-payment"
   ],
   "quotes": [
     {
@@ -45,7 +45,7 @@ The HSTS requirement, one header rather than the family. The chapter's precondit
     "process:web-api"
   ],
   "evidence_refs": [
-    "crossing:flow:customer-to-web-api:submit-payment"
+    "crossing:flow:entity:customer>process:web-api>submit-payment"
   ],
   "quotes": []
 }

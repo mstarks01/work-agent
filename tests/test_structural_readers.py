@@ -89,7 +89,12 @@ def _asvs_block() -> FrameworkAnalysis:
         title="No password length policy is stated",
         description="The requirement applies and the input does not settle it.",
         affected_element_ids=["process:web-app"],
-        grounds=[Ground(kind="derived-fact", flow_id="flow:customer-to-web-app:login")],
+        grounds=[
+            Ground(
+                kind="derived-fact",
+                flow_id="flow:entity:customer>process:web-app>login",
+            )
+        ],
         verdict=Verdict(status="confirmed"),
     )
     return AsvsAnalysis(

@@ -26,7 +26,7 @@
     {
       "assertion": {
         "subject_type": "interaction",
-        "subject": "flow:calling-service-to-inference-gateway:submit-inference-request",
+        "subject": "flow:entity:calling-service>process:inference-gateway>submit-inference-request",
         "predicate": "authentication-mechanism",
         "value": "API key in a header",
         "reason": null,
@@ -124,7 +124,7 @@
     {
       "assertion": {
         "subject_type": "interaction",
-        "subject": "flow:inference-gateway-to-model-server:forward-request",
+        "subject": "flow:process:inference-gateway>process:model-server>forward-request",
         "predicate": "authentication-mechanism",
         "value": "absent",
         "reason": null,
@@ -186,7 +186,7 @@
     {
       "assertion": {
         "subject_type": "interaction",
-        "subject": "flow:model-server-to-model-registry-bucket:load-artifact",
+        "subject": "flow:process:model-server>store:model-registry-bucket>load-artifact",
         "predicate": "authentication-mechanism",
         "value": "the model server's own service account",
         "reason": null,
@@ -227,7 +227,7 @@
     {
       "assertion": {
         "subject_type": "interaction",
-        "subject": "flow:model-server-to-redis-feature-store:read-features",
+        "subject": "flow:process:model-server>store:redis-feature-store>read-features",
         "predicate": "authentication-mechanism",
         "value": "unknown",
         "reason": "hedged",
@@ -366,7 +366,7 @@
     {
       "assertion": {
         "subject_type": "interaction",
-        "subject": "flow:ml-engineer-to-model-registry-bucket:publish-artifact",
+        "subject": "flow:entity:ml-engineer>store:model-registry-bucket>publish-artifact",
         "predicate": "authentication-mechanism",
         "value": "unknown",
         "reason": "hedged",

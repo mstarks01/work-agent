@@ -100,11 +100,11 @@ Not part of the question, but the threats cite these names, so you need them.
 
 | id | source | destination | protocol | authentication | in transit |
 |---|---|---|---|---|---|
-| flow:shopper-to-storefront-api:place-order | entity:shopper | process:storefront-api | HTTPS | session cookie issued after email and password login; no MFA | unknown |
-| flow:card-processor-to-storefront-api:settlement-webhook | entity:card-processor | process:storefront-api | HTTPS POST | unknown | unknown |
-| flow:storefront-api-to-order-service:submit-order | process:storefront-api | process:order-service | gRPC | none; accepted by network position | unknown |
-| flow:order-service-to-orders-db:read-write-orders | process:order-service | store:orders-db | PostgreSQL wire protocol | single shared application account with full read/write; password from an environment variable | unknown |
-| flow:order-service-to-receipt-archive:append-receipt | process:order-service | store:receipt-archive | HTTPS | order service's own service account | TLS |
+| flow:entity:shopper>process:storefront-api>place-order | entity:shopper | process:storefront-api | HTTPS | session cookie issued after email and password login; no MFA | unknown |
+| flow:entity:card-processor>process:storefront-api>settlement-webhook | entity:card-processor | process:storefront-api | HTTPS POST | unknown | unknown |
+| flow:process:storefront-api>process:order-service>submit-order | process:storefront-api | process:order-service | gRPC | none; accepted by network position | unknown |
+| flow:process:order-service>store:orders-db>read-write-orders | process:order-service | store:orders-db | PostgreSQL wire protocol | single shared application account with full read/write; password from an environment variable | unknown |
+| flow:process:order-service>store:receipt-archive>append-receipt | process:order-service | store:receipt-archive | HTTPS | order service's own service account | TLS |
 
 **Trust boundaries**
 
@@ -147,7 +147,7 @@ of them. That is the finding this sitting exists for.
 
 **1.** An attacker who obtains a shopper's session cookie replays it against the storefront API and places orders as that shopper.
 
-- cites: `flow:shopper-to-storefront-api:place-order`, `entity:shopper`
+- cites: `flow:entity:shopper>process:storefront-api>place-order`, `entity:shopper`
 - tier: must-find · severity: high/high
 - recorded note: Single-factor session with no MFA on an internet-facing endpoint; the canonical finding for this flow.
 
@@ -155,7 +155,7 @@ of them. That is the finding this sitting exists for.
 
 **2.** An attacker POSTs a forged settlement webhook to the storefront API, impersonating the card processor to mark an unpaid order as paid.
 
-- cites: `flow:card-processor-to-storefront-api:settlement-webhook`, `process:storefront-api`
+- cites: `flow:entity:card-processor>process:storefront-api>settlement-webhook`, `process:storefront-api`
 - tier: must-find · severity: high/high
 - recorded note: Callback authentication is unknown on an internet-facing endpoint; must be reported as unverified, not assumed present.
 
@@ -163,7 +163,7 @@ of them. That is the finding this sitting exists for.
 
 **3.** Any workload that can reach the order service impersonates the storefront API on the unauthenticated gRPC channel and submits orders.
 
-- cites: `flow:storefront-api-to-order-service:submit-order`, `process:order-service`
+- cites: `flow:process:storefront-api>process:order-service>submit-order`, `process:order-service`
 - tier: must-find · severity: medium/high
 - recorded note: Authentication is stated as none, accepted by network position — a stated absence, not an unknown.
 
@@ -171,7 +171,7 @@ of them. That is the finding this sitting exists for.
 
 **4.** An attacker holding the shared application password connects to orders-db as the order service.
 
-- cites: `flow:order-service-to-orders-db:read-write-orders`, `store:orders-db`
+- cites: `flow:process:order-service>store:orders-db>read-write-orders`, `store:orders-db`
 - tier: expected · severity: medium/high
 - recorded note: Static shared secret from an environment variable; identity is the password.
 
@@ -181,7 +181,7 @@ of them. That is the finding this sitting exists for.
 
 **5.** An attacker positioned in the storefront tier modifies order contents in flight on the gRPC channel, whose transport protection is unverified.
 
-- cites: `flow:storefront-api-to-order-service:submit-order`
+- cites: `flow:process:storefront-api>process:order-service>submit-order`
 - tier: must-find · severity: medium/high
 - recorded note: Crosses dmz to core with authentication none and encryption_in_transit unknown.
 
@@ -189,7 +189,7 @@ of them. That is the finding this sitting exists for.
 
 **6.** An attacker with the shared full read/write database account alters order rows, changing prices or payment status directly.
 
-- cites: `store:orders-db`, `flow:order-service-to-orders-db:read-write-orders`
+- cites: `store:orders-db`, `flow:process:order-service>store:orders-db>read-write-orders`
 - tier: must-find · severity: medium/high
 - recorded note: No least privilege: the same credential that reads can rewrite every row.
 
@@ -197,7 +197,7 @@ of them. That is the finding this sitting exists for.
 
 **7.** An attacker replays or edits a settlement callback to flip the recorded payment state of an order they do not own.
 
-- cites: `flow:card-processor-to-storefront-api:settlement-webhook`, `store:orders-db`
+- cites: `flow:entity:card-processor>process:storefront-api>settlement-webhook`, `store:orders-db`
 - tier: expected · severity: medium/high
 - recorded note: Distinct from the spoofing entry: the target is the persisted order state, not the sender identity.
 
@@ -205,7 +205,7 @@ of them. That is the finding this sitting exists for.
 
 **8.** An attacker holding the order service's service account overwrites or deletes archived receipts to erase evidence of an order.
 
-- cites: `store:receipt-archive`, `flow:order-service-to-receipt-archive:append-receipt`
+- cites: `store:receipt-archive`, `flow:process:order-service>store:receipt-archive>append-receipt`
 - tier: expected · severity: low/medium
 - recorded note: The model states CMEK encryption but says nothing about object immutability or retention locks.
 
@@ -223,7 +223,7 @@ of them. That is the finding this sitting exists for.
 
 **10.** The processor disputes a settlement the storefront recorded, and no verifiable sender identity on the webhook lets either side prove who sent it.
 
-- cites: `flow:card-processor-to-storefront-api:settlement-webhook`
+- cites: `flow:entity:card-processor>process:storefront-api>settlement-webhook`
 - tier: expected · severity: medium/medium
 - recorded note: Follows from unknown callback authentication; a financial dispute path.
 
@@ -231,7 +231,7 @@ of them. That is the finding this sitting exists for.
 
 **11.** An operator makes a change through the shared application account and no record attributes that change to a person.
 
-- cites: `flow:order-service-to-orders-db:read-write-orders`, `store:orders-db`
+- cites: `flow:process:order-service>store:orders-db>read-write-orders`, `store:orders-db`
 - tier: expected · severity: medium/medium
 - recorded note: Shared credential collapses every actor into one database identity.
 
@@ -249,7 +249,7 @@ of them. That is the finding this sitting exists for.
 
 **13.** An attacker with access to the internal network reads order contents and shopper identifiers off the gRPC channel, whose encryption is unverified.
 
-- cites: `flow:storefront-api-to-order-service:submit-order`
+- cites: `flow:process:storefront-api>process:order-service>submit-order`
 - tier: must-find · severity: medium/high
 - recorded note: Same flow as the tampering entry; the lane difference is read versus modify.
 
@@ -257,7 +257,7 @@ of them. That is the finding this sitting exists for.
 
 **14.** An attacker observing the database connection reads PII in transit because transport encryption on it is unverified.
 
-- cites: `flow:order-service-to-orders-db:read-write-orders`
+- cites: `flow:process:order-service>store:orders-db>read-write-orders`
 - tier: expected · severity: medium/high
 - recorded note: Intra-zone flow, so lower exposure than the crossing above, but the same unknown.
 
@@ -265,7 +265,7 @@ of them. That is the finding this sitting exists for.
 
 **15.** An attacker who can read the order service's process environment, crash dumps or logs recovers the database password held in an environment variable.
 
-- cites: `process:order-service`, `flow:order-service-to-orders-db:read-write-orders`
+- cites: `process:order-service`, `flow:process:order-service>store:orders-db>read-write-orders`
 - tier: expected · severity: medium/high
 - recorded note: The credential's storage location is stated in the model, so this is grounded rather than speculative.
 
@@ -275,7 +275,7 @@ of them. That is the finding this sitting exists for.
 
 **16.** An attacker floods the unauthenticated settlement webhook endpoint until the storefront API stops serving shoppers.
 
-- cites: `flow:card-processor-to-storefront-api:settlement-webhook`, `process:storefront-api`
+- cites: `flow:entity:card-processor>process:storefront-api>settlement-webhook`, `process:storefront-api`
 - tier: must-find · severity: medium/medium
 - recorded note: An internet-facing endpoint with no verified caller identity is the cheapest flood target in the model.
 
@@ -291,7 +291,7 @@ of them. That is the finding this sitting exists for.
 
 **18.** An attacker floods the checkout path from the public internet and prevents shoppers from placing orders.
 
-- cites: `flow:shopper-to-storefront-api:place-order`, `process:storefront-api`
+- cites: `flow:entity:shopper>process:storefront-api>place-order`, `process:storefront-api`
 - tier: expected · severity: medium/medium
 - recorded note: Generic but grounded: the storefront API is the single internet-facing component.
 
@@ -301,7 +301,7 @@ of them. That is the finding this sitting exists for.
 
 **19.** An attacker with any foothold in the storefront tier gains order-writing privilege in the core zone, because the order service grants it on network position alone.
 
-- cites: `flow:storefront-api-to-order-service:submit-order`, `process:order-service`
+- cites: `flow:process:storefront-api>process:order-service>submit-order`, `process:order-service`
 - tier: must-find · severity: high/high
 - recorded note: The boundary crossing plus authentication none is the highest-signal fact in this model.
 
@@ -309,7 +309,7 @@ of them. That is the finding this sitting exists for.
 
 **20.** An attacker who compromises the order service inherits full read/write over every order record, because the service holds one unscoped database account.
 
-- cites: `flow:order-service-to-orders-db:read-write-orders`, `store:orders-db`
+- cites: `flow:process:order-service>store:orders-db>read-write-orders`, `store:orders-db`
 - tier: must-find · severity: medium/high
 - recorded note: Blast radius of a single compromise; distinct from the tampering entry, which assumes the credential is already held.
 
@@ -364,7 +364,7 @@ not be raised.
 
 **A3.** `V6.3.1` — The shopper login carries no second factor and no stated anti-automation control.
 
-- cites: `entity:shopper`, `flow:shopper-to-storefront-api:place-order`
+- cites: `entity:shopper`, `flow:entity:shopper>process:storefront-api>place-order`
 - tier: must-find
 - recorded note: The submitter states there is no MFA, so this half is settled rather than open.
 
@@ -374,7 +374,7 @@ not be raised.
 
 **A4.** `V8.2.2` — One shared account holds full read and write on every order record.
 
-- cites: `process:order-service`, `store:orders-db`, `flow:order-service-to-orders-db:read-write-orders`
+- cites: `process:order-service`, `store:orders-db`, `flow:process:order-service>store:orders-db>read-write-orders`
 - tier: must-find
 - recorded note: Stated outright, so the ruling is plain rather than conditional.
 
@@ -384,7 +384,7 @@ not be raised.
 
 **A5.** `V13.3.1` — The database password is held in an environment variable rather than a secret store.
 
-- cites: `process:order-service`, `flow:order-service-to-orders-db:read-write-orders`
+- cites: `process:order-service`, `flow:process:order-service>store:orders-db>read-write-orders`
 - tier: must-find
 - recorded note: Stated outright by the submitter.
 
@@ -414,7 +414,7 @@ not be raised.
 
 **A8.** `V1.2.4` — The order service reaches a PostgreSQL store and the input never says how its queries are built.
 
-- cites: `process:order-service`, `store:orders-db`, `flow:order-service-to-orders-db:read-write-orders`
+- cites: `process:order-service`, `store:orders-db`, `flow:process:order-service>store:orders-db>read-write-orders`
 - tier: must-find
 - recorded note: tech:database fires on store:orders-db. The requirement applies and no fact settles it.
 
@@ -434,7 +434,7 @@ not be raised.
 
 **A10.** `V12.3.3` — The gRPC link between the storefront API and the order service states no transport protection.
 
-- cites: `process:storefront-api`, `process:order-service`, `flow:storefront-api-to-order-service:submit-order`
+- cites: `process:storefront-api`, `process:order-service`, `flow:process:storefront-api>process:order-service>submit-order`
 - tier: must-find
 - recorded note: A derived crossing with encryption_in_transit unknown; the internal scope is not an exemption.
 
@@ -444,7 +444,7 @@ not be raised.
 
 **A11.** `V16.2.1` — Receipt archive entries name the order service rather than the acting shopper.
 
-- cites: `store:receipt-archive`, `flow:order-service-to-receipt-archive:append-receipt`
+- cites: `store:receipt-archive`, `flow:process:order-service>store:receipt-archive>append-receipt`
 - tier: must-find
 - recorded note: The submitter states the record's content, so the ruling is plain.
 
@@ -462,7 +462,7 @@ not be raised.
 
 **A13.** `V7.4.1` — Nothing states whether a terminated shopper session stops being accepted.
 
-- cites: `process:storefront-api`, `flow:shopper-to-storefront-api:place-order`
+- cites: `process:storefront-api`, `flow:entity:shopper>process:storefront-api>place-order`
 - tier: must-find
 - recorded note: A session cookie exists, so the chapter applies; termination is unstated.
 
@@ -488,7 +488,7 @@ not be raised.
 
 **A16.** `V2.2.2` — Nothing says which side enforces validation of the order the shopper submits.
 
-- cites: `entity:shopper`, `process:storefront-api`, `flow:shopper-to-storefront-api:place-order`
+- cites: `entity:shopper`, `process:storefront-api`, `flow:entity:shopper>process:storefront-api>place-order`
 - tier: must-find
 - recorded note: The crossing from the public zone is the fact that makes the requirement apply.
 
@@ -498,7 +498,7 @@ not be raised.
 
 **A17.** `V3.3.1` — The shopper session cookie is named and none of its attributes is stated.
 
-- cites: `entity:shopper`, `process:storefront-api`, `flow:shopper-to-storefront-api:place-order`
+- cites: `entity:shopper`, `process:storefront-api`, `flow:entity:shopper>process:storefront-api>place-order`
 - tier: must-find
 - recorded note: A browser-delivered credential puts this system in the chapter; the attributes are the requirement.
 

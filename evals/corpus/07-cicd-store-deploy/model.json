@@ -101,7 +101,7 @@
   ],
   "data_flows": [
     {
-      "id": "flow:developer-to-git-server:push-branches",
+      "id": "flow:entity:developer>store:git-server>push-branches",
       "name": "push branches",
       "description": "Developers push their branches to the git server; a merge to main is what starts a build.",
       "assets": [
@@ -118,7 +118,7 @@
       "operations": "write"
     },
     {
-      "id": "flow:developer-to-build-runner:manual-rebuild",
+      "id": "flow:entity:developer>process:build-runner>manual-rebuild",
       "name": "manual rebuild",
       "description": "Any developer can log in to the build runner and kick off a rebuild of main by hand.",
       "assets": [],
@@ -133,7 +133,7 @@
       "operations": "write"
     },
     {
-      "id": "flow:build-runner-to-git-server:fetch-source",
+      "id": "flow:process:build-runner>store:git-server>fetch-source",
       "name": "fetch source",
       "description": "The runner picks the merge up and fetches the source it is going to build.",
       "assets": [
@@ -150,7 +150,7 @@
       "operations": "read"
     },
     {
-      "id": "flow:build-runner-to-public-package-registry:resolve-dependencies",
+      "id": "flow:process:build-runner>entity:public-package-registry>resolve-dependencies",
       "name": "resolve dependencies",
       "description": "The runner resolves the lockfile against the public package registry and takes what it downloads as given.",
       "assets": [],
@@ -166,7 +166,7 @@
       "notes": "The source states one verification gap: the runner does not verify signatures on what it downloads. That is artifact authenticity under a signing trust policy, not how the runner authenticates to the registry, which the source never describes. This prose is the only record of it \u2014 no rule reads notes, so the gap reaches no candidate and no evidence entry until the assertion layer in #926 gives it a field."
     },
     {
-      "id": "flow:build-runner-to-image-registry:push-image",
+      "id": "flow:process:build-runner>store:image-registry>push-image",
       "name": "push image",
       "description": "The runner pushes the finished image, tagged with the commit sha, to the registry.",
       "assets": [
@@ -183,7 +183,7 @@
       "operations": "write"
     },
     {
-      "id": "flow:build-runner-to-deploy-controller:set-current-release",
+      "id": "flow:process:build-runner>process:deploy-controller>set-current-release",
       "name": "set current release",
       "description": "The runner calls the controller and asks it to make the image it just pushed the current release.",
       "assets": [
@@ -201,7 +201,7 @@
       "operations": "write"
     },
     {
-      "id": "flow:store-server-to-deploy-controller:poll-current-release",
+      "id": "flow:process:store-server>process:deploy-controller>poll-current-release",
       "name": "poll current release",
       "description": "Every store server asks the controller once a minute what the current release is; the store initiates, nothing is pushed to it.",
       "assets": [],
@@ -216,7 +216,7 @@
       "operations": "read"
     },
     {
-      "id": "flow:store-server-to-image-registry:pull-image",
+      "id": "flow:process:store-server>store:image-registry>pull-image",
       "name": "pull image",
       "description": "On a changed release the store server pulls that image from the registry over the WAN and restarts the container.",
       "assets": [

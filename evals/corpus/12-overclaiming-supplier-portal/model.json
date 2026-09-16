@@ -114,7 +114,7 @@
   ],
   "data_flows": [
     {
-      "id": "flow:supplier-to-supplier-portal:upload-documents",
+      "id": "flow:entity:supplier>process:supplier-portal>upload-documents",
       "name": "upload documents",
       "description": "Supplier uploads compliance paperwork to the portal.",
       "assets": [
@@ -132,7 +132,7 @@
       "operations": "write"
     },
     {
-      "id": "flow:category-manager-to-supplier-portal:review-documents",
+      "id": "flow:entity:category-manager>process:supplier-portal>review-documents",
       "name": "review documents",
       "description": "Category manager reviews uploaded paperwork and records an approval or rejection.",
       "assets": [
@@ -151,7 +151,7 @@
       "operations": "read-write"
     },
     {
-      "id": "flow:supplier-portal-to-document-store:store-documents",
+      "id": "flow:process:supplier-portal>store:document-store>store-documents",
       "name": "store documents",
       "description": "The portal puts uploaded documents into the vendor platform's store.",
       "assets": [
@@ -169,7 +169,7 @@
       "operations": "write"
     },
     {
-      "id": "flow:portal-vendor-to-landing-bucket:push-nightly-extract",
+      "id": "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract",
       "name": "push nightly extract",
       "description": "The vendor initiates a nightly push of the supplier data extract into our bucket.",
       "assets": [
@@ -188,7 +188,7 @@
       "operations": "write"
     },
     {
-      "id": "flow:supplier-master-service-to-landing-bucket:load-extract",
+      "id": "flow:process:supplier-master-service>store:landing-bucket>load-extract",
       "name": "load extract",
       "description": "The supplier master service picks the extract file up from the bucket as-is.",
       "assets": [
@@ -206,7 +206,7 @@
       "operations": "read"
     },
     {
-      "id": "flow:supplier-master-service-to-supplier-database:write-supplier-records",
+      "id": "flow:process:supplier-master-service>store:supplier-database>write-supplier-records",
       "name": "write supplier records",
       "description": "The service writes the loaded records into the supplier database.",
       "assets": [

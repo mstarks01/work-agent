@@ -12,14 +12,14 @@ The API exists — the model says so through the flows' protocols — and nothin
   "direction": "question",
   "needs_evidence": "code",
   "title": "The web API's response content types are never described",
-  "description": "V4.1.1 asks that each response carrying a body labels it with a Content-Type that matches what the body actually holds, charset included. It applies here because `process:web-api` is `internet-facing` and `flow:customer-to-web-api:submit-payment` and `flow:payments-provider-to-web-api:settlement-webhook` both speak HTTPS to it, so HTTP responses exist. The notes describe two callers and the payloads they send, and never describe what the web API sends back or how it labels a response. The requirement applies and the input does not settle it; the response handling in `process:web-api` would.",
+  "description": "V4.1.1 asks that each response carrying a body labels it with a Content-Type that matches what the body actually holds, charset included. It applies here because `process:web-api` is `internet-facing` and `flow:entity:customer>process:web-api>submit-payment` and `flow:entity:payments-provider>process:web-api>settlement-webhook` both speak HTTPS to it, so HTTP responses exist. The notes describe two callers and the payloads they send, and never describe what the web API sends back or how it labels a response. The requirement applies and the input does not settle it; the response handling in `process:web-api` would.",
   "affected_element_ids": [
     "process:web-api",
-    "flow:customer-to-web-api:submit-payment",
-    "flow:payments-provider-to-web-api:settlement-webhook"
+    "flow:entity:customer>process:web-api>submit-payment",
+    "flow:entity:payments-provider>process:web-api>settlement-webhook"
   ],
   "evidence_refs": [
-    "crossing:flow:payments-provider-to-web-api:settlement-webhook"
+    "crossing:flow:entity:payments-provider>process:web-api>settlement-webhook"
   ],
   "quotes": []
 }

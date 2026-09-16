@@ -5,7 +5,7 @@
     "affected_element_ids": [
       "entity:reader",
       "process:web-server",
-      "flow:reader-to-web-server:page-requests"
+      "flow:entity:reader>process:web-server>page-requests"
     ],
     "claim": "Sign-in exists for some readers and no cookie attribute is stated for the session it creates.",
     "tier": "must-find",
@@ -21,7 +21,7 @@
     "affected_element_ids": [
       "process:web-server",
       "entity:cdn",
-      "flow:reader-to-cdn:asset-fetch"
+      "flow:entity:reader>entity:cdn>asset-fetch"
     ],
     "claim": "Assets are fetched over plain HTTP, so no transport security header protects them.",
     "tier": "must-find",
@@ -34,7 +34,7 @@
     "affected_element_ids": [
       "entity:reader",
       "process:web-server",
-      "flow:reader-to-web-server:page-requests"
+      "flow:entity:reader>process:web-server>page-requests"
     ],
     "claim": "Nothing states how a reader session is represented or generated.",
     "tier": "must-find",
@@ -47,7 +47,7 @@
     "affected_element_ids": [
       "process:web-server",
       "store:mysql-database",
-      "flow:web-server-to-mysql-database:cms-data"
+      "flow:process:web-server>store:mysql-database>cms-data"
     ],
     "claim": "The web server builds MySQL queries for CMS content and nothing says how.",
     "tier": "must-find",

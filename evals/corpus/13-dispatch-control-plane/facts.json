@@ -5,7 +5,7 @@
     {
       "assertion": {
         "subject_type": "interaction",
-        "subject": "flow:duty-engineer-to-dispatch-console:open-console",
+        "subject": "flow:entity:duty-engineer>process:dispatch-console>open-console",
         "predicate": "authentication-mechanism",
         "value": "unknown",
         "reason": "hedged",
@@ -186,7 +186,7 @@
     {
       "assertion": {
         "subject_type": "interaction",
-        "subject": "flow:dispatch-console-to-dispatch-api:live-job-status",
+        "subject": "flow:process:dispatch-console>process:dispatch-api>live-job-status",
         "predicate": "transport-encryption",
         "value": "unknown",
         "reason": "hedged",
@@ -207,7 +207,7 @@
     {
       "assertion": {
         "subject_type": "interaction",
-        "subject": "flow:dispatch-console-to-dispatch-api:live-job-status",
+        "subject": "flow:process:dispatch-console>process:dispatch-api>live-job-status",
         "predicate": "authentication-mechanism",
         "value": "unknown",
         "reason": "hedged",
@@ -249,7 +249,7 @@
     {
       "assertion": {
         "subject_type": "interaction",
-        "subject": "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
+        "subject": "flow:process:schedule-importer>entity:scheduling-partner>pull-schedule-feed",
         "predicate": "transport-encryption",
         "value": "HTTPS",
         "reason": null,
@@ -270,7 +270,7 @@
     {
       "assertion": {
         "subject_type": "interaction",
-        "subject": "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
+        "subject": "flow:process:schedule-importer>entity:scheduling-partner>pull-schedule-feed",
         "predicate": "authentication-mechanism",
         "value": "unknown",
         "reason": "hedged",
@@ -291,7 +291,7 @@
     {
       "assertion": {
         "subject_type": "interaction",
-        "subject": "flow:schedule-importer-to-dispatch-api:post-work-orders",
+        "subject": "flow:process:schedule-importer>process:dispatch-api>post-work-orders",
         "predicate": "authentication-mechanism",
         "value": "API token",
         "reason": null,

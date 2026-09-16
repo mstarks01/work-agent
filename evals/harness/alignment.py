@@ -71,6 +71,7 @@ from analysis_service.analysis import states_a_protocol
 from analysis_service.system_model import (
     DataFlow,
     SystemModel,
+    flow_label,
     make_element_id,
     normalize_name,
 )
@@ -436,8 +437,14 @@ def _align_flows(
 
 
 def _label(flow: DataFlow) -> str:
-    """The describing half of a flow ID, which is the last of its segments."""
-    return flow.id.rsplit(":", 1)[-1]
+    """The describing half of a flow ID, read through the identity's own decoder.
+
+    A produced flow can carry any version's ID — an archived emission is read
+    back here — and the delegate answers under whichever rule wrote it. Read as
+    the last colon-separated segment while every flow ID ended in ``:<label>``,
+    which version 2 stopped being true of.
+    """
+    return flow_label(flow.id)
 
 
 def _signature(flow: DataFlow) -> tuple[str, ...]:
