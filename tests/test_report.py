@@ -6,6 +6,14 @@ from typing import get_args
 import pytest
 from pydantic import ValidationError
 
+from analysis_service.assertions import (
+    ABSENT,
+    Assertion,
+    AssertionCatalog,
+    AssertionRecord,
+    Subject,
+    assertion_id,
+)
 from analysis_service.claims import (
     CLAIM_BOUND_MARKS,
     CLAIM_ID_MAX_CHARS,
@@ -266,6 +274,10 @@ class TestGround:
                 "attribute": "authentication",
             },
             {"kind": "derived-fact", "flow_id": "flow:a-to-b:x"},
+            {
+                "kind": "assertion",
+                "assertion": "assertion:mfa-requirement~principal:shoppers~any~absent",
+            },
         ],
     )
     def test_each_branch_accepts_its_own_fields(self, fields):
@@ -281,6 +293,7 @@ class TestGround:
             {"kind": "absent-attribute", "element_id": "flow:a-to-b:x"},
             {"kind": "absent-attribute", "attribute": "authentication"},
             {"kind": "derived-fact"},
+            {"kind": "assertion"},
         ],
     )
     def test_a_branch_missing_its_own_fields_is_rejected(self, fields):
@@ -450,6 +463,43 @@ class TestReportInvariants:
             ]
         )
         with pytest.raises(ValidationError, match="not a derived boundary crossing"):
+            sample_report(threats=[threat])
+
+    def test_an_assertion_ground_resolves_against_the_embedded_catalog(self):
+        """A report that carries the row settles the ground; one without it refuses.
+
+        The same rule as a derived fact: the ground is a reference, and what it
+        references has to be in the artifact it rides on. A report built with
+        no assertion pass holds no catalog, so a claim citing a row is a claim
+        citing nothing.
+        """
+        row = Assertion(
+            subject="principal:shopper-accounts",
+            predicate="mfa-requirement",
+            value=ABSENT,
+            basis="inferred",
+            explanation="the description names password login only",
+        )
+        record = AssertionRecord(
+            proposed=1,
+            catalog=AssertionCatalog(
+                subjects=[
+                    Subject(
+                        id="principal:shopper-accounts",
+                        type="principal",
+                        label="shopper accounts",
+                    )
+                ],
+                entries=[row],
+            ),
+        )
+        threat = sample_threat(
+            grounds=[Ground(kind="assertion", assertion=assertion_id(row))]
+        )
+
+        report = sample_report(threats=[threat], assertions=record)
+        assert report.assertions is record
+        with pytest.raises(ValidationError, match="does not settle"):
             sample_report(threats=[threat])
 
     def test_a_repaired_quote_must_say_what_the_texts_moved(self):

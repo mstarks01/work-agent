@@ -285,6 +285,10 @@ GROUNDS: dict[str, Ground] = {
     ),
     "derived-fact": Ground(kind="derived-fact", flow_id="flow:a-to-b:submit"),
     "absent-element": Ground(kind="absent-element", term="directory service"),
+    "assertion": Ground(
+        kind="assertion",
+        assertion="assertion:mfa-requirement~principal:shoppers~any~absent",
+    ),
 }
 
 
@@ -294,23 +298,23 @@ def test_every_ground_branch_is_named_here():
 
 
 @pytest.mark.parametrize("kind", sorted(GROUNDS))
-def test_a_ground_digests_the_place_its_own_record_reads(kind: str):
-    """``Ground.place`` is the one reader of "which part of the model is this".
+def test_a_ground_digests_the_referent_its_own_record_reads(kind: str):
+    """``Ground.referent`` is the one reader of "what does this ground name".
 
-    The digest re-spelled that reader's ``or`` chain and added ``term`` to the
-    end of it. A sixth branch carrying a new place field would have updated
-    ``place`` and left the digest reading an empty string, so two grounds at two
-    places would share a structural digest and a re-argued claim would read
-    live. Reverting to the second chain fails this the moment a branch is added
-    and this table names it.
+    The digest once re-spelled ``place``'s ``or`` chain and added ``term`` to
+    the end of it, and the sixth branch would have done to that chain what
+    ``term`` did to ``place``: a ground naming an assertion digested as an
+    empty string, so two grounds naming two rows shared a structural digest
+    and a re-argued claim read live. The record answers once now, and this
+    fails the moment a branch is added and this table names it.
     """
     ground = GROUNDS[kind]
 
-    assert _ground_parts(ground) == (
-        ground.kind,
-        ground.place or ground.term,
-        ground.attribute,
-    )
+    assert _ground_parts(ground) == (ground.kind, ground.referent, ground.attribute)
+    if kind == "quote":
+        assert ground.referent == ""
+    else:
+        assert ground.referent, "a non-quote ground names something"
 
 
 def test_two_grounds_at_two_places_do_not_share_a_digest():

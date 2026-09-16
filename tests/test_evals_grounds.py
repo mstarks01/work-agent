@@ -96,6 +96,7 @@ class TestMeasureGrounds:
             "unknown-attribute": 1,
             "absent-attribute": 1,
             "derived-fact": 1,
+            "assertion": 0,
         }
 
     def test_a_quoteless_threat_is_counted_not_faulted(self):

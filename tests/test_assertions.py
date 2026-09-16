@@ -26,6 +26,7 @@ from analysis_service.assertions import (
     REGISTRY_VERSION,
     SUBJECT_PREFIXES,
     UNIVERSAL_TERMS,
+    UNPROJECTED,
     Assertion,
     AssertionCatalog,
     AssertionProposal,
@@ -40,17 +41,20 @@ from analysis_service.assertions import (
     Subject,
     SubjectType,
     _named,
+    answer,
     assertion_id,
     catalog_issues,
     conflicts,
     project,
     projection_fields,
     resolve_catalog,
+    settled,
     span_source,
     spans_for,
     subject_id,
     support_span,
 )
+from analysis_service.claims import Ground
 from analysis_service.system_model import UNKNOWN, SystemModel, all_attribute_names
 
 SOURCE_LABEL = "System description"
@@ -687,6 +691,152 @@ class TestTheAuditProbes:
     def test_a_blank_citation_cannot_make_a_supported_model(self):
         assert codes(catalog_issues(catalog([self.stated(support=[])]))) == [
             "unsupported-assertion"
+        ]
+
+
+class TestWhatAConsumerMayRestOn:
+    """The typed query, and the one rule behind "is this row a fact".
+
+    Phase 4's acceptance criteria, each as a probe: a control on one
+    interaction must not suppress an unknown on another, a mechanism must not
+    imply a second factor, an unsupported or mis-scoped row must not silently
+    settle anything, and a conflict stays visible with no side picked.
+    """
+
+    def row(self, **overrides):
+        fields = {
+            "subject": FLOW,
+            "predicate": "mfa-requirement",
+            "value": ABSENT,
+            "basis": "stated",
+            "support": span_for("we have not rolled out MFA"),
+        }
+        return Assertion(**{**fields, **overrides})
+
+    def test_the_unprojected_predicates_are_read_off_the_registry(self):
+        assert UNPROJECTED == {
+            name for name, predicate in REGISTRY.items() if not predicate.projects_into
+        }
+        assert "mfa-requirement" in UNPROJECTED
+        assert "authentication-mechanism" not in UNPROJECTED
+
+    def test_a_predicate_nobody_asked_about_is_unasked(self):
+        held = catalog([self.row()])
+
+        assert answer(held, FLOW, "credential-rotation").standing == "unasked"
+        assert answer(held, WEBHOOK, "mfa-requirement").standing == "unasked"
+
+    def test_a_stated_absence_is_answered_and_held(self):
+        held = catalog([self.row()])
+        found = answer(held, FLOW, "mfa-requirement")
+
+        assert found.standing == "answered"
+        assert found.holding(ABSENT) == (self.row(),)
+        assert settled(held) == (self.row(),)
+
+    def test_a_mechanism_never_implies_a_second_factor(self):
+        """The registry keys the question, so a stated mechanism on a flow
+        leaves every other predicate on that flow unasked."""
+        held = catalog([stated()])
+
+        assert answer(held, FLOW, "mfa-requirement").standing == "unasked"
+        assert answer(held, FLOW, "authorization-grant").standing == "unasked"
+
+    def test_a_control_on_one_interaction_leaves_anothers_unknown_alone(self):
+        rows = (
+            (FLOW, "interaction", "place order"),
+            (WEBHOOK, "interaction", "post settlement"),
+        )
+        unknown = Assertion(
+            subject=WEBHOOK,
+            predicate="mfa-requirement",
+            value=UNKNOWN,
+            basis="stated",
+            reason="silent",
+        )
+        held = catalog([self.row(value="required"), unknown], rows=rows)
+
+        assert answer(held, FLOW, "mfa-requirement").standing == "answered"
+        assert answer(held, WEBHOOK, "mfa-requirement").standing == "unknown"
+        assert unknown not in settled(held)
+
+    def test_an_unsupported_row_is_set_aside_rather_than_read_as_a_fact(self):
+        judged = self.row(assessment="unsupported", assessor="reviewer/1")
+        found = answer(catalog([judged]), FLOW, "mfa-requirement")
+
+        assert found.rows == (judged,)
+        assert found.settled == ()
+        assert found.standing == "unknown"
+
+    def test_a_legacy_row_is_never_support(self):
+        legacy = self.row(basis="legacy", support=[])
+        assert answer(catalog([legacy]), FLOW, "mfa-requirement").settled == ()
+
+    def test_a_conflict_settles_nothing_and_stays_visible(self):
+        held = catalog([self.row(), self.row(value="required")])
+        found = answer(held, FLOW, "mfa-requirement")
+
+        assert found.standing == "conflicting"
+        assert found.settled == ()
+        assert len(found.conflicts) == 1
+        assert settled(held) == ()
+
+    def test_a_scoped_row_is_settled_for_its_scope_and_nothing_wider(self):
+        admins = self.row(
+            value="required",
+            scope=[Qualifier(kind="principal", value="administrators")],
+        )
+        held = catalog([self.row(), admins])
+        found = answer(held, FLOW, "mfa-requirement")
+
+        assert found.standing == "answered"
+        assert found.settled == (self.row(), admins)
+        assert found.holding(ABSENT) == (self.row(),)
+        assert not found.holding(ABSENT)[0].scope
+
+    def test_an_inference_is_settled_and_labelled_by_its_basis(self):
+        inferred = self.row(basis="inferred", support=[], explanation="password only")
+        (found,) = answer(catalog([inferred]), FLOW, "mfa-requirement").settled
+
+        assert found.basis == "inferred"
+
+    def test_the_longest_identity_fits_the_ground_that_cites_it(self):
+        """The ground's bound is measured off the schema, never guessed.
+
+        Every part of an identity is bounded by a field on the row, so the
+        longest one is composable: the longest subject, the longest
+        registered predicate, a scoped key and the longest term value.
+        """
+        longest = Assertion(
+            subject="principal:" + "x" * (300 - len("principal:")),
+            predicate=max(REGISTRY, key=len),
+            value="y" * 200,
+            basis="stated",
+            scope=[Qualifier(kind="principal", value="z")],
+        )
+        bound = next(
+            meta.max_length
+            for meta in Ground.model_fields["assertion"].metadata
+            if hasattr(meta, "max_length")
+        )
+
+        assert len(assertion_id(longest)) <= bound
+
+    def test_the_two_readers_agree(self):
+        """``settled`` over the catalog is the union of every answer's settled rows."""
+        admins = self.row(
+            value="required",
+            scope=[Qualifier(kind="principal", value="administrators")],
+        )
+        held = catalog([self.row(), admins, stated()])
+        asked = dict.fromkeys(
+            (entry.subject, entry.predicate) for entry in held.entries
+        )
+
+        assert list(settled(held)) == [
+            entry
+            for subject, predicate in asked
+            for entry in answer(held, subject, predicate).settled
         ]
 
 

@@ -5,6 +5,13 @@ import time
 import pytest
 
 from analysis_service import critic, fan_in
+from analysis_service.assertions import (
+    ABSENT,
+    Assertion,
+    AssertionCatalog,
+    Subject,
+    assertion_id,
+)
 from analysis_service.claims import (
     MAX_CLAIMS_PER_BATCH,
     MENTION_MAX_CHARS,
@@ -66,6 +73,32 @@ class TestJoinDrafts:
 
     def test_empty_analysis_is_legal(self, model):
         assert join_drafts({}, STRIDE, model).drafts == []
+
+    def test_an_assertion_ground_resolves_against_the_catalog_the_job_held(self, model):
+        """The same catalog ``prepare`` derived the table from, handed in rather
+        than re-resolved, so what an agent selected from and what its choice
+        resolves against are one set. Without it the ground names nothing."""
+        row = Assertion(
+            subject="principal:shoppers",
+            predicate="mfa-requirement",
+            value=ABSENT,
+            basis="inferred",
+            explanation="password login only",
+        )
+        held = AssertionCatalog(
+            subjects=[
+                Subject(id="principal:shoppers", type="principal", label="shoppers")
+            ],
+            entries=[row],
+        )
+        draft = sample_draft(
+            grounds=[Ground(kind="assertion", assertion=assertion_id(row))]
+        )
+
+        joined = join_drafts({"spoofing": [draft]}, STRIDE, model, assertions=held)
+        assert joined.drafts == [draft]
+        with pytest.raises(DraftJoinError, match="does not settle"):
+            join_drafts({"spoofing": [draft]}, STRIDE, model)
 
     def test_a_claim_naming_only_absent_elements_is_dropped_and_marked(self, model):
         """A finding about nothing is not a finding. It costs the claim, never
