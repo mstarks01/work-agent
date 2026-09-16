@@ -1,0 +1,759 @@
+{
+  "proposal": {
+    "assertions": [
+      {
+        "subject_type": "component",
+        "subject": "process:storefront-api",
+        "predicate": "internet-exposure",
+        "value": "internet-facing",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "It is the only thing we expose to the internet."
+          }
+        ],
+        "explanation": "",
+        "exclusive": true
+      },
+      {
+        "subject_type": "component",
+        "subject": "process:order-service",
+        "predicate": "internet-exposure",
+        "value": "internal",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "it is not exposed outside"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:shopper-to-storefront-api:place-order",
+        "predicate": "authentication-mechanism",
+        "value": "email and password",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Shoppers sign in with email and password"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:shopper-to-storefront-api:place-order",
+        "predicate": "credential-presented",
+        "value": "session cookie",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "get a session cookie"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "principal",
+        "subject": "shopper accounts",
+        "predicate": "mfa-requirement",
+        "value": "absent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "we have not rolled out MFA for shopper accounts yet"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:storefront-api-to-order-service:submit-order",
+        "predicate": "authentication-mechanism",
+        "value": "absent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "There is no auth on that gRPC call"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:order-service-to-orders-db:read-write-orders",
+        "predicate": "authentication-mechanism",
+        "value": "single application account",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "the order service reads and writes with a single application account"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:order-service-to-orders-db:read-write-orders",
+        "predicate": "credential-presented",
+        "value": "application account",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "the order service reads and writes with a single application account"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "principal",
+        "subject": "application account",
+        "predicate": "authorization-grant",
+        "value": "full read/write",
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "orders db"
+          },
+          {
+            "kind": "operation",
+            "value": "read/write"
+          }
+        ],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "a single application account that has full read/write"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "credential",
+        "subject": "application account password",
+        "predicate": "credential-custody",
+        "value": "environment variable on the worker",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The password comes from an environment variable on the worker."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:order-service-to-receipt-archive:append-receipt",
+        "predicate": "transport-encryption",
+        "value": "TLS",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "That is on TLS"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:order-service-to-receipt-archive:append-receipt",
+        "predicate": "authentication-mechanism",
+        "value": "order service's own service account",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "with the order service's own service account"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:order-service-to-receipt-archive:append-receipt",
+        "predicate": "credential-presented",
+        "value": "order service's service account",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "with the order service's own service account"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:receipt-archive",
+        "predicate": "storage-encryption",
+        "value": "customer-managed key",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "the bucket is encrypted with a customer-managed key"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:card-processor-to-storefront-api:settlement-webhook",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "I would have to check how that callback is authenticated."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      }
+    ]
+  },
+  "catalog": {
+    "registry_version": 2,
+    "subjects": [
+      {
+        "id": "credential:application-account",
+        "type": "credential",
+        "label": "application account"
+      },
+      {
+        "id": "credential:application-account-password",
+        "type": "credential",
+        "label": "application account password"
+      },
+      {
+        "id": "credential:order-service-s-service-account",
+        "type": "credential",
+        "label": "order service's service account"
+      },
+      {
+        "id": "credential:session-cookie",
+        "type": "credential",
+        "label": "session cookie"
+      },
+      {
+        "id": "flow:card-processor-to-storefront-api:settlement-webhook",
+        "type": "interaction",
+        "label": "settlement webhook"
+      },
+      {
+        "id": "flow:order-service-to-orders-db:read-write-orders",
+        "type": "interaction",
+        "label": "read write orders"
+      },
+      {
+        "id": "flow:order-service-to-receipt-archive:append-receipt",
+        "type": "interaction",
+        "label": "append receipt"
+      },
+      {
+        "id": "flow:shopper-to-storefront-api:place-order",
+        "type": "interaction",
+        "label": "place order"
+      },
+      {
+        "id": "flow:storefront-api-to-order-service:submit-order",
+        "type": "interaction",
+        "label": "submit order"
+      },
+      {
+        "id": "principal:application-account",
+        "type": "principal",
+        "label": "application account"
+      },
+      {
+        "id": "principal:shopper-accounts",
+        "type": "principal",
+        "label": "shopper accounts"
+      },
+      {
+        "id": "process:order-service",
+        "type": "component",
+        "label": "order service"
+      },
+      {
+        "id": "process:storefront-api",
+        "type": "component",
+        "label": "storefront API"
+      },
+      {
+        "id": "store:receipt-archive",
+        "type": "component",
+        "label": "receipt archive"
+      }
+    ],
+    "entries": [
+      {
+        "subject": "process:storefront-api",
+        "predicate": "internet-exposure",
+        "value": "internet-facing",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08",
+            "start": 166,
+            "end": 213,
+            "quote": "It is the only thing we expose to the internet."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": true,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "process:order-service",
+        "predicate": "internet-exposure",
+        "value": "internal",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08",
+            "start": 479,
+            "end": 505,
+            "quote": "it is not exposed outside"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:shopper-to-storefront-api:place-order",
+        "predicate": "authentication-mechanism",
+        "value": "email and password",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08",
+            "start": 214,
+            "end": 254,
+            "quote": "Shoppers sign in with email and password"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:shopper-to-storefront-api:place-order",
+        "predicate": "credential-presented",
+        "value": "credential:session-cookie",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08",
+            "start": 259,
+            "end": 280,
+            "quote": "get a session cookie"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "principal:shopper-accounts",
+        "predicate": "mfa-requirement",
+        "value": "absent",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08",
+            "start": 281,
+            "end": 333,
+            "quote": "we have not rolled out MFA for shopper accounts yet"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:storefront-api-to-order-service:submit-order",
+        "predicate": "authentication-mechanism",
+        "value": "absent",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08",
+            "start": 506,
+            "end": 540,
+            "quote": "There is no auth on that gRPC call"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:order-service-to-orders-db:read-write-orders",
+        "predicate": "authentication-mechanism",
+        "value": "single application account",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08",
+            "start": 735,
+            "end": 803,
+            "quote": "the order service reads and writes with a single application account"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:order-service-to-orders-db:read-write-orders",
+        "predicate": "credential-presented",
+        "value": "credential:application-account",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08",
+            "start": 735,
+            "end": 803,
+            "quote": "the order service reads and writes with a single application account"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "principal:application-account",
+        "predicate": "authorization-grant",
+        "value": "full read/write",
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "orders db"
+          },
+          {
+            "kind": "operation",
+            "value": "read/write"
+          }
+        ],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08",
+            "start": 775,
+            "end": 829,
+            "quote": "a single application account that has full read/write"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "credential:application-account-password",
+        "predicate": "credential-custody",
+        "value": "environment variable on the worker",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08",
+            "start": 830,
+            "end": 892,
+            "quote": "The password comes from an environment variable on the worker."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:order-service-to-receipt-archive:append-receipt",
+        "predicate": "transport-encryption",
+        "value": "TLS",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08",
+            "start": 999,
+            "end": 1013,
+            "quote": "That is on TLS"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:order-service-to-receipt-archive:append-receipt",
+        "predicate": "authentication-mechanism",
+        "value": "order service's own service account",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08",
+            "start": 1014,
+            "end": 1059,
+            "quote": "with the order service's own service account"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:order-service-to-receipt-archive:append-receipt",
+        "predicate": "credential-presented",
+        "value": "credential:order-service-s-service-account",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08",
+            "start": 1014,
+            "end": 1059,
+            "quote": "with the order service's own service account"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:receipt-archive",
+        "predicate": "storage-encryption",
+        "value": "customer-managed key",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08",
+            "start": 1064,
+            "end": 1116,
+            "quote": "the bucket is encrypted with a customer-managed key"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:card-processor-to-storefront-api:settlement-webhook",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08",
+            "start": 1341,
+            "end": 1398,
+            "quote": "I would have to check how that callback is authenticated."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      }
+    ]
+  },
+  "issues": [],
+  "projection": [
+    {
+      "element_id": "flow:card-processor-to-storefront-api:settlement-webhook",
+      "attribute": "authentication",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:authentication-mechanism~flow:card-processor-to-storefront-api:settlement-webhook~any~unknown"
+      ]
+    },
+    {
+      "element_id": "flow:order-service-to-orders-db:read-write-orders",
+      "attribute": "authentication",
+      "value": "unknown",
+      "reason": "several-predicates",
+      "rows": [
+        "assertion:authentication-mechanism~flow:order-service-to-orders-db:read-write-orders~any~v.e4572c7b351f",
+        "assertion:credential-presented~flow:order-service-to-orders-db:read-write-orders~any~credential:application-account"
+      ]
+    },
+    {
+      "element_id": "flow:order-service-to-receipt-archive:append-receipt",
+      "attribute": "authentication",
+      "value": "unknown",
+      "reason": "several-predicates",
+      "rows": [
+        "assertion:authentication-mechanism~flow:order-service-to-receipt-archive:append-receipt~any~v.2f2519d78d18",
+        "assertion:credential-presented~flow:order-service-to-receipt-archive:append-receipt~any~credential:order-service-s-service-account"
+      ]
+    },
+    {
+      "element_id": "flow:order-service-to-receipt-archive:append-receipt",
+      "attribute": "encryption_in_transit",
+      "value": "TLS",
+      "reason": "stated",
+      "rows": [
+        "assertion:transport-encryption~flow:order-service-to-receipt-archive:append-receipt~any~v.b7e651cbb43b"
+      ]
+    },
+    {
+      "element_id": "flow:shopper-to-storefront-api:place-order",
+      "attribute": "authentication",
+      "value": "unknown",
+      "reason": "several-predicates",
+      "rows": [
+        "assertion:authentication-mechanism~flow:shopper-to-storefront-api:place-order~any~v.6b257b455879",
+        "assertion:credential-presented~flow:shopper-to-storefront-api:place-order~any~credential:session-cookie"
+      ]
+    },
+    {
+      "element_id": "flow:storefront-api-to-order-service:submit-order",
+      "attribute": "authentication",
+      "value": "none",
+      "reason": "absent",
+      "rows": [
+        "assertion:authentication-mechanism~flow:storefront-api-to-order-service:submit-order~any~absent"
+      ]
+    },
+    {
+      "element_id": "process:order-service",
+      "attribute": "exposure",
+      "value": "internal",
+      "reason": "stated",
+      "rows": [
+        "assertion:internet-exposure~process:order-service~any~internal"
+      ]
+    },
+    {
+      "element_id": "process:storefront-api",
+      "attribute": "exposure",
+      "value": "internet-facing",
+      "reason": "stated",
+      "rows": [
+        "assertion:internet-exposure~process:storefront-api~any~internet-facing"
+      ]
+    },
+    {
+      "element_id": "store:receipt-archive",
+      "attribute": "encryption_at_rest",
+      "value": "customer-managed key",
+      "reason": "stated",
+      "rows": [
+        "assertion:storage-encryption~store:receipt-archive~any~v.2e2e0428495b"
+      ]
+    }
+  ]
+}

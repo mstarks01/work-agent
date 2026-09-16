@@ -94,7 +94,13 @@ TOKEN_CAPS: dict[str, int] = {
     # The assertion body alone. The predicate table beside it is rendered from
     # `assertions.REGISTRY` rather than written here, so a predicate added
     # tomorrow moves the composed instruction and never this file.
-    "prompts/assert": 1700,
+    #
+    # Raised from 1700 for the subject rule (#961 step 6). On case 01 the model
+    # found 8 of 23 signed rows in every run, and the 13 it never found all sat
+    # on a principal, a credential or a zone: subjects with no element, which
+    # the procedure named only in passing. The body now lists them as subjects
+    # first, and puts a credential on the principal that presents it.
+    "prompts/assert": 2000,
     # One package's own text, under ``frameworks/<name>/``.
     f"package/{CRITIC_DOC}": 1200,
     f"package/{DISCLAIMER_DOC}": 200,
