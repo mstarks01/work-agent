@@ -1,0 +1,928 @@
+{
+  "proposal": {
+    "assertions": [
+      {
+        "subject_type": "interaction",
+        "subject": "flow:colleague-to-scheduling-web-app:view-shifts",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Nobody has documented how colleagues or managers sign in"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:store-manager-to-scheduling-web-app:build-rota",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Nobody has documented how colleagues or managers sign in"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:scheduling-web-app-to-scheduling-service:rota-requests",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Nobody has documented ... how the web app and the scheduling service identify each other"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:payroll-system-to-file-share:collect-payroll-export",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Nobody has documented ... how the payroll system is identified when it collects the export"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:colleague-to-scheduling-web-app:view-shifts",
+        "predicate": "transport-encryption",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "whether any of it is encrypted"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:store-manager-to-scheduling-web-app:build-rota",
+        "predicate": "transport-encryption",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "whether any of it is encrypted"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:scheduling-web-app-to-scheduling-service:rota-requests",
+        "predicate": "transport-encryption",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "whether any of it is encrypted"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:scheduling-service-to-rota-database:read-write-rotas",
+        "predicate": "transport-encryption",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "whether any of it is encrypted"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:scheduling-service-to-file-share:write-payroll-export",
+        "predicate": "transport-encryption",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "whether any of it is encrypted"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:payroll-system-to-file-share:collect-payroll-export",
+        "predicate": "transport-encryption",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "whether any of it is encrypted"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "process:scheduling-web-app",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "whether any of it is encrypted"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "process:scheduling-service",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "whether any of it is encrypted"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:rota-database",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "whether any of it is encrypted"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:file-share",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "whether any of it is encrypted"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "process:scheduling-service",
+        "predicate": "network-membership",
+        "value": "internal network",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The scheduling service, the rota database and the file share are on the internal network."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:rota-database",
+        "predicate": "network-membership",
+        "value": "internal network",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The scheduling service, the rota database and the file share are on the internal network."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:file-share",
+        "predicate": "network-membership",
+        "value": "internal network",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The scheduling service, the rota database and the file share are on the internal network."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "entity:payroll-system",
+        "predicate": "tenant-ownership",
+        "value": "another team",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The payroll system, which is run by another team, collects the export from the file share."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      }
+    ]
+  },
+  "catalog": {
+    "registry_version": 2,
+    "subjects": [
+      {
+        "id": "boundary:internal-network",
+        "type": "zone",
+        "label": "internal network"
+      },
+      {
+        "id": "entity:payroll-system",
+        "type": "component",
+        "label": "payroll system"
+      },
+      {
+        "id": "flow:colleague-to-scheduling-web-app:view-shifts",
+        "type": "interaction",
+        "label": "view shifts"
+      },
+      {
+        "id": "flow:payroll-system-to-file-share:collect-payroll-export",
+        "type": "interaction",
+        "label": "collect payroll export"
+      },
+      {
+        "id": "flow:scheduling-service-to-file-share:write-payroll-export",
+        "type": "interaction",
+        "label": "write payroll export"
+      },
+      {
+        "id": "flow:scheduling-service-to-rota-database:read-write-rotas",
+        "type": "interaction",
+        "label": "read write rotas"
+      },
+      {
+        "id": "flow:scheduling-web-app-to-scheduling-service:rota-requests",
+        "type": "interaction",
+        "label": "rota requests"
+      },
+      {
+        "id": "flow:store-manager-to-scheduling-web-app:build-rota",
+        "type": "interaction",
+        "label": "build rota"
+      },
+      {
+        "id": "principal:another-team",
+        "type": "principal",
+        "label": "another team"
+      },
+      {
+        "id": "process:scheduling-service",
+        "type": "component",
+        "label": "scheduling service"
+      },
+      {
+        "id": "process:scheduling-web-app",
+        "type": "component",
+        "label": "scheduling web app"
+      },
+      {
+        "id": "store:file-share",
+        "type": "component",
+        "label": "file share"
+      },
+      {
+        "id": "store:rota-database",
+        "type": "component",
+        "label": "rota database"
+      }
+    ],
+    "entries": [
+      {
+        "subject": "flow:colleague-to-scheduling-web-app:view-shifts",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "2507fd3081003c1c94427ef81dcea36f6ca92f5358c965789b49ec4af89b6a60",
+            "start": 766,
+            "end": 823,
+            "quote": "Nobody has documented how colleagues or managers sign in"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:store-manager-to-scheduling-web-app:build-rota",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "2507fd3081003c1c94427ef81dcea36f6ca92f5358c965789b49ec4af89b6a60",
+            "start": 766,
+            "end": 823,
+            "quote": "Nobody has documented how colleagues or managers sign in"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:scheduling-web-app-to-scheduling-service:rota-requests",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "2507fd3081003c1c94427ef81dcea36f6ca92f5358c965789b49ec4af89b6a60",
+            "start": 766,
+            "end": 787,
+            "quote": "Nobody has documented"
+          },
+          {
+            "source_label": "System description",
+            "digest": "2507fd3081003c1c94427ef81dcea36f6ca92f5358c965789b49ec4af89b6a60",
+            "start": 824,
+            "end": 887,
+            "quote": "how the web app and the scheduling service identify each other"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:payroll-system-to-file-share:collect-payroll-export",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "2507fd3081003c1c94427ef81dcea36f6ca92f5358c965789b49ec4af89b6a60",
+            "start": 766,
+            "end": 787,
+            "quote": "Nobody has documented"
+          },
+          {
+            "source_label": "System description",
+            "digest": "2507fd3081003c1c94427ef81dcea36f6ca92f5358c965789b49ec4af89b6a60",
+            "start": 888,
+            "end": 953,
+            "quote": "how the payroll system is identified when it collects the export"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:colleague-to-scheduling-web-app:view-shifts",
+        "predicate": "transport-encryption",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "2507fd3081003c1c94427ef81dcea36f6ca92f5358c965789b49ec4af89b6a60",
+            "start": 957,
+            "end": 988,
+            "quote": "whether any of it is encrypted"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:store-manager-to-scheduling-web-app:build-rota",
+        "predicate": "transport-encryption",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "2507fd3081003c1c94427ef81dcea36f6ca92f5358c965789b49ec4af89b6a60",
+            "start": 957,
+            "end": 988,
+            "quote": "whether any of it is encrypted"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:scheduling-web-app-to-scheduling-service:rota-requests",
+        "predicate": "transport-encryption",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "2507fd3081003c1c94427ef81dcea36f6ca92f5358c965789b49ec4af89b6a60",
+            "start": 957,
+            "end": 988,
+            "quote": "whether any of it is encrypted"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:scheduling-service-to-rota-database:read-write-rotas",
+        "predicate": "transport-encryption",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "2507fd3081003c1c94427ef81dcea36f6ca92f5358c965789b49ec4af89b6a60",
+            "start": 957,
+            "end": 988,
+            "quote": "whether any of it is encrypted"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:scheduling-service-to-file-share:write-payroll-export",
+        "predicate": "transport-encryption",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "2507fd3081003c1c94427ef81dcea36f6ca92f5358c965789b49ec4af89b6a60",
+            "start": 957,
+            "end": 988,
+            "quote": "whether any of it is encrypted"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:payroll-system-to-file-share:collect-payroll-export",
+        "predicate": "transport-encryption",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "2507fd3081003c1c94427ef81dcea36f6ca92f5358c965789b49ec4af89b6a60",
+            "start": 957,
+            "end": 988,
+            "quote": "whether any of it is encrypted"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "process:scheduling-web-app",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "2507fd3081003c1c94427ef81dcea36f6ca92f5358c965789b49ec4af89b6a60",
+            "start": 957,
+            "end": 988,
+            "quote": "whether any of it is encrypted"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "process:scheduling-service",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "2507fd3081003c1c94427ef81dcea36f6ca92f5358c965789b49ec4af89b6a60",
+            "start": 957,
+            "end": 988,
+            "quote": "whether any of it is encrypted"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:rota-database",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "2507fd3081003c1c94427ef81dcea36f6ca92f5358c965789b49ec4af89b6a60",
+            "start": 957,
+            "end": 988,
+            "quote": "whether any of it is encrypted"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:file-share",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "2507fd3081003c1c94427ef81dcea36f6ca92f5358c965789b49ec4af89b6a60",
+            "start": 957,
+            "end": 988,
+            "quote": "whether any of it is encrypted"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "process:scheduling-service",
+        "predicate": "network-membership",
+        "value": "boundary:internal-network",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "2507fd3081003c1c94427ef81dcea36f6ca92f5358c965789b49ec4af89b6a60",
+            "start": 634,
+            "end": 723,
+            "quote": "The scheduling service, the rota database and the file share are on the internal network."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:rota-database",
+        "predicate": "network-membership",
+        "value": "boundary:internal-network",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "2507fd3081003c1c94427ef81dcea36f6ca92f5358c965789b49ec4af89b6a60",
+            "start": 634,
+            "end": 723,
+            "quote": "The scheduling service, the rota database and the file share are on the internal network."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:file-share",
+        "predicate": "network-membership",
+        "value": "boundary:internal-network",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "2507fd3081003c1c94427ef81dcea36f6ca92f5358c965789b49ec4af89b6a60",
+            "start": 634,
+            "end": 723,
+            "quote": "The scheduling service, the rota database and the file share are on the internal network."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "entity:payroll-system",
+        "predicate": "tenant-ownership",
+        "value": "principal:another-team",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "2507fd3081003c1c94427ef81dcea36f6ca92f5358c965789b49ec4af89b6a60",
+            "start": 542,
+            "end": 632,
+            "quote": "The payroll system, which is run by another team, collects the export from the file share."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      }
+    ]
+  },
+  "issues": [],
+  "projection": [
+    {
+      "element_id": "flow:colleague-to-scheduling-web-app:view-shifts",
+      "attribute": "authentication",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:authentication-mechanism~flow:colleague-to-scheduling-web-app:view-shifts~any~unknown"
+      ]
+    },
+    {
+      "element_id": "flow:colleague-to-scheduling-web-app:view-shifts",
+      "attribute": "encryption_in_transit",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:transport-encryption~flow:colleague-to-scheduling-web-app:view-shifts~any~unknown"
+      ]
+    },
+    {
+      "element_id": "flow:payroll-system-to-file-share:collect-payroll-export",
+      "attribute": "authentication",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:authentication-mechanism~flow:payroll-system-to-file-share:collect-payroll-export~any~unknown"
+      ]
+    },
+    {
+      "element_id": "flow:payroll-system-to-file-share:collect-payroll-export",
+      "attribute": "encryption_in_transit",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:transport-encryption~flow:payroll-system-to-file-share:collect-payroll-export~any~unknown"
+      ]
+    },
+    {
+      "element_id": "flow:scheduling-service-to-file-share:write-payroll-export",
+      "attribute": "encryption_in_transit",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:transport-encryption~flow:scheduling-service-to-file-share:write-payroll-export~any~unknown"
+      ]
+    },
+    {
+      "element_id": "flow:scheduling-service-to-rota-database:read-write-rotas",
+      "attribute": "encryption_in_transit",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:transport-encryption~flow:scheduling-service-to-rota-database:read-write-rotas~any~unknown"
+      ]
+    },
+    {
+      "element_id": "flow:scheduling-web-app-to-scheduling-service:rota-requests",
+      "attribute": "authentication",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:authentication-mechanism~flow:scheduling-web-app-to-scheduling-service:rota-requests~any~unknown"
+      ]
+    },
+    {
+      "element_id": "flow:scheduling-web-app-to-scheduling-service:rota-requests",
+      "attribute": "encryption_in_transit",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:transport-encryption~flow:scheduling-web-app-to-scheduling-service:rota-requests~any~unknown"
+      ]
+    },
+    {
+      "element_id": "flow:store-manager-to-scheduling-web-app:build-rota",
+      "attribute": "authentication",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:authentication-mechanism~flow:store-manager-to-scheduling-web-app:build-rota~any~unknown"
+      ]
+    },
+    {
+      "element_id": "flow:store-manager-to-scheduling-web-app:build-rota",
+      "attribute": "encryption_in_transit",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:transport-encryption~flow:store-manager-to-scheduling-web-app:build-rota~any~unknown"
+      ]
+    },
+    {
+      "element_id": "process:scheduling-service",
+      "attribute": "trust_zone",
+      "value": "boundary:internal-network",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~process:scheduling-service~any~boundary:internal-network"
+      ]
+    },
+    {
+      "element_id": "store:file-share",
+      "attribute": "encryption_at_rest",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:storage-encryption~store:file-share~any~unknown"
+      ]
+    },
+    {
+      "element_id": "store:file-share",
+      "attribute": "trust_zone",
+      "value": "boundary:internal-network",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~store:file-share~any~boundary:internal-network"
+      ]
+    },
+    {
+      "element_id": "store:rota-database",
+      "attribute": "encryption_at_rest",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:storage-encryption~store:rota-database~any~unknown"
+      ]
+    },
+    {
+      "element_id": "store:rota-database",
+      "attribute": "trust_zone",
+      "value": "boundary:internal-network",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~store:rota-database~any~boundary:internal-network"
+      ]
+    }
+  ]
+}
