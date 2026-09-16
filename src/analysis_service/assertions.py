@@ -1025,7 +1025,7 @@ def catalog_issues(
 
     issues = _subject_issues(catalog, model)
     by_id = {subject.id: subject for subject in catalog.subjects}
-    checked = _check(sources)
+    checked = _checked(sources)
 
     # One identity per row, computed once. Four checks below read them, and
     # recomputing per check is how two of them would come to disagree.
@@ -1195,6 +1195,20 @@ class _Checked:
     submission once per span: at :data:`MAX_ASSERTIONS` rows of
     :data:`MAX_SPANS` spans that is 4000 reads of one text, measured at 0.77 s
     against 0.00018 s for one, over the 100 KiB ``max_source_bytes`` admits.
+
+    **Not :class:`SpanSource`, because the two answer different questions.**
+    That one folds a source so a quote can be *located* in it, and carries the
+    word index locating needs. This one folds a source so a recorded span can
+    be *verified* against it, and carries the raw text, which locating never
+    reads and verifying cannot do without: a span names offsets into the exact
+    retained text.
+
+    Their digests and haystacks do agree, and are computed twice — 5.9 ms of a
+    100 KiB source per job, against the 77 ms this class removes. Merging them
+    would put the raw text behind :func:`~analysis_service.grounding.index_source`,
+    which answers ``None`` for a source whose two folds disagree, and the gate
+    would then report a source it holds as one it does not. Two types and one
+    duplicated fold is the cheaper of the two mistakes.
     """
 
     text: str
@@ -1202,8 +1216,12 @@ class _Checked:
     haystack: str
 
 
-def _check(sources: Mapping[str, str]) -> Mapping[str, _Checked]:
-    """Every source prepared once for the span checks."""
+def _checked(sources: Mapping[str, str]) -> Mapping[str, _Checked]:
+    """Every source folded once for the span checks, keyed by label.
+
+    Named for what it returns rather than for a check, as :func:`_prepare` is:
+    it verifies nothing, and the gate is what reads it.
+    """
     return {
         label: _Checked(text, text_digest(text), normalize(text))
         for label, text in sources.items()
@@ -1481,7 +1499,7 @@ def resolve_catalog(
             )
         ]
     prepared = _prepare(sources)
-    checked = _check(sources)
+    checked = _checked(sources)
     element_ids = [element.id for element in model.elements()]
     labels = {element.id: element.name for element in model.elements()}
 

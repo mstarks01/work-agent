@@ -349,7 +349,12 @@ def match_normalized(
 
 
 def placements(quote: str, haystack: str, *, limit: int = 2) -> int:
-    """How many places in ``haystack`` the whole of ``quote`` can sit.
+    """How many places in ``haystack`` the whole of ``quote`` can sit, to ``limit``.
+
+    The count stops at ``limit``, so the answer is the number of placements or
+    ``limit``, whichever is smaller. Every caller asks whether there is more
+    than one, and stopping is what bounds the work at a source that repeats a
+    line a thousand times.
 
     **A quote that fits in two places names neither of them.** The matcher
     takes the first placement, which is an answer rather than the answer: a
@@ -365,24 +370,20 @@ def placements(quote: str, haystack: str, *, limit: int = 2) -> int:
     position its **first** fragment can open at with the rest still following,
     which is the question a span asks: where do these words begin.
 
-    ``limit`` stops the count, because every caller asks whether there is more
-    than one. It bounds the work at a repeated source rather than letting a
-    line repeated a thousand times cost a thousand scans.
-
     Measured on 2026-09-16 over every quote this repository holds: **0 of the
     79 signed corpus quotes and 0 of the 829 archived model-proposed quotes
     sit in more than one place.** So the refusal built on this costs nothing
     today, and it is the silent wrong citation it prevents that earns it.
     """
-    found = 0
+    seen = 0
     cursor = 0
-    while found < limit:
+    while seen < limit:
         matched = match_normalized(quote, haystack, start=cursor)
         if matched is None:
             break
-        found += 1
+        seen += 1
         cursor = matched[0][0] + 1
-    return found
+    return seen
 
 
 #: A word of a source, for the offset table :func:`index_source` builds. Nothing
