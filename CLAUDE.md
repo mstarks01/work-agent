@@ -97,8 +97,8 @@ record the measurement beside the code rather than asserting it in prose.
 
 A sweep costs money and sees nothing under the run-to-run spread. Before any
 paid run, read the archived misses and state the fix's ceiling in must-finds:
-`losses` charges each STRIDE miss to the verb, a merge, the critic, the place or
-no lead, and `attribution` charges each ASVS miss to a stage. A fix whose
+`losses` charges each STRIDE miss to one of the causes in its own `CAUSES`
+table, and `attribution` charges each ASVS miss to a stage. A fix whose
 ceiling sits inside the spread gets no run; batch it. A scorer change is priced
 offline on the frontier with `run.py price-verbs`, and the run confirms rather
 than discovers. Spend on the narrowest instrument that can see the change: one

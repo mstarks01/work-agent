@@ -345,8 +345,16 @@ def _bounded(old: str) -> re.Pattern[str]:
     carries its endpoints, so renaming an endpoint moves every flow through it,
     and ``tests/test_metamorphic.py`` drives this over element renames for that
     reason.
+
+    **Bounded on both sides.** The left guard has nothing to catch today: no
+    prefix in use ends with another, so no ID is a *suffix* of a longer one.
+    It is here because ``_ID_PREFIX`` admits ``[a-z_]+``, which a prefix ending
+    in an existing one would satisfy — and a fence sized to one side is safe
+    only while its neighbours are fenced too. The intended sites still match:
+    an ID inside ``crossing:flow:...`` or a JSON string is preceded by ``:``
+    or ``"``, neither of which is a slug character.
     """
-    return re.compile(re.escape(old) + r"(?![a-z0-9-])")
+    return re.compile(r"(?<![a-z0-9_-])" + re.escape(old) + r"(?![a-z0-9-])")
 
 
 def rewrite_text(text: str, renames: Mapping[str, str]) -> str:

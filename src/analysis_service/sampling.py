@@ -88,9 +88,11 @@ from analysis_service.config_files import read_toml
 from analysis_service.errors import ConfigError
 from analysis_service.model_tiers import TIER_NAMES, TierName
 
-# The only schema version this loader accepts. Versions are independent and
-# exact-match across the four config files — a shared number would buy nothing
-# once each file pins its own, since a stale file fails its own check.
+# The only schema version this loader accepts. Every config file pins its own
+# version and every loader exact-matches it, so the numbers are independent — a
+# shared one would buy nothing, since a stale file fails its own check. Stated
+# without a count: this read "the four config files" while five carried a
+# version, and ``deployment.py`` two modules away said five.
 #
 # Version 5 adds the ``review`` tier's block. Every tier is required, so a
 # version-4 file is short one and fails its own check — which is the point: a

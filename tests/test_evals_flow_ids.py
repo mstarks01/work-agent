@@ -457,3 +457,34 @@ def test_the_repository_root_is_where_dependents_are_resolved():
     """The default the command passes, so a test tree cannot rewrite the real one."""
     assert flow_ids.CORPUS_DIR == CORPUS
     assert Path(flow_ids.VOTES_DIR).parts[-3:] == ("evals", "review", "votes")
+
+
+class TestTheRenameIsFencedOnBothSides:
+    """A rename matches a whole ID, never a tail of a longer name.
+
+    The right guard stops ``flow:a>b>read`` rewriting inside
+    ``flow:a>b>read-more``. The left guard stops the mirror case, which
+    ``_ID_PREFIX`` admits: it is ``[a-z_]+``, so a prefix ending in an existing
+    one is a legal spelling and would make a shorter ID the suffix of a longer.
+    """
+
+    RENAMES: ClassVar[dict[str, str]] = {"entity:shopper": "entity:buyer"}
+
+    def test_the_intended_sites_still_rewrite(self):
+        """A JSON field, an evidence reference and prose all carry the ID."""
+        for text in (
+            '"element": "entity:shopper"',
+            '"ref": "crossing:flow:entity:shopper>process:api>place-order"',
+            "the entity:shopper row",
+            "entity:shopper",
+        ):
+            assert "entity:buyer" in flow_ids.rewrite_text(text, self.RENAMES), text
+
+    def test_a_longer_slug_is_not_rewritten(self):
+        held = flow_ids.rewrite_text('"entity:shopper-group"', self.RENAMES)
+        assert held == '"entity:shopper-group"'
+
+    def test_a_prefix_ending_in_another_prefix_is_not_rewritten(self):
+        """The left guard's own case: ``my_entity:shopper`` holds the ID as a tail."""
+        held = flow_ids.rewrite_text('"my_entity:shopper"', self.RENAMES)
+        assert held == '"my_entity:shopper"'
