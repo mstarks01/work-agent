@@ -1174,9 +1174,11 @@ def main() -> int:
     for case_dir in drafted_cases(CORPUS_DIR):
         facts = load_facts(case_dir)
         unsigned = sum(1 for row in facts.rows if row.reviewed_by is None)
+        aliases = len(facts.aliases.entries)
         print(
             f"{case_dir.name}: {FACTS_FILE} holds {len(facts.rows)} rows,"
-            f" {unsigned} unsigned, {len(facts.disputed)} disputed"
+            f" {unsigned} unsigned, {len(facts.disputed)} disputed,"
+            f" {aliases} alias ruling(s), {facts.unsigned_aliases} unsigned"
         )
     # Lane -> whether any case anywhere carries a must-find record for it. The
     # merge bar's second check is over the whole corpus, so it is accumulated

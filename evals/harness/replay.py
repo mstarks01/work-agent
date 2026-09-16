@@ -96,6 +96,7 @@ from analysis_service.assertions import (
     settled,
     snap_subject,
 )
+from analysis_service.grounding import normalize
 from analysis_service.system_model import DataFlow, SystemModel
 from evals.harness.alignment import Alignment, align, element_type, slug_key
 from evals.harness.artifact import EvalArtifact
@@ -135,18 +136,23 @@ FATES: tuple[Fate, ...] = (
 #: instrument could say what happened to it.
 LOSSES: frozenset[str] = frozenset(FATES) - {"found", "renamed"}
 
-RowFate = Literal["found", "worded", "wrong_value", "rescoped", "omitted"]
+RowFate = Literal["found", "worded", "wrong_value", "rescoped", "omitted", "silent"]
 ROW_FATES: tuple[RowFate, ...] = (
     "found",
     "worded",
     "wrong_value",
     "rescoped",
     "omitted",
+    "silent",
 )
 
 #: The row fates a prompt change can aim at. ``worded`` is outside: two
 #: spellings of one fact are a reader's question, and a target list that
-#: carried them would name a row the model found.
+#: carried them would name a row the model found. ``silent`` is outside too:
+#: the reference records a forced placement as an unknown the source never
+#: raised, and the prompt tells the model to write no such row, so nobody
+#: produced it and nobody should have. A produced value against one still
+#: reads ``wrong_value``, which is the defect that matters.
 ROW_LOSSES: frozenset[str] = frozenset({"wrong_value", "rescoped", "omitted"})
 
 ProducedFate = Literal["matched", "misattached", "unreviewed"]
@@ -367,12 +373,87 @@ def unsigned_rows(corpus_dir: Path, case: GoldenCase) -> int | None:
     return sum(row.reviewed_by is None for row in facts.rows)
 
 
-def signed_reference(corpus_dir: Path, case: GoldenCase) -> AssertionCatalog | None:
-    """The case's reference catalog, or ``None`` where no signed file grades it."""
+@dataclass(frozen=True)
+class SignedReference:
+    """A case's signed reference catalog and the alias rulings signed beside it.
+
+    ``subject_aliases`` maps an alias subject ID to the reference's own, and
+    ``qualifier_aliases`` maps a qualifier's kind and normalized alias
+    spelling to the reference's value. Only a signed alias is in either map:
+    an unsigned one is a draft, and a draft rewrites nothing.
+    """
+
+    catalog: AssertionCatalog
+    subject_aliases: Mapping[str, str] = field(default_factory=dict)
+    qualifier_aliases: Mapping[tuple[str, str], str] = field(default_factory=dict)
+
+    @property
+    def entries(self) -> list[Assertion]:
+        return self.catalog.entries
+
+    @property
+    def subjects(self) -> list[Any]:
+        return self.catalog.subjects
+
+
+def signed_reference(corpus_dir: Path, case: GoldenCase) -> SignedReference | None:
+    """The case's signed reference, or ``None`` where no signed file grades it."""
     if unsigned_rows(corpus_dir, case) != 0:
         return None
     sources = {source.label: source.text for source in case.sources}
-    return reference_catalog(load_facts(corpus_dir / case.id), case.model, sources)
+    facts = load_facts(corpus_dir / case.id)
+    return SignedReference(
+        catalog=reference_catalog(facts, case.model, sources),
+        subject_aliases={
+            alias_id: ruling.subject
+            for ruling in facts.aliases.subjects
+            if ruling.reviewed_by is not None
+            for alias_id in ruling.alias_ids
+        },
+        qualifier_aliases={
+            (ruling.kind, normalize(name)): ruling.value
+            for ruling in facts.aliases.qualifiers
+            if ruling.reviewed_by is not None
+            for name in ruling.names
+        },
+    )
+
+
+def under_aliases(produced: Assertion, reference: SignedReference) -> Assertion:
+    """The produced row in the reference's spellings, where a signed alias rules.
+
+    The one place an alias is applied, before any comparison: the subject,
+    a value that points at one of the layer's own subjects, and each scope
+    qualifier are each rewritten to the reference's spelling where a signed
+    ruling names the produced one. Everything else is left as written.
+    """
+    predicate = REGISTRY[produced.predicate]
+    refers_to_own = predicate.value == "reference" and not (
+        predicate.refers_to & GRAPH_BOUND
+    )
+    return produced.model_copy(
+        update={
+            "subject": reference.subject_aliases.get(
+                produced.subject, produced.subject
+            ),
+            "value": (
+                reference.subject_aliases.get(produced.value, produced.value)
+                if refers_to_own
+                else produced.value
+            ),
+            "scope": [
+                qualifier.model_copy(
+                    update={
+                        "value": reference.qualifier_aliases.get(
+                            (qualifier.kind, normalize(qualifier.value)),
+                            qualifier.value,
+                        )
+                    }
+                )
+                for qualifier in produced.scope
+            ],
+        }
+    )
 
 
 def _state(value: str) -> str:
@@ -417,17 +498,27 @@ _PREFERENCE: Mapping[RowFate, int] = {
 
 
 def replay_assertions(
-    case: GoldenCase, reference: AssertionCatalog, result: AssertionResult
+    case: GoldenCase, reference: SignedReference, result: AssertionResult
 ) -> AssertionReplay:
-    """Grade one archived proposal, re-resolved, against the signed reference."""
+    """Grade one archived proposal, re-resolved, against the signed reference.
+
+    Every produced row is read under the reference's signed aliases first,
+    so a principal the model named otherwise, a credential a value points at
+    under another name, and a scope spelled another way are compared as the
+    reviewer ruled they should be. The fates are then the plain matcher's.
+    """
     available: dict[tuple[str, str], list[Assertion]] = defaultdict(list)
     for entry in result.catalog.entries:
-        available[entry.subject, entry.predicate].append(entry)
+        aliased = under_aliases(entry, reference)
+        available[aliased.subject, aliased.predicate].append(aliased)
     rows = []
     for ours in reference.entries:
         candidates = available[ours.subject, ours.predicate]
         if not candidates:
-            rows.append(ReferenceRowFate(assertion_id(ours), "omitted"))
+            unasked = ours.value == UNKNOWN and ours.reason == "silent"
+            rows.append(
+                ReferenceRowFate(assertion_id(ours), "silent" if unasked else "omitted")
+            )
             continue
         fate, theirs = min(
             ((_row_fate(ours, one), one) for one in candidates),

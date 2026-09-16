@@ -263,6 +263,167 @@ class TestEveryReferenceRowTakesOneFate:
 
         assert graded.counts["wrong_value"] == 1
 
+    def test_a_signed_subject_alias_pairs_a_row_named_otherwise(
+        self, golden, reference
+    ):
+        """The reviewer rules two spellings name one principal; the matcher reads it."""
+        row = next(
+            e
+            for e in reference.entries
+            if e.predicate == "authorization-grant"
+            and e.subject == "principal:application-account"
+        )
+        renamed = row.model_copy(
+            update={"subject": "principal:single-application-account"}
+        )
+        unsigned = replay.SignedReference(reference.catalog)
+        signed = replay.SignedReference(
+            reference.catalog,
+            subject_aliases={"principal:single-application-account": row.subject},
+        )
+
+        before = self.graded(golden, unsigned, [renamed])
+        after = self.graded(golden, signed, [renamed])
+
+        # Unsigned, the row sits on a subject nobody ruled on: its grant is one
+        # the reference carries elsewhere, so it reads as a misattachment.
+        assert before.produced == {assertion_id(renamed): "misattached"}
+        assert after.produced == {assertion_id(row): "matched"}
+        assert next(r.fate for r in after.rows if r.reference == assertion_id(row)) == (
+            "found"
+        )
+
+    def test_a_subject_alias_also_rewrites_a_value_that_points_at_it(
+        self, golden, reference
+    ):
+        """A credential named otherwise is one credential wherever a row points at it."""
+        row = next(
+            e
+            for e in reference.entries
+            if e.predicate == "credential-presented"
+            and e.value == "credential:application-account-password"
+        )
+        pointed = row.model_copy(update={"value": "credential:password"})
+        signed = replay.SignedReference(
+            reference.catalog, subject_aliases={"credential:password": row.value}
+        )
+
+        graded = self.graded(golden, signed, [pointed])
+
+        assert next(
+            r.fate for r in graded.rows if r.reference == assertion_id(row)
+        ) == ("found")
+
+    def test_a_signed_qualifier_alias_turns_a_rescoped_row_into_a_found_one(
+        self, golden, reference
+    ):
+        row = next(
+            e
+            for e in reference.entries
+            if e.predicate == "authorization-grant"
+            and e.subject == "principal:application-account"
+        )
+        respelled = row.model_copy(
+            update={
+                "scope": [
+                    q.model_copy(update={"value": "read and write"})
+                    if q.kind == "operation"
+                    else q
+                    for q in row.scope
+                ]
+            }
+        )
+        signed = replay.SignedReference(
+            reference.catalog,
+            qualifier_aliases={("operation", "read and write"): "read-write"},
+        )
+
+        before = self.graded(
+            golden, replay.SignedReference(reference.catalog), [respelled]
+        )
+        after = self.graded(golden, signed, [respelled])
+
+        fate = lambda g: next(
+            r.fate for r in g.rows if r.reference == assertion_id(row)
+        )
+        assert fate(before) == "rescoped"
+        assert fate(after) == "found"
+
+    def test_a_silent_unknown_nobody_produced_is_silent_not_omitted(
+        self, golden, reference
+    ):
+        """The prompt forbids the row and the reference records the forced placement."""
+        graded = self.graded(golden, reference, [])
+
+        silent = {r.reference for r in graded.rows if r.fate == "silent"}
+        expected = {
+            assertion_id(e)
+            for e in reference.entries
+            if e.value == "unknown" and e.reason == "silent"
+        }
+        assert silent == expected
+        assert expected, "case 01 carries silent placements under the step-3 rulings"
+        assert all(
+            r.fate == "omitted" for r in graded.rows if r.reference not in expected
+        )
+
+    def test_a_value_produced_against_a_silent_unknown_is_wrong(
+        self, golden, reference
+    ):
+        row = next(
+            e
+            for e in reference.entries
+            if e.value == "unknown" and e.reason == "silent"
+        )
+        placed = row.model_copy(
+            update={"value": "boundary:core-services", "reason": None}
+        )
+
+        graded = self.graded(golden, reference, [placed])
+
+        assert next(
+            r.fate for r in graded.rows if r.reference == assertion_id(row)
+        ) == ("wrong_value")
+
+    def test_an_unsigned_alias_rewrites_nothing(self, tmp_path):
+        """A draft alias is a draft: the signed reference carries only signed ones."""
+        golden = case("01")
+        source = CORPUS / golden.id
+        target = tmp_path / golden.id
+        target.mkdir()
+        for path in source.iterdir():
+            if path.is_file():
+                (target / path.name).write_bytes(path.read_bytes())
+        facts = json.loads((target / "facts.json").read_text("utf-8"))
+        facts["aliases"] = {
+            "subjects": [
+                {
+                    "subject": "principal:application-account",
+                    "names": ["single application account"],
+                    "ruling": "drafted",
+                    "reviewed_by": None,
+                }
+            ],
+            "qualifiers": [
+                {
+                    "kind": "operation",
+                    "value": "read-write",
+                    "names": ["read and write"],
+                    "ruling": "signed",
+                    "reviewed_by": "someone",
+                }
+            ],
+        }
+        (target / "facts.json").write_text(json.dumps(facts), "utf-8")
+
+        signed = replay.signed_reference(tmp_path, golden)
+
+        assert signed is not None
+        assert signed.subject_aliases == {}
+        assert signed.qualifier_aliases == {
+            ("operation", "read and write"): "read-write"
+        }
+
     def test_a_dropped_row_is_omitted_and_a_new_row_is_unreviewed(
         self, golden, reference
     ):

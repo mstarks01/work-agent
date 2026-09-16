@@ -48,8 +48,11 @@ node proposes. An agent drafted every row, and the maintainer ruled on each
 against the source and signed it on 2026-09-16; the rulings and the model
 values they changed are in each case's `corrections.md`. A zone the schema
 requires and the source never gives reads `unknown` there, so a producer's
-placement is not graded as a fact. `python evals/verify_corpus.py` prints how
-many rows each file holds and how many are unsigned, and
+placement is not graded as a fact. A file may carry signed alias rulings for
+the principals, credentials and scope values the model spells otherwise; the
+replay reads them the way the alignment reads element aliases. `python
+evals/verify_corpus.py` prints how many rows and alias rulings each file holds
+and how many are unsigned, and
 `tests/test_reference_facts.py` skips its gate for any case with an unsigned
 row (`BLESSING.md` step 7).
 
