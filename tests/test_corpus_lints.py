@@ -656,6 +656,27 @@ class TestTheReviewedAliases:
             for alias in case.meta.aliases:
                 assert verify_quote(alias.excerpt, text), f"{case.id}: {alias.name}"
 
+    def test_a_flow_alias_derives_its_id_between_the_flows_own_endpoints(self):
+        """A flow's alias is another label; one that derives the flow's own label is no alias."""
+        from evals import verify_corpus
+
+        case_dir = verify_corpus.CORPUS_DIR / "04-ml-inference-service"
+        meta = json.loads((case_dir / "case.json").read_text("utf-8"))
+        flow_id = "flow:model-server-to-model-registry-bucket:load-artifact"
+        excerpt = "The model server loads model artifacts from a model registry bucket"
+        own = {"element": flow_id, "name": "load artifact", "excerpt": excerpt}
+        other = {"element": flow_id, "name": "load artifacts", "excerpt": excerpt}
+
+        refused = list(
+            verify_corpus._check_aliases(case_dir, meta | {"aliases": [own]})
+        )
+        accepted = list(
+            verify_corpus._check_aliases(case_dir, meta | {"aliases": [other]})
+        )
+
+        assert any("derives the element's own ID" in line for line in refused)
+        assert accepted == []
+
     def test_the_document_store_carries_no_alias_and_says_why(self):
         """The one qualification the reader made. Naming it after the platform
         would collapse the store into `boundary:vendor-platform`, the zone that

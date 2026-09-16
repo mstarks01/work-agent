@@ -54,6 +54,7 @@ from analysis_service.system_model import (
     ELEMENT_GROUPS,
     SystemModel,
     make_element_id,
+    make_flow_id,
 )
 from analysis_service.validation import parse_and_validate
 from evals.harness.calibration import SCORED_LABELS, Label, LabelAnnotation
@@ -586,8 +587,14 @@ def _check_aliases(case_dir: Path, meta: dict) -> Iterator[str]:
             yield f"{where} names {element!r}, which model.json does not hold"
             continue
         try:
-            alias_id = make_element_id(element.split(":", 1)[0], name)
-        except ValueError as exc:
+            alias_id = (
+                make_flow_id(
+                    known[element]["source"], known[element]["destination"], name
+                )
+                if element.startswith("flow:")
+                else make_element_id(element.split(":", 1)[0], name)
+            )
+        except (ValueError, KeyError) as exc:
             yield f"{where}: {name!r} is not a usable element name: {exc}"
             continue
         if alias_id == element:
