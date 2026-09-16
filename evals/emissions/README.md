@@ -5,9 +5,10 @@ that a scorer, a normalizer, a gate or a reference that moves afterwards can be
 applied to the same emissions with no second run.
 
 Each sweep is its artifact, `<name>.json`, beside the directory
-`<name>.reports/` the sweep wrote. An extraction sweep's directory holds one
-`<case>.extraction.json` per case: what the node emitted under `raw`, and the
-model and gate verdict the sweep scored on the day. An assertion sweep's holds
+`<name>.reports/` the sweep wrote. An extraction or end-to-end sweep's
+directory holds one `<case>.extraction.json` per case: what the node emitted
+under `raw`, the model and gate verdict the sweep scored on the day, and under
+`repair` what the repair node returned where one ran. An assertion sweep's holds
 one `<case>.assertions.json`: the proposal, and the catalog the resolver built
 on the day. The artifact records the commit, whether the tree was clean, the
 corpus digest, the models and the instruction digest of the node, so the

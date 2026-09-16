@@ -74,7 +74,9 @@ from analysis_service.graph import (
     ENTRY_PREPARE,
     STATE_ASSERTION_PROPOSAL,
     STATE_EXTRACTED_MODEL,
+    STATE_FIRST_PASS,
     STATE_FRAMEWORK_OPTIONS,
+    STATE_REPAIR_BASELINE,
     STATE_SOURCE_TEXTS,
     STATE_VALID_MODEL,
     Entry,
@@ -82,6 +84,7 @@ from analysis_service.graph import (
     ModelResolver,
     Pipeline,
     Rejected,
+    result_of,
 )
 from analysis_service.report import (
     FrameworkSelection,
@@ -135,7 +138,22 @@ class CaseFailure(GraphFailed):
     a failed case contribute nothing to the usage the artifact prices, so a run
     that cost a dollar would read as free. ``cause`` is the exception the caller
     classifies, unwrapped.
+
+    ``extraction`` is the first pass the graph kept before it failed, where
+    the graph finished and refused its model; a sweep writes it beside the
+    artifact the way it writes a finished case's, because a refused model is
+    the emission most worth reading back (#961). ``None`` where the fault
+    came before the gate or the graph ran none.
     """
+
+    def __init__(
+        self,
+        cause: Exception,
+        node_runs: Sequence[NodeRun],
+        extraction: ExtractionResult | None = None,
+    ) -> None:
+        super().__init__(cause, node_runs)
+        self.extraction = extraction
 
 
 @dataclass(frozen=True)
@@ -158,6 +176,12 @@ class ExtractionResult:
     #: it, and a scorer change that reads IDs differently needs what arrived
     #: (#925). Empty on a run that produced nothing.
     raw: Mapping[str, Any] = MappingProxyType({})
+    #: What ``repair`` emitted where the gate sent the first pass to it, else
+    #: ``None``. The extraction mode runs no repair, so there it is always
+    #: ``None``. An end-to-end run keeps it beside ``raw`` because its report
+    #: carries the model after the overlay and ``model_repair``, and neither
+    #: reconstructs what the repair node itself returned (#961).
+    repair: Mapping[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -186,6 +210,10 @@ class AnalysisRun:
     #: proposal becomes a draft — so without this the lane's own answer to *what
     #: would settle this* cannot be audited after the run (#657).
     proposals: Mapping[FrameworkName, Mapping[str, Any]] = field(default_factory=dict)
+    #: The first pass of ``extract`` and what ``repair`` returned, on a graph
+    #: that ran them. ``None`` on the analysis mode, which seeds the blessed
+    #: model at ``prepare`` and runs neither.
+    extraction: ExtractionResult | None = None
 
     @property
     def merged_drafts(self) -> tuple[DraftThreat, ...]:
@@ -1339,8 +1367,23 @@ async def run_extraction(case: GoldenCase, pipeline: Pipeline) -> ExtractionResu
     # excerpt that passes here fails inside a job. The mapping is read off the
     # state the executor seeded rather than rebuilt from ``case.sources``, so
     # the gate sees the labels the run actually carried.
+    return _extraction_result(
+        case, graph_run, pipeline, state[STATE_EXTRACTED_MODEL], graph_run.node_runs
+    )
+
+
+def _extraction_result(
+    case: GoldenCase,
+    graph_run: GraphRun,
+    pipeline: Pipeline,
+    raw: Mapping[str, Any],
+    node_runs: Sequence[NodeRun],
+    repair: Mapping[str, Any] | None = None,
+) -> ExtractionResult:
+    """One emission of ``extract`` through the gate production applies to it."""
+    state = graph_run.final_state
     model, issues = parse_extraction(
-        state[STATE_EXTRACTED_MODEL],
+        raw,
         pipeline.extraction_format or FULL_FORMAT,
         sources=state.get(STATE_SOURCE_TEXTS, {}),
     )
@@ -1348,8 +1391,29 @@ async def run_extraction(case: GoldenCase, pipeline: Pipeline) -> ExtractionResu
         case_id=case.id,
         extracted=model,
         issues=tuple(issues),
-        node_runs=tuple(graph_run.node_runs),
-        raw=state[STATE_EXTRACTED_MODEL],
+        node_runs=tuple(node_runs),
+        raw=raw,
+        repair=repair,
+    )
+
+
+def _first_pass(
+    case: GoldenCase, graph_run: GraphRun, pipeline: Pipeline
+) -> ExtractionResult | None:
+    """What ``extract`` emitted and what ``repair`` returned, off a finished graph.
+
+    The first gate parks the emission under :data:`STATE_FIRST_PASS` on every
+    route out of it, and ``repair`` writes its own over
+    :data:`STATE_EXTRACTED_MODEL`; a repair ran exactly where the gate parked
+    a baseline for it. ``None`` on a graph that ran no gate, which is the
+    analysis entry seeding the blessed model at ``prepare``.
+    """
+    state = graph_run.final_state
+    if STATE_FIRST_PASS not in state:
+        return None
+    repair = state[STATE_EXTRACTED_MODEL] if STATE_REPAIR_BASELINE in state else None
+    return _extraction_result(
+        case, graph_run, pipeline, state[STATE_FIRST_PASS], (), repair
     )
 
 
@@ -2053,16 +2117,23 @@ def _run_from_graph(
 
     The graph is finished by the time this is called, so every node it ran
     was billed; a failure past this point is a fact about the result and not
-    about the spend, and the sweep needs both.
+    about the spend, and the sweep needs both. The first pass rides out the
+    same way, because the graph refusing its model is the one failure that
+    is a measurement, and the emission it refused is what the measurement
+    is of.
     """
+    extraction = _first_pass(case, graph_run, pipeline)
     try:
-        return _report_of(case, graph_run, pipeline)
+        return _report_of(case, graph_run, pipeline, extraction)
     except Exception as exc:
-        raise CaseFailure(exc, graph_run.node_runs) from exc
+        raise CaseFailure(exc, graph_run.node_runs, extraction) from exc
 
 
 def _report_of(
-    case: GoldenCase, graph_run: GraphRun, pipeline: Pipeline
+    case: GoldenCase,
+    graph_run: GraphRun,
+    pipeline: Pipeline,
+    extraction: ExtractionResult | None,
 ) -> AnalysisRun:
     """Complete the graph's :class:`~analysis_service.graph.Analysis` into a report, as production does.
 
@@ -2080,6 +2151,12 @@ def _report_of(
     """
     now = datetime.now(UTC)
     try:
+        # The terminal shape first, through the one reader of it. A refused
+        # model reached no fan-in, so reading the drafts first would name the
+        # rejection as a framework the graph never reached.
+        outcome = result_of(graph_run.final_state)
+        if isinstance(outcome, Rejected):
+            raise EvalRunError(f"{case.id}: {_rejection(outcome)}")
         # Grading is per framework (#167), so a scorer reads its own package's
         # drafts against its own reference set and two packages' records never
         # meet. Read before the report, so a framework the graph never reached
@@ -2105,9 +2182,15 @@ def _report_of(
     except GraphProducedNothing as exc:
         raise EvalRunError(f"{case.id}: {exc}") from exc
     if isinstance(result, Rejected):
-        detail = "; ".join(f"{issue.code}: {issue.message}" for issue in result.issues)
-        raise EvalRunError(f"{case.id}: the graph rejected the model: {detail}")
-    return AnalysisRun(report=result, drafts=drafts, proposals=proposals)
+        raise EvalRunError(f"{case.id}: {_rejection(result)}")
+    return AnalysisRun(
+        report=result, drafts=drafts, proposals=proposals, extraction=extraction
+    )
+
+
+def _rejection(rejected: Rejected) -> str:
+    detail = "; ".join(f"{issue.code}: {issue.message}" for issue in rejected.issues)
+    return f"the graph rejected the model: {detail}"
 
 
 MODE_ENTRIES: dict[str, Entry] = {
@@ -2116,6 +2199,15 @@ MODE_ENTRIES: dict[str, Entry] = {
     "analysis": ENTRY_PREPARE,
     "end-to-end": ENTRY_EXTRACT,
 }
+
+#: The modes whose graph runs ``extract``, and so the ones whose sweep keeps
+#: an emission beside its artifact. Read off the entries rather than listed,
+#: so a mode added tomorrow answers by the entry it builds.
+EXTRACTING_MODES: frozenset[str] = frozenset(
+    mode
+    for mode, entry in MODE_ENTRIES.items()
+    if entry in {ENTRY_EXTRACT, ENTRY_EXTRACT_ONLY}
+)
 
 #: The modes whose graph ends in a :class:`Report`. ``extraction`` stops at the
 #: validity gate and returns an :class:`ExtractionResult`, so a sweep of it has

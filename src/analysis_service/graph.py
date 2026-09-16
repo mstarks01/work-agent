@@ -618,6 +618,11 @@ STATE_REPAIR_BASELINE = "repair_baseline"
 STATE_MODEL_REPAIR = "model_repair"
 
 STATE_EXTRACTED_MODEL = "extracted_model"
+# What ``extract`` emitted, kept apart from the key it arrived in. ``repair``
+# writes its own emission over :data:`STATE_EXTRACTED_MODEL`, so after a
+# repair nothing else holds the first pass, and a driver that archives a run
+# reads it here whichever route the gate took (#961).
+STATE_FIRST_PASS = "first_pass"
 # What ``assert`` emits: a ``CatalogProposal``, before code resolves its rows
 # into a catalog. Structured, because a driver reads it back and resolves it —
 # see :func:`~analysis_service.assertions.resolve_catalog`.
@@ -713,6 +718,7 @@ SHARED_STRUCTURED_KEYS: frozenset[str] = frozenset(
     {
         STATE_SOURCE_TEXTS,
         STATE_EXTRACTED_MODEL,
+        STATE_FIRST_PASS,
         STATE_ASSERTION_PROPOSAL,
         STATE_ASSERTION_CATALOG,
         STATE_VALID_MODEL,
@@ -1222,6 +1228,11 @@ def validate_extraction(
             f" model to validate. {_TRUNCATION_HINT}"
         )
     state = keys.state(ctx)
+    baseline = state.get(STATE_REPAIR_BASELINE)
+    if baseline is None:
+        # The first gate, on every route out of it: what arrived is kept
+        # before ``repair`` can write over the key it arrived in.
+        state.put(STATE_FIRST_PASS, extracted_model)
     model, issues = parse_extraction(
         extracted_model, extraction_format, sources=source_texts or {}
     )
@@ -1242,7 +1253,6 @@ def validate_extraction(
     # repair prompt's rule is enforced rather than asked for. Only a parsed
     # model can be overlaid; a repair that fails the schema outright is parked
     # as-is and takes the invalid edge, which from here is the rejection.
-    baseline = state.get(STATE_REPAIR_BASELINE)
     if baseline is not None and model is not None:
         repair = ModelRepair(scope=baseline["scope"], implicated=baseline["implicated"])
         if repair.scope == "elements":

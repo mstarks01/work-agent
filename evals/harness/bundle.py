@@ -233,17 +233,23 @@ def write_extractions(
     * ``issues`` — the gate's verdict on it, structured as the repair pass
       would have received it.
 
-    **No post-repair model, because this mode does not produce one.** It stops
-    at the gate by design, so what is written here is the first pass. An
-    analysis or end-to-end sweep carries its repaired model inside the report
-    :func:`write_reports` writes, under ``system_model`` beside ``model_repair``.
+    * ``repair`` — what ``repair`` emitted, where the gate sent the first
+      pass to it, else ``null``. The extraction mode stops at the gate, so
+      there it is always ``null``; an end-to-end sweep ran the repair, and its
+      report carries only the model after the overlay, under ``system_model``
+      beside ``model_repair``, which does not reconstruct what the node
+      returned (#961).
+
+    Every mode that ran ``extract`` writes it, so an end-to-end sweep's first
+    pass replays under the same instrument as an extraction sweep's. The
+    analysis mode seeds the blessed model and has no emission to keep.
 
     **These files are publishable** on the same reading the reports are: they
     carry a model of corpus source text, which is in this repository. The same
     path carries a submitter's own system the moment it runs outside the corpus.
     """
-    if mode != "extraction":
-        print(f"no extractions written: {mode} mode keeps its models in its reports")
+    if mode not in modes.EXTRACTING_MODES:
+        print(f"no extractions written: {mode} mode runs no extraction")
         return
     directory = reports_dir(out)
     directory.mkdir(parents=True, exist_ok=True)
@@ -263,6 +269,7 @@ def write_extractions(
                     "issues": [
                         issue.model_dump(mode="json") for issue in result.issues
                     ],
+                    "repair": None if result.repair is None else dict(result.repair),
                 },
             ),
             "utf-8",
@@ -373,6 +380,9 @@ def extractions_from_reports(
             extracted=model,
             issues=tuple(issues),
             raw=written["raw"],
+            # ``.get``: an emission archived before the key existed came from
+            # a sweep that ran no repair, which is what an absent key means.
+            repair=written.get("repair"),
         )
     return results
 
