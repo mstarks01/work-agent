@@ -42,15 +42,14 @@ from analysis_service.assertions import (
     ABSENT,
     REGISTRY,
     AssertionCatalog,
+    AssertionRecord,
     Assessment,
     CatalogIssue,
     CatalogProposal,
     ProjectionReason,
-    catalog_issues,
     conflicts,
     project,
     projection_fields,
-    resolve_catalog,
 )
 from analysis_service.basis import (
     IN_SCOPE,
@@ -1500,24 +1499,18 @@ async def run_assertions(case: GoldenCase, pipeline: Pipeline) -> AssertionResul
     state = graph_run.final_state
     if STATE_ASSERTION_PROPOSAL not in state:
         raise EvalRunError(f"{case.id}: assert produced no assertions")
-    proposal = CatalogProposal.model_validate(state[STATE_ASSERTION_PROPOSAL])
-    catalog, issues = resolve_catalog(
-        proposal, case.model, state.get(STATE_SOURCE_TEXTS, {})
+    # Resolved and gated through the one reader production's ``prepare`` node
+    # uses, so a sweep grades the catalog a job would have read.
+    record = AssertionRecord.of(
+        CatalogProposal.model_validate(state[STATE_ASSERTION_PROPOSAL]),
+        case.model,
+        state.get(STATE_SOURCE_TEXTS, {}),
     )
-    # The gate over what the resolver built, run rather than assumed: the
-    # resolver's contract is that its output raises nothing, and a sweep is
-    # where that contract meets real model output rather than a fixture.
-    issues = [
-        *issues,
-        *catalog_issues(
-            catalog, model=case.model, sources=state.get(STATE_SOURCE_TEXTS, {})
-        ),
-    ]
     return AssertionResult(
         case_id=case.id,
         proposal=state[STATE_ASSERTION_PROPOSAL],
-        catalog=catalog,
-        issues=tuple(issues),
+        catalog=record.catalog,
+        issues=tuple(record.issues),
         node_runs=tuple(graph_run.node_runs),
     )
 

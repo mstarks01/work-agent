@@ -1018,7 +1018,7 @@ class UpstreamNamingLlm(ScriptedLlm):
 #: The tier keys the *base* tier serves. Spelled as tier node names rather than
 #: graph node names because that is what the resolver is handed, and because the
 #: two are no longer the same thing: six lane agents share one ``analyze/<F>``.
-_BASE_TIER_NODES = frozenset({"extract", "repair"})
+_BASE_TIER_NODES = frozenset({"extract", "repair", "assert"})
 
 
 def scripted_pipeline(
@@ -1029,6 +1029,7 @@ def scripted_pipeline(
     extraction_format: ExtractionFormat = FULL_FORMAT,
     sampling: SamplingConfig | None = None,
     frameworks: Sequence[FrameworkName] = DEFAULT_FRAMEWORKS,
+    assertions: bool = False,
 ) -> tuple[Pipeline, dict[str, ScriptedLlm]]:
     """The real graph, with every LLM node bound to its own scripted stand-in.
 
@@ -1083,6 +1084,7 @@ def scripted_pipeline(
         frameworks=frameworks,
         entry=entry,
         extraction_format=extraction_format,
+        assertions=assertions,
     )
 
     graph = pipeline.workflow.graph

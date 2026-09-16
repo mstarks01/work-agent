@@ -74,6 +74,7 @@ from analysis_service.frameworks import validate_packages
 from analysis_service.graph import (
     ENTRY_EXTRACT,
     ENTRY_EXTRACT_ONLY,
+    PREPARING_ENTRIES,
     Entry,
     ModelResolver,
     Pipeline,
@@ -140,6 +141,13 @@ REQUIRE_CERTIFIED_VAR = "ANALYSIS_REQUIRE_CERTIFIED"
 #: #938 asks of it: nothing persisted changes shape, because every artifact
 #: downstream of the adapter is the same ``SystemModel`` either way.
 COMPACT_EXTRACTION_VAR = "ANALYSIS_COMPACT_EXTRACTION"
+#: Run the assertion pass on every job: the ``assert`` node between the
+#: validity gate and ``prepare``, whose settled rows the evidence catalog
+#: offers and the report embeds (ADR 0036). Off by default, so an install that
+#: sets nothing runs the graph it always ran and spends nothing more. One
+#: variable and one restart is the rollback: a report built without the pass
+#: carries ``assertions: null`` and every other field it carried before.
+ASSERTIONS_VAR = "ANALYSIS_ASSERTIONS"
 
 
 def _path(env: Mapping[str, str], var: str, default: Path) -> Path:
@@ -219,6 +227,10 @@ class Deployment:
     #: everything else held fixed, so letting a submission pick one would make
     #: two reports incomparable for a reason neither of them records.
     extraction_format: ExtractionFormat = FULL_FORMAT
+    #: Whether every job runs the assertion pass. A property of the deployment
+    #: for the reason the transport is: a report with the pass and one without
+    #: are compared with everything else held fixed.
+    assertions: bool = False
     # Held only to derive each vendor's credentials when the adapters are built.
     # Out of repr and equality: a deployment in a log must not carry a key. A
     # copy taken by :meth:`from_env`, never the caller's live mapping: a
@@ -275,6 +287,7 @@ class Deployment:
             extraction_format=(
                 COMPACT_FORMAT if _flag(env, COMPACT_EXTRACTION_VAR) else FULL_FORMAT
             ),
+            assertions=_flag(env, ASSERTIONS_VAR),
             env=MappingProxyType(dict(env)),
         )
 
@@ -377,6 +390,10 @@ class Deployment:
             # extract — so this install's choice reaches the graphs that have one
             # and the others are built for the route they actually run.
             extraction_format=self.extraction_format if extracts else FULL_FORMAT,
+            # The pass sits ahead of ``prepare``, so only an entry that builds
+            # one carries it; the extraction and assertion eval entries run
+            # their one node and stop.
+            assertions=self.assertions and entry in PREPARING_ENTRIES,
         )
 
     @cached_property
