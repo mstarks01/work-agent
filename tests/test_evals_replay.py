@@ -386,7 +386,9 @@ class TestEveryReferenceRowTakesOneFate:
         )
         signed = replay.SignedReference(
             reference.catalog,
-            qualifier_aliases={("operation", "read and write"): "read-write"},
+            qualifier_aliases={
+                ("operation", "read and write"): replay.AliasTarget("read-write")
+            },
         )
 
         before = self.graded(
@@ -399,6 +401,41 @@ class TestEveryReferenceRowTakesOneFate:
         )
         assert fate(before) == "rescoped"
         assert fate(after) == "found"
+
+    def test_a_qualifier_alias_holds_only_under_the_subjects_the_ruling_names(
+        self, golden, reference
+    ):
+        """ "Publish" is the write in one principal's grant and not in another's."""
+        row = next(
+            e
+            for e in reference.entries
+            if e.predicate == "authorization-grant"
+            and e.subject == "principal:application-account"
+        )
+        respelled = row.model_copy(
+            update={
+                "scope": [
+                    q.model_copy(update={"value": "read and write"})
+                    if q.kind == "operation"
+                    else q
+                    for q in row.scope
+                ]
+            }
+        )
+        elsewhere = respelled.model_copy(update={"subject": "principal:order-service"})
+        bounded = replay.AliasTarget("read-write", frozenset({row.subject}))
+        signed = replay.SignedReference(
+            reference.catalog,
+            qualifier_aliases={("operation", "read and write"): bounded},
+        )
+
+        here = replay.under_aliases(respelled, signed)
+        there = replay.under_aliases(elsewhere, signed)
+
+        assert [q.value for q in here.scope if q.kind == "operation"] == ["read-write"]
+        assert [q.value for q in there.scope if q.kind == "operation"] == [
+            "read and write"
+        ]
 
     def test_a_silent_unknown_nobody_produced_is_silent_not_omitted(
         self, golden, reference
@@ -472,7 +509,7 @@ class TestEveryReferenceRowTakesOneFate:
         assert signed is not None
         assert signed.subject_aliases == {}
         assert signed.qualifier_aliases == {
-            ("operation", "read and write"): "read-write"
+            ("operation", "read and write"): replay.AliasTarget("read-write")
         }
 
     def test_a_dropped_row_is_omitted_and_a_new_row_is_unreviewed(

@@ -512,11 +512,10 @@
         "kind": "resource",
         "value": "the weekly rota for their store",
         "names": [
-          "weekly rota for their store",
-          "weekly rota"
+          "weekly rota for their store"
         ],
-        "ruling": "The same rota with the article dropped, and without 'for their store'; the source names one rota per store.",
-        "reviewed_by": null
+        "ruling": "Accepted for 'weekly rota for their store' only. Bare 'weekly rota' is rejected as an unconditional alias: it drops the store restriction.",
+        "reviewed_by": "mstarks01"
       },
       {
         "kind": "operation",
@@ -524,8 +523,8 @@
         "names": [
           "build and change"
         ],
-        "ruling": "Store managers 'build the weekly rota'; building and changing it is the write.",
-        "reviewed_by": null
+        "ruling": "Store managers 'build the weekly rota'; building and changing it is the write. Accepted as write operations; the store-specific resource restriction is preserved.",
+        "reviewed_by": "mstarks01"
       },
       {
         "kind": "resource",
@@ -535,8 +534,8 @@
           "their assigned shifts",
           "their own shifts"
         ],
-        "ruling": "The source: 'Colleagues use the same app to look at the shifts they have been given'; the three spellings name those shifts.",
-        "reviewed_by": null
+        "ruling": "The source: 'Colleagues use the same app to look at the shifts they have been given'; the three spellings name those shifts. Accepted; each spelling preserves the colleague-specific restriction.",
+        "reviewed_by": "mstarks01"
       },
       {
         "kind": "operation",
@@ -545,8 +544,8 @@
           "view",
           "collect"
         ],
-        "ruling": "Looking at shifts is a read; the payroll system 'collects the export', which is a read of the export. Applies to every read grant on the case.",
-        "reviewed_by": null
+        "ruling": "Looking at shifts is a read; the payroll system 'collects the export', which is a read of the export. Applies to every read grant on the case. Accepted across this case's grants, because the resource and the principal scope of each grant stay unchanged; shifts and payroll exports are not made interchangeable.",
+        "reviewed_by": "mstarks01"
       },
       {
         "kind": "resource",
@@ -554,8 +553,8 @@
         "names": [
           "weekly payroll export"
         ],
-        "ruling": "The same export; the source says 'once a week the scheduling service writes a payroll export'.",
-        "reviewed_by": null
+        "ruling": "The same export; the source says 'once a week the scheduling service writes a payroll export'. Accepted; the weekly frequency is explicitly stated.",
+        "reviewed_by": "mstarks01"
       }
     ]
   }

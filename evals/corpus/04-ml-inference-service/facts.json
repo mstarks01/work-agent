@@ -444,24 +444,24 @@
         "names": [
           "calling teams"
         ],
-        "ruling": "The plural of the same party; the source says keys are issued per calling team.",
-        "reviewed_by": null
+        "ruling": "The plural of the same party; the source says keys are issued per calling team. Accepted; per-team issuance is preserved, and distinct teams' credentials are not merged.",
+        "reviewed_by": "mstarks01"
       },
       {
         "subject": "credential:group-account",
         "names": [
           "shared group account"
         ],
-        "ruling": "The source's own words: 'I think it is a shared group account'. The sharing is a fact on the credential, not part of its name.",
-        "reviewed_by": null
+        "ruling": "The source's own words: 'I think it is a shared group account'. The sharing is a fact on the credential, not part of its name. Accepted as the name of the suspected group account; the alias does not upgrade its existence or its sharing from hedged to established.",
+        "reviewed_by": "mstarks01"
       },
       {
         "subject": "artifact:model-artifact",
         "names": [
           "model artifacts"
         ],
-        "ruling": "The plural of the same artifact; the source says 'loads model artifacts'.",
-        "reviewed_by": null
+        "ruling": "The plural of the same artifact; the source says 'loads model artifacts'. Accepted for the artifact category; individually distinguished artifacts are not merged.",
+        "reviewed_by": "mstarks01"
       }
     ],
     "qualifiers": [
@@ -473,8 +473,11 @@
           "publish artifact",
           "publish model artifacts"
         ],
-        "ruling": "The engineers' publish to the registry bucket is the write the reference names; the source says 'ML engineers publish new model artifacts to the registry bucket'.",
-        "reviewed_by": null
+        "ruling": "The engineers' publish to the registry bucket is the write the reference names; the source says 'ML engineers publish new model artifacts to the registry bucket'. Accepted for model-artifact publication to the registry bucket only: the mapping holds under the ML engineers' grant and no other.",
+        "reviewed_by": "mstarks01",
+        "within": [
+          "principal:ml-engineers"
+        ]
       }
     ]
   }
