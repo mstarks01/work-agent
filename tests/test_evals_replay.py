@@ -375,6 +375,28 @@ class TestTheBundleReadsBackWhatItWrote:
         assert read.raw == raw
         assert read.extracted == model
         assert read.issues == tuple(issues)
+        assert read.repair is None
+
+    def test_an_end_to_end_emission_reads_back_with_its_repair(self, golden, tmp_path):
+        broken = golden.model.model_dump(mode="json")
+        broken["data_flows"][0]["destination"] = "process:does-not-exist"
+        repaired = golden.model.model_dump(mode="json")
+        out = tmp_path / "sweep.json"
+        write_extractions(
+            str(out),
+            "end-to-end",
+            {
+                golden.id: ExtractionResult(
+                    golden.id, None, (), raw=broken, repair=repaired
+                )
+            },
+        )
+
+        (read,) = extractions_from_reports(out, [golden]).values()
+
+        assert read.raw == broken
+        assert read.repair == repaired
+        assert [issue.code for issue in read.issues] == ["invalid-reference"]
 
     def test_a_proposal_re_resolves_to_the_catalog_the_sweep_counted(
         self, golden, tmp_path
@@ -493,6 +515,47 @@ class TestTheArchivedEmissionsReplay:
 
         with pytest.raises(EvalRunError, match="analysis sweep keeps no emission"):
             replay_artifact(path, corpus, CORPUS)
+
+    def test_an_end_to_end_sweep_replays_its_first_pass(
+        self,
+        corpus,
+        tmp_path,
+        sampling,  # noqa: F811
+    ):
+        """The paired runs #961 step 6 asks for are end-to-end, and they grade here."""
+        golden = next(c for c in corpus if c.id == CASE)
+        path = write_run(
+            tmp_path,
+            "e2e.json",
+            provenance(sampling),
+            [score(CASE, 4, [0])],
+            mode="end-to-end",
+            instruction=[
+                {
+                    "framework": "(shared)",
+                    "node": "extract",
+                    "tokens": 1,
+                    "sha256": "a" * 64,
+                }
+            ],
+            models={
+                "tiers_config_version": 9,
+                "tiers": {
+                    "base": {"vendor": "openrouter", "model": "x", "upstreams": []}
+                },
+            },
+        )
+        raw = golden.model.model_dump(mode="json")
+        write_extractions(
+            str(path),
+            "end-to-end",
+            {golden.id: ExtractionResult(golden.id, None, (), raw=raw)},
+        )
+
+        sweep = replay_artifact(path, corpus, CORPUS)
+
+        (graded,) = sweep.extractions
+        assert graded.counts["found"] == len(list(golden.model.elements()))
 
     def test_a_case_nobody_signed_is_skipped_by_name(self, corpus, tmp_path):
         bench = next(p for p in ARTIFACTS if "luna-r1" in p.name)

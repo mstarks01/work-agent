@@ -1278,6 +1278,31 @@ def test_revalidate_puts_every_uncited_element_back_and_records_it():
     }
 
 
+def test_the_first_gate_keeps_the_emission_and_the_repair_does_not_write_over_it():
+    """#961: ``repair`` lands in the key ``extract`` wrote, so the first pass is parked apart."""
+    broken = valid_model().model_dump(mode="json")
+    broken["data_flows"][0]["destination"] = "process:does-not-exist"
+    ctx = FakeContext()
+    graph.validate_extraction(ctx, KEYS, broken)
+    assert ctx.state[graph.STATE_FIRST_PASS] == broken
+
+    repaired = valid_model().model_dump(mode="json")
+    event = graph.validate_extraction(ctx, KEYS, repaired)
+
+    assert event.actions.route == graph.ROUTE_VALID
+    assert ctx.state[graph.STATE_FIRST_PASS] == broken
+
+
+def test_a_valid_first_pass_is_kept_the_same_way():
+    """One key whichever route the gate took, so a driver has one place to read."""
+    emitted = valid_model().model_dump(mode="json")
+    ctx = FakeContext()
+    event = graph.validate_extraction(ctx, KEYS, emitted)
+
+    assert event.actions.route == graph.ROUTE_VALID
+    assert ctx.state[graph.STATE_FIRST_PASS] == emitted
+
+
 def test_revalidate_leaves_a_whole_model_repair_alone():
     """No trust zones is a fault over the whole object; nothing is put back."""
     broken = valid_model().model_dump(mode="json")

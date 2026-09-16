@@ -914,6 +914,63 @@ def test_end_to_end_mode_runs_the_production_entry(case):
     assert report_issues(report) == []
 
 
+class TestAnEndToEndRunKeepsItsFirstPass:
+    """#961 finding 14: the report holds the model after repair, and nothing else held the emissions."""
+
+    def broken(self, case):
+        raw = case.model.model_dump(mode="json")
+        raw["data_flows"][0]["destination"] = "process:does-not-exist"
+        return raw
+
+    def test_a_valid_first_pass_is_the_emission_with_no_repair(self, case):
+        pipeline = build(case, ENTRY_EXTRACT, {})
+
+        run = asyncio.run(modes.run_end_to_end(case, pipeline))
+
+        assert run.extraction is not None
+        assert run.extraction.raw == case.model.model_dump(mode="json")
+        assert run.extraction.repair is None
+        assert run.extraction.issues == ()
+
+    def test_a_repaired_run_keeps_what_extract_and_repair_each_emitted(self, case):
+        models: dict[str, ScriptedLlm] = {}
+        pipeline = build(case, ENTRY_EXTRACT, models)
+        broken = self.broken(case)
+        models["extract"].reply = json.dumps(broken)
+        repaired = case.model.model_dump(mode="json")
+        models["repair"].reply = json.dumps(repaired)
+
+        run = asyncio.run(modes.run_end_to_end(case, pipeline))
+
+        assert run.report.model_repair is not None
+        assert run.extraction is not None
+        assert run.extraction.raw == broken
+        assert run.extraction.repair == repaired
+        assert [issue.code for issue in run.extraction.issues] == ["invalid-reference"]
+
+    def test_a_refused_model_rides_out_with_the_failure(self, case):
+        """The failure that is a measurement keeps the emission it measured."""
+        models: dict[str, ScriptedLlm] = {}
+        pipeline = build(case, ENTRY_EXTRACT, models)
+        broken = self.broken(case)
+        models["extract"].reply = json.dumps(broken)
+        models["repair"].reply = json.dumps(broken)
+
+        with pytest.raises(modes.CaseFailure, match="rejected the model") as raised:
+            asyncio.run(modes.run_end_to_end(case, pipeline))
+
+        assert raised.value.extraction is not None
+        assert raised.value.extraction.raw == broken
+        assert raised.value.extraction.repair == broken
+
+    def test_the_analysis_mode_has_no_first_pass(self, case):
+        pipeline = build(case, ENTRY_PREPARE, {})
+
+        run = asyncio.run(modes.run_analysis(case, pipeline))
+
+        assert run.extraction is None
+
+
 # --- Provenance -------------------------------------------------------------
 #
 # A sweep is one of certification's two callers. Without a stamped NodeRun per
