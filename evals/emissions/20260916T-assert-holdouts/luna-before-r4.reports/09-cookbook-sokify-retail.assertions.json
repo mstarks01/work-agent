@@ -1,0 +1,376 @@
+{
+  "proposal": {
+    "assertions": [
+      {
+        "subject_type": "component",
+        "subject": "process:web-api",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Nobody here can tell me what the API does about authentication"
+          }
+        ],
+        "explanation": "The source explicitly says the API's authentication behavior is not known.",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:mobile-app-to-web-api:api-traffic",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Nobody here can tell me what the API does about authentication"
+          }
+        ],
+        "explanation": "The interaction terminates at the API, whose authentication behavior the source says is unknown.",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:catalogue-spreadsheet-to-web-api:sql-statements",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Nobody here can tell me what the API does about authentication"
+          }
+        ],
+        "explanation": "The interaction terminates at the API, whose authentication behavior the source says is unknown.",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:mobile-app-to-web-api:api-traffic",
+        "predicate": "transport-encryption",
+        "value": "none",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The app talks to the web API over HTTP \u2014 not HTTPS"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:user-database",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Nobody here can tell me ... whether the user database and the flat file are encrypted."
+          }
+        ],
+        "explanation": "The source explicitly raises whether the user database is encrypted but does not answer it.",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:delivery-address-flat-file",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Nobody here can tell me ... whether the user database and the flat file are encrypted."
+          }
+        ],
+        "explanation": "The source explicitly raises whether the flat file is encrypted but does not answer it.",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:fax-gateway-to-customer:confirmation-fax",
+        "predicate": "destination-verification",
+        "value": "absent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The gateway dials the number stored against the order and nobody checks it arrived at the right place."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      }
+    ]
+  },
+  "catalog": {
+    "registry_version": 2,
+    "subjects": [
+      {
+        "id": "flow:catalogue-spreadsheet-to-web-api:sql-statements",
+        "type": "interaction",
+        "label": "SQL statements"
+      },
+      {
+        "id": "flow:fax-gateway-to-customer:confirmation-fax",
+        "type": "interaction",
+        "label": "Confirmation fax"
+      },
+      {
+        "id": "flow:mobile-app-to-web-api:api-traffic",
+        "type": "interaction",
+        "label": "API traffic"
+      },
+      {
+        "id": "process:web-api",
+        "type": "component",
+        "label": "Web API"
+      },
+      {
+        "id": "store:delivery-address-flat-file",
+        "type": "component",
+        "label": "Delivery address flat file"
+      },
+      {
+        "id": "store:user-database",
+        "type": "component",
+        "label": "User database"
+      }
+    ],
+    "entries": [
+      {
+        "subject": "process:web-api",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "603873a0d569ba3f0ac4a91a363086b54bae022cf432862d17be9eec9465e4ea",
+            "start": 1112,
+            "end": 1175,
+            "quote": "Nobody here can tell me what the API does about authentication"
+          }
+        ],
+        "premises": [],
+        "explanation": "The source explicitly says the API's authentication behavior is not known.",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:mobile-app-to-web-api:api-traffic",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "603873a0d569ba3f0ac4a91a363086b54bae022cf432862d17be9eec9465e4ea",
+            "start": 1112,
+            "end": 1175,
+            "quote": "Nobody here can tell me what the API does about authentication"
+          }
+        ],
+        "premises": [],
+        "explanation": "The interaction terminates at the API, whose authentication behavior the source says is unknown.",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:catalogue-spreadsheet-to-web-api:sql-statements",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "603873a0d569ba3f0ac4a91a363086b54bae022cf432862d17be9eec9465e4ea",
+            "start": 1112,
+            "end": 1175,
+            "quote": "Nobody here can tell me what the API does about authentication"
+          }
+        ],
+        "premises": [],
+        "explanation": "The interaction terminates at the API, whose authentication behavior the source says is unknown.",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:mobile-app-to-web-api:api-traffic",
+        "predicate": "transport-encryption",
+        "value": "none",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "603873a0d569ba3f0ac4a91a363086b54bae022cf432862d17be9eec9465e4ea",
+            "start": 162,
+            "end": 213,
+            "quote": "The app talks to the web API over HTTP \u2014 not HTTPS"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:user-database",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "603873a0d569ba3f0ac4a91a363086b54bae022cf432862d17be9eec9465e4ea",
+            "start": 1112,
+            "end": 1135,
+            "quote": "Nobody here can tell me"
+          },
+          {
+            "source_label": "System description",
+            "digest": "603873a0d569ba3f0ac4a91a363086b54bae022cf432862d17be9eec9465e4ea",
+            "start": 1179,
+            "end": 1237,
+            "quote": "whether the user database and the flat file are encrypted."
+          }
+        ],
+        "premises": [],
+        "explanation": "The source explicitly raises whether the user database is encrypted but does not answer it.",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:delivery-address-flat-file",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "603873a0d569ba3f0ac4a91a363086b54bae022cf432862d17be9eec9465e4ea",
+            "start": 1112,
+            "end": 1135,
+            "quote": "Nobody here can tell me"
+          },
+          {
+            "source_label": "System description",
+            "digest": "603873a0d569ba3f0ac4a91a363086b54bae022cf432862d17be9eec9465e4ea",
+            "start": 1179,
+            "end": 1237,
+            "quote": "whether the user database and the flat file are encrypted."
+          }
+        ],
+        "premises": [],
+        "explanation": "The source explicitly raises whether the flat file is encrypted but does not answer it.",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:fax-gateway-to-customer:confirmation-fax",
+        "predicate": "destination-verification",
+        "value": "absent",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "603873a0d569ba3f0ac4a91a363086b54bae022cf432862d17be9eec9465e4ea",
+            "start": 765,
+            "end": 867,
+            "quote": "The gateway dials the number stored against the order and nobody checks it arrived at the right place."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      }
+    ]
+  },
+  "issues": [],
+  "projection": [
+    {
+      "element_id": "flow:catalogue-spreadsheet-to-web-api:sql-statements",
+      "attribute": "authentication",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:authentication-mechanism~flow:catalogue-spreadsheet-to-web-api:sql-statements~any~unknown"
+      ]
+    },
+    {
+      "element_id": "flow:mobile-app-to-web-api:api-traffic",
+      "attribute": "authentication",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:authentication-mechanism~flow:mobile-app-to-web-api:api-traffic~any~unknown"
+      ]
+    },
+    {
+      "element_id": "flow:mobile-app-to-web-api:api-traffic",
+      "attribute": "encryption_in_transit",
+      "value": "none",
+      "reason": "stated",
+      "rows": [
+        "assertion:transport-encryption~flow:mobile-app-to-web-api:api-traffic~any~v.140bedbf9c3f"
+      ]
+    },
+    {
+      "element_id": "store:delivery-address-flat-file",
+      "attribute": "encryption_at_rest",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:storage-encryption~store:delivery-address-flat-file~any~unknown"
+      ]
+    },
+    {
+      "element_id": "store:user-database",
+      "attribute": "encryption_at_rest",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:storage-encryption~store:user-database~any~unknown"
+      ]
+    }
+  ]
+}

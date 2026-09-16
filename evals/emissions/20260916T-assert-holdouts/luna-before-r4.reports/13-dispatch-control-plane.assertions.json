@@ -1,0 +1,941 @@
+{
+  "proposal": {
+    "assertions": [
+      {
+        "subject_type": "component",
+        "subject": "process:dispatch-console",
+        "predicate": "network-membership",
+        "value": "corporate network",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Duty engineers sit on the corporate network. They open the dispatch console in their browser."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "process:dispatch-api",
+        "predicate": "network-membership",
+        "value": "production control plane",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The console calls the dispatch API. The dispatch API runs in the production control plane."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "process:schedule-importer",
+        "predicate": "network-membership",
+        "value": "corporate network",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Our schedule importer runs on the corporate network."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:duty-engineer-to-dispatch-console:open-console",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Nobody wrote down how an engineer signs in to it."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:dispatch-console-to-dispatch-api:dispatch-requests",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Whoever configured CORS did not record which origins the API allows, or whether it allows credentials."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:dispatch-console-to-dispatch-api:live-job-status",
+        "predicate": "transport-encryption",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Nobody wrote down whether that socket runs over TLS"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:dispatch-console-to-dispatch-api:live-job-status",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "whether its handshake is authenticated, or whether it checks the engineer's session again after it is open"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
+        "predicate": "transport-encryption",
+        "value": "HTTPS",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Every hour it pulls the partner's SOAP feed over HTTPS"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Nothing was written down about how the partner identifies our importer"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
+        "predicate": "destination-verification",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "or how our importer identifies the partner"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:schedule-importer-to-dispatch-api:post-work-orders",
+        "predicate": "authentication-mechanism",
+        "value": "API token",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "It presents an API token."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:schedule-importer-to-dispatch-api:post-work-orders",
+        "predicate": "credential-presented",
+        "value": "API token",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "It presents an API token."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "credential",
+        "subject": "API token",
+        "predicate": "credential-rotation",
+        "value": "not-rotated",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "That token was issued when the importer was built and nobody has rotated it since."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:dispatch-database",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "How the database is protected at rest is not written down anywhere."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "principal",
+        "subject": "an account",
+        "predicate": "authorization-grant",
+        "value": "move a crew",
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "live estate"
+          },
+          {
+            "kind": "operation",
+            "value": "move"
+          }
+        ],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "an account there can move a crew"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "principal",
+        "subject": "an account",
+        "predicate": "authorization-grant",
+        "value": "change the work a depot does that day",
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "a depot's work"
+          },
+          {
+            "kind": "operation",
+            "value": "change"
+          }
+        ],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "and it can change the work a depot does that day."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "principal",
+        "subject": "corporate laptop",
+        "predicate": "authorization-grant",
+        "value": "absent",
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "live estate"
+          },
+          {
+            "kind": "operation",
+            "value": "move a crew or change a depot's work that day"
+          }
+        ],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "A corporate laptop holds none of those rights."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "entity:scheduling-partner",
+        "predicate": "tenant-ownership",
+        "value": "scheduling partner",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "A scheduling partner, which is another company"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      }
+    ]
+  },
+  "catalog": {
+    "registry_version": 2,
+    "subjects": [
+      {
+        "id": "boundary:corporate-network",
+        "type": "zone",
+        "label": "corporate network"
+      },
+      {
+        "id": "boundary:production-control-plane",
+        "type": "zone",
+        "label": "production control plane"
+      },
+      {
+        "id": "credential:api-token",
+        "type": "credential",
+        "label": "API token"
+      },
+      {
+        "id": "entity:scheduling-partner",
+        "type": "component",
+        "label": "scheduling partner"
+      },
+      {
+        "id": "flow:dispatch-console-to-dispatch-api:dispatch-requests",
+        "type": "interaction",
+        "label": "dispatch requests"
+      },
+      {
+        "id": "flow:dispatch-console-to-dispatch-api:live-job-status",
+        "type": "interaction",
+        "label": "live job status"
+      },
+      {
+        "id": "flow:duty-engineer-to-dispatch-console:open-console",
+        "type": "interaction",
+        "label": "open console"
+      },
+      {
+        "id": "flow:schedule-importer-to-dispatch-api:post-work-orders",
+        "type": "interaction",
+        "label": "post work orders"
+      },
+      {
+        "id": "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
+        "type": "interaction",
+        "label": "pull schedule feed"
+      },
+      {
+        "id": "principal:an-account",
+        "type": "principal",
+        "label": "an account"
+      },
+      {
+        "id": "principal:corporate-laptop",
+        "type": "principal",
+        "label": "corporate laptop"
+      },
+      {
+        "id": "principal:scheduling-partner",
+        "type": "principal",
+        "label": "scheduling partner"
+      },
+      {
+        "id": "process:dispatch-api",
+        "type": "component",
+        "label": "dispatch API"
+      },
+      {
+        "id": "process:dispatch-console",
+        "type": "component",
+        "label": "dispatch console"
+      },
+      {
+        "id": "process:schedule-importer",
+        "type": "component",
+        "label": "schedule importer"
+      },
+      {
+        "id": "store:dispatch-database",
+        "type": "component",
+        "label": "dispatch database"
+      }
+    ],
+    "entries": [
+      {
+        "subject": "process:dispatch-console",
+        "predicate": "network-membership",
+        "value": "boundary:corporate-network",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
+            "start": 146,
+            "end": 239,
+            "quote": "Duty engineers sit on the corporate network. They open the dispatch console in their browser."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "process:dispatch-api",
+        "predicate": "network-membership",
+        "value": "boundary:production-control-plane",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
+            "start": 373,
+            "end": 463,
+            "quote": "The console calls the dispatch API. The dispatch API runs in the production control plane."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "process:schedule-importer",
+        "predicate": "network-membership",
+        "value": "boundary:corporate-network",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
+            "start": 1628,
+            "end": 1680,
+            "quote": "Our schedule importer runs on the corporate network."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:duty-engineer-to-dispatch-console:open-console",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
+            "start": 322,
+            "end": 371,
+            "quote": "Nobody wrote down how an engineer signs in to it."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:dispatch-console-to-dispatch-api:dispatch-requests",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
+            "start": 859,
+            "end": 961,
+            "quote": "Whoever configured CORS did not record which origins the API allows, or whether it allows credentials."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:dispatch-console-to-dispatch-api:live-job-status",
+        "predicate": "transport-encryption",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
+            "start": 1057,
+            "end": 1109,
+            "quote": "Nobody wrote down whether that socket runs over TLS"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:dispatch-console-to-dispatch-api:live-job-status",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
+            "start": 1110,
+            "end": 1217,
+            "quote": "whether its handshake is authenticated, or whether it checks the engineer's session again after it is open"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
+        "predicate": "transport-encryption",
+        "value": "HTTPS",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
+            "start": 1681,
+            "end": 1735,
+            "quote": "Every hour it pulls the partner's SOAP feed over HTTPS"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
+            "start": 1880,
+            "end": 1951,
+            "quote": "Nothing was written down about how the partner identifies our importer"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
+        "predicate": "destination-verification",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
+            "start": 1952,
+            "end": 1995,
+            "quote": "or how our importer identifies the partner"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:schedule-importer-to-dispatch-api:post-work-orders",
+        "predicate": "authentication-mechanism",
+        "value": "API token",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
+            "start": 2088,
+            "end": 2113,
+            "quote": "It presents an API token."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:schedule-importer-to-dispatch-api:post-work-orders",
+        "predicate": "credential-presented",
+        "value": "credential:api-token",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
+            "start": 2088,
+            "end": 2113,
+            "quote": "It presents an API token."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "credential:api-token",
+        "predicate": "credential-rotation",
+        "value": "not-rotated",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
+            "start": 2114,
+            "end": 2196,
+            "quote": "That token was issued when the importer was built and nobody has rotated it since."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:dispatch-database",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
+            "start": 1476,
+            "end": 1543,
+            "quote": "How the database is protected at rest is not written down anywhere."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "principal:an-account",
+        "predicate": "authorization-grant",
+        "value": "move a crew",
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "live estate"
+          },
+          {
+            "kind": "operation",
+            "value": "move"
+          }
+        ],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
+            "start": 569,
+            "end": 602,
+            "quote": "an account there can move a crew"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "principal:an-account",
+        "predicate": "authorization-grant",
+        "value": "change the work a depot does that day",
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "a depot's work"
+          },
+          {
+            "kind": "operation",
+            "value": "change"
+          }
+        ],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
+            "start": 603,
+            "end": 652,
+            "quote": "and it can change the work a depot does that day."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "principal:corporate-laptop",
+        "predicate": "authorization-grant",
+        "value": "absent",
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "live estate"
+          },
+          {
+            "kind": "operation",
+            "value": "move a crew or change a depot's work that day"
+          }
+        ],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
+            "start": 653,
+            "end": 699,
+            "quote": "A corporate laptop holds none of those rights."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "entity:scheduling-partner",
+        "predicate": "tenant-ownership",
+        "value": "principal:scheduling-partner",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
+            "start": 1545,
+            "end": 1592,
+            "quote": "A scheduling partner, which is another company"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      }
+    ]
+  },
+  "issues": [],
+  "projection": [
+    {
+      "element_id": "flow:dispatch-console-to-dispatch-api:dispatch-requests",
+      "attribute": "authentication",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:authentication-mechanism~flow:dispatch-console-to-dispatch-api:dispatch-requests~any~unknown"
+      ]
+    },
+    {
+      "element_id": "flow:dispatch-console-to-dispatch-api:live-job-status",
+      "attribute": "authentication",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:authentication-mechanism~flow:dispatch-console-to-dispatch-api:live-job-status~any~unknown"
+      ]
+    },
+    {
+      "element_id": "flow:dispatch-console-to-dispatch-api:live-job-status",
+      "attribute": "encryption_in_transit",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:transport-encryption~flow:dispatch-console-to-dispatch-api:live-job-status~any~unknown"
+      ]
+    },
+    {
+      "element_id": "flow:duty-engineer-to-dispatch-console:open-console",
+      "attribute": "authentication",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:authentication-mechanism~flow:duty-engineer-to-dispatch-console:open-console~any~unknown"
+      ]
+    },
+    {
+      "element_id": "flow:schedule-importer-to-dispatch-api:post-work-orders",
+      "attribute": "authentication",
+      "value": "unknown",
+      "reason": "several-predicates",
+      "rows": [
+        "assertion:authentication-mechanism~flow:schedule-importer-to-dispatch-api:post-work-orders~any~v.f70443af595c",
+        "assertion:credential-presented~flow:schedule-importer-to-dispatch-api:post-work-orders~any~credential:api-token"
+      ]
+    },
+    {
+      "element_id": "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
+      "attribute": "authentication",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:authentication-mechanism~flow:schedule-importer-to-scheduling-partner:pull-schedule-feed~any~unknown"
+      ]
+    },
+    {
+      "element_id": "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
+      "attribute": "encryption_in_transit",
+      "value": "HTTPS",
+      "reason": "stated",
+      "rows": [
+        "assertion:transport-encryption~flow:schedule-importer-to-scheduling-partner:pull-schedule-feed~any~v.3e1943522517"
+      ]
+    },
+    {
+      "element_id": "process:dispatch-api",
+      "attribute": "trust_zone",
+      "value": "boundary:production-control-plane",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~process:dispatch-api~any~boundary:production-control-plane"
+      ]
+    },
+    {
+      "element_id": "process:dispatch-console",
+      "attribute": "trust_zone",
+      "value": "boundary:corporate-network",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~process:dispatch-console~any~boundary:corporate-network"
+      ]
+    },
+    {
+      "element_id": "process:schedule-importer",
+      "attribute": "trust_zone",
+      "value": "boundary:corporate-network",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~process:schedule-importer~any~boundary:corporate-network"
+      ]
+    },
+    {
+      "element_id": "store:dispatch-database",
+      "attribute": "encryption_at_rest",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:storage-encryption~store:dispatch-database~any~unknown"
+      ]
+    }
+  ]
+}

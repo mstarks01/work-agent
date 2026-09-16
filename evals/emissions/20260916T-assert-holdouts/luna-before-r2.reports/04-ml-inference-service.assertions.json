@@ -1,0 +1,768 @@
+{
+  "proposal": {
+    "assertions": [
+      {
+        "subject_type": "interaction",
+        "subject": "flow:calling-service-to-inference-gateway:submit-inference-request",
+        "predicate": "authentication-mechanism",
+        "value": "API key in a header",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Callers pass an API key in a header."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:calling-service-to-inference-gateway:submit-inference-request",
+        "predicate": "credential-presented",
+        "value": "API key",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Callers pass an API key in a header."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "credential",
+        "subject": "API key",
+        "predicate": "credential-sharing",
+        "value": "per-principal",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Keys are issued per calling team"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "credential",
+        "subject": "API key",
+        "predicate": "credential-rotation",
+        "value": "not-rotated",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "we have never expired one"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:inference-gateway-to-model-server:forward-request",
+        "predicate": "authentication-mechanism",
+        "value": "absent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "There is no auth between the gateway and the model server"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:inference-gateway-to-model-server:forward-request",
+        "predicate": "credential-presented",
+        "value": "absent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "There is no auth between the gateway and the model server"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:model-server-to-model-registry-bucket:load-artifact",
+        "predicate": "authentication-mechanism",
+        "value": "service account",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "It uses its own service account for that."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:model-server-to-model-registry-bucket:load-artifact",
+        "predicate": "credential-presented",
+        "value": "service account",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "It uses its own service account for that."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:model-server-to-model-registry-bucket:load-artifact",
+        "predicate": "signature-verification",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "I don't believe anything verifies the artifact hasn't been swapped"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "artifact",
+        "subject": "model artifact",
+        "predicate": "signature-verification",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "I don't believe anything verifies the artifact hasn't been swapped"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:model-server-to-redis-feature-store:read-features",
+        "predicate": "authentication-mechanism",
+        "value": "no password authentication",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Redis has no password on it"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "process:inference-gateway",
+        "predicate": "internet-exposure",
+        "value": "internet-facing",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "we expose on the internet"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "process:model-server",
+        "predicate": "network-membership",
+        "value": "model network",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "the model server, which runs the actual model on GPU nodes in our model network"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:redis-feature-store",
+        "predicate": "network-membership",
+        "value": "model network",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Redis feature store on the same network"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:ml-engineer-to-model-registry-bucket:publish-artifact",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "I'm not sure what governs who can push \u2014 I think it is a shared group account."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "credential",
+        "subject": "shared group account",
+        "predicate": "credential-sharing",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "I think it is a shared group account."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      }
+    ]
+  },
+  "catalog": {
+    "registry_version": 2,
+    "subjects": [
+      {
+        "id": "artifact:model-artifact",
+        "type": "artifact",
+        "label": "model artifact"
+      },
+      {
+        "id": "boundary:model-network",
+        "type": "zone",
+        "label": "model network"
+      },
+      {
+        "id": "credential:api-key",
+        "type": "credential",
+        "label": "API key"
+      },
+      {
+        "id": "credential:service-account",
+        "type": "credential",
+        "label": "service account"
+      },
+      {
+        "id": "credential:shared-group-account",
+        "type": "credential",
+        "label": "shared group account"
+      },
+      {
+        "id": "flow:calling-service-to-inference-gateway:submit-inference-request",
+        "type": "interaction",
+        "label": "submit inference request"
+      },
+      {
+        "id": "flow:inference-gateway-to-model-server:forward-request",
+        "type": "interaction",
+        "label": "forward request"
+      },
+      {
+        "id": "flow:ml-engineer-to-model-registry-bucket:publish-artifact",
+        "type": "interaction",
+        "label": "publish artifact"
+      },
+      {
+        "id": "flow:model-server-to-model-registry-bucket:load-artifact",
+        "type": "interaction",
+        "label": "load artifact"
+      },
+      {
+        "id": "flow:model-server-to-redis-feature-store:read-features",
+        "type": "interaction",
+        "label": "read features"
+      },
+      {
+        "id": "process:inference-gateway",
+        "type": "component",
+        "label": "inference gateway"
+      },
+      {
+        "id": "process:model-server",
+        "type": "component",
+        "label": "model server"
+      },
+      {
+        "id": "store:redis-feature-store",
+        "type": "component",
+        "label": "Redis feature store"
+      }
+    ],
+    "entries": [
+      {
+        "subject": "flow:calling-service-to-inference-gateway:submit-inference-request",
+        "predicate": "authentication-mechanism",
+        "value": "API key in a header",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
+            "start": 215,
+            "end": 251,
+            "quote": "Callers pass an API key in a header."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:calling-service-to-inference-gateway:submit-inference-request",
+        "predicate": "credential-presented",
+        "value": "credential:api-key",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
+            "start": 215,
+            "end": 251,
+            "quote": "Callers pass an API key in a header."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "credential:api-key",
+        "predicate": "credential-sharing",
+        "value": "per-principal",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
+            "start": 252,
+            "end": 284,
+            "quote": "Keys are issued per calling team"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "credential:api-key",
+        "predicate": "credential-rotation",
+        "value": "not-rotated",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
+            "start": 289,
+            "end": 315,
+            "quote": "we have never expired one"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:inference-gateway-to-model-server:forward-request",
+        "predicate": "authentication-mechanism",
+        "value": "absent",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
+            "start": 434,
+            "end": 492,
+            "quote": "There is no auth between the gateway and the model server"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:inference-gateway-to-model-server:forward-request",
+        "predicate": "credential-presented",
+        "value": "absent",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
+            "start": 434,
+            "end": 492,
+            "quote": "There is no auth between the gateway and the model server"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:model-server-to-model-registry-bucket:load-artifact",
+        "predicate": "authentication-mechanism",
+        "value": "service account",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
+            "start": 640,
+            "end": 681,
+            "quote": "It uses its own service account for that."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:model-server-to-model-registry-bucket:load-artifact",
+        "predicate": "credential-presented",
+        "value": "credential:service-account",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
+            "start": 640,
+            "end": 681,
+            "quote": "It uses its own service account for that."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:model-server-to-model-registry-bucket:load-artifact",
+        "predicate": "signature-verification",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
+            "start": 682,
+            "end": 748,
+            "quote": "I don't believe anything verifies the artifact hasn't been swapped"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "artifact:model-artifact",
+        "predicate": "signature-verification",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
+            "start": 682,
+            "end": 748,
+            "quote": "I don't believe anything verifies the artifact hasn't been swapped"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:model-server-to-redis-feature-store:read-features",
+        "predicate": "authentication-mechanism",
+        "value": "no password authentication",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
+            "start": 894,
+            "end": 922,
+            "quote": "Redis has no password on it"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "process:inference-gateway",
+        "predicate": "internet-exposure",
+        "value": "internet-facing",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
+            "start": 127,
+            "end": 152,
+            "quote": "we expose on the internet"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "process:model-server",
+        "predicate": "network-membership",
+        "value": "boundary:model-network",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
+            "start": 353,
+            "end": 433,
+            "quote": "the model server, which runs the actual model on GPU nodes in our model network"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:redis-feature-store",
+        "predicate": "network-membership",
+        "value": "boundary:model-network",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
+            "start": 853,
+            "end": 893,
+            "quote": "Redis feature store on the same network"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:ml-engineer-to-model-registry-bucket:publish-artifact",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
+            "start": 1283,
+            "end": 1361,
+            "quote": "I'm not sure what governs who can push \u2014 I think it is a shared group account."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "credential:shared-group-account",
+        "predicate": "credential-sharing",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
+            "start": 1324,
+            "end": 1361,
+            "quote": "I think it is a shared group account."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      }
+    ]
+  },
+  "issues": [],
+  "projection": [
+    {
+      "element_id": "flow:calling-service-to-inference-gateway:submit-inference-request",
+      "attribute": "authentication",
+      "value": "unknown",
+      "reason": "several-predicates",
+      "rows": [
+        "assertion:authentication-mechanism~flow:calling-service-to-inference-gateway:submit-inference-request~any~v.fd60f8c677e3",
+        "assertion:credential-presented~flow:calling-service-to-inference-gateway:submit-inference-request~any~credential:api-key"
+      ]
+    },
+    {
+      "element_id": "flow:inference-gateway-to-model-server:forward-request",
+      "attribute": "authentication",
+      "value": "unknown",
+      "reason": "several-predicates",
+      "rows": [
+        "assertion:authentication-mechanism~flow:inference-gateway-to-model-server:forward-request~any~absent",
+        "assertion:credential-presented~flow:inference-gateway-to-model-server:forward-request~any~absent"
+      ]
+    },
+    {
+      "element_id": "flow:ml-engineer-to-model-registry-bucket:publish-artifact",
+      "attribute": "authentication",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:authentication-mechanism~flow:ml-engineer-to-model-registry-bucket:publish-artifact~any~unknown"
+      ]
+    },
+    {
+      "element_id": "flow:model-server-to-model-registry-bucket:load-artifact",
+      "attribute": "authentication",
+      "value": "unknown",
+      "reason": "several-predicates",
+      "rows": [
+        "assertion:authentication-mechanism~flow:model-server-to-model-registry-bucket:load-artifact~any~v.d7da08389824",
+        "assertion:credential-presented~flow:model-server-to-model-registry-bucket:load-artifact~any~credential:service-account"
+      ]
+    },
+    {
+      "element_id": "flow:model-server-to-redis-feature-store:read-features",
+      "attribute": "authentication",
+      "value": "no password authentication",
+      "reason": "stated",
+      "rows": [
+        "assertion:authentication-mechanism~flow:model-server-to-redis-feature-store:read-features~any~v.540687b124be"
+      ]
+    },
+    {
+      "element_id": "process:inference-gateway",
+      "attribute": "exposure",
+      "value": "internet-facing",
+      "reason": "stated",
+      "rows": [
+        "assertion:internet-exposure~process:inference-gateway~any~internet-facing"
+      ]
+    },
+    {
+      "element_id": "process:model-server",
+      "attribute": "trust_zone",
+      "value": "boundary:model-network",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~process:model-server~any~boundary:model-network"
+      ]
+    },
+    {
+      "element_id": "store:redis-feature-store",
+      "attribute": "trust_zone",
+      "value": "boundary:model-network",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~store:redis-feature-store~any~boundary:model-network"
+      ]
+    }
+  ]
+}
