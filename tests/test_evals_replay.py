@@ -489,6 +489,46 @@ class TestTheArchivedEmissionsReplay:
         )
         assert pool["by_type"]["flow"]["endpoint_unaligned"] > 0
 
+    def test_the_spread_is_read_over_the_sweeps_that_ran_every_case(self, corpus):
+        """A ceiling is priced against the sd of the fate's per-sweep count."""
+        sweeps = [
+            replay_artifact(path, corpus, CORPUS)
+            for path in ARTIFACTS
+            if load_artifact(path).mode == "extraction"
+        ]
+        by_arm = replay.by_arm(sweeps)
+        before = next(
+            arm
+            for arm in by_arm
+            if arm.instruction.startswith("88f0740b")
+            and any("luna" in model for model in arm.models)
+        )
+
+        spread = replay.pooled_extraction(by_arm[before])["spread"]
+
+        # Six sweeps on the arm; the preflight ran one case and two ran eleven.
+        assert spread["sweeps"] == 3
+        assert spread["sd"]["found"] == 7.23
+        assert spread["by_type"]["entity"]["omitted"] == 0.0
+
+    def test_one_sweep_has_no_spread(self, corpus):
+        (sweep,) = [
+            replay_artifact(path, corpus, CORPUS)
+            for path in ARTIFACTS
+            if path.name.endswith("preflight-01.json")
+        ]
+
+        spread = replay.pooled_extraction([sweep])["spread"]
+
+        assert spread == {
+            "sweeps": 1,
+            "sd": dict.fromkeys(replay.FATES),
+            "by_type": {
+                kind: dict.fromkeys(replay.FATES)
+                for kind in ("boundary", "entity", "flow", "process", "store")
+            },
+        }
+
     def test_the_command_runs_over_the_archive(self, tmp_path, capsys):
         out = tmp_path / "replay.json"
         code = main(["replay", *map(str, ARTIFACTS[:2]), "--out", str(out)])
