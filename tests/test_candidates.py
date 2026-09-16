@@ -7,11 +7,19 @@ candidate is a lead, and nothing downstream can turn one into a finding.
 
 import pytest
 
-from analysis_service.assertions import ABSENT, Assertion, AssertionCatalog, Subject
+from analysis_service.assertions import (
+    ABSENT,
+    Assertion,
+    AssertionCatalog,
+    Subject,
+    SupportSpan,
+    catalog_issues,
+)
 from analysis_service.candidates import Candidate, generate_candidates
 from analysis_service.claims import Ground
 from analysis_service.frameworks.stride import STRIDE
 from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
+from analysis_service.sources import text_digest
 from analysis_service.system_model import (
     UNKNOWN,
     DataFlow,
@@ -30,6 +38,12 @@ RULES = STRIDE.rules
 
 
 RULE = "spoofing-second-factor-stated-absent"
+
+#: A source the spans below point into. The rule never runs the gate, so what
+#: these spans have to be is well-formed rather than verifiable; the gate's own
+#: reading of them is tested in ``tests/test_assertions.py``.
+SOURCE_LABEL = "Notes"
+SOURCE = "Shopper accounts sign in with a password and nothing else."
 
 
 def candidates(model, catalog=None) -> dict:
@@ -511,3 +525,84 @@ class TestTheRuleThatReadsTheCatalog:
             for c in candidates(model, self.catalog_of(ABSENT))["spoofing"].candidates
         }
         assert with_rows - without == {RULE}
+
+
+class TestAPrincipalReachesAnElementOnlyWhenTheSourcesSaySo:
+    """Item 1 of #926's Phase 4, built as an assertion rather than a field.
+
+    A fact about a class of accounts reaches a rule only through a settled
+    `represented-by`. The gate refuses that predicate on an inferred basis, so
+    the identification is behind a quote the gate verifies — which is the
+    whole reason it is a predicate and not a `binding` field the model fills
+    in free.
+    """
+
+    PRINCIPAL = "principal:shoppers"
+    ENTITY = "entity:customer"
+    FLOW = "flow:entity:customer>process:api>submit"
+
+    def catalog(self, *entries, identified=True):
+        subjects = [
+            Subject(id=self.PRINCIPAL, type="principal", label="shopper accounts"),
+            Subject(id=self.ENTITY, type="component", label="Customer"),
+        ]
+        rows = list(entries)
+        if identified:
+            rows.append(
+                Assertion(
+                    subject=self.PRINCIPAL,
+                    predicate="represented-by",
+                    value=self.ENTITY,
+                    basis="stated",
+                    support=[
+                        SupportSpan(
+                            source_label=SOURCE_LABEL,
+                            digest=text_digest(SOURCE),
+                            start=0,
+                            end=len("Shopper accounts"),
+                            quote="Shopper accounts",
+                        )
+                    ],
+                )
+            )
+        return AssertionCatalog(subjects=subjects, entries=rows)
+
+    def absence(self):
+        return Assertion(
+            subject=self.PRINCIPAL,
+            predicate="mfa-requirement",
+            value=ABSENT,
+            basis="stated",
+            support=[
+                SupportSpan(
+                    source_label=SOURCE_LABEL,
+                    digest=text_digest(SOURCE),
+                    start=0,
+                    end=len("Shopper accounts"),
+                    quote="Shopper accounts",
+                )
+            ],
+        )
+
+    def test_the_fact_reaches_the_flows_the_principal_originates(self, model):
+        hits = fired(model, RULE, self.catalog(self.absence()))
+
+        assert self.FLOW in {hit.element_ids[0] for hit in hits}
+        assert hits[0].facts["second_factor_subject"] == "principal"
+
+    def test_without_the_identification_it_reaches_nothing(self, model):
+        """The measured state before this: 15 of 18 rows reached no candidate."""
+        held = self.catalog(self.absence(), identified=False)
+        assert fired(model, RULE, held) == []
+
+    def test_an_inferred_identification_is_refused_by_the_gate(self):
+        """So a wrong lead needs a source that states the wrong thing."""
+        guessed = Assertion(
+            subject=self.PRINCIPAL,
+            predicate="represented-by",
+            value=self.ENTITY,
+            basis="inferred",
+            explanation="the names look alike",
+        )
+        issues = catalog_issues(self.catalog(guessed, identified=False))
+        assert "inference-refused" in {issue.code for issue in issues}

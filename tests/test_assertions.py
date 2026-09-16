@@ -164,16 +164,16 @@ class TestTheRegistryAnswersItsVocabularies:
         """A predicate cannot be authoritative for a field that does not exist."""
         assert set(projection_fields().values()) <= set(all_attribute_names())
 
-    def test_ten_of_the_sixteen_predicates_project_into_nothing(self):
+    def test_eleven_of_the_seventeen_predicates_project_into_nothing(self):
         """ADR 0034's figure, re-derived rather than asserted in its prose.
 
         It is the whole argument for the catalog: the graph has no field for
-        most of what the first release scopes. Registry version 2 added two
-        predicates a live run showed the sources state, and only one of them
-        has a field to land in.
+        most of what this release scopes. `represented-by` is the eleventh, and
+        it could have no field by construction — it says which element a
+        subject *is*, and no element has an attribute for that.
         """
-        assert len(REGISTRY) == 16
-        assert len(REGISTRY) - len(projection_fields()) == 10
+        assert len(REGISTRY) == 17
+        assert len(REGISTRY) - len(projection_fields()) == 11
 
     def test_two_predicates_can_project_into_one_field(self):
         """A mechanism and the credential it presents share one string today.
@@ -563,6 +563,28 @@ REFUSALS: dict[str, tuple[str, AssertionCatalog, dict]] = {
             [stated(basis="inferred", support=[], explanation="a", exclusive=True)]
         ),
         {},
+    ),
+    "inference-refused": (
+        (
+            "an identification this service guessed moves every fact about the"
+            " subject onto the wrong element, with nothing to show it moved"
+        ),
+        catalog(
+            [
+                Assertion(
+                    subject="principal:shoppers",
+                    predicate="represented-by",
+                    value="entity:shopper",
+                    basis="inferred",
+                    explanation="the names look alike",
+                )
+            ],
+            rows=(
+                ("principal:shoppers", "principal", "shopper accounts"),
+                ("entity:shopper", "component", "shopper"),
+            ),
+        ),
+        {"sources": SOURCES},
     ),
     "unassessed-assessor": (
         "an assessment with nobody behind it is a model judging itself",

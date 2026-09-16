@@ -156,7 +156,9 @@ __all__ = [
 #: whenever a predicate is added, removed, re-spelled, or has its value
 #: vocabulary, scope requirement or multiplicity changed — each of those
 #: changes what a row means, and a reader comparing two runs has to know.
-REGISTRY_VERSION = 2
+#:
+#: Version 3 adds ``represented-by``.
+REGISTRY_VERSION = 3
 
 #: The projection's version: which graph attribute each predicate is
 #: authoritative for, and what :func:`project` does when the rows do not fit one
@@ -319,6 +321,18 @@ class Predicate:
     requires: tuple[str, ...] = ()
     multiplicity: Multiplicity = "one"
     projects_into: str = ""
+    #: Whether the sources must *state* this predicate's value, so an inference
+    #: is refused rather than recorded.
+    #:
+    #: **For a predicate whose value is an identification.** Most predicates
+    #: describe a subject, and this service inferring one is a conclusion a
+    #: reader can weigh by its ``basis``. A predicate that says *this subject
+    #: is that element* is different: a wrong one does not produce a weak
+    #: fact, it moves every fact about the subject onto the wrong element, and
+    #: a reader has no way to see that it moved. A ``stated`` row with a real
+    #: value already needs a span the gate verifies against the source text,
+    #: so requiring the basis is what puts the identification behind a quote.
+    stated_only: bool = False
 
     def admits(self, value: str, known_subjects: Collection[str]) -> bool:
         """Whether ``value`` is legal for this predicate.
@@ -448,6 +462,20 @@ REGISTRY: Mapping[str, Predicate] = MappingProxyType(
             subjects=frozenset({"component", "zone"}),
             value="reference",
             refers_to=frozenset({"principal"}),
+        ),
+        # The one predicate that says a subject *is* an element rather than
+        # describing one. It is what lets a fact about a class of accounts
+        # reach a rule, which reads elements and nothing else. `stated_only`,
+        # because an identification this service guessed would move every fact
+        # about that principal onto the wrong element with nothing to show it
+        # had moved.
+        "represented-by": Predicate(
+            meaning="which element of the model stands for this principal,"
+            " where the sources say the two are the same thing",
+            subjects=frozenset({"principal"}),
+            value="reference",
+            refers_to=frozenset({"component"}),
+            stated_only=True,
         ),
     }
 )
@@ -605,6 +633,9 @@ CatalogIssueCode = Literal[
     "unverifiable-span",
     "ambiguous-span",
     "unassessed-assessor",
+    # A predicate whose value identifies rather than describes, carrying a
+    # value this service inferred. See `Predicate.stated_only`.
+    "inference-refused",
     # Not a refused row. The row stands and stays citable; this says the graph
     # attribute beside it states the opposite, which is the defect this layer
     # was built to make visible rather than one to drop a fact over.
@@ -1223,6 +1254,12 @@ def _entry_issues(
     # when the sources do not answer. A `hedged` unknown may still carry the
     # words somebody hedged with, which is why the span is optional rather than
     # refused.
+    if predicate.stated_only and entry.basis not in ("stated", "legacy"):
+        refuse(
+            "inference-refused",
+            f"{entry.predicate!r} says which element a subject is, so the"
+            f" sources have to state it; this row's basis is {entry.basis!r}",
+        )
     if entry.basis == "stated" and entry.value != UNKNOWN and not entry.support:
         refuse(
             "unsupported-assertion",

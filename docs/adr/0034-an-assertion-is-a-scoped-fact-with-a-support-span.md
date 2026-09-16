@@ -201,6 +201,26 @@ every other component as well as that one. Version 2 answers both.
 
 Sixteen predicates now, **ten of which project into no graph field**.
 
+### Registry version 3
+
+**`represented-by`** — which element of the model stands for a principal, where
+the sources say the two are the same thing. Subject `principal`, a component
+reference, no graph field, and it could have none: it says which element a
+subject *is*, and no element has an attribute for that.
+
+It exists because a rule reads elements and nothing else, so a fact about a
+class of accounts reached no rule at all. Measured over the archived assertion
+sweeps, 15 of 18 `mfa-requirement` rows sat on a principal and 3 on a flow.
+
+**It is the one predicate whose basis the gate constrains.** `stated_only`
+refuses an `inferred` value, so an identification has to come from the sources
+and carries a span the gate verifies against the source text. The reason is the
+blast radius rather than the confidence: a wrong description is a weak fact a
+reader weighs by its basis, while a wrong identification moves every fact about
+the subject onto the wrong element with nothing to show that it moved.
+
+Seventeen predicates now, **eleven of which project into no graph field**.
+
 **A fact outside the registry stays source material.** Extraction does not
 invent a predicate and does not force a fact into the nearest wrong one. That is
 the same rule the asset vocabulary and the **Ground** kinds already follow.
