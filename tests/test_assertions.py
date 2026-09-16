@@ -47,6 +47,7 @@ from analysis_service.assertions import (
     conflicts,
     project,
     projection_fields,
+    referent_type,
     resolve_catalog,
     settled,
     span_source,
@@ -184,6 +185,19 @@ class TestSubjectIdentity:
 
     def test_the_graph_bound_types_are_the_three_the_schema_names(self):
         assert GRAPH_BOUND == {"component", "interaction", "zone"}
+
+    def test_a_type_this_layer_owns_declares_exactly_one_prefix(self):
+        """``subject_id`` reads the single member rather than choosing.
+
+        It does ``next(iter(prefixes))``, which is the one-of-several shape
+        that hides an ambiguity wherever the set can hold two. Here it cannot,
+        and this is what says so: a second prefix on one of these types would
+        make the built ID depend on set ordering.
+        """
+        for subject_type, prefixes in SUBJECT_PREFIXES.items():
+            if subject_type in GRAPH_BOUND:
+                continue
+            assert len(prefixes) == 1, subject_type
 
     def test_a_subject_id_is_deterministic(self):
         assert (
@@ -1544,3 +1558,46 @@ class TestWhatTheFirstLiveRunFound:
 
         (projected,) = project(held)
         assert (projected.attribute, projected.value) == ("trust_zone", "boundary:app")
+
+
+class TestTheOneReaderOfAReferentType:
+    """``referent_type`` answers for every predicate, not only a referring one.
+
+    Three sites read "which subject type does this reference point at": this
+    function, ``prompts._value_form`` and ``evals.harness.replay``. The last
+    two spelled ``next(iter(predicate.refers_to))`` again because this one was
+    private, and that spelling has no answer for the 12 predicates that refer
+    to nothing.
+    """
+
+    def test_a_referring_predicate_names_its_one_type(self):
+        assert referent_type(REGISTRY["credential-presented"]) == "credential"
+        assert referent_type(REGISTRY["network-membership"]) == "zone"
+
+    def test_a_predicate_that_refers_to_nothing_answers_none(self):
+        """The shape the second readers missed. ``next(iter(...))`` raised here."""
+        assert referent_type(REGISTRY["mfa-requirement"]) is None
+        assert referent_type(REGISTRY["credential-custody"]) is None
+
+    def test_every_registered_predicate_has_an_answer(self):
+        """No predicate makes this raise, which is what the second readers did."""
+        for name, predicate in REGISTRY.items():
+            found = referent_type(predicate)
+            assert (found is not None) == bool(predicate.refers_to), name
+
+    def test_a_term_predicate_with_a_bad_term_draws_illegal_value(self):
+        """Why the None matters: this row reaches the replay's referent branch.
+
+        ``illegal-value`` is not a reference predicate's code alone, so a
+        reader keyed on it has to answer for a predicate that refers to
+        nothing.
+        """
+        row = Assertion(
+            subject=FLOW,
+            predicate="mfa-requirement",
+            value="sometimes",
+            basis="inferred",
+            explanation="x",
+        )
+        assert codes(catalog_issues(catalog([row]))) == ["illegal-value"]
+        assert referent_type(REGISTRY[row.predicate]) is None

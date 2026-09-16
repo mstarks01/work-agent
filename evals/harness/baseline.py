@@ -233,7 +233,11 @@ class BaselineIdentity:
 
 
 class _BaselineRule(NamedTuple):
-    """One rule a **Baseline** applies on top of the five identity parts.
+    """One rule a **Baseline** applies on top of :class:`BaselineIdentity`.
+
+    Named rather than counted. This said "the five identity parts" from #321
+    until #910 added the two the operator's endpoint choice needs, and the
+    count was the half nothing recomputed.
 
     ``unmet`` answers with the sentence a Baseline refuses the sweep with, or
     with ``""`` where the sweep satisfies the rule. ``marker`` is what a vote's

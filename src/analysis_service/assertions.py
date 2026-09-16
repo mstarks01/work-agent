@@ -132,6 +132,7 @@ __all__ = [
     "conflicts",
     "project",
     "projection_fields",
+    "referent_type",
     "resolve_catalog",
     "settled",
     "snap_subject",
@@ -1196,19 +1197,18 @@ class _Checked:
     :data:`MAX_SPANS` spans that is 4000 reads of one text, measured at 0.77 s
     against 0.00018 s for one, over the 100 KiB ``max_source_bytes`` admits.
 
-    **Not :class:`SpanSource`, because the two answer different questions.**
-    That one folds a source so a quote can be *located* in it, and carries the
-    word index locating needs. This one folds a source so a recorded span can
-    be *verified* against it, and carries the raw text, which locating never
-    reads and verifying cannot do without: a span names offsets into the exact
-    retained text.
+    **Not :class:`SpanSource`, and the reason is measured rather than tidy.**
+    That one folds a source so a quote can be *located* in it, which needs the
+    word index :func:`~analysis_service.grounding.index_source` builds. This
+    one folds a source so a recorded span can be *verified* against it, which
+    needs the raw text — a span names offsets into the exact retained text —
+    and never reads that index.
 
-    Their digests and haystacks do agree, and are computed twice — 5.9 ms of a
-    100 KiB source per job, against the 77 ms this class removes. Merging them
-    would put the raw text behind :func:`~analysis_service.grounding.index_source`,
-    which answers ``None`` for a source whose two folds disagree, and the gate
-    would then report a source it holds as one it does not. Two types and one
-    duplicated fold is the cheaper of the two mistakes.
+    Their digests and haystacks do agree and are computed twice, which is 5.9 ms
+    of a 100 KiB source per job. Merging them would make the gate build the
+    index it does not read: 47.1 ms in place of 5.9 ms, so one type costs 41 ms
+    to save 5.9. The duplicated fold is the cheaper half by a factor of seven,
+    and a reader who spots the overlap should read this before repairing it.
     """
 
     text: str
@@ -1580,11 +1580,14 @@ def _resolve_row(
     value = row.value
     referent = None
     if predicate.value == "reference" and value not in UNIVERSAL_TERMS:
-        referent = _subject(_referent_type(predicate), value, element_ids, labels)
+        wanted = referent_type(predicate)
+        referent = (
+            None if wanted is None else _subject(wanted, value, element_ids, labels)
+        )
         if referent is None:
             drop(
                 "illegal-value",
-                f"{value!r} names no {_referent_type(predicate)} this predicate takes",
+                f"{value!r} names no {wanted} this predicate takes",
             )
             return None
         value = referent.id
@@ -1616,13 +1619,22 @@ def _resolve_row(
     return identity, entry
 
 
-def _referent_type(predicate: Predicate) -> SubjectType:
-    """The one subject type a reference predicate points at.
+def referent_type(predicate: Predicate) -> SubjectType | None:
+    """The one subject type a reference predicate points at, or ``None``.
 
     One, never two: ``tests/test_assertions.py`` holds the registry to it, so
     this reads the single member rather than choosing between members.
+
+    ``None`` for a predicate that takes no reference, which is 12 of the 16 and
+    the shape a second reader missed. ``evals.harness.replay`` asked
+    ``next(iter(refers_to))`` of every row the gate refused as
+    ``illegal-value``, and a term predicate carrying a term outside its
+    vocabulary draws exactly that code — so an archived catalog holding one
+    would have ended the replay with a bare ``StopIteration`` naming nothing.
+    Public, and the one reader, because the two sites that spelled it again
+    could not call it while it was private.
     """
-    return next(iter(predicate.refers_to))
+    return next(iter(predicate.refers_to), None)
 
 
 def _subject(

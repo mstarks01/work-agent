@@ -67,6 +67,18 @@ def compose(
     how a critic reads a real job: the whole set at once, with the duplicate
     step able to see across it. Scoring one draft at a time would also change
     what the model is asked, which is the thing under test.
+
+    **One half of the production view is absent, and this is where that is
+    written down.** ``merge_drafts`` builds the first pass's view as
+    ``critic_view(drafts, model, repaired=marks.repaired_quotes)``, so a
+    production critic sees what the agent wrote beside each span the repair
+    pass put in its place. :class:`~evals.critic_review.model.CriticFixture`
+    has no field for a repaired quote and ``cases.json`` carries none, so this
+    composes the view without them and grades the critic on a prompt that is
+    short by that mark. What it measures is therefore the re-ask's view rather
+    than the first pass's. Closing it needs a fixture field and a reader to
+    sign the rows that use it; until then a score here says nothing about how
+    a critic reads a repaired quote.
     """
     drafts = [_draft_of(fixture, package) for fixture in fixtures]
     filled = {
