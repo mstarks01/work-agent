@@ -69,7 +69,7 @@ from typing import Literal, NamedTuple, get_args
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from analysis_service.analysis import ABSENT_WORD
+from analysis_service.analysis import ABSENT_WORD, control_state
 from analysis_service.grounding import (
     IndexedSource,
     fragments,
@@ -94,12 +94,14 @@ from analysis_service.system_model import (
 
 __all__ = [
     "ABSENT",
+    "GATE_REFUSALS",
     "MAX_ASSERTIONS",
     "MAX_PREMISES",
     "MAX_QUALIFIERS",
     "MAX_QUOTE_CHARS",
     "MAX_SPANS",
     "MAX_SUBJECTS",
+    "PROJECTION_VERSION",
     "REGISTRY",
     "REGISTRY_VERSION",
     "UNIVERSAL_TERMS",
@@ -114,6 +116,7 @@ __all__ = [
     "CatalogIssueCode",
     "CatalogProposal",
     "Conflict",
+    "Contradiction",
     "Predicate",
     "Projection",
     "ProjectionReason",
@@ -130,6 +133,8 @@ __all__ = [
     "assertion_id",
     "catalog_issues",
     "conflicts",
+    "contradiction_issues",
+    "contradictions",
     "project",
     "projection_fields",
     "referent_type",
@@ -148,6 +153,25 @@ __all__ = [
 #: vocabulary, scope requirement or multiplicity changed — each of those
 #: changes what a row means, and a reader comparing two runs has to know.
 REGISTRY_VERSION = 2
+
+#: The projection's version: which graph attribute each predicate is
+#: authoritative for, and what :func:`project` does when the rows do not fit one
+#: attribute's single unscoped string.
+#:
+#: **Its own number, because the projection's rules are not in the registry.**
+#: :func:`projection_fields` is read off :data:`REGISTRY`, so a predicate's
+#: target moves with a registry bump — but the loss rules live in :func:`project`
+#: and have already changed once on their own: version 2 stopped picking between
+#: two values and started writing ``unknown`` with a
+#: :data:`ProjectionReason` (#937), with no registry change beside it. One
+#: number for both would have called that release identical to the one before
+#: it.
+#:
+#: Bumped whenever a predicate's ``projects_into`` moves, or when :func:`project`
+#: changes which rows reach an attribute or what it writes when they do not fit.
+#: Recorded in :class:`~analysis_service.report.ExecutionEnvelope`, because
+#: nothing else in a report says which rules turned rows into attributes.
+PROJECTION_VERSION = 2
 
 #: The value that says a source stated this fact is **not there**. A positive
 #: statement about an absence, which :attr:`Assertion.basis` then attributes:
@@ -517,6 +541,23 @@ class Assertion(BaseModel):
     #: A claim, so it needs a source: the gate refuses it on a row that is not
     #: ``stated`` or carries no span.
     exclusive: bool = False
+    #: Whether somebody checked that the spans hold what this row says, and
+    #: who. :func:`settled` reads it: ``unsupported`` and ``unresolved`` set a
+    #: row aside, so this field decides whether a lane may rest on the fact.
+    #:
+    #: **Nothing in this service writes anything but ``unchecked``.** An
+    #: extractor's own confidence is not an assessment (ADR 0034), and no
+    #: sitting imports one yet, so every value here is the default.
+    #:
+    #: **Whoever writes the first real one owes the staleness rule.** An
+    #: assessment is a judgement about particular source text, and the text it
+    #: was made against is pinned only on the row's ``support`` spans, by
+    #: ``SupportSpan.digest``. ``settled`` reads the assessment and never the
+    #: spans, so an assessment made against text that has since changed would
+    #: keep a row citable on evidence that no longer says it. The gate reports
+    #: the changed text as ``stale-digest``, and nothing carries that as far as
+    #: the assessment. That is a gap with no consequence while every value is
+    #: ``unchecked``, and a defect the first producer introduces.
     assessment: Assessment = "unchecked"
     #: Who assessed the support, and which version of them. Required once
     #: ``assessment`` moves off ``unchecked``.
@@ -560,7 +601,25 @@ CatalogIssueCode = Literal[
     "unverifiable-span",
     "ambiguous-span",
     "unassessed-assessor",
+    # Not a refused row. The row stands and stays citable; this says the graph
+    # attribute beside it states the opposite, which is the defect this layer
+    # was built to make visible rather than one to drop a fact over.
+    "graph-contradiction",
 ]
+
+
+#: Every code the gate raises over a row, which is every code but one.
+#:
+#: :data:`CatalogIssueCode` holds what a report's ``assertions.issues`` can say,
+#: and ``graph-contradiction`` is the one entry that is not a refusal: the row
+#: stands, stays settled and stays citable, and the finding is about the graph
+#: attribute beside it. Spelled as a set rather than left to a reader to
+#: remember, because ``tests/test_assertions.py`` holds the gate's fixture table
+#: to exactly these, and a new code that is a refusal must fail there rather
+#: than quietly join the exception.
+GATE_REFUSALS: frozenset[str] = frozenset(get_args(CatalogIssueCode)) - {
+    "graph-contradiction"
+}
 
 
 class CatalogIssue(BaseModel):
@@ -588,6 +647,17 @@ class AssertionRecord(BaseModel):
     fact the sources never stated from one the node proposed and lost. The
     proposal itself is not kept here, for the reason the report keeps no raw
     extraction: ``issues[].row`` counts distinct refused rows without it.
+
+    ``projection_version`` sits here rather than on the catalog, because it is
+    not a property of the rows: the catalog says what the sources state, and the
+    projection says what this service then wrote into the graph's attributes.
+    A reader comparing two reports' projected attributes needs it, and the
+    catalog's own ``registry_version`` does not answer it — :func:`project`'s
+    loss rules changed in #937 with no registry change beside them. It is here
+    and not on :class:`~analysis_service.report.ExecutionEnvelope` for the
+    reason the registry version is not: a job that ran no assertion pass
+    projected nothing, and a version recorded for a projection that never ran
+    is a fact with no consequence.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -595,6 +665,7 @@ class AssertionRecord(BaseModel):
     proposed: int = Field(ge=0)
     catalog: AssertionCatalog
     issues: list[CatalogIssue] = Field(default_factory=list)
+    projection_version: int = Field(default=PROJECTION_VERSION, ge=1)
 
     @classmethod
     def of(
@@ -614,7 +685,11 @@ class AssertionRecord(BaseModel):
         """
         catalog, issues = resolve_catalog(proposal, model, sources)
         issues = [*issues, *catalog_issues(catalog, model=model, sources=sources)]
-        return cls(proposed=len(proposal.assertions), catalog=catalog, issues=issues)
+        return cls(
+            proposed=len(proposal.assertions),
+            catalog=catalog,
+            issues=[*issues, *contradiction_issues(catalog, model)],
+        )
 
 
 @dataclass(frozen=True)
@@ -1861,6 +1936,88 @@ def project(catalog: AssertionCatalog) -> tuple[Projection, ...]:
         _projected(element_id, attribute, rows, subjects)
         for (element_id, attribute), rows in sorted(grouped.items())
     )
+
+
+@dataclass(frozen=True)
+class Contradiction:
+    """A graph attribute and the row authoritative for it that state opposites.
+
+    ``projected`` is what the catalog's rows say the attribute would hold;
+    ``carried`` is what the **System Model** beside them actually holds. Both
+    are quoted as written, because which of the two is wrong is not decidable
+    here and a reader has to see the pair.
+    """
+
+    element_id: str
+    attribute: str
+    projected: str
+    carried: str
+    rows: tuple[str, ...]
+
+
+def contradictions(
+    catalog: AssertionCatalog, model: SystemModel
+) -> tuple[Contradiction, ...]:
+    """Attributes whose graph value and whose catalog rows state opposites.
+
+    **Opposed states only, and that is the whole rule.** A projection and an
+    attribute are compared through
+    :func:`~analysis_service.analysis.control_state`, and a pair is reported
+    only when one reads ``stated`` and the other ``absent``. That is the defect
+    this layer was built for: the audit found an explicit lack of MFA standing
+    in the graph as a control, and nothing in the report said the two disagreed.
+
+    **Not an agreement check, and it must not become one.** Two mechanisms
+    worded differently are one answer spelled twice, and the catalog is
+    authoritative for the wording anyway, so flagging that would report a
+    disagreement on every run. ``unverified`` on either side is silence rather
+    than an opposite: a graph attribute nobody stated and a row that states one
+    is the projection doing its job.
+
+    A projection that did not settle — ``unknown`` under any
+    :data:`ProjectionReason` — states nothing to contradict, so it is skipped
+    here and its loss is reported by :func:`project` where it happened.
+    """
+    carried = {element.id: element for element in model.elements()}
+    found = []
+    for projection in project(catalog):
+        element = carried.get(projection.element_id)
+        if element is None:
+            continue
+        held = str(getattr(element, projection.attribute, ""))
+        states = {control_state(projection.value), control_state(held)}
+        if states == {"stated", "absent"}:
+            found.append(
+                Contradiction(
+                    element_id=projection.element_id,
+                    attribute=projection.attribute,
+                    projected=projection.value,
+                    carried=held,
+                    rows=projection.rows,
+                )
+            )
+    return tuple(found)
+
+
+def contradiction_issues(
+    catalog: AssertionCatalog, model: SystemModel
+) -> list[CatalogIssue]:
+    """:func:`contradictions` as the issues a report carries.
+
+    One spelling of the message, so the record written by a job and the record
+    a loaded report is re-checked against cannot word the same finding two
+    ways and read as a disagreement.
+    """
+    return [
+        CatalogIssue(
+            code="graph-contradiction",
+            message=f"{found.element_id}.{found.attribute} holds"
+            f" {found.carried!r} and the rows behind it state"
+            f" {found.projected!r}, which is the opposite state",
+            assertion=found.rows[0] if found.rows else None,
+        )
+        for found in contradictions(catalog, model)
+    ]
 
 
 def _attributes_of(element_id: str) -> frozenset[str]:
