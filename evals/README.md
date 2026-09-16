@@ -337,7 +337,9 @@ carry corpus source text, which is in this repository.
 
 An `assertions` run reads the sources against the blessed model and writes one
 row per statement the sources make: subject, predicate, value, and the span of
-the source that says so. It writes
+the source that says so. An `end-to-end` or `analysis` run on a deployment that
+sets `ANALYSIS_ASSERTIONS` runs the same node inside the graph, and its report
+carries the resolved catalog under `assertions`. It writes
 `artifact.reports/<case>.assertions.json` — what the node proposed, the rows
 code built from it, and why each dropped row dropped — and prints counts per
 case. `rejected` counts the dropped rows and `refused` the reasons by code, and

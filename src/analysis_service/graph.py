@@ -126,7 +126,11 @@ from google.adk.workflow import START, FunctionNode, JoinNode, Workflow
 from google.genai import types
 from pydantic import BaseModel, ValidationError
 
-from analysis_service.assertions import CatalogProposal
+from analysis_service.assertions import (
+    AssertionCatalog,
+    AssertionRecord,
+    CatalogProposal,
+)
 from analysis_service.basis import unbased_controls
 from analysis_service.candidates import generate_candidates
 from analysis_service.claims import (
@@ -496,6 +500,9 @@ Spending every framework's lane agents and critics to score an extraction would
 be that many kinds of noise on one number."""
 
 ENTRY_ASSERT_ONLY: Entry = "assert-only"
+#: The entries that build a ``prepare`` node, and so the ones an assertion
+#: pass can sit in front of.
+PREPARING_ENTRIES: frozenset[Entry] = frozenset({ENTRY_EXTRACT, ENTRY_PREPARE})
 """The assertion eval mode: render a **Valid System Model** seeded in state,
 run ``assert`` over it and the sources, and stop.
 
@@ -615,6 +622,12 @@ STATE_EXTRACTED_MODEL = "extracted_model"
 # into a catalog. Structured, because a driver reads it back and resolves it —
 # see :func:`~analysis_service.assertions.resolve_catalog`.
 STATE_ASSERTION_PROPOSAL = "assertion_proposal"
+# What ``prepare`` made of that proposal: an ``AssertionRecord``, the catalog
+# every lane selected from and the rows the resolver refused. Written once by
+# ``prepare`` and read by every ``merge`` and by ``assemble``, so the catalog an
+# agent chose from, the one its choice resolves against and the one the report
+# embeds are one value resolved once. Absent on a graph that runs no pass.
+STATE_ASSERTION_CATALOG = "assertion_catalog"
 STATE_VALID_MODEL = "valid_model"
 # What ``prepare`` put in front of every lane of every framework: the packs this
 # model earned. Written where the selection happens rather than recomputed at a
@@ -701,6 +714,7 @@ SHARED_STRUCTURED_KEYS: frozenset[str] = frozenset(
         STATE_SOURCE_TEXTS,
         STATE_EXTRACTED_MODEL,
         STATE_ASSERTION_PROPOSAL,
+        STATE_ASSERTION_CATALOG,
         STATE_VALID_MODEL,
         STATE_DOMAIN_PACKS,
         STATE_ANALYSIS,
@@ -915,6 +929,8 @@ class Analysis:
     # What the repair pass was allowed to change and what it changed anyway;
     # ``None`` where no repair ran.
     model_repair: ModelRepair | None = None
+    # What the assertion pass produced; ``None`` where the graph ran none.
+    assertions: AssertionRecord | None = None
 
     def context(self, instruction_sha256: str) -> AnalysisContext:
         """This analysis's context block, given the built graph's digest.
@@ -964,6 +980,7 @@ class Analysis:
             shared_element_names=self.marks.shared_element_names,
             elements_analyzed=len(self.system_model.elements()),
             model_repair=self.model_repair,
+            assertions=self.assertions,
             analysis_context=self.context(pipeline.instruction_sha256),
             execution=ExecutionEnvelope(
                 identity_version=IDENTITY_VERSION,
@@ -988,6 +1005,11 @@ class Analysis:
                 None
                 if self.model_repair is None
                 else self.model_repair.model_dump(mode="json")
+            ),
+            "assertions": (
+                None
+                if self.assertions is None
+                else self.assertions.model_dump(mode="json")
             ),
         }
 
@@ -1018,6 +1040,11 @@ class Analysis:
                 None
                 if data["model_repair"] is None
                 else ModelRepair.model_validate(data["model_repair"])
+            ),
+            assertions=(
+                None
+                if data["assertions"] is None
+                else AssertionRecord.model_validate(data["assertions"])
             ),
         )
 
@@ -1338,6 +1365,7 @@ def prepare_analysis(
     frameworks: Sequence[FrameworkName],
     domain_loader: MarkdownLoader,
     package_loaders: Mapping[FrameworkName, MarkdownLoader],
+    assertions: bool = False,
 ) -> Event:
     """Run each framework's precondition, then derive what its lane agents read.
 
@@ -1376,7 +1404,16 @@ def prepare_analysis(
 
     The loaders are bound by :func:`prepare_node` rather than read from state:
     they are repo paths, not facts about the job, and ADK binds a FunctionNode's
-    parameters from session state.
+    parameters from session state. So is ``assertions``: whether an ``assert``
+    node sits ahead of this one is a fact about the built graph, and it says
+    whether a proposal is owed. Where it is, this node resolves it through
+    :meth:`~analysis_service.assertions.AssertionRecord.of` — once, here,
+    because every later reader takes the record off
+    :data:`STATE_ASSERTION_CATALOG` rather than resolving again — and the
+    evidence catalog is derived from the model *and* the settled rows. An
+    ``assert`` node that wrote nothing fails the job here, on the rule
+    :func:`merge_drafts` applies to a silent lane: a pass the deployment
+    selected and a pass that never ran are not the same report.
 
     Candidate facts carry caller-authored attribute values, so they are fenced
     with :func:`render_fenced` exactly as the model is — the bytes are a subset
@@ -1397,10 +1434,12 @@ def prepare_analysis(
     """
     model = SystemModel.model_validate(valid_model)
     crossings = model.boundary_crossings()
-    catalog = evidence_catalog(model)
+    state = keys.state(ctx)
+    record = _resolve_assertions(state, model) if assertions else None
+    held = None if record is None else record.catalog
+    catalog = evidence_catalog(model, held)
     packs = select_domain_packs(model)
 
-    state = keys.state(ctx)
     options = state.get(STATE_FRAMEWORK_OPTIONS) or {}
     # Before the fan-out, which is the earliest node that holds the selection and
     # its options together. ``assemble`` checks the same thing, because a graph
@@ -1413,7 +1452,7 @@ def prepare_analysis(
         STATE_BOUNDARY_CROSSINGS,
         render_fenced([crossing.model_dump(mode="json") for crossing in crossings]),
     )
-    state.prompt(STATE_EVIDENCE_CATALOG, render_catalog(catalog))
+    state.prompt(STATE_EVIDENCE_CATALOG, render_catalog(catalog, held))
     # Beside the model rather than instead of it: a lane agent reasons over the
     # whole model and *selects* out of this. Neutral by construction — the roster
     # enumerates the one shared model, so every framework's lanes read the same
@@ -1526,8 +1565,40 @@ def prepare_analysis(
             "domain_packs": list(packs),
             "knowledge_doc_count": knowledge_count,
             "preconditions": preconditions,
+            "assertion_count": None if record is None else len(record.catalog.entries),
+            "assertions_refused": (
+                None
+                if record is None
+                else len(
+                    {issue.row for issue in record.issues if issue.row is not None}
+                )
+            ),
         },
     )
+
+
+def _resolve_assertions(state: SessionState, model: SystemModel) -> AssertionRecord:
+    """What the ``assert`` node ahead of ``prepare`` proposed, resolved and parked."""
+    proposed = state.get(STATE_ASSERTION_PROPOSAL)
+    if proposed is None:
+        raise SilentNodeError(
+            f"nothing was written to {STATE_ASSERTION_PROPOSAL!r}, so the"
+            " assertion pass this deployment selected never ran."
+            f" {_TRUNCATION_HINT}"
+        )
+    record = AssertionRecord.of(
+        CatalogProposal.model_validate(proposed),
+        model,
+        state.get(STATE_SOURCE_TEXTS) or {},
+    )
+    state.put(STATE_ASSERTION_CATALOG, record.model_dump(mode="json"))
+    return record
+
+
+def _held_assertions(state: SessionState) -> AssertionCatalog | None:
+    """The catalog ``prepare`` parked, or ``None`` on a graph that ran no pass."""
+    record = state.get(STATE_ASSERTION_CATALOG)
+    return None if record is None else AssertionRecord.model_validate(record).catalog
 
 
 def prepare_node(
@@ -1535,18 +1606,25 @@ def prepare_node(
     frameworks: Sequence[FrameworkName],
     domain_loader: MarkdownLoader,
     package_loaders: Mapping[FrameworkName, MarkdownLoader],
+    assertions: bool = False,
 ) -> FunctionNode:
     """The ``prepare`` node, with this deployment's Markdown roots bound to it.
 
     Everything but ``valid_model`` is bound here rather than read from state for
-    the same reason: a repo path and the graph's own framework list are facts
-    about the build, not about the job, and ADK binds a FunctionNode's parameters
-    from session state.
+    the same reason: a repo path, the graph's own framework list and whether
+    an ``assert`` node runs ahead are facts about the build, not about the job,
+    and ADK binds a FunctionNode's parameters from session state.
     """
 
     def prepare_analysis_node(valid_model: dict, ctx) -> Event:
         return prepare_analysis(
-            valid_model, ctx, keys, frameworks, domain_loader, package_loaders
+            valid_model,
+            ctx,
+            keys,
+            frameworks,
+            domain_loader,
+            package_loaders,
+            assertions,
         )
 
     return _node(prepare_analysis_node, PREPARE_NODE)
@@ -1678,6 +1756,7 @@ def merge_drafts(
         model,
         source_texts or {},
         state.get(nodes.key("ruled_out")) or {},
+        _held_assertions(state),
     )
     state.put(nodes.key("deferred"), merged.deferred)
     state.put(
@@ -1971,6 +2050,7 @@ def assemble_report(
         for name in frameworks
     ]
     repair = state.get(STATE_MODEL_REPAIR)
+    record = state.get(STATE_ASSERTION_CATALOG)
     analysis = Analysis(
         system_model=model,
         boundary_crossings=model.boundary_crossings(),
@@ -1978,6 +2058,7 @@ def assemble_report(
         marks=_model_marks(model),
         domain_packs=list(domain_packs or []),
         model_repair=None if repair is None else ModelRepair.model_validate(repair),
+        assertions=None if record is None else AssertionRecord.model_validate(record),
     )
     state.put(STATE_ANALYSIS, analysis.to_state())
     return {
@@ -2352,12 +2433,15 @@ def _assert_node(
 
 
 def _read_model_node_func(keys: GraphKeys) -> Callable[..., Any]:
-    """Render the seeded model for the assertion node, and nothing else.
+    """Render the model for the assertion node, and nothing else.
 
     A rendered key is written by the node that derives it, so the assertion
     graph derives its own rather than taking bytes from its driver. It renders
     through :func:`render_model`, which ``prepare`` also calls, so the two
-    graphs show one model one way.
+    graphs show one model one way. On a production graph that carries the
+    pass this node sits between the validity gate and ``prepare``, and
+    ``prepare`` renders the same value through the same function again, so
+    the key holds one spelling whichever node wrote it last.
     """
 
     def read(valid_model: dict, ctx) -> dict[str, Any]:
@@ -2551,6 +2635,7 @@ def build_pipeline(
     frameworks: Sequence[FrameworkName],
     entry: Entry = ENTRY_EXTRACT,
     extraction_format: ExtractionFormat = FULL_FORMAT,
+    assertions: bool = False,
     name: str = "analysis_pipeline",
 ) -> Pipeline:
     """Wire the whole graph: prompts, skills, and models onto the topology.
@@ -2582,6 +2667,14 @@ def build_pipeline(
     the lane agents and critics rather than to an element ``extract`` never
     produced. It is a parameter here, not a second topology in the eval tree,
     because two definitions of the same graph drift.
+
+    ``assertions`` puts the ``assert`` node into a graph that prepares, between
+    the validity gate and ``prepare``: the **Valid System Model** is rendered,
+    the node proposes what the sources state about it, and ``prepare``
+    resolves the proposal into the catalog every lane selects from. It is a
+    property of the deployment (``ANALYSIS_ASSERTIONS``) for the reason the
+    transport is, and it is refused on an entry that never prepares, because
+    a pass nothing reads would spend a submitter's money.
     """
     if entry not in (
         ENTRY_EXTRACT,
@@ -2597,6 +2690,11 @@ def build_pipeline(
         raise ValueError(
             f"entry {entry!r} builds no extract node, so it cannot be built for"
             f" the {extraction_format!r} transport"
+        )
+    if assertions and entry not in PREPARING_ENTRIES:
+        raise ValueError(
+            f"entry {entry!r} builds no prepare node, so nothing would read"
+            " an assertion pass"
         )
     if not frameworks:
         raise ValueError("a graph must be built for at least one framework")
@@ -2637,8 +2735,21 @@ def build_pipeline(
         framework: package_loaders[framework].load(DISCLAIMER_DOC).strip()
         for framework in frameworks
     }
-    prepare = prepare_node(keys, frameworks, domain_loader, package_loaders)
+    prepare = prepare_node(keys, frameworks, domain_loader, package_loaders, assertions)
     assemble = _node(_assemble_node_func(keys, frameworks, disclaimers), ASSEMBLE_NODE)
+    # Where the valid model goes next: straight to ``prepare``, or through the
+    # assertion pass first. One name for both, so the three edges that carry
+    # a valid model are written once whichever graph this is.
+    assertion_nodes: list[LlmAgent] = []
+    pass_edges: list[tuple[Any, ...]] = []
+    if assertions:
+        read = _node(_read_model_node_func(keys), READ_MODEL_NODE)
+        assert_node = _assert_node(prompt_loader, resolve_model, resolve_sampling)
+        assertion_nodes = [assert_node]
+        pass_edges = [(read, assert_node, prepare)]
+        first = read
+    else:
+        first = prepare
 
     subgraphs = [
         _framework_subgraph(
@@ -2681,16 +2792,16 @@ def build_pipeline(
             (
                 validate,
                 {
-                    ROUTE_VALID: prepare,
+                    ROUTE_VALID: first,
                     ROUTE_INVALID: repair,
                     ROUTE_UNCONVERTIBLE: reject,
                 },
             ),
             (repair, revalidate),
-            (revalidate, {ROUTE_VALID: prepare, ROUTE_INVALID: reject}),
+            (revalidate, {ROUTE_VALID: first, ROUTE_INVALID: reject}),
         ]
     else:
-        head_edges = [(START, prepare)]
+        head_edges = [(START, first)]
 
     # The fan-out is routed rather than unconditional, which is the whole of the
     # run-time precondition gate's topology: ``prepare`` emits one route per
@@ -2706,12 +2817,14 @@ def build_pipeline(
         name=name,
         edges=[
             *head_edges,
+            *pass_edges,
             (prepare, fan_out),
             *(edge for sub in subgraphs for edge in sub.edges(assemble)),
         ],
     )
     llm_nodes = [
         *extraction_nodes,
+        *assertion_nodes,
         *(node for sub in subgraphs for node in sub.llm_nodes),
     ]
     return pipeline(workflow, llm_nodes)

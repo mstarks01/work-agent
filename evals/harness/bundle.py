@@ -27,10 +27,9 @@ from pathlib import Path
 from typing import Any
 
 from analysis_service.assertions import (
+    AssertionRecord,
     CatalogProposal,
-    catalog_issues,
     project,
-    resolve_catalog,
 )
 from analysis_service.claims import FrameworkAnalysis, FrameworkName
 from analysis_service.compact import FULL_FORMAT, parse_extraction
@@ -384,22 +383,24 @@ def assertions_from_reports(
     """Read a finished assertion sweep's saved proposals back, re-resolved.
 
     Reads ``proposal`` — what ``assert`` emitted — and builds the catalog
-    again through :func:`~analysis_service.assertions.resolve_catalog` and
-    the gate, exactly as :func:`~evals.harness.modes.run_assertions` does
-    over a live emission. The ``catalog`` beside it is what the sweep
+    again through :meth:`~analysis_service.assertions.AssertionRecord.of`,
+    the resolver and the gate as one reader, exactly as
+    :func:`~evals.harness.modes.run_assertions` and the production ``prepare``
+    node do over a live emission. The ``catalog`` beside it is what the sweep
     counted on the day; the resolver has moved since (#940, #964), and a
     replay grades the proposal under the resolver that stands.
     """
     results = {}
     for case, written in _case_files(artifact, cases, ".assertions.json"):
-        sources = _source_texts(case)
-        proposal = CatalogProposal.model_validate(written["proposal"])
-        catalog, issues = resolve_catalog(proposal, case.model, sources)
-        issues = [*issues, *catalog_issues(catalog, model=case.model, sources=sources)]
+        record = AssertionRecord.of(
+            CatalogProposal.model_validate(written["proposal"]),
+            case.model,
+            _source_texts(case),
+        )
         results[case.id] = modes.AssertionResult(
             case_id=case.id,
             proposal=written["proposal"],
-            catalog=catalog,
-            issues=tuple(issues),
+            catalog=record.catalog,
+            issues=tuple(record.issues),
         )
     return results

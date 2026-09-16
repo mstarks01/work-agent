@@ -590,6 +590,26 @@ class AssertionRecord(BaseModel):
     catalog: AssertionCatalog
     issues: list[CatalogIssue] = Field(default_factory=list)
 
+    @classmethod
+    def of(
+        cls,
+        proposal: CatalogProposal,
+        model: SystemModel,
+        sources: Mapping[str, str],
+    ) -> AssertionRecord:
+        """Resolve one proposal and run the gate over what was built.
+
+        **The one reader of "what did the node's proposal come to".** The
+        production ``prepare`` node, the assertion eval mode and the offline
+        replay all ask it, so a resolver change moves every caller at once.
+        The gate runs over the resolver's output rather than being assumed:
+        the resolver's contract is that its catalog raises nothing, and here
+        is where that contract meets real model output.
+        """
+        catalog, issues = resolve_catalog(proposal, model, sources)
+        issues = [*issues, *catalog_issues(catalog, model=model, sources=sources)]
+        return cls(proposed=len(proposal.assertions), catalog=catalog, issues=issues)
+
 
 @dataclass(frozen=True)
 class Conflict:

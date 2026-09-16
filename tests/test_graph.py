@@ -22,6 +22,14 @@ from google.adk.utils import instructions_utils
 from google.adk.workflow import FunctionNode, JoinNode
 
 from analysis_service import critic, graph
+from analysis_service.assertions import (
+    ABSENT,
+    Assertion,
+    AssertionProposal,
+    AssertionRecord,
+    CatalogProposal,
+    assertion_id,
+)
 from analysis_service.binding import NodeBinding
 from analysis_service.claims import (
     CLAIM_BOUND_MARKS,
@@ -334,6 +342,269 @@ def routed_fan_out(pipeline, source: str) -> dict[Any, set[str]]:
         if edge.from_node.name == source:
             fanned.setdefault(edge.route, set()).add(edge.to_node.name)
     return fanned
+
+
+# --- The assertion pass -----------------------------------------------------
+#
+# One deployment flag puts ``read`` and ``assert`` between the validity gate and
+# ``prepare``. What these check is that every valid model goes through the pass
+# when it is built in, that ``prepare`` resolves the proposal once and parks the
+# record every later node reads, and that a graph built without it is the graph
+# it always was.
+
+
+@pytest.fixture
+def assertion_pipeline(prompt_loader, domain_loader, package_loaders):
+    tiers = repo_tiers()
+    sampling = load_sampling(PROJECT_ROOT / "config" / "sampling.toml", env={})
+    return graph.build_pipeline(
+        prompt_loader=prompt_loader,
+        domain_loader=domain_loader,
+        package_loaders=package_loaders,
+        frameworks=FRAMEWORKS,
+        binding=NodeBinding.from_configs(tiers, sampling, _route_resolver(tiers)),
+        assertions=True,
+    )
+
+
+SHOPPERS_ROW = Assertion(
+    subject="principal:shopper-accounts",
+    predicate="mfa-requirement",
+    value=ABSENT,
+    basis="inferred",
+    explanation="the description names password login and nothing else",
+)
+
+
+def proposal(*rows: AssertionProposal) -> dict:
+    """What ``assert`` writes: one inferred absence for a principal by default."""
+    default = AssertionProposal(
+        subject_type="principal",
+        subject="shopper accounts",
+        predicate="mfa-requirement",
+        value=ABSENT,
+        basis="inferred",
+        explanation=SHOPPERS_ROW.explanation,
+    )
+    return CatalogProposal(assertions=list(rows or (default,))).model_dump(mode="json")
+
+
+def prepare_with_assertions(ctx, model, domain_loader, package_loaders):
+    return graph.prepare_analysis(
+        model.model_dump(mode="json"),
+        ctx,
+        KEYS,
+        FRAMEWORKS,
+        domain_loader,
+        package_loaders,
+        assertions=True,
+    ).output
+
+
+def test_the_default_graph_carries_no_assertion_pass(pipeline):
+    names = set(nodes_by_name(pipeline))
+
+    assert graph.ASSERT_NODE not in names
+    assert graph.READ_MODEL_NODE not in names
+    assert routed_targets(pipeline, graph.VALIDATE_NODE)[graph.ROUTE_VALID] == (
+        graph.PREPARE_NODE
+    )
+
+
+def test_every_valid_model_goes_through_the_pass_when_it_is_built_in(
+    assertion_pipeline,
+):
+    """Both gates route a valid model to ``read``, and the pass ends at ``prepare``."""
+    names = nodes_by_name(assertion_pipeline)
+
+    assert names[graph.ASSERT_NODE].output_schema is CatalogProposal
+    assert names[graph.ASSERT_NODE].output_key == graph.STATE_ASSERTION_PROPOSAL
+    for gate in (graph.VALIDATE_NODE, graph.REVALIDATE_NODE):
+        assert routed_targets(assertion_pipeline, gate)[graph.ROUTE_VALID] == (
+            graph.READ_MODEL_NODE
+        )
+    edges = {
+        (edge.from_node.name, edge.to_node.name)
+        for edge in assertion_pipeline.workflow.graph.edges
+    }
+    assert (graph.READ_MODEL_NODE, graph.ASSERT_NODE) in edges
+    assert (graph.ASSERT_NODE, graph.PREPARE_NODE) in edges
+    assert graph.ASSERT_NODE in assertion_pipeline.node_models
+
+
+def test_a_seeded_graph_carries_the_pass_too(
+    prompt_loader, domain_loader, package_loaders
+):
+    """The analysis eval entry prepares, so it can run the pass over a blessed model."""
+    tiers = repo_tiers()
+    sampling = load_sampling(PROJECT_ROOT / "config" / "sampling.toml", env={})
+    seeded = graph.build_pipeline(
+        prompt_loader=prompt_loader,
+        domain_loader=domain_loader,
+        package_loaders=package_loaders,
+        frameworks=FRAMEWORKS,
+        binding=NodeBinding.from_configs(tiers, sampling, _route_resolver(tiers)),
+        entry=graph.ENTRY_PREPARE,
+        assertions=True,
+    )
+    edges = [
+        (edge.from_node.name, edge.to_node.name) for edge in seeded.workflow.graph.edges
+    ]
+
+    assert (graph.READ_MODEL_NODE, graph.ASSERT_NODE) in edges
+    assert (graph.ASSERT_NODE, graph.PREPARE_NODE) in edges
+
+
+@pytest.mark.parametrize("entry", [graph.ENTRY_EXTRACT_ONLY, graph.ENTRY_ASSERT_ONLY])
+def test_an_entry_that_never_prepares_refuses_the_pass(
+    entry, prompt_loader, domain_loader, package_loaders
+):
+    tiers = repo_tiers()
+    sampling = load_sampling(PROJECT_ROOT / "config" / "sampling.toml", env={})
+    with pytest.raises(ValueError, match="nothing would read"):
+        graph.build_pipeline(
+            prompt_loader=prompt_loader,
+            domain_loader=domain_loader,
+            package_loaders=package_loaders,
+            frameworks=FRAMEWORKS,
+            binding=NodeBinding.from_configs(tiers, sampling, _route_resolver(tiers)),
+            entry=entry,
+            assertions=True,
+        )
+
+
+def test_prepare_resolves_the_proposal_once_and_parks_the_record(
+    domain_loader, package_loaders
+):
+    """The catalog every later node reads is written here and nowhere else."""
+    ctx = FakeContext(**{graph.STATE_ASSERTION_PROPOSAL: proposal()})
+    output = prepare_with_assertions(ctx, valid_model(), domain_loader, package_loaders)
+
+    record = AssertionRecord.model_validate(ctx.state[graph.STATE_ASSERTION_CATALOG])
+    assert record.proposed == 1
+    assert record.catalog.entries == [SHOPPERS_ROW]
+    assert record.issues == []
+    assert output["assertion_count"] == 1
+    assert output["assertions_refused"] == 0
+
+
+def test_prepare_offers_the_settled_row_to_every_lane(domain_loader, package_loaders):
+    """The row is in the table the agents select from, glossed in words."""
+    ctx = FakeContext(**{graph.STATE_ASSERTION_PROPOSAL: proposal()})
+    output = prepare_with_assertions(ctx, valid_model(), domain_loader, package_loaders)
+
+    rendered = ctx.state[graph.STATE_EVIDENCE_CATALOG]
+    assert f"| `{assertion_id(SHOPPERS_ROW)}` |" in rendered
+    assert "`mfa-requirement` inferred absent for shopper accounts (principal)" in (
+        rendered
+    )
+    assert output["evidence_count"] == 5
+
+
+def test_prepare_records_what_the_resolver_refused(domain_loader, package_loaders):
+    """A row the sources do not support is kept as a refusal, never as a fact."""
+    unsupported = AssertionProposal(
+        subject_type="interaction",
+        subject="flow:customer-to-web-app:login",
+        predicate="mfa-requirement",
+        value=ABSENT,
+        basis="stated",
+        quotes=[
+            {"source_label": DEFAULT_DESCRIPTION_LABEL, "quote": "never in the text"}
+        ],
+    )
+    ctx = FakeContext(
+        **{
+            graph.STATE_ASSERTION_PROPOSAL: proposal(unsupported),
+            graph.STATE_SOURCE_TEXTS: {DEFAULT_DESCRIPTION_LABEL: DESCRIPTION_TEXT},
+        }
+    )
+    output = prepare_with_assertions(ctx, valid_model(), domain_loader, package_loaders)
+
+    record = AssertionRecord.model_validate(ctx.state[graph.STATE_ASSERTION_CATALOG])
+    assert record.catalog.entries == []
+    assert {issue.row for issue in record.issues} == {0}
+    assert output["assertion_count"] == 0
+    assert output["assertions_refused"] == 1
+    assert "assertion:" not in ctx.state[graph.STATE_EVIDENCE_CATALOG]
+
+
+def test_prepare_fails_the_job_on_a_silent_assertion_node(
+    domain_loader, package_loaders
+):
+    """A pass the deployment selected and a pass that never ran are not one report."""
+    with pytest.raises(graph.SilentNodeError, match="assertion pass"):
+        prepare_with_assertions(
+            FakeContext(), valid_model(), domain_loader, package_loaders
+        )
+
+
+def test_prepare_without_the_pass_reads_no_proposal(domain_loader, package_loaders):
+    """A graph built without the pass is the graph it was, whatever is in state."""
+    ctx = FakeContext(**{graph.STATE_ASSERTION_PROPOSAL: proposal()})
+    output = prepare(ctx, valid_model(), domain_loader, package_loaders)
+
+    assert graph.STATE_ASSERTION_CATALOG not in ctx.state
+    assert output["assertion_count"] is None
+    assert "assertion:" not in ctx.state[graph.STATE_EVIDENCE_CATALOG]
+
+
+def test_merge_resolves_an_assertion_ground_against_the_parked_record():
+    """The fan-in reads the record ``prepare`` parked rather than resolving again."""
+    record = AssertionRecord(
+        proposed=1,
+        catalog={
+            "subjects": [
+                {
+                    "id": SHOPPERS_ROW.subject,
+                    "type": "principal",
+                    "label": "shopper accounts",
+                }
+            ],
+            "entries": [SHOPPERS_ROW.model_dump(mode="json")],
+        },
+    )
+    ctx = FakeContext(
+        **analyze_state(
+            spoofing=[
+                sample_proposal(
+                    "S-01", evidence_refs=[assertion_id(SHOPPERS_ROW)], quotes=[]
+                )
+            ]
+        ),
+        **{graph.STATE_ASSERTION_CATALOG: record.model_dump(mode="json")},
+    )
+    graph.merge_drafts(valid_model().model_dump(mode="json"), ctx, KEYS, NODES)
+
+    (draft,) = ctx.state[NODES.key("drafts")]
+    (ground,) = draft["grounds"]
+    assert (ground["kind"], ground["assertion"]) == (
+        "assertion",
+        assertion_id(SHOPPERS_ROW),
+    )
+    assert ctx.state[NODES.key("marks")]["unresolved_evidence"] == []
+
+
+def test_assemble_embeds_the_record_on_the_report(domain_loader, package_loaders):
+    record = AssertionRecord(
+        proposed=1,
+        catalog={
+            "subjects": [
+                {
+                    "id": SHOPPERS_ROW.subject,
+                    "type": "principal",
+                    "label": "shopper accounts",
+                }
+            ],
+            "entries": [SHOPPERS_ROW.model_dump(mode="json")],
+        },
+    )
+    ctx = FakeContext(**{graph.STATE_ASSERTION_CATALOG: record.model_dump(mode="json")})
+    assemble(valid_model().model_dump(mode="json"), [], ctx)
+
+    analysis = graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS])
+    assert analysis.assertions == record
+    assert graph.Analysis.from_state(analysis.to_state()).assertions == record
 
 
 # --- Wiring -----------------------------------------------------------------
