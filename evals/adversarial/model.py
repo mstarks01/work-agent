@@ -9,7 +9,7 @@ a model grading a poisoned report is reading the same poison.
 class with no case fails, which is what stops the list becoming a statement of
 intent. A case that names a class not in the list fails too, which is what stops
 the corpus growing a class nobody described. This is the same shape
-``CLAUDE.md`` requires of a framework table, for the same reason: machinery that
+``AGENTS.md`` requires of a framework table, for the same reason: machinery that
 grows an entry per anything has to be keyed, and a table nobody compares to its
 registry fails as quietly as the branch it replaced.
 """

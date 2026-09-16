@@ -466,7 +466,7 @@ def _sse_frame(event) -> str:
 # carries it instead.
 #
 # A table because the machinery grew one entry per bound, which is what
-# ``CLAUDE.md`` says to key — and because a missing key raises here rather than
+# ``AGENTS.md`` says to key — and because a missing key raises here rather than
 # falling through to a message about the wrong bound.
 _REFUSALS: dict[str, Callable[[Admission, int], str]] = {
     "at_ceiling": lambda admission, ceiling: (
