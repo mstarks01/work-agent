@@ -72,3 +72,12 @@ that review. A signed alias is active in the replay.
 | 18 | operation `read-write` ← "read/write", "read and write" | Accepted. |
 | 19 | operation `submit order` ← "submit orders" | Accepted for the plural only; "call" and the gRPC spellings were rejected as naming the transport, not the operation. |
 
+## Signed row change of 2026-09-16 (#961 step 6)
+
+The maintainer accepted the row change alias ruling 15 proposed and signed it
+in a session.
+
+| # | Path | Before | After | Ruling |
+|---|---|---|---|---|
+| 20 | `facts.json` row: `authorization-grant`, `write receipts`, receipt-archive/write, inferred | subject `order service` | subject `order service's own service account` | A workload and the account it uses are not interchangeable identities; the source names the service account as what performs the write. |
+
