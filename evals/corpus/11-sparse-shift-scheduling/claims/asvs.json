@@ -5,7 +5,7 @@
     "affected_element_ids": [
       "process:scheduling-service",
       "store:rota-database",
-      "flow:scheduling-service-to-rota-database:read-write-rotas"
+      "flow:process:scheduling-service>store:rota-database>read-write-rotas"
     ],
     "claim": "The scheduling service reads and writes the rota database and nothing says how its queries are built.",
     "tier": "must-find",
@@ -18,7 +18,7 @@
     "affected_element_ids": [
       "entity:colleague",
       "process:scheduling-web-app",
-      "flow:colleague-to-scheduling-web-app:view-shifts"
+      "flow:entity:colleague>process:scheduling-web-app>view-shifts"
     ],
     "claim": "Colleagues reach the scheduling web app from their own phones and no cookie attribute is stated.",
     "tier": "expected",
@@ -83,7 +83,7 @@
     "affected_element_ids": [
       "entity:colleague",
       "process:scheduling-web-app",
-      "flow:colleague-to-scheduling-web-app:view-shifts"
+      "flow:entity:colleague>process:scheduling-web-app>view-shifts"
     ],
     "claim": "Colleagues reach the web app from their own phones and the source says nobody documented whether any of it is encrypted.",
     "tier": "must-find",

@@ -115,7 +115,7 @@
   ],
   "data_flows": [
     {
-      "id": "flow:duty-engineer-to-dispatch-console:open-console",
+      "id": "flow:entity:duty-engineer>process:dispatch-console>open-console",
       "name": "open console",
       "description": "The engineer opens the console in their browser and signs in to it.",
       "assets": [
@@ -133,7 +133,7 @@
       "operations": "unknown"
     },
     {
-      "id": "flow:dispatch-console-to-dispatch-api:dispatch-requests",
+      "id": "flow:process:dispatch-console>process:dispatch-api>dispatch-requests",
       "name": "dispatch requests",
       "description": "The console calls the dispatch API cross-origin, because the two are served from different origins; which origins the API allows, and whether it allows credentials, is not recorded.",
       "assets": [
@@ -150,7 +150,7 @@
       "operations": "write"
     },
     {
-      "id": "flow:dispatch-console-to-dispatch-api:live-job-status",
+      "id": "flow:process:dispatch-console>process:dispatch-api>live-job-status",
       "name": "live job status",
       "description": "The console opens a WebSocket to the dispatch API and holds it open for live job status.",
       "assets": [
@@ -168,7 +168,7 @@
       "operations": "read"
     },
     {
-      "id": "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
+      "id": "flow:process:schedule-importer>entity:scheduling-partner>pull-schedule-feed",
       "name": "pull schedule feed",
       "description": "The importer pulls the partner's SOAP feed every hour and parses the XML document it gets back.",
       "assets": [
@@ -186,7 +186,7 @@
       "operations": "read"
     },
     {
-      "id": "flow:schedule-importer-to-schedule-archive:store-schedule-documents",
+      "id": "flow:process:schedule-importer>store:schedule-archive>store-schedule-documents",
       "name": "store schedule documents",
       "description": "The importer writes each downloaded XML document into the archive folder.",
       "assets": [
@@ -203,7 +203,7 @@
       "operations": "write"
     },
     {
-      "id": "flow:schedule-importer-to-dispatch-api:post-work-orders",
+      "id": "flow:process:schedule-importer>process:dispatch-api>post-work-orders",
       "name": "post work orders",
       "description": "The importer posts the parsed work orders to the same dispatch API the console calls.",
       "assets": [
@@ -221,7 +221,7 @@
       "operations": "write"
     },
     {
-      "id": "flow:dispatch-api-to-dispatch-database:read-write-job-orders",
+      "id": "flow:process:dispatch-api>store:dispatch-database>read-write-job-orders",
       "name": "read write job orders",
       "description": "The API reads and writes the job orders and the crew details behind them.",
       "assets": [
@@ -239,7 +239,7 @@
       "operations": "read-write"
     },
     {
-      "id": "flow:duty-engineer-to-corporate-web-host:load-console",
+      "id": "flow:entity:duty-engineer>process:corporate-web-host>load-console",
       "name": "load console",
       "description": "The engineer's browser fetches the console application from the host that serves it.",
       "assets": [],

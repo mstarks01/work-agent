@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import re
 from collections import Counter
-from collections.abc import Collection, Iterable, Mapping
+from collections.abc import Callable, Collection, Iterable, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import ClassVar, Literal, get_args, get_origin
@@ -52,21 +52,44 @@ CORE_ASSET_TAGS = frozenset(
 _NON_SLUG_CHARS_RE = re.compile(r"[^a-z0-9]+")
 
 
-#: The shape every element ID this service builds already has:
-#: ``<prefix>:<slug>``, or a flow's ``flow:<slug>-to-<slug>:<slug>``, where a
-#: slug is what :func:`normalize_name` produces.
+#: An element ID's two halves, named so the ID pattern, the flow encoding and
+#: the flow decoder read one spelling of each. A prefix is an element class's
+#: ``id_prefix``; a slug is what :func:`normalize_name` produces.
+_ID_PREFIX = r"[a-z_]+"
+_ID_SLUG = r"[a-z0-9]+(?:-[a-z0-9]+)*"
+
+#: A non-flow element ID: ``<prefix>:<slug>``, and exactly one colon.
+_PLAIN_ID = rf"{_ID_PREFIX}:{_ID_SLUG}"
+
+#: The character that separates a **Data Flow** ID's three parts.
 #:
-#: Stated on the field because :func:`derive_element_id` cannot always be asked.
-#: It raises when an element's *name* slugs to empty -- a name of ``"!!!"`` --
-#: and the ``id-mismatch`` rule that would otherwise pin the ID to the derived
-#: one is skipped exactly then, so the emitted ID survived verbatim with only a
-#: length bound. ``references.py`` records that hole as a reference-resolution
-#: one; it is also a fencing one, because an element ID is rendered into a lane
-#: agent's prompt in a table that carries no fence of its own, and a value with
-#: a newline and a backtick run there opens a block that swallows every fenced
-#: block after it. A self-sized fence is only safe while its neighbours are
-#: fenced too.
-ELEMENT_ID = r"^[a-z_]+:[a-z0-9]+(?:-[a-z0-9]+)*(?::[a-z0-9]+(?:-[a-z0-9]+)*)?$"
+#: Picked against the ID alphabet rather than for how it reads. A part is a
+#: prefix drawn from ``[a-z_]`` and a slug drawn from ``[a-z0-9-]``, so a colon
+#: and a hyphen both occur *inside* a part and neither can delimit one — which
+#: is what made version 1's ``-to-`` undecodable. ``>`` occurs in no part, so
+#: splitting on it yields exactly three fields, and :func:`parse_flow_id` is
+#: the decoder that holds the round trip.
+#:
+#: It is also inert where a flow ID is read. Every ID this service renders into
+#: a prompt goes inside a backtick span or inside a JSON fence
+#: (:func:`~analysis_service.graph.render_model`), and ``>`` closes neither.
+FLOW_DELIMITER = ">"
+
+#: Version 2's shape: ``flow:<source id><d><destination id><d><label slug>``,
+#: with ``<d>`` the delimiter above.
+_FLOW_ID_V2 = rf"flow:{_PLAIN_ID}{FLOW_DELIMITER}{_PLAIN_ID}{FLOW_DELIMITER}{_ID_SLUG}"
+
+#: Version 1's shape: ``flow:<slug>-to-<slug>:<slug>``, the endpoints' type
+#: prefixes dropped.
+#:
+#: Still part of the schema's bound because archived emissions and archived
+#: reports hold it and are read back — ``evals.harness.stability`` and
+#: ``evals.harness.extraction_losses`` both parse an archived system model
+#: through this schema. **The pattern is a bound, not the rule.** Which shape a
+#: live extraction may carry is decided by the gate's ``id-mismatch`` rule
+#: against :func:`derive_element_id`, which writes :data:`FLOW_ID_VERSION` and
+#: nothing else.
+_FLOW_ID_V1 = rf"flow:{_ID_SLUG}:{_ID_SLUG}"
 
 
 def normalize_name(name: str) -> str:
@@ -82,15 +105,240 @@ def make_element_id(prefix: str, name: str) -> str:
     return f"{prefix}:{normalize_name(name)}"
 
 
-def make_flow_id(source_id: str, destination_id: str, label: str) -> str:
-    """Build the deterministic ID for a Data Flow: flow:<source>-to-<dest>:<label>.
+class FlowIdError(ValueError):
+    """A flow ID cannot be decoded under the version it was asked for."""
 
-    ``source_id`` and ``destination_id`` are the endpoints' element IDs; their
-    type prefixes are stripped so only the name slugs appear in the flow ID.
+
+@dataclass(frozen=True)
+class FlowParts:
+    """The three parts a flow ID is built from, as a decoder recovers them.
+
+    What ``source`` and ``destination`` hold is the version's own business:
+    version 2 recovers full **Element ID**s, version 1 recovers bare name slugs
+    because its derivation dropped the type prefix. That is why the migration
+    reads the original graph rather than the recorded ID (ADR 0037 rule 5), and
+    why :func:`flow_label` is the only part a version-blind caller asks for.
     """
+
+    source: str
+    destination: str
+    label: str
+
+
+@dataclass(frozen=True)
+class FlowIdRule:
+    """One version of the flow identity: its shape, its builder and its decoder.
+
+    All three in one entry, because a version recorded without its decoder is
+    not compatibility (ADR 0037 rule 4). Every version stays computable, and
+    :data:`FLOW_ID_RULES` is the table a reader of a versioned artifact looks
+    its rule up in — and the table :data:`ELEMENT_ID` and
+    :func:`flow_id_version` are both built from, so a version added here is
+    admitted by the schema and recognised by the shape reader on the same line.
+    """
+
+    version: int
+    #: The unanchored regular expression one ID of this version matches.
+    pattern: str
+    build: Callable[[str, str, str], str]
+    parse: Callable[[str], FlowParts]
+
+
+def _build_v1(source_id: str, destination_id: str, label: str) -> str:
+    """Version 1: ``flow:<source slug>-to-<destination slug>:<label slug>``."""
     source_slug = source_id.split(":", 1)[-1]
     destination_slug = destination_id.split(":", 1)[-1]
     return f"flow:{source_slug}-to-{destination_slug}:{normalize_name(label)}"
+
+
+def _parse_v1(flow_id: str) -> FlowParts:
+    """Version 1's decoder, which recovers slugs and often cannot decide at all.
+
+    ``-to-`` is drawn from the slug alphabet, so it occurs inside an endpoint's
+    own slug as readily as between two of them: ``flow:a-to-b-to-c:read`` is
+    three legal splits and this raises on it. That is the defect ADR 0037 fixes,
+    stated as a property of the rule rather than as a comment — and it is why
+    rule 5 builds the migration mapping from the graph.
+    """
+    body, _, label = _flow_body(flow_id, 1).rpartition(":")
+    if not body or not label:
+        raise FlowIdError(f"{flow_id!r} carries no version 1 label")
+    halves = body.split("-to-")
+    if len(halves) != 2:
+        raise FlowIdError(
+            f"{flow_id!r} splits {len(halves)} ways on version 1's '-to-';"
+            " a version 1 ID whose endpoint slugs carry the separator names no"
+            " pair of endpoints, which is why a migration reads the graph"
+        )
+    return FlowParts(source=halves[0], destination=halves[1], label=label)
+
+
+def _build_v2(source_id: str, destination_id: str, label: str) -> str:
+    """Version 2: the typed endpoint IDs and the label under :data:`FLOW_DELIMITER`."""
+    return FLOW_DELIMITER.join(
+        (f"flow:{source_id}", destination_id, normalize_name(label))
+    )
+
+
+def _parse_v2(flow_id: str) -> FlowParts:
+    """Version 2's decoder. Three fields, because the delimiter is in no part."""
+    fields = _flow_body(flow_id, 2).split(FLOW_DELIMITER)
+    if len(fields) != 3:
+        raise FlowIdError(
+            f"{flow_id!r} splits into {len(fields)} fields on"
+            f" {FLOW_DELIMITER!r}; a version 2 flow ID carries exactly three"
+        )
+    source, destination, label = fields
+    return FlowParts(source=source, destination=destination, label=label)
+
+
+def _flow_body(flow_id: str, version: int) -> str:
+    """Everything after the ``flow:`` prefix, or raise naming the version."""
+    if not flow_id.startswith("flow:"):
+        raise FlowIdError(
+            f"{flow_id!r} is not a flow ID; version {version}'s decoder reads"
+            " an ID carrying the 'flow:' prefix"
+        )
+    return flow_id[len("flow:") :]
+
+
+#: Every flow identity version this service can write or read, keyed by version.
+#:
+#: **Keyed, never branched.** A reader of a versioned artifact looks its rule up
+#: here and gets both halves, so a version cannot be recorded without the
+#: decoder that reads it. A version missing from this table raises rather than
+#: falling back on the current rule, which would decode an old ID under a rule
+#: it was never written by and return parts nobody wrote.
+FLOW_ID_RULES: Mapping[int, FlowIdRule] = MappingProxyType(
+    {
+        1: FlowIdRule(1, _FLOW_ID_V1, _build_v1, _parse_v1),
+        2: FlowIdRule(2, _FLOW_ID_V2, _build_v2, _parse_v2),
+    }
+)
+
+#: Each version's shape, anchored: what :func:`parse_flow_id` holds an ID to
+#: before it decodes, and what :func:`flow_id_version` asks to find out which
+#: rule wrote one.
+_FLOW_ID_SHAPES = MappingProxyType(
+    {
+        version: re.compile(rf"^{rule.pattern}$")
+        for version, rule in FLOW_ID_RULES.items()
+    }
+)
+
+#: The version this service writes. Version 1 dropped the endpoints' type
+#: prefixes, so an entity and a process sharing one name derived one flow ID
+#: (#989); version 2 encodes both endpoints' full IDs. Bumping it is a schema
+#: change with a migration — see ``evals/harness/flow_ids.py``.
+FLOW_ID_VERSION = 2
+
+
+def flow_id_rule(version: int) -> FlowIdRule:
+    """The rule that version writes and reads, or raise naming the table."""
+    try:
+        return FLOW_ID_RULES[version]
+    except KeyError:
+        raise FlowIdError(
+            f"no flow identity rule is declared for version {version!r};"
+            " add it to FLOW_ID_RULES with both its builder and its decoder"
+        ) from None
+
+
+def make_flow_id(
+    source_id: str, destination_id: str, label: str, version: int = FLOW_ID_VERSION
+) -> str:
+    """Build the deterministic ID for a Data Flow under one identity version.
+
+    ``source_id`` and ``destination_id`` are the endpoints' element IDs. Under
+    the current version both are carried whole, prefix included, so two legal
+    elements of different types sharing one name derive two flows.
+    """
+    return flow_id_rule(version).build(source_id, destination_id, label)
+
+
+def parse_flow_id(flow_id: str, version: int = FLOW_ID_VERSION) -> FlowParts:
+    """Decode a flow ID back into the three parts it was built from.
+
+    The round trip against :func:`make_flow_id` is what makes the encoding
+    unambiguous rather than merely readable, and ``tests/test_system_model.py``
+    holds it over every version in :data:`FLOW_ID_RULES`.
+
+    The ID is held to the version's shape before it is split, so a string that
+    is not an ID of that version raises rather than decoding into three fields
+    nobody wrote. Splitting alone would accept ``flow:a>b>c``, whose halves are
+    not element IDs, and hand a caller parts that name nothing.
+    """
+    rule = flow_id_rule(version)
+    if not _FLOW_ID_SHAPES[version].match(flow_id):
+        raise FlowIdError(
+            f"{flow_id!r} is not a version {version} flow ID; that version"
+            f" writes {rule.pattern}"
+        )
+    return rule.parse(flow_id)
+
+
+def flow_id_version(flow_id: str) -> int:
+    """Which version's rule wrote one flow ID, decided by its shape.
+
+    Sound because the shapes are disjoint **by construction** rather than by
+    inspection: :data:`FLOW_DELIMITER` is outside the alphabet every part is
+    drawn from, so a version 2 ID carries a character no version 1 ID can and
+    no string is legal under both. Two matches or none raises, which is what
+    keeps that property a check rather than an assumption.
+
+    This is how a *single* ID is read. It is not how a *tree* is read: the
+    corpus migration takes its source version as an argument, because a corpus
+    holding both shapes must fail as a whole rather than have its unmigrated
+    half quietly fixed.
+    """
+    matched = [
+        version for version, shape in _FLOW_ID_SHAPES.items() if shape.match(flow_id)
+    ]
+    if len(matched) != 1:
+        raise FlowIdError(
+            f"{flow_id!r} matches {len(matched)} flow identity shapes"
+            f" {matched or ''}; one ID is written by exactly one rule"
+        )
+    return matched[0]
+
+
+def flow_label(flow_id: str) -> str:
+    """The describing half of one flow ID, under whichever rule wrote it.
+
+    **The one reader of "what does a flow call itself".** Splitting the ID on
+    its last colon answered this while a flow ID ended in ``:<label>``, and
+    two instruments did exactly that; under version 2 the same split returns
+    the destination's slug glued to the label, and every alignment that turns on
+    a label would have silently stopped matching.
+    """
+    return parse_flow_id(flow_id, flow_id_version(flow_id)).label
+
+
+#: The shape every element ID this service builds already has: a plain
+#: ``<prefix>:<slug>``, or any version's flow shape, taken from
+#: :data:`FLOW_ID_RULES` so the schema admits every version whose decoder ships.
+#:
+#: Stated on the field because :func:`derive_element_id` cannot always be asked.
+#: It raises when an element's *name* slugs to empty -- a name of ``"!!!"`` --
+#: and the ``id-mismatch`` rule that would otherwise pin the ID to the derived
+#: one is skipped exactly then, so the emitted ID survived verbatim with only a
+#: length bound. ``references.py`` records that hole as a reference-resolution
+#: one; it is also a fencing one, because an element ID is rendered into a lane
+#: agent's prompt in a table that carries no fence of its own, and a value with
+#: a newline and a backtick run there opens a block that swallows every fenced
+#: block after it. A self-sized fence is only safe while its neighbours are
+#: fenced too.
+#:
+#: The 300-character bound on the field is the other half of that fence, and
+#: version 2 spends 9 to 13 characters of it: the two endpoint prefixes, their
+#: colons and the third delimiter, less the four ``-to-`` costs. Measured over
+#: the corpus the longest derived flow ID is 83 characters, so the headroom is
+#: unchanged in practice — but a flow between two long names that fitted under
+#: version 1 can now fail the gate as ``schema``, which is a refusal rather
+#: than a silent truncation.
+ELEMENT_ID = "^(?:{})$".format(
+    "|".join([_PLAIN_ID, *(rule.pattern for _, rule in sorted(FLOW_ID_RULES.items()))])
+)
 
 
 class _Element(BaseModel):
@@ -593,8 +841,18 @@ _OTHER_PREFIXES = sorted(
     element.id_prefix for element in get_args(Element) if element is not DataFlow
 )
 _SLUG = r"[a-z0-9-]+"
+# Its own slug, looser than the grammar's on purpose — see the docstring — but
+# the flow **delimiter** comes from :data:`FLOW_DELIMITER` rather than being
+# spelled again. That is the fact two readers would disagree about: a prose
+# reader still splitting a flow ID on a colon would find its first endpoint and
+# report the rest as a second citation.
+_MENTION_PLAIN = rf"(?:{'|'.join(_OTHER_PREFIXES)}):{_SLUG}"
+_MENTION_FLOW = (
+    rf"{_FLOW_PREFIX}:{_MENTION_PLAIN}{FLOW_DELIMITER}"
+    rf"{_MENTION_PLAIN}{FLOW_DELIMITER}{_SLUG}"
+)
 _MENTION_RE = re.compile(
-    rf"\b(?:{_FLOW_PREFIX}:{_SLUG}:{_SLUG}|(?:{'|'.join(_OTHER_PREFIXES)}):{_SLUG})",
+    rf"\b(?:{_MENTION_FLOW}|{_MENTION_PLAIN})",
     re.IGNORECASE,
 )
 

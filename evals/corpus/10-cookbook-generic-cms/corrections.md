@@ -15,7 +15,7 @@ push a boundary crossing rather than an internal write.
 
 ### 1. The stated control stranded in `data_description`
 
-- **Path:** `flow:reader-to-web-server:page-requests`
+- **Path:** `flow:entity:reader>process:web-server>page-requests`
 - **Bootstrap:** `authentication: "unknown"`, with "sign-in state for some
   readers" in `data_description`
 - **Blessed:** `authentication: "sign-in exists for some readers; the mechanism,
@@ -48,8 +48,8 @@ is grounded by the flow, not by a tag on the person at the end of it.
 
 ### 3. Flows carrying account data tagged empty
 
-- **Path:** `flow:web-server-to-mysql-database:cms-data`,
-  `flow:admin-to-mysql-database:direct-administration`
+- **Path:** `flow:process:web-server>store:mysql-database>cms-data`,
+  `flow:entity:admin>store:mysql-database>direct-administration`
 - **Bootstrap:** `assets: []` on every flow in the model
 - **Blessed:** `["pii", "business-critical-data"]` on both database flows
 - **Source reason:** the same pattern from the other side, and the one cases 07
@@ -80,7 +80,7 @@ operated.
 ### 5. Five ID mismatches
 
 - **Path:** every flow
-- **Bootstrap:** IDs such as `flow:reader-to-web-server:page-requests` beside
+- **Bootstrap:** IDs such as `flow:entity:reader>process:web-server>page-requests` beside
   `name: "Reader page requests"`
 - **Blessed:** names shortened to the label the ID already carried
   (`"Page requests"`), so `make_flow_id` reproduces each ID exactly

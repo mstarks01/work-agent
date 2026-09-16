@@ -125,7 +125,7 @@
   ],
   "data_flows": [
     {
-      "id": "flow:sensor-node-to-device-gateway:publish-readings",
+      "id": "flow:entity:sensor-node>process:device-gateway>publish-readings",
       "name": "publish readings",
       "description": "Node publishes sensor readings to the broker.",
       "assets": [
@@ -142,7 +142,7 @@
       "operations": "write"
     },
     {
-      "id": "flow:device-gateway-to-device-registry:look-up-device",
+      "id": "flow:process:device-gateway>store:device-registry>look-up-device",
       "name": "look up device",
       "description": "Gateway checks the presented key and resolves the node's customer.",
       "assets": [
@@ -159,7 +159,7 @@
       "operations": "read"
     },
     {
-      "id": "flow:telemetry-normalizer-to-telemetry-lake:load-readings",
+      "id": "flow:process:telemetry-normalizer>store:telemetry-lake>load-readings",
       "name": "load readings",
       "description": "Normalizer writes readings into the lake.",
       "assets": [
@@ -176,7 +176,7 @@
       "operations": "write"
     },
     {
-      "id": "flow:sensor-node-to-firmware-bucket:poll-firmware",
+      "id": "flow:entity:sensor-node>store:firmware-bucket>poll-firmware",
       "name": "poll firmware",
       "description": "Node polls for a new firmware image and installs what it finds.",
       "assets": [
@@ -193,7 +193,7 @@
       "operations": "read"
     },
     {
-      "id": "flow:field-technician-to-sensor-node:local-service-session",
+      "id": "flow:entity:field-technician>entity:sensor-node>local-service-session",
       "name": "local service session",
       "description": "Technician attaches to a node's serial console on site.",
       "assets": [],
@@ -208,7 +208,7 @@
       "operations": "read-write"
     },
     {
-      "id": "flow:fleet-operator-to-telemetry-lake:query-dashboards",
+      "id": "flow:entity:fleet-operator>store:telemetry-lake>query-dashboards",
       "name": "query dashboards",
       "description": "Operator reads fleet dashboards over BigQuery.",
       "assets": [
@@ -225,7 +225,7 @@
       "operations": "read"
     },
     {
-      "id": "flow:device-gateway-to-pub-sub:forward-readings",
+      "id": "flow:process:device-gateway>store:pub-sub>forward-readings",
       "name": "forward readings",
       "description": "The gateway publishes accepted readings onto the broker.",
       "authentication": "unknown",
@@ -242,7 +242,7 @@
       "operations": "write"
     },
     {
-      "id": "flow:telemetry-normalizer-to-pub-sub:pick-up-readings",
+      "id": "flow:process:telemetry-normalizer>store:pub-sub>pick-up-readings",
       "name": "pick up readings",
       "description": "The normalizer consumes readings from the broker.",
       "authentication": "unknown",

@@ -17,7 +17,7 @@
   {
     "category": "spoofing",
     "affected_element_ids": [
-      "flow:franchise-identity-provider-to-identity-broker:vouch-for-colleague",
+      "flow:entity:franchise-identity-provider>process:identity-broker>vouch-for-colleague",
       "entity:franchise-identity-provider"
     ],
     "claim": "The franchise identity provider vouches for someone who is not a franchise colleague and the broker signs them in as that person, since nothing records which colleagues it may vouch for.",
@@ -32,7 +32,7 @@
   {
     "category": "spoofing",
     "affected_element_ids": [
-      "flow:colleague-to-identity-broker:sign-in",
+      "flow:entity:colleague>process:identity-broker>sign-in",
       "entity:colleague"
     ],
     "claim": "An attacker signs in to the broker as a colleague, because whether colleagues are asked for a second factor is unverified.",
@@ -47,7 +47,7 @@
   {
     "category": "spoofing",
     "affected_element_ids": [
-      "flow:colleague-to-identity-broker:sign-in",
+      "flow:entity:colleague>process:identity-broker>sign-in",
       "process:store-admin-console"
     ],
     "claim": "An attacker who obtains a colleague's token acts as that colleague for the rest of its twelve hours, because nothing calls back to the broker and there is no way to pull a token back.",
@@ -62,7 +62,7 @@
   {
     "category": "spoofing",
     "affected_element_ids": [
-      "flow:store-admin-console-to-identity-broker:fetch-public-key",
+      "flow:process:store-admin-console>process:identity-broker>fetch-public-key",
       "process:store-admin-console"
     ],
     "claim": "An attacker serves the console a signing public key of their own so that tokens the attacker signed verify, since how the console fetches and trusts that key is unverified.",
@@ -92,7 +92,7 @@
   {
     "category": "tampering",
     "affected_element_ids": [
-      "flow:identity-broker-to-hr-system:nightly-group-pull",
+      "flow:process:identity-broker>entity:hr-system>nightly-group-pull",
       "entity:hr-system"
     ],
     "claim": "An attacker alters what the nightly pull returns so that groups are granted, or so that leavers are never removed.",
@@ -107,7 +107,7 @@
   {
     "category": "tampering",
     "affected_element_ids": [
-      "flow:colleague-to-store-admin-console:change-prices-and-void"
+      "flow:entity:colleague>process:store-admin-console>change-prices-and-void"
     ],
     "claim": "An attacker on the path to the console alters a colleague's price change or void in flight, since protection of that traffic is unverified.",
     "tier": "expected",
@@ -122,7 +122,7 @@
     "category": "tampering",
     "affected_element_ids": [
       "store:audit-log",
-      "flow:identity-broker-to-audit-log:write-sign-ins"
+      "flow:process:identity-broker>store:audit-log>write-sign-ins"
     ],
     "claim": "An attacker alters or removes sign-in records in the audit log so a sign-in leaves no trace.",
     "tier": "expected",
@@ -136,7 +136,7 @@
   {
     "category": "repudiation",
     "affected_element_ids": [
-      "flow:franchise-identity-provider-to-identity-broker:vouch-for-colleague",
+      "flow:entity:franchise-identity-provider>process:identity-broker>vouch-for-colleague",
       "store:audit-log"
     ],
     "claim": "A franchise sign-in cannot be attributed to a person, because the identity was asserted by a provider we do not run and whether the log covers that route at all is unverified.",
@@ -152,7 +152,7 @@
     "category": "repudiation",
     "affected_element_ids": [
       "process:store-admin-console",
-      "flow:colleague-to-store-admin-console:change-prices-and-void"
+      "flow:entity:colleague>process:store-admin-console>change-prices-and-void"
     ],
     "claim": "A price change or a void cannot be tied to the store it belongs to, because the console never establishes which store the token holder is from.",
     "tier": "must-find",
@@ -222,7 +222,7 @@
   {
     "category": "information-disclosure",
     "affected_element_ids": [
-      "flow:colleague-to-identity-broker:sign-in"
+      "flow:entity:colleague>process:identity-broker>sign-in"
     ],
     "claim": "An attacker on the path between a colleague and the broker reads the sign-in and the token that comes back, since protection of that traffic is unverified.",
     "tier": "expected",
@@ -236,7 +236,7 @@
   {
     "category": "information-disclosure",
     "affected_element_ids": [
-      "flow:identity-broker-to-hr-system:nightly-group-pull"
+      "flow:process:identity-broker>entity:hr-system>nightly-group-pull"
     ],
     "claim": "An attacker on the path of the nightly pull reads colleague and leaver records as they cross out of the corporate network.",
     "tier": "expected",
@@ -264,7 +264,7 @@
   {
     "category": "denial-of-service",
     "affected_element_ids": [
-      "flow:identity-broker-to-hr-system:nightly-group-pull",
+      "flow:process:identity-broker>entity:hr-system>nightly-group-pull",
       "store:directory"
     ],
     "claim": "An attacker stops the nightly pull and group changes silently stop reaching the directory while everything else keeps working.",
@@ -295,7 +295,7 @@
     "category": "elevation-of-privilege",
     "affected_element_ids": [
       "process:store-admin-console",
-      "flow:colleague-to-store-admin-console:change-prices-and-void"
+      "flow:entity:colleague>process:store-admin-console>change-prices-and-void"
     ],
     "claim": "A colleague who is a store manager in one store changes prices and voids transactions in every store, because the console decides from the group alone and never checks which store they belong to.",
     "tier": "must-find",
@@ -309,7 +309,7 @@
   {
     "category": "elevation-of-privilege",
     "affected_element_ids": [
-      "flow:identity-broker-to-hr-system:nightly-group-pull",
+      "flow:process:identity-broker>entity:hr-system>nightly-group-pull",
       "entity:colleague"
     ],
     "claim": "A leaver keeps their access until the nightly pull runs, and a token issued before it goes on working for twelve hours after that.",

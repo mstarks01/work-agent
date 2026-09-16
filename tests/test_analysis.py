@@ -31,6 +31,7 @@ from analysis_service.system_model import (
     Process,
     SystemModel,
     TrustBoundary,
+    make_flow_id,
 )
 from tests.factories import valid_model
 
@@ -44,9 +45,8 @@ def flow(source, destination, label, **overrides):
         "operations": "unknown",
     }
     fields.update(overrides)
-    slug = f"{source.split(':', 1)[-1]}-to-{destination.split(':', 1)[-1]}"
     return DataFlow(
-        id=f"flow:{slug}:{label}",
+        id=make_flow_id(source, destination, label),
         name=label,
         source=source,
         destination=destination,
@@ -157,10 +157,10 @@ class TestControlState:
 class TestTraversal:
     def test_inbound_and_outbound_split_by_direction(self, chain):
         assert [f.id for f in inbound_flows(chain, "process:worker")] == [
-            "flow:edge-to-worker:dispatch"
+            "flow:process:edge>process:worker>dispatch"
         ]
         assert [f.id for f in outbound_flows(chain, "process:worker")] == [
-            "flow:worker-to-vault:read"
+            "flow:process:worker>store:vault>read"
         ]
 
     def test_reachable_from_is_breadth_first_and_excludes_the_start(self, chain):
@@ -199,7 +199,10 @@ class TestStructuralFacts:
 
     def test_crossing_flow_ids_names_every_crossing(self, chain):
         assert crossing_flow_ids(chain) == frozenset(
-            {"flow:user-to-edge:browse", "flow:edge-to-worker:dispatch"}
+            {
+                "flow:entity:user>process:edge>browse",
+                "flow:process:edge>process:worker>dispatch",
+            }
         )
 
     def test_internet_exposed_excludes_unknown_exposure(self):
@@ -220,7 +223,10 @@ class TestStructuralFacts:
             (control.element_id, control.attribute): control.state
             for control in unknown_controls(chain)
         }
-        assert states[("flow:edge-to-worker:dispatch", "authentication")] == "absent"
+        assert (
+            states[("flow:process:edge>process:worker>dispatch", "authentication")]
+            == "absent"
+        )
         assert states[("store:vault", "encryption_at_rest")] == "unverified"
 
     def test_zone_kinds_maps_boundary_to_kind(self, chain):

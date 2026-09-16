@@ -42,8 +42,8 @@ from analysis_service.system_model import UNKNOWN, DataStore, SystemModel
 from tests.factories import sample_draft, sample_proposal, valid_model
 
 ENCRYPTION_REF = "unknown:store:orders-db:encryption_at_rest"
-LOGIN_CROSSING_REF = "crossing:flow:customer-to-web-app:login"
-LOGIN_FLOW = "flow:customer-to-web-app:login"
+LOGIN_CROSSING_REF = "crossing:flow:entity:customer>process:web-app>login"
+LOGIN_FLOW = "flow:entity:customer>process:web-app>login"
 SHOPPERS = Subject(id="principal:shoppers", type="principal", label="shopper accounts")
 COOKIE = Subject(
     id="credential:session-cookie", type="credential", label="session cookie"
@@ -84,7 +84,7 @@ class TestEvidenceCatalog:
         catalog = evidence_catalog(valid_model())
 
         assert catalog[LOGIN_CROSSING_REF] == Ground(
-            kind="derived-fact", flow_id="flow:customer-to-web-app:login"
+            kind="derived-fact", flow_id="flow:entity:customer>process:web-app>login"
         )
 
     def test_an_attribute_the_model_states_is_not_evidence_of_an_unknown(self):
@@ -125,14 +125,18 @@ class TestEvidenceCatalog:
 
         catalog = evidence_catalog(model)
 
-        ref = absent_evidence_ref("flow:customer-to-web-app:login", "authentication")
+        ref = absent_evidence_ref(
+            "flow:entity:customer>process:web-app>login", "authentication"
+        )
         assert catalog[ref] == Ground(
             kind="absent-attribute",
-            element_id="flow:customer-to-web-app:login",
+            element_id="flow:entity:customer>process:web-app>login",
             attribute="authentication",
         )
         assert (
-            unknown_evidence_ref("flow:customer-to-web-app:login", "authentication")
+            unknown_evidence_ref(
+                "flow:entity:customer>process:web-app>login", "authentication"
+            )
             not in catalog
         )
 
@@ -146,7 +150,9 @@ class TestEvidenceCatalog:
 
         catalog = evidence_catalog(model)
 
-        ref = unknown_evidence_ref("flow:customer-to-web-app:login", "authentication")
+        ref = unknown_evidence_ref(
+            "flow:entity:customer>process:web-app>login", "authentication"
+        )
         assert catalog[ref].kind == "unknown-attribute"
 
     def test_a_stated_control_reading_no_is_not_an_absence(self):
@@ -158,7 +164,7 @@ class TestEvidenceCatalog:
 
         catalog = evidence_catalog(model)
 
-        flow_id = "flow:customer-to-web-app:login"
+        flow_id = "flow:entity:customer>process:web-app>login"
         assert absent_evidence_ref(flow_id, "authentication") not in catalog
         assert unknown_evidence_ref(flow_id, "authentication") not in catalog
 
@@ -173,7 +179,9 @@ class TestEvidenceCatalog:
         catalog = evidence_catalog(model)
 
         assert (
-            absent_evidence_ref("flow:customer-to-web-app:login", "protocol")
+            absent_evidence_ref(
+                "flow:entity:customer>process:web-app>login", "protocol"
+            )
             not in catalog
         )
 
@@ -374,13 +382,13 @@ class TestRenderCatalog:
                     element_id="store:accounts-db",
                     attribute="encryption_at_rest",
                 ),
-                "absent:flow:a-to-b:call:authentication": Ground(
+                "absent:flow:process:a>process:b>call:authentication": Ground(
                     kind="absent-attribute",
-                    element_id="flow:a-to-b:call",
+                    element_id="flow:process:a>process:b>call",
                     attribute="authentication",
                 ),
-                "crossing:flow:a-to-b:call": Ground(
-                    kind="derived-fact", flow_id="flow:a-to-b:call"
+                "crossing:flow:process:a>process:b>call": Ground(
+                    kind="derived-fact", flow_id="flow:process:a>process:b>call"
                 ),
             }
         )
@@ -771,7 +779,7 @@ class TestTheMisShapeIsUnreachable:
         ).drafts
 
         assert draft.grounds[0].kind == "derived-fact"
-        assert draft.grounds[0].flow_id == "flow:customer-to-web-app:login"
+        assert draft.grounds[0].flow_id == "flow:entity:customer>process:web-app>login"
         assert not draft.grounds[0].attribute
 
     def test_an_agent_cannot_name_a_lane_or_a_threat_id_at_all(self):
@@ -827,7 +835,7 @@ class TestTheElementRoster:
     as fenced JSON to read it out of.
 
     On a live end-to-end sweep a lane agent produced
-    ``flow:a-to-b:label:label``, its own label concatenated twice: well-formed,
+    ``flow:process:a>process:b>label:label``, its own label concatenated twice: well-formed,
     plausible, absent from the set.
     """
 

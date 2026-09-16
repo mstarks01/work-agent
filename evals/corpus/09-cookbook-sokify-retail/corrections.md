@@ -34,8 +34,8 @@ tampering target that no sentence in the source supports.
 
 ### 2. Payment capture invented on the customer path
 
-- **Path:** `flow:customer-to-mobile-app:browse-and-order`,
-  `flow:mobile-app-to-web-api:api-traffic`, `process:mobile-app`
+- **Path:** `flow:entity:customer>process:mobile-app>browse-and-order`,
+  `flow:process:mobile-app>process:web-api>api-traffic`, `process:mobile-app`
 - **Bootstrap:** `data_description` of "Browsing activity, order details, and
   payment card details" and "including customer details and the card paid with";
   the app tagged `financial`
@@ -66,7 +66,7 @@ route by which a customer's name and address can reach the API.
 
 ### 4. A stated absence widened into a general one
 
-- **Path:** `flow:fax-gateway-to-customer:confirmation-fax`
+- **Path:** `flow:process:fax-gateway>entity:customer>confirmation-fax`
 - **Bootstrap:** `authentication: "none — nobody checks it arrived at the right
   place"`
 - **Blessed:** `authentication: "the dialled destination is never verified;
@@ -86,7 +86,7 @@ and drops the generalisation.
 ### 5. Fourteen ID mismatches
 
 - **Path:** every flow, three processes, two boundaries
-- **Bootstrap:** IDs such as `flow:mobile-app-to-web-api:api-traffic` beside
+- **Bootstrap:** IDs such as `flow:process:mobile-app>process:web-api>api-traffic` beside
   `name: "Mobile app to web API"`, and `process:sims` beside
   `name: "SIMS stock and inventory system"`
 - **Blessed:** names shortened to the label the ID already carried
@@ -136,7 +136,7 @@ follows one ruling, and `facts.json` changed with it.
 
 | # | Path | Before | After | Ruling |
 |---|---|---|---|---|
-| 6 | `flow:catalogue-spreadsheet-to-web-api:sql-statements.operations` | `read-write` | `write` | The macros change prices and product copy, which are writes. Reading is not stated. The value describes the supported operations, not proof the interface cannot read. |
+| 6 | `flow:process:catalogue-spreadsheet>process:web-api>sql-statements.operations` | `read-write` | `write` | The macros change prices and product copy, which are writes. Reading is not stated. The value describes the supported operations, not proof the interface cannot read. |
 
 ## Signing of 2026-09-16 (#961 step 3)
 

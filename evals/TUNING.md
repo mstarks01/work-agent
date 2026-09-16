@@ -639,9 +639,9 @@ produced 8 structurally invalid models where luna produced none. One task on one
 corpus, so do not generalise it — but do not assume the pricier model extracts
 better either.
 
-**Models emit structurally broken references.** One luna lane agent produced
-`flow:a-to-b:label:label`, its own label glued on twice. No instruction
-anticipates that; the fail-closed join is what catches it.
+**Models emit structurally broken references.** One luna lane agent produced a
+flow ID with its own label glued on twice. No instruction anticipates that; the
+fail-closed join is what catches it.
 
 ### The corpus
 

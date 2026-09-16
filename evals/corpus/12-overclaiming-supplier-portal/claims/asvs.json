@@ -5,7 +5,7 @@
     "affected_element_ids": [
       "process:supplier-master-service",
       "store:supplier-database",
-      "flow:supplier-master-service-to-supplier-database:write-supplier-records"
+      "flow:process:supplier-master-service>store:supplier-database>write-supplier-records"
     ],
     "claim": "The supplier master service writes records from a vendor CSV into the supplier database and nothing says how those writes are built.",
     "tier": "must-find",
@@ -30,7 +30,7 @@
     "affected_element_ids": [
       "entity:supplier",
       "process:supplier-portal",
-      "flow:supplier-to-supplier-portal:upload-documents"
+      "flow:entity:supplier>process:supplier-portal>upload-documents"
     ],
     "claim": "Suppliers upload insurance certificates and audit documents and nothing says the portal checks the file against an expected type.",
     "tier": "must-find",
@@ -92,7 +92,7 @@
     "affected_element_ids": [
       "entity:supplier",
       "process:supplier-portal",
-      "flow:supplier-to-supplier-portal:upload-documents"
+      "flow:entity:supplier>process:supplier-portal>upload-documents"
     ],
     "claim": "Suppliers upload to an externally hosted portal and no flow states its transport.",
     "tier": "must-find",

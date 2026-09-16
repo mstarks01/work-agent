@@ -33,6 +33,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 
 from analysis_service.certification import CertifyResult
 from analysis_service.identity import IDENTITY_VERSION
+from analysis_service.system_model import FLOW_ID_VERSION
 from evals.harness.instruments import INSTRUMENTS, Sweep, artifact_blocks
 from evals.harness.provenance import (
     REPO_ROOT,
@@ -64,6 +65,17 @@ CORPUS_DIR = REPO_ROOT / "evals" / "corpus"
 # them, and a bump would have made the one merged Baseline unreadable by the
 # commands that exist to read it. The version guards the declared keys below,
 # not every field an instrument adds inside its own block.
+#
+# #989 adds the top-level ``flow_identity_version``, and bumps nothing. A
+# top-level key is normally a version event, for the reason version 7 was one:
+# the reader cannot tell the two shapes apart from their contents. It can here.
+# ``carries`` says whether an artifact holds the key, and an artifact that does
+# not predates ADR 0037 — and every flow ID in such a bundle states its own
+# version by shape anyway, because the delimiter version 2 separates its parts
+# with cannot occur inside any part of an earlier one
+# (:func:`~analysis_service.system_model.flow_id_version`). A bump would have
+# made the three merged Baselines unreadable by the commands that exist to read
+# them, to record a fact their own bytes already carry.
 #
 # * Version 7 renames the claim scorer's coverage metrics inside ``scores``:
 #   ``recall`` to ``reference_coverage``, ``must_find_recall`` to
@@ -374,6 +386,14 @@ ENVELOPE_KEYS: tuple[str, ...] = (
     "trusted",
     "repo_commit",
     "corpus_digest",
+    # Declared without a version bump, which the note on ``ARTIFACT_VERSION``
+    # argues. A top-level key is normally a version event because a reader
+    # cannot tell the two shapes apart from their contents; here it can, twice
+    # over: ``carries`` answers whether an artifact holds the key at all, and a
+    # flow ID states its own version by shape, because
+    # :data:`~analysis_service.system_model.FLOW_DELIMITER` is outside the
+    # alphabet every earlier version's parts are drawn from.
+    "flow_identity_version",
     "frameworks",
     "stopped",
     "series",
@@ -469,6 +489,10 @@ def build(
         "trusted": trusted,
         "repo_commit": commit.model_dump(),
         "corpus_digest": corpus,
+        # Which rule spelled every flow ID in this artifact and its report
+        # bundle (ADR 0037 rule 4). The version the writing code holds, because
+        # every ID in the bundle came out of that code.
+        "flow_identity_version": FLOW_ID_VERSION,
         # The selection that ran, off the graphs that were built — one of a
         # Baseline's five identity parts (#321), so it is a field the code
         # reads rather than an inference over per-framework blocks.

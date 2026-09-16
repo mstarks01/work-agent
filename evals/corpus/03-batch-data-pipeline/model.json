@@ -106,7 +106,7 @@
   ],
   "data_flows": [
     {
-      "id": "flow:insurance-partner-to-landing-bucket:push-daily-extract",
+      "id": "flow:entity:insurance-partner>store:landing-bucket>push-daily-extract",
       "name": "push daily extract",
       "description": "Partner uploads its daily claims extract into its folder.",
       "assets": [
@@ -124,7 +124,7 @@
       "operations": "write"
     },
     {
-      "id": "flow:ingest-scheduler-to-landing-bucket:list-and-read-files",
+      "id": "flow:process:ingest-scheduler>store:landing-bucket>list-and-read-files",
       "name": "list and read files",
       "description": "Scheduler lists the bucket nightly and reads every file present, without checking which partner deposited it.",
       "assets": [
@@ -142,7 +142,7 @@
       "operations": "read"
     },
     {
-      "id": "flow:ingest-scheduler-to-airflow-metadata-database:read-connections",
+      "id": "flow:process:ingest-scheduler>store:airflow-metadata-database>read-connections",
       "name": "read connections",
       "description": "Scheduler reads its connection strings and the partner keys.",
       "assets": [
@@ -160,7 +160,7 @@
       "operations": "read"
     },
     {
-      "id": "flow:ingest-scheduler-to-spark-transform-job:trigger-transform",
+      "id": "flow:process:ingest-scheduler>process:spark-transform-job>trigger-transform",
       "name": "trigger transform",
       "description": "Scheduler starts one transform run per landed file.",
       "assets": [],
@@ -175,7 +175,7 @@
       "operations": "write"
     },
     {
-      "id": "flow:spark-transform-job-to-claims-warehouse:load-records",
+      "id": "flow:process:spark-transform-job>store:claims-warehouse>load-records",
       "name": "load records",
       "description": "Transform writes normalized claim rows into the warehouse.",
       "assets": [
@@ -193,7 +193,7 @@
       "operations": "write"
     },
     {
-      "id": "flow:data-analyst-to-claims-warehouse:run-queries",
+      "id": "flow:entity:data-analyst>store:claims-warehouse>run-queries",
       "name": "run queries",
       "description": "Analyst queries the warehouse under a dataset-wide grant.",
       "assets": [
@@ -240,7 +240,7 @@
   "assumptions": [
     {
       "assumption": "SFTP traffic from partners is protected by the SSH transport it runs over.",
-      "element_id": "flow:insurance-partner-to-landing-bucket:push-daily-extract",
+      "element_id": "flow:entity:insurance-partner>store:landing-bucket>push-daily-extract",
       "attribute": "encryption_in_transit",
       "basis": "The text names SFTP, whose transport encryption is intrinsic to the protocol; no other transport claim is made."
     },

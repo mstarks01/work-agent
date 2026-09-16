@@ -59,7 +59,7 @@ def absent(attribute: str = "encryption_in_transit") -> Ground:
     )
 
 
-def derived(flow_id: str = "flow:a-to-b:login") -> Ground:
+def derived(flow_id: str = "flow:process:a>process:b>login") -> Ground:
     return Ground(kind="derived-fact", flow_id=flow_id)
 
 

@@ -4,7 +4,7 @@ Three drafts against the exemplar system, showing the shape and the reasoning. F
 
 ## Canonical: transfer instructions modified in flight
 
-`flow:web-api-to-ledger-service:post-transfer` carries `encryption_in_transit: none` and `authentication: none`, and appears in the derived crossings (dmz → core). Its `data_description` says what an alteration is worth: transfer instructions with customer IDs.
+`flow:process:web-api>process:ledger-service>post-transfer` carries `encryption_in_transit: none` and `authentication: none`, and appears in the derived crossings (dmz → core). Its `data_description` says what an alteration is worth: transfer instructions with customer IDs.
 
 All three facts are catalogued — two `absent:` rows and the crossing — so this draft quotes nothing. The submitter's own sentence says the same thing, and citing it as well would be one fact filed twice.
 
@@ -16,17 +16,17 @@ Two shapes, one test: what does the fix protect? This draft is `alter-in-transit
 {
   "sequence": 1,
   "title": "On-path modification of transfer instructions between web API and ledger",
-  "description": "`flow:web-api-to-ledger-service:post-transfer` moves gRPC transfer instructions from `boundary:dmz` into `boundary:core` with `encryption_in_transit: none`. An attacker positioned on that path — a compromised sidecar, a node in the dmz, or anything that can redirect traffic — rewrites the amount, the destination account, or the customer ID in a message the ledger has no way to distinguish from the original, since the flow also carries `authentication: none`. Second-order: `process:ledger-service` commits the altered instruction to `store:accounts-db`, so the modification becomes an authoritative balance, and `flow:ledger-service-to-audit-log:append-transfer-record` records the forged version as fact.",
+  "description": "`flow:process:web-api>process:ledger-service>post-transfer` moves gRPC transfer instructions from `boundary:dmz` into `boundary:core` with `encryption_in_transit: none`. An attacker positioned on that path — a compromised sidecar, a node in the dmz, or anything that can redirect traffic — rewrites the amount, the destination account, or the customer ID in a message the ledger has no way to distinguish from the original, since the flow also carries `authentication: none`. Second-order: `process:ledger-service` commits the altered instruction to `store:accounts-db`, so the modification becomes an authoritative balance, and `flow:process:ledger-service>store:audit-log>append-transfer-record` records the forged version as fact.",
   "affected_element_ids": [
-    "flow:web-api-to-ledger-service:post-transfer",
+    "flow:process:web-api>process:ledger-service>post-transfer",
     "process:ledger-service",
     "store:accounts-db"
   ],
   "verb": "alter-in-transit",
   "evidence_refs": [
-    "crossing:flow:web-api-to-ledger-service:post-transfer",
-    "absent:flow:web-api-to-ledger-service:post-transfer:authentication",
-    "absent:flow:web-api-to-ledger-service:post-transfer:encryption_in_transit"
+    "crossing:flow:process:web-api>process:ledger-service>post-transfer",
+    "absent:flow:process:web-api>process:ledger-service>post-transfer:authentication",
+    "absent:flow:process:web-api>process:ledger-service>post-transfer:encryption_in_transit"
   ],
   "quotes": [],
   "severity": {
@@ -37,7 +37,7 @@ Two shapes, one test: what does the fix protect? This draft is `alter-in-transit
   "mitigations": [
     {
       "summary": "Encrypt and authenticate the ledger call",
-      "detail": "Require mTLS on `flow:web-api-to-ledger-service:post-transfer` so messages are both confidential and integrity-protected end to end."
+      "detail": "Require mTLS on `flow:process:web-api>process:ledger-service>post-transfer` so messages are both confidential and integrity-protected end to end."
     },
     {
       "summary": "Sign transfer instructions at origin",
@@ -49,16 +49,16 @@ Two shapes, one test: what does the fix protect? This draft is `alter-in-transit
 
 ## Second-order: shared database credential as a write primitive
 
-`flow:ledger-service-to-accounts-db:read-write-balances` authenticates with a shared static password held in an environment variable, granting full read/write. The exemplar is about reach: one leaked secret is not a modest configuration issue, it is unmediated write access to the record of every customer's money, and every consumer downstream inherits the corruption.
+`flow:process:ledger-service>store:accounts-db>read-write-balances` authenticates with a shared static password held in an environment variable, granting full read/write. The exemplar is about reach: one leaked secret is not a modest configuration issue, it is unmediated write access to the record of every customer's money, and every consumer downstream inherits the corruption.
 
 ```json
 {
   "sequence": 2,
   "title": "A leaked static database password grants direct writes to every balance",
-  "description": "`flow:ledger-service-to-accounts-db:read-write-balances` uses a shared static password from an environment variable with full read/write scope. Possession is authority: an attacker who obtains it from a crash dump, an image layer, a log line, or a compromised `process:ledger-service` writes to `store:accounts-db` directly, bypassing whatever validation the ledger applies. Balances, account-holder records, and transaction rows can be rewritten arbitrarily. Second-order: the corruption is invisible to `store:audit-log`, because writes made outside `process:ledger-service` never traverse `flow:ledger-service-to-audit-log:append-transfer-record`, so reconciliation against the audit trail cannot detect them.",
+  "description": "`flow:process:ledger-service>store:accounts-db>read-write-balances` uses a shared static password from an environment variable with full read/write scope. Possession is authority: an attacker who obtains it from a crash dump, an image layer, a log line, or a compromised `process:ledger-service` writes to `store:accounts-db` directly, bypassing whatever validation the ledger applies. Balances, account-holder records, and transaction rows can be rewritten arbitrarily. Second-order: the corruption is invisible to `store:audit-log`, because writes made outside `process:ledger-service` never traverse `flow:process:ledger-service>store:audit-log>append-transfer-record`, so reconciliation against the audit trail cannot detect them.",
   "affected_element_ids": [
     "store:accounts-db",
-    "flow:ledger-service-to-accounts-db:read-write-balances",
+    "flow:process:ledger-service>store:accounts-db>read-write-balances",
     "process:ledger-service"
   ],
   "verb": "alter",
@@ -95,17 +95,17 @@ Written against exemplar system B. The submitter's own words are the trigger her
 {
   "sequence": 3,
   "title": "Fabricated readings enter the pipeline if topic access is unchecked",
-  "description": "`flow:mqtt-broker-to-stream-processor:consume-topic` carries `authentication: unknown` and crosses from `boundary:ingest` into `boundary:platform`. If that unknown resolves to no check on who may attach to a topic, then any party who reaches `process:mqtt-broker` can publish onto the topic `process:stream-processor` consumes, and the processor treats the arriving payloads as gateway telemetry because they came off the expected topic. The attacker modifies the fleet's picture rather than reading it: suppressed alarm thresholds, invented readings, altered volumes written on into `store:telemetry-store` as though a device had reported them. This draft is conditional on that flow's `authentication` attribute; it is not a claim that topic authorization is missing.",
+  "description": "`flow:process:mqtt-broker>process:stream-processor>consume-topic` carries `authentication: unknown` and crosses from `boundary:ingest` into `boundary:platform`. If that unknown resolves to no check on who may attach to a topic, then any party who reaches `process:mqtt-broker` can publish onto the topic `process:stream-processor` consumes, and the processor treats the arriving payloads as gateway telemetry because they came off the expected topic. The attacker modifies the fleet's picture rather than reading it: suppressed alarm thresholds, invented readings, altered volumes written on into `store:telemetry-store` as though a device had reported them. This draft is conditional on that flow's `authentication` attribute; it is not a claim that topic authorization is missing.",
   "affected_element_ids": [
     "process:mqtt-broker",
     "process:stream-processor",
-    "flow:mqtt-broker-to-stream-processor:consume-topic",
+    "flow:process:mqtt-broker>process:stream-processor>consume-topic",
     "store:telemetry-store"
   ],
   "verb": "forge",
   "evidence_refs": [
-    "crossing:flow:mqtt-broker-to-stream-processor:consume-topic",
-    "unknown:flow:mqtt-broker-to-stream-processor:consume-topic:authentication"
+    "crossing:flow:process:mqtt-broker>process:stream-processor>consume-topic",
+    "unknown:flow:process:mqtt-broker>process:stream-processor>consume-topic:authentication"
   ],
   "quotes": [
     {
@@ -121,7 +121,7 @@ Written against exemplar system B. The submitter's own words are the trigger her
   "mitigations": [
     {
       "summary": "Record the topic authorization model, then enforce it",
-      "detail": "Establish what governs publish and subscribe on `flow:mqtt-broker-to-stream-processor:consume-topic`; if nothing does, restrict each credential to its own fleet's topics."
+      "detail": "Establish what governs publish and subscribe on `flow:process:mqtt-broker>process:stream-processor>consume-topic`; if nothing does, restrict each credential to its own fleet's topics."
     },
     {
       "summary": "Make the processor verify what it consumed",

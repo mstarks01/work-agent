@@ -78,12 +78,12 @@ Not part of the question, but the records cite these names, so you need them.
 
 | id | source | destination | protocol | authentication | in transit |
 |---|---|---|---|---|---|
-| flow:insurance-partner-to-landing-bucket:push-daily-extract | entity:insurance-partner | store:landing-bucket | SFTP | static per-partner key issued at onboarding, never rotated | SSH transport (SFTP) |
-| flow:ingest-scheduler-to-landing-bucket:list-and-read-files | process:ingest-scheduler | store:landing-bucket | object storage API | unknown | unknown |
-| flow:ingest-scheduler-to-airflow-metadata-database:read-connections | process:ingest-scheduler | store:airflow-metadata-database | unknown | unknown | unknown |
-| flow:ingest-scheduler-to-spark-transform-job:trigger-transform | process:ingest-scheduler | process:spark-transform-job | unknown | unknown | unknown |
-| flow:spark-transform-job-to-claims-warehouse:load-records | process:spark-transform-job | store:claims-warehouse | BigQuery API | unknown | unknown |
-| flow:data-analyst-to-claims-warehouse:run-queries | entity:data-analyst | store:claims-warehouse | BigQuery API | company SSO; dataset-wide grant with no column-level restriction | unknown |
+| flow:entity:insurance-partner>store:landing-bucket>push-daily-extract | entity:insurance-partner | store:landing-bucket | SFTP | static per-partner key issued at onboarding, never rotated | SSH transport (SFTP) |
+| flow:process:ingest-scheduler>store:landing-bucket>list-and-read-files | process:ingest-scheduler | store:landing-bucket | object storage API | unknown | unknown |
+| flow:process:ingest-scheduler>store:airflow-metadata-database>read-connections | process:ingest-scheduler | store:airflow-metadata-database | unknown | unknown | unknown |
+| flow:process:ingest-scheduler>process:spark-transform-job>trigger-transform | process:ingest-scheduler | process:spark-transform-job | unknown | unknown | unknown |
+| flow:process:spark-transform-job>store:claims-warehouse>load-records | process:spark-transform-job | store:claims-warehouse | BigQuery API | unknown | unknown |
+| flow:entity:data-analyst>store:claims-warehouse>run-queries | entity:data-analyst | store:claims-warehouse | BigQuery API | company SSO; dataset-wide grant with no column-level restriction | unknown |
 
 **Trust boundaries**
 
@@ -99,7 +99,7 @@ Not part of the question, but the records cite these names, so you need them.
 
 **Assumptions**
 
-- `flow:insurance-partner-to-landing-bucket:push-daily-extract` — SFTP traffic from partners is protected by the SSH transport it runs over. (basis: The text names SFTP, whose transport encryption is intrinsic to the protocol; no other transport claim is made.)
+- `flow:entity:insurance-partner>store:landing-bucket>push-daily-extract` — SFTP traffic from partners is protected by the SSH transport it runs over. (basis: The text names SFTP, whose transport encryption is intrinsic to the protocol; no other transport claim is made.)
 - `store:claims-warehouse` — The claims data is health-related personal data. (basis: Described as insurance claim records carrying member names and dates of birth.)
 
 **Reviewed aliases** — other names a reader ruled identify the same element, each with the words in the source that support it. An extraction using one is named differently, not wrong.
@@ -142,7 +142,7 @@ on either of them. That is the finding this sitting exists for.
 
 **1.** An attacker who obtains a partner's never-rotated static SFTP key uploads extracts as that partner.
 
-- `flow:insurance-partner-to-landing-bucket:push-daily-extract`, `entity:insurance-partner`
+- `flow:entity:insurance-partner>store:landing-bucket>push-daily-extract`, `entity:insurance-partner`
 - severity: medium/high · verb: `use-credential`
 - Long-lived shared secret held by a third party; the primary identity weakness on the ingest path. The attacker holds a key they were not issued, which is use-credential rather than impersonate.
 
@@ -158,7 +158,7 @@ on either of them. That is the finding this sitting exists for.
 
 **3.** An attacker submits a transform run impersonating the scheduler, since authentication on the trigger path is unverified.
 
-- `flow:ingest-scheduler-to-spark-transform-job:trigger-transform`
+- `flow:process:ingest-scheduler>process:spark-transform-job>trigger-transform`
 - severity: low/medium · verb: `impersonate`
 - Crosses landing into warehouse with unknown authentication.
 
@@ -177,7 +177,7 @@ on either of them. That is the finding this sitting exists for.
 
 **5.** An attacker who can write to the Airflow metadata database rewrites a connection string to redirect the pipeline to infrastructure they control.
 
-- `store:airflow-metadata-database`, `flow:ingest-scheduler-to-airflow-metadata-database:read-connections`
+- `store:airflow-metadata-database`, `flow:process:ingest-scheduler>store:airflow-metadata-database>read-connections`
 - severity: low/high · verb: `alter`
 - The metadata database is a control plane, not just a data store — worth its own finding.
 
@@ -185,7 +185,7 @@ on either of them. That is the finding this sitting exists for.
 
 **6.** An attacker who compromises the transform job writes fabricated claim rows into the warehouse alongside genuine ones.
 
-- `store:claims-warehouse`, `flow:spark-transform-job-to-claims-warehouse:load-records`
+- `store:claims-warehouse`, `flow:process:spark-transform-job>store:claims-warehouse>load-records`
 - severity: low/high · verb: `forge`
 - The load path has unverified authentication and no downstream reconciliation.
 
@@ -215,7 +215,7 @@ on either of them. That is the finding this sitting exists for.
 
 **9.** An analyst who needs only aggregate figures reads member names and dates of birth, because the grant covers the whole dataset.
 
-- `store:claims-warehouse`, `flow:data-analyst-to-claims-warehouse:run-queries`
+- `store:claims-warehouse`, `flow:entity:data-analyst>store:claims-warehouse>run-queries`
 - severity: high/high · verb: `abuse-grant`
 - Stated absence of column-level restriction over health data; the highest-likelihood disclosure in the model.
 
@@ -239,7 +239,7 @@ on either of them. That is the finding this sitting exists for.
 
 **12.** An attacker observing the load path reads claim records in transit, because transport encryption on it is unverified.
 
-- `flow:spark-transform-job-to-claims-warehouse:load-records`
+- `flow:process:spark-transform-job>store:claims-warehouse>load-records`
 - severity: low/high · verb: `intercept`
 - Intra-zone, so lower likelihood than the crossing flows.
 
@@ -277,7 +277,7 @@ on either of them. That is the finding this sitting exists for.
 
 **16.** An attacker who can plant a file in the landing bucket gains execution in the warehouse network through the job it triggers.
 
-- `process:spark-transform-job`, `flow:ingest-scheduler-to-spark-transform-job:trigger-transform`
+- `process:spark-transform-job`, `flow:process:ingest-scheduler>process:spark-transform-job>trigger-transform`
 - severity: medium/high · verb: `escalate`
 - Data crossing into a compute zone that acts on it is the boundary crossing that matters here.
 
@@ -336,8 +336,8 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "df7757178c394258cbcf1643e81fca5b01f324058a0841824f008e74346da2d0",
-      "model.json": "73e08617511dd8060f92ed958164f3a5f107575795e0c43ecca8228b852f80db",
-      "claims/stride.json": "0d114c8ed9d6a003b1164eec306bcd90ac9e83c435c08196159e099722b80d69"
+      "model.json": "4cc4e9095e0003827944cc231b4ef8827b184421b138551069e40d4974d5603e",
+      "claims/stride.json": "47ff8bbda7f4ddda4ac89fa54e207db321fccfa05d93dbe04ada85f6a7597857"
       }
     }
   }

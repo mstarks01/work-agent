@@ -220,9 +220,9 @@ class TestTheTransportCarriesTheSameFacts:
 
         assert codes(issues) == []
         assert [flow.id for flow in model.data_flows] == [
-            "flow:customer-to-web-app:login",
-            "flow:web-app-to-orders-db:store-order",
-            "flow:web-app-to-orders-db:read-order",
+            "flow:entity:customer>process:web-app>login",
+            "flow:process:web-app>store:orders-db>store-order",
+            "flow:process:web-app>store:orders-db>read-order",
         ]
 
 

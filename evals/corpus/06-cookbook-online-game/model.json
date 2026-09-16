@@ -113,7 +113,7 @@
   ],
   "data_flows": [
     {
-      "id": "flow:player-to-game-client:launch-and-play",
+      "id": "flow:entity:player>process:game-client>launch-and-play",
       "name": "launch and play",
       "description": "Player launches the client and plays through it.",
       "assets": [],
@@ -128,7 +128,7 @@
       "operations": "read-write"
     },
     {
-      "id": "flow:game-client-to-lobby:matchmaking",
+      "id": "flow:process:game-client>process:lobby>matchmaking",
       "name": "matchmaking",
       "description": "Client connects out to the lobby to be placed in a match.",
       "assets": [],
@@ -143,7 +143,7 @@
       "operations": "unknown"
     },
     {
-      "id": "flow:game-client-to-game-server:gameplay-traffic",
+      "id": "flow:process:game-client>process:game-server>gameplay-traffic",
       "name": "gameplay traffic",
       "description": "Client connects directly to the match server for the duration of a match.",
       "assets": [],
@@ -158,7 +158,7 @@
       "operations": "unknown"
     },
     {
-      "id": "flow:lobby-to-game-server:hand-over-match",
+      "id": "flow:process:lobby>process:game-server>hand-over-match",
       "name": "hand over match",
       "description": "Lobby hands a formed match to a game server.",
       "assets": [],
@@ -173,7 +173,7 @@
       "operations": "write"
     },
     {
-      "id": "flow:lobby-to-player-database:read-players",
+      "id": "flow:process:lobby>store:player-database>read-players",
       "name": "read players",
       "description": "Lobby reads player records to form a match.",
       "assets": [
@@ -190,7 +190,7 @@
       "operations": "read"
     },
     {
-      "id": "flow:game-server-to-stats-database:read-write-stats",
+      "id": "flow:process:game-server>store:stats-database>read-write-stats",
       "name": "read write stats",
       "description": "Game servers record match statistics.",
       "assets": [
@@ -207,7 +207,7 @@
       "operations": "read-write"
     },
     {
-      "id": "flow:game-server-to-player-database:update-players",
+      "id": "flow:process:game-server>store:player-database>update-players",
       "name": "update players",
       "description": "Game servers write match outcomes back onto player records.",
       "assets": [
@@ -225,7 +225,7 @@
       "operations": "write"
     },
     {
-      "id": "flow:customer-support-staff-to-moderation-website:moderate-accounts",
+      "id": "flow:entity:customer-support-staff>process:moderation-website>moderate-accounts",
       "name": "moderate accounts",
       "description": "Support staff review and act on player accounts.",
       "assets": [
@@ -242,7 +242,7 @@
       "operations": "read-write"
     },
     {
-      "id": "flow:moderation-website-to-player-database:read-write-players",
+      "id": "flow:process:moderation-website>store:player-database>read-write-players",
       "name": "read write players",
       "description": "Moderation website reads and writes player records directly.",
       "assets": [

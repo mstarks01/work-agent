@@ -35,7 +35,7 @@
       "ruling": "The source identifies the scheduling partner as another company. 'Platform' is an additional abstraction supplied by the corpus."
     },
     {
-      "element": "flow:dispatch-console-to-dispatch-api:dispatch-requests",
+      "element": "flow:process:dispatch-console>process:dispatch-api>dispatch-requests",
       "name": "call api",
       "excerpt": "The console calls the dispatch API.",
       "ruling": "The ordinary console-to-API interaction. A flow alias pairs only between the same aligned endpoints, and it credits this flow alone: the WebSocket flow stands separately and one undifferentiated flow cannot receive credit for both. Ruled by the maintainer on 2026-09-16 (#961 step 6)."

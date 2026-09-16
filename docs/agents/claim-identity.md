@@ -38,6 +38,17 @@ dropped. The corpus carries one finding cited as a flow by one writer and as the
 process at the end of that flow by another; without this they fingerprint
 differently and one finding becomes two.
 
+**A flow's own identity is versioned too, and separately.** A claim fingerprint
+reads a cited flow through the model's flow map, so a change to how a flow ID is
+spelled moves no fingerprint — which is why the two versions are independent
+tables rather than one. `analysis_service.system_model.FLOW_ID_RULES` holds each
+version's shape, its builder and its decoder, `FLOW_ID_VERSION` is the one the
+service writes, and `flow_id_version` says which rule wrote any single ID
+because the versions' shapes are disjoint by construction. A version's decoder
+never leaves the table: archived reports and archived emissions hold earlier
+spellings and are still read. `evals/harness/flow_ids.py` moves a corpus from
+one version to another, and ADR 0037 is the decision.
+
 ## Why the verb, and what it is worth
 
 Elements alone cannot separate a read from a write against one store. The

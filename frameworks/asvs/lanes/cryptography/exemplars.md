@@ -33,13 +33,13 @@ A different primitive from the cipher. The login and the cookie are stated; the 
   "direction": "question",
   "needs_evidence": "code",
   "title": "No hash function is named for the password check or the session token",
-  "description": "V11.4.1 asks that every cryptographic use of a hash — a signature, an HMAC, key derivation, random generation — uses an approved function and never a disallowed one such as MD5. It applies here because `process:web-api` verifies an email-and-password login and issues a session cookie on `flow:customer-to-web-api:submit-payment`, and a password verifier and a token generator each rest on a hash or a KDF. The notes name the mechanism and no function behind it. The requirement applies and the input does not settle it; the code in `process:web-api` that checks a password and mints a token would. This is a separate ruling from V11.3.1: an at-rest cipher mode and a hash function are different primitives.",
+  "description": "V11.4.1 asks that every cryptographic use of a hash — a signature, an HMAC, key derivation, random generation — uses an approved function and never a disallowed one such as MD5. It applies here because `process:web-api` verifies an email-and-password login and issues a session cookie on `flow:entity:customer>process:web-api>submit-payment`, and a password verifier and a token generator each rest on a hash or a KDF. The notes name the mechanism and no function behind it. The requirement applies and the input does not settle it; the code in `process:web-api` that checks a password and mints a token would. This is a separate ruling from V11.3.1: an at-rest cipher mode and a hash function are different primitives.",
   "affected_element_ids": [
     "process:web-api",
-    "flow:customer-to-web-api:submit-payment"
+    "flow:entity:customer>process:web-api>submit-payment"
   ],
   "evidence_refs": [
-    "crossing:flow:customer-to-web-api:submit-payment"
+    "crossing:flow:entity:customer>process:web-api>submit-payment"
   ],
   "quotes": [
     {

@@ -120,7 +120,10 @@ def test_crossings_and_unknown_controls_are_counted_against_citations(
     draft = sample_draft(
         "T-01",
         category="tampering",
-        affected_element_ids=["flow:customer-to-web-app:login", "store:orders-db"],
+        affected_element_ids=[
+            "flow:entity:customer>process:web-app>login",
+            "store:orders-db",
+        ],
         grounds=[
             Ground(
                 kind="unknown-attribute",

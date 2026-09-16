@@ -10,7 +10,7 @@ Applying these in reverse to `model.json` reconstructs the bootstrap artifact.
 | 3 | `flow:model-server-to-model-registry:load-artifact` | (absent) | present | The bootstrap folded artifact loading into the model server's `description` instead of modelling it as a flow, which would have left the case's headline threat with no flow to attach to. |
 | 4 | `store:inference-log.assets` | `[]` | `["pii"]` | Named as a debugging log, so the bootstrap treated it as operational data despite the text stating it holds whatever end users typed. |
 | 5 | `entity:ml-engineer.trust_zone` | `boundary:public-internet` | `boundary:model-network` + assumption | Neither zone is stated. The bootstrap picked one silently; blessed picks the one the text better supports and records the inference. |
-| 6 | `flow:calling-service-to-inference-gateway:submit-inference-request.authentication` | `API key` | `per-team API key in a header, never expired or rotated` | "We have never expired one" is the fact that raises this from routine to must-find. |
+| 6 | `flow:entity:calling-service>process:inference-gateway>submit-inference-request.authentication` | `API key` | `per-team API key in a header, never expired or rotated` | "We have never expired one" is the fact that raises this from routine to must-find. |
 
 ## Signal
 
@@ -32,8 +32,8 @@ follows one ruling, and `facts.json` changed with it.
 
 | # | Path | Before | After | Ruling |
 |---|---|---|---|---|
-| 7 | `flow:calling-service-to-inference-gateway:submit-inference-request.authentication` | `... never expired or rotated` | `...; operator reports never having expired a key` | "We have never expired one" reports the operator's past actions. Neither rotation nor automatic expiry follows from it. The V13.2.1 reference claim says the same. |
-| 8 | `flow:calling-service-to-inference-gateway:submit-inference-request.protocol` | `HTTPS` | `unknown` | An internet-facing FastAPI service and an API-key header establish neither HTTPS nor transport encryption. The V4.1.1 note says the same. |
+| 7 | `flow:entity:calling-service>process:inference-gateway>submit-inference-request.authentication` | `... never expired or rotated` | `...; operator reports never having expired a key` | "We have never expired one" reports the operator's past actions. Neither rotation nor automatic expiry follows from it. The V13.2.1 reference claim says the same. |
+| 8 | `flow:entity:calling-service>process:inference-gateway>submit-inference-request.protocol` | `HTTPS` | `unknown` | An internet-facing FastAPI service and an API-key header establish neither HTTPS nor transport encryption. The V4.1.1 note says the same. |
 | 9 | `process:model-server.exposure` | `internal` | `unknown` + note | "Meant to be reachable only from the gateway" is an intended restriction. Membership in the model network is stated; enforcement is not. |
 | 10 | `entity:ml-engineer` assumption | basis said the registry "is stated to sit in the model network" | a placeholder the schema requires | Publishing to a bucket does not locate the publisher, and the source never locates the bucket. The zone stays because the schema needs one; `facts.json` reads it unknown. |
 | 11 | `store:model-registry-bucket.data_classification` | `internal` | `unknown` | "Model artifacts" settles no sensitivity, and the scheme's `internal` needs a finding that disclosure harms no outside party. |
@@ -51,7 +51,7 @@ against `source.md`. Four values changed in `model.json` with the rulings:
 
 | # | Path | Before | After | Ruling |
 |---|---|---|---|---|
-| 14 | `flow:model-server-to-redis-feature-store:read-features.authentication` | `none` | `unknown` + note | "Redis has no password on it" establishes the absence of password authentication, not the absence of every mechanism. |
+| 14 | `flow:process:model-server>store:redis-feature-store>read-features.authentication` | `none` | `unknown` + note | "Redis has no password on it" establishes the absence of password authentication, not the absence of every mechanism. |
 | 15 | `store:model-registry-bucket.trust_zone` | no assumption | placeholder assumption | Loading artifacts from a bucket does not establish co-location. |
 | 16 | `process:inference-gateway.trust_zone` | no assumption | placeholder assumption | Internet exposure does not establish a separate serving-edge network. |
 | 17 | `store:inference-log.trust_zone` | no assumption | placeholder assumption | Writing to BigQuery does not place it in the gateway's network. |

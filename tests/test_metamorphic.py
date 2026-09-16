@@ -33,6 +33,7 @@ from analysis_service.report import Report
 from analysis_service.sources import DEFAULT_DESCRIPTION_LABEL
 from analysis_service.system_model import ELEMENT_GROUPS, SystemModel
 from analysis_service.validation import parse_and_validate
+from evals.harness.flow_ids import rewrite_text
 from tests.factories import sample_draft, valid_model
 from tests.test_structural_readers import sound_report
 
@@ -213,10 +214,14 @@ def test_a_stable_renaming_maps_every_derived_key_one_to_one(seed):
     )
     assert len(set(id_map.values())) == len(id_map)
 
+    # Through the migration's own substitution rather than a plain ``replace``.
+    # A flow ID carries its endpoints' full IDs, so renaming ``entity:a`` to
+    # ``entity:a-renamed`` inside a ref that already holds the new spelling
+    # applies twice and produces ``entity:a-renamed-renamed``. One reader of
+    # "where does an ID occur in text", and it is the one the corpus migration
+    # runs.
     def translate(ref: str) -> str:
-        for old, new in sorted(id_map.items(), key=lambda kv: -len(kv[0])):
-            ref = ref.replace(old, new)
-        return ref
+        return rewrite_text(ref, id_map)
 
     assert {translate(k) for k in evidence_catalog(before)} == set(
         evidence_catalog(after)

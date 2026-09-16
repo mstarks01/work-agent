@@ -283,7 +283,9 @@ GROUNDS: dict[str, Ground] = {
     "absent-attribute": Ground(
         kind="absent-attribute", element_id="process:api", attribute="authentication"
     ),
-    "derived-fact": Ground(kind="derived-fact", flow_id="flow:a-to-b:submit"),
+    "derived-fact": Ground(
+        kind="derived-fact", flow_id="flow:process:a>process:b>submit"
+    ),
     "absent-element": Ground(kind="absent-element", term="directory service"),
     "assertion": Ground(
         kind="assertion",

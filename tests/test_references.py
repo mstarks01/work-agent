@@ -5,7 +5,12 @@ import pytest
 from analysis_service.references import canonical, fold
 
 ELEMENT_IDS = frozenset(
-    {"entity:customer", "process:web-app", "store:orders-db", "flow:a-to-b:x"}
+    {
+        "entity:customer",
+        "process:web-app",
+        "store:orders-db",
+        "flow:process:a>process:b>x",
+    }
 )
 
 

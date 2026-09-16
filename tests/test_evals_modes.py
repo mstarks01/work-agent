@@ -56,9 +56,12 @@ from analysis_service.grounding import verify_quote
 from analysis_service.report import Report
 from analysis_service.sampling import load_sampling
 from analysis_service.system_model import (
+    FLOW_DELIMITER,
     ZONE_ATTRIBUTE,
     ModelIndex,
     SystemModel,
+    flow_label,
+    make_flow_id,
     normalize_element_ids,
 )
 from analysis_service.validation import validate
@@ -315,7 +318,7 @@ def test_analysis_mode_injects_the_blessed_model_at_prepare(case):
     assert "extract" not in models
     assert report.system_model == case.model
     spoofing = models[analyze_node_name("stride", "spoofing")].seen[0]
-    assert "flow:shopper-to-storefront-api:place-order" in spoofing
+    assert "flow:entity:shopper>process:storefront-api>place-order" in spoofing
 
 
 def test_analysis_mode_output_passes_the_tier_1_gates(case):
@@ -614,7 +617,7 @@ class TestAProjectionIsComparedTheWayItsFieldSays:
     def test_an_explicit_absence_is_its_own_denominator(self):
         """Case 01's gRPC hop is unauthenticated, and the sources say so."""
         golden = load_case(CORPUS / self.CASE)
-        flow = "flow:storefront-api-to-order-service:submit-order"
+        flow = "flow:process:storefront-api>process:order-service>submit-order"
         reachable = modes.reachable_controls(golden.model)
 
         assert reachable[flow, "authentication"] == "absent"
@@ -625,7 +628,7 @@ class TestAProjectionIsComparedTheWayItsFieldSays:
 
     def test_asserting_the_absence_agrees_in_the_absent_stratum(self):
         golden = load_case(CORPUS / self.CASE)
-        flow = "flow:storefront-api-to-order-service:submit-order"
+        flow = "flow:process:storefront-api>process:order-service>submit-order"
         catalog = self.resolved(
             golden,
             [
@@ -766,7 +769,7 @@ def test_an_invented_control_is_caught_where_the_blessed_model_says_unknown(case
 
     assert [check.to_json() for check in score.differing] == [
         {
-            "element": "flow:card-processor-to-storefront-api:settlement-webhook",
+            "element": "flow:entity:card-processor>process:storefront-api>settlement-webhook",
             "attribute": "authentication",
             "blessed": "unverified",
             "extracted": "stated",
@@ -1161,7 +1164,7 @@ class TestTheEndpointReadingOfAnExtraction:
     """A flow's identity is its endpoints; its label describes it (#293).
 
     Two models on the same corpus both missed
-    ``flow:card-processor-to-storefront-api:settlement-webhook`` and both
+    ``flow:entity:card-processor>process:storefront-api>settlement-webhook`` and both
     emitted those exact endpoints under another label. Strictly that is a miss
     *and* an invention for one flow that was found. The strict reading is right
     for a report reader — an ID that does not resolve does not resolve — and
@@ -1181,8 +1184,8 @@ class TestTheEndpointReadingOfAnExtraction:
     def test_a_relabelled_flow_stops_being_both_a_miss_and_an_invention(self):
         """The defect the reading exists for, at its smallest."""
         s = self.score(
-            missing=("flow:a-to-b:settlement-webhook",),
-            extra=("flow:a-to-b:payment-webhook",),
+            missing=("flow:process:a>process:b>settlement-webhook",),
+            extra=("flow:process:a>process:b>payment-webhook",),
         )
 
         assert s.recall == 0.0
@@ -1192,10 +1195,13 @@ class TestTheEndpointReadingOfAnExtraction:
 
     def test_a_genuinely_missed_flow_stays_missed(self):
         """Folding the label must not forgive an endpoint pair nobody emitted."""
-        s = self.score(missing=("flow:a-to-b:x",), extra=("flow:c-to-d:y",))
+        s = self.score(
+            missing=("flow:process:a>process:b>x",),
+            extra=("flow:process:c>process:d>y",),
+        )
 
-        assert s.endpoint_missing == frozenset({"flow:a-to-b"})
-        assert s.endpoint_extra == frozenset({"flow:c-to-d"})
+        assert s.endpoint_missing == frozenset({"flow:process:a>process:b"})
+        assert s.endpoint_extra == frozenset({"flow:process:c>process:d"})
         assert s.endpoint_recall == 0.0
 
     def test_nothing_but_flows_is_folded(self):
@@ -1212,7 +1218,9 @@ class TestTheEndpointReadingOfAnExtraction:
 
     def test_the_two_readings_agree_when_no_flow_was_relabelled(self):
         """The reading adds nothing where naming did not drift, which is the point."""
-        s = self.score(matched=("process:a", "flow:a-to-b:x"), missing=("store:c",))
+        s = self.score(
+            matched=("process:a", "flow:process:a>process:b>x"), missing=("store:c",)
+        )
 
         assert s.recall == s.endpoint_recall
 
@@ -1282,11 +1290,23 @@ class TestTheNameFreeReadingOfCrossings:
         is that the key drops the descriptive third segment a live extraction
         gets wrong, and a hand-built flow ID would not prove the corpus's do.
         """
-        keys = modes.crossing_keys(load_case(CORPUS / "01-payments-checkout").model)
+        case = load_case(CORPUS / "01-payments-checkout")
+        keys = modes.crossing_keys(case.model)
 
         assert keys
-        assert all(key.count(":") == 1 for key in keys), keys
         assert all(key.startswith("flow:") for key in keys)
+        # The label is gone and both endpoints survive, asked of the model's own
+        # flows rather than of a segment count: what a flow ID's segments are is
+        # the identity version's business, and a test counting colons pinned one
+        # version's spelling as the property.
+        assert set(keys) == {
+            f"flow:{flow.source}{FLOW_DELIMITER}{flow.destination}"
+            for flow in case.model.data_flows
+            if modes._endpoint_key(flow.id) in keys
+        }
+        assert not any(
+            flow_label(flow.id) in key for flow in case.model.data_flows for key in keys
+        )
 
     def test_a_model_with_no_zones_is_underivable_rather_than_empty(self):
         """``None`` comes from the raise, not from a guess about the input."""
@@ -1688,7 +1708,7 @@ class TestAnExtraElementIsACandidateOrUnreviewedAndNeverARename:
         """
         raw = case.model.model_dump()
         flow = dict(raw["data_flows"][0])
-        flow["id"] = flow["id"].rsplit(":", 1)[0] + ":another-label"
+        flow["id"] = make_flow_id(flow["source"], flow["destination"], "another label")
         flow["name"] = "another label"
         raw["data_flows"].append(flow)
         score = modes.score_extraction(
@@ -1724,7 +1744,9 @@ def test_a_coined_flow_label_is_never_invention(case):
     """
     raw = case.model.model_dump()
     flow = dict(raw["data_flows"][0])
-    flow["id"] = flow["id"].rsplit(":", 1)[0] + ":a-label-no-source-contains"
+    flow["id"] = make_flow_id(
+        flow["source"], flow["destination"], "a label no source contains"
+    )
     flow["name"] = "a label no source contains"
     raw["data_flows"].append(flow)
     widened = type(case.model).model_validate(raw)

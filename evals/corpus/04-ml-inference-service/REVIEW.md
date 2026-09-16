@@ -83,12 +83,12 @@ Not part of the question, but the records cite these names, so you need them.
 
 | id | source | destination | protocol | authentication | in transit |
 |---|---|---|---|---|---|
-| flow:calling-service-to-inference-gateway:submit-inference-request | entity:calling-service | process:inference-gateway | unknown | per-team API key in a header; operator reports never having expired a key | unknown |
-| flow:inference-gateway-to-model-server:forward-request | process:inference-gateway | process:model-server | unknown | none; accepted by network position | unknown |
-| flow:model-server-to-model-registry-bucket:load-artifact | process:model-server | store:model-registry-bucket | object storage API | model server's own service account | unknown |
-| flow:model-server-to-redis-feature-store:read-features | process:model-server | store:redis-feature-store | Redis protocol | unknown | unknown |
-| flow:inference-gateway-to-inference-log:write-request-log | process:inference-gateway | store:inference-log | BigQuery API | unknown | unknown |
-| flow:ml-engineer-to-model-registry-bucket:publish-artifact | entity:ml-engineer | store:model-registry-bucket | object storage API | unknown; possibly a shared group account | unknown |
+| flow:entity:calling-service>process:inference-gateway>submit-inference-request | entity:calling-service | process:inference-gateway | unknown | per-team API key in a header; operator reports never having expired a key | unknown |
+| flow:process:inference-gateway>process:model-server>forward-request | process:inference-gateway | process:model-server | unknown | none; accepted by network position | unknown |
+| flow:process:model-server>store:model-registry-bucket>load-artifact | process:model-server | store:model-registry-bucket | object storage API | model server's own service account | unknown |
+| flow:process:model-server>store:redis-feature-store>read-features | process:model-server | store:redis-feature-store | Redis protocol | unknown | unknown |
+| flow:process:inference-gateway>store:inference-log>write-request-log | process:inference-gateway | store:inference-log | BigQuery API | unknown | unknown |
+| flow:entity:ml-engineer>store:model-registry-bucket>publish-artifact | entity:ml-engineer | store:model-registry-bucket | object storage API | unknown; possibly a shared group account | unknown |
 
 **Trust boundaries**
 
@@ -101,7 +101,7 @@ Not part of the question, but the records cite these names, so you need them.
 **Recorded notes** — hedges, probed gaps and source disagreements live here, so read them before the sets.
 
 - `process:model-server` — The source says the model network is meant to be reachable only from the gateway, which is an intended restriction; nothing states whether the server itself can be reached from outside, so exposure stays unknown.
-- `flow:model-server-to-redis-feature-store:read-features` — The source says Redis has no password on it, which establishes the absence of password authentication and not the absence of every mechanism.
+- `flow:process:model-server>store:redis-feature-store>read-features` — The source says Redis has no password on it, which establishes the absence of password authentication and not the absence of every mechanism.
 
 **Assumptions**
 
@@ -152,14 +152,14 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A2.** `V5.2.1` — Nothing limits the size or type of a model artifact published into the registry.
 
-- `entity:ml-engineer`, `store:model-registry-bucket`, `flow:ml-engineer-to-model-registry-bucket:publish-artifact`
+- `entity:ml-engineer`, `store:model-registry-bucket`, `flow:entity:ml-engineer>store:model-registry-bucket>publish-artifact`
 - An artifact upload path exists; feature:file-upload has a subject here.
 
 > mark:
 
 **A3.** `V5.2.2` — Nothing states what validates a published artifact before the model server loads it.
 
-- `store:model-registry-bucket`, `flow:ml-engineer-to-model-registry-bucket:publish-artifact`
+- `store:model-registry-bucket`, `flow:entity:ml-engineer>store:model-registry-bucket>publish-artifact`
 - The registry is read by an internal server, so an unvalidated artifact is executed content.
 
 > mark:
@@ -169,7 +169,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A4.** `V9.1.1` — The per-team API key carries no claims, so this chapter does not apply to the gateway.
 
-- `entity:calling-service`, `process:inference-gateway`, `flow:calling-service-to-inference-gateway:submit-inference-request`
+- `entity:calling-service`, `process:inference-gateway`, `flow:entity:calling-service>process:inference-gateway>submit-inference-request`
 - The stated credential is an opaque key rather than a self-contained token; the exclusion is the answer.
 
 > mark:
@@ -179,7 +179,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A5.** `V13.2.1` — The calling service authenticates to the inference gateway with a per-team API key that the operator has never expired, an unchanging credential on a backend link.
 
-- `entity:calling-service`, `flow:calling-service-to-inference-gateway:submit-inference-request`
+- `entity:calling-service`, `flow:entity:calling-service>process:inference-gateway>submit-inference-request`
 - Stated outright, so the ruling is plain. V6.2.10 is about user passwords and forbids forced rotation, so it was the wrong home for this fact.
 
 > mark:
@@ -189,7 +189,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A6.** `V8.2.1` — The model server accepts forwarded requests on network position with no stated permission check.
 
-- `process:inference-gateway`, `process:model-server`, `flow:inference-gateway-to-model-server:forward-request`
+- `process:inference-gateway`, `process:model-server`, `flow:process:inference-gateway>process:model-server>forward-request`
 - authentication is stated as none, so the ruling is plain.
 
 > mark:
@@ -209,7 +209,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A8.** `V12.3.3` — The gateway to model server link states neither a protocol nor transport protection.
 
-- `process:inference-gateway`, `process:model-server`, `flow:inference-gateway-to-model-server:forward-request`
+- `process:inference-gateway`, `process:model-server`, `flow:process:inference-gateway>process:model-server>forward-request`
 - protocol and encryption_in_transit are both unknown on an internal crossing.
 
 > mark:
@@ -219,7 +219,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A9.** `V16.2.5` — Nothing states what of an inference request is written to the confidential request log.
 
-- `process:inference-gateway`, `store:inference-log`, `flow:inference-gateway-to-inference-log:write-request-log`
+- `process:inference-gateway`, `store:inference-log`, `flow:process:inference-gateway>store:inference-log>write-request-log`
 - The log is confidential and its content is never described. What reaches the log comes from the call site or from the logging configuration, so either route settles it.
 
 > mark:
@@ -254,7 +254,7 @@ on either of them. That is the finding this sitting exists for.
 
 **1.** An attacker who obtains a never-expiring API key calls the inference gateway as that team indefinitely.
 
-- `flow:calling-service-to-inference-gateway:submit-inference-request`, `entity:calling-service`
+- `flow:entity:calling-service>process:inference-gateway>submit-inference-request`, `entity:calling-service`
 - severity: high/high · verb: `use-credential`
 - Bearer credential with no expiry on an internet-facing endpoint; compromise is permanent until noticed.
 
@@ -262,7 +262,7 @@ on either of them. That is the finding this sitting exists for.
 
 **2.** Any workload inside the model network submits inference requests posing as the gateway, which the model server accepts on network position alone.
 
-- `flow:inference-gateway-to-model-server:forward-request`, `process:model-server`
+- `flow:process:inference-gateway>process:model-server>forward-request`, `process:model-server`
 - severity: medium/high · verb: `impersonate`
 - Stated absence of authentication behind a boundary that is only 'meant to be' closed.
 
@@ -270,7 +270,7 @@ on either of them. That is the finding this sitting exists for.
 
 **3.** An attacker publishes a model artifact under a shared group account with no individual identity behind it.
 
-- `flow:ml-engineer-to-model-registry-bucket:publish-artifact`, `entity:ml-engineer`
+- `flow:entity:ml-engineer>store:model-registry-bucket>publish-artifact`, `entity:ml-engineer`
 - severity: medium/high · verb: `use-credential`
 - Publish authentication is unknown and possibly shared; report as unverified.
 
@@ -281,7 +281,7 @@ on either of them. That is the finding this sitting exists for.
 
 **4.** An attacker who can write to the registry swaps the model artifact and the model server loads it without any integrity verification.
 
-- `store:model-registry-bucket`, `flow:model-server-to-model-registry-bucket:load-artifact`
+- `store:model-registry-bucket`, `flow:process:model-server>store:model-registry-bucket>load-artifact`
 - severity: high/high · verb: `plant`
 - The defining supply-chain finding of this case; the source states verification is absent.
 
@@ -289,7 +289,7 @@ on either of them. That is the finding this sitting exists for.
 
 **5.** An attacker with model-network access writes to the unauthenticated Redis feature store and changes the features a decision is made on.
 
-- `store:redis-feature-store`, `flow:model-server-to-redis-feature-store:read-features`
+- `store:redis-feature-store`, `flow:process:model-server>store:redis-feature-store>read-features`
 - severity: medium/high · verb: `alter`
 - No password is a stated fact, not an unknown; poisoning features silently changes inference output.
 
@@ -297,7 +297,7 @@ on either of them. That is the finding this sitting exists for.
 
 **6.** An attacker inside the model network alters request payloads in flight on the unauthenticated, unencrypted forward path.
 
-- `flow:inference-gateway-to-model-server:forward-request`
+- `flow:process:inference-gateway>process:model-server>forward-request`
 - severity: medium/medium · verb: `alter-in-transit`
 - Same flow as the spoofing entry; the lane difference is modifying content versus assuming identity.
 
@@ -343,7 +343,7 @@ on either of them. That is the finding this sitting exists for.
 
 **11.** A caller crafts a request that makes the model emit customer features belonging to a different tenant.
 
-- `process:model-server`, `flow:calling-service-to-inference-gateway:submit-inference-request`
+- `process:model-server`, `flow:entity:calling-service>process:inference-gateway>submit-inference-request`
 - severity: medium/high · verb: `elicit`
 - Model-mediated disclosure: the gateway authenticates the team but nothing scopes which customers' features a request may pull. Review sitting 01 struck 'or training data' from this claim: no training pipeline exists in this model, and the label set already rules training-time attacks out of scope for this case, so the claim graded the tool against a fact the model does not hold.
 
@@ -351,7 +351,7 @@ on either of them. That is the finding this sitting exists for.
 
 **12.** An attacker on the internal path reads end-user text out of forwarded requests, because transport encryption there is unverified.
 
-- `flow:inference-gateway-to-model-server:forward-request`
+- `flow:process:inference-gateway>process:model-server>forward-request`
 - severity: medium/medium · verb: `intercept`
 - Boundary crossing from serving edge into model network with no stated protection.
 
@@ -362,7 +362,7 @@ on either of them. That is the finding this sitting exists for.
 
 **13.** A caller holding a valid key floods the gateway with inference requests and exhausts the shared GPU capacity behind it.
 
-- `process:inference-gateway`, `flow:calling-service-to-inference-gateway:submit-inference-request`
+- `process:inference-gateway`, `flow:entity:calling-service>process:inference-gateway>submit-inference-request`
 - severity: high/high · verb: `flood`
 - GPU capacity is the scarce, expensive resource; no quota or rate limit per key is described.
 
@@ -456,9 +456,9 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
-      "model.json": "10e1b5ccf291f6fa444881e756d27b6db72938201e7d7c76c6703abfeecb5167",
-      "claims/asvs.json": "af1349bb41be071d6bf58fb4a243a79e50b8ef3e2ed6cd21b8600f01328bdd4e",
-      "claims/stride.json": "288fe3576466a3adc2ee67154a9cfbdc919a60db6264466faba6b6092e05e47a"
+      "model.json": "a9e12699ec65d966f6a5575b1cfbe6f8a75ec694dff1e028b4232e9b27ad3982",
+      "claims/asvs.json": "706763e2a779d88882eb261120141984574e9f0f116b6e94fbac1842798788c9",
+      "claims/stride.json": "3c266c4f193ac011357c62709d2457e256610c29d02e498e0f4adf69fbfde5e1"
       }
     }
   }

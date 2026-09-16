@@ -2,7 +2,7 @@
   {
     "category": "spoofing",
     "affected_element_ids": [
-      "flow:sensor-node-to-device-gateway:publish-readings",
+      "flow:entity:sensor-node>process:device-gateway>publish-readings",
       "entity:sensor-node"
     ],
     "claim": "An attacker who extracts the fleet-wide pre-shared key from any one node publishes readings to the gateway as any other device in the fleet.",
@@ -17,7 +17,7 @@
   {
     "category": "spoofing",
     "affected_element_ids": [
-      "flow:field-technician-to-sensor-node:local-service-session",
+      "flow:entity:field-technician>entity:sensor-node>local-service-session",
       "entity:sensor-node"
     ],
     "claim": "An attacker with physical access presents themselves as a field technician on the node's serial console, whose authentication is unverified.",
@@ -33,7 +33,7 @@
     "category": "spoofing",
     "affected_element_ids": [
       "store:firmware-bucket",
-      "flow:sensor-node-to-firmware-bucket:poll-firmware"
+      "flow:entity:sensor-node>store:firmware-bucket>poll-firmware"
     ],
     "claim": "An attacker serves a node a firmware image that impersonates an official release, because the node authenticates neither the bucket nor the image's origin.",
     "tier": "expected",
@@ -62,7 +62,7 @@
   {
     "category": "tampering",
     "affected_element_ids": [
-      "flow:sensor-node-to-device-gateway:publish-readings",
+      "flow:entity:sensor-node>process:device-gateway>publish-readings",
       "store:telemetry-lake"
     ],
     "claim": "An attacker holding the fleet key injects fabricated readings that the normalizer loads into the lake as genuine customer data.",
@@ -78,7 +78,7 @@
     "category": "tampering",
     "affected_element_ids": [
       "store:device-registry",
-      "flow:device-gateway-to-device-registry:look-up-device"
+      "flow:process:device-gateway>store:device-registry>look-up-device"
     ],
     "claim": "An attacker who can write to the device registry reassigns a node to a different customer, redirecting or corrupting that customer's data.",
     "tier": "expected",
@@ -107,7 +107,7 @@
   {
     "category": "repudiation",
     "affected_element_ids": [
-      "flow:field-technician-to-sensor-node:local-service-session"
+      "flow:entity:field-technician>entity:sensor-node>local-service-session"
     ],
     "claim": "A technician denies having made a configuration change on a node, and the unauthenticated local console records no actor to contradict them.",
     "tier": "expected",
@@ -135,7 +135,7 @@
   {
     "category": "information-disclosure",
     "affected_element_ids": [
-      "flow:sensor-node-to-device-gateway:publish-readings"
+      "flow:entity:sensor-node>process:device-gateway>publish-readings"
     ],
     "claim": "An attacker on the path between a node and the gateway reads readings and the presented key, because transport encryption on the MQTT session is unverified.",
     "tier": "must-find",
@@ -178,7 +178,7 @@
     "category": "denial-of-service",
     "affected_element_ids": [
       "process:device-gateway",
-      "flow:sensor-node-to-device-gateway:publish-readings"
+      "flow:entity:sensor-node>process:device-gateway>publish-readings"
     ],
     "claim": "An attacker floods the internet-exposed MQTT broker with connections until genuine nodes can no longer publish readings.",
     "tier": "must-find",
@@ -223,7 +223,7 @@
     "category": "elevation-of-privilege",
     "affected_element_ids": [
       "entity:sensor-node",
-      "flow:sensor-node-to-firmware-bucket:poll-firmware"
+      "flow:entity:sensor-node>store:firmware-bucket>poll-firmware"
     ],
     "claim": "An attacker turns an unsigned firmware update into code execution on every node, escalating from bucket write access to control of the physical fleet.",
     "tier": "must-find",

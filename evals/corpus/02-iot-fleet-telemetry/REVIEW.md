@@ -84,14 +84,14 @@ Not part of the question, but the records cite these names, so you need them.
 
 | id | source | destination | protocol | authentication | in transit |
 |---|---|---|---|---|---|
-| flow:sensor-node-to-device-gateway:publish-readings | entity:sensor-node | process:device-gateway | MQTT | fleet-wide pre-shared key, shared by every device and never rotated | unknown |
-| flow:device-gateway-to-device-registry:look-up-device | process:device-gateway | store:device-registry | Firestore API | unknown | unknown |
-| flow:telemetry-normalizer-to-telemetry-lake:load-readings | process:telemetry-normalizer | store:telemetry-lake | BigQuery API | unknown | unknown |
-| flow:sensor-node-to-firmware-bucket:poll-firmware | entity:sensor-node | store:firmware-bucket | HTTPS | none; the bucket is public read | unknown |
-| flow:field-technician-to-sensor-node:local-service-session | entity:field-technician | entity:sensor-node | local serial console | unknown | unknown |
-| flow:fleet-operator-to-telemetry-lake:query-dashboards | entity:fleet-operator | store:telemetry-lake | BigQuery API | company SSO | unknown |
-| flow:device-gateway-to-pub-sub:forward-readings | process:device-gateway | store:pub-sub | unknown | unknown | unknown |
-| flow:telemetry-normalizer-to-pub-sub:pick-up-readings | process:telemetry-normalizer | store:pub-sub | unknown | unknown | unknown |
+| flow:entity:sensor-node>process:device-gateway>publish-readings | entity:sensor-node | process:device-gateway | MQTT | fleet-wide pre-shared key, shared by every device and never rotated | unknown |
+| flow:process:device-gateway>store:device-registry>look-up-device | process:device-gateway | store:device-registry | Firestore API | unknown | unknown |
+| flow:process:telemetry-normalizer>store:telemetry-lake>load-readings | process:telemetry-normalizer | store:telemetry-lake | BigQuery API | unknown | unknown |
+| flow:entity:sensor-node>store:firmware-bucket>poll-firmware | entity:sensor-node | store:firmware-bucket | HTTPS | none; the bucket is public read | unknown |
+| flow:entity:field-technician>entity:sensor-node>local-service-session | entity:field-technician | entity:sensor-node | local serial console | unknown | unknown |
+| flow:entity:fleet-operator>store:telemetry-lake>query-dashboards | entity:fleet-operator | store:telemetry-lake | BigQuery API | company SSO | unknown |
+| flow:process:device-gateway>store:pub-sub>forward-readings | process:device-gateway | store:pub-sub | unknown | unknown | unknown |
+| flow:process:telemetry-normalizer>store:pub-sub>pick-up-readings | process:telemetry-normalizer | store:pub-sub | unknown | unknown | unknown |
 
 **Trust boundaries**
 
@@ -148,7 +148,7 @@ on either of them. That is the finding this sitting exists for.
 
 **1.** An attacker who extracts the fleet-wide pre-shared key from any one node publishes readings to the gateway as any other device in the fleet.
 
-- `flow:sensor-node-to-device-gateway:publish-readings`, `entity:sensor-node`
+- `flow:entity:sensor-node>process:device-gateway>publish-readings`, `entity:sensor-node`
 - severity: high/high · verb: `use-credential`
 - The defining finding of this case: one shared, never-rotated key across physically exposed devices. The attacker holds a key they were not issued, which is use-credential rather than impersonate.
 
@@ -156,7 +156,7 @@ on either of them. That is the finding this sitting exists for.
 
 **2.** An attacker with physical access presents themselves as a field technician on the node's serial console, whose authentication is unverified.
 
-- `flow:field-technician-to-sensor-node:local-service-session`, `entity:sensor-node`
+- `flow:entity:field-technician>entity:sensor-node>local-service-session`, `entity:sensor-node`
 - severity: medium/high · verb: `impersonate`
 - Physical exposure is stated in the source; console authentication is unknown, so it must be reported unverified.
 
@@ -164,7 +164,7 @@ on either of them. That is the finding this sitting exists for.
 
 **3.** An attacker serves a node a firmware image that impersonates an official release, because the node authenticates neither the bucket nor the image's origin.
 
-- `store:firmware-bucket`, `flow:sensor-node-to-firmware-bucket:poll-firmware`
+- `store:firmware-bucket`, `flow:entity:sensor-node>store:firmware-bucket>poll-firmware`
 - severity: medium/high · verb: `forge`
 - Origin authentication, as distinct from the tampering entry about modifying an image in place.
 
@@ -183,7 +183,7 @@ on either of them. That is the finding this sitting exists for.
 
 **5.** An attacker holding the fleet key injects fabricated readings that the normalizer loads into the lake as genuine customer data.
 
-- `flow:sensor-node-to-device-gateway:publish-readings`, `store:telemetry-lake`
+- `flow:entity:sensor-node>process:device-gateway>publish-readings`, `store:telemetry-lake`
 - severity: high/medium · verb: `forge`
 - Data integrity downstream of a spoofable device identity; distinct from the spoofing lane's identity claim.
 
@@ -191,7 +191,7 @@ on either of them. That is the finding this sitting exists for.
 
 **6.** An attacker who can write to the device registry reassigns a node to a different customer, redirecting or corrupting that customer's data.
 
-- `store:device-registry`, `flow:device-gateway-to-device-registry:look-up-device`
+- `store:device-registry`, `flow:process:device-gateway>store:device-registry>look-up-device`
 - severity: low/high · verb: `alter`
 - The registry is the authority for tenancy; its own access control is unverified.
 
@@ -210,7 +210,7 @@ on either of them. That is the finding this sitting exists for.
 
 **8.** A technician denies having made a configuration change on a node, and the unauthenticated local console records no actor to contradict them.
 
-- `flow:field-technician-to-sensor-node:local-service-session`
+- `flow:entity:field-technician>entity:sensor-node>local-service-session`
 - severity: medium/medium · verb: `unattributable`
 - No logging is described anywhere on the service path.
 
@@ -229,7 +229,7 @@ on either of them. That is the finding this sitting exists for.
 
 **10.** An attacker on the path between a node and the gateway reads readings and the presented key, because transport encryption on the MQTT session is unverified.
 
-- `flow:sensor-node-to-device-gateway:publish-readings`
+- `flow:entity:sensor-node>process:device-gateway>publish-readings`
 - severity: medium/high · verb: `intercept`
 - The same wire carries the credential and the data; a needs-info verdict on encryption is acceptable.
 
@@ -256,7 +256,7 @@ on either of them. That is the finding this sitting exists for.
 
 **13.** An attacker floods the internet-exposed MQTT broker with connections until genuine nodes can no longer publish readings.
 
-- `process:device-gateway`, `flow:sensor-node-to-device-gateway:publish-readings`
+- `process:device-gateway`, `flow:entity:sensor-node>process:device-gateway>publish-readings`
 - severity: high/high · verb: `flood`
 - The gateway is the single ingest point for the whole fleet and is tagged availability-critical.
 
@@ -283,7 +283,7 @@ on either of them. That is the finding this sitting exists for.
 
 **16.** An attacker turns an unsigned firmware update into code execution on every node, escalating from bucket write access to control of the physical fleet.
 
-- `entity:sensor-node`, `flow:sensor-node-to-firmware-bucket:poll-firmware`
+- `entity:sensor-node`, `flow:entity:sensor-node>store:firmware-bucket>poll-firmware`
 - severity: high/high · verb: `escalate`
 - The escalation framing of the firmware finding: privilege gained, not just data changed.
 
@@ -350,8 +350,8 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "fc745e273aff8be740a814f0a9b4a45d6f3c6fe39dc7c8efa2b879d4f270ac74",
-      "model.json": "6a956e155cf39c92c9021f5f5ed386c858d4788a2a20d9d717d428b76ea0747a",
-      "claims/stride.json": "bde9c43b971a6a77370e399214b273d8b005ef4a01e2fe7ca99b62a47c35729e"
+      "model.json": "41078fc5cbf143a5581c7a54baeae135774430edb713a5b7ee6e6938768e2632",
+      "claims/stride.json": "2bce750ba6ddc1307074a289e48c4591c59f7f2883ff687d9bd98e4f5e7db675"
       }
     }
   }

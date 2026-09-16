@@ -2,7 +2,7 @@
   {
     "category": "spoofing",
     "affected_element_ids": [
-      "flow:supplier-to-supplier-portal:upload-documents",
+      "flow:entity:supplier>process:supplier-portal>upload-documents",
       "entity:supplier"
     ],
     "claim": "An attacker who obtains a supplier's vendor-issued password signs in as that supplier and uploads paperwork in their name.",
@@ -17,7 +17,7 @@
   {
     "category": "spoofing",
     "affected_element_ids": [
-      "flow:category-manager-to-supplier-portal:review-documents",
+      "flow:entity:category-manager>process:supplier-portal>review-documents",
       "entity:category-manager"
     ],
     "claim": "An attacker signs in to the portal as a category manager and approves supplier paperwork, because how category managers are authenticated is unverified.",
@@ -32,7 +32,7 @@
   {
     "category": "spoofing",
     "affected_element_ids": [
-      "flow:portal-vendor-to-landing-bucket:push-nightly-extract",
+      "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract",
       "store:landing-bucket"
     ],
     "claim": "An attacker writes a file into the landing bucket while posing as the vendor's nightly push, since how the bucket identifies the writer is unverified.",
@@ -48,7 +48,7 @@
     "category": "tampering",
     "affected_element_ids": [
       "store:landing-bucket",
-      "flow:supplier-master-service-to-landing-bucket:load-extract"
+      "flow:process:supplier-master-service>store:landing-bucket>load-extract"
     ],
     "claim": "An attacker modifies the extract file in the landing bucket before the supplier master service loads it, and the altered supplier records reach the database.",
     "tier": "must-find",
@@ -62,7 +62,7 @@
   {
     "category": "tampering",
     "affected_element_ids": [
-      "flow:portal-vendor-to-landing-bucket:push-nightly-extract"
+      "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract"
     ],
     "claim": "An attacker on the path of the nightly push alters the extract in transit, because the source contradicts itself over whether that transfer is encrypted.",
     "tier": "must-find",
@@ -77,7 +77,7 @@
     "category": "tampering",
     "affected_element_ids": [
       "store:document-store",
-      "flow:supplier-portal-to-document-store:store-documents"
+      "flow:process:supplier-portal>store:document-store>store-documents"
     ],
     "claim": "An attacker with access inside the vendor platform alters a stored compliance document so a supplier appears certified when they are not.",
     "tier": "expected",
@@ -91,7 +91,7 @@
   {
     "category": "repudiation",
     "affected_element_ids": [
-      "flow:category-manager-to-supplier-portal:review-documents",
+      "flow:entity:category-manager>process:supplier-portal>review-documents",
       "process:supplier-portal"
     ],
     "claim": "A category manager denies having approved a supplier's paperwork, and the model holds no audit record we control or can produce.",
@@ -107,7 +107,7 @@
     "category": "repudiation",
     "affected_element_ids": [
       "entity:portal-vendor",
-      "flow:portal-vendor-to-landing-bucket:push-nightly-extract"
+      "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract"
     ],
     "claim": "The vendor disputes what a given nightly extract contained when it left their platform, and nothing on our side records what arrived.",
     "tier": "expected",
@@ -150,7 +150,7 @@
   {
     "category": "information-disclosure",
     "affected_element_ids": [
-      "flow:supplier-to-supplier-portal:upload-documents"
+      "flow:entity:supplier>process:supplier-portal>upload-documents"
     ],
     "claim": "An attacker on the network path between a supplier and the portal reads uploaded paperwork in transit, because whether that traffic is encrypted is unverified.",
     "tier": "expected",
@@ -194,7 +194,7 @@
   {
     "category": "elevation-of-privilege",
     "affected_element_ids": [
-      "flow:supplier-to-supplier-portal:upload-documents",
+      "flow:entity:supplier>process:supplier-portal>upload-documents",
       "process:supplier-portal"
     ],
     "claim": "A signed-in supplier reaches another supplier's compliance documents through the portal, because no separation between supplier tenants is stated.",
@@ -209,7 +209,7 @@
   {
     "category": "elevation-of-privilege",
     "affected_element_ids": [
-      "flow:supplier-master-service-to-landing-bucket:load-extract",
+      "flow:process:supplier-master-service>store:landing-bucket>load-extract",
       "process:supplier-master-service"
     ],
     "claim": "An attacker uses the contents of the extract file to make the supplier master service act beyond what a data load should do, since the file is consumed as-is.",

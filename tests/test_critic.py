@@ -33,7 +33,7 @@ LABEL = DEFAULT_DESCRIPTION_LABEL
 # The job's one source, as the executor hands it to the fan-in.
 SOURCES = {LABEL: "Customers log in to the web app, which stores orders."}
 # A flow the sample model really derives as a boundary crossing.
-CROSSING = "flow:customer-to-web-app:login"
+CROSSING = "flow:entity:customer>process:web-app>login"
 
 
 @pytest.fixture
@@ -53,8 +53,8 @@ class TestMentionedIds:
         [
             ("An attacker reaches process:web-app.", ["process:web-app"]),
             (
-                "Rides `flow:customer-to-web-app:login` inward.",
-                ["flow:customer-to-web-app:login"],
+                "Rides `flow:entity:customer>process:web-app>login` inward.",
+                ["flow:entity:customer>process:web-app>login"],
             ),
             (
                 "From entity:customer through process:web-app to store:orders-db",
@@ -443,7 +443,7 @@ class TestRulingsMergeOntoDrafts:
             "S-01",
             title="Session cookie theft",
             description="Stolen cookies let an attacker impersonate the customer.",
-            affected_element_ids=["flow:customer-to-web-app:login"],
+            affected_element_ids=["flow:entity:customer>process:web-app>login"],
         )
         (threat,), _ = assemble_claims([draft], [sample_ruling("S-01")], model, SCHEMAS)
         assert threat.title == draft.title
@@ -499,7 +499,12 @@ class TestRulingsMergeOntoDrafts:
 
 
 ELEMENT_IDS = frozenset(
-    {"entity:customer", "process:web-app", "store:orders-db", "flow:a-to-b:x"}
+    {
+        "entity:customer",
+        "process:web-app",
+        "store:orders-db",
+        "flow:process:a>process:b>x",
+    }
 )
 
 
@@ -587,7 +592,7 @@ class TestAnUnknownGroundMakesTheClaimConditional:
                 ),
                 Ground(
                     kind="unknown-attribute",
-                    element_id="flow:customer-to-web-app:login",
+                    element_id="flow:entity:customer>process:web-app>login",
                     attribute="encryption_in_transit",
                 ),
             ],
@@ -959,7 +964,7 @@ def test_ruling_view_keeps_every_field_the_critic_rules_on():
     # Step 5 reads grounds for relevance, so each entry keeps its own branch.
     assert [ground["kind"] for ground in view["grounds"]] == ["quote", "derived-fact"]
     assert view["grounds"][0]["text"] == "Customers log in to the web app"
-    assert view["grounds"][1]["flow_id"] == "flow:customer-to-web-app:login"
+    assert view["grounds"][1]["flow_id"] == "flow:entity:customer>process:web-app>login"
 
 
 def test_ruling_view_drops_a_grounds_empty_branches_and_nothing_else():
@@ -1180,7 +1185,12 @@ def test_ruling_view_carries_the_unit_text_a_package_supplies():
         title="t",
         description="d",
         affected_element_ids=[],
-        grounds=[Ground(kind="derived-fact", flow_id="flow:customer-to-web-app:login")],
+        grounds=[
+            Ground(
+                kind="derived-fact",
+                flow_id="flow:entity:customer>process:web-app>login",
+            )
+        ],
         verdict=Verdict(status="confirmed"),
     )
     (asvs_view,) = critic._ruling_view([asvs])

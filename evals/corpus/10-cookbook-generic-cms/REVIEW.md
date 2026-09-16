@@ -71,11 +71,11 @@ Not part of the question, but the records cite these names, so you need them.
 
 | id | source | destination | protocol | authentication | in transit |
 |---|---|---|---|---|---|
-| flow:reader-to-web-server:page-requests | entity:reader | process:web-server | HTTPS | sign-in exists for some readers; the mechanism, its strength and how sessions are handled are not stated | HTTPS |
-| flow:reader-to-cdn:asset-fetch | entity:reader | entity:cdn | HTTP | unknown | none — readers fetch these over HTTP |
-| flow:web-server-to-mysql-database:cms-data | process:web-server | store:mysql-database | MySQL | unknown | unknown |
-| flow:web-server-to-cdn-bucket:asset-publish | process:web-server | store:cdn-bucket | unknown | unknown | unknown |
-| flow:admin-to-mysql-database:direct-administration | entity:admin | store:mysql-database | MySQL | unknown | none — an unsecured MySQL connection, no TLS on it |
+| flow:entity:reader>process:web-server>page-requests | entity:reader | process:web-server | HTTPS | sign-in exists for some readers; the mechanism, its strength and how sessions are handled are not stated | HTTPS |
+| flow:entity:reader>entity:cdn>asset-fetch | entity:reader | entity:cdn | HTTP | unknown | none — readers fetch these over HTTP |
+| flow:process:web-server>store:mysql-database>cms-data | process:web-server | store:mysql-database | MySQL | unknown | unknown |
+| flow:process:web-server>store:cdn-bucket>asset-publish | process:web-server | store:cdn-bucket | unknown | unknown | unknown |
+| flow:entity:admin>store:mysql-database>direct-administration | entity:admin | store:mysql-database | MySQL | unknown | none — an unsecured MySQL connection, no TLS on it |
 
 **Trust boundaries**
 
@@ -92,7 +92,7 @@ Not part of the question, but the records cite these names, so you need them.
 - `entity:cdn` — The source names no CDN provider and does not say whether it is operated by the same party as the hosted network.
 - `process:web-server` — The source treats 'the web server' and 'the CMS' as one deployed thing; modelled as a single process.
 - `store:mysql-database` — Not tagged credentials: the source says the database holds accounts, and what an account record contains is never stated. Sign-in exists for some readers, but where its secrets live is not described.
-- `flow:web-server-to-cdn-bucket:asset-publish` — The source states outright that how this push is authenticated is not described, which is why the attribute is unknown rather than absent.
+- `flow:process:web-server>store:cdn-bucket>asset-publish` — The source states outright that how this push is authenticated is not described, which is why the attribute is unknown rather than absent.
 
 **Assumptions**
 
@@ -127,14 +127,14 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A1.** `V3.3.1` — Sign-in exists for some readers and no cookie attribute is stated for the session it creates.
 
-- `entity:reader`, `process:web-server`, `flow:reader-to-web-server:page-requests`
+- `entity:reader`, `process:web-server`, `flow:entity:reader>process:web-server>page-requests`
 - The submitter says the mechanism and session handling are not stated, which is the requirement. The attribute is set by whatever emits Set-Cookie, which is the application or the layer in front of it, so either route settles it.
 
 > mark:
 
 **A2.** `V3.4.1` — Assets are fetched over plain HTTP, so no transport security header protects them.
 
-- `process:web-server`, `entity:cdn`, `flow:reader-to-cdn:asset-fetch`
+- `process:web-server`, `entity:cdn`, `flow:entity:reader>entity:cdn>asset-fetch`
 - encryption_in_transit is stated absent on the CDN fetch.
 
 > mark:
@@ -144,7 +144,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A3.** `V7.2.2` — Nothing states how a reader session is represented or generated.
 
-- `entity:reader`, `process:web-server`, `flow:reader-to-web-server:page-requests`
+- `entity:reader`, `process:web-server`, `flow:entity:reader>process:web-server>page-requests`
 - Sign-in is stated to exist and its session handling is stated not to be described.
 
 > mark:
@@ -154,7 +154,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A4.** `V1.2.4` — The web server builds MySQL queries for CMS content and nothing says how.
 
-- `process:web-server`, `store:mysql-database`, `flow:web-server-to-mysql-database:cms-data`
+- `process:web-server`, `store:mysql-database`, `flow:process:web-server>store:mysql-database>cms-data`
 - tech:database fires on a MySQL store reached from an internet-facing process.
 
 > mark:
@@ -209,7 +209,7 @@ on either of them. That is the finding this sitting exists for.
 
 **1.** An attacker holding the admin's database credentials connects to MySQL as the admin from anywhere on the internet, since there is no jump host in the way.
 
-- `flow:admin-to-mysql-database:direct-administration`, `entity:admin`
+- `flow:entity:admin>store:mysql-database>direct-administration`, `entity:admin`
 - severity: medium/high · verb: `use-credential`
 - The source states the path is reachable from wherever the admin happens to be, which is the same as saying it is reachable from wherever an attacker happens to be.
 
@@ -217,7 +217,7 @@ on either of them. That is the finding this sitting exists for.
 
 **2.** An attacker publishes assets into the CDN bucket as if they came from the web server, because how that push is authenticated is unverified.
 
-- `flow:web-server-to-cdn-bucket:asset-publish`, `store:cdn-bucket`
+- `flow:process:web-server>store:cdn-bucket>asset-publish`, `store:cdn-bucket`
 - severity: medium/high · verb: `impersonate`
 - The source says outright that nothing tells you how the push is authenticated; this is the unknown the case is built around.
 
@@ -225,7 +225,7 @@ on either of them. That is the finding this sitting exists for.
 
 **3.** An attacker takes over a signed-in reader's session, since nothing is stated about how those sessions are handled.
 
-- `flow:reader-to-web-server:page-requests`, `entity:reader`
+- `flow:entity:reader>process:web-server>page-requests`, `entity:reader`
 - severity: medium/medium · verb: `use-credential`
 - Sign-in is stated to exist and nothing else about it is; the finding available here is the unverified strength, not an absent control.
 
@@ -236,7 +236,7 @@ on either of them. That is the finding this sitting exists for.
 
 **4.** An attacker on the network path rewrites a stylesheet or script in flight before it reaches the reader, because assets are fetched over plain HTTP.
 
-- `flow:reader-to-cdn:asset-fetch`
+- `flow:entity:reader>entity:cdn>asset-fetch`
 - severity: high/high · verb: `alter-in-transit`
 - The mixed-transport trap: the page arrives over HTTPS and its executable furniture does not, so the protection on the origin link buys nothing.
 
@@ -252,7 +252,7 @@ on either of them. That is the finding this sitting exists for.
 
 **6.** An attacker on the network path modifies the admin's statements in flight, because the connection carries no TLS.
 
-- `flow:admin-to-mysql-database:direct-administration`
+- `flow:entity:admin>store:mysql-database>direct-administration`
 - severity: medium/high · verb: `alter-in-transit`
 - The missing TLS is stated rather than inferred, and the traffic it protects is database administration.
 
@@ -271,7 +271,7 @@ on either of them. That is the finding this sitting exists for.
 
 **8.** Content is changed directly in the database and no CMS record shows who changed it, because that path bypasses the CMS entirely.
 
-- `flow:admin-to-mysql-database:direct-administration`, `process:web-server`
+- `flow:entity:admin>store:mysql-database>direct-administration`, `process:web-server`
 - severity: medium/medium · verb: `unattributable`
 - The reason this case carries a repudiation lane worth grading: the accountability gap is structural, stated by the source in the words 'rather than through the CMS', and no missing control has to be assumed for it.
 
@@ -279,7 +279,7 @@ on either of them. That is the finding this sitting exists for.
 
 **9.** A reader disputes a comment recorded against their account and the site cannot show it came from their session, since nothing about how sign-in is handled is stated.
 
-- `store:mysql-database`, `flow:reader-to-web-server:page-requests`
+- `store:mysql-database`, `flow:entity:reader>process:web-server>page-requests`
 - severity: low/medium · verb: `unattributable`
 - Comments are named by the source as stored content attributable to accounts, which is what makes the dispute concrete.
 
@@ -290,7 +290,7 @@ on either of them. That is the finding this sitting exists for.
 
 **10.** An attacker sniffing the admin's unsecured MySQL connection reads account and comment records in clear text.
 
-- `flow:admin-to-mysql-database:direct-administration`
+- `flow:entity:admin>store:mysql-database>direct-administration`
 - severity: high/high · verb: `intercept`
 - The single highest-signal finding in the case: a stated absence of TLS on a link stated to carry the whole database.
 
@@ -306,7 +306,7 @@ on either of them. That is the finding this sitting exists for.
 
 **12.** An attacker watching a reader's plain-HTTP asset fetches learns which pages that reader is viewing.
 
-- `flow:reader-to-cdn:asset-fetch`, `entity:reader`
+- `flow:entity:reader>entity:cdn>asset-fetch`, `entity:reader`
 - severity: medium/low · verb: `intercept`
 - The privacy half of the mixed-transport problem; the HTTPS page request hides the URL and the asset fetches give it back.
 
@@ -333,7 +333,7 @@ on either of them. That is the finding this sitting exists for.
 
 **15.** An attacker on the direct MySQL path runs queries expensive enough that the web server cannot serve pages.
 
-- `store:mysql-database`, `flow:admin-to-mysql-database:direct-administration`
+- `store:mysql-database`, `flow:entity:admin>store:mysql-database>direct-administration`
 - severity: low/high · verb: `flood`
 - The database is shared between the admin path and the site, and the source describes no separation between them.
 
@@ -344,7 +344,7 @@ on either of them. That is the finding this sitting exists for.
 
 **16.** An attacker who intercepts the admin's unencrypted session obtains database authority that bypasses every control the CMS applies.
 
-- `flow:admin-to-mysql-database:direct-administration`, `store:mysql-database`
+- `flow:entity:admin>store:mysql-database>direct-administration`, `store:mysql-database`
 - severity: medium/high · verb: `escalate`
 - The escalation the case is built to grade: authority is not gained inside the application but around it, and the CMS never sees the actor.
 
@@ -352,7 +352,7 @@ on either of them. That is the finding this sitting exists for.
 
 **17.** An attacker who plants a script in the CDN bucket runs code in every reader's browser in the site's own context.
 
-- `store:cdn-bucket`, `flow:reader-to-cdn:asset-fetch`
+- `store:cdn-bucket`, `flow:entity:reader>entity:cdn>asset-fetch`
 - severity: medium/high · verb: `plant`
 - Where the two crossings compound: write access in a zone the site does not control becomes execution inside the site's origin, and neither crossing on its own carries that.
 
@@ -403,9 +403,9 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "11d2a58f0e1d5773054f0a72d222b3cc96f889cdd0206dd3656495a3d5fe8313",
-      "model.json": "6efc31ce10ad06b7e7a6ecb3ae653b96581789de0bbf2b86939e6e1795eeeaa1",
-      "claims/asvs.json": "d93e47bc85c07208471fe4d60114767124a16fc291f897c8323e5fd3886e97a7",
-      "claims/stride.json": "c009d8fb390bfd8ed23cc59440a5967430112fa8a32cad71f7f0ab4bfa8b2cf2"
+      "model.json": "d5d125e135751bbe5e8f074aac280b0d77167cd0e5e5c2f5a6944cbe4f0c3a9c",
+      "claims/asvs.json": "a9729f279ab4f3c7f855a19131ad3b3504ad4cba5dbd23c6c6ae86053147e1dc",
+      "claims/stride.json": "b914aa99215333ed4a49748b1c03ab422d37a5cb741ec9fb63a81e82f11db06f"
       }
     }
   }

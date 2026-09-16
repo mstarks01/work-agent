@@ -68,6 +68,7 @@ from evals.harness import (
     consent,
     envelope,
     extraction_losses,
+    flow_ids,
     instruction,
     instruction_delta,
     ledger,
@@ -2286,6 +2287,12 @@ COMMANDS: dict[str, Command] = {
         " into a copy (no credentials)",
         run=command_migrate,
         arguments=_migrate_arguments,
+    ),
+    "migrate-flow-ids": Command(
+        help="move the corpus and the vote ledger to a newer flow identity"
+        " version, previewing by default (no credentials)",
+        run=flow_ids.command_migrate_flow_ids,
+        arguments=flow_ids.arguments,
     ),
     "comparison": Command(
         help="rebuild evals/baselines/README.md from the merged Baselines"

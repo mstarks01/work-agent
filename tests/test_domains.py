@@ -14,6 +14,7 @@ from analysis_service.system_model import (
     Process,
     SystemModel,
     TrustBoundary,
+    make_flow_id,
 )
 
 
@@ -59,7 +60,7 @@ def flow(label, **overrides):
     }
     fields.update(overrides)
     return DataFlow(
-        id=f"flow:a-to-b:{label}",
+        id=make_flow_id("process:a", "process:b", label),
         name=label,
         source="process:a",
         destination="process:b",

@@ -18,7 +18,7 @@ did not force a judgement call; it surfaced one.
 - **Bootstrap:** a separate flow from the broker back to the colleague, carrying
   the issued token
 - **Blessed:** dropped; its facts fold into
-  `flow:colleague-to-identity-broker:sign-in`'s `data_description`
+  `flow:entity:colleague>process:identity-broker>sign-in`'s `data_description`
 - **Source reason:** CONTEXT.md is explicit — one flow per interaction,
   direction is who initiates, and the response rides implicitly. The colleague
   initiates a sign-in and the token comes back on that same interaction. This is
@@ -38,7 +38,7 @@ would have quietly removed two references' worth of grounding.
 - **Bootstrap:** a generic relying application alongside
   `process:store-admin-console`, each with its own token-presentation flow
 - **Blessed:** both dropped; the public-key fetch retargeted to
-  `flow:store-admin-console-to-identity-broker:fetch-public-key`, and the
+  `flow:process:store-admin-console>process:identity-broker>fetch-public-key`, and the
   collective facts recorded in the console's `notes`
 - **Source reason:** the source describes a class ("every application takes that
   token") and names exactly one member of it. Modelling both gives two elements

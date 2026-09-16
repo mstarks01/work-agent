@@ -5,7 +5,7 @@
     "affected_element_ids": [
       "process:mobile-app",
       "process:web-api",
-      "flow:mobile-app-to-web-api:api-traffic"
+      "flow:process:mobile-app>process:web-api>api-traffic"
     ],
     "claim": "The mobile app reaches the web API over HTTP rather than HTTPS.",
     "tier": "must-find",
@@ -18,7 +18,7 @@
     "affected_element_ids": [
       "store:user-database",
       "process:web-api",
-      "flow:web-api-to-user-database:customer-records"
+      "flow:process:web-api>store:user-database>customer-records"
     ],
     "claim": "Customer names, addresses and card details are held with no stated protection.",
     "tier": "must-find",
@@ -31,7 +31,7 @@
     "affected_element_ids": [
       "process:catalogue-spreadsheet",
       "process:web-api",
-      "flow:catalogue-spreadsheet-to-web-api:sql-statements"
+      "flow:process:catalogue-spreadsheet>process:web-api>sql-statements"
     ],
     "claim": "A macro-bearing spreadsheet sends SQL statements to the web API over an unstated transport.",
     "tier": "must-find",
@@ -44,7 +44,7 @@
     "affected_element_ids": [
       "process:mobile-app",
       "process:web-api",
-      "flow:mobile-app-to-web-api:api-traffic"
+      "flow:process:mobile-app>process:web-api>api-traffic"
     ],
     "claim": "The web API serves customer records to the mobile app and nothing states which fields a response carries.",
     "tier": "must-find",
@@ -57,7 +57,7 @@
     "affected_element_ids": [
       "entity:customer",
       "process:mobile-app",
-      "flow:customer-to-mobile-app:browse-and-order"
+      "flow:entity:customer>process:mobile-app>browse-and-order"
     ],
     "claim": "Nothing states how a customer is authenticated to the mobile app.",
     "tier": "must-find",
@@ -81,7 +81,7 @@
     "requirement": "V3.5.3",
     "affected_element_ids": [
       "process:web-api",
-      "flow:mobile-app-to-web-api:api-traffic"
+      "flow:process:mobile-app>process:web-api>api-traffic"
     ],
     "claim": "Nothing states which HTTP methods the web API accepts for order submission.",
     "tier": "expected",
