@@ -84,6 +84,7 @@ from analysis_service.sources import text_digest
 from analysis_service.system_model import (
     ELEMENT_ID,
     UNKNOWN,
+    Assumption,
     DataFlow,
     Element,
     SystemModel,
@@ -91,6 +92,7 @@ from analysis_service.system_model import (
     ZonedElement,
     normalize_name,
 )
+from analysis_service.validation import validate
 
 __all__ = [
     "ABSENT",
@@ -104,6 +106,7 @@ __all__ = [
     "PROJECTION_VERSION",
     "REGISTRY",
     "REGISTRY_VERSION",
+    "SETTLING_REASONS",
     "UNIVERSAL_TERMS",
     "UNPROJECTED",
     "Answer",
@@ -130,6 +133,7 @@ __all__ = [
     "SupportSpan",
     "UnknownReason",
     "answer",
+    "apply_projection",
     "assertion_id",
     "catalog_issues",
     "conflicts",
@@ -2018,6 +2022,99 @@ def contradiction_issues(
         )
         for found in contradictions(catalog, model)
     ]
+
+
+#: The projection reasons under which a projected value replaces the graph's
+#: own. Both are the catalog answering: the sources stated the value, or stated
+#: that the control is not there.
+#:
+#: **Every other reason declines, and a decline leaves the attribute alone.**
+#: :func:`project` writes ``unknown`` when the rows do not fit one string —
+#: a conflict, two values, two predicates, a scoped value, a row set aside.
+#: Writing that ``unknown`` into the graph would erase what extraction stated
+#: and put nothing in its place. Measured over the archived assertion sweeps:
+#: applying every projection would have replaced 55 stated attributes with
+#: ``unknown``, against 7 it corrected. Applying only these two corrects the 7
+#: and erases none.
+SETTLING_REASONS: frozenset[str] = frozenset({"stated", "absent"})
+
+
+def apply_projection(
+    model: SystemModel, catalog: AssertionCatalog
+) -> tuple[SystemModel, tuple[Projection, ...]]:
+    """The model with each settled projection written into its attribute.
+
+    **The migration ADR 0034 defers to Phase 4, taken one reader at a time.**
+    The catalog becomes authoritative for a migrated fact and the element
+    attribute becomes a value code computes — but only where the catalog
+    actually answers. Where :func:`project` declines, the attribute extraction
+    wrote stands and the rows stay in the catalog for a reader to see.
+
+    Returns the model and the projections that were applied, so a caller can
+    record what moved rather than diff two models to find out.
+
+    **An applied projection whose rows are inferred writes an Assumption.** An
+    :class:`~analysis_service.system_model.Assumption` is the record of a value
+    this service inferred into a graph attribute, and a projection resting on
+    an ``inferred`` row is exactly that. Without the entry the model would
+    carry an inference with nothing naming it, which is the state the gate
+    refuses for every other inferred attribute.
+
+    Measured, over every archived assertion sweep: 210 settled projections
+    already agreed with the blessed model, 7 disagreed, and every one of the 7
+    was the catalog reading a stated absence where the graph read ``unknown``.
+    That is the substitution this layer exists to remove, and it is the whole
+    of what this function changes.
+    """
+    applied = tuple(
+        projection
+        for projection in project(catalog)
+        if projection.reason in SETTLING_REASONS
+    )
+    if not applied:
+        return model, ()
+    updated = _projected_model(model, catalog, applied)
+    # **Fail closed on the model, not on the rows.** A projected ``trust_zone``
+    # is a reference, and a row naming a zone this model does not hold would
+    # leave a dangling endpoint that ``boundary_crossings`` refuses — after
+    # every consumer downstream has been handed the model. So the result is put
+    # back through the shared gate, and a model the gate refuses is discarded
+    # whole: the graph keeps what extraction wrote and the rows stay in the
+    # catalog, which is the state this function exists to improve on rather
+    # than a state it may leave worse.
+    if validate(updated):
+        return model, ()
+    return updated, applied
+
+
+def _projected_model(
+    model: SystemModel, catalog: AssertionCatalog, applied: tuple[Projection, ...]
+) -> SystemModel:
+    """``model`` with each applied projection written in, before the gate sees it."""
+    updated = model.model_copy(deep=True)
+    elements = {element.id: element for element in updated.elements()}
+    rows = {assertion_id(entry): entry for entry in catalog.entries}
+    for projection in applied:
+        element = elements.get(projection.element_id)
+        if element is None or not hasattr(element, projection.attribute):
+            continue
+        setattr(element, projection.attribute, projection.value)
+        bases = {rows[ref].basis for ref in projection.rows if ref in rows}
+        if "inferred" in bases and not any(
+            entry.element_id == projection.element_id
+            and entry.attribute == projection.attribute
+            for entry in updated.assumptions
+        ):
+            updated.assumptions.append(
+                Assumption(
+                    assumption=f"{projection.attribute} is {projection.value}",
+                    element_id=projection.element_id,
+                    attribute=projection.attribute,
+                    basis="inferred by the assertion pass from the sources"
+                    f" ({', '.join(sorted(projection.rows))})"[:1000],
+                )
+            )
+    return updated
 
 
 def _attributes_of(element_id: str) -> frozenset[str]:

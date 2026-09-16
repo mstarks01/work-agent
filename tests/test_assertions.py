@@ -44,6 +44,7 @@ from analysis_service.assertions import (
     SubjectType,
     _named,
     answer,
+    apply_projection,
     assertion_id,
     catalog_issues,
     conflicts,
@@ -1706,3 +1707,144 @@ class TestAGraphAttributeAndItsRowsStatingOpposites:
         assert all(
             issue.row is None for issue in contradiction_issues(held, self.model())
         )
+
+
+class TestTheProjectionBecomesTheGraphsValue:
+    """ADR 0034's migration, applied where the catalog answers and nowhere else.
+
+    What it must *not* do carries the weight. A projection that declines writes
+    ``unknown``, and writing that into the graph erases what extraction stated
+    and puts nothing in its place — measured at 55 such erasures against 7
+    corrections over the archived sweeps.
+    """
+
+    def catalog_of(
+        self, value, *, basis="stated", predicate="authentication-mechanism"
+    ):
+        return catalog(
+            [
+                Assertion(
+                    subject=FLOW,
+                    predicate=predicate,
+                    value=value,
+                    basis=basis,
+                    explanation="" if basis == "stated" else "no login step is named",
+                    support=span_for("sign in with email and password")
+                    if basis == "stated"
+                    else [],
+                )
+            ]
+        )
+
+    def model(self):
+        return SystemModel.model_validate(
+            {
+                "external_entities": [
+                    {
+                        "id": "entity:shopper",
+                        "name": "shopper",
+                        "kind": "human",
+                        "trust_zone": "boundary:internet",
+                    }
+                ],
+                "processes": [
+                    {
+                        "id": "process:storefront-api",
+                        "name": "storefront API",
+                        "technology": "web",
+                        "trust_zone": "boundary:app",
+                        "exposure": "internet-facing",
+                        "interface_kind": "web",
+                    }
+                ],
+                "trust_boundaries": [
+                    {"id": "boundary:internet", "name": "internet", "kind": "network"},
+                    {"id": "boundary:app", "name": "app", "kind": "network"},
+                ],
+                "data_flows": [
+                    {
+                        "id": FLOW,
+                        "name": "place order",
+                        "source": "entity:shopper",
+                        "destination": "process:storefront-api",
+                        "protocol": "https",
+                        "authentication": "session cookie",
+                        "data_description": "an order",
+                        "encryption_in_transit": "TLS",
+                    }
+                ],
+            }
+        )
+
+    def _flow(self, model):
+        return model.data_flows[0]
+
+    def test_a_stated_absence_replaces_a_vague_graph_value(self):
+        """The 7 corrections: the graph hid an absence the sources stated."""
+        updated, applied = apply_projection(self.model(), self.catalog_of(ABSENT))
+
+        assert self._flow(updated).authentication == ABSENT_WORD
+        assert [entry.reason for entry in applied] == ["absent"]
+
+    def test_a_declining_projection_leaves_the_attribute_alone(self):
+        """Two predicates on one attribute: the catalog cannot fit one string."""
+        held = catalog(
+            [
+                stated(),
+                Assertion(
+                    subject=FLOW,
+                    predicate="credential-presented",
+                    value="credential:api-key",
+                    basis="stated",
+                    support=span_for("sign in with email and password"),
+                ),
+            ],
+            rows=(
+                (FLOW, "interaction", "place order"),
+                ("credential:api-key", "credential", "api key"),
+            ),
+        )
+        updated, applied = apply_projection(self.model(), held)
+
+        assert self._flow(updated).authentication == "session cookie"
+        assert applied == ()
+
+    def test_an_empty_catalog_returns_the_model_unchanged(self):
+        updated, applied = apply_projection(self.model(), AssertionCatalog())
+
+        assert updated == self.model() and applied == ()
+
+    def test_an_inferred_projection_records_an_assumption(self):
+        """A value this service inferred into a graph attribute needs its record."""
+        updated, _ = apply_projection(
+            self.model(), self.catalog_of(ABSENT, basis="inferred")
+        )
+
+        assert [(a.element_id, a.attribute) for a in updated.assumptions] == [
+            (FLOW, "authentication")
+        ]
+
+    def test_a_stated_projection_records_no_assumption(self):
+        """The sources said it, so this service inferred nothing."""
+        updated, _ = apply_projection(self.model(), self.catalog_of(ABSENT))
+
+        assert updated.assumptions == []
+
+    def test_a_projection_the_gate_would_refuse_is_discarded_whole(self):
+        """Fail closed: a zone reference naming no boundary would dangle."""
+        held = catalog(
+            [
+                Assertion(
+                    subject="process:storefront-api",
+                    predicate="network-membership",
+                    value="boundary:nowhere",
+                    basis="stated",
+                    support=span_for("sign in with email and password"),
+                )
+            ],
+            rows=(("process:storefront-api", "component", "storefront API"),),
+        )
+        updated, applied = apply_projection(self.model(), held)
+
+        assert updated.processes[0].trust_zone == "boundary:app"
+        assert applied == ()

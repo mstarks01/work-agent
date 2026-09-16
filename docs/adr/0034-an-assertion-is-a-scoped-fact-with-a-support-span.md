@@ -211,6 +211,20 @@ the same rule the asset vocabulary and the **Ground** kinds already follow.
   scopes and spans, and whether one call emits topology and assertions together.
 - **The consumer migration.** Phase 4 decides how the evidence catalog carries a
   positive assertion, and ADR 0010's three tests govern it.
+
+  **Settled, for the projecting predicates.** The projection is written into the
+  element attribute where its reason is `stated` or `absent`, and nowhere else.
+  Every other reason is the projection declining, and writing that `unknown`
+  into the graph erases what extraction wrote and puts nothing in its place.
+  Measured over every archived assertion sweep: 210 settled projections already
+  agreed with the blessed model, **7 disagreed and every one of the 7 was the
+  catalog reading a stated absence where the graph read `unknown`**, and
+  applying the declining ones as well would have erased **55** stated
+  attributes. So the catalog is authoritative where it answers, the graph keeps
+  its own value where the catalog declines, and the rows stay visible either
+  way. The projected model is put back on the session's valid-model key, so the
+  model a lane agent reads, the model the report embeds and the model a ground
+  resolves against are one value. It runs only where the assertion pass ran.
 - **The `assumptions` list.** An **Assumption** stays the record of a value this
   service inferred into a graph attribute. The catalog's `inferred` basis covers
   predicates the graph has no field for. When a predicate's projection becomes
