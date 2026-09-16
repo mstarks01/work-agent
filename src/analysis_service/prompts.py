@@ -34,7 +34,7 @@ therefore share the longest possible cacheable prefix.
 
 from __future__ import annotations
 
-from analysis_service.assertions import REGISTRY, Predicate
+from analysis_service.assertions import REGISTRY, Predicate, referent_type
 from analysis_service.compact import COMPACT_FORMAT, FULL_FORMAT
 from analysis_service.frameworks import OUTPUT_DOC
 from analysis_service.markdown_loader import MarkdownLoader
@@ -220,5 +220,5 @@ def _value_form(predicate: Predicate) -> str:
     if predicate.value == "term":
         return ", ".join(f"`{term}`" for term in sorted(predicate.terms))
     if predicate.value == "reference":
-        return f"the name of a {next(iter(predicate.refers_to))}"
+        return f"the name of a {referent_type(predicate)}"
     return "what the source says, in a few words"

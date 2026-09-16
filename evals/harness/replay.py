@@ -93,6 +93,7 @@ from analysis_service.assertions import (
     CatalogProposal,
     assertion_id,
     identity_parts,
+    referent_type,
     settled,
     snap_subject,
 )
@@ -744,8 +745,14 @@ def bind_assertions(
             aligned = produced_of.get(blessed_id or "", "")
             fate = "renamed" if aligned else "omitted"
         elif "illegal-value" in codes[index]:
-            referent_type = next(iter(REGISTRY[row.predicate].refers_to))
-            blessed_id = snap_subject(referent_type, row.value, case.model)
+            # Through the registry's own reader, which answers None for the 12
+            # predicates that take no reference. A term predicate carrying a
+            # term outside its vocabulary draws this same code, and reading
+            # `refers_to` directly ended the replay with a bare StopIteration.
+            wanted = referent_type(REGISTRY[row.predicate])
+            blessed_id = (
+                None if wanted is None else snap_subject(wanted, row.value, case.model)
+            )
             aligned = produced_of.get(blessed_id or "", "")
             fate = "referent_renamed" if aligned else "referent_omitted"
         else:

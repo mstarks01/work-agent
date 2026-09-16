@@ -739,3 +739,47 @@ class TestTheReviewedAliases:
 
             derived = make_element_id(element.split(":", 1)[0], alias.name)
             assert derived.split(":", 1)[0] == element.split(":", 1)[0], case_id
+
+
+class TestTheTwoReadersOfTheIdRule:
+    """Which builder derives an element's ID is one rule, and it has two readers.
+
+    :func:`~analysis_service.system_model.derive_element_id` is the single
+    definition, and it branches on ``isinstance(element, DataFlow)``. The
+    corpus alias lint cannot call it — it reads a recorded graph as JSON,
+    before any schema admits it, and it derives an ID for the *alias's* name
+    rather than the element's own — so it branches on ``startswith("flow:")``
+    instead.
+
+    Two readers of one rule, each testable against its own expectation, which
+    is the shape that drifts in silence. They are tested against each other
+    instead: over every element of every blessed model, the lint's branch must
+    choose the same builder the schema's does.
+    """
+
+    def test_both_readers_choose_one_builder_for_every_blessed_element(self):
+        from analysis_service.system_model import (
+            DataFlow,
+            derive_element_id,
+            make_element_id,
+            make_flow_id,
+        )
+
+        checked = 0
+        for case_dir in sorted((verify_corpus.CORPUS_DIR).glob("*/")):
+            path = case_dir / "model.json"
+            if not path.is_file():
+                continue
+            model, _ = parse_and_validate(json.loads(path.read_text(encoding="utf-8")))
+            assert model is not None, path
+            for element in model.elements():
+                checked += 1
+                # The lint's branch, spelled as the lint spells it.
+                by_prefix = (
+                    make_flow_id(element.source, element.destination, element.name)
+                    if element.id.startswith("flow:")
+                    else make_element_id(element.id.split(":", 1)[0], element.name)
+                )
+                assert by_prefix == derive_element_id(element), element.id
+                assert isinstance(element, DataFlow) == element.id.startswith("flow:")
+        assert checked > 100
