@@ -505,3 +505,108 @@ class TestTheArchivedEmissionsReplay:
         assert sweep.skipped == {
             "01-payments-checkout": "no facts file, so nothing grades it"
         }
+
+
+class TestBindingAProposalToAnExtractedGraph:
+    """Finding 9: fact omission and binding failure, counted apart."""
+
+    @pytest.fixture(scope="class")
+    def golden(self):
+        return case("01")
+
+    @pytest.fixture(scope="class")
+    def proposal(self, golden):
+        bench = next(p for p in ARTIFACTS if "luna-r1" in p.name)
+        return assertions_from_reports(bench, [golden])[golden.id]
+
+    def bound(self, golden, proposal, model, graph="graph"):
+        return replay.bind_assertions(
+            golden, proposal, ExtractionResult(golden.id, model, ()), graph
+        )
+
+    def test_the_blessed_graph_binds_every_row_the_blessed_resolver_kept(
+        self, golden, proposal
+    ):
+        binding = self.bound(golden, proposal, golden.model)
+
+        assert binding.parsed
+        assert not any(binding.counts[fate] for fate in replay.BIND_LOSSES)
+        assert binding.counts["bound"] + binding.counts["own"] > 0
+        assert binding.counts["refused"] == len(
+            {issue.row for issue in proposal.issues if issue.row is not None}
+        )
+        assert binding.offered == binding.offered_blessed
+
+    def test_a_relabelled_flow_is_a_binding_the_alignment_would_take(
+        self, golden, proposal
+    ):
+        """The flow keeps its endpoints and its discriminators under another
+        label, so the resolver's snap misses it and the alignment pairs it."""
+        flow = "flow:order-service-to-orders-db:read-write-orders"
+        assert any(row["subject"] == flow for row in proposal.proposal["assertions"])
+        model = renamed(golden.model, flow, "database access")
+        binding = self.bound(golden, proposal, model)
+
+        renamed_rows = [row for row in binding.rows if row.fate == "renamed"]
+        assert {row.subject for row in renamed_rows} == {flow}
+        assert {row.aligned for row in renamed_rows} == {
+            "flow:order-service-to-orders-db:database-access"
+        }
+        assert binding.counts["omitted"] == 0
+
+    def test_a_referent_the_graph_names_otherwise_is_charged_to_the_value(
+        self, golden, proposal
+    ):
+        """A zone a component sits in is a reference value, and the alias
+        ruling pairs the blessed zone with the produced one."""
+        zone_rows = [
+            row
+            for row in proposal.proposal["assertions"]
+            if row["predicate"] == "network-membership"
+        ]
+        assert zone_rows, "the fixture proposal places a component in a zone"
+        model = renamed(golden.model, "boundary:core-services", "core network")
+        binding = self.bound(golden, proposal, model)
+
+        referent_rows = [row for row in binding.rows if row.fate == "referent_renamed"]
+        assert referent_rows
+        assert {row.aligned for row in referent_rows} == {"boundary:core-network"}
+        assert all(row.predicate == "network-membership" for row in referent_rows)
+
+    def test_a_dropped_element_is_an_omission_of_the_graph(self, golden, proposal):
+        model = without(golden.model, "process:storefront-api")
+        binding = self.bound(golden, proposal, model)
+
+        omitted = [row for row in binding.rows if row.fate == "omitted"]
+        assert omitted
+        assert all(not row.aligned for row in omitted)
+
+    def test_an_emission_that_did_not_parse_binds_nothing(self, golden, proposal):
+        binding = self.bound(golden, proposal, None)
+
+        assert not binding.parsed
+        assert binding.rows == ()
+        assert binding.offered == 0
+        assert binding.offered_blessed > 0
+
+    def test_the_archive_binds_and_the_command_runs(self, tmp_path, capsys):
+        proposals = [p for p in ARTIFACTS if "luna-r1" in p.name]
+        graphs = [p for p in ARTIFACTS if "preflight-01" in p.name]
+        out = tmp_path / "bind.json"
+
+        code = main(
+            [
+                "bind",
+                *map(str, proposals),
+                "--graphs",
+                *map(str, graphs),
+                "--out",
+                str(out),
+            ]
+        )
+
+        assert code == 0
+        assert "bound" in capsys.readouterr().out
+        written = json.loads(out.read_text("utf-8"))
+        assert set(written) == {"coordinates", "arms", "bindings"}
+        assert written["bindings"]

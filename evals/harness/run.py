@@ -1522,6 +1522,66 @@ def replay_artifact(
     return sweep(assertions=tuple(graded), skipped=skipped)
 
 
+def command_bind(args: argparse.Namespace) -> int:
+    """Bind archived proposals to archived extracted graphs, and name every refusal.
+
+    Credential-free. The assertion benchmark seeded the blessed model, so its
+    proposals name blessed element IDs; a production job resolves them
+    against the graph its own extraction produced. Each proposal is resolved
+    against every archived extracted graph of the same case, and a row the
+    extracted graph refused is charged to a rename the alignment could take
+    or to an element the graph omitted (#961 finding 9).
+    """
+    corpus_dir = Path(args.corpus)
+    try:
+        cases = load_corpus(corpus_dir)
+        graphs = [
+            (path.name, extractions_from_reports(path, cases))
+            for path in map(Path, args.graphs)
+        ]
+        sweeps = [bind_artifact(Path(path), cases, graphs) for path in args.proposals]
+    except (ProvenanceError, CorpusError, modes.EvalRunError, ValueError) as error:
+        print(f"cannot bind: {error}", file=sys.stderr)
+        return 1
+    replay.render_bindings(sweeps, args.targets)
+    if args.out:
+        commit = repo_commit()
+        report = replay.binding_artifact(
+            sweeps, commit.commit, commit.clean, corpus_digest(corpus_dir)
+        )
+        Path(args.out).write_text(archive_bytes("artifact", report), encoding="utf-8")
+        print(f"\nbindings written to {args.out}")
+    return 0
+
+
+def bind_artifact(
+    path: Path,
+    cases: Sequence[GoldenCase],
+    graphs: Sequence[tuple[str, Mapping[str, modes.ExtractionResult]]],
+) -> replay.BindingSweep:
+    """One archived assertion sweep against every archived graph of each case."""
+    loaded = load_artifact(path)
+    if loaded.mode != "assertions":
+        raise modes.EvalRunError(
+            f"{path}: a {loaded.mode} sweep keeps no proposal to bind"
+        )
+    held = [case for case in cases if case.id in loaded.cases]
+    if not held:
+        raise modes.EvalRunError(f"{path}: none of its cases are in the corpus")
+    proposed = assertions_from_reports(path, held)
+    return replay.BindingSweep(
+        artifact=path.name,
+        arm=replay.arm_of(loaded),
+        bindings=tuple(
+            replay.bind_assertions(case, proposed[case.id], extracted[case.id], name)
+            for case in held
+            if case.id in proposed
+            for name, extracted in graphs
+            if case.id in extracted
+        ),
+    )
+
+
 def _rows(named: Sequence[str] | None) -> set[tuple[str, str]]:
     """``--row case:reference`` pairs, or an empty set for the whole corpus.
 
@@ -1975,6 +2035,29 @@ def _extraction_losses_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--out", help="where to write the extraction-loss report")
 
 
+def _bind_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "proposals",
+        nargs="+",
+        help="archived assertion sweep artifacts, each with its .reports/ dir",
+    )
+    parser.add_argument(
+        "--graphs",
+        nargs="+",
+        required=True,
+        help="archived extraction sweep artifacts whose emissions are the graphs",
+    )
+    parser.add_argument(
+        "--corpus",
+        default=str(DEFAULT_CORPUS_DIR),
+        help="corpus root: the blessed models the proposals were seeded with",
+    )
+    parser.add_argument(
+        "--targets", type=int, default=10, help="how many refused rows to list per arm"
+    )
+    parser.add_argument("--out", help="where to write the binding report")
+
+
 def _replay_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "artifact",
@@ -2156,6 +2239,12 @@ COMMANDS: dict[str, Command] = {
         " coordinates and name every loss (no credentials)",
         run=command_replay,
         arguments=_replay_arguments,
+    ),
+    "bind": Command(
+        help="bind archived assertion proposals to archived extracted graphs and"
+        " name every binding the graphs refuse (no credentials)",
+        run=command_bind,
+        arguments=_bind_arguments,
     ),
     "sitting-import": Command(
         help="apply one offline sitting envelope to this tree (no credentials)",
