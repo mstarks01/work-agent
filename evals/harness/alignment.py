@@ -109,6 +109,30 @@ FLOW_DISCRIMINATORS: Mapping[str, Callable[[Any], str]] = {
 }
 
 
+def placeholder_zones(model: SystemModel) -> frozenset[str]:
+    """The zones a reference holds only because the schema requires one.
+
+    A blessed zone whose every member's placement is an assumption the model
+    records — the schema requires a zone and the source gives none — is a
+    placement, not a fact the source states, and a reader has ruled that a
+    producer is not required to draw it (#961 step 6). Read off
+    :meth:`~analysis_service.system_model.SystemModel.assumed_zone_elements`,
+    the one reader of which placements are inferred, so the rule has no
+    second spelling here. A zone with no member is not a placeholder: nothing
+    says why it exists.
+    """
+    assumed = model.assumed_zone_elements()
+    members: dict[str, list[str]] = defaultdict(list)
+    for element in model.zoned_elements():
+        if element.trust_zone:
+            members[element.trust_zone].append(element.id)
+    return frozenset(
+        zone.id
+        for zone in model.trust_boundaries
+        if members[zone.id] and all(one in assumed for one in members[zone.id])
+    )
+
+
 def singular(word: str) -> str:
     """One word with a plural ``s`` dropped, so ``servers`` and ``server`` are one.
 

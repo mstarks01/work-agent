@@ -33,7 +33,19 @@
       "name": "own identity provider",
       "excerpt": "their own identity provider vouches for them",
       "ruling": "Supported; the provider vouches for franchise colleagues."
+    },
+    {
+      "element": "entity:franchise-identity-provider",
+      "name": "identity provider",
+      "excerpt": "their own identity provider vouches for them and the broker",
+      "ruling": "The shorter name, where it is the provider that vouches for franchise colleagues to the broker. It stays distinct from the corporate broker; a separately extracted franchise colleague is a supported actor, not a duplicate. Ruled by the maintainer on 2026-09-16 (#961 step 6)."
+    },
+    {
+      "element": "boundary:franchise-partner",
+      "name": "franchise stores",
+      "excerpt": "We also let the franchise stores in.",
+      "ruling": "The partner boundary is an organisational identity-trust boundary, not a network segment; 'franchise stores' represents it where it preserves that separation and the provider's affiliation. 'Home devices' does not. Ruled by the maintainer on 2026-09-16 (#961 step 6)."
     }
   ],
-  "notes": "Internal-systems case 2 of 2 (ticket 029). The trust shape no other case carries is trust granted to claims and to parties rather than to network position: authorization is decided entirely from groups inside a signed token, nothing calls back to the issuer, and one federated partner is trusted to assert identities with no written limit on who. The instrument that makes this case worth its slot is that the boundary crossings under-describe the risk \u2014 only four flows cross a zone, and the case's two highest-severity references (a store-manager token working against every store, and a leaver retaining access across a nightly sync plus a twelve-hour non-revocable token) cross nothing at all. Every other case in the corpus rewards an analyst that follows the crossings; this one punishes an analyst that follows only the crossings. It is also the only case whose worst finding is stated as a completed fact rather than as a gap, and the only one whose hardest finding is assembled from three facts no single sentence of the source contains."
+  "notes": "Internal-systems case 2 of 2 (ticket 029). The trust shape no other case carries is trust granted to claims and to parties rather than to network position: authorization is decided entirely from groups inside a signed token, nothing calls back to the issuer, and one federated partner is trusted to assert identities with no written limit on who. The instrument that makes this case worth its slot is that the boundary crossings under-describe the risk — only four flows cross a zone, and the case's two highest-severity references (a store-manager token working against every store, and a leaver retaining access across a nightly sync plus a twelve-hour non-revocable token) cross nothing at all. Every other case in the corpus rewards an analyst that follows the crossings; this one punishes an analyst that follows only the crossings. It is also the only case whose worst finding is stated as a completed fact rather than as a gap, and the only one whose hardest finding is assembled from three facts no single sentence of the source contains."
 }

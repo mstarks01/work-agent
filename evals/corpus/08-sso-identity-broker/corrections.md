@@ -161,3 +161,11 @@ landed where an analyst reads it. Worth noting precisely because it is the
 corpus's most repeated failure everywhere else: whatever is different about this
 source (the qualifier sits in the same sentence as the behaviour it qualifies)
 is worth knowing when the re-bootstrap runs.
+
+## Rulings of 2026-09-16 (#961 step 6)
+
+`identity provider` is an alias for `entity:franchise-identity-provider`, which
+stays distinct from the corporate broker; a separately extracted franchise
+colleague is a supported actor. `franchise stores` is an alias for
+`boundary:franchise-partner`, an organisational identity-trust boundary and
+not a network segment; `home devices` does not substitute for it.

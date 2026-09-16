@@ -64,3 +64,10 @@ Two STRIDE reference claims, records 4 and 13, still call the Redis store
 The wording stays because the calibration review of 2026-09-02 keys its
 sample by the claim text, and a rewording would move two fixtures out from
 under a signed record; the case sitting for this case reads those claims.
+
+## Rulings of 2026-09-16 (#961 step 6)
+
+`internet` is an alias for `boundary:public-internet`, the inferred internet
+interaction zone; `external` is accepted only where its membership establishes
+the same meaning. `other team's backend` is an alias for `entity:calling-service`;
+`calling team's user` is not, because the backend makes the call.

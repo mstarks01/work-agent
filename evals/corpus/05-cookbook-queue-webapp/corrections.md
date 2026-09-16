@@ -20,3 +20,8 @@ to watch as the corpus takes on more cookbook material. Correction 4 repeats the
 now-familiar shape from cases 02 and 03: a fact stated in the source survives
 into `source_excerpt` but not into any attribute or description an analyst
 reads. Across five cases that is the single most repeated extraction failure.
+
+## Rulings of 2026-09-16 (#961 step 6)
+
+`user's browser` is an alias for `entity:browser`, and `background worker` for
+`process:background-worker-process`.

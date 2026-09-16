@@ -24,7 +24,7 @@ from analysis_service.assertions import (
 from analysis_service.system_model import SystemModel, normalize_element_ids
 from analysis_service.validation import parse_and_validate
 from evals.harness import replay
-from evals.harness.alignment import align
+from evals.harness.alignment import align, placeholder_zones
 from evals.harness.archive import kind_of
 from evals.harness.artifact import load_artifact
 from evals.harness.bundle import (
@@ -119,6 +119,32 @@ class TestEveryBlessedElementTakesOneFate:
 
         assert row.fate == "mistyped"
         assert row.candidates == ("process:orders-db",)
+
+    def test_a_zone_held_only_because_the_schema_requires_one_is_a_placeholder(
+        self, golden
+    ):
+        """#961 step 6: the reader removed the DMZ expectation; the model keeps the zone."""
+        raw = golden.model.model_dump(mode="json")
+        zone = "boundary:storefront-dmz"
+        assert zone in placeholder_zones(golden.model)
+        raw["trust_boundaries"] = [
+            b for b in raw["trust_boundaries"] if b["id"] != zone
+        ]
+        for element in raw["processes"]:
+            if element["trust_zone"] == zone:
+                element["trust_zone"] = "boundary:core-services"
+        raw["assumptions"] = [
+            a for a in raw["assumptions"] if a["element_id"] != "process:storefront-api"
+        ]
+        model = SystemModel.model_validate(raw)
+
+        row = fates(golden, model)[zone]
+
+        assert row.fate == "placeholder"
+        assert "placeholder" not in replay.LOSSES
+
+    def test_a_zone_the_source_places_something_in_is_not_a_placeholder(self, golden):
+        assert "boundary:core-services" not in placeholder_zones(golden.model)
 
     def test_a_dropped_element_with_no_type_mate_is_omitted(self, golden):
         model = without(golden.model, "store:receipt-archive")

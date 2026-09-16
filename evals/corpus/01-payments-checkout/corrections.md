@@ -81,3 +81,11 @@ in a session.
 |---|---|---|---|---|
 | 20 | `facts.json` row: `authorization-grant`, `write receipts`, receipt-archive/write, inferred | subject `order service` | subject `order service's own service account` | A workload and the account it uses are not interchangeable identities; the source names the service account as what performs the write. |
 
+## Ruling of 2026-09-16 (#961 step 6): the storefront DMZ is a placeholder
+
+The maintainer ruled that the source establishes internet exposure and not a
+DMZ, and removed the zone expectation. `boundary:storefront-dmz` stays in
+`model.json` because the schema requires a zone, and every member's placement
+is an assumption (change 10), so the replay reads the zone as a placeholder
+and not as a required element. Neither `card-processor` nor `cloud-storage`
+is its alias.
