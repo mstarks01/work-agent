@@ -575,3 +575,50 @@ class TestAnElementIdCannotCarryStructure:
         _, issues = parse_and_validate(model.model_dump(mode="json"))
 
         assert not issues
+
+
+def test_a_flow_between_same_named_endpoints_of_two_types_is_refused_as_a_duplicate():
+    """#961 finding 5: the derived flow ID drops the endpoint type, so an entity
+    named x and a process named x writing the same label to one store derive
+    one ID. The gate refuses the collision before any reference is rewritten
+    through it; ADR 0037 decides the identity that stops it colliding."""
+    from tests.factories import valid_model
+
+    raw = valid_model().model_dump(mode="json")
+    store = raw["data_stores"][0]["id"]
+    zone = raw["trust_boundaries"][0]["id"]
+    raw["external_entities"].append(
+        {
+            **raw["external_entities"][0],
+            "id": "entity:x",
+            "name": "x",
+            "trust_zone": zone,
+        }
+    )
+    raw["processes"].append(
+        {**raw["processes"][0], "id": "process:x", "name": "x", "trust_zone": zone}
+    )
+    flow = raw["data_flows"][0]
+    raw["data_flows"].append(
+        {
+            **flow,
+            "id": "flow:a",
+            "name": "read",
+            "source": "entity:x",
+            "destination": store,
+        }
+    )
+    raw["data_flows"].append(
+        {
+            **flow,
+            "id": "flow:b",
+            "name": "read",
+            "source": "process:x",
+            "destination": store,
+        }
+    )
+
+    _, issues = parse_and_validate(raw, normalize_ids=True, sources={})
+
+    assert [issue.code for issue in issues] == ["duplicate-id"]
+    assert "flow:x-to-" in issues[0].message
