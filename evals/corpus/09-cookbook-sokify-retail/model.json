@@ -178,7 +178,7 @@
       "authentication": "unknown",
       "data_description": "SQL statements changing prices and product copy",
       "encryption_in_transit": "unknown",
-      "operations": "read-write"
+      "operations": "write"
     },
     {
       "id": "flow:web-api-to-user-database:customer-records",

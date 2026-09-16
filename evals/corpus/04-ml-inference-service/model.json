@@ -49,8 +49,9 @@
       "source_label": "System description",
       "technology": "GPU inference server",
       "trust_zone": "boundary:model-network",
-      "exposure": "internal",
-      "interface_kind": "unknown"
+      "exposure": "unknown",
+      "interface_kind": "unknown",
+      "notes": "The source says the model network is meant to be reachable only from the gateway, which is an intended restriction; nothing states whether the server itself can be reached from outside, so exposure stays unknown."
     }
   ],
   "data_stores": [
@@ -65,7 +66,7 @@
       "source_label": "System description",
       "technology": "object storage bucket",
       "trust_zone": "boundary:model-network",
-      "data_classification": "internal",
+      "data_classification": "unknown",
       "encryption_at_rest": "unknown"
     },
     {
@@ -94,7 +95,7 @@
       "source_label": "System description",
       "technology": "BigQuery",
       "trust_zone": "boundary:serving-edge",
-      "data_classification": "confidential",
+      "data_classification": "unknown",
       "encryption_at_rest": "unknown"
     }
   ],
@@ -110,8 +111,8 @@
       "source_label": "System description",
       "source": "entity:calling-service",
       "destination": "process:inference-gateway",
-      "protocol": "HTTPS",
-      "authentication": "per-team API key in a header, never expired or rotated",
+      "protocol": "unknown",
+      "authentication": "per-team API key in a header; operator reports never having expired a key",
       "data_description": "inference request including end-user text",
       "encryption_in_transit": "unknown",
       "operations": "write"
@@ -231,16 +232,22 @@
   ],
   "assumptions": [
     {
-      "assumption": "ML engineers work from inside the model network rather than over the public internet.",
+      "assumption": "The ML engineer is placed in the model network because the schema requires a zone; the source places neither the engineer nor the registry bucket.",
       "element_id": "entity:ml-engineer",
       "attribute": "trust_zone",
-      "basis": "No remote-access path is described for artifact publication; the registry is stated to sit in the model network."
+      "basis": "No statement locates the engineer or the bucket, and publishing to a bucket does not locate the publisher. The value is a placement the schema requires, not a source-backed fact."
     },
     {
-      "assumption": "The inference log contains personal data.",
+      "assumption": "The inference log may contain personal data.",
       "element_id": "store:inference-log",
       "attribute": "assets",
-      "basis": "Stated to hold raw prompts carrying \"whatever the calling team's users typed\"."
+      "basis": "Stated to hold raw prompts carrying \"whatever the calling team's users typed\"; whether that text is personal is not stated, so the tag records a possibility."
+    },
+    {
+      "assumption": "The Redis feature store holds confidential data under the scheme in prompts/extract.md.",
+      "element_id": "store:redis-feature-store",
+      "attribute": "data_classification",
+      "basis": "The source says it holds account age and spend bands per customer, which is customer-specific information; the classification is inferred under the scheme, not quoted."
     }
   ]
 }

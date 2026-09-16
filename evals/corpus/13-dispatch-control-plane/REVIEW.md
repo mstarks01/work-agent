@@ -125,6 +125,7 @@ Not part of the question, but the records cite these names, so you need them.
 **Assumptions**
 
 - `process:dispatch-api` — The dispatch API is not reachable from the internet. (basis: The source states the control plane is not reachable from the internet, and places the dispatch API in it; the source states nothing about the API's own exposure.)
+- `store:dispatch-database` — The dispatch database is placed in the production control plane because the schema requires a zone; the source does not place it. (basis: The dispatch API, which runs in the control plane, reads and writes the database. Access does not entail co-location, and no statement locates the database; the value is a placement the schema requires, not a source-backed fact.)
 
 **Reviewed aliases** — other names a reader ruled identify the same element, each with the words in the source that support it. An extraction using one is named differently, not wrong.
 
@@ -435,7 +436,7 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
-      "model.json": "1182e6b88d0295052c2e70f1e1419d29e9645792efba9e27151739238bf7d992",
+      "model.json": "bfb025e066ae89e84576a81a35150cab6ccbbc76be95c3781e3b1487acfbca4d",
       "claims/asvs.json": "21223b93d65a21e5b8de043940250783cfd9408246e5c1825bef5b8cf4c3ec45",
       "claims/stride.json": "07a43e4387e0f3d490edbdf732259e37957f4a09394d4e23e5203fca2d4558f3"
       }

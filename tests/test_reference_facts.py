@@ -122,11 +122,21 @@ def test_the_rows_reproduce_every_control_the_blessed_model_states(drafted):
     land on a pair the blessed model states too, so the reference cannot
     quietly assert a control the model leaves unverified. A pair the drafter
     disputes is exempt in both directions until somebody rules on it.
+
+    **A placement the schema requires is not a fact the reference must hold.**
+    A zoned element needs a zone whether or not the source gives one, and the
+    model's assumptions list is where it says a value was inferred. Where that
+    list names the pair, the reference decides which kind of inference it was:
+    a row with an inferred basis that agrees says the source supports it, and
+    a row reading unknown says the value is a placeholder and keeps the pair
+    out of the required-fact denominator. A pair no assumption names must
+    agree, because nothing in the model admits it was inferred.
     """
     case, facts, catalog = drafted
     by_id = {element.id: element for element in case.model.elements()}
     reachable = reachable_controls(case.model)
     disputed = {(dispute.element_id, dispute.attribute) for dispute in facts.disputed}
+    assumed = {(entry.element_id, entry.attribute) for entry in case.model.assumptions}
     projected = {
         (projection.element_id, projection.attribute): projection
         for projection in project(catalog)
@@ -137,6 +147,8 @@ def test_the_rows_reproduce_every_control_the_blessed_model_states(drafted):
             continue
         projection = projected.get(key)
         assert projection is not None, f"no row reaches {key}"
+        if projection.reason == "unknown" and key in assumed:
+            continue
         assert projection.reason == stratum, f"{key}: {projection.reason}"
         compared = PROJECTION_COMPARED[projection.attribute]
         blessed = str(getattr(by_id[key[0]], key[1]))
