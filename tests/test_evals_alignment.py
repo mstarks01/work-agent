@@ -14,7 +14,11 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.system_model import SystemModel, normalize_element_ids
+from analysis_service.system_model import (
+    SystemModel,
+    make_flow_id,
+    normalize_element_ids,
+)
 from evals.harness import alignment, modes
 from evals.harness.alignment import (
     EVIDENCE,
@@ -25,7 +29,7 @@ from evals.harness.alignment import (
     protocol_state,
 )
 from evals.harness.extraction_losses import attribute_handoff
-from evals.harness.reference import load_case, load_corpus
+from evals.harness.reference import ElementAlias, load_case, load_corpus
 from evals.harness.stability import load_runs
 from tests.test_evals_extraction_losses import write_report_model
 from tests.test_evals_provenance import provenance, sampling  # noqa: F401
@@ -41,6 +45,15 @@ def case(prefix: str):
 
 def scored(golden, model: SystemModel) -> modes.ExtractionScore:
     return modes.score_extraction(golden, modes.ExtractionResult(golden.id, model, ()))
+
+
+def relabelled(model: SystemModel, flow_id: str, label: str) -> SystemModel:
+    """The model with one flow under another label, its ID re-derived."""
+    raw = model.model_dump(mode="json")
+    flow = next(f for f in raw["data_flows"] if f["id"] == flow_id)
+    flow["name"] = label
+    flow["id"] = make_flow_id(flow["source"], flow["destination"], label)
+    return SystemModel.model_validate(raw)
 
 
 def renamed(model: SystemModel, element_id: str, name: str) -> SystemModel:
@@ -261,6 +274,64 @@ class TestInteractionsAlignOneToOne:
         assert labelled
         assert all("airflow-scheduler" in pair.produced for pair in labelled)
         assert all("ingest-scheduler" in pair.reference for pair in labelled)
+
+
+class TestAFlowAliasIsReadBetweenItsEndpoints:
+    """A ruled label for one flow pairs the produced flow that carries it, and no other."""
+
+    def test_a_ruled_label_pairs_the_flow_as_an_alias(self):
+        golden = case("04")
+        flow_id = "flow:model-server-to-model-registry-bucket:load-artifact"
+        alias = ElementAlias(
+            element=flow_id,
+            name="load artifacts",
+            excerpt="loads model artifacts from a model registry bucket",
+            ruling="plural of the same label",
+        )
+        ruled = replace(
+            golden, meta=golden.meta.model_copy(update={"aliases": [alias]})
+        )
+        # Under another label and with a discriminator that differs, so
+        # neither the label rule nor rule 4 pairs it: the alias is what does.
+        model = relabelled(golden.model, flow_id, "load artifacts")
+        raw = model.model_dump(mode="json")
+        next(f for f in raw["data_flows"] if f["id"].endswith(":load-artifacts"))[
+            "protocol"
+        ] = "unknown"
+        model = SystemModel.model_validate(raw)
+
+        before = align(golden, model)
+        after = align(ruled, model)
+
+        assert flow_id in before.unaligned_reference
+        (pair,) = after.by_evidence("alias")
+        assert pair.reference == flow_id
+        assert pair.produced.endswith(":load-artifacts")
+        assert pair.excerpt == alias.excerpt
+
+    def test_a_ruled_label_never_reaches_across_endpoints(self):
+        golden = case("04")
+        flow_id = "flow:model-server-to-model-registry-bucket:load-artifact"
+        alias = ElementAlias(
+            element=flow_id,
+            name="load artifacts",
+            excerpt="loads model artifacts from a model registry bucket",
+        )
+        ruled = replace(
+            golden, meta=golden.meta.model_copy(update={"aliases": [alias]})
+        )
+        model = relabelled(golden.model, flow_id, "load artifacts")
+        raw = model.model_dump(mode="json")
+        moved = next(
+            f for f in raw["data_flows"] if f["id"].endswith(":load-artifacts")
+        )
+        moved["source"] = "process:inference-gateway"
+        moved["id"] = "flow:inference-gateway-to-model-registry-bucket:load-artifacts"
+
+        after = align(ruled, SystemModel.model_validate(raw))
+
+        assert after.by_evidence("alias") == ()
+        assert flow_id in after.unaligned_reference
 
 
 class TestTheAlignmentIsTheOneReader:
