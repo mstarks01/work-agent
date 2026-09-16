@@ -24,12 +24,17 @@ The System Model already extracted from that text, whose element IDs you name:
 
 ## Procedure
 
-1. **Walk the predicates, not the text.** For each subject in the model and each predicate the table says applies to it, ask what the sources say. This is what stops the exercise from becoming a summary of whatever caught your eye.
-2. **Name the subject.** For a `component`, an `interaction` or a `zone`, write the element's `id` exactly as the model above spells it. For a `principal`, a `credential` or an `artifact`, write a short name, the way the text names it — `shopper accounts`, `session cookie`, `build token`. These have no element of their own and need none.
-3. **Write the value.** The table says which form each predicate takes. A `term` predicate takes one word from its own list. A `text` predicate takes the mechanism in a few words. A `reference` predicate takes the **name** of what it points at, and code builds the identifier.
-4. **Say where it applies.** Where the source scopes a statement — to some principals, to one operation, to one resource, to staging only — add a `scope` entry naming that qualifier. An empty scope means the source stated the fact without a qualifier. It never means "for everyone".
-5. **Quote what says it.** Every `stated` row carries at least one `quotes` entry: the `source_label` of the block, and the shortest verbatim span carrying the fact. Never tidy a quote. A quote may run across adjoining turns, keeping speaker labels as they appear, with `…` marking anything cut.
-6. **Set the basis.** `stated` where the source says it. `inferred` where you concluded it from what the source says, with the reasoning in `explanation`. Nothing else: `derived` and `legacy` are for values code writes.
+1. **List the subjects first; the model is only half of them.** The elements above are the components, interactions and zones. The text also names parties that act (a shopper, an application account, a third-party processor, "anything that can reach the service"), credentials they present or keep (a session cookie, a password in an environment variable, a service account), and artifacts that are signed or checked. None of those has an element, and each is a subject in its own right. Read the text once for them before you write a row.
+2. **Walk the predicates, not the text.** For each subject, element or not, and each predicate the table says applies to it, ask what the sources say. This is what stops the exercise from becoming a summary of whatever caught your eye. A text that names a party and says what it does has answered at least one predicate on that party.
+3. **Name the subject.** For a `component`, an `interaction` or a `zone`, write the element's `id` exactly as the model above spells it. For a `principal`, a `credential` or an `artifact`, write a short name, the way the text names it — `shopper accounts`, `session cookie`, `build token`. These have no element of their own and need none.
+4. **Write the value.** The table says which form each predicate takes. A `term` predicate takes one word from its own list. A `text` predicate takes the mechanism in a few words. A `reference` predicate takes the **name** of what it points at, and code builds the identifier.
+5. **Say where it applies.** Where the source scopes a statement — to some principals, to one operation, to one resource, to staging only — add a `scope` entry naming that qualifier. An empty scope means the source stated the fact without a qualifier. It never means "for everyone".
+6. **Quote what says it.** Every `stated` row carries at least one `quotes` entry: the `source_label` of the block, and the shortest verbatim span carrying the fact. Never tidy a quote. A quote may run across adjoining turns, keeping speaker labels as they appear, with `…` marking anything cut.
+7. **Set the basis.** `stated` where the source says it. `inferred` where you concluded it from what the source says, with the reasoning in `explanation`. Nothing else: `derived` and `legacy` are for values code writes. A grant the text states in words is `stated`; one you read off an action the text describes is `inferred`, because a described action shows a permission in effect and not one granted. Presenting a credential is `inferred` the same way unless the text says so in words.
+
+### A credential sits on the principal that presents it
+
+"Shoppers get a session cookie" is a `credential-presented` row on the principal `shopper accounts`, not on the flow they use. The flow takes `authentication-mechanism`, how its initiator proves who it is; the principal takes `credential-presented`, what it holds. One fact, two subjects, and each row goes on its own.
 
 ### Three values, and the difference between them
 
