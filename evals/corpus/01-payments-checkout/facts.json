@@ -501,8 +501,8 @@
         "names": [
           "single application account"
         ],
-        "ruling": "The source says 'a single application account'; the model keeps the count word in the name. One account.",
-        "reviewed_by": null
+        "ruling": "Accepted. 'A single application account' identifies the account the order service uses for orders-db; 'single' states its count and does not name a different account or establish sharing.",
+        "reviewed_by": "assistant review requested by mstarks01 (#961, 2026-09-16)"
       },
       {
         "subject": "principal:anything-that-can-reach-the-order-service",
@@ -510,24 +510,20 @@
           "anything that can reach the service",
           "anything that can reach it"
         ],
-        "ruling": "The source says 'the order service accepts anything that can reach it'; the three spellings name the same open set of callers.",
-        "reviewed_by": null
-      },
-      {
-        "subject": "principal:order-service",
-        "names": [
-          "order service's own service account"
-        ],
-        "ruling": "The receipt write is 'with the order service's own service account'; the account is the identity the order service acts under, and the source names no other principal for it.",
-        "reviewed_by": null
+        "ruling": "Accepted within this case and the order-service context. The source's 'it' refers to the order service, and the three spellings identify the same reachability-defined set of callers. The pronoun resolution does not extend to another service.",
+        "reviewed_by": "assistant review requested by mstarks01 (#961, 2026-09-16)"
       },
       {
         "subject": "credential:application-account-password",
         "names": [
           "password"
         ],
-        "ruling": "The source names one password, the application account's, and 'the password' in the text refers to it.",
-        "reviewed_by": null
+        "ruling": "Accepted within the orders-db application-account context. 'The password comes from an environment variable on the worker' refers to that account's password by its antecedent. Shopper password sign-in also appears in the source, so a bare 'password' on a shopper or another incompatible subject is not rewritten.",
+        "reviewed_by": "assistant review requested by mstarks01 (#961, 2026-09-16)",
+        "within": [
+          "principal:application-account",
+          "flow:order-service-to-orders-db:read-write-orders"
+        ]
       }
     ],
     "qualifiers": [
@@ -537,8 +533,8 @@
         "names": [
           "orders db"
         ],
-        "ruling": "The store's ID with and without the hyphen.",
-        "reviewed_by": null
+        "ruling": "Accepted. Punctuation variants of the same named database in this case.",
+        "reviewed_by": "assistant review requested by mstarks01 (#961, 2026-09-16)"
       },
       {
         "kind": "operation",
@@ -547,20 +543,17 @@
           "read/write",
           "read and write"
         ],
-        "ruling": "The source says 'full read/write'; the three spellings are one grant.",
-        "reviewed_by": null
+        "ruling": "Accepted. Each spelling denotes both read and write operations; the equivalence changes no resource scope and implies no further privilege.",
+        "reviewed_by": "assistant review requested by mstarks01 (#961, 2026-09-16)"
       },
       {
         "kind": "operation",
         "value": "submit order",
         "names": [
-          "submit orders",
-          "call",
-          "gRPC call",
-          "gRPC calls"
+          "submit orders"
         ],
-        "ruling": "The order service takes one operation, the order submitted over gRPC; a spelling that names the transport names the same operation.",
-        "reviewed_by": null
+        "ruling": "Accepted for the plural only. 'Call' and 'gRPC call(s)' identify invocation or transport, not the business operation; the source describes an order submission over gRPC and does not state that the service has one operation.",
+        "reviewed_by": "assistant review requested by mstarks01 (#961, 2026-09-16)"
       }
     ]
   }

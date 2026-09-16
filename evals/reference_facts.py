@@ -151,6 +151,12 @@ class SubjectAlias(BaseModel):
 
     subject: str = Field(min_length=1)
     names: list[str] = Field(min_length=1)
+    #: The produced subjects under which a *value* naming this subject is
+    #: rewritten; empty means any. A reviewer who accepts "password" for the
+    #: application account's password within that account's rows, and not on
+    #: a shopper's, states the context here and the replay holds to it. A
+    #: produced row whose own subject is the alias is rewritten regardless.
+    within: list[str] = Field(default_factory=list)
     ruling: str = Field(min_length=1)
     reviewed_by: str | None = None
 

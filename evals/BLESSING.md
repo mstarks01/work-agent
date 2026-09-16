@@ -536,7 +536,9 @@ The file may also carry `aliases`: under `subjects`, other names a produced
 row may use for a principal, a credential or an artifact the reference names
 (an element's aliases stay in `case.json`); under `qualifiers`, other
 spellings of one scope value, by kind. Each ruling carries `names`, a
-`ruling` in words and `reviewed_by`. The replay rewrites a produced row's
+`ruling` in words and `reviewed_by`; a subject alias may carry `within`, the
+produced subjects under which a value naming it is rewritten, for a ruling
+that holds in one context and not another. The replay rewrites a produced row's
 subject, a value that points at an aliased subject, and each scope qualifier
 to the reference's spelling before it compares the rows, and only where the
 alias is signed. A produced row on a subject nobody ruled an alias for reads
