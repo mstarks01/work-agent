@@ -21,7 +21,7 @@
         "exclusive": false
       },
       "rationale": "Raised and unanswered: how colleagues sign in.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -42,7 +42,7 @@
         "exclusive": false
       },
       "rationale": "Raised and unanswered: how managers sign in.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -56,14 +56,14 @@
         "quotes": [
           {
             "source_label": "System description",
-            "quote": "how the web app and the scheduling service identify each other"
+            "quote": "Nobody has documented how colleagues or managers sign in, how the web app and the scheduling service identify each other, how the payroll system is identified when it collects the export, or whether any of it is encrypted."
           }
         ],
         "explanation": "",
         "exclusive": false
       },
-      "rationale": "Raised and unanswered: how the two services identify each other.",
-      "reviewed_by": null
+      "rationale": "Raised and unanswered: how the two services identify each other. The whole sentence carries the statement of uncertainty; its fragment alone does not.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -77,14 +77,14 @@
         "quotes": [
           {
             "source_label": "System description",
-            "quote": "how the payroll system is identified when it collects the export"
+            "quote": "Nobody has documented how colleagues or managers sign in, how the web app and the scheduling service identify each other, how the payroll system is identified when it collects the export, or whether any of it is encrypted."
           }
         ],
         "explanation": "",
         "exclusive": false
       },
-      "rationale": "Raised and unanswered: how the payroll system is identified.",
-      "reviewed_by": null
+      "rationale": "Raised and unanswered: how the payroll system is identified. The whole sentence carries the statement of uncertainty; its fragment alone does not.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -98,14 +98,14 @@
         "quotes": [
           {
             "source_label": "System description",
-            "quote": "or whether any of it is encrypted"
+            "quote": "Nobody has documented how colleagues or managers sign in, how the web app and the scheduling service identify each other, how the payroll system is identified when it collects the export, or whether any of it is encrypted."
           }
         ],
         "explanation": "",
         "exclusive": false
       },
-      "rationale": "'Whether any of it is encrypted' raises transport protection on every interaction and answers none.",
-      "reviewed_by": null
+      "rationale": "'Whether any of it is encrypted' raises transport protection on every interaction and answers none. The whole sentence carries the statement of uncertainty; its fragment alone does not.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -119,14 +119,14 @@
         "quotes": [
           {
             "source_label": "System description",
-            "quote": "or whether any of it is encrypted"
+            "quote": "Nobody has documented how colleagues or managers sign in, how the web app and the scheduling service identify each other, how the payroll system is identified when it collects the export, or whether any of it is encrypted."
           }
         ],
         "explanation": "",
         "exclusive": false
       },
-      "rationale": "'Whether any of it is encrypted' raises transport protection on every interaction and answers none.",
-      "reviewed_by": null
+      "rationale": "'Whether any of it is encrypted' raises transport protection on every interaction and answers none. The whole sentence carries the statement of uncertainty; its fragment alone does not.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -140,14 +140,14 @@
         "quotes": [
           {
             "source_label": "System description",
-            "quote": "or whether any of it is encrypted"
+            "quote": "Nobody has documented how colleagues or managers sign in, how the web app and the scheduling service identify each other, how the payroll system is identified when it collects the export, or whether any of it is encrypted."
           }
         ],
         "explanation": "",
         "exclusive": false
       },
-      "rationale": "'Whether any of it is encrypted' raises transport protection on every interaction and answers none.",
-      "reviewed_by": null
+      "rationale": "'Whether any of it is encrypted' raises transport protection on every interaction and answers none. The whole sentence carries the statement of uncertainty; its fragment alone does not.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -161,14 +161,14 @@
         "quotes": [
           {
             "source_label": "System description",
-            "quote": "or whether any of it is encrypted"
+            "quote": "Nobody has documented how colleagues or managers sign in, how the web app and the scheduling service identify each other, how the payroll system is identified when it collects the export, or whether any of it is encrypted."
           }
         ],
         "explanation": "",
         "exclusive": false
       },
-      "rationale": "'Whether any of it is encrypted' raises transport protection on every interaction and answers none.",
-      "reviewed_by": null
+      "rationale": "'Whether any of it is encrypted' raises transport protection on every interaction and answers none. The whole sentence carries the statement of uncertainty; its fragment alone does not.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -182,14 +182,14 @@
         "quotes": [
           {
             "source_label": "System description",
-            "quote": "or whether any of it is encrypted"
+            "quote": "Nobody has documented how colleagues or managers sign in, how the web app and the scheduling service identify each other, how the payroll system is identified when it collects the export, or whether any of it is encrypted."
           }
         ],
         "explanation": "",
         "exclusive": false
       },
-      "rationale": "'Whether any of it is encrypted' raises transport protection on every interaction and answers none.",
-      "reviewed_by": null
+      "rationale": "'Whether any of it is encrypted' raises transport protection on every interaction and answers none. The whole sentence carries the statement of uncertainty; its fragment alone does not.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -203,14 +203,14 @@
         "quotes": [
           {
             "source_label": "System description",
-            "quote": "or whether any of it is encrypted"
+            "quote": "Nobody has documented how colleagues or managers sign in, how the web app and the scheduling service identify each other, how the payroll system is identified when it collects the export, or whether any of it is encrypted."
           }
         ],
         "explanation": "",
         "exclusive": false
       },
-      "rationale": "'Whether any of it is encrypted' raises transport protection on every interaction and answers none.",
-      "reviewed_by": null
+      "rationale": "'Whether any of it is encrypted' raises transport protection on every interaction and answers none. The whole sentence carries the statement of uncertainty; its fragment alone does not.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -224,14 +224,14 @@
         "quotes": [
           {
             "source_label": "System description",
-            "quote": "or whether any of it is encrypted"
+            "quote": "Nobody has documented how colleagues or managers sign in, how the web app and the scheduling service identify each other, how the payroll system is identified when it collects the export, or whether any of it is encrypted."
           }
         ],
         "explanation": "",
         "exclusive": false
       },
-      "rationale": "'Whether any of it is encrypted' raises protection at rest on both stores and answers neither.",
-      "reviewed_by": null
+      "rationale": "'Whether any of it is encrypted' raises protection at rest on both stores and answers neither. The whole sentence carries the statement of uncertainty; its fragment alone does not.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -245,14 +245,14 @@
         "quotes": [
           {
             "source_label": "System description",
-            "quote": "or whether any of it is encrypted"
+            "quote": "Nobody has documented how colleagues or managers sign in, how the web app and the scheduling service identify each other, how the payroll system is identified when it collects the export, or whether any of it is encrypted."
           }
         ],
         "explanation": "",
         "exclusive": false
       },
-      "rationale": "'Whether any of it is encrypted' raises protection at rest on both stores and answers neither.",
-      "reviewed_by": null
+      "rationale": "'Whether any of it is encrypted' raises protection at rest on both stores and answers neither. The whole sentence carries the statement of uncertainty; its fragment alone does not.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -273,7 +273,7 @@
         "exclusive": false
       },
       "rationale": "Stated placement.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -294,7 +294,7 @@
         "exclusive": false
       },
       "rationale": "Stated placement.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -315,79 +315,75 @@
         "exclusive": false
       },
       "rationale": "Stated placement.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
         "subject_type": "component",
         "subject": "process:scheduling-web-app",
         "predicate": "network-membership",
-        "value": "boundary:internal-network",
-        "reason": null,
+        "value": "unknown",
+        "reason": "silent",
         "scope": [],
-        "basis": "inferred",
+        "basis": "stated",
         "quotes": [],
-        "explanation": "The source lists the service, the database and the share as internal and places the web app nowhere; it is grouped with them.",
         "exclusive": false
       },
-      "rationale": "Inferred, as model.json's assumption records: the source places the web app nowhere.",
-      "reviewed_by": null
+      "rationale": "The placement of the service, the database and the share does not establish the web app's placement. model.json's zone is a placement the schema requires, recorded in its assumption.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
         "subject_type": "component",
         "subject": "entity:colleague",
         "predicate": "network-membership",
-        "value": "boundary:public-internet",
-        "reason": null,
+        "value": "unknown",
+        "reason": "silent",
         "scope": [],
-        "basis": "inferred",
+        "basis": "stated",
         "quotes": [],
-        "explanation": "Colleagues reach the app from their own phones, which the source does not place on the internal network.",
         "exclusive": false
       },
-      "rationale": "Colleagues reach the app from their own phones, which the source does not place on the internal network.",
-      "reviewed_by": null
+      "rationale": "Personal phones and use of the same app do not establish internet access; an internal connection or a VPN remains possible. model.json's zone is a placement the schema requires, recorded in its assumption.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
         "subject_type": "component",
         "subject": "entity:store-manager",
         "predicate": "network-membership",
-        "value": "boundary:public-internet",
-        "reason": null,
+        "value": "unknown",
+        "reason": "silent",
         "scope": [],
-        "basis": "inferred",
+        "basis": "stated",
         "quotes": [],
-        "explanation": "Store managers use the same app colleagues reach from their own phones, and the source places managers nowhere.",
         "exclusive": false
       },
-      "rationale": "The source places managers nowhere; the model puts them with colleagues, who use the same app.",
-      "reviewed_by": null
+      "rationale": "Use of the same app does not establish internet access; an internal connection or a VPN remains possible. model.json's zone is a placement the schema requires, recorded in its assumption.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
         "subject_type": "component",
         "subject": "entity:payroll-system",
         "predicate": "network-membership",
-        "value": "boundary:payroll-team-environment",
-        "reason": null,
+        "value": "unknown",
+        "reason": "silent",
         "scope": [],
-        "basis": "inferred",
+        "basis": "stated",
         "quotes": [],
-        "explanation": "The payroll system is run by another team, and the model draws that team's environment as its own zone.",
         "exclusive": false
       },
-      "rationale": "The source states who runs the payroll system and nothing about where it is; the zone is the model's drawing of that ownership.",
-      "reviewed_by": null
+      "rationale": "Operation by another team does not establish a separate network or trust zone. model.json's zone is a placement the schema requires, recorded in its assumption.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
         "subject_type": "component",
         "subject": "entity:payroll-system",
         "predicate": "tenant-ownership",
-        "value": "another team",
-        "reason": null,
+        "value": "unknown",
+        "reason": "hedged",
         "scope": [],
         "basis": "stated",
         "quotes": [
@@ -399,24 +395,23 @@
         "explanation": "",
         "exclusive": false
       },
-      "rationale": "The one stated fact about the payroll system: who runs it.",
-      "reviewed_by": null
+      "rationale": "'Run by another team' establishes operational responsibility, not a distinct owner or tenant, so ownership is unknown and the statement is kept as the words spoken about it.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
         "subject_type": "component",
         "subject": "process:scheduling-web-app",
         "predicate": "internet-exposure",
-        "value": "internet-facing",
-        "reason": null,
+        "value": "unknown",
+        "reason": "silent",
         "scope": [],
-        "basis": "inferred",
+        "basis": "stated",
         "quotes": [],
-        "explanation": "Colleagues are stated to reach the app from their own phones, which the source does not place on the internal network.",
         "exclusive": false
       },
-      "rationale": "Inferred, as model.json's assumption records.",
-      "reviewed_by": null
+      "rationale": "Access from personal phones does not establish that the web app is internet-facing. model.json reads exposure unknown.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -435,18 +430,18 @@
             "value": "write"
           }
         ],
-        "basis": "stated",
+        "basis": "inferred",
         "quotes": [
           {
             "source_label": "System description",
             "quote": "Store managers use a scheduling web app to build the weekly rota for their store."
           }
         ],
-        "explanation": "",
+        "explanation": "Building the rota through the app supports an effective permission held by store managers; a grant is not stated.",
         "exclusive": false
       },
-      "rationale": "The grant the source states, scoped to the manager's own store.",
-      "reviewed_by": null
+      "rationale": "Inferred: the described action supports an effective permission; an authorization grant is not stated.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -465,18 +460,18 @@
             "value": "read"
           }
         ],
-        "basis": "stated",
+        "basis": "inferred",
         "quotes": [
           {
             "source_label": "System description",
             "quote": "Colleagues use the same app to look at the shifts they have been given."
           }
         ],
-        "explanation": "",
+        "explanation": "Looking at their shifts through the app supports an effective permission held by colleagues; a grant is not stated.",
         "exclusive": false
       },
-      "rationale": "The grant the source states, scoped to the colleague's own shifts.",
-      "reviewed_by": null
+      "rationale": "Inferred: the described action supports an effective permission; an authorization grant is not stated.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -495,18 +490,18 @@
             "value": "read"
           }
         ],
-        "basis": "stated",
+        "basis": "inferred",
         "quotes": [
           {
             "source_label": "System description",
             "quote": "The payroll system, which is run by another team, collects the export from the file share."
           }
         ],
-        "explanation": "",
+        "explanation": "Collecting the export supports an effective permission held by the payroll system; a grant is not stated.",
         "exclusive": false
       },
-      "rationale": "The read the source states the payroll system performs.",
-      "reviewed_by": null
+      "rationale": "Inferred: the described action supports an effective permission; an authorization grant is not stated.",
+      "reviewed_by": "mstarks01"
     }
   ],
   "disputed": []

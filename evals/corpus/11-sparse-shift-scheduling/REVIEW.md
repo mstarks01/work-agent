@@ -63,7 +63,7 @@ Not part of the question, but the records cite these names, so you need them.
 
 | id | exposure | interface | zone | technology |
 |---|---|---|---|---|
-| process:scheduling-web-app | internet-facing | web | boundary:internal-network | unknown |
+| process:scheduling-web-app | unknown | web | boundary:internal-network | unknown |
 | process:scheduling-service | unknown | unknown | boundary:internal-network | unknown |
 
 **Data stores**
@@ -98,9 +98,11 @@ Not part of the question, but the records cite these names, so you need them.
 
 **Assumptions**
 
-- `process:scheduling-web-app` — The scheduling web app is reachable from outside the internal network. (basis: Colleagues are stated to reach it from their own phones, which the source does not place on the internal network.)
-- `process:scheduling-web-app` — The scheduling web app itself sits on the internal network. (basis: The source lists the service, database and share as internal and does not place the web app anywhere; it is grouped with them for want of any stated zone of its own.)
+- `process:scheduling-web-app` — The scheduling web app is placed on the internal network because the schema requires a zone; the source places it nowhere. (basis: The placement of the service, the database and the share does not establish the web app's placement. The value is a placement the schema requires, not a source-backed fact.)
 - `flow:scheduling-web-app-to-scheduling-service:rota-requests` — The app both reads and writes rotas through the scheduling service. (basis: The interaction itself is described only as 'talks to'. Managers build rotas through the app and colleagues view their shifts through it, and the service is what reads and writes the rotas, so the app's path carries both.)
+- `entity:colleague` — The colleague is placed on the public internet because the schema requires a zone; the source does not place them. (basis: Personal phones and use of the app do not establish internet access; an internal connection or a VPN remains possible. The value is a placement the schema requires, not a source-backed fact.)
+- `entity:store-manager` — The store manager is placed on the public internet because the schema requires a zone; the source does not place them. (basis: Use of the same app does not establish internet access; an internal connection or a VPN remains possible. The value is a placement the schema requires, not a source-backed fact.)
+- `entity:payroll-system` — The payroll system is placed in a payroll team environment because the schema requires a zone; the source states only who runs it. (basis: Operation by another team does not establish a separate network or trust zone. The value is a placement the schema requires, not a source-backed fact.)
 
 **Reviewed aliases** — other names a reader ruled identify the same element, each with the words in the source that support it. An extraction using one is named differently, not wrong.
 
@@ -407,7 +409,7 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "2507fd3081003c1c94427ef81dcea36f6ca92f5358c965789b49ec4af89b6a60",
-      "model.json": "0be9d7820da3ccf6d08a381640da7459b9d76240c9c1b3b25321c633aea1a2f8",
+      "model.json": "11aa23312ad57b5257922c71f89d2ea02e07fa4061e2677fdfd9e5ea72617488",
       "claims/asvs.json": "5aa40048cd72a41cfaf7079d760a9a6aee4bf16a197e22203d32d60c39a54e6f",
       "claims/stride.json": "b56e600389930164b345d4859160bc6fd77bc59df466b5ecf0af5e22bb8d67b0"
       }

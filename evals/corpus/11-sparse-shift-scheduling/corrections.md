@@ -37,3 +37,21 @@ follows one ruling, and `facts.json` changed with it.
 |---|---|---|---|---|
 | 8 | `flow:scheduling-web-app-to-scheduling-service:rota-requests.operations` | `read-write`, no assumption | `read-write` + assumption | The interaction is described only as "talks to". Managers build rotas through the app and colleagues view shifts through it, and the service reads and writes the rotas, so the app's path carries both. A supported inference, and its basis is now visible. |
 | 9 | `process:scheduling-service.exposure` | `internal` | `unknown` | Network placement alone does not establish the absence of internet ingress. The internal-network membership stays stated. |
+
+## Signing of 2026-09-16 (#961 step 3)
+
+The maintainer signed every row of `facts.json` in a session, ruling on each
+against `source.md`. Five values changed in `model.json` with the rulings:
+
+| # | Path | Before | After | Ruling |
+|---|---|---|---|---|
+| 10 | `process:scheduling-web-app.exposure` | `internet-facing` + assumption | `unknown` | Access from personal phones does not establish that the web app is internet-facing. |
+| 11 | `process:scheduling-web-app.trust_zone` | inferred assumption | placeholder assumption | The placement of the service, the database and the share does not establish the web app's placement. |
+| 12 | `entity:colleague.trust_zone` | no assumption | placeholder assumption | Personal phones and use of the app do not establish internet access; an internal connection or a VPN remains possible. |
+| 13 | `entity:store-manager.trust_zone` | no assumption | placeholder assumption | The same. |
+| 14 | `entity:payroll-system.trust_zone` | no assumption | placeholder assumption | Operation by another team does not establish a separate network or trust zone. |
+
+"Run by another team" establishes operational responsibility, not a distinct
+owner or tenant, so the reference reads ownership unknown and keeps that
+statement. The zone's `kind` of `tenant` is a graph-owned modelling
+judgement the ruling did not reach.
