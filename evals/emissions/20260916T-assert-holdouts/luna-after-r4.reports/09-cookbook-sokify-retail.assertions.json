@@ -1,0 +1,306 @@
+{
+  "proposal": {
+    "assertions": [
+      {
+        "subject_type": "component",
+        "subject": "process:web-api",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Nobody here can tell me what the API does about authentication"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:mobile-app-to-web-api:api-traffic",
+        "predicate": "transport-encryption",
+        "value": "none",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The app talks to the web API over HTTP \u2014 not HTTPS"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:user-database",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Nobody here can tell me ... whether the user database ... [is] encrypted."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:delivery-address-flat-file",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Nobody here can tell me ... whether ... the flat file [is] encrypted."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:fax-gateway-to-customer:confirmation-fax",
+        "predicate": "destination-verification",
+        "value": "absent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The gateway dials the number stored against the order and nobody checks it arrived at the right place."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "principal",
+        "subject": "Marketing",
+        "predicate": "authorization-grant",
+        "value": "change prices and product copy",
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "web API"
+          },
+          {
+            "kind": "operation",
+            "value": "change prices and product copy"
+          }
+        ],
+        "basis": "inferred",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The macros in it send SQL statements straight to the web API to change prices and product copy"
+          }
+        ],
+        "explanation": "The described macro action shows that Marketing's catalogue tooling has permission in effect to change prices and product copy through the web API; the source does not state how that permission was granted.",
+        "exclusive": false
+      }
+    ]
+  },
+  "catalog": {
+    "registry_version": 2,
+    "subjects": [
+      {
+        "id": "flow:fax-gateway-to-customer:confirmation-fax",
+        "type": "interaction",
+        "label": "Confirmation fax"
+      },
+      {
+        "id": "flow:mobile-app-to-web-api:api-traffic",
+        "type": "interaction",
+        "label": "API traffic"
+      },
+      {
+        "id": "principal:marketing",
+        "type": "principal",
+        "label": "Marketing"
+      },
+      {
+        "id": "process:web-api",
+        "type": "component",
+        "label": "Web API"
+      },
+      {
+        "id": "store:delivery-address-flat-file",
+        "type": "component",
+        "label": "Delivery address flat file"
+      },
+      {
+        "id": "store:user-database",
+        "type": "component",
+        "label": "User database"
+      }
+    ],
+    "entries": [
+      {
+        "subject": "process:web-api",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "603873a0d569ba3f0ac4a91a363086b54bae022cf432862d17be9eec9465e4ea",
+            "start": 1112,
+            "end": 1175,
+            "quote": "Nobody here can tell me what the API does about authentication"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:mobile-app-to-web-api:api-traffic",
+        "predicate": "transport-encryption",
+        "value": "none",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "603873a0d569ba3f0ac4a91a363086b54bae022cf432862d17be9eec9465e4ea",
+            "start": 162,
+            "end": 213,
+            "quote": "The app talks to the web API over HTTP \u2014 not HTTPS"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:user-database",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:delivery-address-flat-file",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:fax-gateway-to-customer:confirmation-fax",
+        "predicate": "destination-verification",
+        "value": "absent",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "603873a0d569ba3f0ac4a91a363086b54bae022cf432862d17be9eec9465e4ea",
+            "start": 765,
+            "end": 867,
+            "quote": "The gateway dials the number stored against the order and nobody checks it arrived at the right place."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "principal:marketing",
+        "predicate": "authorization-grant",
+        "value": "change prices and product copy",
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "web API"
+          },
+          {
+            "kind": "operation",
+            "value": "change prices and product copy"
+          }
+        ],
+        "basis": "inferred",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "603873a0d569ba3f0ac4a91a363086b54bae022cf432862d17be9eec9465e4ea",
+            "start": 916,
+            "end": 1010,
+            "quote": "The macros in it send SQL statements straight to the web API to change prices and product copy"
+          }
+        ],
+        "premises": [],
+        "explanation": "The described macro action shows that Marketing's catalogue tooling has permission in effect to change prices and product copy through the web API; the source does not state how that permission was granted.",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      }
+    ]
+  },
+  "issues": [],
+  "projection": [
+    {
+      "element_id": "flow:mobile-app-to-web-api:api-traffic",
+      "attribute": "encryption_in_transit",
+      "value": "none",
+      "reason": "stated",
+      "rows": [
+        "assertion:transport-encryption~flow:mobile-app-to-web-api:api-traffic~any~v.140bedbf9c3f"
+      ]
+    },
+    {
+      "element_id": "store:delivery-address-flat-file",
+      "attribute": "encryption_at_rest",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:storage-encryption~store:delivery-address-flat-file~any~unknown"
+      ]
+    },
+    {
+      "element_id": "store:user-database",
+      "attribute": "encryption_at_rest",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:storage-encryption~store:user-database~any~unknown"
+      ]
+    }
+  ]
+}

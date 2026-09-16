@@ -1,0 +1,549 @@
+{
+  "proposal": {
+    "assertions": [
+      {
+        "subject_type": "interaction",
+        "subject": "flow:mobile-app-to-web-api:api-traffic",
+        "predicate": "transport-encryption",
+        "value": "absent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The app talks to the web API over HTTP \u2014 not HTTPS"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:mobile-app-to-web-api:api-traffic",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "what the API does about authentication"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:catalogue-spreadsheet-to-web-api:sql-statements",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "what the API does about authentication"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:user-database",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "whether the user database and the flat file are encrypted"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:delivery-address-flat-file",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "whether the user database and the flat file are encrypted"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:fax-gateway-to-customer:confirmation-fax",
+        "predicate": "destination-verification",
+        "value": "absent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "nobody checks it arrived at the right place"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "principal",
+        "subject": "customers",
+        "predicate": "authorization-grant",
+        "value": "browse and order through the mobile app",
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "mobile app"
+          },
+          {
+            "kind": "operation",
+            "value": "browse and order"
+          }
+        ],
+        "basis": "inferred",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Customers browse and order through our mobile app"
+          }
+        ],
+        "explanation": "The described customer action demonstrates permission to browse and place orders through the mobile app.",
+        "exclusive": false
+      },
+      {
+        "subject_type": "principal",
+        "subject": "Marketing",
+        "predicate": "authorization-grant",
+        "value": "keep the catalogue in the catalogue spreadsheet",
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "catalogue spreadsheet"
+          },
+          {
+            "kind": "operation",
+            "value": "keep catalogue"
+          }
+        ],
+        "basis": "inferred",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Marketing keep the catalogue in a spreadsheet"
+          }
+        ],
+        "explanation": "The described activity demonstrates that Marketing can maintain the catalogue in the spreadsheet.",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "process:web-api",
+        "predicate": "internet-exposure",
+        "value": "internet-facing",
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Customers browse and order through our mobile app; there is no website. The app talks to the web API over HTTP"
+          }
+        ],
+        "explanation": "The API receives traffic from the customer-facing mobile app used by customers on their own devices.",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "process:catalogue-spreadsheet",
+        "predicate": "network-membership",
+        "value": "Marketing office",
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The spreadsheet lives on a marketing laptop in the office"
+          }
+        ],
+        "explanation": "The source places the spreadsheet on a marketing laptop in the office, corresponding to the Marketing office zone.",
+        "exclusive": false
+      }
+    ]
+  },
+  "catalog": {
+    "registry_version": 2,
+    "subjects": [
+      {
+        "id": "boundary:marketing-office",
+        "type": "zone",
+        "label": "Marketing office"
+      },
+      {
+        "id": "flow:catalogue-spreadsheet-to-web-api:sql-statements",
+        "type": "interaction",
+        "label": "SQL statements"
+      },
+      {
+        "id": "flow:fax-gateway-to-customer:confirmation-fax",
+        "type": "interaction",
+        "label": "Confirmation fax"
+      },
+      {
+        "id": "flow:mobile-app-to-web-api:api-traffic",
+        "type": "interaction",
+        "label": "API traffic"
+      },
+      {
+        "id": "principal:customers",
+        "type": "principal",
+        "label": "customers"
+      },
+      {
+        "id": "principal:marketing",
+        "type": "principal",
+        "label": "Marketing"
+      },
+      {
+        "id": "process:catalogue-spreadsheet",
+        "type": "component",
+        "label": "Catalogue spreadsheet"
+      },
+      {
+        "id": "process:web-api",
+        "type": "component",
+        "label": "Web API"
+      },
+      {
+        "id": "store:delivery-address-flat-file",
+        "type": "component",
+        "label": "Delivery address flat file"
+      },
+      {
+        "id": "store:user-database",
+        "type": "component",
+        "label": "User database"
+      }
+    ],
+    "entries": [
+      {
+        "subject": "flow:mobile-app-to-web-api:api-traffic",
+        "predicate": "transport-encryption",
+        "value": "absent",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "603873a0d569ba3f0ac4a91a363086b54bae022cf432862d17be9eec9465e4ea",
+            "start": 162,
+            "end": 213,
+            "quote": "The app talks to the web API over HTTP \u2014 not HTTPS"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:mobile-app-to-web-api:api-traffic",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "603873a0d569ba3f0ac4a91a363086b54bae022cf432862d17be9eec9465e4ea",
+            "start": 1136,
+            "end": 1175,
+            "quote": "what the API does about authentication"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:catalogue-spreadsheet-to-web-api:sql-statements",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "603873a0d569ba3f0ac4a91a363086b54bae022cf432862d17be9eec9465e4ea",
+            "start": 1136,
+            "end": 1175,
+            "quote": "what the API does about authentication"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:user-database",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "603873a0d569ba3f0ac4a91a363086b54bae022cf432862d17be9eec9465e4ea",
+            "start": 1179,
+            "end": 1237,
+            "quote": "whether the user database and the flat file are encrypted"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:delivery-address-flat-file",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "603873a0d569ba3f0ac4a91a363086b54bae022cf432862d17be9eec9465e4ea",
+            "start": 1179,
+            "end": 1237,
+            "quote": "whether the user database and the flat file are encrypted"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:fax-gateway-to-customer:confirmation-fax",
+        "predicate": "destination-verification",
+        "value": "absent",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "603873a0d569ba3f0ac4a91a363086b54bae022cf432862d17be9eec9465e4ea",
+            "start": 823,
+            "end": 867,
+            "quote": "nobody checks it arrived at the right place"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "principal:customers",
+        "predicate": "authorization-grant",
+        "value": "browse and order through the mobile app",
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "mobile app"
+          },
+          {
+            "kind": "operation",
+            "value": "browse and order"
+          }
+        ],
+        "basis": "inferred",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "603873a0d569ba3f0ac4a91a363086b54bae022cf432862d17be9eec9465e4ea",
+            "start": 90,
+            "end": 140,
+            "quote": "Customers browse and order through our mobile app"
+          }
+        ],
+        "premises": [],
+        "explanation": "The described customer action demonstrates permission to browse and place orders through the mobile app.",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "principal:marketing",
+        "predicate": "authorization-grant",
+        "value": "keep the catalogue in the catalogue spreadsheet",
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "catalogue spreadsheet"
+          },
+          {
+            "kind": "operation",
+            "value": "keep catalogue"
+          }
+        ],
+        "basis": "inferred",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "603873a0d569ba3f0ac4a91a363086b54bae022cf432862d17be9eec9465e4ea",
+            "start": 869,
+            "end": 915,
+            "quote": "Marketing keep the catalogue in a spreadsheet"
+          }
+        ],
+        "premises": [],
+        "explanation": "The described activity demonstrates that Marketing can maintain the catalogue in the spreadsheet.",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "process:web-api",
+        "predicate": "internet-exposure",
+        "value": "internet-facing",
+        "scope": [],
+        "basis": "inferred",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "603873a0d569ba3f0ac4a91a363086b54bae022cf432862d17be9eec9465e4ea",
+            "start": 90,
+            "end": 200,
+            "quote": "Customers browse and order through our mobile app; there is no website. The app talks to the web API over HTTP"
+          }
+        ],
+        "premises": [],
+        "explanation": "The API receives traffic from the customer-facing mobile app used by customers on their own devices.",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "process:catalogue-spreadsheet",
+        "predicate": "network-membership",
+        "value": "boundary:marketing-office",
+        "scope": [],
+        "basis": "inferred",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "603873a0d569ba3f0ac4a91a363086b54bae022cf432862d17be9eec9465e4ea",
+            "start": 1052,
+            "end": 1110,
+            "quote": "The spreadsheet lives on a marketing laptop in the office"
+          }
+        ],
+        "premises": [],
+        "explanation": "The source places the spreadsheet on a marketing laptop in the office, corresponding to the Marketing office zone.",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      }
+    ]
+  },
+  "issues": [],
+  "projection": [
+    {
+      "element_id": "flow:catalogue-spreadsheet-to-web-api:sql-statements",
+      "attribute": "authentication",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:authentication-mechanism~flow:catalogue-spreadsheet-to-web-api:sql-statements~any~unknown"
+      ]
+    },
+    {
+      "element_id": "flow:mobile-app-to-web-api:api-traffic",
+      "attribute": "authentication",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:authentication-mechanism~flow:mobile-app-to-web-api:api-traffic~any~unknown"
+      ]
+    },
+    {
+      "element_id": "flow:mobile-app-to-web-api:api-traffic",
+      "attribute": "encryption_in_transit",
+      "value": "none",
+      "reason": "absent",
+      "rows": [
+        "assertion:transport-encryption~flow:mobile-app-to-web-api:api-traffic~any~absent"
+      ]
+    },
+    {
+      "element_id": "process:catalogue-spreadsheet",
+      "attribute": "trust_zone",
+      "value": "boundary:marketing-office",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~process:catalogue-spreadsheet~any~boundary:marketing-office"
+      ]
+    },
+    {
+      "element_id": "process:web-api",
+      "attribute": "exposure",
+      "value": "internet-facing",
+      "reason": "stated",
+      "rows": [
+        "assertion:internet-exposure~process:web-api~any~internet-facing"
+      ]
+    },
+    {
+      "element_id": "store:delivery-address-flat-file",
+      "attribute": "encryption_at_rest",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:storage-encryption~store:delivery-address-flat-file~any~unknown"
+      ]
+    },
+    {
+      "element_id": "store:user-database",
+      "attribute": "encryption_at_rest",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:storage-encryption~store:user-database~any~unknown"
+      ]
+    }
+  ]
+}
