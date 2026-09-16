@@ -63,3 +63,10 @@ are scoped to the two rights the source names, crew movements and depot work
 assignments, and the corporate laptop's absent grant covers those two alone.
 The partner platform zone's ownership is inferred, conditional on the zone
 standing for the partner's organizational boundary.
+
+## Ruling of 2026-09-16 (#961 step 6): two console-to-API flows
+
+`call api` is accepted as an alias for `dispatch-requests` (`case.json`). The
+WebSocket flow `live-job-status` stands separately: the source explicitly adds
+a persistent WebSocket interaction, and one undifferentiated flow cannot
+receive credit for both reference flows.

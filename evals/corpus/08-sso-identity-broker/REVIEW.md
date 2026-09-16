@@ -125,6 +125,8 @@ Not part of the question, but the records cite these names, so you need them.
 **Reviewed aliases** — other names a reader ruled identify the same element, each with the words in the source that support it. An extraction using one is named differently, not wrong.
 
 - `entity:franchise-identity-provider — own identity provider` — Supported; the provider vouches for franchise colleagues. Source: > their own identity provider vouches for them
+- `entity:franchise-identity-provider — identity provider` — The shorter name, where it is the provider that vouches for franchise colleagues to the broker. It stays distinct from the corporate broker; a separately extracted franchise colleague is a supported actor, not a duplicate. Ruled by the maintainer on 2026-09-16 (#961 step 6). Source: > their own identity provider vouches for them and the broker
+- `boundary:franchise-partner — franchise stores` — The partner boundary is an organisational identity-trust boundary, not a network segment; 'franchise stores' represents it where it preserves that separation and the provider's affiliation. 'Home devices' does not. Ruled by the maintainer on 2026-09-16 (#961 step 6). Source: > We also let the franchise stores in.
 
 ### Your list
 

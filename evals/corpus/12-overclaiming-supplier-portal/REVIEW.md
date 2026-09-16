@@ -105,11 +105,14 @@ Not part of the question, but the records cite these names, so you need them.
 **Assumptions**
 
 - `process:supplier-portal` — Suppliers reach the portal across the public internet. (basis: The portal is a vendor-hosted SaaS product suppliers sign in to, and the source places suppliers nowhere on our networks.)
+- `entity:supplier` — Suppliers are placed on the public internet because the schema requires a zone; the source places them nowhere. (basis: Supplier access to a SaaS product does not establish the suppliers' network location. The value is a placement the schema requires, not a source-backed fact.)
 
 **Reviewed aliases** — other names a reader ruled identify the same element, each with the words in the source that support it. An extraction using one is named differently, not wrong.
 
 - `entity:portal-vendor — vendor` — Supported shorthand for the vendor hosting the portal. Source: > The vendor hosts it
 - `process:supplier-portal — supplier document portal` — Supported by the portal’s stated purpose and users. Source: > Supplier document portal.
+- `process:supplier-portal — portal` — The source calls it 'the portal' throughout; one portal. Ruled by the maintainer on 2026-09-16 (#961 step 6). Source: > The portal is a SaaS product.
+- `store:document-store — vendor platform` — Accepted as the storage role the source states for the documents. The alias keeps the store type, so a vendor platform modelled as anything but a store is not this element, and the whole SaaS platform is not equated with the store unconditionally. Ruled by the maintainer on 2026-09-16 (#961 step 6). Source: > documents themselves stay in the vendor's platform
 
 ### Your list
 
@@ -415,7 +418,7 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
-      "model.json": "42f967ad622a733d8252da6518742db9e9b85dedb6000a36be501fd8ea144131",
+      "model.json": "8d5cc4485ffed8c5effc2d4fab5efddefa0d33b99808958209b0095767885975",
       "claims/asvs.json": "52c00ea520ff7d309bfb232c3c53f582862a1139bad518535449fc3dc69f57eb",
       "claims/stride.json": "ba62b3d4e2587cf389a824acaeffbfe6c37097cdff1c9aed2859c4309b6c5cf3"
       }

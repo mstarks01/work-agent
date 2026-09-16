@@ -44,7 +44,7 @@
       "source_excerpt": "The portal is a SaaS product.",
       "source_label": "System description",
       "technology": "unknown",
-      "notes": "The datasheet's phrases \u2014 secure by design, enterprise-grade encryption throughout, fully authenticated and audited, fully compliant \u2014 name no technology and state no verifiable control, so none of them set an attribute here.",
+      "notes": "The datasheet's phrases — secure by design, enterprise-grade encryption throughout, fully authenticated and audited, fully compliant — name no technology and state no verifiable control, so none of them set an attribute here.",
       "trust_zone": "boundary:vendor-platform",
       "exposure": "internet-facing",
       "interface_kind": "web"
@@ -76,7 +76,7 @@
       "source_excerpt": "The documents themselves stay in the vendor's platform.",
       "source_label": "System description",
       "technology": "unknown",
-      "notes": "A logical store for the documents retained in the vendor platform, and deliberately not a separately identified database, bucket or service: the source says only that the documents stay in the platform, and names no store of its own. So this carries no reviewed alias \u2014 naming it after the platform would collapse it into boundary:vendor-platform, which is the zone that contains it. Enterprise-grade encryption throughout is a vendor marketing claim about the platform, not a stated property of this store, so encryption_at_rest is unknown rather than encrypted.",
+      "notes": "A logical store for the documents retained in the vendor platform, and deliberately not a separately identified database, bucket or service: the source says only that the documents stay in the platform, and names no store of its own. So this carries no reviewed alias — naming it after the platform would collapse it into boundary:vendor-platform, which is the zone that contains it. Enterprise-grade encryption throughout is a vendor marketing claim about the platform, not a stated property of this store, so encryption_at_rest is unknown rather than encrypted.",
       "trust_zone": "boundary:vendor-platform",
       "data_classification": "unknown",
       "encryption_at_rest": "unknown"
@@ -264,6 +264,12 @@
       "element_id": "process:supplier-portal",
       "attribute": "exposure",
       "basis": "The portal is a vendor-hosted SaaS product suppliers sign in to, and the source places suppliers nowhere on our networks."
+    },
+    {
+      "assumption": "Suppliers are placed on the public internet because the schema requires a zone; the source places them nowhere.",
+      "element_id": "entity:supplier",
+      "attribute": "trust_zone",
+      "basis": "Supplier access to a SaaS product does not establish the suppliers' network location. The value is a placement the schema requires, not a source-backed fact."
     }
   ]
 }

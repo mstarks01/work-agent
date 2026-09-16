@@ -38,8 +38,20 @@
       "element": "process:supplier-portal",
       "name": "supplier document portal",
       "excerpt": "Supplier document portal.",
-      "ruling": "Supported by the portal\u2019s stated purpose and users."
+      "ruling": "Supported by the portal’s stated purpose and users."
+    },
+    {
+      "element": "process:supplier-portal",
+      "name": "portal",
+      "excerpt": "The portal is a SaaS product.",
+      "ruling": "The source calls it 'the portal' throughout; one portal. Ruled by the maintainer on 2026-09-16 (#961 step 6)."
+    },
+    {
+      "element": "store:document-store",
+      "name": "vendor platform",
+      "excerpt": "documents themselves stay in the vendor's platform",
+      "ruling": "Accepted as the storage role the source states for the documents. The alias keeps the store type, so a vendor platform modelled as anything but a store is not this element, and the whole SaaS platform is not equated with the store unconditionally. Ruled by the maintainer on 2026-09-16 (#961 step 6)."
     }
   ],
-  "notes": "Adversarial case 2 of 2, replacing the repair-to-reject case ticket 029 originally specified (see the ticket resolution: that path is unreachable from source text and is already pinned offline by tests/test_pipeline.py). Where case 11 grades silence, this one grades noise dressed as fact. The source is dense with assurance that states nothing verifiable \u2014 secure by design, enterprise-grade encryption throughout, fully authenticated and audited, fully compliant \u2014 and none of it may set an attribute; it also leaves a control genuinely open, claiming the nightly extract is encrypted end to end where the runbook says it arrives as a plain CSV \u2014 one names no layer and the other describes the file at rest \u2014 which must resolve to unknown rather than to either side. One genuine control is stated among the noise (vendor-issued username and password on supplier sign-in) so the case cannot be passed by discarding everything, and one genuine absence is stated (picked up as-is) so grounded findings remain available. Far from the payments exemplar in shape: the trust hand-off is an organizational one into a platform we run no part of and can verify nothing inside, and the availability failure is silent staleness."
+  "notes": "Adversarial case 2 of 2, replacing the repair-to-reject case ticket 029 originally specified (see the ticket resolution: that path is unreachable from source text and is already pinned offline by tests/test_pipeline.py). Where case 11 grades silence, this one grades noise dressed as fact. The source is dense with assurance that states nothing verifiable — secure by design, enterprise-grade encryption throughout, fully authenticated and audited, fully compliant — and none of it may set an attribute; it also leaves a control genuinely open, claiming the nightly extract is encrypted end to end where the runbook says it arrives as a plain CSV — one names no layer and the other describes the file at rest — which must resolve to unknown rather than to either side. One genuine control is stated among the noise (vendor-issued username and password on supplier sign-in) so the case cannot be passed by discarding everything, and one genuine absence is stated (picked up as-is) so grounded findings remain available. Far from the payments exemplar in shape: the trust hand-off is an organizational one into a platform we run no part of and can verify nothing inside, and the availability failure is silent staleness."
 }

@@ -33,3 +33,11 @@ graded by the same `unknown`/assumption distinction — the corpus now has a cas
 pulling on each side of it. Correction 7 is the familiar dropped-actor error
 from cases 02 and 04, and it landed on the actor the reader is least inclined to
 model, the one on the far side of an organizational boundary.
+
+## Rulings of 2026-09-16 (#961 step 6)
+
+| # | Path | Ruling |
+|---|---|---|
+| a | `entity:supplier.trust_zone` | Supplier access to SaaS does not establish the suppliers' network location. The placement is now recorded as an assumption, so the replay reads `boundary:public-internet` as a placeholder and not a required zone. `suppliers` may describe an actor group, not a network. |
+| b | `store:document-store` | The reference stands as a logical document store; `vendor platform` is accepted as an alias for that storage role (`case.json`). |
+| c | `process:supplier-portal` | `portal` is accepted as an alias. |

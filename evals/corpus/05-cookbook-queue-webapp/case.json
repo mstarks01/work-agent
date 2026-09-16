@@ -27,5 +27,19 @@
       "exemplar_proximity": "far"
     }
   ],
-  "notes": "Cookbook conversion 1 of 2. Faithful to the source diagram's elements, flows and boundaries; the source.md is a prose rendering of the diagram, since the service's input is submitted text, not a DFD file. The original model's own threat annotations were used only as a sanity check that the blessed reference set does not miss what a human modeller found — not as the reference set itself, which is written against our schema, our tiers and our severity model. Structurally far from the payments exemplar in one specific way that earns its place: the trust hand-off is an asynchronous queue rather than a synchronous call, so both the poisoned-message threat and the loss of request attribution have no exemplar analogue. Attribute-poor by nature, so it also exercises how analysts behave when most attributes are unknown."
+  "notes": "Cookbook conversion 1 of 2. Faithful to the source diagram's elements, flows and boundaries; the source.md is a prose rendering of the diagram, since the service's input is submitted text, not a DFD file. The original model's own threat annotations were used only as a sanity check that the blessed reference set does not miss what a human modeller found — not as the reference set itself, which is written against our schema, our tiers and our severity model. Structurally far from the payments exemplar in one specific way that earns its place: the trust hand-off is an asynchronous queue rather than a synchronous call, so both the poisoned-message threat and the loss of request attribution have no exemplar analogue. Attribute-poor by nature, so it also exercises how analysts behave when most attributes are unknown.",
+  "aliases": [
+    {
+      "element": "entity:browser",
+      "name": "user's browser",
+      "excerpt": "A user's browser talks to the web application",
+      "ruling": "The source's own words for the browser. Ruled by the maintainer on 2026-09-16 (#961 step 6)."
+    },
+    {
+      "element": "process:background-worker-process",
+      "name": "background worker",
+      "excerpt": "The background worker reads and writes the database.",
+      "ruling": "The source drops the word 'process' on second mention; one worker. Ruled by the maintainer on 2026-09-16 (#961 step 6)."
+    }
+  ]
 }
