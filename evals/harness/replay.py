@@ -632,7 +632,13 @@ def bind_assertions(
 
 @dataclass(frozen=True)
 class Arm:
-    """What one archived sweep was: the node's instruction and the models that ran it."""
+    """What one archived sweep was: the node's instruction and the models that answered it.
+
+    ``models`` is what answered the archived node, read off the sweep's own
+    execution record, never the tier table. Two sweeps with one tier table
+    and one prompt are two arms when the node ran on different tiers, which
+    is exactly the per-phase model comparison #961 step 6 asks for.
+    """
 
     node: str
     instruction: str
@@ -671,10 +677,13 @@ def arm_of(artifact: EvalArtifact) -> Arm:
             f"{artifact.path}: the instruction block names {len(digests)} digests"
             f" for {node}, so the sweep cannot be placed on one arm"
         )
-    tiers = artifact.block("models")["tiers"]
-    models = tuple(
-        sorted({f"{tier['vendor']}/{tier['model']}" for tier in tiers.values()})
-    )
+    executions = artifact.block("provenance")["node_runs"].get(node, [])
+    if not executions:
+        raise ValueError(
+            f"{artifact.path}: the provenance block records no execution of {node},"
+            " so the sweep cannot be placed on an arm"
+        )
+    models = tuple(sorted({execution["requested_model"] for execution in executions}))
     return Arm(node, next(iter(digests)), models)
 
 
