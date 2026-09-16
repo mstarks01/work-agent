@@ -1111,7 +1111,7 @@ class TokenUsage:
 > assertion catalog the job's lanes selected from, with each row's basis and
 > assessment, and the rows the resolver and the gate refused. `None` on a job
 > that ran no assertion pass, which is every job on a deployment that has not
-> selected one. A sixth `Ground` kind, `assertion`, references a row in it.
+> set `ANALYSIS_ASSERTIONS`. A sixth `Ground` kind, `assertion`, references a row in it.
 > Additive on the same argument as `model_repair`, and it rides 3.0 for the
 > reason `absent-attribute` does: 3.0 has never shipped.
 

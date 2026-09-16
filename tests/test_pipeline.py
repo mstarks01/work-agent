@@ -19,6 +19,13 @@ from google.adk.models import LlmResponse
 
 from analysis_service import graph
 from analysis_service.api import create_app
+from analysis_service.assertions import (
+    ABSENT,
+    Assertion,
+    AssertionProposal,
+    CatalogProposal,
+    assertion_id,
+)
 from analysis_service.claims import ProposedVerdict, UnknownRef
 from analysis_service.frameworks import PACKAGES, FrameworkName
 from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
@@ -149,6 +156,73 @@ def test_a_clean_run_produces_a_report():
     assert set(ANALYZE_NODES) <= set(visited)
     assert graph.REPAIR_NODE not in visited
     assert graph.REJECT_NODE not in visited
+
+
+def test_a_stated_absence_reaches_the_report_as_a_fact_a_claim_rests_on():
+    """The exit criterion of #961 step 5, end to end over the scripted graph.
+
+    The sources say shoppers sign in with a password and nothing else. With the
+    pass built in, ``assert`` writes that as a row, ``prepare`` offers it in
+    the table the spoofing agent selects from, the agent cites it, the fan-in
+    resolves the citation against the record ``prepare`` parked, and the report
+    embeds both the row and the ground. The same job without the pass carries
+    neither, and a claim citing the row would have been dropped.
+    """
+    row = Assertion(
+        subject="principal:shoppers",
+        predicate="mfa-requirement",
+        value=ABSENT,
+        basis="inferred",
+        explanation="the description names a password and no second factor",
+    )
+    replies = happy_replies() | {
+        graph.ASSERT_NODE: CatalogProposal(
+            assertions=[
+                AssertionProposal(
+                    subject_type="principal",
+                    subject="shoppers",
+                    predicate="mfa-requirement",
+                    value=ABSENT,
+                    basis="inferred",
+                    explanation=row.explanation,
+                )
+            ]
+        ).model_dump_json(),
+        graph.analyze_node_name("stride", "spoofing"): proposal_json(
+            "S-01", "spoofing", evidence_refs=[assertion_id(row)], quotes=[]
+        ),
+    }
+    pipeline, _ = build(replies, assertions=True)
+    outcome, visited = run(pipeline, job())
+
+    assert isinstance(outcome, PipelineCompleted)
+    report = outcome.report
+    assert visited[:4] == [
+        graph.EXTRACT_NODE,
+        graph.VALIDATE_NODE,
+        graph.READ_MODEL_NODE,
+        graph.ASSERT_NODE,
+    ]
+    assert report.assertions is not None
+    assert report.assertions.catalog.entries == [row]
+    (claim,) = block(report).claims
+    assert [ground.assertion for ground in claim.grounds] == [assertion_id(row)]
+    assert block(report).dropped_claims == []
+    assert any(node.node == graph.ASSERT_NODE for node in report.nodes)
+
+    # The same lanes on the graph without the pass: no row, and the citation
+    # names nothing, so the claim is dropped and the report says so.
+    without, _ = build(
+        {name: reply for name, reply in replies.items() if name != graph.ASSERT_NODE}
+    )
+    outcome, visited = run(without, job())
+    assert isinstance(outcome, PipelineCompleted)
+    assert outcome.report.assertions is None
+    assert graph.ASSERT_NODE not in visited
+    assert block(outcome.report).claims == []
+    assert [dropped.claim_id for dropped in block(outcome.report).dropped_claims] == [
+        "S-01"
+    ]
 
 
 def test_a_draft_resting_on_an_unknown_still_reaches_the_critic():

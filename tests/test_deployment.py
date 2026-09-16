@@ -21,6 +21,7 @@ from analysis_service.compact import (
     CompactSystemModel,
 )
 from analysis_service.deployment import (
+    ASSERTIONS_VAR,
     BLESSED_FINGERPRINTS_VAR,
     COMPACT_EXTRACTION_VAR,
     MODEL_TIERS_VAR,
@@ -332,6 +333,35 @@ def test_an_entry_that_extracts_nothing_records_no_transport():
 
     assert seeded.extraction_format is None
     assert extracting.extraction_format == COMPACT_FORMAT
+
+
+# --- The assertion pass -----------------------------------------------------
+
+
+def test_an_install_that_sets_nothing_runs_no_assertion_pass():
+    deployment = Deployment.from_env(env=VERTEX_ENV)
+    pipeline = deployment.pipeline(DEFAULT_FRAMEWORKS)
+
+    assert deployment.assertions is False
+    assert graph.ASSERT_NODE not in pipeline.node_models
+
+
+def test_the_flag_puts_the_pass_into_every_graph_that_prepares():
+    env = VERTEX_ENV | {ASSERTIONS_VAR: "true"}
+    deployment = Deployment.from_env(env=env)
+
+    production = deployment.pipeline(DEFAULT_FRAMEWORKS)
+    seeded = deployment.pipeline(DEFAULT_FRAMEWORKS, entry=graph.ENTRY_PREPARE)
+    extracting = deployment.pipeline(DEFAULT_FRAMEWORKS, entry=graph.ENTRY_EXTRACT_ONLY)
+
+    assert deployment.assertions is True
+    assert graph.ASSERT_NODE in production.node_models
+    assert graph.ASSERT_NODE in seeded.node_models
+    assert graph.ASSERT_NODE not in extracting.node_models
+    assert (
+        production.node_models[graph.ASSERT_NODE]
+        == (production.node_models[graph.EXTRACT_NODE])
+    ), "the pass runs on the base tier beside extraction"
 
 
 def test_the_llm_nodes_share_two_adapters_one_per_tier():

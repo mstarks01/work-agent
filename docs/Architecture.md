@@ -19,11 +19,12 @@ model calls:
 flowchart TD
     start([text in]) --> extract["extract<br/>(base)"]
     extract --> validate{{validate}}
-    validate -- valid --> prepare[prepare]
+    validate -- valid --> assert["assert<br/>(base, ANALYSIS_ASSERTIONS)"]
     validate -- invalid --> repair["repair<br/>(base)"]
     repair --> revalidate{{revalidate}}
-    revalidate -- valid --> prepare
+    revalidate -- valid --> assert
     revalidate -- invalid --> reject([rejected])
+    assert --> prepare[prepare]
 
     prepare --> analyze["lane agents, in parallel<br/>one per lane of each framework<br/>(strong)"]
     analyze --> merge["merge<br/>(per framework)"]
@@ -44,7 +45,7 @@ flowchart TD
     classDef bad fill:#fee2e2,stroke:#dc2626,stroke-width:1.5px,color:#450a0a
     classDef io fill:#f1f5f9,stroke:#64748b,stroke-width:1.5px,color:#0f172a
 
-    class extract,repair,analyze,critic,recritic llm
+    class extract,repair,assert,analyze,critic,recritic llm
     class prepare,merge,assemble code
     class validate,revalidate,router,rereview gate
     class report good
@@ -54,7 +55,8 @@ flowchart TD
 
 Purple nodes are model calls. Everything else is a deterministic `FunctionNode`:
 blue ones do work, amber ones only choose an edge, and the rounded ends are the
-run's three outcomes.
+run's three outcomes. `assert` is in the graph only where the deployment sets
+`ANALYSIS_ASSERTIONS`; otherwise a valid model goes straight to `prepare`.
 
 - **extract** turns the untrusted text into a canonical system model (five DFD
   element types: external entity, process, data store, data flow, trust
@@ -153,6 +155,31 @@ one variable and a restart.
 | Variable | Effect |
 | --- | --- |
 | `ANALYSIS_COMPACT_EXTRACTION` | Ask `extract` for the compact wire form. Off by default. |
+
+## The assertion pass
+
+`ANALYSIS_ASSERTIONS` puts one more `base`-tier call into every job, between
+the validity gate and `prepare`. The `assert` node reads the sources against
+the validated model and proposes one row per statement the sources make: a
+subject, a predicate from the service's registry, a value, a scope and the
+quote that says so. `prepare` resolves the proposal in code, once, and parks
+the record every later node reads. A settled row of a predicate the graph has
+no field for — a second factor stated absent, a credential stated shared — is
+then an entry in the evidence catalog every lane selects from, and the report
+embeds the catalog and the rows the resolver refused under `assertions`. See
+[ADR 0034](adr/0034-an-assertion-is-a-scoped-fact-with-a-support-span.md) for
+the contract and
+[ADR 0036](adr/0036-a-settled-assertion-is-evidence-a-lane-may-cite.md) for
+what a lane may cite.
+
+An `assert` node that writes nothing fails the job, on the rule a silent lane
+fails it: a pass the deployment selected and a pass that never ran are not the
+same report. The pass is off by default, and a report built without it carries
+`assertions: null` and every other field it carried before.
+
+| Variable | Effect |
+| --- | --- |
+| `ANALYSIS_ASSERTIONS` | Run the assertion pass on every job. Off by default. |
 
 ## Models
 
