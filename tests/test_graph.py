@@ -3449,3 +3449,25 @@ def test_merge_drops_a_gap_that_rests_on_absence_alone():
     (dropped,) = ctx.state[asvs_nodes.key("marks")]["dropped_claims"]
     assert dropped["claim_id"] == "v5.0.0-6.2.1"
     assert "absent elements alone" in dropped["reason"]
+
+
+class TestThePerFrameworkRoles:
+    """``ROLES`` is the set, so nothing states a count that a seventh role broke.
+
+    ``FrameworkNodes.node`` said "one of the six per-framework roles" while
+    seven role constants stood beside it. A count in a docstring is a fact
+    nothing reads; a tuple is one this reads.
+    """
+
+    def test_it_holds_every_role_constant_the_module_declares(self):
+        declared = {
+            value
+            for name, value in vars(graph).items()
+            if name.endswith("_ROLE") and isinstance(value, str)
+        }
+        assert set(graph.ROLES) == declared
+
+    def test_every_role_names_a_node_of_its_own(self):
+        """A role that named the same node as another would silently merge two."""
+        named = [NODES.node(role) for role in graph.ROLES]
+        assert len(set(named)) == len(graph.ROLES)
