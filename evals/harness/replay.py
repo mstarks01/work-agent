@@ -171,10 +171,15 @@ class ElementFate:
     #: that names some: the same slug under another type, the flows touching
     #: the endpoints, the unpaired elements of its type.
     candidates: tuple[str, ...] = ()
+    #: What the pair rests on, on a ``found`` or ``renamed``: the alignment's
+    #: own evidence kind, so a table can say how much of ``renamed`` a rule
+    #: that reads structure carries. Empty on every loss.
+    evidence: str = ""
 
     def to_json(self) -> dict[str, Any]:
         return {
             "reference": self.reference,
+            "evidence": self.evidence,
             "fate": self.fate,
             "produced": self.produced,
             "candidates": list(self.candidates),
@@ -233,6 +238,7 @@ def classify_elements(
             pair.reference,
             "found" if pair.evidence == "exact" else "renamed",
             pair.produced,
+            evidence=pair.evidence,
         )
         for pair in alignment.pairs
     ]
@@ -842,6 +848,7 @@ def pooled_extraction(sweeps: Sequence[SweepReplay]) -> dict[str, Any]:
     by_type: dict[str, Counter[str]] = defaultdict(Counter)
     per_element: dict[str, Counter[str]] = defaultdict(Counter)
     wrong_facts: Counter[str] = Counter()
+    renamed_by: Counter[str] = Counter()
     emissions = 0
     unparsed = 0
     extra = 0
@@ -853,6 +860,8 @@ def pooled_extraction(sweeps: Sequence[SweepReplay]) -> dict[str, Any]:
             counts.update(replay.counts)
             for row in replay.fates:
                 by_type[element_type(row.reference)][row.fate] += 1
+                if row.fate == "renamed":
+                    renamed_by[row.evidence] += 1
                 if row.fate in LOSSES:
                     per_element[f"{replay.case_id}/{row.reference}"][row.fate] += 1
             wrong_facts.update(check.key for check in replay.wrong_facts)
@@ -865,6 +874,9 @@ def pooled_extraction(sweeps: Sequence[SweepReplay]) -> dict[str, Any]:
         "unparsed": unparsed,
         "extra": extra,
         "fates": {fate: counts[fate] for fate in FATES},
+        # What each renamed pair rests on, by the alignment's evidence kind,
+        # so a rule that reads structure is visible in the number it moves.
+        "renamed_by": dict(sorted(renamed_by.items())),
         "spread": _spread(sweeps),
         # The same fates per element type, because the question a prompt
         # change asks is usually about one type: whether the actors were
@@ -1096,6 +1108,9 @@ def _render_extraction(pool: dict[str, Any], targets: int) -> None:
         per_kind = " ".join(f"{pool['by_type'][kind][fate]:>8}" for kind in kinds)
         total, mean = pool["fates"][fate], pool["fates"][fate] / per
         print(f"  {fate:<20} {total:>5} {mean:>9.1f}  {per_kind}")
+    if pool["renamed_by"]:
+        listed = ", ".join(f"{kind} {n}" for kind, n in pool["renamed_by"].items())
+        print(f"  renamed by: {listed}")
     spread = pool["spread"]
     print(
         f"  spread: sd of the per-sweep count over the {spread['sweeps']} sweep(s)"

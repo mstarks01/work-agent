@@ -209,7 +209,9 @@ class TestInteractionsAlignOneToOne:
         The endpoint fold kept interaction recall at 1.0 because the pair
         still carried two flows. The alignment pairs the untouched flow by
         label and leaves the fabricated one, whose operation and protocol
-        state agree with nothing, unpaired on both sides.
+        state agree with nothing, unpaired on both sides. Rule 6 does not
+        reach it: it pairs the sole flow on each side, and this endpoint pair
+        carries two.
         """
         model = parallel.model.model_copy(deep=True)
         pairs = Counter((f.source, f.destination) for f in model.data_flows)
@@ -303,7 +305,7 @@ class TestAFlowAliasIsReadBetweenItsEndpoints:
         before = align(golden, model)
         after = align(ruled, model)
 
-        assert flow_id in before.unaligned_reference
+        assert [p.evidence for p in before.pairs if p.reference == flow_id] == ["sole"]
         (pair,) = after.by_evidence("alias")
         assert pair.reference == flow_id
         assert pair.produced.endswith(":load-artifacts")
@@ -332,6 +334,98 @@ class TestAFlowAliasIsReadBetweenItsEndpoints:
 
         assert after.by_evidence("alias") == ()
         assert flow_id in after.unaligned_reference
+
+
+class TestAZoneIsPairedByItsMembers:
+    """Rule 3: a zone's name is coined; where its paired members sit is the fact."""
+
+    def test_the_zone_holding_most_paired_members_pairs_as_membership(self):
+        golden = case("04")
+        model = renamed(golden.model, "boundary:serving-edge", "GKE")
+
+        aligned = align(golden, model)
+
+        (pair,) = aligned.by_evidence("membership")
+        assert pair.reference == "boundary:serving-edge"
+        assert pair.produced == "boundary:gke"
+
+    def test_a_tie_is_listed_and_pairs_nothing(self):
+        golden = case("04")
+        raw = renamed(golden.model, "boundary:serving-edge", "GKE").model_dump(
+            mode="json"
+        )
+        # The zone's two paired members split across two produced zones.
+        raw["trust_boundaries"].append(
+            {**raw["trust_boundaries"][0], "id": "boundary:edge", "name": "edge"}
+        )
+        next(s for s in raw["data_stores"] if s["id"] == "store:inference-log")[
+            "trust_zone"
+        ] = "boundary:edge"
+
+        aligned = align(golden, SystemModel.model_validate(raw))
+
+        assert aligned.by_evidence("membership") == ()
+        assert any(a.reference == ("boundary:serving-edge",) for a in aligned.ambiguous)
+
+    def test_a_produced_zone_two_reference_zones_claim_pairs_neither(self):
+        golden = case("04")
+        raw = golden.model.model_dump(mode="json")
+        # Every zoned element into one produced zone named otherwise.
+        raw["trust_boundaries"] = [
+            {
+                **raw["trust_boundaries"][0],
+                "id": "boundary:everything",
+                "name": "everything",
+            }
+        ]
+        for key in ("processes", "external_entities", "data_stores"):
+            for element in raw[key]:
+                element["trust_zone"] = "boundary:everything"
+
+        aligned = align(golden, SystemModel.model_validate(raw))
+
+        assert aligned.by_evidence("membership") == ()
+        assert any(a.produced == ("boundary:everything",) for a in aligned.ambiguous)
+
+
+class TestTheSoleFlowBetweenFoundEndpoints:
+    """Rule 6: one flow each side between two found elements is one interaction."""
+
+    def test_a_lone_flow_under_another_label_with_other_facts_pairs_as_sole(self):
+        golden = case("04")
+        flow_id = "flow:model-server-to-model-registry-bucket:load-artifact"
+        model = relabelled(golden.model, flow_id, "fetch model")
+        raw = model.model_dump(mode="json")
+        next(f for f in raw["data_flows"] if f["id"].endswith(":fetch-model"))[
+            "protocol"
+        ] = "unknown"
+
+        aligned = align(golden, SystemModel.model_validate(raw))
+
+        (pair,) = aligned.by_evidence("sole")
+        assert pair.reference == flow_id
+        assert pair.produced.endswith(":fetch-model")
+
+    def test_two_produced_flows_beside_one_reference_flow_stay_unpaired(self):
+        golden = case("04")
+        flow_id = "flow:model-server-to-model-registry-bucket:load-artifact"
+        model = relabelled(golden.model, flow_id, "fetch model")
+        raw = model.model_dump(mode="json")
+        one = next(f for f in raw["data_flows"] if f["id"].endswith(":fetch-model"))
+        one["protocol"] = "unknown"
+        raw["data_flows"].append(
+            {
+                **one,
+                "id": one["id"].replace(":fetch-model", ":verify-model"),
+                "name": "verify model",
+                "operations": "read",
+            }
+        )
+
+        aligned = align(golden, SystemModel.model_validate(raw))
+
+        assert aligned.by_evidence("sole") == ()
+        assert flow_id in aligned.unaligned_reference
 
 
 class TestTheAlignmentIsTheOneReader:
