@@ -13,9 +13,11 @@ from typing import get_args
 import pytest
 from pydantic import ValidationError
 
+from analysis_service.analysis import ABSENT_WORD
 from analysis_service.assertions import (
     ABSENT,
     BASIS_RANK,
+    GATE_REFUSALS,
     GRAPH_BOUND,
     MAX_ASSERTIONS,
     MAX_QUOTE_CHARS,
@@ -45,6 +47,8 @@ from analysis_service.assertions import (
     assertion_id,
     catalog_issues,
     conflicts,
+    contradiction_issues,
+    contradictions,
     project,
     projection_fields,
     referent_type,
@@ -582,8 +586,17 @@ class TestWhatTheGateRefuses:
         assert code in codes(catalog_issues(held, **reads)), why
 
     def test_every_refusal_code_has_a_fixture(self):
-        """The table answers ``CatalogIssueCode``, with nothing left over."""
-        assert set(REFUSALS) == set(get_args(CatalogIssueCode))
+        """The table answers every code the gate raises, with nothing left over.
+
+        ``graph-contradiction`` is outside it and has its own class below: the
+        gate refuses rows, and that code refuses none.
+        """
+        assert set(REFUSALS) == GATE_REFUSALS
+
+    def test_the_one_code_outside_the_gate_is_the_one_that_drops_no_row(self):
+        assert set(get_args(CatalogIssueCode)) - GATE_REFUSALS == {
+            "graph-contradiction"
+        }
 
     @pytest.mark.parametrize(
         "code", ["wrong-registry-version", "too-many-assertions", "too-many-subjects"]
@@ -1601,3 +1614,95 @@ class TestTheOneReaderOfAReferentType:
         )
         assert codes(catalog_issues(catalog([row]))) == ["illegal-value"]
         assert referent_type(REGISTRY[row.predicate]) is None
+
+
+class TestAGraphAttributeAndItsRowsStatingOpposites:
+    """The audit's own defect: an explicit absence standing in the graph as a control.
+
+    ``contradictions`` is the one reader, and what it must *not* do matters as
+    much as what it must: two wordings of one mechanism are one answer spelled
+    twice, and reporting those would put a finding on every run.
+    """
+
+    def model(self, authentication="session cookie"):
+        return SystemModel.model_validate(
+            {
+                "external_entities": [
+                    {
+                        "id": "entity:shopper",
+                        "name": "shopper",
+                        "kind": "human",
+                        "trust_zone": "boundary:internet",
+                    }
+                ],
+                "processes": [
+                    {
+                        "id": "process:storefront-api",
+                        "name": "storefront API",
+                        "technology": "web",
+                        "trust_zone": "boundary:app",
+                        "exposure": "internet-facing",
+                        "interface_kind": "web",
+                    }
+                ],
+                "trust_boundaries": [
+                    {"id": "boundary:internet", "name": "internet", "kind": "network"},
+                    {"id": "boundary:app", "name": "app", "kind": "network"},
+                ],
+                "data_flows": [
+                    {
+                        "id": FLOW,
+                        "name": "place order",
+                        "source": "entity:shopper",
+                        "destination": "process:storefront-api",
+                        "protocol": "https",
+                        "authentication": authentication,
+                        "data_description": "an order",
+                        "encryption_in_transit": "TLS",
+                    }
+                ],
+            }
+        )
+
+    def test_a_stated_absence_under_a_graph_control_is_reported(self):
+        """The defect #926 was opened for, now visible in the report."""
+        held = catalog([stated(value=ABSENT)])
+        found = contradictions(held, self.model())
+        assert [(entry.attribute, entry.carried) for entry in found] == [
+            ("authentication", "session cookie")
+        ]
+
+    def test_a_graph_absence_under_a_stated_row_is_reported_too(self):
+        """The mirror, because either side can be the wrong one."""
+        found = contradictions(catalog([stated()]), self.model(authentication="none"))
+        assert len(found) == 1 and found[0].projected == "email and password"
+
+    def test_two_wordings_of_one_mechanism_are_not_a_contradiction(self):
+        """Otherwise every run reports one, and the finding means nothing."""
+        assert contradictions(catalog([stated()]), self.model()) == ()
+
+    def test_silence_on_either_side_is_not_an_opposite(self):
+        """A graph attribute nobody stated is the projection doing its job."""
+        assert contradictions(catalog([stated()]), self.model(UNKNOWN)) == ()
+
+    def test_an_issue_names_both_values_so_a_reader_can_see_the_pair(self):
+        """Which of the two is wrong is not decidable here.
+
+        The projected half is spelled ``"none"`` rather than ``absent``: a
+        projection writes the word the **System Model** uses, which is what
+        :func:`~analysis_service.analysis.control_state` reads as an absence.
+        The two spellings of one fact are why this is asserted rather than
+        assumed.
+        """
+        issues = contradiction_issues(catalog([stated(value=ABSENT)]), self.model())
+        assert codes(issues) == ["graph-contradiction"]
+        assert "'session cookie'" in issues[0].message
+        assert f"'{ABSENT_WORD}'" in issues[0].message
+
+    def test_the_row_stays_settled_because_it_is_not_a_refused_row(self):
+        """A contradiction makes a fact visible; it never drops one."""
+        held = catalog([stated(value=ABSENT)])
+        assert len(settled(held)) == 1
+        assert all(
+            issue.row is None for issue in contradiction_issues(held, self.model())
+        )
