@@ -302,7 +302,7 @@ def _check(name: str, problems: list[str], notes: list[str] | None = None) -> Ch
 # Each of these reads its kind out of :data:`KINDS` and is bound to one by
 # ``partial`` in that kind's preflight. Written once because the three kinds
 # differ only in a path prefix, a noun and a count, and all three of those
-# already live on the :class:`Kind` — which is what ``CLAUDE.md`` means by
+# already live on the :class:`Kind` — which is what ``AGENTS.md`` means by
 # keying machinery that grows an entry per anything. A fourth kind adds a
 # table row and no check.
 

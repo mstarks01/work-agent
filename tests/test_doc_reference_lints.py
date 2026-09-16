@@ -75,7 +75,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 #: Trees whose prose describes a state the repository has left, by convention
-#: recorded in ``CLAUDE.md`` and ``docs/agents/``. ``.wayfinder/`` holds
+#: recorded in ``AGENTS.md`` and ``docs/agents/``. ``.wayfinder/`` holds
 #: completed maps that are archived history rather than live, and
 #: ``docs/research/`` is frozen evidence — both name files that were real when
 #: they were written, and rewriting either would destroy the record.
