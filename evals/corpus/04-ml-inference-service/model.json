@@ -164,10 +164,11 @@
       "source": "process:model-server",
       "destination": "store:redis-feature-store",
       "protocol": "Redis protocol",
-      "authentication": "none",
+      "authentication": "unknown",
       "data_description": "account age and spend bands per customer",
       "encryption_in_transit": "unknown",
-      "operations": "read"
+      "operations": "read",
+      "notes": "The source says Redis has no password on it, which establishes the absence of password authentication and not the absence of every mechanism."
     },
     {
       "id": "flow:inference-gateway-to-inference-log:write-request-log",
@@ -248,6 +249,24 @@
       "element_id": "store:redis-feature-store",
       "attribute": "data_classification",
       "basis": "The source says it holds account age and spend bands per customer, which is customer-specific information; the classification is inferred under the scheme, not quoted."
+    },
+    {
+      "assumption": "The model registry bucket is placed in the model network because the schema requires a zone; the source does not place it.",
+      "element_id": "store:model-registry-bucket",
+      "attribute": "trust_zone",
+      "basis": "Loading artifacts from a bucket does not establish co-location. The value is a placement the schema requires, not a source-backed fact."
+    },
+    {
+      "assumption": "The inference gateway is placed in its own serving-edge zone because the schema requires a zone; the source names no such zone.",
+      "element_id": "process:inference-gateway",
+      "attribute": "trust_zone",
+      "basis": "Internet exposure does not establish a separate serving-edge network. The value is a placement the schema requires, not a source-backed fact."
+    },
+    {
+      "assumption": "The inference log is placed in the serving-edge zone because the schema requires a zone; the source does not place it.",
+      "element_id": "store:inference-log",
+      "attribute": "trust_zone",
+      "basis": "Writing to BigQuery does not place it in the gateway's network. The value is a placement the schema requires, not a source-backed fact."
     }
   ]
 }

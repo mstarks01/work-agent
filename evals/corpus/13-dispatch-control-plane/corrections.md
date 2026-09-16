@@ -43,3 +43,23 @@ follows one ruling, and `facts.json` changed with it.
 | # | Path | Before | After | Ruling |
 |---|---|---|---|---|
 | 10 | `store:dispatch-database.trust_zone` | `boundary:production-control-plane`, no assumption | same value + a placeholder assumption | The API is placed in the control plane; the database is not. Access does not entail co-location. The zone stays because the schema needs one; `facts.json` reads it unknown. |
+
+## Signing of 2026-09-16 (#961 step 3)
+
+The maintainer signed every row of `facts.json` in a session, ruling on each
+against `source.md`. Three zones were ruled placements the schema requires
+rather than facts the source states, and `model.json` records each as an
+assumption:
+
+| # | Path | Ruling |
+|---|---|---|
+| 11 | `store:schedule-archive.trust_zone` | "A folder on the corporate file store" establishes affiliation and a folder-on-file-store relationship, not placement on the corporate network. |
+| 12 | `process:corporate-web-host.trust_zone` | "Our corporate web host" does not establish network location. |
+| 13 | `entity:scheduling-partner.trust_zone` | Another company establishes an ownership boundary, not a network placement. |
+
+The console keeps an inferred corporate-network placement: it executes in
+the browsers of engineers on the corporate network. The two stated grants
+are scoped to the two rights the source names, crew movements and depot work
+assignments, and the corporate laptop's absent grant covers those two alone.
+The partner platform zone's ownership is inferred, conditional on the zone
+standing for the partner's organizational boundary.

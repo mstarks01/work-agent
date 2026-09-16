@@ -21,7 +21,7 @@
         "exclusive": true
       },
       "rationale": "The source states it outright and states that nothing else is exposed, so the row is exclusive: a catalog that reads it may close the world on exposure.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -42,7 +42,7 @@
         "exclusive": false
       },
       "rationale": "The source says the order service is not exposed outside. model.json records the same value with an assumption calling it a statement of intent; an assertion says what the source states and nothing about the deployed system, so the basis is stated. Weakest reading in this file: the reviewer may prefer inferred.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -63,55 +63,52 @@
         "exclusive": false
       },
       "rationale": "The source places the order service in the core network, which the model's core-services zone stands for (case.json holds the alias).",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
         "subject_type": "component",
         "subject": "process:storefront-api",
         "predicate": "network-membership",
-        "value": "boundary:storefront-dmz",
-        "reason": null,
+        "value": "unknown",
+        "reason": "silent",
         "scope": [],
-        "basis": "inferred",
+        "basis": "stated",
         "quotes": [],
-        "explanation": "The storefront API is the only component the source exposes to the internet, and the model gives that tier its own zone.",
         "exclusive": false
       },
-      "rationale": "The source names no zone for the storefront API; the DMZ is the model's placement of the one internet-exposed component.",
-      "reviewed_by": null
+      "rationale": "Internet exposure does not establish a DMZ or a separate network zone. model.json's zone is a placement the schema requires, recorded in its assumption.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
         "subject_type": "component",
         "subject": "store:orders-db",
         "predicate": "network-membership",
-        "value": "boundary:core-services",
-        "reason": null,
+        "value": "unknown",
+        "reason": "silent",
         "scope": [],
-        "basis": "inferred",
+        "basis": "stated",
         "quotes": [],
-        "explanation": "The order service reads and writes orders-db, and the source places the order service in the core network.",
         "exclusive": false
       },
-      "rationale": "The source never places the database; the order service, which is in the core network, reads and writes it.",
-      "reviewed_by": null
+      "rationale": "The service accessing the database does not establish that they share a network. model.json's zone is a placement the schema requires, recorded in its assumption.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
         "subject_type": "component",
         "subject": "store:receipt-archive",
         "predicate": "network-membership",
-        "value": "boundary:core-services",
-        "reason": null,
+        "value": "unknown",
+        "reason": "silent",
         "scope": [],
-        "basis": "inferred",
+        "basis": "stated",
         "quotes": [],
-        "explanation": "The order service writes the receipt archive, and the source places the order service in the core network.",
         "exclusive": false
       },
-      "rationale": "The source never places the bucket; the order service writes it.",
-      "reviewed_by": null
+      "rationale": "Writing to the bucket does not place it in the service's network. model.json's zone is a placement the schema requires, recorded in its assumption.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -127,7 +124,7 @@
         "exclusive": false
       },
       "rationale": "Shoppers reach the storefront API, the one component exposed to the internet.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -143,7 +140,7 @@
         "exclusive": false
       },
       "rationale": "A third party that calls back over the internet to the exposed component.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -164,7 +161,7 @@
         "exclusive": false
       },
       "rationale": "The source states the processor is a third party, which is the one ownership fact in the text.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -185,7 +182,7 @@
         "exclusive": false
       },
       "rationale": "Stated mechanism on the shopper's interaction. The cookie is recorded on the principal below rather than as a second predicate here, so the projection into authentication stays a value.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -195,18 +192,18 @@
         "value": "session cookie",
         "reason": null,
         "scope": [],
-        "basis": "stated",
+        "basis": "inferred",
         "quotes": [
           {
             "source_label": "System description",
             "quote": "get a session cookie"
           }
         ],
-        "explanation": "",
+        "explanation": "Receiving a cookie is stated; presenting it on later requests is implied.",
         "exclusive": false
       },
-      "rationale": "What a signed-in shopper presents after sign-in.",
-      "reviewed_by": null
+      "rationale": "Inferred: the source states the cookie is issued, and its presentation on later requests is implied.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -227,7 +224,7 @@
         "exclusive": false
       },
       "rationale": "An explicit absence, stated: the fact the assertion layer exists to keep.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -248,7 +245,7 @@
         "exclusive": false
       },
       "rationale": "An explicit absence, stated. model.json reads it as 'none; accepted by network position'.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -278,7 +275,7 @@
         "exclusive": false
       },
       "rationale": "The source states the whole check is reachability. 'Meant to be only the storefront API' is intent and is not a grant, so the principal is what the source names: anything that can reach it. The reviewer may prefer to name the storefront API.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -293,13 +290,17 @@
           {
             "source_label": "System description",
             "quote": "the order service reads and writes with a single application account"
+          },
+          {
+            "source_label": "System description",
+            "quote": "The password comes from an environment variable on the worker."
           }
         ],
         "explanation": "",
         "exclusive": false
       },
-      "rationale": "Stated mechanism. The source says 'single'; one account used by one service does not establish that several principals hold it, so no credential-sharing row is drafted.",
-      "reviewed_by": null
+      "rationale": "Stated mechanism, on two sentences: the single application account, and the password it authenticates with. The source says 'single'; one account used by one service does not establish that several principals hold it, so no credential-sharing row is drafted.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -329,7 +330,7 @@
         "exclusive": false
       },
       "rationale": "The grant the source states, with its resource and operation.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -339,18 +340,18 @@
         "value": "application account password",
         "reason": null,
         "scope": [],
-        "basis": "stated",
+        "basis": "inferred",
         "quotes": [
           {
             "source_label": "System description",
             "quote": "The password comes from an environment variable on the worker."
           }
         ],
-        "explanation": "",
+        "explanation": "Presentation of the password is implied by the account and password context; the source states where the password is kept.",
         "exclusive": false
       },
-      "rationale": "The source names the password as the credential the worker holds.",
-      "reviewed_by": null
+      "rationale": "Inferred: the source names the account and its password, and presenting the password follows from that context rather than being stated.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -371,7 +372,7 @@
         "exclusive": false
       },
       "rationale": "Stated custody; registry version 2 added the predicate for this sentence.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -392,7 +393,7 @@
         "exclusive": false
       },
       "rationale": "Stated transport protection.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -413,7 +414,7 @@
         "exclusive": false
       },
       "rationale": "Stated mechanism on the archive write.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -432,18 +433,22 @@
             "value": "write"
           }
         ],
-        "basis": "stated",
+        "basis": "inferred",
         "quotes": [
           {
             "source_label": "System description",
             "quote": "Every completed order also gets a receipt written to a Cloud Storage bucket"
+          },
+          {
+            "source_label": "System description",
+            "quote": "That is on TLS with the order service's own service account"
           }
         ],
-        "explanation": "",
+        "explanation": "The described write supports an effective permission held by the order service's own service account; no grant is stated as such.",
         "exclusive": false
       },
-      "rationale": "The write the source states the order service performs.",
-      "reviewed_by": null
+      "rationale": "Inferred: the source describes the write and names the account that performs it, which supports an effective permission; an authorization grant is not stated.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -464,7 +469,7 @@
         "exclusive": false
       },
       "rationale": "Stated protection at rest.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -485,7 +490,7 @@
         "exclusive": false
       },
       "rationale": "The speaker raises the question and does not answer it: a hedged unknown, which a produced catalog must retain rather than fill.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     }
   ],
   "disputed": []

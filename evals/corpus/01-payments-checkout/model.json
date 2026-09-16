@@ -216,6 +216,24 @@
       "element_id": "store:orders-db",
       "attribute": "data_classification",
       "basis": "The source says it holds \"shopper addresses and card-last-four\", which is personal and payment-related data, so disclosure harms the people described."
+    },
+    {
+      "assumption": "The storefront API is placed in its own DMZ zone because the schema requires a zone; the source names no such zone.",
+      "element_id": "process:storefront-api",
+      "attribute": "trust_zone",
+      "basis": "Internet exposure does not establish a DMZ or a separate network zone. The value is a placement the schema requires, not a source-backed fact."
+    },
+    {
+      "assumption": "The orders DB is placed in the core services zone because the schema requires a zone; the source does not place it.",
+      "element_id": "store:orders-db",
+      "attribute": "trust_zone",
+      "basis": "The order service accessing the database does not establish that they share a network. The value is a placement the schema requires, not a source-backed fact."
+    },
+    {
+      "assumption": "The receipt archive is placed in the core services zone because the schema requires a zone; the source does not place it.",
+      "element_id": "store:receipt-archive",
+      "attribute": "trust_zone",
+      "basis": "Writing to the bucket does not place it in the service's network. The value is a placement the schema requires, not a source-backed fact."
     }
   ]
 }

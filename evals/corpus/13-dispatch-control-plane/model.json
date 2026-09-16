@@ -298,6 +298,24 @@
       "element_id": "store:dispatch-database",
       "attribute": "trust_zone",
       "basis": "The dispatch API, which runs in the control plane, reads and writes the database. Access does not entail co-location, and no statement locates the database; the value is a placement the schema requires, not a source-backed fact."
+    },
+    {
+      "assumption": "The schedule archive is placed on the corporate network because the schema requires a zone; the source states a folder on the corporate file store.",
+      "element_id": "store:schedule-archive",
+      "attribute": "trust_zone",
+      "basis": "'A folder on the corporate file store' establishes affiliation and the folder-on-file-store relationship, not placement on the corporate network. The value is a placement the schema requires, not a source-backed fact."
+    },
+    {
+      "assumption": "The corporate web host is placed on the corporate network because the schema requires a zone; the source does not place it.",
+      "element_id": "process:corporate-web-host",
+      "attribute": "trust_zone",
+      "basis": "'Our corporate web host' does not establish network location. The value is a placement the schema requires, not a source-backed fact."
+    },
+    {
+      "assumption": "The scheduling partner is placed in a partner platform zone because the schema requires a zone; the source states only that it is another company.",
+      "element_id": "entity:scheduling-partner",
+      "attribute": "trust_zone",
+      "basis": "Another company establishes an ownership boundary, not a network placement. The value is a placement the schema requires, not a source-backed fact."
     }
   ]
 }

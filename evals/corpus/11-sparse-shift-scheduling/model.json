@@ -45,7 +45,7 @@
       "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:internal-network",
-      "exposure": "internet-facing",
+      "exposure": "unknown",
       "interface_kind": "web"
     },
     {
@@ -231,22 +231,34 @@
   ],
   "assumptions": [
     {
-      "assumption": "The scheduling web app is reachable from outside the internal network.",
-      "element_id": "process:scheduling-web-app",
-      "attribute": "exposure",
-      "basis": "Colleagues are stated to reach it from their own phones, which the source does not place on the internal network."
-    },
-    {
-      "assumption": "The scheduling web app itself sits on the internal network.",
+      "assumption": "The scheduling web app is placed on the internal network because the schema requires a zone; the source places it nowhere.",
       "element_id": "process:scheduling-web-app",
       "attribute": "trust_zone",
-      "basis": "The source lists the service, database and share as internal and does not place the web app anywhere; it is grouped with them for want of any stated zone of its own."
+      "basis": "The placement of the service, the database and the share does not establish the web app's placement. The value is a placement the schema requires, not a source-backed fact."
     },
     {
       "assumption": "The app both reads and writes rotas through the scheduling service.",
       "element_id": "flow:scheduling-web-app-to-scheduling-service:rota-requests",
       "attribute": "operations",
       "basis": "The interaction itself is described only as 'talks to'. Managers build rotas through the app and colleagues view their shifts through it, and the service is what reads and writes the rotas, so the app's path carries both."
+    },
+    {
+      "assumption": "The colleague is placed on the public internet because the schema requires a zone; the source does not place them.",
+      "element_id": "entity:colleague",
+      "attribute": "trust_zone",
+      "basis": "Personal phones and use of the app do not establish internet access; an internal connection or a VPN remains possible. The value is a placement the schema requires, not a source-backed fact."
+    },
+    {
+      "assumption": "The store manager is placed on the public internet because the schema requires a zone; the source does not place them.",
+      "element_id": "entity:store-manager",
+      "attribute": "trust_zone",
+      "basis": "Use of the same app does not establish internet access; an internal connection or a VPN remains possible. The value is a placement the schema requires, not a source-backed fact."
+    },
+    {
+      "assumption": "The payroll system is placed in a payroll team environment because the schema requires a zone; the source states only who runs it.",
+      "element_id": "entity:payroll-system",
+      "attribute": "trust_zone",
+      "basis": "Operation by another team does not establish a separate network or trust zone. The value is a placement the schema requires, not a source-backed fact."
     }
   ]
 }

@@ -43,3 +43,24 @@ follows one ruling, and `facts.json` changed with it.
 Two aliases were ruled for `case.json`: "Other teams' backends" for
 `entity:calling-service` and "ML engineers" for `entity:ml-engineer`. Both are
 the source's own words for the aggregate actor.
+
+## Signing of 2026-09-16 (#961 step 3)
+
+The maintainer signed every row of `facts.json` in a session, ruling on each
+against `source.md`. Four values changed in `model.json` with the rulings:
+
+| # | Path | Before | After | Ruling |
+|---|---|---|---|---|
+| 14 | `flow:model-server-to-redis-feature-store:read-features.authentication` | `none` | `unknown` + note | "Redis has no password on it" establishes the absence of password authentication, not the absence of every mechanism. |
+| 15 | `store:model-registry-bucket.trust_zone` | no assumption | placeholder assumption | Loading artifacts from a bucket does not establish co-location. |
+| 16 | `process:inference-gateway.trust_zone` | no assumption | placeholder assumption | Internet exposure does not establish a separate serving-edge network. |
+| 17 | `store:inference-log.trust_zone` | no assumption | placeholder assumption | Writing to BigQuery does not place it in the gateway's network. |
+
+The calling service keeps an inferred public-internet placement: it records
+participation from the internet, not where every calling service is hosted.
+
+Two STRIDE reference claims, records 4 and 13, still call the Redis store
+"unauthenticated". The ruling above says the source states less than that.
+The wording stays because the calibration review of 2026-09-02 keys its
+sample by the claim text, and a rewording would move two fixtures out from
+under a signed record; the case sitting for this case reads those claims.

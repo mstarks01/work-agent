@@ -86,7 +86,7 @@ Not part of the question, but the records cite these names, so you need them.
 | flow:calling-service-to-inference-gateway:submit-inference-request | entity:calling-service | process:inference-gateway | unknown | per-team API key in a header; operator reports never having expired a key | unknown |
 | flow:inference-gateway-to-model-server:forward-request | process:inference-gateway | process:model-server | unknown | none; accepted by network position | unknown |
 | flow:model-server-to-model-registry-bucket:load-artifact | process:model-server | store:model-registry-bucket | object storage API | model server's own service account | unknown |
-| flow:model-server-to-redis-feature-store:read-features | process:model-server | store:redis-feature-store | Redis protocol | none | unknown |
+| flow:model-server-to-redis-feature-store:read-features | process:model-server | store:redis-feature-store | Redis protocol | unknown | unknown |
 | flow:inference-gateway-to-inference-log:write-request-log | process:inference-gateway | store:inference-log | BigQuery API | unknown | unknown |
 | flow:ml-engineer-to-model-registry-bucket:publish-artifact | entity:ml-engineer | store:model-registry-bucket | object storage API | unknown; possibly a shared group account | unknown |
 
@@ -101,12 +101,16 @@ Not part of the question, but the records cite these names, so you need them.
 **Recorded notes** — hedges, probed gaps and source disagreements live here, so read them before the sets.
 
 - `process:model-server` — The source says the model network is meant to be reachable only from the gateway, which is an intended restriction; nothing states whether the server itself can be reached from outside, so exposure stays unknown.
+- `flow:model-server-to-redis-feature-store:read-features` — The source says Redis has no password on it, which establishes the absence of password authentication and not the absence of every mechanism.
 
 **Assumptions**
 
 - `entity:ml-engineer` — The ML engineer is placed in the model network because the schema requires a zone; the source places neither the engineer nor the registry bucket. (basis: No statement locates the engineer or the bucket, and publishing to a bucket does not locate the publisher. The value is a placement the schema requires, not a source-backed fact.)
 - `store:inference-log` — The inference log may contain personal data. (basis: Stated to hold raw prompts carrying "whatever the calling team's users typed"; whether that text is personal is not stated, so the tag records a possibility.)
 - `store:redis-feature-store` — The Redis feature store holds confidential data under the scheme in prompts/extract.md. (basis: The source says it holds account age and spend bands per customer, which is customer-specific information; the classification is inferred under the scheme, not quoted.)
+- `store:model-registry-bucket` — The model registry bucket is placed in the model network because the schema requires a zone; the source does not place it. (basis: Loading artifacts from a bucket does not establish co-location. The value is a placement the schema requires, not a source-backed fact.)
+- `process:inference-gateway` — The inference gateway is placed in its own serving-edge zone because the schema requires a zone; the source names no such zone. (basis: Internet exposure does not establish a separate serving-edge network. The value is a placement the schema requires, not a source-backed fact.)
+- `store:inference-log` — The inference log is placed in the serving-edge zone because the schema requires a zone; the source does not place it. (basis: Writing to BigQuery does not place it in the gateway's network. The value is a placement the schema requires, not a source-backed fact.)
 
 **Reviewed aliases** — other names a reader ruled identify the same element, each with the words in the source that support it. An extraction using one is named differently, not wrong.
 
@@ -450,7 +454,7 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
-      "model.json": "d67780026525b19495710cb9104027c0eab4f39bc47e8306cdaba30b8fe03b8a",
+      "model.json": "10e1b5ccf291f6fa444881e756d27b6db72938201e7d7c76c6703abfeecb5167",
       "claims/asvs.json": "af1349bb41be071d6bf58fb4a243a79e50b8ef3e2ed6cd21b8600f01328bdd4e",
       "claims/stride.json": "288fe3576466a3adc2ee67154a9cfbdc919a60db6264466faba6b6092e05e47a"
       }
