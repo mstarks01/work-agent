@@ -4,7 +4,11 @@ A sweep writes one report, one drafts file and one proposals file per case
 into the directory :func:`reports_dir` derives from the artifact path. The
 artifact holds the measurements somebody thought of in advance; the bundle
 holds what the agents said, so every later question about a finished sweep
-reads here rather than paying for a second sweep.
+reads here rather than paying for a second sweep. An extraction sweep writes
+one emission file per case instead, and an assertion sweep one proposal
+file; :func:`extractions_from_reports` and :func:`assertions_from_reports`
+read those back through the parser and the resolver that stand today, which
+is what a replay wants.
 
 The block readers sit beside the bundle because every reader of a saved
 report asks the same first question: which framework's block, and at which
@@ -22,8 +26,14 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from analysis_service.assertions import project
+from analysis_service.assertions import (
+    CatalogProposal,
+    catalog_issues,
+    project,
+    resolve_catalog,
+)
 from analysis_service.claims import FrameworkAnalysis, FrameworkName
+from analysis_service.compact import FULL_FORMAT, parse_extraction
 from analysis_service.frameworks import PACKAGES
 from analysis_service.frameworks.stride.record import Threat
 from analysis_service.report import Report
@@ -306,3 +316,90 @@ def runs_from_reports(artifact: Path, cases: Sequence[GoldenCase]) -> dict[str, 
             f"{directory} carries no report for any case in the artifact"
         )
     return runs
+
+
+def _source_texts(case: GoldenCase) -> dict[str, str]:
+    """Label to text, which is what both resolvers read."""
+    return {source.label: source.text for source in case.sources}
+
+
+def _case_files(
+    artifact: Path, cases: Sequence[GoldenCase], suffix: str
+) -> list[tuple[GoldenCase, dict[str, Any]]]:
+    """Each case's saved file under ``suffix``, parsed, for the cases that have one."""
+    directory = reports_dir(artifact)
+    if not directory.is_dir():
+        raise modes.EvalRunError(
+            f"{directory} does not exist; a replay reads the files a sweep"
+            " writes beside its artifact, not the artifact alone"
+        )
+    found = []
+    for case in cases:
+        path = directory / f"{case.id}{suffix}"
+        if path.exists():
+            found.append((case, json.loads(path.read_text(encoding="utf-8"))))
+    if not found:
+        raise modes.EvalRunError(
+            f"{directory} carries no {suffix} file for any case in the artifact"
+        )
+    return found
+
+
+def extractions_from_reports(
+    artifact: Path, cases: Sequence[GoldenCase]
+) -> dict[str, modes.ExtractionResult]:
+    """Read a finished extraction sweep's saved emissions back, re-parsed.
+
+    :func:`runs_from_reports`'s counterpart for the extraction mode. It reads
+    ``raw`` — what ``extract`` emitted — and derives the model again through
+    the :func:`~analysis_service.compact.parse_extraction` the ``validate``
+    node calls **today**, with the case's own sources so the citation half
+    of the gate runs. The ``normalized`` model and ``issues`` beside it are
+    what the sweep scored on the day; a replay wants the emission under the
+    current normalizer and gate, which is the whole point of keeping ``raw``
+    (#925, #961). A reader that wants the recorded model opens the file.
+
+    Every saved emission is in the full transport: the compact route has
+    never persisted one, and :data:`~analysis_service.compact.COMPACT_FORMAT`
+    says so. A payload in another shape parses to no model with the gate's
+    own issues, which the replay reports rather than skips.
+    """
+    results = {}
+    for case, written in _case_files(artifact, cases, ".extraction.json"):
+        model, issues = parse_extraction(
+            written["raw"], FULL_FORMAT, sources=_source_texts(case)
+        )
+        results[case.id] = modes.ExtractionResult(
+            case_id=case.id,
+            extracted=model,
+            issues=tuple(issues),
+            raw=written["raw"],
+        )
+    return results
+
+
+def assertions_from_reports(
+    artifact: Path, cases: Sequence[GoldenCase]
+) -> dict[str, modes.AssertionResult]:
+    """Read a finished assertion sweep's saved proposals back, re-resolved.
+
+    Reads ``proposal`` — what ``assert`` emitted — and builds the catalog
+    again through :func:`~analysis_service.assertions.resolve_catalog` and
+    the gate, exactly as :func:`~evals.harness.modes.run_assertions` does
+    over a live emission. The ``catalog`` beside it is what the sweep
+    counted on the day; the resolver has moved since (#940, #964), and a
+    replay grades the proposal under the resolver that stands.
+    """
+    results = {}
+    for case, written in _case_files(artifact, cases, ".assertions.json"):
+        sources = _source_texts(case)
+        proposal = CatalogProposal.model_validate(written["proposal"])
+        catalog, issues = resolve_catalog(proposal, case.model, sources)
+        issues = [*issues, *catalog_issues(catalog, model=case.model, sources=sources)]
+        results[case.id] = modes.AssertionResult(
+            case_id=case.id,
+            proposal=written["proposal"],
+            catalog=catalog,
+            issues=tuple(issues),
+        )
+    return results

@@ -1,0 +1,215 @@
+{
+  "proposal": {
+    "assertions": [
+      {
+        "subject_type": "component",
+        "subject": "process:storefront-api",
+        "predicate": "internet-exposure",
+        "value": "internet-facing",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "It is the only thing we expose to the internet."
+          }
+        ],
+        "explanation": "",
+        "exclusive": true
+      },
+      {
+        "subject_type": "principal",
+        "subject": "shopper accounts",
+        "predicate": "mfa-requirement",
+        "value": "absent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "we have not rolled out MFA for shopper accounts yet."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:storefront-api-to-order-service:submit-order",
+        "predicate": "authentication-mechanism",
+        "value": "absent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "There is no auth on that gRPC call \u2014 the order service accepts anything that can reach it"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:receipt-archive",
+        "predicate": "storage-encryption",
+        "value": "customer-managed key",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "the bucket is encrypted with a customer-managed key."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      }
+    ]
+  },
+  "catalog": {
+    "registry_version": 2,
+    "subjects": [
+      {
+        "id": "flow:storefront-api-to-order-service:submit-order",
+        "type": "interaction",
+        "label": "submit order"
+      },
+      {
+        "id": "principal:shopper-accounts",
+        "type": "principal",
+        "label": "shopper accounts"
+      },
+      {
+        "id": "process:storefront-api",
+        "type": "component",
+        "label": "storefront API"
+      },
+      {
+        "id": "store:receipt-archive",
+        "type": "component",
+        "label": "receipt archive"
+      }
+    ],
+    "entries": [
+      {
+        "subject": "process:storefront-api",
+        "predicate": "internet-exposure",
+        "value": "internet-facing",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08",
+            "start": 166,
+            "end": 213,
+            "quote": "It is the only thing we expose to the internet."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": true,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "principal:shopper-accounts",
+        "predicate": "mfa-requirement",
+        "value": "absent",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08",
+            "start": 281,
+            "end": 333,
+            "quote": "we have not rolled out MFA for shopper accounts yet."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:storefront-api-to-order-service:submit-order",
+        "predicate": "authentication-mechanism",
+        "value": "absent",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08",
+            "start": 506,
+            "end": 596,
+            "quote": "There is no auth on that gRPC call \u2014 the order service accepts anything that can reach it"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:receipt-archive",
+        "predicate": "storage-encryption",
+        "value": "customer-managed key",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08",
+            "start": 1064,
+            "end": 1116,
+            "quote": "the bucket is encrypted with a customer-managed key."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      }
+    ]
+  },
+  "issues": [],
+  "projection": [
+    {
+      "element_id": "flow:storefront-api-to-order-service:submit-order",
+      "attribute": "authentication",
+      "value": "none",
+      "reason": "absent",
+      "rows": [
+        "assertion:authentication-mechanism~flow:storefront-api-to-order-service:submit-order~any~absent"
+      ]
+    },
+    {
+      "element_id": "process:storefront-api",
+      "attribute": "exposure",
+      "value": "internet-facing",
+      "reason": "stated",
+      "rows": [
+        "assertion:internet-exposure~process:storefront-api~any~internet-facing"
+      ]
+    },
+    {
+      "element_id": "store:receipt-archive",
+      "attribute": "encryption_at_rest",
+      "value": "customer-managed key",
+      "reason": "stated",
+      "rows": [
+        "assertion:storage-encryption~store:receipt-archive~any~v.2e2e0428495b"
+      ]
+    }
+  ]
+}

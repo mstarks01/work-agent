@@ -75,6 +75,7 @@ from evals.harness import (
     modes,
     pairing,
     queue,
+    replay,
     roster,
     standings,
     submit,
@@ -93,6 +94,8 @@ from evals.harness.artifact import (
 from evals.harness.artifact import build as build_artifact
 from evals.harness.baseline import BASELINES_DIR
 from evals.harness.bundle import (
+    assertions_from_reports,
+    extractions_from_reports,
     optional_block,
     runs_from_reports,
     stride_threats,
@@ -1438,6 +1441,87 @@ def command_extraction_losses(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_replay(args: argparse.Namespace) -> int:
+    """Re-score archived emissions under the coordinates that stand, and name every loss.
+
+    Credential-free: an extraction sweep kept what ``extract`` emitted and an
+    assertion sweep kept what ``assert`` proposed, and the corpus holds the
+    blessed models and the signed reference facts. Each artifact is placed on
+    an arm by the instruction its node ran and the models that answered, so
+    two prompts replayed together read as two tables rather than one.
+    """
+    corpus_dir = Path(args.corpus)
+    try:
+        cases = load_corpus(corpus_dir)
+        sweeps = [
+            replay_artifact(Path(path), cases, corpus_dir) for path in args.artifact
+        ]
+    except (ProvenanceError, CorpusError, modes.EvalRunError, ValueError) as error:
+        print(f"cannot replay: {error}", file=sys.stderr)
+        return 1
+    replay.render(sweeps, args.targets)
+    if args.out:
+        commit = repo_commit()
+        report = replay.artifact(
+            sweeps, commit.commit, commit.clean, corpus_digest(corpus_dir)
+        )
+        Path(args.out).write_text(archive_bytes("artifact", report), encoding="utf-8")
+        print(f"\nreplay written to {args.out}")
+    return 0
+
+
+def replay_artifact(
+    path: Path, cases: Sequence[GoldenCase], corpus_dir: Path
+) -> replay.SweepReplay:
+    """One archived sweep, read through the loader and re-scored by its mode."""
+    loaded = load_artifact(path)
+    if loaded.mode not in replay.NODE_OF:
+        raise modes.EvalRunError(
+            f"{path}: a {loaded.mode} sweep keeps no emission this instrument reads;"
+            f" it replays {sorted(replay.NODE_OF)}"
+        )
+    held = [case for case in cases if case.id in loaded.cases]
+    if not held:
+        raise modes.EvalRunError(f"{path}: none of its cases are in {corpus_dir}")
+    arm = replay.arm_of(loaded)
+
+    def sweep(**graded: Any) -> replay.SweepReplay:
+        return replay.SweepReplay(
+            artifact=path.name,
+            arm=arm,
+            commit=loaded.commit.commit,
+            clean=loaded.commit.clean,
+            corpus_digest=loaded.corpus_digest,
+            **graded,
+        )
+
+    if loaded.mode == "extraction":
+        extracted = extractions_from_reports(path, held)
+        return sweep(
+            extractions=tuple(
+                replay.replay_extraction(case, extracted[case.id])
+                for case in held
+                if case.id in extracted
+            )
+        )
+    proposed = assertions_from_reports(path, held)
+    graded, skipped = [], {}
+    for case in held:
+        if case.id not in proposed:
+            continue
+        reference = replay.signed_reference(corpus_dir, case)
+        if reference is None:
+            unsigned = replay.unsigned_rows(corpus_dir, case)
+            skipped[case.id] = (
+                "no facts file, so nothing grades it"
+                if unsigned is None
+                else f"{unsigned} unsigned reference row(s); a draft grades nothing"
+            )
+            continue
+        graded.append(replay.replay_assertions(case, reference, proposed[case.id]))
+    return sweep(assertions=tuple(graded), skipped=skipped)
+
+
 def _rows(named: Sequence[str] | None) -> set[tuple[str, str]]:
     """``--row case:reference`` pairs, or an empty set for the whole corpus.
 
@@ -1891,6 +1975,25 @@ def _extraction_losses_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--out", help="where to write the extraction-loss report")
 
 
+def _replay_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "artifact",
+        nargs="+",
+        help="archived extraction or assertion sweep artifacts, each with its"
+        " .reports/ dir beside it",
+    )
+    parser.add_argument(
+        "--corpus",
+        default=str(DEFAULT_CORPUS_DIR),
+        help="corpus root: the blessed models and the signed reference facts"
+        " the emissions are scored against",
+    )
+    parser.add_argument(
+        "--targets", type=int, default=10, help="how many lost elements to list per arm"
+    )
+    parser.add_argument("--out", help="where to write the replay report")
+
+
 def _stability_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "artifact",
@@ -2047,6 +2150,12 @@ COMMANDS: dict[str, Command] = {
         " (no credentials)",
         run=instruction_delta.command_compare,
         arguments=_compare_arguments,
+    ),
+    "replay": Command(
+        help="re-score archived extraction or assertion emissions under today's"
+        " coordinates and name every loss (no credentials)",
+        run=command_replay,
+        arguments=_replay_arguments,
     ),
     "sitting-import": Command(
         help="apply one offline sitting envelope to this tree (no credentials)",

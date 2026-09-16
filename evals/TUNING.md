@@ -466,6 +466,27 @@ row records one observation and hides no other cause; a run can move rows
 between classes. On 2026-09-09 one exemplar edit went to a paid sweep before
 this was read; its ceiling was five must-finds, inside the band.
 
+**Price an extraction or assertion change on the archived emissions.** An
+extraction sweep keeps what `extract` emitted and an assertion sweep keeps
+what `assert` proposed, and `evals/emissions/` holds every paid one. `replay`
+re-parses each emission under the code and the corpus that stand and gives
+every blessed element one fate: found, renamed under a reader's alias or a
+flow's own label, respelled, mistyped, misattached, lost with its endpoint,
+omitted outright, or unresolved because a candidate sits beside it that nobody
+has ruled on. The fates are split per element type, so a change aimed at the
+actors reads its ceiling off the `entity` column and nothing else. A signed
+reference row on an assertion case takes a fate the same way.
+
+```bash
+python -m evals.harness.run replay evals/emissions/*.json --out /tmp/replay.json
+```
+
+An `omitted` count is the ceiling of a prompt change that asks the model to
+read more. An `unresolved` count is not: it waits on a ruling, and a run
+cannot move it. Read the two apart. And read the replay as a ceiling rather
+than a prediction: it applies today's code to yesterday's emission, and a
+behaviour the prompt under test would have changed is invisible to it.
+
 **Price a scorer change on the frontier, with no run at all.** A verb
 equivalence in `evals/harness/verbs.py` is a decision with a price on three
 axes and a gain on one, and every number is offline:

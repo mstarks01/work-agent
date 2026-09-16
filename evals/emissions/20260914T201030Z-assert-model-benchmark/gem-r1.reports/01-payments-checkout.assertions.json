@@ -1,0 +1,363 @@
+{
+  "proposal": {
+    "assertions": [
+      {
+        "subject_type": "principal",
+        "subject": "shopper accounts",
+        "predicate": "mfa-requirement",
+        "value": "absent",
+        "scope": [
+          {
+            "kind": "principal",
+            "value": "shopper accounts"
+          }
+        ],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "we have not rolled out MFA for shopper accounts yet."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:storefront-api-to-order-service:submit-order",
+        "predicate": "authentication-mechanism",
+        "value": "absent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "There is no auth on that gRPC call \u2014 the order service accepts anything that can reach it"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "process:storefront-api",
+        "predicate": "internet-exposure",
+        "value": "internet-facing",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "It is the only thing we expose to the internet."
+          }
+        ],
+        "explanation": "",
+        "exclusive": true
+      },
+      {
+        "subject_type": "component",
+        "subject": "process:order-service",
+        "predicate": "internet-exposure",
+        "value": "internal",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "the order service is a Python worker in our core network; it is not exposed outside."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "credential",
+        "subject": "application account",
+        "predicate": "credential-sharing",
+        "value": "shared",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "reads and writes with a single application account that has full read/write."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "credential",
+        "subject": "application account password",
+        "predicate": "credential-custody",
+        "value": "environment variable on the worker",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The password comes from an environment variable on the worker."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:receipt-archive",
+        "predicate": "storage-encryption",
+        "value": "customer-managed key",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "the bucket is encrypted with a customer-managed key."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      }
+    ]
+  },
+  "catalog": {
+    "registry_version": 2,
+    "subjects": [
+      {
+        "id": "credential:application-account",
+        "type": "credential",
+        "label": "application account"
+      },
+      {
+        "id": "credential:application-account-password",
+        "type": "credential",
+        "label": "application account password"
+      },
+      {
+        "id": "flow:storefront-api-to-order-service:submit-order",
+        "type": "interaction",
+        "label": "submit order"
+      },
+      {
+        "id": "principal:shopper-accounts",
+        "type": "principal",
+        "label": "shopper accounts"
+      },
+      {
+        "id": "process:order-service",
+        "type": "component",
+        "label": "order service"
+      },
+      {
+        "id": "process:storefront-api",
+        "type": "component",
+        "label": "storefront API"
+      },
+      {
+        "id": "store:receipt-archive",
+        "type": "component",
+        "label": "receipt archive"
+      }
+    ],
+    "entries": [
+      {
+        "subject": "principal:shopper-accounts",
+        "predicate": "mfa-requirement",
+        "value": "absent",
+        "scope": [
+          {
+            "kind": "principal",
+            "value": "shopper accounts"
+          }
+        ],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08",
+            "start": 281,
+            "end": 333,
+            "quote": "we have not rolled out MFA for shopper accounts yet."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:storefront-api-to-order-service:submit-order",
+        "predicate": "authentication-mechanism",
+        "value": "absent",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08",
+            "start": 506,
+            "end": 596,
+            "quote": "There is no auth on that gRPC call \u2014 the order service accepts anything that can reach it"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "process:storefront-api",
+        "predicate": "internet-exposure",
+        "value": "internet-facing",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08",
+            "start": 166,
+            "end": 213,
+            "quote": "It is the only thing we expose to the internet."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": true,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "process:order-service",
+        "predicate": "internet-exposure",
+        "value": "internal",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08",
+            "start": 421,
+            "end": 505,
+            "quote": "the order service is a Python worker in our core network; it is not exposed outside."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "credential:application-account",
+        "predicate": "credential-sharing",
+        "value": "shared",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08",
+            "start": 753,
+            "end": 829,
+            "quote": "reads and writes with a single application account that has full read/write."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "credential:application-account-password",
+        "predicate": "credential-custody",
+        "value": "environment variable on the worker",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08",
+            "start": 830,
+            "end": 892,
+            "quote": "The password comes from an environment variable on the worker."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:receipt-archive",
+        "predicate": "storage-encryption",
+        "value": "customer-managed key",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08",
+            "start": 1064,
+            "end": 1116,
+            "quote": "the bucket is encrypted with a customer-managed key."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      }
+    ]
+  },
+  "issues": [],
+  "projection": [
+    {
+      "element_id": "flow:storefront-api-to-order-service:submit-order",
+      "attribute": "authentication",
+      "value": "none",
+      "reason": "absent",
+      "rows": [
+        "assertion:authentication-mechanism~flow:storefront-api-to-order-service:submit-order~any~absent"
+      ]
+    },
+    {
+      "element_id": "process:order-service",
+      "attribute": "exposure",
+      "value": "internal",
+      "reason": "stated",
+      "rows": [
+        "assertion:internet-exposure~process:order-service~any~internal"
+      ]
+    },
+    {
+      "element_id": "process:storefront-api",
+      "attribute": "exposure",
+      "value": "internet-facing",
+      "reason": "stated",
+      "rows": [
+        "assertion:internet-exposure~process:storefront-api~any~internet-facing"
+      ]
+    },
+    {
+      "element_id": "store:receipt-archive",
+      "attribute": "encryption_at_rest",
+      "value": "customer-managed key",
+      "reason": "stated",
+      "rows": [
+        "assertion:storage-encryption~store:receipt-archive~any~v.2e2e0428495b"
+      ]
+    }
+  ]
+}

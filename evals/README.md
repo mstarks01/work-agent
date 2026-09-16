@@ -150,6 +150,8 @@ evals/
   review/votes/                 the vote ledger, one file per voter — the only human record here
   baselines/README.md           the published comparison over every merged Baseline (generated)
   baselines/<derived-name>/     merged Baselines: up to ten sweeps with their reports, per configuration
+  emissions/                    archived emissions: what `extract` and `assert` said in
+                                paid sweeps, kept so `run.py replay` re-scores them offline
   runs/                         local sweeps (gitignored) — the private scratch area
 ```
 
@@ -195,7 +197,7 @@ somewhere else.
 | Module | What it owns |
 |---|---|
 | `harness/reference.py` | The `ReferenceThreat` type and the fail-closed corpus loader. |
-| `harness/bundle.py` | A sweep's report bundle: the per-case report, drafts and proposals files beside an artifact, their writer and reader, and the block accessors every reader of a saved report starts from. |
+| `harness/bundle.py` | A sweep's report bundle: the per-case report, drafts and proposals files beside an artifact, their writer and reader, and the block accessors every reader of a saved report starts from. Also the extraction and assertion emission files an extraction or assertion sweep writes, and the readers that re-parse them under the code that stands. |
 | `harness/structural.py` | The structural gates — the only checks that fail a run. |
 | `harness/scorer.py` | The scoring pipeline: prefilter → rule → match → standing → severity. |
 | `harness/pairing.py` | The reading view behind one applicability disagreement: every requirement the run applied that the case did not expect, and every one the case expected that the run did not deliver, each with the standard's text and the argument made for it. Scores nothing and rules on nothing. |
@@ -210,6 +212,7 @@ somewhere else.
 | `harness/stability.py` | Run-to-run stability: which references two or more finished sweeps agree on, whether a reference every run missed kept one loss cause, and whether a reference two runs matched kept one severity band and one resolved place. Reads artifacts and their report bundles rather than re-running. |
 | `harness/alignment.py` | Which produced element stands for which blessed one, one to one, on recorded evidence: an exact ID, a reader's alias, a flow's own label between aligned endpoints, or the discriminators between them. What it cannot decide is listed as an ambiguity. Every extraction figure and the loss instrument read it. |
 | `harness/extraction_losses.py` | What an end-to-end run lost before its lanes ran: every reference's fate across that run and the analysis-mode run beside it (`both`, `downstream`, `extraction`, `recovered`), and for each extraction loss what the extracted model lacked at the reference's place, read through the extraction scorer over the report's own embedded model. `run.py extraction-losses`. |
+| `harness/replay.py` | Archived emissions re-scored under the coordinates that stand. Every blessed element takes one fate off the alignment — `found`, `renamed`, `respelled`, `mistyped`, `misattached`, `endpoint_unaligned`, `omitted`, `ambiguous`, `unresolved` — and every signed reference row one off the produced catalog, so a prompt change has the elements it aims at and the ceiling it cannot exceed before a run is paid for. `run.py replay`. |
 | `harness/triggers.py` | Same-lane target overlap: whether `analysis_service.candidates` fired a rule in a reference claim's own lane, on an element that claim names. Nothing compares the rule's question to the claim's mechanism, so a hit can credit an unrelated concern about the same place — the published keys are `overlap`, not `recall`, for that reason. A miss is the sharper half: no rule in the lane named any element the claim is about. Costs no provider call. |
 | `harness/calibration.py` | Rule-vs-label agreement over the labelled fixtures — the scoreboard any rule change must clear. |
 | `harness/verbs.py` | The closed vocabulary of attacker actions, and what counts as one action. |
@@ -380,6 +383,16 @@ what one sweep cannot tell you is how much of its own number is sampling noise:
 
 ```sh
 python -m evals.harness.run stability run-a.json run-b.json --out stability.json
+```
+
+Also credential-free, over the emissions an extraction or assertion sweep kept
+beside its artifact — the archive under `emissions/` holds every paid one — is
+the replay. It re-parses each emission under the normalizer, the gate, the
+alignment and the corpus as they stand, and names what happened to every
+blessed element and every signed reference row:
+
+```sh
+python -m evals.harness.run replay evals/emissions/*.json --out replay.json
 ```
 
 A `run` fails (exits non-zero) **only** on a structural problem — a report that

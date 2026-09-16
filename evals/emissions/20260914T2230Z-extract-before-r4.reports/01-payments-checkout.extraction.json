@@ -1,0 +1,569 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:shopper",
+        "name": "Shopper",
+        "description": "A shopper who browses the storefront, signs in, and places orders.",
+        "assets": [],
+        "source_excerpt": "Shoppers browse the storefront and place orders",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:internet"
+      },
+      {
+        "id": "entity:card-processor",
+        "name": "card processor",
+        "description": "A third-party card processor that settles payments and sends payment webhooks.",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "Our card processor is a third party.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:third-party"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:storefront-api",
+        "name": "storefront API",
+        "description": "A Node service running on Cloud Run that shoppers use to browse and place orders and that receives payment webhooks.",
+        "assets": [
+          "credentials",
+          "business-critical-data"
+        ],
+        "source_excerpt": "the storefront API, a Node service running on Cloud Run",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "Node service running on Cloud Run",
+        "trust_zone": "boundary:cloud-run",
+        "exposure": "internet-facing",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:order-service",
+        "name": "order service",
+        "description": "A Python worker in the core network that processes orders, reads and writes the orders database, and writes completed-order receipts.",
+        "assets": [
+          "pii",
+          "financial",
+          "business-critical-data"
+        ],
+        "source_excerpt": "The order service is a Python worker in our core network",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "Python worker",
+        "trust_zone": "boundary:core-network",
+        "exposure": "internal",
+        "interface_kind": "non-web"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:orders-db",
+        "name": "orders-db",
+        "description": "A PostgreSQL database containing orders, shopper addresses, and card-last-four data.",
+        "assets": [
+          "pii",
+          "financial",
+          "business-critical-data"
+        ],
+        "source_excerpt": "Orders, shopper addresses and card-last-four live in a PostgreSQL database (orders-db)",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "PostgreSQL",
+        "trust_zone": "boundary:core-network",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:receipt-archive",
+        "name": "receipt archive",
+        "description": "A Cloud Storage bucket containing receipts for completed orders, including which order was written and that the order service wrote it.",
+        "assets": [
+          "financial",
+          "business-critical-data"
+        ],
+        "source_excerpt": "a Cloud Storage bucket we call the receipt archive",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "Cloud Storage",
+        "trust_zone": "boundary:cloud-storage",
+        "data_classification": "confidential",
+        "encryption_at_rest": "customer-managed key"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:shopper-to-storefront-api:browse-and-place-orders",
+        "name": "browse and place orders",
+        "description": "Shopper interaction with the storefront for browsing, sign-in, and order placement.",
+        "assets": [
+          "credentials",
+          "business-critical-data"
+        ],
+        "source_excerpt": "Shoppers browse the storefront and place orders through the storefront API",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:shopper",
+        "destination": "process:storefront-api",
+        "protocol": "unknown",
+        "authentication": "email and password with a session cookie; MFA not rolled out",
+        "data_description": "Browsing, shopper sign-in, and order placement",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:storefront-api-to-order-service:order-submission",
+        "name": "order submission",
+        "description": "The storefront API calls the order service when a shopper submits an order.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "When a shopper submits an order the storefront API calls the order service over gRPC.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:storefront-api",
+        "destination": "process:order-service",
+        "protocol": "gRPC",
+        "authentication": "none",
+        "data_description": "Submitted order",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:order-service-to-orders-db:order-data-access",
+        "name": "order data access",
+        "description": "The order service reads and writes orders, shopper addresses, and card-last-four in the database.",
+        "assets": [
+          "pii",
+          "financial",
+          "business-critical-data"
+        ],
+        "source_excerpt": "the order service reads and writes with a single application account that has full read/write",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:order-service",
+        "destination": "store:orders-db",
+        "protocol": "unknown",
+        "authentication": "single application account; password from an environment variable on the worker",
+        "data_description": "Orders, shopper addresses, and card-last-four",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:order-service-to-receipt-archive:receipt-writing",
+        "name": "receipt writing",
+        "description": "The order service writes a receipt for every completed order to the receipt archive.",
+        "assets": [
+          "financial",
+          "business-critical-data"
+        ],
+        "source_excerpt": "Every completed order also gets a receipt written to a Cloud Storage bucket we call the receipt archive.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:order-service",
+        "destination": "store:receipt-archive",
+        "protocol": "TLS",
+        "authentication": "order service's own service account",
+        "data_description": "Receipt recording which order was written and that the order service wrote it",
+        "encryption_in_transit": "TLS",
+        "operations": "write"
+      },
+      {
+        "id": "flow:card-processor-to-storefront-api:payment-webhook",
+        "name": "payment webhook",
+        "description": "The card processor sends a webhook to the storefront API after settling a payment to report that the order is paid.",
+        "assets": [
+          "financial",
+          "business-critical-data"
+        ],
+        "source_excerpt": "After they settle a payment they POST a webhook back to the storefront API to tell us the order is paid.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The source states: \"I would have to check how that callback is authenticated.\"",
+        "source": "entity:card-processor",
+        "destination": "process:storefront-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Payment settlement and order-paid notification",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:internet",
+        "name": "internet",
+        "description": "The internet-facing environment from which shoppers reach the storefront.",
+        "assets": [],
+        "source_excerpt": "It is the only thing we expose to the internet.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:cloud-run",
+        "name": "Cloud Run",
+        "description": "The Cloud Run hosting environment for the storefront API.",
+        "assets": [],
+        "source_excerpt": "a Node service running on Cloud Run",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:core-network",
+        "name": "core network",
+        "description": "The organisation's core network containing the order service and orders database.",
+        "assets": [],
+        "source_excerpt": "The order service is a Python worker in our core network",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:cloud-storage",
+        "name": "Cloud Storage",
+        "description": "The Cloud Storage hosting environment containing the receipt archive.",
+        "assets": [],
+        "source_excerpt": "a Cloud Storage bucket we call the receipt archive",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:third-party",
+        "name": "third party",
+        "description": "The external-party zone containing the third-party card processor.",
+        "assets": [],
+        "source_excerpt": "Our card processor is a third party.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The storefront API presents a web interface because it is described as a storefront used by shoppers to browse and place orders.",
+        "element_id": "process:storefront-api",
+        "attribute": "interface_kind",
+        "basis": "The source describes shoppers browsing the storefront and placing orders through the storefront API."
+      },
+      {
+        "assumption": "The orders database is confidential because it contains shopper addresses and card-last-four data.",
+        "element_id": "store:orders-db",
+        "attribute": "data_classification",
+        "basis": "The source states that orders-db contains shopper addresses and card-last-four data."
+      },
+      {
+        "assumption": "The receipt archive is confidential because it contains completed-order receipts and payment-related order records.",
+        "element_id": "store:receipt-archive",
+        "attribute": "data_classification",
+        "basis": "The source states that completed orders produce receipts and that the receipt records the order written."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:shopper",
+        "name": "Shopper",
+        "description": "A shopper who browses the storefront, signs in, and places orders.",
+        "assets": [],
+        "source_excerpt": "Shoppers browse the storefront and place orders",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:internet"
+      },
+      {
+        "id": "entity:card-processor",
+        "name": "card processor",
+        "description": "A third-party card processor that settles payments and sends payment webhooks.",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "Our card processor is a third party.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:third-party"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:storefront-api",
+        "name": "storefront API",
+        "description": "A Node service running on Cloud Run that shoppers use to browse and place orders and that receives payment webhooks.",
+        "assets": [
+          "credentials",
+          "business-critical-data"
+        ],
+        "source_excerpt": "the storefront API, a Node service running on Cloud Run",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "Node service running on Cloud Run",
+        "trust_zone": "boundary:cloud-run",
+        "exposure": "internet-facing",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:order-service",
+        "name": "order service",
+        "description": "A Python worker in the core network that processes orders, reads and writes the orders database, and writes completed-order receipts.",
+        "assets": [
+          "pii",
+          "financial",
+          "business-critical-data"
+        ],
+        "source_excerpt": "The order service is a Python worker in our core network",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "Python worker",
+        "trust_zone": "boundary:core-network",
+        "exposure": "internal",
+        "interface_kind": "non-web"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:orders-db",
+        "name": "orders-db",
+        "description": "A PostgreSQL database containing orders, shopper addresses, and card-last-four data.",
+        "assets": [
+          "pii",
+          "financial",
+          "business-critical-data"
+        ],
+        "source_excerpt": "Orders, shopper addresses and card-last-four live in a PostgreSQL database (orders-db)",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "PostgreSQL",
+        "trust_zone": "boundary:core-network",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:receipt-archive",
+        "name": "receipt archive",
+        "description": "A Cloud Storage bucket containing receipts for completed orders, including which order was written and that the order service wrote it.",
+        "assets": [
+          "financial",
+          "business-critical-data"
+        ],
+        "source_excerpt": "a Cloud Storage bucket we call the receipt archive",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "Cloud Storage",
+        "trust_zone": "boundary:cloud-storage",
+        "data_classification": "confidential",
+        "encryption_at_rest": "customer-managed key"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:shopper-to-storefront-api:browse-and-place-orders",
+        "name": "browse and place orders",
+        "description": "Shopper interaction with the storefront for browsing, sign-in, and order placement.",
+        "assets": [
+          "credentials",
+          "business-critical-data"
+        ],
+        "source_excerpt": "Shoppers browse the storefront and place orders through the storefront API",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:shopper",
+        "destination": "process:storefront-api",
+        "protocol": "unknown",
+        "authentication": "email and password with a session cookie; MFA not rolled out",
+        "data_description": "Browsing, shopper sign-in, and order placement",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:storefront-api-to-order-service:order-submission",
+        "name": "order submission",
+        "description": "The storefront API calls the order service when a shopper submits an order.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "When a shopper submits an order the storefront API calls the order service over gRPC.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:storefront-api",
+        "destination": "process:order-service",
+        "protocol": "gRPC",
+        "authentication": "none",
+        "data_description": "Submitted order",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:order-service-to-orders-db:order-data-access",
+        "name": "order data access",
+        "description": "The order service reads and writes orders, shopper addresses, and card-last-four in the database.",
+        "assets": [
+          "pii",
+          "financial",
+          "business-critical-data"
+        ],
+        "source_excerpt": "the order service reads and writes with a single application account that has full read/write",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:order-service",
+        "destination": "store:orders-db",
+        "protocol": "unknown",
+        "authentication": "single application account; password from an environment variable on the worker",
+        "data_description": "Orders, shopper addresses, and card-last-four",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:order-service-to-receipt-archive:receipt-writing",
+        "name": "receipt writing",
+        "description": "The order service writes a receipt for every completed order to the receipt archive.",
+        "assets": [
+          "financial",
+          "business-critical-data"
+        ],
+        "source_excerpt": "Every completed order also gets a receipt written to a Cloud Storage bucket we call the receipt archive.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:order-service",
+        "destination": "store:receipt-archive",
+        "protocol": "TLS",
+        "authentication": "order service's own service account",
+        "data_description": "Receipt recording which order was written and that the order service wrote it",
+        "encryption_in_transit": "TLS",
+        "operations": "write"
+      },
+      {
+        "id": "flow:card-processor-to-storefront-api:payment-webhook",
+        "name": "payment webhook",
+        "description": "The card processor sends a webhook to the storefront API after settling a payment to report that the order is paid.",
+        "assets": [
+          "financial",
+          "business-critical-data"
+        ],
+        "source_excerpt": "After they settle a payment they POST a webhook back to the storefront API to tell us the order is paid.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The source states: \"I would have to check how that callback is authenticated.\"",
+        "source": "entity:card-processor",
+        "destination": "process:storefront-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Payment settlement and order-paid notification",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:internet",
+        "name": "internet",
+        "description": "The internet-facing environment from which shoppers reach the storefront.",
+        "assets": [],
+        "source_excerpt": "It is the only thing we expose to the internet.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:cloud-run",
+        "name": "Cloud Run",
+        "description": "The Cloud Run hosting environment for the storefront API.",
+        "assets": [],
+        "source_excerpt": "a Node service running on Cloud Run",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:core-network",
+        "name": "core network",
+        "description": "The organisation's core network containing the order service and orders database.",
+        "assets": [],
+        "source_excerpt": "The order service is a Python worker in our core network",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:cloud-storage",
+        "name": "Cloud Storage",
+        "description": "The Cloud Storage hosting environment containing the receipt archive.",
+        "assets": [],
+        "source_excerpt": "a Cloud Storage bucket we call the receipt archive",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:third-party",
+        "name": "third party",
+        "description": "The external-party zone containing the third-party card processor.",
+        "assets": [],
+        "source_excerpt": "Our card processor is a third party.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The storefront API presents a web interface because it is described as a storefront used by shoppers to browse and place orders.",
+        "element_id": "process:storefront-api",
+        "attribute": "interface_kind",
+        "basis": "The source describes shoppers browsing the storefront and placing orders through the storefront API."
+      },
+      {
+        "assumption": "The orders database is confidential because it contains shopper addresses and card-last-four data.",
+        "element_id": "store:orders-db",
+        "attribute": "data_classification",
+        "basis": "The source states that orders-db contains shopper addresses and card-last-four data."
+      },
+      {
+        "assumption": "The receipt archive is confidential because it contains completed-order receipts and payment-related order records.",
+        "element_id": "store:receipt-archive",
+        "attribute": "data_classification",
+        "basis": "The source states that completed orders produce receipts and that the receipt records the order written."
+      }
+    ]
+  },
+  "issues": []
+}
