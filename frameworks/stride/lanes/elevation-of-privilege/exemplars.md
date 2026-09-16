@@ -4,7 +4,7 @@ Three drafts against the exemplar system, showing the shape and the reasoning. F
 
 ## Canonical: a confused deputy holding standing database authority
 
-`process:ledger-service` accepts instructions over `flow:web-api-to-ledger-service:post-transfer` with `authentication: none`, and holds a full read/write credential to `store:accounts-db`. It makes no authorization decision of its own about whose money is being moved, yet it carries authority over everyone's.
+`process:ledger-service` accepts instructions over `flow:process:web-api>process:ledger-service>post-transfer` with `authentication: none`, and holds a full read/write credential to `store:accounts-db`. It makes no authorization decision of its own about whose money is being moved, yet it carries authority over everyone's.
 
 Lane contrast: being accepted *as* the web API is spoofing. Directing an honest, over-privileged service to use authority the caller does not have is yours.
 
@@ -16,10 +16,10 @@ Two verbs, and the fix decides between them: narrow a grant and it is `abuse-gra
 {
   "sequence": 1,
   "title": "The ledger service lends its full database authority to any caller",
-  "description": "`process:ledger-service` performs transfers using the standing full read/write credential on `flow:ledger-service-to-accounts-db:read-write-balances`, and takes its instructions from `flow:web-api-to-ledger-service:post-transfer`, which carries `authentication: none`. Nothing binds an instruction to an authorized customer at the point authority is exercised: the caller supplies the account identifiers and the ledger acts on them with its own privilege, the classic confused deputy. An attacker who can reach the ledger moves funds between arbitrary accounts — horizontal escalation across the entire customer base — without ever holding a customer credential. Second-order: the same standing authority covers all rows of `store:accounts-db`, so any code-execution flaw in this process inherits it wholesale.",
+  "description": "`process:ledger-service` performs transfers using the standing full read/write credential on `flow:process:ledger-service>store:accounts-db>read-write-balances`, and takes its instructions from `flow:process:web-api>process:ledger-service>post-transfer`, which carries `authentication: none`. Nothing binds an instruction to an authorized customer at the point authority is exercised: the caller supplies the account identifiers and the ledger acts on them with its own privilege, the classic confused deputy. An attacker who can reach the ledger moves funds between arbitrary accounts — horizontal escalation across the entire customer base — without ever holding a customer credential. Second-order: the same standing authority covers all rows of `store:accounts-db`, so any code-execution flaw in this process inherits it wholesale.",
   "affected_element_ids": [
     "process:ledger-service",
-    "flow:ledger-service-to-accounts-db:read-write-balances",
+    "flow:process:ledger-service>store:accounts-db>read-write-balances",
     "store:accounts-db"
   ],
   "verb": "abuse-grant",
@@ -38,7 +38,7 @@ Two verbs, and the fix decides between them: narrow a grant and it is `abuse-gra
   "mitigations": [
     {
       "summary": "Enforce object-level authorization at the ledger",
-      "detail": "Require `process:ledger-service` to verify that the authenticated principal owns the source account, using an identity propagated from `flow:customer-to-web-api:submit-payment` rather than caller-supplied identifiers."
+      "detail": "Require `process:ledger-service` to verify that the authenticated principal owns the source account, using an identity propagated from `flow:entity:customer>process:web-api>submit-payment` rather than caller-supplied identifiers."
     },
     {
       "summary": "Reduce the standing grant",
@@ -56,17 +56,17 @@ Written against exemplar system B. Elevation does not need a privilege bug when 
 {
   "sequence": 2,
   "title": "A publisher selects its own tenant and writes into any customer's partition",
-  "description": "`process:stream-processor` reads the tenant key out of the device payload carried on `flow:sensor-gateway-to-mqtt-broker:publish-telemetry`, which crosses from `boundary:field` into `boundary:ingest`, and then writes under that key over `flow:stream-processor-to-telemetry-store:write-readings` using a service account holding write on every tenant partition. Nothing between the two re-derives the tenant from an authenticated identity, so a publisher that sets another customer's tenant in its own payload is not defeating an authorization check — it is supplying the input that check would have been made from. Second-order: the writing identity already spans the whole of `store:telemetry-store`, so the escalation is from one fleet's data to every tenant's in a single hop, and the readings land through the ordinary ingest path rather than an anomalous one.",
+  "description": "`process:stream-processor` reads the tenant key out of the device payload carried on `flow:entity:sensor-gateway>process:mqtt-broker>publish-telemetry`, which crosses from `boundary:field` into `boundary:ingest`, and then writes under that key over `flow:process:stream-processor>store:telemetry-store>write-readings` using a service account holding write on every tenant partition. Nothing between the two re-derives the tenant from an authenticated identity, so a publisher that sets another customer's tenant in its own payload is not defeating an authorization check — it is supplying the input that check would have been made from. Second-order: the writing identity already spans the whole of `store:telemetry-store`, so the escalation is from one fleet's data to every tenant's in a single hop, and the readings land through the ordinary ingest path rather than an anomalous one.",
   "affected_element_ids": [
     "entity:sensor-gateway",
     "process:stream-processor",
-    "flow:sensor-gateway-to-mqtt-broker:publish-telemetry",
-    "flow:stream-processor-to-telemetry-store:write-readings",
+    "flow:entity:sensor-gateway>process:mqtt-broker>publish-telemetry",
+    "flow:process:stream-processor>store:telemetry-store>write-readings",
     "store:telemetry-store"
   ],
   "verb": "abuse-grant",
   "evidence_refs": [
-    "crossing:flow:sensor-gateway-to-mqtt-broker:publish-telemetry"
+    "crossing:flow:entity:sensor-gateway>process:mqtt-broker>publish-telemetry"
   ],
   "quotes": [
     {
@@ -90,7 +90,7 @@ Written against exemplar system B. Elevation does not need a privilege bug when 
     },
     {
       "summary": "Scope the write identity to one tenant at a time",
-      "detail": "Replace the platform-wide service account on `flow:stream-processor-to-telemetry-store:write-readings` with a per-tenant credential, so a wrong tenant key fails the write instead of performing it."
+      "detail": "Replace the platform-wide service account on `flow:process:stream-processor>store:telemetry-store>write-readings` with a per-tenant credential, so a wrong tenant key fails the write instead of performing it."
     }
   ]
 }
@@ -104,10 +104,10 @@ Written against exemplar system B. Elevation does not need a privilege bug when 
 {
   "sequence": 3,
   "title": "Direct transfer authority if the ledger service is reachable beyond the core zone",
-  "description": "`process:ledger-service` has `exposure: unknown`, and it accepts transfer instructions over `flow:web-api-to-ledger-service:post-transfer` from `process:web-api` with `authentication: none`. If that unknown resolves to reachability beyond `boundary:core` — a load balancer, a peered network, a management interface — then a position outside the core zone reaches the transfer surface directly, without a dmz foothold and without any prior compromise: the attacker's position does not carry transfer authority, and the crossing hands it over on reachability alone. What the ledger then does with its own database authority is E-01's finding, not this one. This draft is conditional on the `exposure` attribute of `process:ledger-service`; it is not a claim that the process is externally reachable.",
+  "description": "`process:ledger-service` has `exposure: unknown`, and it accepts transfer instructions over `flow:process:web-api>process:ledger-service>post-transfer` from `process:web-api` with `authentication: none`. If that unknown resolves to reachability beyond `boundary:core` — a load balancer, a peered network, a management interface — then a position outside the core zone reaches the transfer surface directly, without a dmz foothold and without any prior compromise: the attacker's position does not carry transfer authority, and the crossing hands it over on reachability alone. What the ledger then does with its own database authority is E-01's finding, not this one. This draft is conditional on the `exposure` attribute of `process:ledger-service`; it is not a claim that the process is externally reachable.",
   "affected_element_ids": [
     "process:web-api",
-    "flow:web-api-to-ledger-service:post-transfer",
+    "flow:process:web-api>process:ledger-service>post-transfer",
     "process:ledger-service"
   ],
   "verb": "escalate",

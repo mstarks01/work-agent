@@ -4,7 +4,7 @@
     "requirement": "V1.5.1",
     "affected_element_ids": [
       "process:schedule-importer",
-      "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed"
+      "flow:process:schedule-importer>entity:scheduling-partner>pull-schedule-feed"
     ],
     "claim": "The importer parses a partner's SOAP feed as XML and nothing states whether external entities are disabled.",
     "tier": "must-find",
@@ -17,7 +17,7 @@
     "affected_element_ids": [
       "process:dispatch-api",
       "process:dispatch-console",
-      "flow:dispatch-console-to-dispatch-api:dispatch-requests"
+      "flow:process:dispatch-console>process:dispatch-api>dispatch-requests"
     ],
     "claim": "Nothing states which origins the dispatch API returns in its Access-Control-Allow-Origin header.",
     "tier": "must-find",
@@ -32,7 +32,7 @@
     "requirement": "V3.5.1",
     "affected_element_ids": [
       "process:dispatch-api",
-      "flow:dispatch-console-to-dispatch-api:dispatch-requests"
+      "flow:process:dispatch-console>process:dispatch-api>dispatch-requests"
     ],
     "claim": "Nothing states what validates a cross-origin dispatch request as one the console originated.",
     "tier": "expected",
@@ -43,7 +43,7 @@
     "chapter": "api-and-web-service",
     "requirement": "V4.4.1",
     "affected_element_ids": [
-      "flow:dispatch-console-to-dispatch-api:live-job-status"
+      "flow:process:dispatch-console>process:dispatch-api>live-job-status"
     ],
     "claim": "Nothing states whether the live job status WebSocket runs over TLS.",
     "tier": "must-find",
@@ -54,7 +54,7 @@
     "chapter": "session-management",
     "requirement": "V7.2.1",
     "affected_element_ids": [
-      "flow:dispatch-console-to-dispatch-api:live-job-status",
+      "flow:process:dispatch-console>process:dispatch-api>live-job-status",
       "process:dispatch-api"
     ],
     "claim": "Nothing states whether the dispatch API checks an engineer's session again once the socket is open.",
@@ -66,7 +66,7 @@
     "chapter": "authentication",
     "requirement": "V6.1.1",
     "affected_element_ids": [
-      "flow:duty-engineer-to-dispatch-console:open-console",
+      "flow:entity:duty-engineer>process:dispatch-console>open-console",
       "process:dispatch-console"
     ],
     "claim": "The input carries no documentation of how an engineer signs in to the console or what limits repeated attempts.",

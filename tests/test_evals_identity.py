@@ -324,10 +324,13 @@ class TestAClaimThatNamesNoPlaceMatchesNothing:
     """
 
     CASE = "01-payments-checkout"
-    REFERENCE = ("flow:shopper-to-storefront-api:place-order", "entity:shopper")
+    REFERENCE = (
+        "flow:entity:shopper>process:storefront-api>place-order",
+        "entity:shopper",
+    )
     FLOWS: ClassVar[dict[str, dict[str, tuple[str, str]]]] = {
         CASE: {
-            "flow:shopper-to-storefront-api:place-order": (
+            "flow:entity:shopper>process:storefront-api>place-order": (
                 "entity:shopper",
                 "process:storefront-api",
             )

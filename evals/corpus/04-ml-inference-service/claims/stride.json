@@ -2,7 +2,7 @@
   {
     "category": "spoofing",
     "affected_element_ids": [
-      "flow:calling-service-to-inference-gateway:submit-inference-request",
+      "flow:entity:calling-service>process:inference-gateway>submit-inference-request",
       "entity:calling-service"
     ],
     "claim": "An attacker who obtains a never-expiring API key calls the inference gateway as that team indefinitely.",
@@ -17,7 +17,7 @@
   {
     "category": "spoofing",
     "affected_element_ids": [
-      "flow:inference-gateway-to-model-server:forward-request",
+      "flow:process:inference-gateway>process:model-server>forward-request",
       "process:model-server"
     ],
     "claim": "Any workload inside the model network submits inference requests posing as the gateway, which the model server accepts on network position alone.",
@@ -32,7 +32,7 @@
   {
     "category": "spoofing",
     "affected_element_ids": [
-      "flow:ml-engineer-to-model-registry-bucket:publish-artifact",
+      "flow:entity:ml-engineer>store:model-registry-bucket>publish-artifact",
       "entity:ml-engineer"
     ],
     "claim": "An attacker publishes a model artifact under a shared group account with no individual identity behind it.",
@@ -48,7 +48,7 @@
     "category": "tampering",
     "affected_element_ids": [
       "store:model-registry-bucket",
-      "flow:model-server-to-model-registry-bucket:load-artifact"
+      "flow:process:model-server>store:model-registry-bucket>load-artifact"
     ],
     "claim": "An attacker who can write to the registry swaps the model artifact and the model server loads it without any integrity verification.",
     "tier": "must-find",
@@ -63,7 +63,7 @@
     "category": "tampering",
     "affected_element_ids": [
       "store:redis-feature-store",
-      "flow:model-server-to-redis-feature-store:read-features"
+      "flow:process:model-server>store:redis-feature-store>read-features"
     ],
     "claim": "An attacker with model-network access writes to the unauthenticated Redis feature store and changes the features a decision is made on.",
     "tier": "must-find",
@@ -77,7 +77,7 @@
   {
     "category": "tampering",
     "affected_element_ids": [
-      "flow:inference-gateway-to-model-server:forward-request"
+      "flow:process:inference-gateway>process:model-server>forward-request"
     ],
     "claim": "An attacker inside the model network alters request payloads in flight on the unauthenticated, unencrypted forward path.",
     "tier": "expected",
@@ -150,7 +150,7 @@
     "category": "information-disclosure",
     "affected_element_ids": [
       "process:model-server",
-      "flow:calling-service-to-inference-gateway:submit-inference-request"
+      "flow:entity:calling-service>process:inference-gateway>submit-inference-request"
     ],
     "claim": "A caller crafts a request that makes the model emit customer features belonging to a different tenant.",
     "tier": "expected",
@@ -164,7 +164,7 @@
   {
     "category": "information-disclosure",
     "affected_element_ids": [
-      "flow:inference-gateway-to-model-server:forward-request"
+      "flow:process:inference-gateway>process:model-server>forward-request"
     ],
     "claim": "An attacker on the internal path reads end-user text out of forwarded requests, because transport encryption there is unverified.",
     "tier": "expected",
@@ -179,7 +179,7 @@
     "category": "denial-of-service",
     "affected_element_ids": [
       "process:inference-gateway",
-      "flow:calling-service-to-inference-gateway:submit-inference-request"
+      "flow:entity:calling-service>process:inference-gateway>submit-inference-request"
     ],
     "claim": "A caller holding a valid key floods the gateway with inference requests and exhausts the shared GPU capacity behind it.",
     "tier": "must-find",

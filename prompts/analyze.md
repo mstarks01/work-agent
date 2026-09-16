@@ -53,11 +53,11 @@ Trust zones: `boundary:public-internet` (network), `boundary:dmz` (network), `bo
 
 | Flow | Attributes |
 |---|---|
-| `flow:customer-to-web-api:submit-payment` | HTTPS/TLS 1.3; `authentication`: session cookie issued after password login, no MFA; carries payment instructions and account identifiers |
-| `flow:payments-provider-to-web-api:settlement-webhook` | HTTPS POST; `authentication: unknown`; carries settlement confirmations |
-| `flow:web-api-to-ledger-service:post-transfer` | gRPC; `authentication: none` (accepted by network position); `encryption_in_transit: none`; carries transfer instructions with customer IDs |
-| `flow:ledger-service-to-accounts-db:read-write-balances` | PostgreSQL wire protocol; `authentication`: shared static password from an environment variable, full read/write; `encryption_in_transit: unknown`; carries balances and account-holder PII |
-| `flow:ledger-service-to-audit-log:append-transfer-record` | HTTPS append; `authentication`: ledger service account; TLS 1.3; records tagged with the ledger service identity only |
+| `flow:entity:customer>process:web-api>submit-payment` | HTTPS/TLS 1.3; `authentication`: session cookie issued after password login, no MFA; carries payment instructions and account identifiers |
+| `flow:entity:payments-provider>process:web-api>settlement-webhook` | HTTPS POST; `authentication: unknown`; carries settlement confirmations |
+| `flow:process:web-api>process:ledger-service>post-transfer` | gRPC; `authentication: none` (accepted by network position); `encryption_in_transit: none`; carries transfer instructions with customer IDs |
+| `flow:process:ledger-service>store:accounts-db>read-write-balances` | PostgreSQL wire protocol; `authentication`: shared static password from an environment variable, full read/write; `encryption_in_transit: unknown`; carries balances and account-holder PII |
+| `flow:process:ledger-service>store:audit-log>append-transfer-record` | HTTPS append; `authentication`: ledger service account; TLS 1.3; records tagged with the ledger service identity only |
 
 Its evidence catalog, rendered as yours will be:
 
@@ -67,13 +67,13 @@ Its evidence catalog, rendered as yours will be:
 | --- | --- |
 | `unknown:process:ledger-service:exposure` | `exposure` never stated |
 | `unknown:store:accounts-db:encryption_at_rest` | `encryption_at_rest` never stated |
-| `unknown:flow:payments-provider-to-web-api:settlement-webhook:authentication` | `authentication` never stated |
-| `absent:flow:web-api-to-ledger-service:post-transfer:authentication` | `authentication` stated absent |
-| `absent:flow:web-api-to-ledger-service:post-transfer:encryption_in_transit` | `encryption_in_transit` stated absent |
-| `unknown:flow:ledger-service-to-accounts-db:read-write-balances:encryption_in_transit` | `encryption_in_transit` never stated |
-| `crossing:flow:customer-to-web-api:submit-payment` | crosses a trust boundary |
-| `crossing:flow:payments-provider-to-web-api:settlement-webhook` | crosses a trust boundary |
-| `crossing:flow:web-api-to-ledger-service:post-transfer` | crosses a trust boundary |
+| `unknown:flow:entity:payments-provider>process:web-api>settlement-webhook:authentication` | `authentication` never stated |
+| `absent:flow:process:web-api>process:ledger-service>post-transfer:authentication` | `authentication` stated absent |
+| `absent:flow:process:web-api>process:ledger-service>post-transfer:encryption_in_transit` | `encryption_in_transit` stated absent |
+| `unknown:flow:process:ledger-service>store:accounts-db>read-write-balances:encryption_in_transit` | `encryption_in_transit` never stated |
+| `crossing:flow:entity:customer>process:web-api>submit-payment` | crosses a trust boundary |
+| `crossing:flow:entity:payments-provider>process:web-api>settlement-webhook` | crosses a trust boundary |
+| `crossing:flow:process:web-api>process:ledger-service>post-transfer` | crosses a trust boundary |
 
 #### Exemplar system B: fleet telemetry platform
 
@@ -102,9 +102,9 @@ Trust zones: `boundary:field` (network), `boundary:ingest` (network), `boundary:
 
 | Flow | Attributes |
 |---|---|
-| `flow:sensor-gateway-to-mqtt-broker:publish-telemetry` | MQTT over TLS; `authentication`: one client certificate shared by every device image; payload carries the tenant_id |
-| `flow:mqtt-broker-to-stream-processor:consume-topic` | topic subscription; `authentication: unknown`; carries raw device payloads |
-| `flow:stream-processor-to-telemetry-store:write-readings` | time-series write API; `authentication`: one service account holding write on every tenant partition; `encryption_in_transit: unknown` |
+| `flow:entity:sensor-gateway>process:mqtt-broker>publish-telemetry` | MQTT over TLS; `authentication`: one client certificate shared by every device image; payload carries the tenant_id |
+| `flow:process:mqtt-broker>process:stream-processor>consume-topic` | topic subscription; `authentication: unknown`; carries raw device payloads |
+| `flow:process:stream-processor>store:telemetry-store>write-readings` | time-series write API; `authentication`: one service account holding write on every tenant partition; `encryption_in_transit: unknown` |
 
 Its evidence catalog:
 
@@ -114,10 +114,10 @@ Its evidence catalog:
 | --- | --- |
 | `unknown:process:stream-processor:exposure` | `exposure` never stated |
 | `unknown:store:telemetry-store:encryption_at_rest` | `encryption_at_rest` never stated |
-| `unknown:flow:mqtt-broker-to-stream-processor:consume-topic:authentication` | `authentication` never stated |
-| `unknown:flow:stream-processor-to-telemetry-store:write-readings:encryption_in_transit` | `encryption_in_transit` never stated |
-| `crossing:flow:sensor-gateway-to-mqtt-broker:publish-telemetry` | crosses a trust boundary |
-| `crossing:flow:mqtt-broker-to-stream-processor:consume-topic` | crosses a trust boundary |
+| `unknown:flow:process:mqtt-broker>process:stream-processor>consume-topic:authentication` | `authentication` never stated |
+| `unknown:flow:process:stream-processor>store:telemetry-store>write-readings:encryption_in_transit` | `encryption_in_transit` never stated |
+| `crossing:flow:entity:sensor-gateway>process:mqtt-broker>publish-telemetry` | crosses a trust boundary |
+| `crossing:flow:process:mqtt-broker>process:stream-processor>consume-topic` | crosses a trust boundary |
 
 ## Input
 

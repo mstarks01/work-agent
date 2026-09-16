@@ -79,12 +79,12 @@ Not part of the question, but the records cite these names, so you need them.
 
 | id | source | destination | protocol | authentication | in transit |
 |---|---|---|---|---|---|
-| flow:browser-to-web-application:page-request | entity:browser | process:web-application | HTTP/S | unknown | encrypted (marked as the one encrypted link) |
-| flow:web-application-to-message-queue:enqueue-job | process:web-application | store:message-queue | unknown | unknown | unknown |
-| flow:background-worker-process-to-message-queue:consume-job | process:background-worker-process | store:message-queue | unknown | unknown | unknown |
-| flow:background-worker-process-to-database:read-write-records | process:background-worker-process | store:database | unknown | unknown | unknown |
-| flow:web-application-to-web-application-config:read-configuration | process:web-application | store:web-application-config | unknown | unknown | unknown |
-| flow:background-worker-process-to-worker-config:read-configuration | process:background-worker-process | store:worker-config | unknown | unknown | unknown |
+| flow:entity:browser>process:web-application>page-request | entity:browser | process:web-application | HTTP/S | unknown | encrypted (marked as the one encrypted link) |
+| flow:process:web-application>store:message-queue>enqueue-job | process:web-application | store:message-queue | unknown | unknown | unknown |
+| flow:process:background-worker-process>store:message-queue>consume-job | process:background-worker-process | store:message-queue | unknown | unknown | unknown |
+| flow:process:background-worker-process>store:database>read-write-records | process:background-worker-process | store:database | unknown | unknown | unknown |
+| flow:process:web-application>store:web-application-config>read-configuration | process:web-application | store:web-application-config | unknown | unknown | unknown |
+| flow:process:background-worker-process>store:worker-config>read-configuration | process:background-worker-process | store:worker-config | unknown | unknown | unknown |
 
 **Trust boundaries**
 
@@ -126,14 +126,14 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A1.** `V3.4.1` — No security response header is described for the one encrypted browser-facing link.
 
-- `entity:browser`, `process:web-application`, `flow:browser-to-web-application:page-request`
+- `entity:browser`, `process:web-application`, `flow:entity:browser>process:web-application>page-request`
 - tech:browser-frontend fires; the chapter applies and every header is unstated. The header is emitted by the application or by the layer in front of it, so either route settles it.
 
 > mark:
 
 **A2.** `V3.3.1` — Nothing states whether the web application sets any cookie or with which attributes.
 
-- `process:web-application`, `flow:browser-to-web-application:page-request`
+- `process:web-application`, `flow:entity:browser>process:web-application>page-request`
 - A browser client is stated; the cookie question is open rather than answered. The attribute is set by whatever emits Set-Cookie, which is the application or the layer in front of it, so either route settles it.
 
 > mark:
@@ -153,7 +153,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A4.** `V15.2.2` — Nothing states what bounds the work a queued job can consume.
 
-- `process:background-worker-process`, `store:message-queue`, `flow:background-worker-process-to-message-queue:consume-job`
+- `process:background-worker-process`, `store:message-queue`, `flow:process:background-worker-process>store:message-queue>consume-job`
 - A queue with an internal worker raises the availability requirement; the input never reaches it.
 
 > mark:
@@ -173,7 +173,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A6.** `V12.3.3` — Every link except the browser one states no transport protection at all.
 
-- `process:web-application`, `store:message-queue`, `flow:web-application-to-message-queue:enqueue-job`
+- `process:web-application`, `store:message-queue`, `flow:process:web-application>store:message-queue>enqueue-job`
 - The submitter marks one link as the only encrypted one, which settles the others.
 
 > mark:
@@ -208,7 +208,7 @@ on either of them. That is the finding this sitting exists for.
 
 **1.** An attacker interacts with the web application as a legitimate user, because how the application authenticates the browser is unverified.
 
-- `flow:browser-to-web-application:page-request`, `entity:browser`
+- `flow:entity:browser>process:web-application>page-request`, `entity:browser`
 - severity: medium/medium · verb: `impersonate`
 - Authentication on the one internet-crossing flow is unknown; needs-info is an acceptable verdict, silence is not.
 
@@ -216,7 +216,7 @@ on either of them. That is the finding this sitting exists for.
 
 **2.** An attacker who reaches the queue enqueues jobs as if they came from the web application, since queue authentication is unverified.
 
-- `flow:web-application-to-message-queue:enqueue-job`, `store:message-queue`
+- `flow:process:web-application>store:message-queue>enqueue-job`, `store:message-queue`
 - severity: medium/high · verb: `impersonate`
 - The queue is the trust hand-off in this design; nothing states how a producer is identified.
 
@@ -224,7 +224,7 @@ on either of them. That is the finding this sitting exists for.
 
 **3.** An attacker holding the worker's database credentials connects to the database as the worker.
 
-- `flow:background-worker-process-to-database:read-write-records`
+- `flow:process:background-worker-process>store:database>read-write-records`
 - severity: medium/high · verb: `use-credential`
 - Credentials are stated to exist in the worker config; their protection is not.
 
@@ -251,7 +251,7 @@ on either of them. That is the finding this sitting exists for.
 
 **6.** An attacker with the worker's database access alters application records or the log records stored alongside them.
 
-- `store:database`, `flow:background-worker-process-to-database:read-write-records`
+- `store:database`, `flow:process:background-worker-process>store:database>read-write-records`
 - severity: medium/high · verb: `alter`
 - Records and their own audit log share one store — tampering with one covers the other.
 
@@ -270,7 +270,7 @@ on either of them. That is the finding this sitting exists for.
 
 **8.** The origin of a processed job cannot be established, because nothing records which producer enqueued it.
 
-- `store:message-queue`, `flow:web-application-to-message-queue:enqueue-job`
+- `store:message-queue`, `flow:process:web-application>store:message-queue>enqueue-job`
 - severity: medium/medium · verb: `unattributable`
 - Decoupling removes the request context that would otherwise attribute the work.
 
@@ -305,7 +305,7 @@ on either of them. That is the finding this sitting exists for.
 
 **12.** An attacker on the internal network reads job contents in transit, because transport encryption between the tiers is unverified.
 
-- `flow:web-application-to-message-queue:enqueue-job`, `flow:background-worker-process-to-message-queue:consume-job`
+- `flow:process:web-application>store:message-queue>enqueue-job`, `flow:process:background-worker-process>store:message-queue>consume-job`
 - severity: medium/medium · verb: `intercept`
 - Only the browser link is marked encrypted; the rest is explicitly silent.
 
@@ -324,7 +324,7 @@ on either of them. That is the finding this sitting exists for.
 
 **14.** An attacker floods the internet-facing web application until it stops serving browsers.
 
-- `process:web-application`, `flow:browser-to-web-application:page-request`
+- `process:web-application`, `flow:entity:browser>process:web-application>page-request`
 - severity: medium/medium · verb: `flood`
 - Generic but grounded: it is the only internet-facing element.
 
@@ -402,9 +402,9 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "20b0aa82c922766db2353cade33f7a26b38c60a3c7061244ef4686b7a647778b",
-      "model.json": "2c1e465c69510db346e8d5709774450a74953df8c4e5de53037b4b4f43da1617",
-      "claims/asvs.json": "075017cff273aa1532584ba72d91af485363346aac8a5e22e7009cf2885db83b",
-      "claims/stride.json": "f2b2d70db625dcf2eb6f7f91b3532dc706137263d5ffb1ac707bef5dcddab39e"
+      "model.json": "828bc9a79a8299013b667bd92c0184814f51cee8f181f5ec8e34f14fc950ca1d",
+      "claims/asvs.json": "9e4ee6be326673ba2101ed60662718b0d50ecaf6aba7218bcec702c785b033c5",
+      "claims/stride.json": "eb2f6e6330b22dbf3f6151e8d93290df9b401f89a1171f146c17f0b27bab572e"
       }
     }
   }

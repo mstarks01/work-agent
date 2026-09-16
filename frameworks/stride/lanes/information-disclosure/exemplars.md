@@ -4,7 +4,7 @@ Three drafts against the exemplar system, showing the shape and the reasoning. F
 
 ## Canonical: plaintext transfer traffic between zones
 
-`flow:web-api-to-ledger-service:post-transfer` has `encryption_in_transit: none`, appears in the derived crossings (dmz → core), and carries transfer instructions with customer IDs. Stated trigger, stated content, stated crossing.
+`flow:process:web-api>process:ledger-service>post-transfer` has `encryption_in_transit: none`, appears in the derived crossings (dmz → core), and carries transfer instructions with customer IDs. Stated trigger, stated content, stated crossing.
 
 Same path, two lanes: rewriting those messages is tampering, reading them is yours. Write the read harm only, and score it on what is exposed rather than on what could be changed.
 
@@ -12,15 +12,15 @@ Same path, two lanes: rewriting those messages is tampering, reading them is you
 {
   "sequence": 1,
   "title": "Transfer instructions readable on the wire between the web API and the ledger",
-  "description": "`flow:web-api-to-ledger-service:post-transfer` carries gRPC transfer instructions — customer identifiers, amounts, destination accounts — from `boundary:dmz` into `boundary:core` with `encryption_in_transit: none`. Anyone able to observe that path (a compromised node in either zone, a misconfigured span port, a sidecar with packet capture) reads the payment activity of every customer in real time, without needing to authenticate to anything. Second-order: the observed identifiers are the inputs the ledger uses against `store:accounts-db`, so a passive observer accumulates the account mapping needed to target specific customers in later attacks.",
+  "description": "`flow:process:web-api>process:ledger-service>post-transfer` carries gRPC transfer instructions — customer identifiers, amounts, destination accounts — from `boundary:dmz` into `boundary:core` with `encryption_in_transit: none`. Anyone able to observe that path (a compromised node in either zone, a misconfigured span port, a sidecar with packet capture) reads the payment activity of every customer in real time, without needing to authenticate to anything. Second-order: the observed identifiers are the inputs the ledger uses against `store:accounts-db`, so a passive observer accumulates the account mapping needed to target specific customers in later attacks.",
   "affected_element_ids": [
-    "flow:web-api-to-ledger-service:post-transfer",
+    "flow:process:web-api>process:ledger-service>post-transfer",
     "process:web-api",
     "process:ledger-service"
   ],
   "verb": "intercept",
   "evidence_refs": [
-    "crossing:flow:web-api-to-ledger-service:post-transfer"
+    "crossing:flow:process:web-api>process:ledger-service>post-transfer"
   ],
   "quotes": [
     {
@@ -36,7 +36,7 @@ Same path, two lanes: rewriting those messages is tampering, reading them is you
   "mitigations": [
     {
       "summary": "Require TLS on the ledger call",
-      "detail": "Set `encryption_in_transit` on `flow:web-api-to-ledger-service:post-transfer` to mTLS, so the payload is confidential and the peer is verified in one step."
+      "detail": "Set `encryption_in_transit` on `flow:process:web-api>process:ledger-service>post-transfer` to mTLS, so the payload is confidential and the peer is verified in one step."
     },
     {
       "summary": "Minimize identifiers on the wire",
@@ -48,16 +48,16 @@ Same path, two lanes: rewriting those messages is tampering, reading them is you
 
 ## Second-order: one leaked credential exposes the whole corpus
 
-`flow:ledger-service-to-accounts-db:read-write-balances` authenticates with a shared static password from an environment variable. The exemplar is about scale: the credential itself is a small thing, and reading it is a small event, but what it unlocks is every account holder's record at once.
+`flow:process:ledger-service>store:accounts-db>read-write-balances` authenticates with a shared static password from an environment variable. The exemplar is about scale: the credential itself is a small thing, and reading it is a small event, but what it unlocks is every account holder's record at once.
 
 ```json
 {
   "sequence": 2,
   "title": "A leaked static database password exposes every account holder's records",
-  "description": "The shared static password on `flow:ledger-service-to-accounts-db:read-write-balances` lives in an environment variable of `process:ledger-service` and grants full read access to `store:accounts-db`. Environment variables surface in crash dumps, process listings, error pages, container image layers, and log output, so disclosure does not require compromising the process outright. An attacker holding the password queries the store directly from anywhere in `boundary:core`, reading balances and account-holder PII in bulk. Second-order: this is corpus-scale rather than per-request disclosure — one small leak yields the entire confidential dataset, and the read leaves no trace in `store:audit-log`, which only records transfers made through the ledger.",
+  "description": "The shared static password on `flow:process:ledger-service>store:accounts-db>read-write-balances` lives in an environment variable of `process:ledger-service` and grants full read access to `store:accounts-db`. Environment variables surface in crash dumps, process listings, error pages, container image layers, and log output, so disclosure does not require compromising the process outright. An attacker holding the password queries the store directly from anywhere in `boundary:core`, reading balances and account-holder PII in bulk. Second-order: this is corpus-scale rather than per-request disclosure — one small leak yields the entire confidential dataset, and the read leaves no trace in `store:audit-log`, which only records transfers made through the ledger.",
   "affected_element_ids": [
     "store:accounts-db",
-    "flow:ledger-service-to-accounts-db:read-write-balances",
+    "flow:process:ledger-service>store:accounts-db>read-write-balances",
     "process:ledger-service"
   ],
   "verb": "recover-credential",

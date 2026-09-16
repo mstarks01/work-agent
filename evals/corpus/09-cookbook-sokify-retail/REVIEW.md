@@ -82,14 +82,14 @@ Not part of the question, but the records cite these names, so you need them.
 
 | id | source | destination | protocol | authentication | in transit |
 |---|---|---|---|---|---|
-| flow:customer-to-mobile-app:browse-and-order | entity:customer | process:mobile-app | unknown | unknown | unknown |
-| flow:mobile-app-to-web-api:api-traffic | process:mobile-app | process:web-api | HTTP | unknown | none — the app talks to the web API over HTTP, not HTTPS |
-| flow:catalogue-spreadsheet-to-web-api:sql-statements | process:catalogue-spreadsheet | process:web-api | SQL statements over an unstated transport | unknown | unknown |
-| flow:web-api-to-user-database:customer-records | process:web-api | store:user-database | unknown | unknown | unknown |
-| flow:web-api-to-sims:order-handover | process:web-api | process:sims | unknown | unknown | unknown |
-| flow:sims-to-delivery-address-flat-file:address-write | process:sims | store:delivery-address-flat-file | unknown | unknown | unknown |
-| flow:sims-to-fax-gateway:dispatch-note | process:sims | process:fax-gateway | unknown | unknown | unknown |
-| flow:fax-gateway-to-customer:confirmation-fax | process:fax-gateway | entity:customer | fax | unknown | unknown |
+| flow:entity:customer>process:mobile-app>browse-and-order | entity:customer | process:mobile-app | unknown | unknown | unknown |
+| flow:process:mobile-app>process:web-api>api-traffic | process:mobile-app | process:web-api | HTTP | unknown | none — the app talks to the web API over HTTP, not HTTPS |
+| flow:process:catalogue-spreadsheet>process:web-api>sql-statements | process:catalogue-spreadsheet | process:web-api | SQL statements over an unstated transport | unknown | unknown |
+| flow:process:web-api>store:user-database>customer-records | process:web-api | store:user-database | unknown | unknown | unknown |
+| flow:process:web-api>process:sims>order-handover | process:web-api | process:sims | unknown | unknown | unknown |
+| flow:process:sims>store:delivery-address-flat-file>address-write | process:sims | store:delivery-address-flat-file | unknown | unknown | unknown |
+| flow:process:sims>process:fax-gateway>dispatch-note | process:sims | process:fax-gateway | unknown | unknown | unknown |
+| flow:process:fax-gateway>entity:customer>confirmation-fax | process:fax-gateway | entity:customer | fax | unknown | unknown |
 
 **Trust boundaries**
 
@@ -105,7 +105,7 @@ Not part of the question, but the records cite these names, so you need them.
 - `process:web-api` — The source states outright that nobody can say what the API does about authentication, so every flow into it holds authentication unknown rather than absent.
 - `process:fax-gateway` — The source does not say whether the gateway is operated in-house or by a third party; it is zoned with Sokify's own systems on the strength of being described as part of what SIMS does with an order.
 - `process:catalogue-spreadsheet` — Typed as a process rather than an external entity: it is the org's own tooling and the source describes it by what its macros execute, not by who operates it. It is the resting place of the catalogue and the code that pushes SQL, and is modelled once.
-- `flow:fax-gateway-to-customer:confirmation-fax` — The source states one verification gap: the gateway dials the number stored against the order and nobody checks it arrived at the right place. That is assurance that the recipient is the intended one, not how this leg authenticates, which the source never describes. It is also not an integrity property — a fax can arrive unaltered at the wrong recipient. This prose is the only record of it — no rule reads notes, so the gap reaches no candidate and no evidence entry until the assertion layer in #926 gives it a field.
+- `flow:process:fax-gateway>entity:customer>confirmation-fax` — The source states one verification gap: the gateway dials the number stored against the order and nobody checks it arrived at the right place. That is assurance that the recipient is the intended one, not how this leg authenticates, which the source never describes. It is also not an integrity property — a fax can arrive unaltered at the wrong recipient. This prose is the only record of it — no rule reads notes, so the gap reaches no candidate and no evidence entry until the assertion layer in #926 gives it a field.
 - `boundary:sokify-internal-systems` — The source names no network segments; this zone groups the components described as Sokify's own systems.
 
 **Assumptions**
@@ -152,7 +152,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A1.** `V12.2.1` — The mobile app reaches the web API over HTTP rather than HTTPS.
 
-- `process:mobile-app`, `process:web-api`, `flow:mobile-app-to-web-api:api-traffic`
+- `process:mobile-app`, `process:web-api`, `flow:process:mobile-app>process:web-api>api-traffic`
 - encryption_in_transit is stated absent, so the ruling is plain rather than conditional.
 
 > mark:
@@ -162,7 +162,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A2.** `V14.2.1` — Customer names, addresses and card details are held with no stated protection.
 
-- `store:user-database`, `process:web-api`, `flow:web-api-to-user-database:customer-records`
+- `store:user-database`, `process:web-api`, `flow:process:web-api>store:user-database>customer-records`
 - The classification is stated and nothing that follows from it is.
 
 > mark:
@@ -172,7 +172,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A3.** `V1.2.4` — A macro-bearing spreadsheet sends SQL statements to the web API over an unstated transport.
 
-- `process:catalogue-spreadsheet`, `process:web-api`, `flow:catalogue-spreadsheet-to-web-api:sql-statements`
+- `process:catalogue-spreadsheet`, `process:web-api`, `flow:process:catalogue-spreadsheet>process:web-api>sql-statements`
 - The strongest injection trigger in the corpus: raw SQL from a client the model names.
 
 > mark:
@@ -182,7 +182,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A4.** `V15.3.1` — The web API serves customer records to the mobile app and nothing states which fields a response carries.
 
-- `process:mobile-app`, `process:web-api`, `flow:mobile-app-to-web-api:api-traffic`
+- `process:mobile-app`, `process:web-api`, `flow:process:mobile-app>process:web-api>api-traffic`
 - The delivery file receives addresses only, and the source says so. The open subset question is what the API returns to the app.
 
 > mark:
@@ -192,7 +192,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A5.** `V6.1.1` — Nothing states how a customer is authenticated to the mobile app.
 
-- `entity:customer`, `process:mobile-app`, `flow:customer-to-mobile-app:browse-and-order`
+- `entity:customer`, `process:mobile-app`, `flow:entity:customer>process:mobile-app>browse-and-order`
 - authentication is unknown on the one human-facing flow.
 
 > mark:
@@ -212,7 +212,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A7.** `V3.5.3` — Nothing states which HTTP methods the web API accepts for order submission.
 
-- `process:web-api`, `flow:mobile-app-to-web-api:api-traffic`
+- `process:web-api`, `flow:process:mobile-app>process:web-api>api-traffic`
 - An HTTP surface is stated; the method policy is not.
 
 > mark:
@@ -237,7 +237,7 @@ on either of them. That is the finding this sitting exists for.
 
 **1.** An attacker submits orders to the web API as if they came from the mobile app, since how the API authenticates callers is unverified.
 
-- `flow:mobile-app-to-web-api:api-traffic`, `process:web-api`
+- `flow:process:mobile-app>process:web-api>api-traffic`, `process:web-api`
 - severity: medium/high · verb: `impersonate`
 - The source states outright that nobody can say what the API does about authentication, and the app is the only stated client; needs-info is an acceptable verdict here, silence is not.
 
@@ -245,7 +245,7 @@ on either of them. That is the finding this sitting exists for.
 
 **2.** An attacker who obtains a copy of the catalogue spreadsheet sends SQL to the web API as the catalogue tool.
 
-- `flow:catalogue-spreadsheet-to-web-api:sql-statements`, `process:catalogue-spreadsheet`
+- `flow:process:catalogue-spreadsheet>process:web-api>sql-statements`, `process:catalogue-spreadsheet`
 - severity: medium/high · verb: `impersonate`
 - The macro path's authority is carried by a file on a laptop; nothing in the source identifies who is driving it.
 
@@ -253,7 +253,7 @@ on either of them. That is the finding this sitting exists for.
 
 **3.** An attacker faxes a customer what appears to be a Sokify order confirmation, since nothing on the fax leg identifies the sender.
 
-- `flow:fax-gateway-to-customer:confirmation-fax`, `entity:customer`
+- `flow:process:fax-gateway>entity:customer>confirmation-fax`, `entity:customer`
 - severity: low/medium · verb: `forge`
 - The reverse direction of the case's signature weakness: the model records that the destination is never verified, and the leg carries no sender identity either.
 
@@ -264,7 +264,7 @@ on either of them. That is the finding this sitting exists for.
 
 **4.** An attacker on the network path alters order details in flight between the app and the web API, because that traffic runs over plain HTTP.
 
-- `flow:mobile-app-to-web-api:api-traffic`
+- `flow:process:mobile-app>process:web-api>api-traffic`
 - severity: high/medium · verb: `alter-in-transit`
 - The missing TLS is stated by the source rather than inferred, so this is the one claim in the case that rests on no unknown at all.
 
@@ -272,7 +272,7 @@ on either of them. That is the finding this sitting exists for.
 
 **5.** An attacker drives the spreadsheet's macros to change catalogue prices through the web API.
 
-- `flow:catalogue-spreadsheet-to-web-api:sql-statements`, `process:web-api`
+- `flow:process:catalogue-spreadsheet>process:web-api>sql-statements`, `process:web-api`
 - severity: medium/high · verb: `alter`
 - The stated purpose of the path, exercised by the wrong party; distinct from injecting statements the path was never meant to carry.
 
@@ -280,7 +280,7 @@ on either of them. That is the finding this sitting exists for.
 
 **6.** An attacker appends further SQL to the statements the macros send so the web API executes changes beyond prices and product copy.
 
-- `flow:catalogue-spreadsheet-to-web-api:sql-statements`, `process:web-api`
+- `flow:process:catalogue-spreadsheet>process:web-api>sql-statements`, `process:web-api`
 - severity: medium/high · verb: `inject`
 - Injection through a path that carries statements rather than parameters; kept distinct from the price-change claim because the target differs. `inject` against a claim about altering a price is a verb difference as well as an element one.
 
@@ -296,7 +296,7 @@ on either of them. That is the finding this sitting exists for.
 
 **8.** An attacker changes the number stored against an order so the confirmation is faxed to a machine they control.
 
-- `flow:web-api-to-sims:order-handover`, `process:sims`
+- `flow:process:web-api>process:sims>order-handover`, `process:sims`
 - severity: low/medium · verb: `alter`
 - Reaches the disclosure below by a tampering route; the two are separate findings because the actions differ.
 
@@ -307,7 +307,7 @@ on either of them. That is the finding this sitting exists for.
 
 **9.** A customer denies placing an order and Sokify cannot show who submitted it, because how the API authenticates callers is unverified.
 
-- `process:web-api`, `flow:mobile-app-to-web-api:api-traffic`
+- `process:web-api`, `flow:process:mobile-app>process:web-api>api-traffic`
 - severity: medium/medium · verb: `unattributable`
 - The same unknown as the spoofing claim, filed for what it costs after the fact rather than for the access it grants.
 
@@ -315,7 +315,7 @@ on either of them. That is the finding this sitting exists for.
 
 **10.** Nobody can show who made a price change, because the changes arrive at the web API as SQL from a spreadsheet rather than from an identified user.
 
-- `flow:catalogue-spreadsheet-to-web-api:sql-statements`
+- `flow:process:catalogue-spreadsheet>process:web-api>sql-statements`
 - severity: medium/medium · verb: `unattributable`
 - Grounded in the model's shape rather than in a missing control: the source describes no person at the sending end of this flow.
 
@@ -323,7 +323,7 @@ on either of them. That is the finding this sitting exists for.
 
 **11.** Sokify cannot show a confirmation ever reached the customer, because nobody checks the fax arrived at the right place.
 
-- `flow:fax-gateway-to-customer:confirmation-fax`
+- `flow:process:fax-gateway>entity:customer>confirmation-fax`
 - severity: medium/low · verb: `unattributable`
 - The stated absence read for its evidentiary cost; an analyst that only files the disclosure has read half of it.
 
@@ -334,7 +334,7 @@ on either of them. That is the finding this sitting exists for.
 
 **12.** An attacker on the network path reads customer details out of the app's plain-HTTP traffic to the web API.
 
-- `flow:mobile-app-to-web-api:api-traffic`
+- `flow:process:mobile-app>process:web-api>api-traffic`
 - severity: high/high · verb: `intercept`
 - The clearest finding in the case and the one that needs no unknown; a run that misses it has not read the source at all.
 
@@ -358,7 +358,7 @@ on either of them. That is the finding this sitting exists for.
 
 **15.** The confirmation fax discloses a customer's name and address to whoever holds the dialled number, because nobody checks it arrived at the right place.
 
-- `flow:fax-gateway-to-customer:confirmation-fax`, `process:fax-gateway`
+- `flow:process:fax-gateway>entity:customer>confirmation-fax`, `process:fax-gateway`
 - severity: medium/medium · verb: `read`
 - The case's signature threat and the reason the fax leg is in the corpus at all: a channel where the control is not unverified but unavailable, which is a different thing from unknown.
 
@@ -377,7 +377,7 @@ on either of them. That is the finding this sitting exists for.
 
 **17.** An attacker sends SQL through the macro path that locks catalogue rows so the app cannot serve the catalogue.
 
-- `flow:catalogue-spreadsheet-to-web-api:sql-statements`, `process:web-api`
+- `flow:process:catalogue-spreadsheet>process:web-api>sql-statements`, `process:web-api`
 - severity: low/high · verb: `inject`
 - The same path as the tampering claims, used to deny rather than to alter.
 
@@ -385,7 +385,7 @@ on either of them. That is the finding this sitting exists for.
 
 **18.** An attacker who stops SIMS accepting order handovers halts dispatch for every order placed.
 
-- `process:sims`, `flow:web-api-to-sims:order-handover`
+- `process:sims`, `flow:process:web-api>process:sims>order-handover`
 - severity: low/high · verb: `disable`
 - SIMS is a single legacy path with no stated alternative; orders are taken but nothing ships.
 
@@ -396,7 +396,7 @@ on either of them. That is the finding this sitting exists for.
 
 **19.** An attacker who reaches the marketing laptop gains a write path into the web API from the office zone, because the spreadsheet's macros speak SQL to it.
 
-- `process:catalogue-spreadsheet`, `flow:catalogue-spreadsheet-to-web-api:sql-statements`, `process:web-api`
+- `process:catalogue-spreadsheet`, `flow:process:catalogue-spreadsheet>process:web-api>sql-statements`, `process:web-api`
 - severity: medium/high · verb: `escalate`
 - The crossing an analyst should see first: an unmanaged endpoint in a different zone holds a standing write path into the server-side estate.
 
@@ -404,7 +404,7 @@ on either of them. That is the finding this sitting exists for.
 
 **20.** An attacker whose SQL reaches the web API through the catalogue path acts against customer records the catalogue tool has no business touching.
 
-- `flow:catalogue-spreadsheet-to-web-api:sql-statements`, `store:user-database`
+- `flow:process:catalogue-spreadsheet>process:web-api>sql-statements`, `store:user-database`
 - severity: medium/high · verb: `abuse-grant`
 - The classic escalation shape: a path scoped by intent rather than by a control, reaching whatever authority the API holds over the database.
 
@@ -455,9 +455,9 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "603873a0d569ba3f0ac4a91a363086b54bae022cf432862d17be9eec9465e4ea",
-      "model.json": "6c6748b25157286d45b10d64d9a36a6370f55a7f4d9f3bcc43ad974489ca0c1e",
-      "claims/asvs.json": "fa211c11c2a82bf649b5518b6d7120ece7720af93b570fdcfb1a56b15a0b0adb",
-      "claims/stride.json": "33f48cb7d16f23f0d627279af76e3c66acdf37011ca3fbd319b9a9965af07c2a"
+      "model.json": "d6c0f91a9ae04bdb237850d3aff9a13c7b5c206578658d4ea44e169d8323d14d",
+      "claims/asvs.json": "fbc32dc14ac8a90e9bbb2bab6801dc704f2468a03e056d992f41564c9d8de41c",
+      "claims/stride.json": "76fdfa62117b576ed28510a9466455116f8c7862ea407373202359cbd96cac24"
       }
     }
   }

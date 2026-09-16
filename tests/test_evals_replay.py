@@ -153,7 +153,7 @@ class TestEveryBlessedElementTakesOneFate:
 
         assert rows["store:receipt-archive"].fate == "omitted"
         assert (
-            rows["flow:order-service-to-receipt-archive:append-receipt"].fate
+            rows["flow:process:order-service>store:receipt-archive>append-receipt"].fate
             == "endpoint_unaligned"
         )
 
@@ -171,18 +171,18 @@ class TestEveryBlessedElementTakesOneFate:
         flow = next(
             f
             for f in copy.data_flows
-            if f.id == "flow:order-service-to-receipt-archive:append-receipt"
+            if f.id == "flow:process:order-service>store:receipt-archive>append-receipt"
         )
         flow.source = "process:storefront-api"
         model = normalize_element_ids(copy)
 
         row = fates(golden, model)[
-            "flow:order-service-to-receipt-archive:append-receipt"
+            "flow:process:order-service>store:receipt-archive>append-receipt"
         ]
 
         assert row.fate == "misattached"
         assert row.candidates == (
-            "flow:storefront-api-to-receipt-archive:append-receipt",
+            "flow:process:storefront-api>store:receipt-archive>append-receipt",
         )
 
     def test_the_sole_flow_under_another_label_is_renamed_and_a_second_one_is_not(
@@ -190,7 +190,7 @@ class TestEveryBlessedElementTakesOneFate:
     ):
         """Rule 6 pairs one flow each side; beside a second flow it stays a ruling."""
         copy = golden.model.model_copy(deep=True)
-        flow_id = "flow:order-service-to-receipt-archive:append-receipt"
+        flow_id = "flow:process:order-service>store:receipt-archive>append-receipt"
         flow = next(f for f in copy.data_flows if f.id == flow_id)
         flow.name = "Nightly export"
         flow.operations = "read"
@@ -214,11 +214,11 @@ class TestEveryBlessedElementTakesOneFate:
         copy.data_flows[:] = [
             f
             for f in copy.data_flows
-            if f.id != "flow:order-service-to-receipt-archive:append-receipt"
+            if f.id != "flow:process:order-service>store:receipt-archive>append-receipt"
         ]
 
         row = fates(golden, copy)[
-            "flow:order-service-to-receipt-archive:append-receipt"
+            "flow:process:order-service>store:receipt-archive>append-receipt"
         ]
 
         assert row.fate == "omitted"
@@ -540,7 +540,7 @@ class TestEveryReferenceRowTakesOneFate:
             and e.subject == "principal:shopper-accounts"
         )
         moved = row.model_copy(
-            update={"subject": "flow:shopper-to-storefront-api:place-order"}
+            update={"subject": "flow:entity:shopper>process:storefront-api>place-order"}
         )
         entries = [moved if e is row else e for e in reference.entries]
 
@@ -929,7 +929,7 @@ class TestBindingAProposalToAnExtractedGraph:
     ):
         """The flow keeps its endpoints and its discriminators under another
         label, so the resolver's snap misses it and the alignment pairs it."""
-        flow = "flow:order-service-to-orders-db:read-write-orders"
+        flow = "flow:process:order-service>store:orders-db>read-write-orders"
         assert any(row["subject"] == flow for row in proposal.proposal["assertions"])
         model = renamed(golden.model, flow, "database access")
         binding = self.bound(golden, proposal, model)
@@ -937,7 +937,7 @@ class TestBindingAProposalToAnExtractedGraph:
         renamed_rows = [row for row in binding.rows if row.fate == "renamed"]
         assert {row.subject for row in renamed_rows} == {flow}
         assert {row.aligned for row in renamed_rows} == {
-            "flow:order-service-to-orders-db:database-access"
+            "flow:process:order-service>store:orders-db>database-access"
         }
         assert binding.counts["omitted"] == 0
 

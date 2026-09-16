@@ -5,7 +5,7 @@
     "affected_element_ids": [
       "process:moderation-website",
       "store:player-database",
-      "flow:moderation-website-to-player-database:read-write-players"
+      "flow:process:moderation-website>store:player-database>read-write-players"
     ],
     "claim": "The moderation website reads and writes the player database directly and nothing says how its queries are built.",
     "tier": "must-find",
@@ -30,7 +30,7 @@
     "affected_element_ids": [
       "entity:customer-support-staff",
       "process:moderation-website",
-      "flow:customer-support-staff-to-moderation-website:moderate-accounts"
+      "flow:entity:customer-support-staff>process:moderation-website>moderate-accounts"
     ],
     "claim": "The moderation website is browser-delivered and no cookie attribute is stated.",
     "tier": "expected",

@@ -37,7 +37,7 @@ from evals.harness.verbs import VerbError
 from tests.test_parsing import ISDIGIT_TRAPS
 
 FLOWS = {
-    "flow:shopper-to-storefront-api:place-order": (
+    "flow:entity:shopper>process:storefront-api>place-order": (
         "entity:shopper",
         "process:storefront-api",
     ),
@@ -56,7 +56,7 @@ def test_a_flow_and_its_endpoints_fingerprint_alike():
     as_flow = components_for(
         "stride",
         "spoofing",
-        ["flow:shopper-to-storefront-api:place-order"],
+        ["flow:entity:shopper>process:storefront-api>place-order"],
         FLOWS,
         verb="replay",
     )

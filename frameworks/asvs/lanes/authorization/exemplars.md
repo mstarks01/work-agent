@@ -12,15 +12,15 @@ Two callers reach the web API on different flows with different payloads, so the
   "direction": "question",
   "needs_evidence": "code",
   "title": "Nothing restricts which operations a caller of the web API may invoke",
-  "description": "V8.2.1 asks that each function the application exposes is restricted to consumers holding explicit permission for it. It applies here because `entity:customer` and `entity:payments-provider` both reach `process:web-api` from `boundary:public-internet`, on `flow:customer-to-web-api:submit-payment` and `flow:payments-provider-to-web-api:settlement-webhook`, and each flow invokes a different operation. The notes describe both callers and never describe a check that keeps a customer session off the settlement endpoint or a webhook caller off payment submission. The requirement applies and the input does not settle it; the authorization code in `process:web-api` would.",
+  "description": "V8.2.1 asks that each function the application exposes is restricted to consumers holding explicit permission for it. It applies here because `entity:customer` and `entity:payments-provider` both reach `process:web-api` from `boundary:public-internet`, on `flow:entity:customer>process:web-api>submit-payment` and `flow:entity:payments-provider>process:web-api>settlement-webhook`, and each flow invokes a different operation. The notes describe both callers and never describe a check that keeps a customer session off the settlement endpoint or a webhook caller off payment submission. The requirement applies and the input does not settle it; the authorization code in `process:web-api` would.",
   "affected_element_ids": [
     "entity:customer",
     "entity:payments-provider",
     "process:web-api"
   ],
   "evidence_refs": [
-    "crossing:flow:customer-to-web-api:submit-payment",
-    "crossing:flow:payments-provider-to-web-api:settlement-webhook"
+    "crossing:flow:entity:customer>process:web-api>submit-payment",
+    "crossing:flow:entity:payments-provider>process:web-api>settlement-webhook"
   ],
   "quotes": []
 }
@@ -40,8 +40,8 @@ A documentation requirement again. It applies — there are rules to document, b
     "process:web-api"
   ],
   "evidence_refs": [
-    "crossing:flow:customer-to-web-api:submit-payment",
-    "crossing:flow:payments-provider-to-web-api:settlement-webhook"
+    "crossing:flow:entity:customer>process:web-api>submit-payment",
+    "crossing:flow:entity:payments-provider>process:web-api>settlement-webhook"
   ],
   "quotes": []
 }

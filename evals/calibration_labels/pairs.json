@@ -5,12 +5,12 @@
     "reference_claim": "An attacker who obtains a shopper's session cookie replays it against the storefront API and places orders as that shopper.",
     "reference_element_ids": [
       "entity:shopper",
-      "flow:shopper-to-storefront-api:place-order"
+      "flow:entity:shopper>process:storefront-api>place-order"
     ],
     "candidate_claim": "An attacker steals a shopper's session cookie and uses it to submit orders on that shopper's account.",
     "candidate_element_ids": [
       "entity:shopper",
-      "flow:shopper-to-storefront-api:place-order"
+      "flow:entity:shopper>process:storefront-api>place-order"
     ],
     "reference_verb": "replay",
     "candidate_verb": "replay",
@@ -23,7 +23,7 @@
     "reference_claim": "An attacker who obtains a shopper's session cookie replays it against the storefront API and places orders as that shopper.",
     "reference_element_ids": [
       "entity:shopper",
-      "flow:shopper-to-storefront-api:place-order"
+      "flow:entity:shopper>process:storefront-api>place-order"
     ],
     "candidate_claim": "An attacker guesses a shopper's password because no MFA is enforced on shopper accounts.",
     "candidate_element_ids": [
@@ -39,12 +39,12 @@
     "category": "spoofing",
     "reference_claim": "An attacker POSTs a forged settlement webhook to the storefront API, impersonating the card processor to mark an unpaid order as paid.",
     "reference_element_ids": [
-      "flow:card-processor-to-storefront-api:settlement-webhook",
+      "flow:entity:card-processor>process:storefront-api>settlement-webhook",
       "process:storefront-api"
     ],
     "candidate_claim": "An attacker sends a fake payment-settlement callback so an unpaid order is recorded as paid.",
     "candidate_element_ids": [
-      "flow:card-processor-to-storefront-api:settlement-webhook",
+      "flow:entity:card-processor>process:storefront-api>settlement-webhook",
       "process:storefront-api"
     ],
     "reference_verb": "forge",
@@ -57,12 +57,12 @@
     "category": "spoofing",
     "reference_claim": "An attacker POSTs a forged settlement webhook to the storefront API, impersonating the card processor to mark an unpaid order as paid.",
     "reference_element_ids": [
-      "flow:card-processor-to-storefront-api:settlement-webhook",
+      "flow:entity:card-processor>process:storefront-api>settlement-webhook",
       "process:storefront-api"
     ],
     "candidate_claim": "An attacker replays a genuine settlement webhook the processor sent earlier.",
     "candidate_element_ids": [
-      "flow:card-processor-to-storefront-api:settlement-webhook"
+      "flow:entity:card-processor>process:storefront-api>settlement-webhook"
     ],
     "reference_verb": "forge",
     "candidate_verb": "replay",
@@ -74,7 +74,7 @@
     "category": "spoofing",
     "reference_claim": "Any workload that can reach the order service impersonates the storefront API on the unauthenticated gRPC channel and submits orders.",
     "reference_element_ids": [
-      "flow:storefront-api-to-order-service:submit-order",
+      "flow:process:storefront-api>process:order-service>submit-order",
       "process:order-service"
     ],
     "candidate_claim": "A compromised workload in the internal network calls the order service's gRPC endpoint, which accepts it without authentication.",
@@ -91,7 +91,7 @@
     "category": "spoofing",
     "reference_claim": "An attacker holding the shared application password connects to orders-db as the order service.",
     "reference_element_ids": [
-      "flow:order-service-to-orders-db:read-write-orders",
+      "flow:process:order-service>store:orders-db>read-write-orders",
       "store:orders-db"
     ],
     "candidate_claim": "An attacker reads the database password out of the order service's environment and logs in to orders-db.",
@@ -109,11 +109,11 @@
     "category": "tampering",
     "reference_claim": "An attacker positioned in the storefront tier modifies order contents in flight on the gRPC channel, whose transport protection is unverified.",
     "reference_element_ids": [
-      "flow:storefront-api-to-order-service:submit-order"
+      "flow:process:storefront-api>process:order-service>submit-order"
     ],
     "candidate_claim": "An attacker intercepts the gRPC call between the storefront API and the order service and rewrites the order before it is captured.",
     "candidate_element_ids": [
-      "flow:storefront-api-to-order-service:submit-order"
+      "flow:process:storefront-api>process:order-service>submit-order"
     ],
     "reference_verb": "alter-in-transit",
     "candidate_verb": "alter-in-transit",
@@ -125,7 +125,7 @@
     "category": "tampering",
     "reference_claim": "An attacker with the shared full read/write database account alters order rows, changing prices or payment status directly.",
     "reference_element_ids": [
-      "flow:order-service-to-orders-db:read-write-orders",
+      "flow:process:order-service>store:orders-db>read-write-orders",
       "store:orders-db"
     ],
     "candidate_claim": "An attacker with database access rewrites order prices directly in orders-db.",
@@ -142,7 +142,7 @@
     "category": "tampering",
     "reference_claim": "An attacker with the shared full read/write database account alters order rows, changing prices or payment status directly.",
     "reference_element_ids": [
-      "flow:order-service-to-orders-db:read-write-orders",
+      "flow:process:order-service>store:orders-db>read-write-orders",
       "store:orders-db"
     ],
     "candidate_claim": "An attacker deletes order rows from orders-db to destroy records of a purchase.",
@@ -210,11 +210,11 @@
     "category": "information-disclosure",
     "reference_claim": "An attacker with access to the internal network reads order contents and shopper identifiers off the gRPC channel, whose encryption is unverified.",
     "reference_element_ids": [
-      "flow:storefront-api-to-order-service:submit-order"
+      "flow:process:storefront-api>process:order-service>submit-order"
     ],
     "candidate_claim": "An attacker sniffing internal traffic reads customer identifiers from the storefront-to-order-service call.",
     "candidate_element_ids": [
-      "flow:storefront-api-to-order-service:submit-order"
+      "flow:process:storefront-api>process:order-service>submit-order"
     ],
     "reference_verb": "intercept",
     "candidate_verb": "intercept",
@@ -226,11 +226,11 @@
     "category": "information-disclosure",
     "reference_claim": "An attacker with access to the internal network reads order contents and shopper identifiers off the gRPC channel, whose encryption is unverified.",
     "reference_element_ids": [
-      "flow:storefront-api-to-order-service:submit-order"
+      "flow:process:storefront-api>process:order-service>submit-order"
     ],
     "candidate_claim": "An attacker sniffing the shopper's HTTPS connection reads their card details.",
     "candidate_element_ids": [
-      "flow:shopper-to-storefront-api:place-order"
+      "flow:entity:shopper>process:storefront-api>place-order"
     ],
     "reference_verb": "intercept",
     "candidate_verb": "intercept",
@@ -242,12 +242,12 @@
     "category": "denial-of-service",
     "reference_claim": "An attacker floods the unauthenticated settlement webhook endpoint until the storefront API stops serving shoppers.",
     "reference_element_ids": [
-      "flow:card-processor-to-storefront-api:settlement-webhook",
+      "flow:entity:card-processor>process:storefront-api>settlement-webhook",
       "process:storefront-api"
     ],
     "candidate_claim": "An attacker sends a high volume of requests to the webhook endpoint until the storefront API becomes unresponsive.",
     "candidate_element_ids": [
-      "flow:card-processor-to-storefront-api:settlement-webhook",
+      "flow:entity:card-processor>process:storefront-api>settlement-webhook",
       "process:storefront-api"
     ],
     "reference_verb": "flood",
@@ -260,7 +260,7 @@
     "category": "elevation-of-privilege",
     "reference_claim": "An attacker with any foothold in the storefront tier gains order-writing privilege in the core zone, because the order service grants it on network position alone.",
     "reference_element_ids": [
-      "flow:storefront-api-to-order-service:submit-order",
+      "flow:process:storefront-api>process:order-service>submit-order",
       "process:order-service"
     ],
     "candidate_claim": "An attacker who lands anywhere in the storefront tier can write orders in the core zone, because the order service trusts network position.",
@@ -278,7 +278,7 @@
     "category": "elevation-of-privilege",
     "reference_claim": "An attacker with any foothold in the storefront tier gains order-writing privilege in the core zone, because the order service grants it on network position alone.",
     "reference_element_ids": [
-      "flow:storefront-api-to-order-service:submit-order",
+      "flow:process:storefront-api>process:order-service>submit-order",
       "process:order-service"
     ],
     "candidate_claim": "An attacker compromises the storefront API and moves into the core network.",
@@ -296,12 +296,12 @@
     "reference_claim": "An attacker who extracts the fleet-wide pre-shared key from any one node publishes readings to the gateway as any other device in the fleet.",
     "reference_element_ids": [
       "entity:sensor-node",
-      "flow:sensor-node-to-device-gateway:publish-readings"
+      "flow:entity:sensor-node>process:device-gateway>publish-readings"
     ],
     "candidate_claim": "An attacker recovers the shared key from one device and publishes telemetry impersonating any other node.",
     "candidate_element_ids": [
       "entity:sensor-node",
-      "flow:sensor-node-to-device-gateway:publish-readings"
+      "flow:entity:sensor-node>process:device-gateway>publish-readings"
     ],
     "reference_verb": "use-credential",
     "candidate_verb": "impersonate",
@@ -314,7 +314,7 @@
     "reference_claim": "An attacker who extracts the fleet-wide pre-shared key from any one node publishes readings to the gateway as any other device in the fleet.",
     "reference_element_ids": [
       "entity:sensor-node",
-      "flow:sensor-node-to-device-gateway:publish-readings"
+      "flow:entity:sensor-node>process:device-gateway>publish-readings"
     ],
     "candidate_claim": "An attacker brute-forces the fleet pre-shared key against the broker.",
     "candidate_element_ids": [
@@ -331,12 +331,12 @@
     "reference_claim": "An attacker with physical access presents themselves as a field technician on the node's serial console, whose authentication is unverified.",
     "reference_element_ids": [
       "entity:sensor-node",
-      "flow:field-technician-to-sensor-node:local-service-session"
+      "flow:entity:field-technician>entity:sensor-node>local-service-session"
     ],
     "candidate_claim": "Someone with physical access to a node uses the serial console, whose authentication the model does not establish.",
     "candidate_element_ids": [
       "entity:sensor-node",
-      "flow:field-technician-to-sensor-node:local-service-session"
+      "flow:entity:field-technician>entity:sensor-node>local-service-session"
     ],
     "reference_verb": "impersonate",
     "candidate_verb": "impersonate",
@@ -370,7 +370,7 @@
     ],
     "candidate_claim": "An attacker modifies firmware in transit between the bucket and a node.",
     "candidate_element_ids": [
-      "flow:sensor-node-to-firmware-bucket:poll-firmware"
+      "flow:entity:sensor-node>store:firmware-bucket>poll-firmware"
     ],
     "reference_verb": "plant",
     "candidate_verb": "alter-in-transit",
@@ -382,12 +382,12 @@
     "category": "tampering",
     "reference_claim": "An attacker holding the fleet key injects fabricated readings that the normalizer loads into the lake as genuine customer data.",
     "reference_element_ids": [
-      "flow:sensor-node-to-device-gateway:publish-readings",
+      "flow:entity:sensor-node>process:device-gateway>publish-readings",
       "store:telemetry-lake"
     ],
     "candidate_claim": "An attacker with the fleet key sends bogus sensor readings that end up stored as genuine customer data.",
     "candidate_element_ids": [
-      "flow:sensor-node-to-device-gateway:publish-readings",
+      "flow:entity:sensor-node>process:device-gateway>publish-readings",
       "store:telemetry-lake"
     ],
     "reference_verb": "forge",
@@ -400,13 +400,13 @@
     "category": "tampering",
     "reference_claim": "An attacker holding the fleet key injects fabricated readings that the normalizer loads into the lake as genuine customer data.",
     "reference_element_ids": [
-      "flow:sensor-node-to-device-gateway:publish-readings",
+      "flow:entity:sensor-node>process:device-gateway>publish-readings",
       "store:telemetry-lake"
     ],
     "candidate_claim": "An attacker with the fleet key publishes readings as another device.",
     "candidate_element_ids": [
       "entity:sensor-node",
-      "flow:sensor-node-to-device-gateway:publish-readings"
+      "flow:entity:sensor-node>process:device-gateway>publish-readings"
     ],
     "reference_verb": "forge",
     "candidate_verb": "impersonate",
@@ -424,7 +424,7 @@
     "candidate_claim": "There is no way to tell which physical device produced a disputed reading, because every node presents the same credential.",
     "candidate_element_ids": [
       "entity:sensor-node",
-      "flow:sensor-node-to-device-gateway:publish-readings"
+      "flow:entity:sensor-node>process:device-gateway>publish-readings"
     ],
     "reference_verb": "unattributable",
     "candidate_verb": "unattributable",
@@ -452,11 +452,11 @@
     "category": "information-disclosure",
     "reference_claim": "An attacker on the path between a node and the gateway reads readings and the presented key, because transport encryption on the MQTT session is unverified.",
     "reference_element_ids": [
-      "flow:sensor-node-to-device-gateway:publish-readings"
+      "flow:entity:sensor-node>process:device-gateway>publish-readings"
     ],
     "candidate_claim": "An attacker on the network path between a node and the broker captures the pre-shared key from an unencrypted MQTT session.",
     "candidate_element_ids": [
-      "flow:sensor-node-to-device-gateway:publish-readings"
+      "flow:entity:sensor-node>process:device-gateway>publish-readings"
     ],
     "reference_verb": "intercept",
     "candidate_verb": "intercept",
@@ -500,7 +500,7 @@
     "category": "denial-of-service",
     "reference_claim": "An attacker floods the internet-exposed MQTT broker with connections until genuine nodes can no longer publish readings.",
     "reference_element_ids": [
-      "flow:sensor-node-to-device-gateway:publish-readings",
+      "flow:entity:sensor-node>process:device-gateway>publish-readings",
       "process:device-gateway"
     ],
     "candidate_claim": "An attacker opens huge numbers of MQTT connections to the gateway so real devices cannot connect.",
@@ -536,7 +536,7 @@
     "reference_claim": "An attacker turns an unsigned firmware update into code execution on every node, escalating from bucket write access to control of the physical fleet.",
     "reference_element_ids": [
       "entity:sensor-node",
-      "flow:sensor-node-to-firmware-bucket:poll-firmware"
+      "flow:entity:sensor-node>store:firmware-bucket>poll-firmware"
     ],
     "candidate_claim": "An attacker who can write firmware runs their own code on every device in the fleet.",
     "candidate_element_ids": [
@@ -589,12 +589,12 @@
     "reference_claim": "An attacker who obtains a partner's never-rotated static SFTP key uploads extracts as that partner.",
     "reference_element_ids": [
       "entity:insurance-partner",
-      "flow:insurance-partner-to-landing-bucket:push-daily-extract"
+      "flow:entity:insurance-partner>store:landing-bucket>push-daily-extract"
     ],
     "candidate_claim": "An attacker who steals a partner's SFTP key uploads extracts in that partner's name.",
     "candidate_element_ids": [
       "entity:insurance-partner",
-      "flow:insurance-partner-to-landing-bucket:push-daily-extract"
+      "flow:entity:insurance-partner>store:landing-bucket>push-daily-extract"
     ],
     "reference_verb": "use-credential",
     "candidate_verb": "use-credential",
@@ -611,7 +611,7 @@
     ],
     "candidate_claim": "An attacker drops a file into a partner folder and the nightly run ingests it as that partner's data, since the depositor is never checked.",
     "candidate_element_ids": [
-      "flow:ingest-scheduler-to-landing-bucket:list-and-read-files",
+      "flow:process:ingest-scheduler>store:landing-bucket>list-and-read-files",
       "store:landing-bucket"
     ],
     "reference_verb": "plant",
@@ -629,7 +629,7 @@
     ],
     "candidate_claim": "An attacker with a valid partner key uploads a file to a folder belonging to a different partner.",
     "candidate_element_ids": [
-      "flow:insurance-partner-to-landing-bucket:push-daily-extract",
+      "flow:entity:insurance-partner>store:landing-bucket>push-daily-extract",
       "store:landing-bucket"
     ],
     "reference_verb": "plant",
@@ -679,7 +679,7 @@
     "category": "tampering",
     "reference_claim": "An attacker who can write to the Airflow metadata database rewrites a connection string to redirect the pipeline to infrastructure they control.",
     "reference_element_ids": [
-      "flow:ingest-scheduler-to-airflow-metadata-database:read-connections",
+      "flow:process:ingest-scheduler>store:airflow-metadata-database>read-connections",
       "store:airflow-metadata-database"
     ],
     "candidate_claim": "An attacker changes an Airflow connection string so the pipeline reads from or writes to a system they control.",
@@ -702,7 +702,7 @@
     "candidate_claim": "Nothing ties an uploaded file to the key that uploaded it, so a partner can disown an extract.",
     "candidate_element_ids": [
       "entity:insurance-partner",
-      "flow:insurance-partner-to-landing-bucket:push-daily-extract"
+      "flow:entity:insurance-partner>store:landing-bucket>push-daily-extract"
     ],
     "reference_verb": "unattributable",
     "candidate_verb": "unattributable",
@@ -714,13 +714,13 @@
     "category": "information-disclosure",
     "reference_claim": "An analyst who needs only aggregate figures reads member names and dates of birth, because the grant covers the whole dataset.",
     "reference_element_ids": [
-      "flow:data-analyst-to-claims-warehouse:run-queries",
+      "flow:entity:data-analyst>store:claims-warehouse>run-queries",
       "store:claims-warehouse"
     ],
     "candidate_claim": "An analyst with dataset-wide access views member names and dates of birth they have no need for.",
     "candidate_element_ids": [
       "entity:data-analyst",
-      "flow:data-analyst-to-claims-warehouse:run-queries"
+      "flow:entity:data-analyst>store:claims-warehouse>run-queries"
     ],
     "reference_verb": "abuse-grant",
     "candidate_verb": "abuse-grant",
@@ -732,7 +732,7 @@
     "category": "information-disclosure",
     "reference_claim": "An analyst who needs only aggregate figures reads member names and dates of birth, because the grant covers the whole dataset.",
     "reference_element_ids": [
-      "flow:data-analyst-to-claims-warehouse:run-queries",
+      "flow:entity:data-analyst>store:claims-warehouse>run-queries",
       "store:claims-warehouse"
     ],
     "candidate_claim": "An analyst exports member records out of the warehouse to an unmanaged device.",
@@ -834,7 +834,7 @@
     "category": "elevation-of-privilege",
     "reference_claim": "An attacker who can plant a file in the landing bucket gains execution in the warehouse network through the job it triggers.",
     "reference_element_ids": [
-      "flow:ingest-scheduler-to-spark-transform-job:trigger-transform",
+      "flow:process:ingest-scheduler>process:spark-transform-job>trigger-transform",
       "process:spark-transform-job"
     ],
     "candidate_claim": "An attacker who can place a file in the landing bucket obtains code execution in the warehouse network via the job that processes it.",
@@ -858,7 +858,7 @@
     "candidate_claim": "An analyst queries claims belonging to partners outside their assigned remit.",
     "candidate_element_ids": [
       "entity:data-analyst",
-      "flow:data-analyst-to-claims-warehouse:run-queries"
+      "flow:entity:data-analyst>store:claims-warehouse>run-queries"
     ],
     "reference_verb": "abuse-grant",
     "candidate_verb": "abuse-grant",
@@ -889,11 +889,11 @@
     "reference_claim": "An attacker who obtains a never-expiring API key calls the inference gateway as that team indefinitely.",
     "reference_element_ids": [
       "entity:calling-service",
-      "flow:calling-service-to-inference-gateway:submit-inference-request"
+      "flow:entity:calling-service>process:inference-gateway>submit-inference-request"
     ],
     "candidate_claim": "An attacker with a leaked API key keeps calling the inference gateway indefinitely, since keys are never expired.",
     "candidate_element_ids": [
-      "flow:calling-service-to-inference-gateway:submit-inference-request",
+      "flow:entity:calling-service>process:inference-gateway>submit-inference-request",
       "process:inference-gateway"
     ],
     "reference_verb": "use-credential",
@@ -907,7 +907,7 @@
     "reference_claim": "An attacker who obtains a never-expiring API key calls the inference gateway as that team indefinitely.",
     "reference_element_ids": [
       "entity:calling-service",
-      "flow:calling-service-to-inference-gateway:submit-inference-request"
+      "flow:entity:calling-service>process:inference-gateway>submit-inference-request"
     ],
     "candidate_claim": "An attacker brute-forces a valid API key against the gateway.",
     "candidate_element_ids": [
@@ -923,7 +923,7 @@
     "category": "spoofing",
     "reference_claim": "Any workload inside the model network submits inference requests posing as the gateway, which the model server accepts on network position alone.",
     "reference_element_ids": [
-      "flow:inference-gateway-to-model-server:forward-request",
+      "flow:process:inference-gateway>process:model-server>forward-request",
       "process:model-server"
     ],
     "candidate_claim": "Anything already inside the model network can send requests straight to the model server, which authenticates nothing.",
@@ -940,12 +940,12 @@
     "category": "tampering",
     "reference_claim": "An attacker who can write to the registry swaps the model artifact and the model server loads it without any integrity verification.",
     "reference_element_ids": [
-      "flow:model-server-to-model-registry-bucket:load-artifact",
+      "flow:process:model-server>store:model-registry-bucket>load-artifact",
       "store:model-registry-bucket"
     ],
     "candidate_claim": "An attacker replaces the model artifact in the registry and the model server loads the substituted model without checking it.",
     "candidate_element_ids": [
-      "flow:model-server-to-model-registry-bucket:load-artifact",
+      "flow:process:model-server>store:model-registry-bucket>load-artifact",
       "store:model-registry-bucket"
     ],
     "reference_verb": "plant",
@@ -958,7 +958,7 @@
     "category": "tampering",
     "reference_claim": "An attacker who can write to the registry swaps the model artifact and the model server loads it without any integrity verification.",
     "reference_element_ids": [
-      "flow:model-server-to-model-registry-bucket:load-artifact",
+      "flow:process:model-server>store:model-registry-bucket>load-artifact",
       "store:model-registry-bucket"
     ],
     "candidate_claim": "An attacker poisons the training data so the published model behaves incorrectly.",
@@ -976,7 +976,7 @@
     "category": "tampering",
     "reference_claim": "An attacker with model-network access writes to the unauthenticated Redis feature store and changes the features a decision is made on.",
     "reference_element_ids": [
-      "flow:model-server-to-redis-feature-store:read-features",
+      "flow:process:model-server>store:redis-feature-store>read-features",
       "store:redis-feature-store"
     ],
     "candidate_claim": "An attacker with access to the model network writes new values into Redis and changes the features the model scores on.",
@@ -993,7 +993,7 @@
     "category": "tampering",
     "reference_claim": "An attacker with model-network access writes to the unauthenticated Redis feature store and changes the features a decision is made on.",
     "reference_element_ids": [
-      "flow:model-server-to-redis-feature-store:read-features",
+      "flow:process:model-server>store:redis-feature-store>read-features",
       "store:redis-feature-store"
     ],
     "candidate_claim": "An attacker reads customer features out of the unauthenticated Redis store.",
@@ -1015,7 +1015,7 @@
     ],
     "candidate_claim": "Because artifacts are published from a shared account, there is no record of which individual published a given model.",
     "candidate_element_ids": [
-      "flow:ml-engineer-to-model-registry-bucket:publish-artifact",
+      "flow:entity:ml-engineer>store:model-registry-bucket>publish-artifact",
       "store:model-registry-bucket"
     ],
     "reference_verb": "unattributable",
@@ -1060,7 +1060,7 @@
     "category": "information-disclosure",
     "reference_claim": "A caller crafts a request that makes the model emit customer features belonging to a different tenant.",
     "reference_element_ids": [
-      "flow:calling-service-to-inference-gateway:submit-inference-request",
+      "flow:entity:calling-service>process:inference-gateway>submit-inference-request",
       "process:model-server"
     ],
     "candidate_claim": "A caller crafts an input that makes the model reveal another tenant's customer features in its output.",
@@ -1077,12 +1077,12 @@
     "category": "information-disclosure",
     "reference_claim": "A caller crafts a request that makes the model emit customer features belonging to a different tenant.",
     "reference_element_ids": [
-      "flow:calling-service-to-inference-gateway:submit-inference-request",
+      "flow:entity:calling-service>process:inference-gateway>submit-inference-request",
       "process:model-server"
     ],
     "candidate_claim": "A caller sends a prompt that makes the model ignore its instructions and produce disallowed output.",
     "candidate_element_ids": [
-      "flow:calling-service-to-inference-gateway:submit-inference-request",
+      "flow:entity:calling-service>process:inference-gateway>submit-inference-request",
       "process:model-server"
     ],
     "reference_verb": "elicit",
@@ -1095,7 +1095,7 @@
     "category": "denial-of-service",
     "reference_claim": "A caller holding a valid key floods the gateway with inference requests and exhausts the shared GPU capacity behind it.",
     "reference_element_ids": [
-      "flow:calling-service-to-inference-gateway:submit-inference-request",
+      "flow:entity:calling-service>process:inference-gateway>submit-inference-request",
       "process:inference-gateway"
     ],
     "candidate_claim": "A caller with a valid key sends enough inference requests to starve every other team of GPU capacity.",
@@ -1171,7 +1171,7 @@
     "candidate_claim": "A calling team invokes a model endpoint their key was never meant to reach.",
     "candidate_element_ids": [
       "entity:calling-service",
-      "flow:calling-service-to-inference-gateway:submit-inference-request"
+      "flow:entity:calling-service>process:inference-gateway>submit-inference-request"
     ],
     "reference_verb": "abuse-grant",
     "candidate_verb": "abuse-grant",
@@ -1183,12 +1183,12 @@
     "category": "spoofing",
     "reference_claim": "An attacker who reaches the queue enqueues jobs as if they came from the web application, since queue authentication is unverified.",
     "reference_element_ids": [
-      "flow:web-application-to-message-queue:enqueue-job",
+      "flow:process:web-application>store:message-queue>enqueue-job",
       "store:message-queue"
     ],
     "candidate_claim": "An attacker who can reach the message queue writes job messages that the worker treats as coming from the web application.",
     "candidate_element_ids": [
-      "flow:background-worker-process-to-message-queue:consume-job",
+      "flow:process:background-worker-process>store:message-queue>consume-job",
       "store:message-queue"
     ],
     "reference_verb": "impersonate",
@@ -1224,7 +1224,7 @@
     ],
     "candidate_claim": "An attacker enqueues jobs as the web application, since the queue does not authenticate producers.",
     "candidate_element_ids": [
-      "flow:web-application-to-message-queue:enqueue-job",
+      "flow:process:web-application>store:message-queue>enqueue-job",
       "store:message-queue"
     ],
     "reference_verb": "plant",
@@ -1354,13 +1354,13 @@
     "category": "information-disclosure",
     "reference_claim": "An attacker on the internal network reads job contents in transit, because transport encryption between the tiers is unverified.",
     "reference_element_ids": [
-      "flow:background-worker-process-to-message-queue:consume-job",
-      "flow:web-application-to-message-queue:enqueue-job"
+      "flow:process:background-worker-process>store:message-queue>consume-job",
+      "flow:process:web-application>store:message-queue>enqueue-job"
     ],
     "candidate_claim": "An attacker on the internal network reads job messages moving between the application, the queue and the worker.",
     "candidate_element_ids": [
-      "flow:background-worker-process-to-message-queue:consume-job",
-      "flow:web-application-to-message-queue:enqueue-job"
+      "flow:process:background-worker-process>store:message-queue>consume-job",
+      "flow:process:web-application>store:message-queue>enqueue-job"
     ],
     "reference_verb": "intercept",
     "candidate_verb": "intercept",
@@ -1462,12 +1462,12 @@
     "reference_claim": "An attacker interacts with the web application as a legitimate user, because how the application authenticates the browser is unverified.",
     "reference_element_ids": [
       "entity:browser",
-      "flow:browser-to-web-application:page-request"
+      "flow:entity:browser>process:web-application>page-request"
     ],
     "candidate_claim": "An attacker accesses the application as a signed-in user because the model does not establish how users are authenticated.",
     "candidate_element_ids": [
       "entity:browser",
-      "flow:browser-to-web-application:page-request"
+      "flow:entity:browser>process:web-application>page-request"
     ],
     "reference_verb": "impersonate",
     "candidate_verb": "impersonate",
@@ -1479,12 +1479,12 @@
     "category": "spoofing",
     "reference_claim": "An attacker connects to the exposed lobby port as another player, because how the lobby authenticates a client is unverified.",
     "reference_element_ids": [
-      "flow:game-client-to-lobby:matchmaking",
+      "flow:process:game-client>process:lobby>matchmaking",
       "process:lobby"
     ],
     "candidate_claim": "An attacker connects to the lobby's exposed port and is accepted as another player, since client authentication is unverified.",
     "candidate_element_ids": [
-      "flow:game-client-to-lobby:matchmaking",
+      "flow:process:game-client>process:lobby>matchmaking",
       "process:lobby"
     ],
     "reference_verb": "impersonate",
@@ -1497,12 +1497,12 @@
     "category": "spoofing",
     "reference_claim": "An attacker connects directly to a game server on its exposed port, bypassing the lobby, as a player who was never assigned to that match.",
     "reference_element_ids": [
-      "flow:game-client-to-game-server:gameplay-traffic",
+      "flow:process:game-client>process:game-server>gameplay-traffic",
       "process:game-server"
     ],
     "candidate_claim": "An attacker connects straight to a game server without going through matchmaking and joins a match they were not assigned to.",
     "candidate_element_ids": [
-      "flow:game-client-to-game-server:gameplay-traffic",
+      "flow:process:game-client>process:game-server>gameplay-traffic",
       "process:game-server"
     ],
     "reference_verb": "impersonate",
@@ -1515,7 +1515,7 @@
     "category": "spoofing",
     "reference_claim": "An attacker connects directly to a game server on its exposed port, bypassing the lobby, as a player who was never assigned to that match.",
     "reference_element_ids": [
-      "flow:game-client-to-game-server:gameplay-traffic",
+      "flow:process:game-client>process:game-server>gameplay-traffic",
       "process:game-server"
     ],
     "candidate_claim": "An attacker floods a game server's port so the match cannot proceed.",
@@ -1535,12 +1535,12 @@
     "category": "tampering",
     "reference_claim": "A player modifies the game client on their own machine and sends manipulated gameplay actions that the servers accept.",
     "reference_element_ids": [
-      "flow:game-client-to-game-server:gameplay-traffic",
+      "flow:process:game-client>process:game-server>gameplay-traffic",
       "process:game-client"
     ],
     "candidate_claim": "A player patches their local game client and sends gameplay messages the server accepts as valid.",
     "candidate_element_ids": [
-      "flow:game-client-to-game-server:gameplay-traffic",
+      "flow:process:game-client>process:game-server>gameplay-traffic",
       "process:game-client"
     ],
     "reference_verb": "forge",
@@ -1553,7 +1553,7 @@
     "category": "tampering",
     "reference_claim": "A player modifies the game client on their own machine and sends manipulated gameplay actions that the servers accept.",
     "reference_element_ids": [
-      "flow:game-client-to-game-server:gameplay-traffic",
+      "flow:process:game-client>process:game-server>gameplay-traffic",
       "process:game-client"
     ],
     "candidate_claim": "A player uses their modified client to see other players' positions through walls.",
@@ -1570,7 +1570,7 @@
     "category": "tampering",
     "reference_claim": "An attacker alters match statistics in the stats database to change rankings or rewards.",
     "reference_element_ids": [
-      "flow:game-server-to-stats-database:read-write-stats",
+      "flow:process:game-server>store:stats-database>read-write-stats",
       "store:stats-database"
     ],
     "candidate_claim": "An attacker rewrites entries in the stats database to inflate their ranking.",
@@ -1592,7 +1592,7 @@
     ],
     "candidate_claim": "Nothing records which support agent performed a given moderation action on a player account.",
     "candidate_element_ids": [
-      "flow:customer-support-staff-to-moderation-website:moderate-accounts",
+      "flow:entity:customer-support-staff>process:moderation-website>moderate-accounts",
       "process:moderation-website"
     ],
     "reference_verb": "unattributable",
@@ -1610,7 +1610,7 @@
     ],
     "candidate_claim": "A support agent bans a player account without justification.",
     "candidate_element_ids": [
-      "flow:customer-support-staff-to-moderation-website:moderate-accounts",
+      "flow:entity:customer-support-staff>process:moderation-website>moderate-accounts",
       "process:moderation-website"
     ],
     "reference_verb": "unattributable",
@@ -1639,13 +1639,13 @@
     "category": "information-disclosure",
     "reference_claim": "An attacker on the network path reads matchmaking and gameplay traffic, including player identifiers, because encryption on both client links is unverified.",
     "reference_element_ids": [
-      "flow:game-client-to-game-server:gameplay-traffic",
-      "flow:game-client-to-lobby:matchmaking"
+      "flow:process:game-client>process:game-server>gameplay-traffic",
+      "flow:process:game-client>process:lobby>matchmaking"
     ],
     "candidate_claim": "An attacker capturing traffic on the client's connections reads player identifiers, because neither client link is stated to be encrypted.",
     "candidate_element_ids": [
-      "flow:game-client-to-game-server:gameplay-traffic",
-      "flow:game-client-to-lobby:matchmaking"
+      "flow:process:game-client>process:game-server>gameplay-traffic",
+      "flow:process:game-client>process:lobby>matchmaking"
     ],
     "reference_verb": "intercept",
     "candidate_verb": "intercept",
@@ -1662,7 +1662,7 @@
     ],
     "candidate_claim": "A player reads state from their own client that the server sent but should not have exposed, such as opponents' locations.",
     "candidate_element_ids": [
-      "flow:game-client-to-game-server:gameplay-traffic",
+      "flow:process:game-client>process:game-server>gameplay-traffic",
       "process:game-client"
     ],
     "reference_verb": "elicit",
@@ -1681,7 +1681,7 @@
     "candidate_claim": "A support agent browses player account data unrelated to any moderation case they are working.",
     "candidate_element_ids": [
       "entity:customer-support-staff",
-      "flow:moderation-website-to-player-database:read-write-players"
+      "flow:process:moderation-website>store:player-database>read-write-players"
     ],
     "reference_verb": "abuse-grant",
     "candidate_verb": "abuse-grant",
@@ -1693,7 +1693,7 @@
     "category": "denial-of-service",
     "reference_claim": "An attacker floods the exposed lobby until players can no longer be matched into games.",
     "reference_element_ids": [
-      "flow:game-client-to-lobby:matchmaking",
+      "flow:process:game-client>process:lobby>matchmaking",
       "process:lobby"
     ],
     "candidate_claim": "An attacker overwhelms the lobby with connections and players can no longer get into matches.",
@@ -1710,7 +1710,7 @@
     "category": "denial-of-service",
     "reference_claim": "An attacker floods a game server's exposed port and disrupts a match in progress for every player in it.",
     "reference_element_ids": [
-      "flow:game-client-to-game-server:gameplay-traffic",
+      "flow:process:game-client>process:game-server>gameplay-traffic",
       "process:game-server"
     ],
     "candidate_claim": "An attacker floods a game server mid-match and disrupts play for everyone in that match.",
@@ -1732,7 +1732,7 @@
     ],
     "candidate_claim": "An attacker who takes over a game server writes to player records across production.",
     "candidate_element_ids": [
-      "flow:game-server-to-player-database:update-players",
+      "flow:process:game-server>store:player-database>update-players",
       "process:game-server"
     ],
     "reference_verb": "escalate",
@@ -1802,12 +1802,12 @@
     "reference_claim": "An attacker who obtains a shopper's session cookie replays it against the storefront API and places orders as that shopper.",
     "reference_element_ids": [
       "entity:shopper",
-      "flow:shopper-to-storefront-api:place-order"
+      "flow:entity:shopper>process:storefront-api>place-order"
     ],
     "candidate_claim": "An attacker fixes a shopper's session identifier before they log in and then reuses it.",
     "candidate_element_ids": [
       "entity:shopper",
-      "flow:shopper-to-storefront-api:place-order"
+      "flow:entity:shopper>process:storefront-api>place-order"
     ],
     "reference_verb": "replay",
     "candidate_verb": "ride-session",
@@ -1819,12 +1819,12 @@
     "category": "spoofing",
     "reference_claim": "Any workload that can reach the order service impersonates the storefront API on the unauthenticated gRPC channel and submits orders.",
     "reference_element_ids": [
-      "flow:storefront-api-to-order-service:submit-order",
+      "flow:process:storefront-api>process:order-service>submit-order",
       "process:order-service"
     ],
     "candidate_claim": "An attacker sends malformed gRPC messages that crash the order service.",
     "candidate_element_ids": [
-      "flow:storefront-api-to-order-service:submit-order",
+      "flow:process:storefront-api>process:order-service>submit-order",
       "process:order-service"
     ],
     "reference_verb": "impersonate",
@@ -1887,7 +1887,7 @@
     "category": "spoofing",
     "reference_claim": "An attacker serves a node a firmware image that impersonates an official release, because the node authenticates neither the bucket nor the image's origin.",
     "reference_element_ids": [
-      "flow:sensor-node-to-firmware-bucket:poll-firmware",
+      "flow:entity:sensor-node>store:firmware-bucket>poll-firmware",
       "store:firmware-bucket"
     ],
     "candidate_claim": "An attacker registers a device that was never manufactured by the operator.",
@@ -1905,7 +1905,7 @@
     "category": "tampering",
     "reference_claim": "An attacker who can write to the device registry reassigns a node to a different customer, redirecting or corrupting that customer's data.",
     "reference_element_ids": [
-      "flow:device-gateway-to-device-registry:look-up-device",
+      "flow:process:device-gateway>store:device-registry>look-up-device",
       "store:device-registry"
     ],
     "candidate_claim": "An attacker deletes a device's entry from the registry so it can no longer connect.",
@@ -1955,7 +1955,7 @@
     "category": "spoofing",
     "reference_claim": "An attacker submits a transform run impersonating the scheduler, since authentication on the trigger path is unverified.",
     "reference_element_ids": [
-      "flow:ingest-scheduler-to-spark-transform-job:trigger-transform"
+      "flow:process:ingest-scheduler>process:spark-transform-job>trigger-transform"
     ],
     "candidate_claim": "An attacker cancels a scheduled Airflow run so the extract is never processed.",
     "candidate_element_ids": [
@@ -1971,7 +1971,7 @@
     "category": "tampering",
     "reference_claim": "An attacker who compromises the transform job writes fabricated claim rows into the warehouse alongside genuine ones.",
     "reference_element_ids": [
-      "flow:spark-transform-job-to-claims-warehouse:load-records",
+      "flow:process:spark-transform-job>store:claims-warehouse>load-records",
       "store:claims-warehouse"
     ],
     "candidate_claim": "An attacker modifies the Spark job's code so every future run transforms records incorrectly.",
@@ -2007,7 +2007,7 @@
     ],
     "candidate_claim": "An attacker intercepts partner uploads and reads claim records in transit over SFTP.",
     "candidate_element_ids": [
-      "flow:insurance-partner-to-landing-bucket:push-daily-extract"
+      "flow:entity:insurance-partner>store:landing-bucket>push-daily-extract"
     ],
     "reference_verb": "read",
     "candidate_verb": "intercept",
@@ -2020,12 +2020,12 @@
     "reference_claim": "An attacker publishes a model artifact under a shared group account with no individual identity behind it.",
     "reference_element_ids": [
       "entity:ml-engineer",
-      "flow:ml-engineer-to-model-registry-bucket:publish-artifact"
+      "flow:entity:ml-engineer>store:model-registry-bucket>publish-artifact"
     ],
     "candidate_claim": "An attacker steals an ML engineer's laptop and publishes an artifact from it.",
     "candidate_element_ids": [
       "entity:ml-engineer",
-      "flow:ml-engineer-to-model-registry-bucket:publish-artifact"
+      "flow:entity:ml-engineer>store:model-registry-bucket>publish-artifact"
     ],
     "reference_verb": "use-credential",
     "candidate_verb": "use-credential",
@@ -2037,11 +2037,11 @@
     "category": "tampering",
     "reference_claim": "An attacker inside the model network alters request payloads in flight on the unauthenticated, unencrypted forward path.",
     "reference_element_ids": [
-      "flow:inference-gateway-to-model-server:forward-request"
+      "flow:process:inference-gateway>process:model-server>forward-request"
     ],
     "candidate_claim": "An attacker replays a previously captured inference request against the model server.",
     "candidate_element_ids": [
-      "flow:inference-gateway-to-model-server:forward-request"
+      "flow:process:inference-gateway>process:model-server>forward-request"
     ],
     "reference_verb": "alter-in-transit",
     "candidate_verb": "replay",
@@ -2108,7 +2108,7 @@
     "category": "spoofing",
     "reference_claim": "An attacker holding the worker's database credentials connects to the database as the worker.",
     "reference_element_ids": [
-      "flow:background-worker-process-to-database:read-write-records"
+      "flow:process:background-worker-process>store:database>read-write-records"
     ],
     "candidate_claim": "An attacker who reaches the database queries it directly without any credential.",
     "candidate_element_ids": [
@@ -2124,7 +2124,7 @@
     "category": "tampering",
     "reference_claim": "An attacker with the worker's database access alters application records or the log records stored alongside them.",
     "reference_element_ids": [
-      "flow:background-worker-process-to-database:read-write-records",
+      "flow:process:background-worker-process>store:database>read-write-records",
       "store:database"
     ],
     "candidate_claim": "An attacker alters the message queue's contents after the worker has read them.",
@@ -2141,7 +2141,7 @@
     "category": "denial-of-service",
     "reference_claim": "An attacker floods the internet-facing web application until it stops serving browsers.",
     "reference_element_ids": [
-      "flow:browser-to-web-application:page-request",
+      "flow:entity:browser>process:web-application>page-request",
       "process:web-application"
     ],
     "candidate_claim": "An attacker exploits a vulnerability in the web application framework to crash it.",
@@ -2176,7 +2176,7 @@
     "category": "spoofing",
     "reference_claim": "An attacker connects to the exposed lobby port as another player, because how the lobby authenticates a client is unverified.",
     "reference_element_ids": [
-      "flow:game-client-to-lobby:matchmaking",
+      "flow:process:game-client>process:lobby>matchmaking",
       "process:lobby"
     ],
     "candidate_claim": "An attacker takes over a player's account by resetting its password.",
@@ -2194,12 +2194,12 @@
     "category": "tampering",
     "reference_claim": "An attacker who influences a game server writes fabricated progression onto player records.",
     "reference_element_ids": [
-      "flow:game-server-to-player-database:update-players",
+      "flow:process:game-server>store:player-database>update-players",
       "store:player-database"
     ],
     "candidate_claim": "An attacker modifies the game client to report fabricated match results.",
     "candidate_element_ids": [
-      "flow:game-client-to-game-server:gameplay-traffic",
+      "flow:process:game-client>process:game-server>gameplay-traffic",
       "process:game-client"
     ],
     "reference_verb": "forge",
@@ -2247,12 +2247,12 @@
     "category": "spoofing",
     "reference_claim": "An attacker holding the shared build token calls the deploy controller as if it were the build runner and names an image sha of their own choosing as the current release.",
     "reference_element_ids": [
-      "flow:build-runner-to-deploy-controller:set-current-release",
+      "flow:process:build-runner>process:deploy-controller>set-current-release",
       "process:deploy-controller"
     ],
     "candidate_claim": "An attacker who has the build token names any image sha as the current release and the controller accepts it as the runner.",
     "candidate_element_ids": [
-      "flow:build-runner-to-deploy-controller:set-current-release",
+      "flow:process:build-runner>process:deploy-controller>set-current-release",
       "process:deploy-controller"
     ],
     "reference_verb": "use-credential",
@@ -2265,7 +2265,7 @@
     "category": "spoofing",
     "reference_claim": "An attacker holding the shared build token calls the deploy controller as if it were the build runner and names an image sha of their own choosing as the current release.",
     "reference_element_ids": [
-      "flow:build-runner-to-deploy-controller:set-current-release",
+      "flow:process:build-runner>process:deploy-controller>set-current-release",
       "process:deploy-controller"
     ],
     "candidate_claim": "Someone in possession of the pipeline's build token instructs the deploy controller to change the estate's release.",
@@ -2282,7 +2282,7 @@
     "category": "spoofing",
     "reference_claim": "An attacker holding the shared build token calls the deploy controller as if it were the build runner and names an image sha of their own choosing as the current release.",
     "reference_element_ids": [
-      "flow:build-runner-to-deploy-controller:set-current-release",
+      "flow:process:build-runner>process:deploy-controller>set-current-release",
       "process:deploy-controller"
     ],
     "candidate_claim": "An attacker guesses the build token because it is short.",
@@ -2299,12 +2299,12 @@
     "category": "spoofing",
     "reference_claim": "An attacker on the retail WAN presents itself to the image registry as a store server and pulls the estate's container images.",
     "reference_element_ids": [
-      "flow:store-server-to-image-registry:pull-image",
+      "flow:process:store-server>store:image-registry>pull-image",
       "store:image-registry"
     ],
     "candidate_claim": "An attacker on the WAN downloads the estate's container images from the registry by presenting whatever a store server presents.",
     "candidate_element_ids": [
-      "flow:store-server-to-image-registry:pull-image",
+      "flow:process:store-server>store:image-registry>pull-image",
       "store:image-registry"
     ],
     "reference_verb": "impersonate",
@@ -2317,12 +2317,12 @@
     "category": "spoofing",
     "reference_claim": "An attacker on the retail WAN presents itself to the image registry as a store server and pulls the estate's container images.",
     "reference_element_ids": [
-      "flow:store-server-to-image-registry:pull-image",
+      "flow:process:store-server>store:image-registry>pull-image",
       "store:image-registry"
     ],
     "candidate_claim": "An attacker pushes a new image into the registry while claiming to be the build runner.",
     "candidate_element_ids": [
-      "flow:build-runner-to-image-registry:push-image",
+      "flow:process:build-runner>store:image-registry>push-image",
       "store:image-registry"
     ],
     "reference_verb": "impersonate",
@@ -2335,12 +2335,12 @@
     "category": "spoofing",
     "reference_claim": "An attacker polls the deploy controller while claiming to be a store server, since what a store server presents to the controller is unverified.",
     "reference_element_ids": [
-      "flow:store-server-to-deploy-controller:poll-current-release",
+      "flow:process:store-server>process:deploy-controller>poll-current-release",
       "process:deploy-controller"
     ],
     "candidate_claim": "An attacker uses the store server's expired client certificate to poll the controller.",
     "candidate_element_ids": [
-      "flow:store-server-to-deploy-controller:poll-current-release",
+      "flow:process:store-server>process:deploy-controller>poll-current-release",
       "process:deploy-controller"
     ],
     "reference_verb": "impersonate",
@@ -2354,12 +2354,12 @@
     "reference_claim": "An attacker pushes branches to the git server as a developer, because how developers authenticate to it is unverified.",
     "reference_element_ids": [
       "entity:developer",
-      "flow:developer-to-git-server:push-branches"
+      "flow:entity:developer>store:git-server>push-branches"
     ],
     "candidate_claim": "An attacker bypasses the multi-factor authentication on the git server to push as a developer.",
     "candidate_element_ids": [
       "entity:developer",
-      "flow:developer-to-git-server:push-branches"
+      "flow:entity:developer>store:git-server>push-branches"
     ],
     "reference_verb": "impersonate",
     "candidate_verb": "impersonate",
@@ -2405,13 +2405,13 @@
     "category": "tampering",
     "reference_claim": "An attacker publishes a package that the lockfile resolves to and the runner bakes it into the image unchecked, because signatures on downloads are not verified.",
     "reference_element_ids": [
-      "flow:build-runner-to-public-package-registry:resolve-dependencies",
+      "flow:process:build-runner>entity:public-package-registry>resolve-dependencies",
       "process:build-runner"
     ],
     "candidate_claim": "An attacker gets a backdoored dependency into the build because downloads are not signature-checked.",
     "candidate_element_ids": [
       "entity:public-package-registry",
-      "flow:build-runner-to-public-package-registry:resolve-dependencies"
+      "flow:process:build-runner>entity:public-package-registry>resolve-dependencies"
     ],
     "reference_verb": "plant",
     "candidate_verb": "plant",
@@ -2423,12 +2423,12 @@
     "category": "tampering",
     "reference_claim": "An attacker publishes a package that the lockfile resolves to and the runner bakes it into the image unchecked, because signatures on downloads are not verified.",
     "reference_element_ids": [
-      "flow:build-runner-to-public-package-registry:resolve-dependencies",
+      "flow:process:build-runner>entity:public-package-registry>resolve-dependencies",
       "process:build-runner"
     ],
     "candidate_claim": "An attacker modifies a package in transit between the public registry and the runner.",
     "candidate_element_ids": [
-      "flow:build-runner-to-public-package-registry:resolve-dependencies"
+      "flow:process:build-runner>entity:public-package-registry>resolve-dependencies"
     ],
     "reference_verb": "plant",
     "candidate_verb": "alter-in-transit",
@@ -2477,11 +2477,11 @@
     "category": "tampering",
     "reference_claim": "An attacker on the retail WAN alters the container image as a store server pulls it, since protection of that traffic is unverified.",
     "reference_element_ids": [
-      "flow:store-server-to-image-registry:pull-image"
+      "flow:process:store-server>store:image-registry>pull-image"
     ],
     "candidate_claim": "An attacker sitting on the retail WAN modifies the image while a store is pulling it.",
     "candidate_element_ids": [
-      "flow:store-server-to-image-registry:pull-image"
+      "flow:process:store-server>store:image-registry>pull-image"
     ],
     "reference_verb": "alter-in-transit",
     "candidate_verb": "alter-in-transit",
@@ -2493,11 +2493,11 @@
     "category": "tampering",
     "reference_claim": "An attacker on the retail WAN alters the container image as a store server pulls it, since protection of that traffic is unverified.",
     "reference_element_ids": [
-      "flow:store-server-to-image-registry:pull-image"
+      "flow:process:store-server>store:image-registry>pull-image"
     ],
     "candidate_claim": "An attacker reads the container image as it crosses the WAN.",
     "candidate_element_ids": [
-      "flow:store-server-to-image-registry:pull-image"
+      "flow:process:store-server>store:image-registry>pull-image"
     ],
     "reference_verb": "alter-in-transit",
     "candidate_verb": "intercept",
@@ -2509,12 +2509,12 @@
     "category": "repudiation",
     "reference_claim": "A build that reached the estate cannot be attributed to the developer who started it, because any developer can trigger a manual rebuild on an unreviewed path whose authentication is unverified.",
     "reference_element_ids": [
-      "flow:developer-to-build-runner:manual-rebuild",
+      "flow:entity:developer>process:build-runner>manual-rebuild",
       "process:build-runner"
     ],
     "candidate_claim": "There is no way to tell which developer started a build, because manual rebuilds bypass the merge and are not reviewed.",
     "candidate_element_ids": [
-      "flow:developer-to-build-runner:manual-rebuild",
+      "flow:entity:developer>process:build-runner>manual-rebuild",
       "process:build-runner"
     ],
     "reference_verb": "unattributable",
@@ -2527,12 +2527,12 @@
     "category": "repudiation",
     "reference_claim": "The deploy controller cannot tell which pipeline set a release, because every pipeline presents the same shared build token.",
     "reference_element_ids": [
-      "flow:build-runner-to-deploy-controller:set-current-release",
+      "flow:process:build-runner>process:deploy-controller>set-current-release",
       "process:deploy-controller"
     ],
     "candidate_claim": "Release records cannot distinguish one pipeline from another, since they all present the same token.",
     "candidate_element_ids": [
-      "flow:build-runner-to-deploy-controller:set-current-release",
+      "flow:process:build-runner>process:deploy-controller>set-current-release",
       "process:deploy-controller"
     ],
     "reference_verb": "unattributable",
@@ -2545,7 +2545,7 @@
     "category": "information-disclosure",
     "reference_claim": "An attacker who reads the build runner's configuration recovers the shared build token and can thereafter set the estate's release.",
     "reference_element_ids": [
-      "flow:build-runner-to-deploy-controller:set-current-release",
+      "flow:process:build-runner>process:deploy-controller>set-current-release",
       "process:build-runner"
     ],
     "candidate_claim": "An attacker who reads the runner's config files walks away with the build token.",
@@ -2562,12 +2562,12 @@
     "category": "information-disclosure",
     "reference_claim": "An attacker who reads the build runner's configuration recovers the shared build token and can thereafter set the estate's release.",
     "reference_element_ids": [
-      "flow:build-runner-to-deploy-controller:set-current-release",
+      "flow:process:build-runner>process:deploy-controller>set-current-release",
       "process:build-runner"
     ],
     "candidate_claim": "An attacker uses the build token to set the estate's release.",
     "candidate_element_ids": [
-      "flow:build-runner-to-deploy-controller:set-current-release",
+      "flow:process:build-runner>process:deploy-controller>set-current-release",
       "process:deploy-controller"
     ],
     "reference_verb": "recover-credential",
@@ -2612,11 +2612,11 @@
     "category": "information-disclosure",
     "reference_claim": "An attacker on the retail WAN reads the container image as a store server pulls it, since protection of that traffic is unverified.",
     "reference_element_ids": [
-      "flow:store-server-to-image-registry:pull-image"
+      "flow:process:store-server>store:image-registry>pull-image"
     ],
     "candidate_claim": "An attacker alters the container image as it crosses the WAN.",
     "candidate_element_ids": [
-      "flow:store-server-to-image-registry:pull-image"
+      "flow:process:store-server>store:image-registry>pull-image"
     ],
     "reference_verb": "intercept",
     "candidate_verb": "alter-in-transit",
@@ -2683,12 +2683,12 @@
     "category": "denial-of-service",
     "reference_claim": "An attacker makes the image registry unreachable over the WAN so store servers cannot complete a pull and the estate is left split across two releases.",
     "reference_element_ids": [
-      "flow:store-server-to-image-registry:pull-image",
+      "flow:process:store-server>store:image-registry>pull-image",
       "store:image-registry"
     ],
     "candidate_claim": "Stores cannot finish pulling because the registry is unreachable and the estate ends up on two different releases.",
     "candidate_element_ids": [
-      "flow:store-server-to-image-registry:pull-image",
+      "flow:process:store-server>store:image-registry>pull-image",
       "store:image-registry"
     ],
     "reference_verb": "disable",
@@ -2701,13 +2701,13 @@
     "category": "elevation-of-privilege",
     "reference_claim": "Any developer turns code of their own choosing into the software running in 1,200 stores by triggering the manual rebuild, a path the source states requires no merge and receives no review.",
     "reference_element_ids": [
-      "flow:developer-to-build-runner:manual-rebuild",
+      "flow:entity:developer>process:build-runner>manual-rebuild",
       "process:store-server"
     ],
     "candidate_claim": "A developer ships code to every store without anyone reviewing it, using the by-hand rebuild.",
     "candidate_element_ids": [
       "entity:developer",
-      "flow:developer-to-build-runner:manual-rebuild"
+      "flow:entity:developer>process:build-runner>manual-rebuild"
     ],
     "reference_verb": "abuse-grant",
     "candidate_verb": "abuse-grant",
@@ -2719,12 +2719,12 @@
     "category": "elevation-of-privilege",
     "reference_claim": "Any developer turns code of their own choosing into the software running in 1,200 stores by triggering the manual rebuild, a path the source states requires no merge and receives no review.",
     "reference_element_ids": [
-      "flow:developer-to-build-runner:manual-rebuild",
+      "flow:entity:developer>process:build-runner>manual-rebuild",
       "process:store-server"
     ],
     "candidate_claim": "An attacker who is not a developer signs in to the build runner and starts a rebuild.",
     "candidate_element_ids": [
-      "flow:developer-to-build-runner:manual-rebuild",
+      "flow:entity:developer>process:build-runner>manual-rebuild",
       "process:build-runner"
     ],
     "reference_verb": "abuse-grant",
@@ -2755,8 +2755,8 @@
     "category": "elevation-of-privilege",
     "reference_claim": "An attacker who takes one store server uses whatever it presents to reach the deploy controller on the corporate network and the registry in the build environment.",
     "reference_element_ids": [
-      "flow:store-server-to-deploy-controller:poll-current-release",
-      "flow:store-server-to-image-registry:pull-image",
+      "flow:process:store-server>process:deploy-controller>poll-current-release",
+      "flow:process:store-server>store:image-registry>pull-image",
       "process:store-server"
     ],
     "candidate_claim": "An attacker who compromises a back-office store server pivots to the deploy controller.",
@@ -2774,8 +2774,8 @@
     "category": "elevation-of-privilege",
     "reference_claim": "An attacker who takes one store server uses whatever it presents to reach the deploy controller on the corporate network and the registry in the build environment.",
     "reference_element_ids": [
-      "flow:store-server-to-deploy-controller:poll-current-release",
-      "flow:store-server-to-image-registry:pull-image",
+      "flow:process:store-server>process:deploy-controller>poll-current-release",
+      "flow:process:store-server>store:image-registry>pull-image",
       "process:store-server"
     ],
     "candidate_claim": "An attacker who compromises the build runner reaches the store estate.",
@@ -2793,12 +2793,12 @@
     "category": "elevation-of-privilege",
     "reference_claim": "A malicious dependency executes with the build runner's authority during the build, carrying an attacker from the public internet into the build environment.",
     "reference_element_ids": [
-      "flow:build-runner-to-public-package-registry:resolve-dependencies",
+      "flow:process:build-runner>entity:public-package-registry>resolve-dependencies",
       "process:build-runner"
     ],
     "candidate_claim": "A poisoned package runs code on the build runner during the build.",
     "candidate_element_ids": [
-      "flow:build-runner-to-public-package-registry:resolve-dependencies",
+      "flow:process:build-runner>entity:public-package-registry>resolve-dependencies",
       "process:build-runner"
     ],
     "reference_verb": "escalate",
@@ -2847,11 +2847,11 @@
     "reference_claim": "The franchise identity provider vouches for someone who is not a franchise colleague and the broker signs them in as that person, since nothing records which colleagues it may vouch for.",
     "reference_element_ids": [
       "entity:franchise-identity-provider",
-      "flow:franchise-identity-provider-to-identity-broker:vouch-for-colleague"
+      "flow:entity:franchise-identity-provider>process:identity-broker>vouch-for-colleague"
     ],
     "candidate_claim": "The franchise provider asserts an identity it should not be able to assert and the broker signs that person in.",
     "candidate_element_ids": [
-      "flow:franchise-identity-provider-to-identity-broker:vouch-for-colleague",
+      "flow:entity:franchise-identity-provider>process:identity-broker>vouch-for-colleague",
       "process:identity-broker"
     ],
     "reference_verb": "impersonate",
@@ -2865,11 +2865,11 @@
     "reference_claim": "The franchise identity provider vouches for someone who is not a franchise colleague and the broker signs them in as that person, since nothing records which colleagues it may vouch for.",
     "reference_element_ids": [
       "entity:franchise-identity-provider",
-      "flow:franchise-identity-provider-to-identity-broker:vouch-for-colleague"
+      "flow:entity:franchise-identity-provider>process:identity-broker>vouch-for-colleague"
     ],
     "candidate_claim": "An attacker intercepts the franchise provider's assertion and replays it later to sign in.",
     "candidate_element_ids": [
-      "flow:franchise-identity-provider-to-identity-broker:vouch-for-colleague"
+      "flow:entity:franchise-identity-provider>process:identity-broker>vouch-for-colleague"
     ],
     "reference_verb": "impersonate",
     "candidate_verb": "replay",
@@ -2882,11 +2882,11 @@
     "reference_claim": "An attacker signs in to the broker as a colleague, because whether colleagues are asked for a second factor is unverified.",
     "reference_element_ids": [
       "entity:colleague",
-      "flow:colleague-to-identity-broker:sign-in"
+      "flow:entity:colleague>process:identity-broker>sign-in"
     ],
     "candidate_claim": "An attacker who has a colleague's password signs in to the broker as them, since a second factor is not established.",
     "candidate_element_ids": [
-      "flow:colleague-to-identity-broker:sign-in"
+      "flow:entity:colleague>process:identity-broker>sign-in"
     ],
     "reference_verb": "impersonate",
     "candidate_verb": "impersonate",
@@ -2898,12 +2898,12 @@
     "category": "spoofing",
     "reference_claim": "An attacker who obtains a colleague's token acts as that colleague for the rest of its twelve hours, because nothing calls back to the broker and there is no way to pull a token back.",
     "reference_element_ids": [
-      "flow:colleague-to-identity-broker:sign-in",
+      "flow:entity:colleague>process:identity-broker>sign-in",
       "process:store-admin-console"
     ],
     "candidate_claim": "An attacker who steals a colleague's token keeps using it until it expires, because it cannot be revoked.",
     "candidate_element_ids": [
-      "flow:colleague-to-identity-broker:sign-in",
+      "flow:entity:colleague>process:identity-broker>sign-in",
       "process:identity-broker"
     ],
     "reference_verb": "use-credential",
@@ -2916,12 +2916,12 @@
     "category": "spoofing",
     "reference_claim": "An attacker who obtains a colleague's token acts as that colleague for the rest of its twelve hours, because nothing calls back to the broker and there is no way to pull a token back.",
     "reference_element_ids": [
-      "flow:colleague-to-identity-broker:sign-in",
+      "flow:entity:colleague>process:identity-broker>sign-in",
       "process:store-admin-console"
     ],
     "candidate_claim": "An attacker who steals a colleague's token changes the groups inside it to become a store manager.",
     "candidate_element_ids": [
-      "flow:colleague-to-identity-broker:sign-in",
+      "flow:entity:colleague>process:identity-broker>sign-in",
       "process:store-admin-console"
     ],
     "reference_verb": "use-credential",
@@ -2934,12 +2934,12 @@
     "category": "spoofing",
     "reference_claim": "An attacker serves the console a signing public key of their own so that tokens the attacker signed verify, since how the console fetches and trusts that key is unverified.",
     "reference_element_ids": [
-      "flow:store-admin-console-to-identity-broker:fetch-public-key",
+      "flow:process:store-admin-console>process:identity-broker>fetch-public-key",
       "process:store-admin-console"
     ],
     "candidate_claim": "An attacker gets the console to trust a signing key of the attacker's own so forged tokens verify.",
     "candidate_element_ids": [
-      "flow:store-admin-console-to-identity-broker:fetch-public-key",
+      "flow:process:store-admin-console>process:identity-broker>fetch-public-key",
       "process:store-admin-console"
     ],
     "reference_verb": "forge",
@@ -2987,11 +2987,11 @@
     "reference_claim": "An attacker alters what the nightly pull returns so that groups are granted, or so that leavers are never removed.",
     "reference_element_ids": [
       "entity:hr-system",
-      "flow:identity-broker-to-hr-system:nightly-group-pull"
+      "flow:process:identity-broker>entity:hr-system>nightly-group-pull"
     ],
     "candidate_claim": "An attacker tampers with the overnight feed from HR so a leaver is never removed.",
     "candidate_element_ids": [
-      "flow:identity-broker-to-hr-system:nightly-group-pull"
+      "flow:process:identity-broker>entity:hr-system>nightly-group-pull"
     ],
     "reference_verb": "alter-in-transit",
     "candidate_verb": "alter-in-transit",
@@ -3004,11 +3004,11 @@
     "reference_claim": "An attacker alters what the nightly pull returns so that groups are granted, or so that leavers are never removed.",
     "reference_element_ids": [
       "entity:hr-system",
-      "flow:identity-broker-to-hr-system:nightly-group-pull"
+      "flow:process:identity-broker>entity:hr-system>nightly-group-pull"
     ],
     "candidate_claim": "An attacker prevents the overnight feed from running so no group changes arrive.",
     "candidate_element_ids": [
-      "flow:identity-broker-to-hr-system:nightly-group-pull"
+      "flow:process:identity-broker>entity:hr-system>nightly-group-pull"
     ],
     "reference_verb": "alter-in-transit",
     "candidate_verb": "disable",
@@ -3020,7 +3020,7 @@
     "category": "tampering",
     "reference_claim": "An attacker alters or removes sign-in records in the audit log so a sign-in leaves no trace.",
     "reference_element_ids": [
-      "flow:identity-broker-to-audit-log:write-sign-ins",
+      "flow:process:identity-broker>store:audit-log>write-sign-ins",
       "store:audit-log"
     ],
     "candidate_claim": "An attacker deletes their own sign-in from the audit log.",
@@ -3037,12 +3037,12 @@
     "category": "repudiation",
     "reference_claim": "A franchise sign-in cannot be attributed to a person, because the identity was asserted by a provider we do not run and whether the log covers that route at all is unverified.",
     "reference_element_ids": [
-      "flow:franchise-identity-provider-to-identity-broker:vouch-for-colleague",
+      "flow:entity:franchise-identity-provider>process:identity-broker>vouch-for-colleague",
       "store:audit-log"
     ],
     "candidate_claim": "When a franchise sign-in is disputed there is nobody to hold to it, because another company asserted the identity and the log may not cover it at all.",
     "candidate_element_ids": [
-      "flow:franchise-identity-provider-to-identity-broker:vouch-for-colleague",
+      "flow:entity:franchise-identity-provider>process:identity-broker>vouch-for-colleague",
       "store:audit-log"
     ],
     "reference_verb": "unattributable",
@@ -3055,12 +3055,12 @@
     "category": "repudiation",
     "reference_claim": "A price change or a void cannot be tied to the store it belongs to, because the console never establishes which store the token holder is from.",
     "reference_element_ids": [
-      "flow:colleague-to-store-admin-console:change-prices-and-void",
+      "flow:entity:colleague>process:store-admin-console>change-prices-and-void",
       "process:store-admin-console"
     ],
     "candidate_claim": "A price change cannot be pinned to a store, because the console never learns which store the token holder works in.",
     "candidate_element_ids": [
-      "flow:colleague-to-store-admin-console:change-prices-and-void",
+      "flow:entity:colleague>process:store-admin-console>change-prices-and-void",
       "process:store-admin-console"
     ],
     "reference_verb": "unattributable",
@@ -3073,12 +3073,12 @@
     "category": "repudiation",
     "reference_claim": "A price change or a void cannot be tied to the store it belongs to, because the console never establishes which store the token holder is from.",
     "reference_element_ids": [
-      "flow:colleague-to-store-admin-console:change-prices-and-void",
+      "flow:entity:colleague>process:store-admin-console>change-prices-and-void",
       "process:store-admin-console"
     ],
     "candidate_claim": "A store manager changes prices in a store that is not theirs.",
     "candidate_element_ids": [
-      "flow:colleague-to-store-admin-console:change-prices-and-void",
+      "flow:entity:colleague>process:store-admin-console>change-prices-and-void",
       "process:store-admin-console"
     ],
     "reference_verb": "unattributable",
@@ -3155,11 +3155,11 @@
     "category": "information-disclosure",
     "reference_claim": "An attacker on the path between a colleague and the broker reads the sign-in and the token that comes back, since protection of that traffic is unverified.",
     "reference_element_ids": [
-      "flow:colleague-to-identity-broker:sign-in"
+      "flow:entity:colleague>process:identity-broker>sign-in"
     ],
     "candidate_claim": "An attacker on the network path between a colleague at home and the broker captures the token issued to them.",
     "candidate_element_ids": [
-      "flow:colleague-to-identity-broker:sign-in"
+      "flow:entity:colleague>process:identity-broker>sign-in"
     ],
     "reference_verb": "intercept",
     "candidate_verb": "intercept",
@@ -3171,11 +3171,11 @@
     "category": "information-disclosure",
     "reference_claim": "An attacker on the path between a colleague and the broker reads the sign-in and the token that comes back, since protection of that traffic is unverified.",
     "reference_element_ids": [
-      "flow:colleague-to-identity-broker:sign-in"
+      "flow:entity:colleague>process:identity-broker>sign-in"
     ],
     "candidate_claim": "An attacker reads the public half of the signing key as the console fetches it.",
     "candidate_element_ids": [
-      "flow:store-admin-console-to-identity-broker:fetch-public-key"
+      "flow:process:store-admin-console>process:identity-broker>fetch-public-key"
     ],
     "reference_verb": "intercept",
     "candidate_verb": "intercept",
@@ -3219,12 +3219,12 @@
     "category": "denial-of-service",
     "reference_claim": "An attacker stops the nightly pull and group changes silently stop reaching the directory while everything else keeps working.",
     "reference_element_ids": [
-      "flow:identity-broker-to-hr-system:nightly-group-pull",
+      "flow:process:identity-broker>entity:hr-system>nightly-group-pull",
       "store:directory"
     ],
     "candidate_claim": "The nightly pull stops running and the directory quietly keeps serving group membership that is out of date.",
     "candidate_element_ids": [
-      "flow:identity-broker-to-hr-system:nightly-group-pull",
+      "flow:process:identity-broker>entity:hr-system>nightly-group-pull",
       "store:directory"
     ],
     "reference_verb": "disable",
@@ -3254,12 +3254,12 @@
     "category": "elevation-of-privilege",
     "reference_claim": "A colleague who is a store manager in one store changes prices and voids transactions in every store, because the console decides from the group alone and never checks which store they belong to.",
     "reference_element_ids": [
-      "flow:colleague-to-store-admin-console:change-prices-and-void",
+      "flow:entity:colleague>process:store-admin-console>change-prices-and-void",
       "process:store-admin-console"
     ],
     "candidate_claim": "A colleague holding a store-manager token voids transactions in a store they have nothing to do with, because only the group is checked.",
     "candidate_element_ids": [
-      "flow:colleague-to-store-admin-console:change-prices-and-void",
+      "flow:entity:colleague>process:store-admin-console>change-prices-and-void",
       "process:store-admin-console"
     ],
     "reference_verb": "abuse-grant",
@@ -3272,7 +3272,7 @@
     "category": "elevation-of-privilege",
     "reference_claim": "A colleague who is a store manager in one store changes prices and voids transactions in every store, because the console decides from the group alone and never checks which store they belong to.",
     "reference_element_ids": [
-      "flow:colleague-to-store-admin-console:change-prices-and-void",
+      "flow:entity:colleague>process:store-admin-console>change-prices-and-void",
       "process:store-admin-console"
     ],
     "candidate_claim": "An attacker adds themselves to the store-manager group to gain the console's powers.",
@@ -3291,11 +3291,11 @@
     "reference_claim": "A leaver keeps their access until the nightly pull runs, and a token issued before it goes on working for twelve hours after that.",
     "reference_element_ids": [
       "entity:colleague",
-      "flow:identity-broker-to-hr-system:nightly-group-pull"
+      "flow:process:identity-broker>entity:hr-system>nightly-group-pull"
     ],
     "candidate_claim": "Someone who has left keeps working access until the overnight sync catches up, and a token they already hold outlives even that.",
     "candidate_element_ids": [
-      "flow:identity-broker-to-hr-system:nightly-group-pull",
+      "flow:process:identity-broker>entity:hr-system>nightly-group-pull",
       "store:directory"
     ],
     "reference_verb": "abuse-grant",
@@ -3309,12 +3309,12 @@
     "reference_claim": "A leaver keeps their access until the nightly pull runs, and a token issued before it goes on working for twelve hours after that.",
     "reference_element_ids": [
       "entity:colleague",
-      "flow:identity-broker-to-hr-system:nightly-group-pull"
+      "flow:process:identity-broker>entity:hr-system>nightly-group-pull"
     ],
     "candidate_claim": "A colleague who changes role keeps the groups from their old one until the nightly sync runs.",
     "candidate_element_ids": [
       "entity:colleague",
-      "flow:identity-broker-to-hr-system:nightly-group-pull"
+      "flow:process:identity-broker>entity:hr-system>nightly-group-pull"
     ],
     "reference_verb": "abuse-grant",
     "candidate_verb": "abuse-grant",
@@ -3332,7 +3332,7 @@
     "candidate_claim": "An attacker who takes over the franchise provider signs in to our internal applications.",
     "candidate_element_ids": [
       "entity:franchise-identity-provider",
-      "flow:franchise-identity-provider-to-identity-broker:vouch-for-colleague"
+      "flow:entity:franchise-identity-provider>process:identity-broker>vouch-for-colleague"
     ],
     "reference_verb": "escalate",
     "candidate_verb": "escalate",
@@ -3364,12 +3364,12 @@
     "category": "spoofing",
     "reference_claim": "An attacker submits orders to the web API as if they came from the mobile app, since how the API authenticates callers is unverified.",
     "reference_element_ids": [
-      "flow:mobile-app-to-web-api:api-traffic",
+      "flow:process:mobile-app>process:web-api>api-traffic",
       "process:web-api"
     ],
     "candidate_claim": "An attacker calls the web API directly and it accepts the orders as though the app had sent them.",
     "candidate_element_ids": [
-      "flow:mobile-app-to-web-api:api-traffic",
+      "flow:process:mobile-app>process:web-api>api-traffic",
       "process:web-api"
     ],
     "reference_verb": "impersonate",
@@ -3382,12 +3382,12 @@
     "category": "spoofing",
     "reference_claim": "An attacker submits orders to the web API as if they came from the mobile app, since how the API authenticates callers is unverified.",
     "reference_element_ids": [
-      "flow:mobile-app-to-web-api:api-traffic",
+      "flow:process:mobile-app>process:web-api>api-traffic",
       "process:web-api"
     ],
     "candidate_claim": "Anything that can reach the web API can act as the mobile app, since the API's authentication is unverified.",
     "candidate_element_ids": [
-      "flow:mobile-app-to-web-api:api-traffic",
+      "flow:process:mobile-app>process:web-api>api-traffic",
       "process:web-api"
     ],
     "reference_verb": "impersonate",
@@ -3400,7 +3400,7 @@
     "category": "spoofing",
     "reference_claim": "An attacker submits orders to the web API as if they came from the mobile app, since how the API authenticates callers is unverified.",
     "reference_element_ids": [
-      "flow:mobile-app-to-web-api:api-traffic",
+      "flow:process:mobile-app>process:web-api>api-traffic",
       "process:web-api"
     ],
     "candidate_claim": "An attacker guesses a customer's password in the mobile app and places orders on their account.",
@@ -3418,12 +3418,12 @@
     "category": "spoofing",
     "reference_claim": "An attacker who obtains a copy of the catalogue spreadsheet sends SQL to the web API as the catalogue tool.",
     "reference_element_ids": [
-      "flow:catalogue-spreadsheet-to-web-api:sql-statements",
+      "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
       "process:catalogue-spreadsheet"
     ],
     "candidate_claim": "An attacker with a copy of the catalogue spreadsheet drives its macros and the web API takes the SQL as the catalogue tool.",
     "candidate_element_ids": [
-      "flow:catalogue-spreadsheet-to-web-api:sql-statements",
+      "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
       "process:catalogue-spreadsheet"
     ],
     "reference_verb": "impersonate",
@@ -3436,7 +3436,7 @@
     "category": "spoofing",
     "reference_claim": "An attacker who obtains a copy of the catalogue spreadsheet sends SQL to the web API as the catalogue tool.",
     "reference_element_ids": [
-      "flow:catalogue-spreadsheet-to-web-api:sql-statements",
+      "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
       "process:catalogue-spreadsheet"
     ],
     "candidate_claim": "An attacker steals a marketing employee's password and signs in to the catalogue tool.",
@@ -3454,11 +3454,11 @@
     "reference_claim": "An attacker faxes a customer what appears to be a Sokify order confirmation, since nothing on the fax leg identifies the sender.",
     "reference_element_ids": [
       "entity:customer",
-      "flow:fax-gateway-to-customer:confirmation-fax"
+      "flow:process:fax-gateway>entity:customer>confirmation-fax"
     ],
     "candidate_claim": "An attacker sends a customer a forged dispatch fax that appears to come from Sokify.",
     "candidate_element_ids": [
-      "flow:fax-gateway-to-customer:confirmation-fax"
+      "flow:process:fax-gateway>entity:customer>confirmation-fax"
     ],
     "reference_verb": "forge",
     "candidate_verb": "forge",
@@ -3471,11 +3471,11 @@
     "reference_claim": "An attacker faxes a customer what appears to be a Sokify order confirmation, since nothing on the fax leg identifies the sender.",
     "reference_element_ids": [
       "entity:customer",
-      "flow:fax-gateway-to-customer:confirmation-fax"
+      "flow:process:fax-gateway>entity:customer>confirmation-fax"
     ],
     "candidate_claim": "An attacker intercepts the confirmation fax in transit and reads the customer's address.",
     "candidate_element_ids": [
-      "flow:fax-gateway-to-customer:confirmation-fax"
+      "flow:process:fax-gateway>entity:customer>confirmation-fax"
     ],
     "reference_verb": "forge",
     "candidate_verb": "intercept",
@@ -3490,11 +3490,11 @@
     "category": "tampering",
     "reference_claim": "An attacker on the network path alters order details in flight between the app and the web API, because that traffic runs over plain HTTP.",
     "reference_element_ids": [
-      "flow:mobile-app-to-web-api:api-traffic"
+      "flow:process:mobile-app>process:web-api>api-traffic"
     ],
     "candidate_claim": "An attacker modifies an order in transit over the app's unencrypted connection to the API.",
     "candidate_element_ids": [
-      "flow:mobile-app-to-web-api:api-traffic"
+      "flow:process:mobile-app>process:web-api>api-traffic"
     ],
     "reference_verb": "alter-in-transit",
     "candidate_verb": "alter-in-transit",
@@ -3506,11 +3506,11 @@
     "category": "tampering",
     "reference_claim": "An attacker on the network path alters order details in flight between the app and the web API, because that traffic runs over plain HTTP.",
     "reference_element_ids": [
-      "flow:mobile-app-to-web-api:api-traffic"
+      "flow:process:mobile-app>process:web-api>api-traffic"
     ],
     "candidate_claim": "An attacker reads order details out of the app's HTTP traffic.",
     "candidate_element_ids": [
-      "flow:mobile-app-to-web-api:api-traffic"
+      "flow:process:mobile-app>process:web-api>api-traffic"
     ],
     "reference_verb": "alter-in-transit",
     "candidate_verb": "intercept",
@@ -3522,12 +3522,12 @@
     "category": "tampering",
     "reference_claim": "An attacker drives the spreadsheet's macros to change catalogue prices through the web API.",
     "reference_element_ids": [
-      "flow:catalogue-spreadsheet-to-web-api:sql-statements",
+      "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
       "process:web-api"
     ],
     "candidate_claim": "An attacker uses the spreadsheet's macros to push a price change into the catalogue through the web API.",
     "candidate_element_ids": [
-      "flow:catalogue-spreadsheet-to-web-api:sql-statements",
+      "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
       "process:web-api"
     ],
     "reference_verb": "alter",
@@ -3540,12 +3540,12 @@
     "category": "tampering",
     "reference_claim": "An attacker drives the spreadsheet's macros to change catalogue prices through the web API.",
     "reference_element_ids": [
-      "flow:catalogue-spreadsheet-to-web-api:sql-statements",
+      "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
       "process:web-api"
     ],
     "candidate_claim": "An attacker appends extra SQL to the macro traffic so the API also updates customer rows.",
     "candidate_element_ids": [
-      "flow:catalogue-spreadsheet-to-web-api:sql-statements",
+      "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
       "process:web-api"
     ],
     "reference_verb": "alter",
@@ -3558,12 +3558,12 @@
     "category": "tampering",
     "reference_claim": "An attacker appends further SQL to the statements the macros send so the web API executes changes beyond prices and product copy.",
     "reference_element_ids": [
-      "flow:catalogue-spreadsheet-to-web-api:sql-statements",
+      "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
       "process:web-api"
     ],
     "candidate_claim": "An attacker smuggles additional SQL statements into what the macros send so the web API executes them.",
     "candidate_element_ids": [
-      "flow:catalogue-spreadsheet-to-web-api:sql-statements",
+      "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
       "process:web-api"
     ],
     "reference_verb": "inject",
@@ -3576,12 +3576,12 @@
     "category": "tampering",
     "reference_claim": "An attacker appends further SQL to the statements the macros send so the web API executes changes beyond prices and product copy.",
     "reference_element_ids": [
-      "flow:catalogue-spreadsheet-to-web-api:sql-statements",
+      "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
       "process:web-api"
     ],
     "candidate_claim": "An attacker changes catalogue prices using the macros the way they were meant to be used.",
     "candidate_element_ids": [
-      "flow:catalogue-spreadsheet-to-web-api:sql-statements",
+      "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
       "process:web-api"
     ],
     "reference_verb": "inject",
@@ -3628,12 +3628,12 @@
     "category": "tampering",
     "reference_claim": "An attacker changes the number stored against an order so the confirmation is faxed to a machine they control.",
     "reference_element_ids": [
-      "flow:web-api-to-sims:order-handover",
+      "flow:process:web-api>process:sims>order-handover",
       "process:sims"
     ],
     "candidate_claim": "An attacker edits the fax number held against an order so the confirmation reaches a machine they control.",
     "candidate_element_ids": [
-      "flow:sims-to-fax-gateway:dispatch-note",
+      "flow:process:sims>process:fax-gateway>dispatch-note",
       "process:sims"
     ],
     "reference_verb": "alter",
@@ -3646,12 +3646,12 @@
     "category": "tampering",
     "reference_claim": "An attacker changes the number stored against an order so the confirmation is faxed to a machine they control.",
     "reference_element_ids": [
-      "flow:web-api-to-sims:order-handover",
+      "flow:process:web-api>process:sims>order-handover",
       "process:sims"
     ],
     "candidate_claim": "An attacker changes the delivery address on an order before SIMS writes it out.",
     "candidate_element_ids": [
-      "flow:web-api-to-sims:order-handover",
+      "flow:process:web-api>process:sims>order-handover",
       "process:sims"
     ],
     "reference_verb": "alter",
@@ -3664,12 +3664,12 @@
     "category": "repudiation",
     "reference_claim": "A customer denies placing an order and Sokify cannot show who submitted it, because how the API authenticates callers is unverified.",
     "reference_element_ids": [
-      "flow:mobile-app-to-web-api:api-traffic",
+      "flow:process:mobile-app>process:web-api>api-traffic",
       "process:web-api"
     ],
     "candidate_claim": "A customer disputes an order and nothing records which caller submitted it.",
     "candidate_element_ids": [
-      "flow:mobile-app-to-web-api:api-traffic",
+      "flow:process:mobile-app>process:web-api>api-traffic",
       "process:web-api"
     ],
     "reference_verb": "unattributable",
@@ -3682,7 +3682,7 @@
     "category": "repudiation",
     "reference_claim": "A customer denies placing an order and Sokify cannot show who submitted it, because how the API authenticates callers is unverified.",
     "reference_element_ids": [
-      "flow:mobile-app-to-web-api:api-traffic",
+      "flow:process:mobile-app>process:web-api>api-traffic",
       "process:web-api"
     ],
     "candidate_claim": "An attacker deletes order records so a purchase cannot be proven afterwards.",
@@ -3699,11 +3699,11 @@
     "category": "repudiation",
     "reference_claim": "Nobody can show who made a price change, because the changes arrive at the web API as SQL from a spreadsheet rather than from an identified user.",
     "reference_element_ids": [
-      "flow:catalogue-spreadsheet-to-web-api:sql-statements"
+      "flow:process:catalogue-spreadsheet>process:web-api>sql-statements"
     ],
     "candidate_claim": "There is no way to tell which person made a catalogue change, because the API only ever sees SQL arriving from a spreadsheet.",
     "candidate_element_ids": [
-      "flow:catalogue-spreadsheet-to-web-api:sql-statements",
+      "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
       "process:web-api"
     ],
     "reference_verb": "unattributable",
@@ -3716,11 +3716,11 @@
     "category": "repudiation",
     "reference_claim": "Sokify cannot show a confirmation ever reached the customer, because nobody checks the fax arrived at the right place.",
     "reference_element_ids": [
-      "flow:fax-gateway-to-customer:confirmation-fax"
+      "flow:process:fax-gateway>entity:customer>confirmation-fax"
     ],
     "candidate_claim": "Sokify has no evidence a confirmation reached the customer, since delivery to the dialled number is never confirmed.",
     "candidate_element_ids": [
-      "flow:fax-gateway-to-customer:confirmation-fax"
+      "flow:process:fax-gateway>entity:customer>confirmation-fax"
     ],
     "reference_verb": "unattributable",
     "candidate_verb": "unattributable",
@@ -3732,11 +3732,11 @@
     "category": "repudiation",
     "reference_claim": "Sokify cannot show a confirmation ever reached the customer, because nobody checks the fax arrived at the right place.",
     "reference_element_ids": [
-      "flow:fax-gateway-to-customer:confirmation-fax"
+      "flow:process:fax-gateway>entity:customer>confirmation-fax"
     ],
     "candidate_claim": "The confirmation fax exposes the customer's name and address to whoever holds the dialled number.",
     "candidate_element_ids": [
-      "flow:fax-gateway-to-customer:confirmation-fax",
+      "flow:process:fax-gateway>entity:customer>confirmation-fax",
       "process:fax-gateway"
     ],
     "reference_verb": "unattributable",
@@ -3752,11 +3752,11 @@
     "category": "information-disclosure",
     "reference_claim": "An attacker on the network path reads customer details out of the app's plain-HTTP traffic to the web API.",
     "reference_element_ids": [
-      "flow:mobile-app-to-web-api:api-traffic"
+      "flow:process:mobile-app>process:web-api>api-traffic"
     ],
     "candidate_claim": "An attacker sniffing the network reads customer details out of the app's plain HTTP calls to the API.",
     "candidate_element_ids": [
-      "flow:mobile-app-to-web-api:api-traffic"
+      "flow:process:mobile-app>process:web-api>api-traffic"
     ],
     "reference_verb": "intercept",
     "candidate_verb": "intercept",
@@ -3768,11 +3768,11 @@
     "category": "information-disclosure",
     "reference_claim": "An attacker on the network path reads customer details out of the app's plain-HTTP traffic to the web API.",
     "reference_element_ids": [
-      "flow:mobile-app-to-web-api:api-traffic"
+      "flow:process:mobile-app>process:web-api>api-traffic"
     ],
     "candidate_claim": "Customer details leaving the mobile app are readable in transit, because the app talks to the API over HTTP.",
     "candidate_element_ids": [
-      "flow:mobile-app-to-web-api:api-traffic"
+      "flow:process:mobile-app>process:web-api>api-traffic"
     ],
     "reference_verb": "intercept",
     "candidate_verb": "intercept",
@@ -3784,11 +3784,11 @@
     "category": "information-disclosure",
     "reference_claim": "An attacker on the network path reads customer details out of the app's plain-HTTP traffic to the web API.",
     "reference_element_ids": [
-      "flow:mobile-app-to-web-api:api-traffic"
+      "flow:process:mobile-app>process:web-api>api-traffic"
     ],
     "candidate_claim": "An attacker reads customers' card numbers out of the app's HTTP traffic.",
     "candidate_element_ids": [
-      "flow:mobile-app-to-web-api:api-traffic"
+      "flow:process:mobile-app>process:web-api>api-traffic"
     ],
     "reference_verb": "intercept",
     "candidate_verb": "intercept",
@@ -3865,12 +3865,12 @@
     "category": "information-disclosure",
     "reference_claim": "The confirmation fax discloses a customer's name and address to whoever holds the dialled number, because nobody checks it arrived at the right place.",
     "reference_element_ids": [
-      "flow:fax-gateway-to-customer:confirmation-fax",
+      "flow:process:fax-gateway>entity:customer>confirmation-fax",
       "process:fax-gateway"
     ],
     "candidate_claim": "A confirmation carrying a customer's name and address arrives at a stranger's fax machine and nothing detects it.",
     "candidate_element_ids": [
-      "flow:fax-gateway-to-customer:confirmation-fax"
+      "flow:process:fax-gateway>entity:customer>confirmation-fax"
     ],
     "reference_verb": "read",
     "candidate_verb": "read",
@@ -3882,12 +3882,12 @@
     "category": "information-disclosure",
     "reference_claim": "The confirmation fax discloses a customer's name and address to whoever holds the dialled number, because nobody checks it arrived at the right place.",
     "reference_element_ids": [
-      "flow:fax-gateway-to-customer:confirmation-fax",
+      "flow:process:fax-gateway>entity:customer>confirmation-fax",
       "process:fax-gateway"
     ],
     "candidate_claim": "An attacker taps the phone line and reads the fax while it is being transmitted.",
     "candidate_element_ids": [
-      "flow:fax-gateway-to-customer:confirmation-fax"
+      "flow:process:fax-gateway>entity:customer>confirmation-fax"
     ],
     "reference_verb": "read",
     "candidate_verb": "intercept",
@@ -3915,12 +3915,12 @@
     "category": "denial-of-service",
     "reference_claim": "An attacker sends SQL through the macro path that locks catalogue rows so the app cannot serve the catalogue.",
     "reference_element_ids": [
-      "flow:catalogue-spreadsheet-to-web-api:sql-statements",
+      "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
       "process:web-api"
     ],
     "candidate_claim": "An attacker uses the macro path to lock catalogue rows so the app cannot show products.",
     "candidate_element_ids": [
-      "flow:catalogue-spreadsheet-to-web-api:sql-statements",
+      "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
       "process:web-api"
     ],
     "reference_verb": "inject",
@@ -3933,7 +3933,7 @@
     "category": "denial-of-service",
     "reference_claim": "An attacker sends SQL through the macro path that locks catalogue rows so the app cannot serve the catalogue.",
     "reference_element_ids": [
-      "flow:catalogue-spreadsheet-to-web-api:sql-statements",
+      "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
       "process:web-api"
     ],
     "candidate_claim": "An attacker floods the web API until the catalogue is unavailable.",
@@ -3950,12 +3950,12 @@
     "category": "denial-of-service",
     "reference_claim": "An attacker who stops SIMS accepting order handovers halts dispatch for every order placed.",
     "reference_element_ids": [
-      "flow:web-api-to-sims:order-handover",
+      "flow:process:web-api>process:sims>order-handover",
       "process:sims"
     ],
     "candidate_claim": "An attacker stops SIMS accepting handovers, so orders are still taken and nothing ships.",
     "candidate_element_ids": [
-      "flow:web-api-to-sims:order-handover",
+      "flow:process:web-api>process:sims>order-handover",
       "process:sims"
     ],
     "reference_verb": "disable",
@@ -3968,7 +3968,7 @@
     "category": "denial-of-service",
     "reference_claim": "An attacker who stops SIMS accepting order handovers halts dispatch for every order placed.",
     "reference_element_ids": [
-      "flow:web-api-to-sims:order-handover",
+      "flow:process:web-api>process:sims>order-handover",
       "process:sims"
     ],
     "candidate_claim": "An attacker floods the fax gateway so dispatch notes never go out.",
@@ -3985,13 +3985,13 @@
     "category": "elevation-of-privilege",
     "reference_claim": "An attacker who reaches the marketing laptop gains a write path into the web API from the office zone, because the spreadsheet's macros speak SQL to it.",
     "reference_element_ids": [
-      "flow:catalogue-spreadsheet-to-web-api:sql-statements",
+      "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
       "process:catalogue-spreadsheet",
       "process:web-api"
     ],
     "candidate_claim": "An attacker who compromises the marketing laptop inherits a standing write path into the server-side systems.",
     "candidate_element_ids": [
-      "flow:catalogue-spreadsheet-to-web-api:sql-statements",
+      "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
       "process:catalogue-spreadsheet"
     ],
     "reference_verb": "escalate",
@@ -4004,13 +4004,13 @@
     "category": "elevation-of-privilege",
     "reference_claim": "An attacker who reaches the marketing laptop gains a write path into the web API from the office zone, because the spreadsheet's macros speak SQL to it.",
     "reference_element_ids": [
-      "flow:catalogue-spreadsheet-to-web-api:sql-statements",
+      "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
       "process:catalogue-spreadsheet",
       "process:web-api"
     ],
     "candidate_claim": "An attacker on the office network reaches the web API's data through the spreadsheet's macros.",
     "candidate_element_ids": [
-      "flow:catalogue-spreadsheet-to-web-api:sql-statements",
+      "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
       "process:web-api"
     ],
     "reference_verb": "escalate",
@@ -4023,12 +4023,12 @@
     "category": "elevation-of-privilege",
     "reference_claim": "An attacker whose SQL reaches the web API through the catalogue path acts against customer records the catalogue tool has no business touching.",
     "reference_element_ids": [
-      "flow:catalogue-spreadsheet-to-web-api:sql-statements",
+      "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
       "store:user-database"
     ],
     "candidate_claim": "An attacker whose SQL reaches the API through the catalogue path acts on customer records that path was never meant to touch.",
     "candidate_element_ids": [
-      "flow:catalogue-spreadsheet-to-web-api:sql-statements",
+      "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
       "store:user-database"
     ],
     "reference_verb": "abuse-grant",
@@ -4041,12 +4041,12 @@
     "category": "elevation-of-privilege",
     "reference_claim": "An attacker whose SQL reaches the web API through the catalogue path acts against customer records the catalogue tool has no business touching.",
     "reference_element_ids": [
-      "flow:catalogue-spreadsheet-to-web-api:sql-statements",
+      "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
       "store:user-database"
     ],
     "candidate_claim": "An attacker with catalogue access changes product prices.",
     "candidate_element_ids": [
-      "flow:catalogue-spreadsheet-to-web-api:sql-statements",
+      "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
       "process:web-api"
     ],
     "reference_verb": "abuse-grant",
@@ -4060,11 +4060,11 @@
     "reference_claim": "An attacker holding the admin's database credentials connects to MySQL as the admin from anywhere on the internet, since there is no jump host in the way.",
     "reference_element_ids": [
       "entity:admin",
-      "flow:admin-to-mysql-database:direct-administration"
+      "flow:entity:admin>store:mysql-database>direct-administration"
     ],
     "candidate_claim": "An attacker holding the admin's MySQL credentials connects to the database from the public internet.",
     "candidate_element_ids": [
-      "flow:admin-to-mysql-database:direct-administration",
+      "flow:entity:admin>store:mysql-database>direct-administration",
       "store:mysql-database"
     ],
     "reference_verb": "use-credential",
@@ -4078,11 +4078,11 @@
     "reference_claim": "An attacker holding the admin's database credentials connects to MySQL as the admin from anywhere on the internet, since there is no jump host in the way.",
     "reference_element_ids": [
       "entity:admin",
-      "flow:admin-to-mysql-database:direct-administration"
+      "flow:entity:admin>store:mysql-database>direct-administration"
     ],
     "candidate_claim": "Anyone with the admin's credentials can administer the database, because nothing stands between it and the internet.",
     "candidate_element_ids": [
-      "flow:admin-to-mysql-database:direct-administration",
+      "flow:entity:admin>store:mysql-database>direct-administration",
       "store:mysql-database"
     ],
     "reference_verb": "use-credential",
@@ -4096,7 +4096,7 @@
     "reference_claim": "An attacker holding the admin's database credentials connects to MySQL as the admin from anywhere on the internet, since there is no jump host in the way.",
     "reference_element_ids": [
       "entity:admin",
-      "flow:admin-to-mysql-database:direct-administration"
+      "flow:entity:admin>store:mysql-database>direct-administration"
     ],
     "candidate_claim": "An attacker brute-forces the admin's database password.",
     "candidate_element_ids": [
@@ -4113,12 +4113,12 @@
     "category": "spoofing",
     "reference_claim": "An attacker publishes assets into the CDN bucket as if they came from the web server, because how that push is authenticated is unverified.",
     "reference_element_ids": [
-      "flow:web-server-to-cdn-bucket:asset-publish",
+      "flow:process:web-server>store:cdn-bucket>asset-publish",
       "store:cdn-bucket"
     ],
     "candidate_claim": "An attacker uploads assets into the CDN bucket and the CDN serves them as if the web server had published them.",
     "candidate_element_ids": [
-      "flow:web-server-to-cdn-bucket:asset-publish",
+      "flow:process:web-server>store:cdn-bucket>asset-publish",
       "store:cdn-bucket"
     ],
     "reference_verb": "impersonate",
@@ -4131,7 +4131,7 @@
     "category": "spoofing",
     "reference_claim": "An attacker publishes assets into the CDN bucket as if they came from the web server, because how that push is authenticated is unverified.",
     "reference_element_ids": [
-      "flow:web-server-to-cdn-bucket:asset-publish",
+      "flow:process:web-server>store:cdn-bucket>asset-publish",
       "store:cdn-bucket"
     ],
     "candidate_claim": "An attacker replaces an asset already sitting in the bucket.",
@@ -4149,12 +4149,12 @@
     "reference_claim": "An attacker takes over a signed-in reader's session, since nothing is stated about how those sessions are handled.",
     "reference_element_ids": [
       "entity:reader",
-      "flow:reader-to-web-server:page-requests"
+      "flow:entity:reader>process:web-server>page-requests"
     ],
     "candidate_claim": "An attacker rides a signed-in reader's session and acts as that reader on the site.",
     "candidate_element_ids": [
       "entity:reader",
-      "flow:reader-to-web-server:page-requests"
+      "flow:entity:reader>process:web-server>page-requests"
     ],
     "reference_verb": "use-credential",
     "candidate_verb": "use-credential",
@@ -4167,7 +4167,7 @@
     "reference_claim": "An attacker takes over a signed-in reader's session, since nothing is stated about how those sessions are handled.",
     "reference_element_ids": [
       "entity:reader",
-      "flow:reader-to-web-server:page-requests"
+      "flow:entity:reader>process:web-server>page-requests"
     ],
     "candidate_claim": "An attacker registers a reader account in someone else's name.",
     "candidate_element_ids": null,
@@ -4184,11 +4184,11 @@
     "category": "tampering",
     "reference_claim": "An attacker on the network path rewrites a stylesheet or script in flight before it reaches the reader, because assets are fetched over plain HTTP.",
     "reference_element_ids": [
-      "flow:reader-to-cdn:asset-fetch"
+      "flow:entity:reader>entity:cdn>asset-fetch"
     ],
     "candidate_claim": "An attacker on the network path injects modified script into an asset the reader is loading over HTTP.",
     "candidate_element_ids": [
-      "flow:reader-to-cdn:asset-fetch"
+      "flow:entity:reader>entity:cdn>asset-fetch"
     ],
     "reference_verb": "alter-in-transit",
     "candidate_verb": "alter-in-transit",
@@ -4200,7 +4200,7 @@
     "category": "tampering",
     "reference_claim": "An attacker on the network path rewrites a stylesheet or script in flight before it reaches the reader, because assets are fetched over plain HTTP.",
     "reference_element_ids": [
-      "flow:reader-to-cdn:asset-fetch"
+      "flow:entity:reader>entity:cdn>asset-fetch"
     ],
     "candidate_claim": "An attacker replaces the asset in the CDN bucket so every reader receives the modified file.",
     "candidate_element_ids": [
@@ -4250,11 +4250,11 @@
     "category": "tampering",
     "reference_claim": "An attacker on the network path modifies the admin's statements in flight, because the connection carries no TLS.",
     "reference_element_ids": [
-      "flow:admin-to-mysql-database:direct-administration"
+      "flow:entity:admin>store:mysql-database>direct-administration"
     ],
     "candidate_claim": "An attacker on the network alters the admin's SQL in transit, since that connection carries no TLS.",
     "candidate_element_ids": [
-      "flow:admin-to-mysql-database:direct-administration"
+      "flow:entity:admin>store:mysql-database>direct-administration"
     ],
     "reference_verb": "alter-in-transit",
     "candidate_verb": "alter-in-transit",
@@ -4266,11 +4266,11 @@
     "category": "tampering",
     "reference_claim": "An attacker on the network path modifies the admin's statements in flight, because the connection carries no TLS.",
     "reference_element_ids": [
-      "flow:admin-to-mysql-database:direct-administration"
+      "flow:entity:admin>store:mysql-database>direct-administration"
     ],
     "candidate_claim": "An attacker reads the admin's SQL traffic because there is no TLS on the connection.",
     "candidate_element_ids": [
-      "flow:admin-to-mysql-database:direct-administration"
+      "flow:entity:admin>store:mysql-database>direct-administration"
     ],
     "reference_verb": "alter-in-transit",
     "candidate_verb": "intercept",
@@ -4299,12 +4299,12 @@
     "category": "repudiation",
     "reference_claim": "Content is changed directly in the database and no CMS record shows who changed it, because that path bypasses the CMS entirely.",
     "reference_element_ids": [
-      "flow:admin-to-mysql-database:direct-administration",
+      "flow:entity:admin>store:mysql-database>direct-administration",
       "process:web-server"
     ],
     "candidate_claim": "A change made straight in the database leaves no CMS record of who made it.",
     "candidate_element_ids": [
-      "flow:admin-to-mysql-database:direct-administration",
+      "flow:entity:admin>store:mysql-database>direct-administration",
       "store:mysql-database"
     ],
     "reference_verb": "unattributable",
@@ -4317,12 +4317,12 @@
     "category": "repudiation",
     "reference_claim": "Content is changed directly in the database and no CMS record shows who changed it, because that path bypasses the CMS entirely.",
     "reference_element_ids": [
-      "flow:admin-to-mysql-database:direct-administration",
+      "flow:entity:admin>store:mysql-database>direct-administration",
       "process:web-server"
     ],
     "candidate_claim": "The CMS cannot attribute direct database edits to anyone, because that path does not pass through it.",
     "candidate_element_ids": [
-      "flow:admin-to-mysql-database:direct-administration",
+      "flow:entity:admin>store:mysql-database>direct-administration",
       "process:web-server"
     ],
     "reference_verb": "unattributable",
@@ -4335,7 +4335,7 @@
     "category": "repudiation",
     "reference_claim": "Content is changed directly in the database and no CMS record shows who changed it, because that path bypasses the CMS entirely.",
     "reference_element_ids": [
-      "flow:admin-to-mysql-database:direct-administration",
+      "flow:entity:admin>store:mysql-database>direct-administration",
       "process:web-server"
     ],
     "candidate_claim": "An attacker deletes the CMS audit log to hide the change they made.",
@@ -4353,13 +4353,13 @@
     "category": "repudiation",
     "reference_claim": "A reader disputes a comment recorded against their account and the site cannot show it came from their session, since nothing about how sign-in is handled is stated.",
     "reference_element_ids": [
-      "flow:reader-to-web-server:page-requests",
+      "flow:entity:reader>process:web-server>page-requests",
       "store:mysql-database"
     ],
     "candidate_claim": "A reader denies writing a comment and nothing shows the comment came from their session.",
     "candidate_element_ids": [
       "entity:reader",
-      "flow:reader-to-web-server:page-requests"
+      "flow:entity:reader>process:web-server>page-requests"
     ],
     "reference_verb": "unattributable",
     "candidate_verb": "unattributable",
@@ -4371,11 +4371,11 @@
     "category": "information-disclosure",
     "reference_claim": "An attacker sniffing the admin's unsecured MySQL connection reads account and comment records in clear text.",
     "reference_element_ids": [
-      "flow:admin-to-mysql-database:direct-administration"
+      "flow:entity:admin>store:mysql-database>direct-administration"
     ],
     "candidate_claim": "An attacker on the network path reads accounts and comments off the admin's unencrypted MySQL session.",
     "candidate_element_ids": [
-      "flow:admin-to-mysql-database:direct-administration"
+      "flow:entity:admin>store:mysql-database>direct-administration"
     ],
     "reference_verb": "intercept",
     "candidate_verb": "intercept",
@@ -4387,11 +4387,11 @@
     "category": "information-disclosure",
     "reference_claim": "An attacker sniffing the admin's unsecured MySQL connection reads account and comment records in clear text.",
     "reference_element_ids": [
-      "flow:admin-to-mysql-database:direct-administration"
+      "flow:entity:admin>store:mysql-database>direct-administration"
     ],
     "candidate_claim": "An attacker reads readers' page requests in transit.",
     "candidate_element_ids": [
-      "flow:reader-to-web-server:page-requests"
+      "flow:entity:reader>process:web-server>page-requests"
     ],
     "reference_verb": "intercept",
     "candidate_verb": "intercept",
@@ -4423,7 +4423,7 @@
     ],
     "candidate_claim": "An attacker reads account records off the wire from the admin's connection.",
     "candidate_element_ids": [
-      "flow:admin-to-mysql-database:direct-administration"
+      "flow:entity:admin>store:mysql-database>direct-administration"
     ],
     "reference_verb": "read",
     "candidate_verb": "intercept",
@@ -4436,11 +4436,11 @@
     "reference_claim": "An attacker watching a reader's plain-HTTP asset fetches learns which pages that reader is viewing.",
     "reference_element_ids": [
       "entity:reader",
-      "flow:reader-to-cdn:asset-fetch"
+      "flow:entity:reader>entity:cdn>asset-fetch"
     ],
     "candidate_claim": "An attacker watching plain HTTP asset requests can tell which articles a reader opened.",
     "candidate_element_ids": [
-      "flow:reader-to-cdn:asset-fetch"
+      "flow:entity:reader>entity:cdn>asset-fetch"
     ],
     "reference_verb": "intercept",
     "candidate_verb": "intercept",
@@ -4453,12 +4453,12 @@
     "reference_claim": "An attacker watching a reader's plain-HTTP asset fetches learns which pages that reader is viewing.",
     "reference_element_ids": [
       "entity:reader",
-      "flow:reader-to-cdn:asset-fetch"
+      "flow:entity:reader>entity:cdn>asset-fetch"
     ],
     "candidate_claim": "An attacker reads the reader's session cookie out of the HTTP asset request.",
     "candidate_element_ids": [
       "entity:reader",
-      "flow:reader-to-cdn:asset-fetch"
+      "flow:entity:reader>entity:cdn>asset-fetch"
     ],
     "reference_verb": "intercept",
     "candidate_verb": "intercept",
@@ -4521,12 +4521,12 @@
     "category": "denial-of-service",
     "reference_claim": "An attacker on the direct MySQL path runs queries expensive enough that the web server cannot serve pages.",
     "reference_element_ids": [
-      "flow:admin-to-mysql-database:direct-administration",
+      "flow:entity:admin>store:mysql-database>direct-administration",
       "store:mysql-database"
     ],
     "candidate_claim": "An attacker uses the direct database path to run queries heavy enough that the site cannot serve pages.",
     "candidate_element_ids": [
-      "flow:admin-to-mysql-database:direct-administration",
+      "flow:entity:admin>store:mysql-database>direct-administration",
       "store:mysql-database"
     ],
     "reference_verb": "flood",
@@ -4539,12 +4539,12 @@
     "category": "elevation-of-privilege",
     "reference_claim": "An attacker who intercepts the admin's unencrypted session obtains database authority that bypasses every control the CMS applies.",
     "reference_element_ids": [
-      "flow:admin-to-mysql-database:direct-administration",
+      "flow:entity:admin>store:mysql-database>direct-administration",
       "store:mysql-database"
     ],
     "candidate_claim": "An attacker who gets onto the admin's plaintext connection ends up with database powers the CMS would never grant.",
     "candidate_element_ids": [
-      "flow:admin-to-mysql-database:direct-administration",
+      "flow:entity:admin>store:mysql-database>direct-administration",
       "store:mysql-database"
     ],
     "reference_verb": "escalate",
@@ -4557,7 +4557,7 @@
     "category": "elevation-of-privilege",
     "reference_claim": "An attacker who intercepts the admin's unencrypted session obtains database authority that bypasses every control the CMS applies.",
     "reference_element_ids": [
-      "flow:admin-to-mysql-database:direct-administration",
+      "flow:entity:admin>store:mysql-database>direct-administration",
       "store:mysql-database"
     ],
     "candidate_claim": "An attacker signs in to the CMS as an editor and publishes a page.",
@@ -4574,7 +4574,7 @@
     "category": "elevation-of-privilege",
     "reference_claim": "An attacker who plants a script in the CDN bucket runs code in every reader's browser in the site's own context.",
     "reference_element_ids": [
-      "flow:reader-to-cdn:asset-fetch",
+      "flow:entity:reader>entity:cdn>asset-fetch",
       "store:cdn-bucket"
     ],
     "candidate_claim": "An attacker who writes a script into the CDN bucket executes code in visitors' browsers under the site's origin.",
@@ -4592,7 +4592,7 @@
     "category": "elevation-of-privilege",
     "reference_claim": "An attacker who plants a script in the CDN bucket runs code in every reader's browser in the site's own context.",
     "reference_element_ids": [
-      "flow:reader-to-cdn:asset-fetch",
+      "flow:entity:reader>entity:cdn>asset-fetch",
       "store:cdn-bucket"
     ],
     "candidate_claim": "Write access to the bucket becomes code execution in every reader's browser.",
@@ -4610,7 +4610,7 @@
     "category": "elevation-of-privilege",
     "reference_claim": "An attacker who plants a script in the CDN bucket runs code in every reader's browser in the site's own context.",
     "reference_element_ids": [
-      "flow:reader-to-cdn:asset-fetch",
+      "flow:entity:reader>entity:cdn>asset-fetch",
       "store:cdn-bucket"
     ],
     "candidate_claim": "An attacker uses the planted script to steal the admin's database credentials.",
@@ -4629,12 +4629,12 @@
     "reference_claim": "An attacker signs in to the scheduling web app as a colleague and reads that colleague's shifts and details, because how colleagues are authenticated is unverified.",
     "reference_element_ids": [
       "entity:colleague",
-      "flow:colleague-to-scheduling-web-app:view-shifts"
+      "flow:entity:colleague>process:scheduling-web-app>view-shifts"
     ],
     "candidate_claim": "An attacker who obtains a colleague's login views that colleague's shifts and personal details in the app.",
     "candidate_element_ids": [
       "entity:colleague",
-      "flow:colleague-to-scheduling-web-app:view-shifts"
+      "flow:entity:colleague>process:scheduling-web-app>view-shifts"
     ],
     "reference_verb": "impersonate",
     "candidate_verb": "impersonate",
@@ -4647,12 +4647,12 @@
     "reference_claim": "An attacker signs in to the scheduling web app as a colleague and reads that colleague's shifts and details, because how colleagues are authenticated is unverified.",
     "reference_element_ids": [
       "entity:colleague",
-      "flow:colleague-to-scheduling-web-app:view-shifts"
+      "flow:entity:colleague>process:scheduling-web-app>view-shifts"
     ],
     "candidate_claim": "An attacker signs in as a colleague and changes their own availability to get better shifts.",
     "candidate_element_ids": [
       "entity:colleague",
-      "flow:colleague-to-scheduling-web-app:view-shifts"
+      "flow:entity:colleague>process:scheduling-web-app>view-shifts"
     ],
     "reference_verb": "impersonate",
     "candidate_verb": "alter",
@@ -4665,12 +4665,12 @@
     "reference_claim": "An attacker signs in as a store manager and builds that store's rota, because how managers are authenticated is unverified.",
     "reference_element_ids": [
       "entity:store-manager",
-      "flow:store-manager-to-scheduling-web-app:build-rota"
+      "flow:entity:store-manager>process:scheduling-web-app>build-rota"
     ],
     "candidate_claim": "An attacker authenticates to the app as a store manager and publishes a rota for that manager's store.",
     "candidate_element_ids": [
       "entity:store-manager",
-      "flow:store-manager-to-scheduling-web-app:build-rota"
+      "flow:entity:store-manager>process:scheduling-web-app>build-rota"
     ],
     "reference_verb": "impersonate",
     "candidate_verb": "impersonate",
@@ -4683,12 +4683,12 @@
     "reference_claim": "An attacker signs in as a store manager and builds that store's rota, because how managers are authenticated is unverified.",
     "reference_element_ids": [
       "entity:store-manager",
-      "flow:store-manager-to-scheduling-web-app:build-rota"
+      "flow:entity:store-manager>process:scheduling-web-app>build-rota"
     ],
     "candidate_claim": "An attacker signs in to the app as a colleague and reads their shifts.",
     "candidate_element_ids": [
       "entity:colleague",
-      "flow:colleague-to-scheduling-web-app:view-shifts"
+      "flow:entity:colleague>process:scheduling-web-app>view-shifts"
     ],
     "reference_verb": "impersonate",
     "candidate_verb": "impersonate",
@@ -4700,12 +4700,12 @@
     "category": "spoofing",
     "reference_claim": "An attacker presents itself to the file share as the payroll system and collects the weekly payroll export, since how the share identifies a collector is unverified.",
     "reference_element_ids": [
-      "flow:payroll-system-to-file-share:collect-payroll-export",
+      "flow:entity:payroll-system>store:file-share>collect-payroll-export",
       "store:file-share"
     ],
     "candidate_claim": "An attacker pulls the weekly payroll export off the file share by presenting itself as the payroll system.",
     "candidate_element_ids": [
-      "flow:payroll-system-to-file-share:collect-payroll-export",
+      "flow:entity:payroll-system>store:file-share>collect-payroll-export",
       "store:file-share"
     ],
     "reference_verb": "impersonate",
@@ -4718,7 +4718,7 @@
     "category": "spoofing",
     "reference_claim": "An attacker presents itself to the file share as the payroll system and collects the weekly payroll export, since how the share identifies a collector is unverified.",
     "reference_element_ids": [
-      "flow:payroll-system-to-file-share:collect-payroll-export",
+      "flow:entity:payroll-system>store:file-share>collect-payroll-export",
       "store:file-share"
     ],
     "candidate_claim": "An attacker reads the payroll export from the file share because it is stored unencrypted.",
@@ -4735,11 +4735,11 @@
     "category": "spoofing",
     "reference_claim": "An attacker on the internal network calls the scheduling service while claiming to be the web app, because how the two identify each other is unverified.",
     "reference_element_ids": [
-      "flow:scheduling-web-app-to-scheduling-service:rota-requests"
+      "flow:process:scheduling-web-app>process:scheduling-service>rota-requests"
     ],
     "candidate_claim": "A workload on the internal network issues rota writes to the scheduling service while claiming to be the web app.",
     "candidate_element_ids": [
-      "flow:scheduling-web-app-to-scheduling-service:rota-requests",
+      "flow:process:scheduling-web-app>process:scheduling-service>rota-requests",
       "process:scheduling-service"
     ],
     "reference_verb": "impersonate",
@@ -4752,7 +4752,7 @@
     "category": "tampering",
     "reference_claim": "An attacker alters the payroll export while it sits on the file share, so the payroll system collects hours nobody worked.",
     "reference_element_ids": [
-      "flow:payroll-system-to-file-share:collect-payroll-export",
+      "flow:entity:payroll-system>store:file-share>collect-payroll-export",
       "store:file-share"
     ],
     "candidate_claim": "An attacker edits the payroll export on the share before payroll collects it, so colleagues are paid for hours they did not work.",
@@ -4769,7 +4769,7 @@
     "category": "tampering",
     "reference_claim": "An attacker alters the payroll export while it sits on the file share, so the payroll system collects hours nobody worked.",
     "reference_element_ids": [
-      "flow:payroll-system-to-file-share:collect-payroll-export",
+      "flow:entity:payroll-system>store:file-share>collect-payroll-export",
       "store:file-share"
     ],
     "candidate_claim": "An attacker deletes the payroll export from the share so it is never collected.",
@@ -4786,7 +4786,7 @@
     "category": "tampering",
     "reference_claim": "An attacker who reaches the rota database changes rota entries directly, bypassing whatever the scheduling service enforces.",
     "reference_element_ids": [
-      "flow:scheduling-service-to-rota-database:read-write-rotas",
+      "flow:process:scheduling-service>store:rota-database>read-write-rotas",
       "store:rota-database"
     ],
     "candidate_claim": "An attacker with database access rewrites rota rows without going through the scheduling service.",
@@ -4803,11 +4803,11 @@
     "category": "tampering",
     "reference_claim": "An attacker positioned between a manager's device and the web app modifies rota changes in flight, because whether the traffic is encrypted is unverified.",
     "reference_element_ids": [
-      "flow:store-manager-to-scheduling-web-app:build-rota"
+      "flow:entity:store-manager>process:scheduling-web-app>build-rota"
     ],
     "candidate_claim": "An attacker intercepts a manager's rota change on its way to the web app and alters it.",
     "candidate_element_ids": [
-      "flow:store-manager-to-scheduling-web-app:build-rota"
+      "flow:entity:store-manager>process:scheduling-web-app>build-rota"
     ],
     "reference_verb": "alter-in-transit",
     "candidate_verb": "alter-in-transit",
@@ -4819,11 +4819,11 @@
     "category": "tampering",
     "reference_claim": "An attacker positioned between a manager's device and the web app modifies rota changes in flight, because whether the traffic is encrypted is unverified.",
     "reference_element_ids": [
-      "flow:store-manager-to-scheduling-web-app:build-rota"
+      "flow:entity:store-manager>process:scheduling-web-app>build-rota"
     ],
     "candidate_claim": "An attacker intercepts a manager's session and reads the rota in transit.",
     "candidate_element_ids": [
-      "flow:store-manager-to-scheduling-web-app:build-rota"
+      "flow:entity:store-manager>process:scheduling-web-app>build-rota"
     ],
     "reference_verb": "alter-in-transit",
     "candidate_verb": "intercept",
@@ -4835,12 +4835,12 @@
     "category": "repudiation",
     "reference_claim": "A store manager denies having made a rota change that disadvantaged a colleague, and nothing in the model records who changed what.",
     "reference_element_ids": [
-      "flow:store-manager-to-scheduling-web-app:build-rota",
+      "flow:entity:store-manager>process:scheduling-web-app>build-rota",
       "process:scheduling-service"
     ],
     "candidate_claim": "A manager who cut a colleague's hours denies having done it, and nothing records who made the change.",
     "candidate_element_ids": [
-      "flow:store-manager-to-scheduling-web-app:build-rota",
+      "flow:entity:store-manager>process:scheduling-web-app>build-rota",
       "store:rota-database"
     ],
     "reference_verb": "unattributable",
@@ -4853,7 +4853,7 @@
     "category": "repudiation",
     "reference_claim": "A store manager denies having made a rota change that disadvantaged a colleague, and nothing in the model records who changed what.",
     "reference_element_ids": [
-      "flow:store-manager-to-scheduling-web-app:build-rota",
+      "flow:entity:store-manager>process:scheduling-web-app>build-rota",
       "process:scheduling-service"
     ],
     "candidate_claim": "An attacker deletes the audit records of a rota change to hide it.",
@@ -4871,12 +4871,12 @@
     "category": "repudiation",
     "reference_claim": "Nobody can establish who collected a given payroll export from the file share, because no record of collections exists in the model.",
     "reference_element_ids": [
-      "flow:payroll-system-to-file-share:collect-payroll-export",
+      "flow:entity:payroll-system>store:file-share>collect-payroll-export",
       "store:file-share"
     ],
     "candidate_claim": "There is no record establishing which party fetched a particular payroll export.",
     "candidate_element_ids": [
-      "flow:payroll-system-to-file-share:collect-payroll-export",
+      "flow:entity:payroll-system>store:file-share>collect-payroll-export",
       "store:file-share"
     ],
     "reference_verb": "unattributable",
@@ -4921,7 +4921,7 @@
     "category": "information-disclosure",
     "reference_claim": "An attacker with access to the file share reads a whole store's payroll export in one file.",
     "reference_element_ids": [
-      "flow:scheduling-service-to-file-share:write-payroll-export",
+      "flow:process:scheduling-service>store:file-share>write-payroll-export",
       "store:file-share"
     ],
     "candidate_claim": "An attacker who can list the file share opens the payroll export and reads a whole store's data at once.",
@@ -4959,7 +4959,7 @@
     ],
     "candidate_claim": "An attacker stops the weekly export reaching the share, so a store's colleagues are not paid.",
     "candidate_element_ids": [
-      "flow:scheduling-service-to-file-share:write-payroll-export",
+      "flow:process:scheduling-service>store:file-share>write-payroll-export",
       "store:file-share"
     ],
     "reference_verb": "disable",
@@ -4972,12 +4972,12 @@
     "category": "elevation-of-privilege",
     "reference_claim": "A colleague uses the shared app to build or change a rota as though they were a store manager, because the separation between the two roles is unverified.",
     "reference_element_ids": [
-      "flow:colleague-to-scheduling-web-app:view-shifts",
+      "flow:entity:colleague>process:scheduling-web-app>view-shifts",
       "process:scheduling-web-app"
     ],
     "candidate_claim": "A colleague uses the app to edit the rota as though they held a manager's role.",
     "candidate_element_ids": [
-      "flow:colleague-to-scheduling-web-app:view-shifts",
+      "flow:entity:colleague>process:scheduling-web-app>view-shifts",
       "process:scheduling-web-app"
     ],
     "reference_verb": "abuse-grant",
@@ -4990,7 +4990,7 @@
     "category": "elevation-of-privilege",
     "reference_claim": "A colleague uses the shared app to build or change a rota as though they were a store manager, because the separation between the two roles is unverified.",
     "reference_element_ids": [
-      "flow:colleague-to-scheduling-web-app:view-shifts",
+      "flow:entity:colleague>process:scheduling-web-app>view-shifts",
       "process:scheduling-web-app"
     ],
     "candidate_claim": "A colleague exploits a flaw in the app's role checks to become an administrator.",
@@ -5007,12 +5007,12 @@
     "category": "elevation-of-privilege",
     "reference_claim": "An attacker on the internal network calls the scheduling service directly and performs rota writes the web app would not have allowed.",
     "reference_element_ids": [
-      "flow:scheduling-web-app-to-scheduling-service:rota-requests",
+      "flow:process:scheduling-web-app>process:scheduling-service>rota-requests",
       "process:scheduling-service"
     ],
     "candidate_claim": "An attacker inside the internal network writes rotas by calling the scheduling service without going through the app.",
     "candidate_element_ids": [
-      "flow:scheduling-web-app-to-scheduling-service:rota-requests",
+      "flow:process:scheduling-web-app>process:scheduling-service>rota-requests",
       "process:scheduling-service"
     ],
     "reference_verb": "escalate",
@@ -5026,12 +5026,12 @@
     "reference_claim": "An attacker who obtains a supplier's vendor-issued password signs in as that supplier and uploads paperwork in their name.",
     "reference_element_ids": [
       "entity:supplier",
-      "flow:supplier-to-supplier-portal:upload-documents"
+      "flow:entity:supplier>process:supplier-portal>upload-documents"
     ],
     "candidate_claim": "An attacker who has a supplier's portal password logs in as that supplier and files paperwork on their behalf.",
     "candidate_element_ids": [
       "entity:supplier",
-      "flow:supplier-to-supplier-portal:upload-documents"
+      "flow:entity:supplier>process:supplier-portal>upload-documents"
     ],
     "reference_verb": "use-credential",
     "candidate_verb": "use-credential",
@@ -5044,12 +5044,12 @@
     "reference_claim": "An attacker who obtains a supplier's vendor-issued password signs in as that supplier and uploads paperwork in their name.",
     "reference_element_ids": [
       "entity:supplier",
-      "flow:supplier-to-supplier-portal:upload-documents"
+      "flow:entity:supplier>process:supplier-portal>upload-documents"
     ],
     "candidate_claim": "An attacker signs in as a supplier because the portal enforces no multi-factor authentication.",
     "candidate_element_ids": [
       "entity:supplier",
-      "flow:supplier-to-supplier-portal:upload-documents"
+      "flow:entity:supplier>process:supplier-portal>upload-documents"
     ],
     "reference_verb": "use-credential",
     "candidate_verb": "impersonate",
@@ -5062,12 +5062,12 @@
     "reference_claim": "An attacker signs in to the portal as a category manager and approves supplier paperwork, because how category managers are authenticated is unverified.",
     "reference_element_ids": [
       "entity:category-manager",
-      "flow:category-manager-to-supplier-portal:review-documents"
+      "flow:entity:category-manager>process:supplier-portal>review-documents"
     ],
     "candidate_claim": "An attacker gets into the portal as a category manager and approves a supplier's compliance paperwork.",
     "candidate_element_ids": [
       "entity:category-manager",
-      "flow:category-manager-to-supplier-portal:review-documents"
+      "flow:entity:category-manager>process:supplier-portal>review-documents"
     ],
     "reference_verb": "impersonate",
     "candidate_verb": "impersonate",
@@ -5080,12 +5080,12 @@
     "reference_claim": "An attacker signs in to the portal as a category manager and approves supplier paperwork, because how category managers are authenticated is unverified.",
     "reference_element_ids": [
       "entity:category-manager",
-      "flow:category-manager-to-supplier-portal:review-documents"
+      "flow:entity:category-manager>process:supplier-portal>review-documents"
     ],
     "candidate_claim": "An attacker signs in as a category manager, which the platform prevents because all access is fully authenticated.",
     "candidate_element_ids": [
       "entity:category-manager",
-      "flow:category-manager-to-supplier-portal:review-documents"
+      "flow:entity:category-manager>process:supplier-portal>review-documents"
     ],
     "reference_verb": "impersonate",
     "candidate_verb": "impersonate",
@@ -5097,12 +5097,12 @@
     "category": "spoofing",
     "reference_claim": "An attacker writes a file into the landing bucket while posing as the vendor's nightly push, since how the bucket identifies the writer is unverified.",
     "reference_element_ids": [
-      "flow:portal-vendor-to-landing-bucket:push-nightly-extract",
+      "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract",
       "store:landing-bucket"
     ],
     "candidate_claim": "An attacker drops a file into the landing bucket that our side takes for the vendor's nightly push.",
     "candidate_element_ids": [
-      "flow:portal-vendor-to-landing-bucket:push-nightly-extract",
+      "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract",
       "store:landing-bucket"
     ],
     "reference_verb": "plant",
@@ -5115,7 +5115,7 @@
     "category": "spoofing",
     "reference_claim": "An attacker writes a file into the landing bucket while posing as the vendor's nightly push, since how the bucket identifies the writer is unverified.",
     "reference_element_ids": [
-      "flow:portal-vendor-to-landing-bucket:push-nightly-extract",
+      "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract",
       "store:landing-bucket"
     ],
     "candidate_claim": "An attacker reads the nightly extract out of the landing bucket.",
@@ -5135,12 +5135,12 @@
     "category": "tampering",
     "reference_claim": "An attacker modifies the extract file in the landing bucket before the supplier master service loads it, and the altered supplier records reach the database.",
     "reference_element_ids": [
-      "flow:supplier-master-service-to-landing-bucket:load-extract",
+      "flow:process:supplier-master-service>store:landing-bucket>load-extract",
       "store:landing-bucket"
     ],
     "candidate_claim": "An attacker alters the CSV sitting in the landing bucket and the supplier master service loads the altered records without checking them.",
     "candidate_element_ids": [
-      "flow:supplier-master-service-to-landing-bucket:load-extract",
+      "flow:process:supplier-master-service>store:landing-bucket>load-extract",
       "store:landing-bucket"
     ],
     "reference_verb": "alter",
@@ -5153,12 +5153,12 @@
     "category": "tampering",
     "reference_claim": "An attacker modifies the extract file in the landing bucket before the supplier master service loads it, and the altered supplier records reach the database.",
     "reference_element_ids": [
-      "flow:supplier-master-service-to-landing-bucket:load-extract",
+      "flow:process:supplier-master-service>store:landing-bucket>load-extract",
       "store:landing-bucket"
     ],
     "candidate_claim": "An attacker alters the extract while the vendor is transferring it.",
     "candidate_element_ids": [
-      "flow:portal-vendor-to-landing-bucket:push-nightly-extract"
+      "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract"
     ],
     "reference_verb": "alter",
     "candidate_verb": "alter-in-transit",
@@ -5170,11 +5170,11 @@
     "category": "tampering",
     "reference_claim": "An attacker on the path of the nightly push alters the extract in transit, because the source contradicts itself over whether that transfer is encrypted.",
     "reference_element_ids": [
-      "flow:portal-vendor-to-landing-bucket:push-nightly-extract"
+      "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract"
     ],
     "candidate_claim": "An attacker on the path of the nightly transfer modifies the extract, since the source both claims end-to-end encryption and describes a plain CSV.",
     "candidate_element_ids": [
-      "flow:portal-vendor-to-landing-bucket:push-nightly-extract"
+      "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract"
     ],
     "reference_verb": "alter-in-transit",
     "candidate_verb": "alter-in-transit",
@@ -5186,11 +5186,11 @@
     "category": "tampering",
     "reference_claim": "An attacker on the path of the nightly push alters the extract in transit, because the source contradicts itself over whether that transfer is encrypted.",
     "reference_element_ids": [
-      "flow:portal-vendor-to-landing-bucket:push-nightly-extract"
+      "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract"
     ],
     "candidate_claim": "An attacker on the path of the nightly transfer modifies the extract, which is sent unencrypted.",
     "candidate_element_ids": [
-      "flow:portal-vendor-to-landing-bucket:push-nightly-extract"
+      "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract"
     ],
     "reference_verb": "alter-in-transit",
     "candidate_verb": "alter-in-transit",
@@ -5202,7 +5202,7 @@
     "category": "tampering",
     "reference_claim": "An attacker with access inside the vendor platform alters a stored compliance document so a supplier appears certified when they are not.",
     "reference_element_ids": [
-      "flow:supplier-portal-to-document-store:store-documents",
+      "flow:process:supplier-portal>store:document-store>store-documents",
       "store:document-store"
     ],
     "candidate_claim": "Someone with access inside the vendor platform edits a stored audit certificate so a supplier looks compliant.",
@@ -5219,7 +5219,7 @@
     "category": "tampering",
     "reference_claim": "An attacker with access inside the vendor platform alters a stored compliance document so a supplier appears certified when they are not.",
     "reference_element_ids": [
-      "flow:supplier-portal-to-document-store:store-documents",
+      "flow:process:supplier-portal>store:document-store>store-documents",
       "store:document-store"
     ],
     "candidate_claim": "An attacker alters a compliance document in the vendor's platform, which stores documents without encryption.",
@@ -5236,12 +5236,12 @@
     "category": "repudiation",
     "reference_claim": "A category manager denies having approved a supplier's paperwork, and the model holds no audit record we control or can produce.",
     "reference_element_ids": [
-      "flow:category-manager-to-supplier-portal:review-documents",
+      "flow:entity:category-manager>process:supplier-portal>review-documents",
       "process:supplier-portal"
     ],
     "candidate_claim": "A category manager disputes an approval recorded against their name and we hold no audit trail of our own.",
     "candidate_element_ids": [
-      "flow:category-manager-to-supplier-portal:review-documents",
+      "flow:entity:category-manager>process:supplier-portal>review-documents",
       "process:supplier-portal"
     ],
     "reference_verb": "unattributable",
@@ -5254,7 +5254,7 @@
     "category": "repudiation",
     "reference_claim": "A category manager denies having approved a supplier's paperwork, and the model holds no audit record we control or can produce.",
     "reference_element_ids": [
-      "flow:category-manager-to-supplier-portal:review-documents",
+      "flow:entity:category-manager>process:supplier-portal>review-documents",
       "process:supplier-portal"
     ],
     "candidate_claim": "A category manager disputes an approval, and the platform's audit log shows the wrong actor.",
@@ -5273,11 +5273,11 @@
     "reference_claim": "The vendor disputes what a given nightly extract contained when it left their platform, and nothing on our side records what arrived.",
     "reference_element_ids": [
       "entity:portal-vendor",
-      "flow:portal-vendor-to-landing-bucket:push-nightly-extract"
+      "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract"
     ],
     "candidate_claim": "The vendor and our team disagree over what a nightly extract contained, and nothing on our side recorded what arrived.",
     "candidate_element_ids": [
-      "flow:portal-vendor-to-landing-bucket:push-nightly-extract",
+      "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract",
       "store:landing-bucket"
     ],
     "reference_verb": "unattributable",
@@ -5323,11 +5323,11 @@
     "category": "information-disclosure",
     "reference_claim": "An attacker on the network path between a supplier and the portal reads uploaded paperwork in transit, because whether that traffic is encrypted is unverified.",
     "reference_element_ids": [
-      "flow:supplier-to-supplier-portal:upload-documents"
+      "flow:entity:supplier>process:supplier-portal>upload-documents"
     ],
     "candidate_claim": "An attacker between a supplier and the portal captures the paperwork as it is uploaded.",
     "candidate_element_ids": [
-      "flow:supplier-to-supplier-portal:upload-documents"
+      "flow:entity:supplier>process:supplier-portal>upload-documents"
     ],
     "reference_verb": "intercept",
     "candidate_verb": "intercept",
@@ -5344,7 +5344,7 @@
     ],
     "candidate_claim": "Suppliers cannot file paperwork while the vendor's platform is down.",
     "candidate_element_ids": [
-      "flow:supplier-to-supplier-portal:upload-documents",
+      "flow:entity:supplier>process:supplier-portal>upload-documents",
       "process:supplier-portal"
     ],
     "reference_verb": "disable",
@@ -5362,7 +5362,7 @@
     ],
     "candidate_claim": "The nightly load stops happening and the supplier database keeps serving records that are no longer current.",
     "candidate_element_ids": [
-      "flow:supplier-master-service-to-landing-bucket:load-extract",
+      "flow:process:supplier-master-service>store:landing-bucket>load-extract",
       "store:supplier-database"
     ],
     "reference_verb": "disable",
@@ -5392,7 +5392,7 @@
     "category": "elevation-of-privilege",
     "reference_claim": "A signed-in supplier reaches another supplier's compliance documents through the portal, because no separation between supplier tenants is stated.",
     "reference_element_ids": [
-      "flow:supplier-to-supplier-portal:upload-documents",
+      "flow:entity:supplier>process:supplier-portal>upload-documents",
       "process:supplier-portal"
     ],
     "candidate_claim": "A supplier signed in to the portal reaches compliance documents belonging to a different supplier.",
@@ -5410,7 +5410,7 @@
     "category": "elevation-of-privilege",
     "reference_claim": "A signed-in supplier reaches another supplier's compliance documents through the portal, because no separation between supplier tenants is stated.",
     "reference_element_ids": [
-      "flow:supplier-to-supplier-portal:upload-documents",
+      "flow:entity:supplier>process:supplier-portal>upload-documents",
       "process:supplier-portal"
     ],
     "candidate_claim": "A supplier escalates to a category manager role in the portal.",
@@ -5428,12 +5428,12 @@
     "category": "elevation-of-privilege",
     "reference_claim": "An attacker uses the contents of the extract file to make the supplier master service act beyond what a data load should do, since the file is consumed as-is.",
     "reference_element_ids": [
-      "flow:supplier-master-service-to-landing-bucket:load-extract",
+      "flow:process:supplier-master-service>store:landing-bucket>load-extract",
       "process:supplier-master-service"
     ],
     "candidate_claim": "An attacker who influences the extract's contents gets the supplier master service to act on it beyond a plain data load.",
     "candidate_element_ids": [
-      "flow:supplier-master-service-to-landing-bucket:load-extract",
+      "flow:process:supplier-master-service>store:landing-bucket>load-extract",
       "process:supplier-master-service"
     ],
     "reference_verb": "inject",
@@ -5446,13 +5446,13 @@
     "category": "spoofing",
     "reference_claim": "An attacker who holds the importer's never-rotated API token posts work orders to the dispatch API as the importer.",
     "reference_element_ids": [
-      "flow:schedule-importer-to-dispatch-api:post-work-orders",
+      "flow:process:schedule-importer>process:dispatch-api>post-work-orders",
       "process:dispatch-api",
       "process:schedule-importer"
     ],
     "candidate_claim": "An attacker who obtains the importer's API token posts work orders to the dispatch API as the importer.",
     "candidate_element_ids": [
-      "flow:schedule-importer-to-dispatch-api:post-work-orders",
+      "flow:process:schedule-importer>process:dispatch-api>post-work-orders",
       "process:dispatch-api"
     ],
     "reference_verb": "use-credential",
@@ -5465,7 +5465,7 @@
     "category": "spoofing",
     "reference_claim": "An attacker who holds the importer's never-rotated API token posts work orders to the dispatch API as the importer.",
     "reference_element_ids": [
-      "flow:schedule-importer-to-dispatch-api:post-work-orders",
+      "flow:process:schedule-importer>process:dispatch-api>post-work-orders",
       "process:dispatch-api",
       "process:schedule-importer"
     ],
@@ -5486,12 +5486,12 @@
     "category": "spoofing",
     "reference_claim": "An attacker opens a WebSocket to the dispatch API in a duty engineer's name, because nothing states what the handshake checks.",
     "reference_element_ids": [
-      "flow:dispatch-console-to-dispatch-api:live-job-status",
+      "flow:process:dispatch-console>process:dispatch-api>live-job-status",
       "process:dispatch-api"
     ],
     "candidate_claim": "An attacker opens a live status socket to the dispatch API as a duty engineer, since the handshake's authentication is not established.",
     "candidate_element_ids": [
-      "flow:dispatch-console-to-dispatch-api:live-job-status",
+      "flow:process:dispatch-console>process:dispatch-api>live-job-status",
       "process:dispatch-api"
     ],
     "reference_verb": "impersonate",
@@ -5504,12 +5504,12 @@
     "category": "spoofing",
     "reference_claim": "An attacker opens a WebSocket to the dispatch API in a duty engineer's name, because nothing states what the handshake checks.",
     "reference_element_ids": [
-      "flow:dispatch-console-to-dispatch-api:live-job-status",
+      "flow:process:dispatch-console>process:dispatch-api>live-job-status",
       "process:dispatch-api"
     ],
     "candidate_claim": "An attacker steals a duty engineer's session token out of the browser and opens the socket with it.",
     "candidate_element_ids": [
-      "flow:dispatch-console-to-dispatch-api:live-job-status",
+      "flow:process:dispatch-console>process:dispatch-api>live-job-status",
       "process:dispatch-api"
     ],
     "reference_verb": "impersonate",
@@ -5523,13 +5523,13 @@
     "reference_claim": "An attacker answers the hourly pull as the scheduling partner, because nothing states how the importer identifies the partner.",
     "reference_element_ids": [
       "entity:scheduling-partner",
-      "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
+      "flow:process:schedule-importer>entity:scheduling-partner>pull-schedule-feed",
       "process:schedule-importer"
     ],
     "candidate_claim": "An attacker stands up a service that answers the importer's hourly pull in the partner's place.",
     "candidate_element_ids": [
       "entity:scheduling-partner",
-      "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed"
+      "flow:process:schedule-importer>entity:scheduling-partner>pull-schedule-feed"
     ],
     "reference_verb": "impersonate",
     "candidate_verb": "impersonate",
@@ -5541,12 +5541,12 @@
     "category": "spoofing",
     "reference_claim": "An attacker signs in to the dispatch console as a duty engineer, because nothing states what the sign-in checks.",
     "reference_element_ids": [
-      "flow:duty-engineer-to-dispatch-console:open-console",
+      "flow:entity:duty-engineer>process:dispatch-console>open-console",
       "process:dispatch-console"
     ],
     "candidate_claim": "An attacker signs in to the console as a duty engineer because no multi-factor authentication is enforced.",
     "candidate_element_ids": [
-      "flow:duty-engineer-to-dispatch-console:open-console",
+      "flow:entity:duty-engineer>process:dispatch-console>open-console",
       "process:dispatch-console"
     ],
     "reference_verb": "impersonate",
@@ -5559,13 +5559,13 @@
     "category": "tampering",
     "reference_claim": "An attacker returns an XML document to the hourly pull that plants work orders the partner never sent.",
     "reference_element_ids": [
-      "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
+      "flow:process:schedule-importer>entity:scheduling-partner>pull-schedule-feed",
       "process:dispatch-api",
       "process:schedule-importer"
     ],
     "candidate_claim": "An attacker who answers the pull returns a schedule carrying work orders the partner never sent, and a depot works them.",
     "candidate_element_ids": [
-      "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
+      "flow:process:schedule-importer>entity:scheduling-partner>pull-schedule-feed",
       "process:schedule-importer"
     ],
     "reference_verb": "forge",
@@ -5578,13 +5578,13 @@
     "category": "tampering",
     "reference_claim": "An attacker returns an XML document to the hourly pull that plants work orders the partner never sent.",
     "reference_element_ids": [
-      "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
+      "flow:process:schedule-importer>entity:scheduling-partner>pull-schedule-feed",
       "process:dispatch-api",
       "process:schedule-importer"
     ],
     "candidate_claim": "An attacker modifies the partner's XML document while it is in transit to the importer.",
     "candidate_element_ids": [
-      "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed"
+      "flow:process:schedule-importer>entity:scheduling-partner>pull-schedule-feed"
     ],
     "reference_verb": "forge",
     "candidate_verb": "alter-in-transit",
@@ -5596,12 +5596,12 @@
     "category": "tampering",
     "reference_claim": "An attacker on the corporate network alters a dispatch request on its way into the control plane, because nothing states the call is encrypted.",
     "reference_element_ids": [
-      "flow:dispatch-console-to-dispatch-api:dispatch-requests",
+      "flow:process:dispatch-console>process:dispatch-api>dispatch-requests",
       "process:dispatch-api"
     ],
     "candidate_claim": "An attacker on the corporate network rewrites a crew move on its way to the dispatch API.",
     "candidate_element_ids": [
-      "flow:dispatch-console-to-dispatch-api:dispatch-requests"
+      "flow:process:dispatch-console>process:dispatch-api>dispatch-requests"
     ],
     "reference_verb": "alter-in-transit",
     "candidate_verb": "alter-in-transit",
@@ -5613,12 +5613,12 @@
     "category": "tampering",
     "reference_claim": "An attacker on the corporate network alters a dispatch request on its way into the control plane, because nothing states the call is encrypted.",
     "reference_element_ids": [
-      "flow:dispatch-console-to-dispatch-api:dispatch-requests",
+      "flow:process:dispatch-console>process:dispatch-api>dispatch-requests",
       "process:dispatch-api"
     ],
     "candidate_claim": "An attacker on the corporate network reads a dispatch request in flight.",
     "candidate_element_ids": [
-      "flow:dispatch-console-to-dispatch-api:dispatch-requests"
+      "flow:process:dispatch-console>process:dispatch-api>dispatch-requests"
     ],
     "reference_verb": "alter-in-transit",
     "candidate_verb": "intercept",
@@ -5630,7 +5630,7 @@
     "category": "tampering",
     "reference_claim": "An attacker inside the control plane writes job orders straight into the dispatch database, because nothing states what the connection checks.",
     "reference_element_ids": [
-      "flow:dispatch-api-to-dispatch-database:read-write-job-orders",
+      "flow:process:dispatch-api>store:dispatch-database>read-write-job-orders",
       "store:dispatch-database"
     ],
     "candidate_claim": "An attacker inside the control plane alters job orders in the dispatch database.",
@@ -5647,7 +5647,7 @@
     "category": "tampering",
     "reference_claim": "An attacker rewrites a document in the schedule archive so the kept copy no longer matches what the partner sent.",
     "reference_element_ids": [
-      "flow:schedule-importer-to-schedule-archive:store-schedule-documents",
+      "flow:process:schedule-importer>store:schedule-archive>store-schedule-documents",
       "store:schedule-archive"
     ],
     "candidate_claim": "An attacker deletes documents from the schedule archive so no copy of the day's work survives.",
@@ -5669,7 +5669,7 @@
     ],
     "candidate_claim": "A duty engineer disputes a crew move and nothing in the job order names a person.",
     "candidate_element_ids": [
-      "flow:dispatch-console-to-dispatch-api:dispatch-requests",
+      "flow:process:dispatch-console>process:dispatch-api>dispatch-requests",
       "store:dispatch-database"
     ],
     "reference_verb": "unattributable",
@@ -5700,11 +5700,11 @@
     "category": "information-disclosure",
     "reference_claim": "An attacker on the corporate network reads the live job status stream, because nothing states the WebSocket runs over TLS.",
     "reference_element_ids": [
-      "flow:dispatch-console-to-dispatch-api:live-job-status"
+      "flow:process:dispatch-console>process:dispatch-api>live-job-status"
     ],
     "candidate_claim": "An attacker on the corporate network reads crew job status off the open socket, whose transport is unstated.",
     "candidate_element_ids": [
-      "flow:dispatch-console-to-dispatch-api:live-job-status"
+      "flow:process:dispatch-console>process:dispatch-api>live-job-status"
     ],
     "reference_verb": "intercept",
     "candidate_verb": "intercept",
@@ -5748,12 +5748,12 @@
     "category": "information-disclosure",
     "reference_claim": "An attacker returns an XML document whose external entity makes the importer read a file off the corporate network and hand it back.",
     "reference_element_ids": [
-      "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
+      "flow:process:schedule-importer>entity:scheduling-partner>pull-schedule-feed",
       "process:schedule-importer"
     ],
     "candidate_claim": "An attacker returns an XML document whose external entity makes the importer fetch an internal file and hand it back.",
     "candidate_element_ids": [
-      "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
+      "flow:process:schedule-importer>entity:scheduling-partner>pull-schedule-feed",
       "process:schedule-importer"
     ],
     "reference_verb": "elicit",
@@ -5766,7 +5766,7 @@
     "category": "information-disclosure",
     "reference_claim": "An attacker who reaches the corporate file store reads the partner's schedule documents out of the archive.",
     "reference_element_ids": [
-      "flow:schedule-importer-to-schedule-archive:store-schedule-documents",
+      "flow:process:schedule-importer>store:schedule-archive>store-schedule-documents",
       "store:schedule-archive"
     ],
     "candidate_claim": "An attacker who reaches the corporate file store reads the partner's schedule documents.",
@@ -5783,12 +5783,12 @@
     "category": "denial-of-service",
     "reference_claim": "An attacker holds open enough WebSockets to the dispatch API that duty engineers lose live job status.",
     "reference_element_ids": [
-      "flow:dispatch-console-to-dispatch-api:live-job-status",
+      "flow:process:dispatch-console>process:dispatch-api>live-job-status",
       "process:dispatch-api"
     ],
     "candidate_claim": "An attacker opens sockets to the dispatch API until engineers can no longer see live job status.",
     "candidate_element_ids": [
-      "flow:dispatch-console-to-dispatch-api:live-job-status",
+      "flow:process:dispatch-console>process:dispatch-api>live-job-status",
       "process:dispatch-api"
     ],
     "reference_verb": "flood",
@@ -5801,12 +5801,12 @@
     "category": "denial-of-service",
     "reference_claim": "An attacker returns an XML document large enough that the hourly import never finishes and tomorrow's work never reaches the control plane.",
     "reference_element_ids": [
-      "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
+      "flow:process:schedule-importer>entity:scheduling-partner>pull-schedule-feed",
       "process:schedule-importer"
     ],
     "candidate_claim": "An attacker returns an XML document with nested entity expansion, so the hourly import never completes.",
     "candidate_element_ids": [
-      "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
+      "flow:process:schedule-importer>entity:scheduling-partner>pull-schedule-feed",
       "process:schedule-importer"
     ],
     "reference_verb": "flood",
@@ -5820,12 +5820,12 @@
     "reference_claim": "An attacker on the corporate network uses the importer's token to act in the control plane, where a corporate laptop holds no rights at all.",
     "reference_element_ids": [
       "boundary:production-control-plane",
-      "flow:schedule-importer-to-dispatch-api:post-work-orders",
+      "flow:process:schedule-importer>process:dispatch-api>post-work-orders",
       "process:dispatch-api"
     ],
     "candidate_claim": "An attacker on the corporate network uses the importer's token to act inside the production control plane.",
     "candidate_element_ids": [
-      "flow:schedule-importer-to-dispatch-api:post-work-orders",
+      "flow:process:schedule-importer>process:dispatch-api>post-work-orders",
       "process:dispatch-api"
     ],
     "reference_verb": "escalate",
@@ -5839,7 +5839,7 @@
     "reference_claim": "An attacker on the corporate network uses the importer's token to act in the control plane, where a corporate laptop holds no rights at all.",
     "reference_element_ids": [
       "boundary:production-control-plane",
-      "flow:schedule-importer-to-dispatch-api:post-work-orders",
+      "flow:process:schedule-importer>process:dispatch-api>post-work-orders",
       "process:dispatch-api"
     ],
     "candidate_claim": "An attacker who takes the dispatch API gains rights across the corporate network.",
@@ -5856,12 +5856,12 @@
     "category": "elevation-of-privilege",
     "reference_claim": "An attacker gets a duty engineer's browser to dispatch a crew from a page the attacker controls, because the API's allowed origins and its credential rule are unrecorded.",
     "reference_element_ids": [
-      "flow:dispatch-console-to-dispatch-api:dispatch-requests",
+      "flow:process:dispatch-console>process:dispatch-api>dispatch-requests",
       "process:dispatch-api"
     ],
     "candidate_claim": "An attacker lures a signed-in duty engineer to a page that calls the dispatch API from the attacker's own origin.",
     "candidate_element_ids": [
-      "flow:dispatch-console-to-dispatch-api:dispatch-requests",
+      "flow:process:dispatch-console>process:dispatch-api>dispatch-requests",
       "process:dispatch-api"
     ],
     "reference_verb": "ride-session",
@@ -5874,12 +5874,12 @@
     "category": "elevation-of-privilege",
     "reference_claim": "An attacker gets a duty engineer's browser to dispatch a crew from a page the attacker controls, because the API's allowed origins and its credential rule are unrecorded.",
     "reference_element_ids": [
-      "flow:dispatch-console-to-dispatch-api:dispatch-requests",
+      "flow:process:dispatch-console>process:dispatch-api>dispatch-requests",
       "process:dispatch-api"
     ],
     "candidate_claim": "An attacker calls the dispatch API from their own origin, which the API allows because its policy permits any origin.",
     "candidate_element_ids": [
-      "flow:dispatch-console-to-dispatch-api:dispatch-requests",
+      "flow:process:dispatch-console>process:dispatch-api>dispatch-requests",
       "process:dispatch-api"
     ],
     "reference_verb": "ride-session",
@@ -5892,12 +5892,12 @@
     "category": "elevation-of-privilege",
     "reference_claim": "An attacker who can publish on the corporate web host serves script from the console's own origin and dispatches crews with it.",
     "reference_element_ids": [
-      "flow:dispatch-console-to-dispatch-api:dispatch-requests",
+      "flow:process:dispatch-console>process:dispatch-api>dispatch-requests",
       "process:dispatch-console"
     ],
     "candidate_claim": "An attacker who can publish files on the corporate web host serves script that dispatches crews.",
     "candidate_element_ids": [
-      "flow:dispatch-console-to-dispatch-api:dispatch-requests",
+      "flow:process:dispatch-console>process:dispatch-api>dispatch-requests",
       "process:dispatch-console"
     ],
     "reference_verb": "inject",

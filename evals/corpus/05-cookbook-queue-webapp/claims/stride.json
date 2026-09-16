@@ -2,7 +2,7 @@
   {
     "category": "spoofing",
     "affected_element_ids": [
-      "flow:browser-to-web-application:page-request",
+      "flow:entity:browser>process:web-application>page-request",
       "entity:browser"
     ],
     "claim": "An attacker interacts with the web application as a legitimate user, because how the application authenticates the browser is unverified.",
@@ -17,7 +17,7 @@
   {
     "category": "spoofing",
     "affected_element_ids": [
-      "flow:web-application-to-message-queue:enqueue-job",
+      "flow:process:web-application>store:message-queue>enqueue-job",
       "store:message-queue"
     ],
     "claim": "An attacker who reaches the queue enqueues jobs as if they came from the web application, since queue authentication is unverified.",
@@ -32,7 +32,7 @@
   {
     "category": "spoofing",
     "affected_element_ids": [
-      "flow:background-worker-process-to-database:read-write-records"
+      "flow:process:background-worker-process>store:database>read-write-records"
     ],
     "claim": "An attacker holding the worker's database credentials connects to the database as the worker.",
     "tier": "expected",
@@ -77,7 +77,7 @@
     "category": "tampering",
     "affected_element_ids": [
       "store:database",
-      "flow:background-worker-process-to-database:read-write-records"
+      "flow:process:background-worker-process>store:database>read-write-records"
     ],
     "claim": "An attacker with the worker's database access alters application records or the log records stored alongside them.",
     "tier": "expected",
@@ -107,7 +107,7 @@
     "category": "repudiation",
     "affected_element_ids": [
       "store:message-queue",
-      "flow:web-application-to-message-queue:enqueue-job"
+      "flow:process:web-application>store:message-queue>enqueue-job"
     ],
     "claim": "The origin of a processed job cannot be established, because nothing records which producer enqueued it.",
     "tier": "expected",
@@ -163,8 +163,8 @@
   {
     "category": "information-disclosure",
     "affected_element_ids": [
-      "flow:web-application-to-message-queue:enqueue-job",
-      "flow:background-worker-process-to-message-queue:consume-job"
+      "flow:process:web-application>store:message-queue>enqueue-job",
+      "flow:process:background-worker-process>store:message-queue>consume-job"
     ],
     "claim": "An attacker on the internal network reads job contents in transit, because transport encryption between the tiers is unverified.",
     "tier": "expected",
@@ -194,7 +194,7 @@
     "category": "denial-of-service",
     "affected_element_ids": [
       "process:web-application",
-      "flow:browser-to-web-application:page-request"
+      "flow:entity:browser>process:web-application>page-request"
     ],
     "claim": "An attacker floods the internet-facing web application until it stops serving browsers.",
     "tier": "expected",

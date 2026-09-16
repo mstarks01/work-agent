@@ -18,6 +18,7 @@ from analysis_service.system_model import (
     Process,
     SystemModel,
     TrustBoundary,
+    make_flow_id,
 )
 
 #: STRIDE's own rule table. The neutral engine takes the lanes and the rules as
@@ -45,9 +46,8 @@ def flow(source, destination, label, **overrides):
         "operations": "unknown",
     }
     fields.update(overrides)
-    slug = f"{source.split(':', 1)[-1]}-to-{destination.split(':', 1)[-1]}"
     return DataFlow(
-        id=f"flow:{slug}:{label}",
+        id=make_flow_id(source, destination, label),
         name=label,
         source=source,
         destination=destination,
@@ -192,9 +192,9 @@ class TestFiring:
     def test_unverified_boundary_auth_fires_on_the_crossing(self, model):
         hits = fired(model, "spoofing-unverified-boundary-auth")
         assert {hit.element_ids[0] for hit in hits} == {
-            "flow:customer-to-api:submit",
-            "flow:partner-to-api:callback",
-            "flow:api-to-admin:escalate",
+            "flow:entity:customer>process:api>submit",
+            "flow:entity:partner>process:api>callback",
+            "flow:process:api>process:admin>escalate",
         }
 
     def test_facts_distinguish_unknown_from_stated_absent(self, model):
@@ -202,23 +202,25 @@ class TestFiring:
             hit.element_ids[0]: hit.facts
             for hit in fired(model, "spoofing-unverified-boundary-auth")
         }
-        assert by_flow["flow:customer-to-api:submit"]["authentication_state"] == (
-            "unverified"
-        )
-        assert by_flow["flow:partner-to-api:callback"]["authentication_state"] == (
-            "absent"
-        )
+        assert by_flow["flow:entity:customer>process:api>submit"][
+            "authentication_state"
+        ] == ("unverified")
+        assert by_flow["flow:entity:partner>process:api>callback"][
+            "authentication_state"
+        ] == ("absent")
 
     def test_external_caller_rule_reads_the_entity_kind(self, model):
         hits = fired(model, "spoofing-unverified-external-caller")
         assert [hit.element_ids for hit in hits] == [
-            ("flow:partner-to-api:callback", "entity:partner")
+            ("flow:entity:partner>process:api>callback", "entity:partner")
         ]
 
     def test_transit_crossing_rule_needs_both_halves(self, model):
         hits = fired(model, "tampering-unprotected-transit-crossing")
         # api->ledger has unknown encryption but does not cross; api->admin does.
-        assert [hit.element_ids[0] for hit in hits] == ["flow:api-to-admin:escalate"]
+        assert [hit.element_ids[0] for hit in hits] == [
+            "flow:process:api>process:admin>escalate"
+        ]
 
     def test_write_to_store_rule_carries_the_classification(self, model):
         model.data_flows[2].authentication = "unknown"
@@ -260,7 +262,9 @@ class TestFiring:
 
     def test_sensitive_transit_reads_both_endpoints(self, model):
         hits = fired(model, "information-disclosure-unprotected-sensitive-transit")
-        assert [hit.element_ids[0] for hit in hits] == ["flow:api-to-ledger:write"]
+        assert [hit.element_ids[0] for hit in hits] == [
+            "flow:process:api>store:ledger>write"
+        ]
 
     def test_store_at_rest_rule_fires_on_the_unknown(self, model):
         hits = fired(model, "information-disclosure-store-at-rest-unverified")
@@ -280,7 +284,7 @@ class TestFiring:
     def test_privilege_crossing_reads_the_boundary_kind(self, model):
         hits = fired(model, "elevation-of-privilege-privilege-zone-crossing")
         assert hits[0].element_ids == (
-            "flow:api-to-admin:escalate",
+            "flow:process:api>process:admin>escalate",
             "boundary:privileged",
         )
         assert hits[0].facts["destination_zone_kind"] == "privilege"
@@ -301,7 +305,10 @@ class TestFiring:
             "elevation-of-privilege-privilege-zone-crossing",
         )
         assert len(hits) == 1
-        assert hits[0].element_ids == ("flow:theirs-to-ours:call", "boundary:theirs")
+        assert hits[0].element_ids == (
+            "flow:process:theirs>process:ours>call",
+            "boundary:theirs",
+        )
         assert hits[0].facts["direction"] == "out-of"
         assert hits[0].facts["zone_kind"] == "tenant"
 
@@ -318,7 +325,9 @@ class TestFiring:
 
     def test_exposed_process_authority_needs_a_crossing(self, model):
         hits = fired(model, "elevation-of-privilege-inbound-from-exposed-process")
-        assert [hit.element_ids[0] for hit in hits] == ["flow:api-to-admin:escalate"]
+        assert [hit.element_ids[0] for hit in hits] == [
+            "flow:process:api>process:admin>escalate"
+        ]
 
     def test_a_model_with_nothing_to_say_fires_nothing(self):
         model = SystemModel(

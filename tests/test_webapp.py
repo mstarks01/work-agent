@@ -834,7 +834,7 @@ def test_the_viewer_renders_a_backticked_identifier_as_code():
     mitigation carries them. The page showed them as characters until `prose`
     turned each span into a `code` element.
     """
-    written = "The `encryption_in_transit` state of `flow:a-to-b:sync` is unknown."
+    written = "The `encryption_in_transit` state of `flow:process:a>process:b>sync` is unknown."
     rendered = run_viewer_helpers(
         f'const n = proseEl("div", null, {json.dumps(written)});'
         "console.log(JSON.stringify({ text: n.textContent, codes: n.codes }));"
@@ -842,9 +842,12 @@ def test_the_viewer_renders_a_backticked_identifier_as_code():
 
     assert "`" not in rendered["text"]
     assert rendered["text"] == (
-        "The encryption_in_transit state of flow:a-to-b:sync is unknown."
+        "The encryption_in_transit state of flow:process:a>process:b>sync is unknown."
     )
-    assert rendered["codes"] == ["encryption_in_transit", "flow:a-to-b:sync"]
+    assert rendered["codes"] == [
+        "encryption_in_transit",
+        "flow:process:a>process:b>sync",
+    ]
 
 
 def test_the_viewer_leaves_an_unpaired_backtick_alone():

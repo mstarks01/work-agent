@@ -2,7 +2,7 @@
   {
     "category": "spoofing",
     "affected_element_ids": [
-      "flow:colleague-to-scheduling-web-app:view-shifts",
+      "flow:entity:colleague>process:scheduling-web-app>view-shifts",
       "entity:colleague"
     ],
     "claim": "An attacker signs in to the scheduling web app as a colleague and reads that colleague's shifts and details, because how colleagues are authenticated is unverified.",
@@ -17,7 +17,7 @@
   {
     "category": "spoofing",
     "affected_element_ids": [
-      "flow:store-manager-to-scheduling-web-app:build-rota",
+      "flow:entity:store-manager>process:scheduling-web-app>build-rota",
       "entity:store-manager"
     ],
     "claim": "An attacker signs in as a store manager and builds that store's rota, because how managers are authenticated is unverified.",
@@ -32,7 +32,7 @@
   {
     "category": "spoofing",
     "affected_element_ids": [
-      "flow:payroll-system-to-file-share:collect-payroll-export",
+      "flow:entity:payroll-system>store:file-share>collect-payroll-export",
       "store:file-share"
     ],
     "claim": "An attacker presents itself to the file share as the payroll system and collects the weekly payroll export, since how the share identifies a collector is unverified.",
@@ -47,7 +47,7 @@
   {
     "category": "spoofing",
     "affected_element_ids": [
-      "flow:scheduling-web-app-to-scheduling-service:rota-requests"
+      "flow:process:scheduling-web-app>process:scheduling-service>rota-requests"
     ],
     "claim": "An attacker on the internal network calls the scheduling service while claiming to be the web app, because how the two identify each other is unverified.",
     "tier": "expected",
@@ -62,7 +62,7 @@
     "category": "tampering",
     "affected_element_ids": [
       "store:file-share",
-      "flow:payroll-system-to-file-share:collect-payroll-export"
+      "flow:entity:payroll-system>store:file-share>collect-payroll-export"
     ],
     "claim": "An attacker alters the payroll export while it sits on the file share, so the payroll system collects hours nobody worked.",
     "tier": "must-find",
@@ -77,7 +77,7 @@
     "category": "tampering",
     "affected_element_ids": [
       "store:rota-database",
-      "flow:scheduling-service-to-rota-database:read-write-rotas"
+      "flow:process:scheduling-service>store:rota-database>read-write-rotas"
     ],
     "claim": "An attacker who reaches the rota database changes rota entries directly, bypassing whatever the scheduling service enforces.",
     "tier": "expected",
@@ -91,7 +91,7 @@
   {
     "category": "tampering",
     "affected_element_ids": [
-      "flow:store-manager-to-scheduling-web-app:build-rota"
+      "flow:entity:store-manager>process:scheduling-web-app>build-rota"
     ],
     "claim": "An attacker positioned between a manager's device and the web app modifies rota changes in flight, because whether the traffic is encrypted is unverified.",
     "tier": "expected",
@@ -106,7 +106,7 @@
     "category": "repudiation",
     "affected_element_ids": [
       "process:scheduling-service",
-      "flow:store-manager-to-scheduling-web-app:build-rota"
+      "flow:entity:store-manager>process:scheduling-web-app>build-rota"
     ],
     "claim": "A store manager denies having made a rota change that disadvantaged a colleague, and nothing in the model records who changed what.",
     "tier": "must-find",
@@ -120,7 +120,7 @@
   {
     "category": "repudiation",
     "affected_element_ids": [
-      "flow:payroll-system-to-file-share:collect-payroll-export",
+      "flow:entity:payroll-system>store:file-share>collect-payroll-export",
       "store:file-share"
     ],
     "claim": "Nobody can establish who collected a given payroll export from the file share, because no record of collections exists in the model.",
@@ -150,7 +150,7 @@
     "category": "information-disclosure",
     "affected_element_ids": [
       "store:file-share",
-      "flow:scheduling-service-to-file-share:write-payroll-export"
+      "flow:process:scheduling-service>store:file-share>write-payroll-export"
     ],
     "claim": "An attacker with access to the file share reads a whole store's payroll export in one file.",
     "tier": "must-find",
@@ -164,7 +164,7 @@
   {
     "category": "information-disclosure",
     "affected_element_ids": [
-      "flow:colleague-to-scheduling-web-app:view-shifts"
+      "flow:entity:colleague>process:scheduling-web-app>view-shifts"
     ],
     "claim": "An attacker on the network path between a colleague's phone and the web app reads that colleague's shifts and details in transit.",
     "tier": "expected",
@@ -208,7 +208,7 @@
     "category": "elevation-of-privilege",
     "affected_element_ids": [
       "process:scheduling-web-app",
-      "flow:colleague-to-scheduling-web-app:view-shifts"
+      "flow:entity:colleague>process:scheduling-web-app>view-shifts"
     ],
     "claim": "A colleague uses the shared app to build or change a rota as though they were a store manager, because the separation between the two roles is unverified.",
     "tier": "must-find",
@@ -223,7 +223,7 @@
     "category": "elevation-of-privilege",
     "affected_element_ids": [
       "process:scheduling-service",
-      "flow:scheduling-web-app-to-scheduling-service:rota-requests"
+      "flow:process:scheduling-web-app>process:scheduling-service>rota-requests"
     ],
     "claim": "An attacker on the internal network calls the scheduling service directly and performs rota writes the web app would not have allowed.",
     "tier": "expected",

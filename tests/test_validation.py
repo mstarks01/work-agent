@@ -4,7 +4,7 @@ from typing import ClassVar
 
 import pytest
 
-from analysis_service.system_model import SystemModel
+from analysis_service.system_model import SystemModel, make_flow_id
 from analysis_service.validation import (
     CITATION_FIELDS,
     MAX_ELEMENTS,
@@ -51,7 +51,7 @@ class TestDeterministicIds:
         model.data_flows[0].id = "flow:login"
         issues = [i for i in validate(model) if i.code == "id-mismatch"]
         assert issues[0].element_id == "flow:login"
-        assert "flow:customer-to-web-app:login" in issues[0].message
+        assert "flow:entity:customer>process:web-app>login" in issues[0].message
 
 
 class TestReferentialIntegrity:
@@ -577,11 +577,16 @@ class TestAnElementIdCannotCarryStructure:
         assert not issues
 
 
-def test_a_flow_between_same_named_endpoints_of_two_types_is_refused_as_a_duplicate():
-    """#961 finding 5: the derived flow ID drops the endpoint type, so an entity
-    named x and a process named x writing the same label to one store derive
-    one ID. The gate refuses the collision before any reference is rewritten
-    through it; ADR 0037 decides the identity that stops it colliding."""
+def test_a_flow_between_same_named_endpoints_of_two_types_derives_two_flows():
+    """ADR 0037's acceptance probe, and #961 finding 5 before it.
+
+    Version 1 dropped the endpoint's type prefix, so an entity named ``x`` and a
+    process named ``x`` writing one label to one store derived a single flow ID.
+    The gate refused the collision as ``duplicate-id``, which kept it out of a
+    report and stopped a correct model at the gate. Under version 2 the two
+    endpoints carry their types into the identity, so the same model derives two
+    flows and raises nothing.
+    """
     from tests.factories import valid_model
 
     raw = valid_model().model_dump(mode="json")
@@ -618,7 +623,11 @@ def test_a_flow_between_same_named_endpoints_of_two_types_is_refused_as_a_duplic
         }
     )
 
-    _, issues = parse_and_validate(raw, normalize_ids=True, sources={})
+    model, issues = parse_and_validate(raw, normalize_ids=True, sources={})
 
-    assert [issue.code for issue in issues] == ["duplicate-id"]
-    assert "flow:x-to-" in issues[0].message
+    assert issues == []
+    assert model is not None
+    assert {flow.id for flow in model.data_flows} >= {
+        make_flow_id("entity:x", store, "read"),
+        make_flow_id("process:x", store, "read"),
+    }

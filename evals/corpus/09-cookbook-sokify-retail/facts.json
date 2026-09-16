@@ -5,7 +5,7 @@
     {
       "assertion": {
         "subject_type": "interaction",
-        "subject": "flow:mobile-app-to-web-api:api-traffic",
+        "subject": "flow:process:mobile-app>process:web-api>api-traffic",
         "predicate": "transport-encryption",
         "value": "absent",
         "reason": null,
@@ -47,7 +47,7 @@
     {
       "assertion": {
         "subject_type": "interaction",
-        "subject": "flow:fax-gateway-to-customer:confirmation-fax",
+        "subject": "flow:process:fax-gateway>entity:customer>confirmation-fax",
         "predicate": "destination-verification",
         "value": "absent",
         "reason": null,

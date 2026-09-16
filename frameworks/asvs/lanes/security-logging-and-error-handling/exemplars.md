@@ -12,11 +12,11 @@ The audit record is described and its content is stated to be incomplete. That i
   "direction": "gap",
   "needs_evidence": "",
   "title": "Audit records do not identify the acting customer",
-  "description": "V16.2.1 asks that security-relevant events are logged with enough detail to identify who acted. It applies here because `flow:ledger-service-to-audit-log:append-transfer-record` writes every transfer to `store:audit-log`, so an audit trail exists. The submitter states what it contains: the entry names the ledger service and never the customer. So the input settles that the record does not identify the acting party, and it settles it without any inference about the logging library.",
+  "description": "V16.2.1 asks that security-relevant events are logged with enough detail to identify who acted. It applies here because `flow:process:ledger-service>store:audit-log>append-transfer-record` writes every transfer to `store:audit-log`, so an audit trail exists. The submitter states what it contains: the entry names the ledger service and never the customer. So the input settles that the record does not identify the acting party, and it settles it without any inference about the logging library.",
   "affected_element_ids": [
     "process:ledger-service",
     "store:audit-log",
-    "flow:ledger-service-to-audit-log:append-transfer-record"
+    "flow:process:ledger-service>store:audit-log>append-transfer-record"
   ],
   "evidence_refs": [],
   "quotes": [

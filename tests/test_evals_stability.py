@@ -534,7 +534,10 @@ class TestContentStability:
                 0: ("high", ["process:storefront-api"]),
                 # A flow cited on one side and its endpoints on the other is one
                 # place, by the same resolution the identity rule applies.
-                1: ("critical", ["flow:shopper-to-storefront-api:place-order"]),
+                1: (
+                    "critical",
+                    ["flow:entity:shopper>process:storefront-api>place-order"],
+                ),
                 2: ("medium", ["process:order-service"]),
             },
         )

@@ -83,7 +83,7 @@ from analysis_service.prompts import (
     lane_exemplars_doc,
 )
 from analysis_service.skills import estimate_tokens
-from analysis_service.system_model import mentioned_ids
+from analysis_service.system_model import ELEMENT_ID, mentioned_ids
 from analysis_service.token_caps import (
     COMPOSED_ANALYZE_CAP,
     COMPOSED_EXTRACT_COMPACT_CAP,
@@ -129,7 +129,11 @@ SOURCE_BLOCK_RE = re.compile(
     re.MULTILINE | re.DOTALL,
 )
 # Element and flow IDs as the prompts write them: `type:normalized-name`.
-ELEMENT_ID_RE = re.compile(r"`((?:entity|process|store|flow|boundary):[a-z0-9:-]+)`")
+# The shipped grammar, not a second spelling of it: a flow ID's parts are
+# separated by `FLOW_DELIMITER`, and a lint that kept its own character class
+# read only the first endpoint and reported the rest of every exemplar's flow
+# citations as undefined.
+ELEMENT_ID_RE = re.compile(rf"`({ELEMENT_ID.strip('^$')})`")
 # A job-varying placeholder ADK templates from session state at run time. The
 # first one in an instruction is where its cacheable prefix stops.
 PLACEHOLDER_RE = re.compile(r"\{[a-z_]+\}")

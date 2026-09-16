@@ -25,7 +25,7 @@ from evals.harness.queue import (
 from tests.eval_factories import SAMPLE_CONTENT, SAMPLE_PROSE, cast, other_content
 
 FLOWS = {
-    "01": {"flow:a-to-b:call": ("process:a", "process:b")},
+    "01": {"flow:process:a>process:b>call": ("process:a", "process:b")},
 }
 
 
@@ -107,7 +107,7 @@ def test_a_flow_and_its_endpoints_are_one_question():
         lane="spoofing",
         title="Cited as a flow",
         description="",
-        element_ids=("flow:a-to-b:call",),
+        element_ids=("flow:process:a>process:b>call",),
         verb="intercept",
         content=SAMPLE_CONTENT,
         prose=SAMPLE_PROSE,

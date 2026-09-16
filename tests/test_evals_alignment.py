@@ -16,6 +16,7 @@ import pytest
 
 from analysis_service.system_model import (
     SystemModel,
+    flow_label,
     make_flow_id,
     normalize_element_ids,
 )
@@ -239,8 +240,8 @@ class TestInteractionsAlignOneToOne:
         score = scored(parallel, model)
 
         (pair,) = score.alignment.by_evidence("discriminated")
-        assert pair.reference.endswith(":websocket-updates")
-        assert pair.produced.endswith(":live-updates")
+        assert flow_label(pair.reference) == "websocket-updates"
+        assert flow_label(pair.produced) == "live-updates"
         assert score.aligned_interaction_recall == 1.0
 
     def test_two_flows_the_rules_cannot_tell_apart_are_listed_not_guessed(
@@ -283,7 +284,7 @@ class TestAFlowAliasIsReadBetweenItsEndpoints:
 
     def test_a_ruled_label_pairs_the_flow_as_an_alias(self):
         golden = case("04")
-        flow_id = "flow:model-server-to-model-registry-bucket:load-artifact"
+        flow_id = "flow:process:model-server>store:model-registry-bucket>load-artifact"
         alias = ElementAlias(
             element=flow_id,
             name="load artifacts",
@@ -297,7 +298,7 @@ class TestAFlowAliasIsReadBetweenItsEndpoints:
         # neither the label rule nor rule 4 pairs it: the alias is what does.
         model = relabelled(golden.model, flow_id, "load artifacts")
         raw = model.model_dump(mode="json")
-        next(f for f in raw["data_flows"] if f["id"].endswith(":load-artifacts"))[
+        next(f for f in raw["data_flows"] if flow_label(f["id"]) == "load-artifacts")[
             "protocol"
         ] = "unknown"
         model = SystemModel.model_validate(raw)
@@ -308,12 +309,12 @@ class TestAFlowAliasIsReadBetweenItsEndpoints:
         assert [p.evidence for p in before.pairs if p.reference == flow_id] == ["sole"]
         (pair,) = after.by_evidence("alias")
         assert pair.reference == flow_id
-        assert pair.produced.endswith(":load-artifacts")
+        assert flow_label(pair.produced) == "load-artifacts"
         assert pair.excerpt == alias.excerpt
 
     def test_a_ruled_label_never_reaches_across_endpoints(self):
         golden = case("04")
-        flow_id = "flow:model-server-to-model-registry-bucket:load-artifact"
+        flow_id = "flow:process:model-server>store:model-registry-bucket>load-artifact"
         alias = ElementAlias(
             element=flow_id,
             name="load artifacts",
@@ -325,10 +326,12 @@ class TestAFlowAliasIsReadBetweenItsEndpoints:
         model = relabelled(golden.model, flow_id, "load artifacts")
         raw = model.model_dump(mode="json")
         moved = next(
-            f for f in raw["data_flows"] if f["id"].endswith(":load-artifacts")
+            f for f in raw["data_flows"] if flow_label(f["id"]) == "load-artifacts"
         )
         moved["source"] = "process:inference-gateway"
-        moved["id"] = "flow:inference-gateway-to-model-registry-bucket:load-artifacts"
+        moved["id"] = (
+            "flow:process:inference-gateway>store:model-registry-bucket>load-artifacts"
+        )
 
         after = align(ruled, SystemModel.model_validate(raw))
 
@@ -393,10 +396,10 @@ class TestTheSoleFlowBetweenFoundEndpoints:
 
     def test_a_lone_flow_under_another_label_with_other_facts_pairs_as_sole(self):
         golden = case("04")
-        flow_id = "flow:model-server-to-model-registry-bucket:load-artifact"
+        flow_id = "flow:process:model-server>store:model-registry-bucket>load-artifact"
         model = relabelled(golden.model, flow_id, "fetch model")
         raw = model.model_dump(mode="json")
-        next(f for f in raw["data_flows"] if f["id"].endswith(":fetch-model"))[
+        next(f for f in raw["data_flows"] if flow_label(f["id"]) == "fetch-model")[
             "protocol"
         ] = "unknown"
 
@@ -404,14 +407,14 @@ class TestTheSoleFlowBetweenFoundEndpoints:
 
         (pair,) = aligned.by_evidence("sole")
         assert pair.reference == flow_id
-        assert pair.produced.endswith(":fetch-model")
+        assert flow_label(pair.produced) == "fetch-model"
 
     def test_two_produced_flows_beside_one_reference_flow_stay_unpaired(self):
         golden = case("04")
-        flow_id = "flow:model-server-to-model-registry-bucket:load-artifact"
+        flow_id = "flow:process:model-server>store:model-registry-bucket>load-artifact"
         model = relabelled(golden.model, flow_id, "fetch model")
         raw = model.model_dump(mode="json")
-        one = next(f for f in raw["data_flows"] if f["id"].endswith(":fetch-model"))
+        one = next(f for f in raw["data_flows"] if flow_label(f["id"]) == "fetch-model")
         one["protocol"] = "unknown"
         raw["data_flows"].append(
             {

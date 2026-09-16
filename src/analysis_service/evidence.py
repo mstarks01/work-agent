@@ -405,9 +405,8 @@ def render_element_roster(model: SystemModel) -> str:
 
     ``affected_element_ids`` had only the constraint — "every one of them
     present in the System Model" — and the model as fenced JSON to read it out
-    of. On a live end-to-end sweep a lane agent produced
-    ``flow:a-to-b:label:label``, its own label concatenated twice: well-formed,
-    plausible, absent from the set. It never appears in ``analysis`` mode, whose
+    of. On a live end-to-end sweep a lane agent produced a flow ID with its own
+    label concatenated twice: well-formed, plausible, absent from the set. It never appears in ``analysis`` mode, whose
     seeded blessed model has clean IDs to copy (#306).
 
     **The gloss is type and place, never the attributes.** Those are in the

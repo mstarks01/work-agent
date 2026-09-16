@@ -26,7 +26,7 @@ model must say, then checking whether it says it.
 
 ### 2. A stated absence recorded as an unknown
 
-- **Path:** `flow:build-runner-to-public-package-registry:resolve-dependencies.authentication`
+- **Path:** `flow:process:build-runner>entity:public-package-registry>resolve-dependencies.authentication`
 - **Bootstrap:** `"unknown"`
 - **Blessed:** `"none — the runner does not verify signatures on the packages it downloads"`
 - **Source reason:** "the runner does not verify signatures on what it downloads"
@@ -52,7 +52,7 @@ the non-verification outright. Nothing else in this case was moved from
 
 ### 4. The manual-rebuild qualifiers left only in prose
 
-- **Path:** `flow:developer-to-build-runner:manual-rebuild.data_description`
+- **Path:** `flow:entity:developer>process:build-runner>manual-rebuild.data_description`
 - **Bootstrap:** `"Interactive login and manual rebuild command for main"`
 - **Blessed:** `"an interactive login and a rebuild of main that any developer may trigger, requiring no merge and receiving no review"`
 - **Source reason:** "any developer", "does not require a merge" and "is not

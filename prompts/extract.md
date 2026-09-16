@@ -75,7 +75,7 @@ Two illustrations of steps 5 and 8:
 **Sparse input.** In a source labelled `Architecture note`: *"Customers hit our web app, which writes to a Postgres database."* Nothing is said about authentication, transport, storage protection, or exposure, so those attributes stay `unknown` and `assumptions` stays empty:
 
 ```json
-{"id": "flow:customer-to-web-app:requests", "source": "entity:customer", "destination": "process:web-app",
+{"id": "flow:entity:customer>process:web-app>requests", "source": "entity:customer", "destination": "process:web-app",
  "protocol": "unknown", "authentication": "unknown", "encryption_in_transit": "unknown",
  "data_description": "unknown", "source_excerpt": "Customers hit our web app",
  "source_label": "Architecture note"}

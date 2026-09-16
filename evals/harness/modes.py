@@ -98,13 +98,17 @@ from analysis_service.sampling import (
 )
 from analysis_service.sources import Source
 from analysis_service.system_model import (
+    FLOW_DELIMITER,
     UNKNOWN,
     DataFlow,
     Element,
     ExternalEntity,
+    FlowIdError,
     ModelIndex,
     SystemModel,
     TrustBoundary,
+    flow_id_version,
+    parse_flow_id,
 )
 from analysis_service.validation import ValidationIssue
 from evals.harness.alignment import (
@@ -368,14 +372,24 @@ def _is_zone(element_id: str) -> bool:
 def _endpoint_key(element_id: str) -> str:
     """One element ID reduced to what identifies it structurally.
 
-    A flow is ``flow:<source>-to-<target>:<label>`` and the label is the
-    describing half, so it drops. Every other type is returned unchanged: there
-    is no structural key behind an entity's or a boundary's name.
+    A flow's label is the describing half, so it drops and its two endpoints
+    stay. Every other type is returned unchanged: there is no structural key
+    behind an entity's or a boundary's name, and an ID that is not a flow ID
+    under any shipped identity version has no parts to drop.
+
+    Through the identity's own decoder rather than a split of its own. This read
+    the first two colon-separated segments while a flow ID was
+    ``flow:<endpoints>:<label>``; under a version whose endpoints carry their
+    types that returns ``flow:<one prefix>`` for every flow in the model, so
+    every crossing keyed alike and the precision reading went to 1.0 over a
+    model that separated everything from everything.
     """
-    parts = element_id.split(":")
-    if parts[0] == "flow" and len(parts) > 2:
-        return ":".join(parts[:2])
-    return element_id
+    try:
+        version = flow_id_version(element_id)
+    except FlowIdError:
+        return element_id
+    parts = parse_flow_id(element_id, version)
+    return f"flow:{parts.source}{FLOW_DELIMITER}{parts.destination}"
 
 
 def _endpoint_keys(ids: Iterable[str]) -> frozenset[str]:
@@ -423,7 +437,7 @@ class ExtractionScore:
 
     It is the wrong reading for a question about **extraction**, and #293 is
     what showed the difference. Two models on the same corpus both missed
-    ``flow:card-processor-to-storefront-api:settlement-webhook`` and both
+    ``flow:entity:card-processor>process:storefront-api>settlement-webhook`` and both
     emitted the same endpoints under another label — ``payment-webhook`` and
     ``post-webhook``. Identical architecture, one word apart, charged once as a
     miss and again as an invention. Measured over 13 cases, folding the flow

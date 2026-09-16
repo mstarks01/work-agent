@@ -744,7 +744,12 @@ def sample_asvs_claim(
         title="No password length policy is stated",
         description="The requirement applies and the input does not settle it.",
         affected_element_ids=[],
-        grounds=[Ground(kind="derived-fact", flow_id="flow:customer-to-web-app:login")],
+        grounds=[
+            Ground(
+                kind="derived-fact",
+                flow_id="flow:entity:customer>process:web-app>login",
+            )
+        ],
         verdict=Verdict(status="confirmed"),
     )
 
@@ -1402,7 +1407,7 @@ def test_an_invented_key_is_marked_even_when_its_evidence_kind_would_defer_it():
             description="d",
             needs_evidence="code",
             direction="question",
-            evidence_refs=["crossing:flow:customer-to-web-app:login"],
+            evidence_refs=["crossing:flow:entity:customer>process:web-app>login"],
         ),
     ]
 

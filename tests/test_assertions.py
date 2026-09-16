@@ -69,8 +69,8 @@ SOURCE = (
 )
 SOURCES = {SOURCE_LABEL: SOURCE}
 
-FLOW = "flow:shopper-to-storefront-api:place-order"
-WEBHOOK = "flow:card-processor-to-settlement-webhook:post-settlement"
+FLOW = "flow:entity:shopper>process:storefront-api>place-order"
+WEBHOOK = "flow:entity:card-processor>process:settlement-webhook>post-settlement"
 
 
 def span_for(quote):
@@ -389,7 +389,7 @@ REFUSALS: dict[str, tuple[str, AssertionCatalog, dict]] = {
     ),
     "dangling-subject": (
         "a row about a subject nothing declares",
-        catalog([stated(subject="flow:a-to-b:c")]),
+        catalog([stated(subject="flow:process:a>process:b>c")]),
         {},
     ),
     "dangling-binding": (

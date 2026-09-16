@@ -5,7 +5,7 @@
     "affected_element_ids": [
       "entity:colleague",
       "process:identity-broker",
-      "flow:colleague-to-identity-broker:sign-in"
+      "flow:entity:colleague>process:identity-broker>sign-in"
     ],
     "claim": "The input carries no documentation of rate limiting or anti-automation on a sign-in colleagues reach from their own devices at home.",
     "tier": "expected",
@@ -18,7 +18,7 @@
     "affected_element_ids": [
       "entity:franchise-identity-provider",
       "process:identity-broker",
-      "flow:franchise-identity-provider-to-identity-broker:vouch-for-colleague"
+      "flow:entity:franchise-identity-provider>process:identity-broker>vouch-for-colleague"
     ],
     "claim": "The broker accepts a franchise provider's assertion as a sign-in and nothing documents the trust relationships in that federation.",
     "tier": "expected",
@@ -31,7 +31,7 @@
     "affected_element_ids": [
       "entity:hr-system",
       "process:identity-broker",
-      "flow:identity-broker-to-hr-system:nightly-group-pull"
+      "flow:process:identity-broker>entity:hr-system>nightly-group-pull"
     ],
     "claim": "A leaver stops being a colleague on a nightly pull while their twelve-hour token stays usable, and nothing can end it early.",
     "tier": "must-find",
@@ -44,7 +44,7 @@
     "affected_element_ids": [
       "entity:colleague",
       "process:store-admin-console",
-      "flow:colleague-to-store-admin-console:change-prices-and-void"
+      "flow:entity:colleague>process:store-admin-console>change-prices-and-void"
     ],
     "claim": "The console reads the store-manager group from the token and never checks which store the holder belongs to.",
     "tier": "must-find",
@@ -107,7 +107,7 @@
     "affected_element_ids": [
       "entity:colleague",
       "process:identity-broker",
-      "flow:colleague-to-identity-broker:sign-in"
+      "flow:entity:colleague>process:identity-broker>sign-in"
     ],
     "claim": "Colleagues sign in from their own devices at home and no flow states its transport.",
     "tier": "must-find",
@@ -120,7 +120,7 @@
     "affected_element_ids": [
       "process:identity-broker",
       "store:audit-log",
-      "flow:identity-broker-to-audit-log:write-sign-ins"
+      "flow:process:identity-broker>store:audit-log>write-sign-ins"
     ],
     "claim": "An audit log exists and the input carries nothing written down about what it records or whether it covers the franchise route.",
     "tier": "must-find",

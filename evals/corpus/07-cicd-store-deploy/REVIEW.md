@@ -95,14 +95,14 @@ Not part of the question, but the records cite these names, so you need them.
 
 | id | source | destination | protocol | authentication | in transit |
 |---|---|---|---|---|---|
-| flow:developer-to-git-server:push-branches | entity:developer | store:git-server | unknown | unknown | unknown |
-| flow:developer-to-build-runner:manual-rebuild | entity:developer | process:build-runner | unknown | unknown | unknown |
-| flow:build-runner-to-git-server:fetch-source | process:build-runner | store:git-server | unknown | unknown | unknown |
-| flow:build-runner-to-public-package-registry:resolve-dependencies | process:build-runner | entity:public-package-registry | unknown | unknown | unknown |
-| flow:build-runner-to-image-registry:push-image | process:build-runner | store:image-registry | unknown | unknown | unknown |
-| flow:build-runner-to-deploy-controller:set-current-release | process:build-runner | process:deploy-controller | unknown | a shared build token, the same for every pipeline, never rotated since the pipeline was set up | unknown |
-| flow:store-server-to-deploy-controller:poll-current-release | process:store-server | process:deploy-controller | unknown | unknown | unknown |
-| flow:store-server-to-image-registry:pull-image | process:store-server | store:image-registry | unknown | unknown | unknown |
+| flow:entity:developer>store:git-server>push-branches | entity:developer | store:git-server | unknown | unknown | unknown |
+| flow:entity:developer>process:build-runner>manual-rebuild | entity:developer | process:build-runner | unknown | unknown | unknown |
+| flow:process:build-runner>store:git-server>fetch-source | process:build-runner | store:git-server | unknown | unknown | unknown |
+| flow:process:build-runner>entity:public-package-registry>resolve-dependencies | process:build-runner | entity:public-package-registry | unknown | unknown | unknown |
+| flow:process:build-runner>store:image-registry>push-image | process:build-runner | store:image-registry | unknown | unknown | unknown |
+| flow:process:build-runner>process:deploy-controller>set-current-release | process:build-runner | process:deploy-controller | unknown | a shared build token, the same for every pipeline, never rotated since the pipeline was set up | unknown |
+| flow:process:store-server>process:deploy-controller>poll-current-release | process:store-server | process:deploy-controller | unknown | unknown | unknown |
+| flow:process:store-server>store:image-registry>pull-image | process:store-server | store:image-registry | unknown | unknown | unknown |
 
 **Trust boundaries**
 
@@ -117,7 +117,7 @@ Not part of the question, but the records cite these names, so you need them.
 
 - `process:store-server` — One element stands for the whole fleet of ~1,200 identical servers; the source describes them collectively and states no per-store difference.
 - `store:git-server` — The source treats the git server both as somewhere source rests and as something developers push to; modelled as a Data Store, which is where the source code actually lives.
-- `flow:build-runner-to-public-package-registry:resolve-dependencies` — The source states one verification gap: the runner does not verify signatures on what it downloads. That is artifact authenticity under a signing trust policy, not how the runner authenticates to the registry, which the source never describes. This prose is the only record of it — no rule reads notes, so the gap reaches no candidate and no evidence entry until the assertion layer in #926 gives it a field.
+- `flow:process:build-runner>entity:public-package-registry>resolve-dependencies` — The source states one verification gap: the runner does not verify signatures on what it downloads. That is artifact authenticity under a signing trust policy, not how the runner authenticates to the registry, which the source never describes. This prose is the only record of it — no rule reads notes, so the gap reaches no candidate and no evidence entry until the assertion layer in #926 gives it a field.
 
 **Assumptions**
 
@@ -164,7 +164,7 @@ on either of them. That is the finding this sitting exists for.
 
 **1.** An attacker holding the shared build token calls the deploy controller as if it were the build runner and names an image sha of their own choosing as the current release.
 
-- `flow:build-runner-to-deploy-controller:set-current-release`, `process:deploy-controller`
+- `flow:process:build-runner>process:deploy-controller>set-current-release`, `process:deploy-controller`
 - severity: medium/high · verb: `use-credential`
 - The one credential the source describes in full, and it describes it as shared across every pipeline and never rotated. Holding it is indistinguishable from being the runner.
 
@@ -172,7 +172,7 @@ on either of them. That is the finding this sitting exists for.
 
 **2.** An attacker on the retail WAN presents itself to the image registry as a store server and pulls the estate's container images.
 
-- `flow:store-server-to-image-registry:pull-image`, `store:image-registry`
+- `flow:process:store-server>store:image-registry>pull-image`, `store:image-registry`
 - severity: medium/medium · verb: `impersonate`
 - The source says the registry allows the pull and that nobody has written down what a store server presents to it; needs-info is the right verdict, not silence.
 
@@ -180,7 +180,7 @@ on either of them. That is the finding this sitting exists for.
 
 **3.** An attacker polls the deploy controller while claiming to be a store server, since what a store server presents to the controller is unverified.
 
-- `flow:store-server-to-deploy-controller:poll-current-release`, `process:deploy-controller`
+- `flow:process:store-server>process:deploy-controller>poll-current-release`, `process:deploy-controller`
 - severity: medium/low · verb: `impersonate`
 - Lower impact than the registry pull because the poll returns one sha, but it is the same undocumented identity and belongs on the record.
 
@@ -188,7 +188,7 @@ on either of them. That is the finding this sitting exists for.
 
 **4.** An attacker pushes branches to the git server as a developer, because how developers authenticate to it is unverified.
 
-- `flow:developer-to-git-server:push-branches`, `entity:developer`
+- `flow:entity:developer>store:git-server>push-branches`, `entity:developer`
 - severity: medium/medium · verb: `impersonate`
 - Pushing a branch alone does not reach the estate — a merge to main is what starts a build — which is why this sits below the release-setting claims.
 
@@ -196,7 +196,7 @@ on either of them. That is the finding this sitting exists for.
 
 **5.** An attacker logs in to the build runner as a developer and triggers a rebuild of main, since how that login is authenticated is unverified.
 
-- `flow:developer-to-build-runner:manual-rebuild`, `process:build-runner`
+- `flow:entity:developer>process:build-runner>manual-rebuild`, `process:build-runner`
 - severity: medium/high · verb: `impersonate`
 - Distinct from the elevation claim on the same flow: this is an outsider becoming a developer, not a developer using the authority they legitimately have.
 
@@ -215,7 +215,7 @@ on either of them. That is the finding this sitting exists for.
 
 **7.** An attacker publishes a package that the lockfile resolves to and the runner bakes it into the image unchecked, because signatures on downloads are not verified.
 
-- `flow:build-runner-to-public-package-registry:resolve-dependencies`, `process:build-runner`
+- `flow:process:build-runner>entity:public-package-registry>resolve-dependencies`, `process:build-runner`
 - severity: medium/high · verb: `plant`
 - A stated absence, not an unknown — the source says outright that the runner does not verify signatures, so this is grounded rather than needs-info.
 
@@ -239,7 +239,7 @@ on either of them. That is the finding this sitting exists for.
 
 **10.** An attacker on the retail WAN alters the container image as a store server pulls it, since protection of that traffic is unverified.
 
-- `flow:store-server-to-image-registry:pull-image`
+- `flow:process:store-server>store:image-registry>pull-image`
 - severity: low/high · verb: `alter-in-transit`
 - The image crosses from the build environment to the store estate over a WAN the source describes without saying anything about how it is protected.
 
@@ -247,7 +247,7 @@ on either of them. That is the finding this sitting exists for.
 
 **11.** An attacker on the retail WAN alters the answer to a store server's poll so that store installs a different image sha from the rest of the estate.
 
-- `flow:store-server-to-deploy-controller:poll-current-release`
+- `flow:process:store-server>process:deploy-controller>poll-current-release`
 - severity: low/medium · verb: `alter-in-transit`
 - Per-store rather than estate-wide, which is what separates it from writing the controller's record.
 
@@ -258,7 +258,7 @@ on either of them. That is the finding this sitting exists for.
 
 **12.** A build that reached the estate cannot be attributed to the developer who started it, because any developer can trigger a manual rebuild on an unreviewed path whose authentication is unverified.
 
-- `flow:developer-to-build-runner:manual-rebuild`, `process:build-runner`
+- `flow:entity:developer>process:build-runner>manual-rebuild`, `process:build-runner`
 - severity: medium/medium · verb: `unattributable`
 - The source states the path is not reviewed and does not require a merge, so the git history that would otherwise carry attribution is bypassed by construction.
 
@@ -266,7 +266,7 @@ on either of them. That is the finding this sitting exists for.
 
 **13.** The deploy controller cannot tell which pipeline set a release, because every pipeline presents the same shared build token.
 
-- `flow:build-runner-to-deploy-controller:set-current-release`, `process:deploy-controller`
+- `flow:process:build-runner>process:deploy-controller>set-current-release`, `process:deploy-controller`
 - severity: high/medium · verb: `unattributable`
 - High likelihood because it is not an attack condition but the described steady state — the token is stated to be the same for every pipeline.
 
@@ -277,7 +277,7 @@ on either of them. That is the finding this sitting exists for.
 
 **14.** An attacker who reads the build runner's configuration recovers the shared build token and can thereafter set the estate's release.
 
-- `process:build-runner`, `flow:build-runner-to-deploy-controller:set-current-release`
+- `process:build-runner`, `flow:process:build-runner>process:deploy-controller>set-current-release`
 - severity: medium/high · verb: `recover-credential`
 - Recovering the credential is a separate action from using it, and the corpus files the use under spoofing; the never-rotated qualifier is what makes recovery durable.
 
@@ -301,7 +301,7 @@ on either of them. That is the finding this sitting exists for.
 
 **17.** An attacker on the retail WAN reads the container image as a store server pulls it, since protection of that traffic is unverified.
 
-- `flow:store-server-to-image-registry:pull-image`
+- `flow:process:store-server>store:image-registry>pull-image`
 - severity: low/medium · verb: `intercept`
 - Reading the image in transit and altering it in transit are two claims on one flow. The elements are identical, so the action verb is the only thing that separates them: `intercept` against `alter-in-transit`.
 
@@ -328,7 +328,7 @@ on either of them. That is the finding this sitting exists for.
 
 **20.** An attacker makes the image registry unreachable over the WAN so store servers cannot complete a pull and the estate is left split across two releases.
 
-- `flow:store-server-to-image-registry:pull-image`, `store:image-registry`
+- `flow:process:store-server>store:image-registry>pull-image`, `store:image-registry`
 - severity: low/medium · verb: `disable`
 - The interesting consequence is not downtime but divergence: the source describes no ordering or rollback across 1,200 independent pullers.
 
@@ -339,7 +339,7 @@ on either of them. That is the finding this sitting exists for.
 
 **21.** Any developer turns code of their own choosing into the software running in 1,200 stores by triggering the manual rebuild, a path the source states requires no merge and receives no review.
 
-- `flow:developer-to-build-runner:manual-rebuild`, `process:store-server`
+- `flow:entity:developer>process:build-runner>manual-rebuild`, `process:store-server`
 - severity: medium/high · verb: `abuse-grant`
 - The case's signature shape: authority flows upward through the build, so the weakest gate on the input side is the real authority over the estate.
 
@@ -355,7 +355,7 @@ on either of them. That is the finding this sitting exists for.
 
 **23.** An attacker who takes one store server uses whatever it presents to reach the deploy controller on the corporate network and the registry in the build environment.
 
-- `flow:store-server-to-deploy-controller:poll-current-release`, `flow:store-server-to-image-registry:pull-image`, `process:store-server`
+- `flow:process:store-server>process:deploy-controller>poll-current-release`, `flow:process:store-server>store:image-registry>pull-image`, `process:store-server`
 - severity: low/high · verb: `escalate`
 - A back-office box in one of 1,200 stores is the least defensible element in the model and it is stated to reach across two boundaries. It cites the two flows it crosses on, so the image registry it reaches is part of the place and this claim does not sit at the same place as the dependency one.
 
@@ -363,7 +363,7 @@ on either of them. That is the finding this sitting exists for.
 
 **24.** A malicious dependency executes with the build runner's authority during the build, carrying an attacker from the public internet into the build environment.
 
-- `flow:build-runner-to-public-package-registry:resolve-dependencies`, `process:build-runner`
+- `flow:process:build-runner>entity:public-package-registry>resolve-dependencies`, `process:build-runner`
 - severity: medium/high · verb: `escalate`
 - Distinct from the tampering claim on the same flow: that one is about what ends up in the image, this one is about code running on the runner at build time.
 
@@ -414,8 +414,8 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "1bfb96ef3374b697ef78e76661daa3d2b227792a3b20d2d1ee1d526cde02652c",
-      "model.json": "3a5681119550c5b8e5e461b414a3266d95ac7ebb887bd25f863244f0c50854ec",
-      "claims/stride.json": "20819276989745ff8df40a7b64cbaf6f595c1324b30ea2f160caa68c35363e1f"
+      "model.json": "d1b86827c28af02381ec53351fde0294f760ea296e051611e93aef2384d4c92c",
+      "claims/stride.json": "418d496873e962611c9b2187a1c7193dbca22348b556136d3c721e84bf0c43d8"
       }
     }
   }

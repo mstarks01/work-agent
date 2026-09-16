@@ -505,7 +505,7 @@ def test_prepare_records_what_the_resolver_refused(domain_loader, package_loader
     """A row the sources do not support is kept as a refusal, never as a fact."""
     unsupported = AssertionProposal(
         subject_type="interaction",
-        subject="flow:customer-to-web-app:login",
+        subject="flow:entity:customer>process:web-app>login",
         predicate="mfa-requirement",
         value=ABSENT,
         basis="stated",
@@ -1260,7 +1260,9 @@ def test_revalidate_puts_every_uncited_element_back_and_records_it():
     # The flow's ID is derived from its endpoints, so the issue names the
     # broken flow under its derived ID, and the repaired flow arrives under a
     # new one: a delete the issue licensed plus an add, both permitted.
-    assert baseline["implicated"] == ["flow:customer-to-does-not-exist:login"]
+    assert baseline["implicated"] == [
+        "flow:entity:customer>process:does-not-exist>login"
+    ]
 
     repaired = valid_model().model_dump(mode="json")
     repaired["processes"][0]["technology"] = "rewritten while I was here"
@@ -1270,10 +1272,13 @@ def test_revalidate_puts_every_uncited_element_back_and_records_it():
     published = ctx.state[graph.STATE_VALID_MODEL]
     assert published["processes"][0]["technology"] == "Python/FastAPI on Cloud Run"
     flows = {flow["id"]: flow for flow in published["data_flows"]}
-    assert flows["flow:customer-to-web-app:login"]["destination"] == "process:web-app"
+    assert (
+        flows["flow:entity:customer>process:web-app>login"]["destination"]
+        == "process:web-app"
+    )
     assert ctx.state[graph.STATE_MODEL_REPAIR] == {
         "scope": "elements",
-        "implicated": ["flow:customer-to-does-not-exist:login"],
+        "implicated": ["flow:entity:customer>process:does-not-exist>login"],
         "restored": ["process:web-app"],
     }
 
@@ -1373,7 +1378,10 @@ def test_prepare_derives_crossings_rather_than_trusting_them(
     # — `_attribute_entry` reads every type-specific field through
     # `control_state`, so the new field is catalogued the day it lands.
     assert output["evidence_count"] == 4
-    assert "flow:customer-to-web-app:login" in ctx.state[graph.STATE_BOUNDARY_CROSSINGS]
+    assert (
+        "flow:entity:customer>process:web-app>login"
+        in ctx.state[graph.STATE_BOUNDARY_CROSSINGS]
+    )
     assert "process:web-app" in ctx.state[graph.STATE_SYSTEM_MODEL]
 
 
@@ -1400,7 +1408,7 @@ def test_prepare_shows_the_agents_the_evidence_catalog_as_references(
     )
 
     rendered = ctx.state[graph.STATE_EVIDENCE_CATALOG]
-    assert "| `crossing:flow:customer-to-web-app:login` |" in rendered
+    assert "| `crossing:flow:entity:customer>process:web-app>login` |" in rendered
     assert "crosses a trust boundary" in rendered
     assert not rendered.lstrip().startswith("["), "a list is what agents composed from"
     assert all(isinstance(ref, str) for ref in rendered)
@@ -3379,7 +3387,7 @@ def test_merge_marks_an_invented_key_before_the_deferral_split():
                 description="d",
                 needs_evidence="code",
                 direction="question",
-                evidence_refs=["crossing:flow:customer-to-web-app:login"],
+                evidence_refs=["crossing:flow:entity:customer>process:web-app>login"],
             ).model_dump(mode="json")
         ]
     }
