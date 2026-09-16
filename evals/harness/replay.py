@@ -97,7 +97,7 @@ from analysis_service.assertions import (
     snap_subject,
 )
 from analysis_service.grounding import normalize
-from analysis_service.system_model import DataFlow, SystemModel
+from analysis_service.system_model import DataFlow, SystemModel, flow_label
 from evals.harness.alignment import (
     Alignment,
     align,
@@ -317,11 +317,11 @@ def _flow_fate(
     )
     if between:
         return ElementFate(flow.id, "unresolved", candidates=between)
-    label = flow.id.rsplit(":", 1)[-1]
+    label = flow_label(flow.id)
     touching = tuple(
         one.id
         for one in loose
-        if one.id.rsplit(":", 1)[-1] == label
+        if flow_label(one.id) == label
         and {one.source, one.destination} & {source, destination}
     )
     if touching:

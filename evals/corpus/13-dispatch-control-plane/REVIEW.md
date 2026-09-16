@@ -97,14 +97,14 @@ Not part of the question, but the records cite these names, so you need them.
 
 | id | source | destination | protocol | authentication | in transit |
 |---|---|---|---|---|---|
-| flow:duty-engineer-to-dispatch-console:open-console | entity:duty-engineer | process:dispatch-console | unknown | unknown | unknown |
-| flow:dispatch-console-to-dispatch-api:dispatch-requests | process:dispatch-console | process:dispatch-api | unknown | unknown | unknown |
-| flow:dispatch-console-to-dispatch-api:live-job-status | process:dispatch-console | process:dispatch-api | WebSocket | unknown | unknown |
-| flow:schedule-importer-to-scheduling-partner:pull-schedule-feed | process:schedule-importer | entity:scheduling-partner | SOAP over HTTPS | unknown | encrypted (HTTPS) |
-| flow:schedule-importer-to-schedule-archive:store-schedule-documents | process:schedule-importer | store:schedule-archive | unknown | unknown | unknown |
-| flow:schedule-importer-to-dispatch-api:post-work-orders | process:schedule-importer | process:dispatch-api | unknown | an API token issued when the importer was built and never rotated since | unknown |
-| flow:dispatch-api-to-dispatch-database:read-write-job-orders | process:dispatch-api | store:dispatch-database | unknown | unknown | unknown |
-| flow:duty-engineer-to-corporate-web-host:load-console | entity:duty-engineer | process:corporate-web-host | unknown | unknown | unknown |
+| flow:entity:duty-engineer>process:dispatch-console>open-console | entity:duty-engineer | process:dispatch-console | unknown | unknown | unknown |
+| flow:process:dispatch-console>process:dispatch-api>dispatch-requests | process:dispatch-console | process:dispatch-api | unknown | unknown | unknown |
+| flow:process:dispatch-console>process:dispatch-api>live-job-status | process:dispatch-console | process:dispatch-api | WebSocket | unknown | unknown |
+| flow:process:schedule-importer>entity:scheduling-partner>pull-schedule-feed | process:schedule-importer | entity:scheduling-partner | SOAP over HTTPS | unknown | encrypted (HTTPS) |
+| flow:process:schedule-importer>store:schedule-archive>store-schedule-documents | process:schedule-importer | store:schedule-archive | unknown | unknown | unknown |
+| flow:process:schedule-importer>process:dispatch-api>post-work-orders | process:schedule-importer | process:dispatch-api | unknown | an API token issued when the importer was built and never rotated since | unknown |
+| flow:process:dispatch-api>store:dispatch-database>read-write-job-orders | process:dispatch-api | store:dispatch-database | unknown | unknown | unknown |
+| flow:entity:duty-engineer>process:corporate-web-host>load-console | entity:duty-engineer | process:corporate-web-host | unknown | unknown | unknown |
 
 **Trust boundaries**
 
@@ -117,9 +117,9 @@ Not part of the question, but the records cite these names, so you need them.
 **Recorded notes** — hedges, probed gaps and source disagreements live here, so read them before the sets.
 
 - `store:dispatch-database` — The source states the at-rest protection is not written down anywhere, so this is a gap somebody registered rather than a topic nobody raised.
-- `flow:duty-engineer-to-dispatch-console:open-console` — The source states nobody wrote down how an engineer signs in.
-- `flow:dispatch-console-to-dispatch-api:live-job-status` — The source states nobody wrote down whether the socket runs over TLS, whether its handshake is authenticated, or whether it checks the session again once open.
-- `flow:schedule-importer-to-scheduling-partner:pull-schedule-feed` — The source states nothing was written down about how the partner identifies our importer, or how our importer identifies the partner.
+- `flow:entity:duty-engineer>process:dispatch-console>open-console` — The source states nobody wrote down how an engineer signs in.
+- `flow:process:dispatch-console>process:dispatch-api>live-job-status` — The source states nobody wrote down whether the socket runs over TLS, whether its handshake is authenticated, or whether it checks the session again once open.
+- `flow:process:schedule-importer>entity:scheduling-partner>pull-schedule-feed` — The source states nothing was written down about how the partner identifies our importer, or how our importer identifies the partner.
 - `boundary:scheduling-partner-platform` — The source establishes an organizational distinction: the scheduling partner is another company. Drawing that distinction as a trust zone is a separate modelling judgement, and the reviewed alias on 'scheduling partner' rules on the name alone.
 
 **Assumptions**
@@ -133,7 +133,7 @@ Not part of the question, but the records cite these names, so you need them.
 **Reviewed aliases** — other names a reader ruled identify the same element, each with the words in the source that support it. An extraction using one is named differently, not wrong.
 
 - `boundary:scheduling-partner-platform — scheduling partner` — The source identifies the scheduling partner as another company. 'Platform' is an additional abstraction supplied by the corpus. Source: > A scheduling partner, which is another company
-- `flow:dispatch-console-to-dispatch-api:dispatch-requests — call api` — The ordinary console-to-API interaction. A flow alias pairs only between the same aligned endpoints, and it credits this flow alone: the WebSocket flow stands separately and one undifferentiated flow cannot receive credit for both. Ruled by the maintainer on 2026-09-16 (#961 step 6). Source: > The console calls the dispatch API.
+- `flow:process:dispatch-console>process:dispatch-api>dispatch-requests — call api` — The ordinary console-to-API interaction. A flow alias pairs only between the same aligned endpoints, and it credits this flow alone: the WebSocket flow stands separately and one undifferentiated flow cannot receive credit for both. Ruled by the maintainer on 2026-09-16 (#961 step 6). Source: > The console calls the dispatch API.
 
 ### Your list
 
@@ -158,7 +158,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A1.** `V1.5.1` — The importer parses a partner's SOAP feed as XML and nothing states whether external entities are disabled.
 
-- `process:schedule-importer`, `flow:schedule-importer-to-scheduling-partner:pull-schedule-feed`
+- `process:schedule-importer`, `flow:process:schedule-importer>entity:scheduling-partner>pull-schedule-feed`
 - The corpus's first XML parse, and the reason this case was authored for the encoding-and-sanitization lane.
 
 > mark:
@@ -168,14 +168,14 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A2.** `V3.4.2` — Nothing states which origins the dispatch API returns in its Access-Control-Allow-Origin header.
 
-- `process:dispatch-api`, `process:dispatch-console`, `flow:dispatch-console-to-dispatch-api:dispatch-requests`
+- `process:dispatch-api`, `process:dispatch-console`, `flow:process:dispatch-console>process:dispatch-api>dispatch-requests`
 - The source states the policy exists and states that nobody recorded its origins, so this is an unknown somebody registered rather than an absent control. The header is emitted by the application or by the layer in front of it, so either route settles it.
 
 > mark:
 
 **A3.** `V3.5.1` — Nothing states what validates a cross-origin dispatch request as one the console originated.
 
-- `process:dispatch-api`, `flow:dispatch-console-to-dispatch-api:dispatch-requests`
+- `process:dispatch-api`, `flow:process:dispatch-console>process:dispatch-api>dispatch-requests`
 - Separate from the header's value: one requirement asks which origins are named and this one asks what checks the request itself.
 
 > mark:
@@ -185,7 +185,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A4.** `V4.4.1` — Nothing states whether the live job status WebSocket runs over TLS.
 
-- `flow:dispatch-console-to-dispatch-api:live-job-status`
+- `flow:process:dispatch-console>process:dispatch-api>live-job-status`
 - The corpus's first WebSocket, and the transport is the attribute the source leaves unwritten by name.
 
 > mark:
@@ -195,7 +195,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A5.** `V7.2.1` — Nothing states whether the dispatch API checks an engineer's session again once the socket is open.
 
-- `flow:dispatch-console-to-dispatch-api:live-job-status`, `process:dispatch-api`
+- `flow:process:dispatch-console>process:dispatch-api>live-job-status`, `process:dispatch-api`
 - A long-lived channel is where session verification stops being a per-request property, which is the shape no other case carries.
 
 > mark:
@@ -205,7 +205,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A6.** `V6.1.1` — The input carries no documentation of how an engineer signs in to the console or what limits repeated attempts.
 
-- `flow:duty-engineer-to-dispatch-console:open-console`, `process:dispatch-console`
+- `flow:entity:duty-engineer>process:dispatch-console>open-console`, `process:dispatch-console`
 - The source states the sign-in was never written down, which is the documentation this requirement asks for.
 
 > mark:
@@ -230,7 +230,7 @@ on either of them. That is the finding this sitting exists for.
 
 **1.** An attacker who holds the importer's never-rotated API token posts work orders to the dispatch API as the importer.
 
-- `flow:schedule-importer-to-dispatch-api:post-work-orders`, `process:schedule-importer`, `process:dispatch-api`
+- `flow:process:schedule-importer>process:dispatch-api>post-work-orders`, `process:schedule-importer`, `process:dispatch-api`
 - severity: medium/high · verb: `use-credential`
 - The token is the case's one fully stated credential: issued once at build time and never rotated. It is also the only stated authentication on any crossing into the control plane, so a lane that misses it is reading nothing the source gave it.
 
@@ -238,7 +238,7 @@ on either of them. That is the finding this sitting exists for.
 
 **2.** An attacker opens a WebSocket to the dispatch API in a duty engineer's name, because nothing states what the handshake checks.
 
-- `flow:dispatch-console-to-dispatch-api:live-job-status`, `process:dispatch-api`
+- `flow:process:dispatch-console>process:dispatch-api>live-job-status`, `process:dispatch-api`
 - severity: medium/medium · verb: `impersonate`
 - The source states the handshake's authentication was never written down, which is an unknown somebody registered rather than a topic nobody raised.
 
@@ -246,7 +246,7 @@ on either of them. That is the finding this sitting exists for.
 
 **3.** An attacker answers the hourly pull as the scheduling partner, because nothing states how the importer identifies the partner.
 
-- `flow:schedule-importer-to-scheduling-partner:pull-schedule-feed`, `entity:scheduling-partner`, `process:schedule-importer`
+- `flow:process:schedule-importer>entity:scheduling-partner>pull-schedule-feed`, `entity:scheduling-partner`, `process:schedule-importer`
 - severity: low/high · verb: `impersonate`
 - Kept apart from the tampering entry on the same flow: standing in for the partner is the action here, and what the returned document then carries is the other.
 
@@ -254,7 +254,7 @@ on either of them. That is the finding this sitting exists for.
 
 **4.** An attacker signs in to the dispatch console as a duty engineer, because nothing states what the sign-in checks.
 
-- `flow:duty-engineer-to-dispatch-console:open-console`, `process:dispatch-console`
+- `flow:entity:duty-engineer>process:dispatch-console>open-console`, `process:dispatch-console`
 - severity: medium/high · verb: `impersonate`
 - The console is the near end of every crossing into the control plane, so the weakest gate on it is the authority over the estate.
 
@@ -265,7 +265,7 @@ on either of them. That is the finding this sitting exists for.
 
 **5.** An attacker returns an XML document to the hourly pull that plants work orders the partner never sent.
 
-- `flow:schedule-importer-to-scheduling-partner:pull-schedule-feed`, `process:schedule-importer`, `process:dispatch-api`
+- `flow:process:schedule-importer>entity:scheduling-partner>pull-schedule-feed`, `process:schedule-importer`, `process:dispatch-api`
 - severity: medium/high · verb: `forge`
 - The path the case is built on: a document from outside becomes work the control plane hands to a depot, and nothing between the two checks it.
 
@@ -273,7 +273,7 @@ on either of them. That is the finding this sitting exists for.
 
 **6.** An attacker on the corporate network alters a dispatch request on its way into the control plane, because nothing states the call is encrypted.
 
-- `flow:dispatch-console-to-dispatch-api:dispatch-requests`, `process:dispatch-api`
+- `flow:process:dispatch-console>process:dispatch-api>dispatch-requests`, `process:dispatch-api`
 - severity: medium/high · verb: `alter-in-transit`
 - encryption_in_transit is unknown on the one flow that carries crew moves, and the crossing it makes is into the privilege zone.
 
@@ -281,7 +281,7 @@ on either of them. That is the finding this sitting exists for.
 
 **7.** An attacker inside the control plane writes job orders straight into the dispatch database, because nothing states what the connection checks.
 
-- `store:dispatch-database`, `flow:dispatch-api-to-dispatch-database:read-write-job-orders`
+- `store:dispatch-database`, `flow:process:dispatch-api>store:dispatch-database>read-write-job-orders`
 - severity: low/high · verb: `forge`
 - Distinct from the transit entry: writing at the store is a different action from altering a request in flight.
 
@@ -289,7 +289,7 @@ on either of them. That is the finding this sitting exists for.
 
 **8.** An attacker rewrites a document in the schedule archive so the kept copy no longer matches what the partner sent.
 
-- `store:schedule-archive`, `flow:schedule-importer-to-schedule-archive:store-schedule-documents`
+- `store:schedule-archive`, `flow:process:schedule-importer>store:schedule-archive>store-schedule-documents`
 - severity: low/medium · verb: `alter`
 - The archive is written after the parse, so this alters the record of the day rather than the work itself.
 
@@ -308,7 +308,7 @@ on either of them. That is the finding this sitting exists for.
 
 **10.** The scheduling partner denies sending a work order, and nothing ties the posted order to the archived document it was parsed from.
 
-- `process:schedule-importer`, `flow:schedule-importer-to-dispatch-api:post-work-orders`, `store:schedule-archive`
+- `process:schedule-importer`, `flow:process:schedule-importer>process:dispatch-api>post-work-orders`, `store:schedule-archive`
 - severity: low/medium · verb: `unattributable`
 - The archive holds the documents and the database holds the orders, and the source states no link between them.
 
@@ -319,7 +319,7 @@ on either of them. That is the finding this sitting exists for.
 
 **11.** An attacker on the corporate network reads the live job status stream, because nothing states the WebSocket runs over TLS.
 
-- `flow:dispatch-console-to-dispatch-api:live-job-status`
+- `flow:process:dispatch-console>process:dispatch-api>live-job-status`
 - severity: medium/medium · verb: `intercept`
 - The transport of the long-lived channel is the attribute the source explicitly leaves unwritten.
 
@@ -335,7 +335,7 @@ on either of them. That is the finding this sitting exists for.
 
 **13.** An attacker returns an XML document whose external entity makes the importer read a file off the corporate network and hand it back.
 
-- `process:schedule-importer`, `flow:schedule-importer-to-scheduling-partner:pull-schedule-feed`
+- `process:schedule-importer`, `flow:process:schedule-importer>entity:scheduling-partner>pull-schedule-feed`
 - severity: low/high · verb: `elicit`
 - The parser's configuration is unstated, which is exactly what the ASVS encoding-and-sanitization record rules on for the same element.
 
@@ -343,7 +343,7 @@ on either of them. That is the finding this sitting exists for.
 
 **14.** An attacker who reaches the corporate file store reads the partner's schedule documents out of the archive.
 
-- `store:schedule-archive`, `flow:schedule-importer-to-schedule-archive:store-schedule-documents`
+- `store:schedule-archive`, `flow:process:schedule-importer>store:schedule-archive>store-schedule-documents`
 - severity: low/medium · verb: `read`
 - The archive sits in the corporate zone, so it is the one copy of the day's work an attacker reaches without crossing into the control plane.
 
@@ -354,7 +354,7 @@ on either of them. That is the finding this sitting exists for.
 
 **15.** An attacker holds open enough WebSockets to the dispatch API that duty engineers lose live job status.
 
-- `process:dispatch-api`, `flow:dispatch-console-to-dispatch-api:live-job-status`
+- `process:dispatch-api`, `flow:process:dispatch-console>process:dispatch-api>live-job-status`
 - severity: medium/medium · verb: `flood`
 - A long-lived channel is the availability shape a request-response API does not have, and the API serves both the console and the importer.
 
@@ -362,7 +362,7 @@ on either of them. That is the finding this sitting exists for.
 
 **16.** An attacker returns an XML document large enough that the hourly import never finishes and tomorrow's work never reaches the control plane.
 
-- `process:schedule-importer`, `flow:schedule-importer-to-scheduling-partner:pull-schedule-feed`
+- `process:schedule-importer`, `flow:process:schedule-importer>entity:scheduling-partner>pull-schedule-feed`
 - severity: low/medium · verb: `flood`
 - The failure is silent staleness rather than an outage: the API keeps answering and the work it holds is yesterday's.
 
@@ -373,7 +373,7 @@ on either of them. That is the finding this sitting exists for.
 
 **17.** An attacker on the corporate network uses the importer's token to act in the control plane, where a corporate laptop holds no rights at all.
 
-- `flow:schedule-importer-to-dispatch-api:post-work-orders`, `process:dispatch-api`, `boundary:production-control-plane`
+- `flow:process:schedule-importer>process:dispatch-api>post-work-orders`, `process:dispatch-api`, `boundary:production-control-plane`
 - severity: medium/high · verb: `escalate`
 - The case's central claim, and the one the privilege boundary exists to put in front of a lane: same company on both sides, and the authority is on the far side.
 
@@ -381,7 +381,7 @@ on either of them. That is the finding this sitting exists for.
 
 **18.** An attacker gets a duty engineer's browser to dispatch a crew from a page the attacker controls, because the API's allowed origins and its credential rule are unrecorded.
 
-- `flow:dispatch-console-to-dispatch-api:dispatch-requests`, `process:dispatch-api`
+- `flow:process:dispatch-console>process:dispatch-api>dispatch-requests`, `process:dispatch-api`
 - severity: medium/high · verb: `ride-session`
 - The browser holds the authority and the origin rule is what decides who may spend it, which is why an unrecorded CORS policy is an elevation rather than a header hygiene point.
 
@@ -389,7 +389,7 @@ on either of them. That is the finding this sitting exists for.
 
 **19.** An attacker who can publish on the corporate web host serves script from the console's own origin and dispatches crews with it.
 
-- `process:dispatch-console`, `flow:dispatch-console-to-dispatch-api:dispatch-requests`
+- `process:dispatch-console`, `flow:process:dispatch-console>process:dispatch-api>dispatch-requests`
 - severity: low/high · verb: `inject`
 - Distinct from the cross-origin entry: this attacker takes the origin the API trusts rather than working around what it allows.
 
@@ -440,9 +440,9 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
-      "model.json": "8bf208f98e3e38a99809426a5e5c946658b9944cc602a4bcba63dcb7c9910922",
-      "claims/asvs.json": "21223b93d65a21e5b8de043940250783cfd9408246e5c1825bef5b8cf4c3ec45",
-      "claims/stride.json": "07a43e4387e0f3d490edbdf732259e37957f4a09394d4e23e5203fca2d4558f3"
+      "model.json": "b31bc54f80f1e972ebf62c0b2c380109a67034c38cc9c15f655d36992bea9b98",
+      "claims/asvs.json": "51c6af9b7ef4046e6b6651ad6aee4290907a72b6916932821aa419b8cba6a75c",
+      "claims/stride.json": "0dda409b877378e8b1742d6054b2509100edcff310bbe5eca3fe4974a30ebf62"
       }
     }
   }

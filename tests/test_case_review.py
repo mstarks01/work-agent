@@ -65,8 +65,12 @@ UNREVIEWED: dict[str, str] = {
         "the word shared out of the orders DB authentication. So the "
         "signature cannot match. **Something the reader read has changed**: "
         "they read a model that stated a protocol on four flows and a shared "
-        "account, and the claims they ruled on were written against it. A "
-        "sitting over the current four files clears it."
+        "account, and the claims they ruled on were written against it. The "
+        "#989 flow identity migration then moved every flow ID in model.json "
+        "and in both claim files, which is a digest change and nothing more: "
+        "the same five interactions between the same endpoints under the same "
+        "labels, spelled with the endpoints' types. A sitting over the current "
+        "four files clears it."
     ),
     "02-iot-fleet-telemetry": (
         "18 STRIDE claims, waiting on a re-sitting rather than on a first "
@@ -79,8 +83,11 @@ UNREVIEWED: dict[str, str] = {
         "the gateway to the normalizer, and the telemetry lake's "
         "classification reads confidential with an assumption. **Something "
         "the reader read has changed**: two flows and a store are new, and "
-        "no recorded mark names them. A sitting over the current three files "
-        "clears it."
+        "no recorded mark names them. The #989 flow identity migration also "
+        "moved every flow ID in model.json and claims/stride.json, which is a "
+        "digest change alone: the same interactions between the same endpoints "
+        "under the same labels. A sitting over the current three files clears "
+        "it."
     ),
     "03-batch-data-pipeline": "17 STRIDE claims, unread. Declares STRIDE only.",
     "04-ml-inference-service": (

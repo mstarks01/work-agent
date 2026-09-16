@@ -53,7 +53,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from analysis_service.claims import FrameworkName
-from analysis_service.system_model import SystemModel
+from analysis_service.system_model import SystemModel, normalize_element_ids
 from evals.harness.bundle import reports_dir
 from evals.harness.fingerprint import IDENTIFIER_OF
 from evals.harness.modes import ExtractionResult, ExtractionScore, score_extraction
@@ -233,7 +233,14 @@ def extracted_model(artifact_path: Path | str, case_id: str) -> SystemModel:
         )
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
-        return SystemModel.model_validate(raw["system_model"])
+        # Normalized as well as validated, so an archived model's IDs are the
+        # ones today's rule derives. A report written under an earlier flow
+        # identity version spells its flows the way that version did, and
+        # comparing those against a migrated corpus loses every flow by ID
+        # (#989). The shipped derivation is the lift: it rebuilds each ID from
+        # the element's own name and endpoints and rewrites every reference,
+        # which is a no-op on a report already at this version.
+        return normalize_element_ids(SystemModel.model_validate(raw["system_model"]))
     except (OSError, ValueError, KeyError, TypeError) as exc:
         raise ProvenanceError(f"{path}: cannot read its system model: {exc}") from exc
 

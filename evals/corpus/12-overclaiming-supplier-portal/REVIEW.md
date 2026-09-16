@@ -79,12 +79,12 @@ Not part of the question, but the records cite these names, so you need them.
 
 | id | source | destination | protocol | authentication | in transit |
 |---|---|---|---|---|---|
-| flow:supplier-to-supplier-portal:upload-documents | entity:supplier | process:supplier-portal | unknown | username and password issued by the vendor | unknown |
-| flow:category-manager-to-supplier-portal:review-documents | entity:category-manager | process:supplier-portal | unknown | unknown | unknown |
-| flow:supplier-portal-to-document-store:store-documents | process:supplier-portal | store:document-store | unknown | unknown | unknown |
-| flow:portal-vendor-to-landing-bucket:push-nightly-extract | entity:portal-vendor | store:landing-bucket | unknown | unknown | unknown |
-| flow:supplier-master-service-to-landing-bucket:load-extract | process:supplier-master-service | store:landing-bucket | unknown | unknown | unknown |
-| flow:supplier-master-service-to-supplier-database:write-supplier-records | process:supplier-master-service | store:supplier-database | unknown | unknown | unknown |
+| flow:entity:supplier>process:supplier-portal>upload-documents | entity:supplier | process:supplier-portal | unknown | username and password issued by the vendor | unknown |
+| flow:entity:category-manager>process:supplier-portal>review-documents | entity:category-manager | process:supplier-portal | unknown | unknown | unknown |
+| flow:process:supplier-portal>store:document-store>store-documents | process:supplier-portal | store:document-store | unknown | unknown | unknown |
+| flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract | entity:portal-vendor | store:landing-bucket | unknown | unknown | unknown |
+| flow:process:supplier-master-service>store:landing-bucket>load-extract | process:supplier-master-service | store:landing-bucket | unknown | unknown | unknown |
+| flow:process:supplier-master-service>store:supplier-database>write-supplier-records | process:supplier-master-service | store:supplier-database | unknown | unknown | unknown |
 
 **Trust boundaries**
 
@@ -99,8 +99,8 @@ Not part of the question, but the records cite these names, so you need them.
 
 - `process:supplier-portal` — The datasheet's phrases — secure by design, enterprise-grade encryption throughout, fully authenticated and audited, fully compliant — name no technology and state no verifiable control, so none of them set an attribute here.
 - `store:document-store` — A logical store for the documents retained in the vendor platform, and deliberately not a separately identified database, bucket or service: the source says only that the documents stay in the platform, and names no store of its own. So this carries no reviewed alias — naming it after the platform would collapse it into boundary:vendor-platform, which is the zone that contains it. Enterprise-grade encryption throughout is a vendor marketing claim about the platform, not a stated property of this store, so encryption_at_rest is unknown rather than encrypted.
-- `flow:category-manager-to-supplier-portal:review-documents` — All access is fully authenticated and audited is a datasheet claim covering the platform generally; the source states how suppliers sign in and never states how category managers do, so this stays unknown.
-- `flow:portal-vendor-to-landing-bucket:push-nightly-extract` — The source leaves this open: we were told the extract is encrypted end to end, and the landing bucket runbook says the file arrives as a plain CSV picked up as-is. The first names no layer and the second describes the file at rest in the bucket, so they are in tension without settling whether the channel was protected. Nothing in the source resolves it, so this is unknown rather than either encrypted or unencrypted, and the open question is itself a finding.
+- `flow:entity:category-manager>process:supplier-portal>review-documents` — All access is fully authenticated and audited is a datasheet claim covering the platform generally; the source states how suppliers sign in and never states how category managers do, so this stays unknown.
+- `flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract` — The source leaves this open: we were told the extract is encrypted end to end, and the landing bucket runbook says the file arrives as a plain CSV picked up as-is. The first names no layer and the second describes the file at rest in the bucket, so they are in tension without settling whether the channel was protected. Nothing in the source resolves it, so this is unknown rather than either encrypted or unencrypted, and the open question is itself a finding.
 
 **Assumptions**
 
@@ -137,7 +137,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A1.** `V1.2.4` — The supplier master service writes records from a vendor CSV into the supplier database and nothing says how those writes are built.
 
-- `process:supplier-master-service`, `store:supplier-database`, `flow:supplier-master-service-to-supplier-database:write-supplier-records`
+- `process:supplier-master-service`, `store:supplier-database`, `flow:process:supplier-master-service>store:supplier-database>write-supplier-records`
 - The runbook states the file arrives as plain CSV and is picked up as-is, which is the fact that makes an untrusted-input path concrete.
 
 > mark:
@@ -154,7 +154,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A3.** `V5.2.2` — Suppliers upload insurance certificates and audit documents and nothing says the portal checks the file against an expected type.
 
-- `entity:supplier`, `process:supplier-portal`, `flow:supplier-to-supplier-portal:upload-documents`
+- `entity:supplier`, `process:supplier-portal`, `flow:entity:supplier>process:supplier-portal>upload-documents`
 - An upload from outside the organization is the trigger. The vendor datasheet asserts the platform is secure by design, which is a claim rather than a stated control.
 
 > mark:
@@ -198,7 +198,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A8.** `V12.2.1` — Suppliers upload to an externally hosted portal and no flow states its transport.
 
-- `entity:supplier`, `process:supplier-portal`, `flow:supplier-to-supplier-portal:upload-documents`
+- `entity:supplier`, `process:supplier-portal`, `flow:entity:supplier>process:supplier-portal>upload-documents`
 - 'Enterprise-grade encryption throughout' is the vendor's claim about its own product, not a stated fact about this connection. The requirement applies and is unsettled.
 
 > mark:
@@ -240,7 +240,7 @@ on either of them. That is the finding this sitting exists for.
 
 **1.** An attacker who obtains a supplier's vendor-issued password signs in as that supplier and uploads paperwork in their name.
 
-- `flow:supplier-to-supplier-portal:upload-documents`, `entity:supplier`
+- `flow:entity:supplier>process:supplier-portal>upload-documents`, `entity:supplier`
 - severity: medium/medium · verb: `use-credential`
 - Sign-in is the one control the source actually states, so this claim rests on a stated fact rather than on an unknown. Whether a second factor exists is never stated, and asserting its absence would be unsupported. The attacker holds the supplier's password, which is use-credential rather than impersonate.
 
@@ -248,7 +248,7 @@ on either of them. That is the finding this sitting exists for.
 
 **2.** An attacker signs in to the portal as a category manager and approves supplier paperwork, because how category managers are authenticated is unverified.
 
-- `flow:category-manager-to-supplier-portal:review-documents`, `entity:category-manager`
+- `flow:entity:category-manager>process:supplier-portal>review-documents`, `entity:category-manager`
 - severity: medium/high · verb: `impersonate`
 - The datasheet's fully authenticated and audited covers this flow rhetorically and states nothing about it. An analyst that treats the manager path as authenticated because the vendor says so has swallowed the claim.
 
@@ -256,7 +256,7 @@ on either of them. That is the finding this sitting exists for.
 
 **3.** An attacker writes a file into the landing bucket while posing as the vendor's nightly push, since how the bucket identifies the writer is unverified.
 
-- `flow:portal-vendor-to-landing-bucket:push-nightly-extract`, `store:landing-bucket`
+- `flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract`, `store:landing-bucket`
 - severity: medium/high · verb: `plant`
 - The one flow crossing from the vendor platform into our cloud account, and the source states no authentication on it at all.
 
@@ -267,7 +267,7 @@ on either of them. That is the finding this sitting exists for.
 
 **4.** An attacker modifies the extract file in the landing bucket before the supplier master service loads it, and the altered supplier records reach the database.
 
-- `store:landing-bucket`, `flow:supplier-master-service-to-landing-bucket:load-extract`
+- `store:landing-bucket`, `flow:process:supplier-master-service>store:landing-bucket>load-extract`
 - severity: medium/high · verb: `alter`
 - The runbook states the file is picked up as-is, which is a stated absence of validation rather than an inferred one — the strongest grounded finding in the case.
 
@@ -275,7 +275,7 @@ on either of them. That is the finding this sitting exists for.
 
 **5.** An attacker on the path of the nightly push alters the extract in transit, because the source contradicts itself over whether that transfer is encrypted.
 
-- `flow:portal-vendor-to-landing-bucket:push-nightly-extract`
+- `flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract`
 - severity: medium/high · verb: `alter-in-transit`
 - This is the case's central reference. The correct handling of we were told it is encrypted end to end against the runbook's plain CSV is needs-info on an unresolved question; the first names no layer and the second describes the file at rest, so neither settles the channel. Both a confident encrypted and a confident unencrypted are wrong, and the latter is worse.
 
@@ -283,7 +283,7 @@ on either of them. That is the finding this sitting exists for.
 
 **6.** An attacker with access inside the vendor platform alters a stored compliance document so a supplier appears certified when they are not.
 
-- `store:document-store`, `flow:supplier-portal-to-document-store:store-documents`
+- `store:document-store`, `flow:process:supplier-portal>store:document-store>store-documents`
 - severity: low/high · verb: `alter`
 - We run no part of the vendor platform, so every control inside it is unverifiable by us rather than absent. Secure by design is not a control.
 
@@ -294,7 +294,7 @@ on either of them. That is the finding this sitting exists for.
 
 **7.** A category manager denies having approved a supplier's paperwork, and the model holds no audit record we control or can produce.
 
-- `flow:category-manager-to-supplier-portal:review-documents`, `process:supplier-portal`
+- `flow:entity:category-manager>process:supplier-portal>review-documents`, `process:supplier-portal`
 - severity: medium/medium · verb: `unattributable`
 - The datasheet says audited and the model has no audit store, because a marketing adjective is not an element. An analyst that cites an audit log here is citing something that does not exist in the model.
 
@@ -302,7 +302,7 @@ on either of them. That is the finding this sitting exists for.
 
 **8.** The vendor disputes what a given nightly extract contained when it left their platform, and nothing on our side records what arrived.
 
-- `entity:portal-vendor`, `flow:portal-vendor-to-landing-bucket:push-nightly-extract`
+- `entity:portal-vendor`, `flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract`
 - severity: low/medium · verb: `unattributable`
 - A dispute across an organizational boundary is the repudiation shape that matters here, and it is the boundary we have least visibility across.
 
@@ -329,7 +329,7 @@ on either of them. That is the finding this sitting exists for.
 
 **11.** An attacker on the network path between a supplier and the portal reads uploaded paperwork in transit, because whether that traffic is encrypted is unverified.
 
-- `flow:supplier-to-supplier-portal:upload-documents`
+- `flow:entity:supplier>process:supplier-portal>upload-documents`
 - severity: low/medium · verb: `intercept`
 - The upload flow crosses from the public internet into the vendor platform and the datasheet's encryption claim never becomes a stated property of it.
 
@@ -359,7 +359,7 @@ on either of them. That is the finding this sitting exists for.
 
 **14.** A signed-in supplier reaches another supplier's compliance documents through the portal, because no separation between supplier tenants is stated.
 
-- `flow:supplier-to-supplier-portal:upload-documents`, `process:supplier-portal`
+- `flow:entity:supplier>process:supplier-portal>upload-documents`, `process:supplier-portal`
 - severity: medium/high · verb: `abuse-grant`
 - Many suppliers share one vendor-hosted product and the source states nothing about isolation between them. Fully compliant is the phrase most likely to be mistaken for an answer to this.
 
@@ -367,7 +367,7 @@ on either of them. That is the finding this sitting exists for.
 
 **15.** An attacker uses the contents of the extract file to make the supplier master service act beyond what a data load should do, since the file is consumed as-is.
 
-- `flow:supplier-master-service-to-landing-bucket:load-extract`, `process:supplier-master-service`
+- `flow:process:supplier-master-service>store:landing-bucket>load-extract`, `process:supplier-master-service`
 - severity: low/high · verb: `inject`
 - Picked up as-is is stated, so treating attacker-influenced file content as trusted input is grounded rather than speculative.
 
@@ -418,9 +418,9 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
-      "model.json": "8d5cc4485ffed8c5effc2d4fab5efddefa0d33b99808958209b0095767885975",
-      "claims/asvs.json": "52c00ea520ff7d309bfb232c3c53f582862a1139bad518535449fc3dc69f57eb",
-      "claims/stride.json": "ba62b3d4e2587cf389a824acaeffbfe6c37097cdff1c9aed2859c4309b6c5cf3"
+      "model.json": "e53a1efeb936ed8bb6c69986dad9e330aafd460e33ad10f16fa84ca54a6b2563",
+      "claims/asvs.json": "1557978c4d8757e7d5243d8839aa3a0950bec51093b9851e24b470fa4abb6e31",
+      "claims/stride.json": "682ed7f034133a83c6bcef123cba03d91f2cfface683d15eab24d4e6f57a60e5"
       }
     }
   }

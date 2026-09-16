@@ -62,7 +62,7 @@ def _model(**flow) -> SystemModel:
             "data_stores": [],
             "data_flows": [
                 {
-                    "id": "flow:shopper-to-api:place-order",
+                    "id": "flow:entity:shopper>process:api>place-order",
                     "name": "place order",
                     "source": "entity:shopper",
                     "destination": "process:api",

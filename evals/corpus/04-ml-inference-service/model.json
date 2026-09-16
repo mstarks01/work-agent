@@ -101,7 +101,7 @@
   ],
   "data_flows": [
     {
-      "id": "flow:calling-service-to-inference-gateway:submit-inference-request",
+      "id": "flow:entity:calling-service>process:inference-gateway>submit-inference-request",
       "name": "submit inference request",
       "description": "A product backend submits an inference request over the internet.",
       "assets": [
@@ -118,7 +118,7 @@
       "operations": "write"
     },
     {
-      "id": "flow:inference-gateway-to-model-server:forward-request",
+      "id": "flow:process:inference-gateway>process:model-server>forward-request",
       "name": "forward request",
       "description": "Gateway forwards the request into the model network.",
       "assets": [
@@ -135,7 +135,7 @@
       "operations": "write"
     },
     {
-      "id": "flow:model-server-to-model-registry-bucket:load-artifact",
+      "id": "flow:process:model-server>store:model-registry-bucket>load-artifact",
       "name": "load artifact",
       "description": "Model server pulls its model artifact at startup and loads it without verifying integrity.",
       "assets": [
@@ -152,7 +152,7 @@
       "operations": "read"
     },
     {
-      "id": "flow:model-server-to-redis-feature-store:read-features",
+      "id": "flow:process:model-server>store:redis-feature-store>read-features",
       "name": "read features",
       "description": "Model server reads per-customer features for a request.",
       "assets": [
@@ -171,7 +171,7 @@
       "notes": "The source says Redis has no password on it, which establishes the absence of password authentication and not the absence of every mechanism."
     },
     {
-      "id": "flow:inference-gateway-to-inference-log:write-request-log",
+      "id": "flow:process:inference-gateway>store:inference-log>write-request-log",
       "name": "write request log",
       "description": "Gateway records the full request and response for debugging.",
       "assets": [
@@ -188,7 +188,7 @@
       "operations": "write"
     },
     {
-      "id": "flow:ml-engineer-to-model-registry-bucket:publish-artifact",
+      "id": "flow:entity:ml-engineer>store:model-registry-bucket>publish-artifact",
       "name": "publish artifact",
       "description": "Engineer pushes a new model artifact into the registry.",
       "assets": [

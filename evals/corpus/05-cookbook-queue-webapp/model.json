@@ -103,7 +103,7 @@
   ],
   "data_flows": [
     {
-      "id": "flow:browser-to-web-application:page-request",
+      "id": "flow:entity:browser>process:web-application>page-request",
       "name": "page request",
       "description": "User's browser makes requests to the application; responses ride the same interaction.",
       "assets": [],
@@ -118,7 +118,7 @@
       "operations": "unknown"
     },
     {
-      "id": "flow:web-application-to-message-queue:enqueue-job",
+      "id": "flow:process:web-application>store:message-queue>enqueue-job",
       "name": "enqueue job",
       "description": "Application places a job on the queue.",
       "assets": [
@@ -135,7 +135,7 @@
       "operations": "write"
     },
     {
-      "id": "flow:background-worker-process-to-message-queue:consume-job",
+      "id": "flow:process:background-worker-process>store:message-queue>consume-job",
       "name": "consume job",
       "description": "Worker takes jobs off the queue.",
       "assets": [
@@ -152,7 +152,7 @@
       "operations": "read-write"
     },
     {
-      "id": "flow:background-worker-process-to-database:read-write-records",
+      "id": "flow:process:background-worker-process>store:database>read-write-records",
       "name": "read write records",
       "description": "Worker reads and writes application records and log records.",
       "assets": [
@@ -169,7 +169,7 @@
       "operations": "read-write"
     },
     {
-      "id": "flow:web-application-to-web-application-config:read-configuration",
+      "id": "flow:process:web-application>store:web-application-config>read-configuration",
       "name": "read configuration",
       "description": "Application reads its settings, including queue credentials.",
       "assets": [
@@ -186,7 +186,7 @@
       "operations": "read"
     },
     {
-      "id": "flow:background-worker-process-to-worker-config:read-configuration",
+      "id": "flow:process:background-worker-process>store:worker-config>read-configuration",
       "name": "read configuration",
       "description": "Worker reads its settings, including database credentials.",
       "assets": [

@@ -163,7 +163,12 @@ a **table**, `VERSION_FOR`, not a default: an open claim set composes an identit
 from an action and a place, and a claim naming a catalog requirement composes
 one from that requirement and the place it was ruled in. It is **versioned**, and a vote stores its components rather than its hash,
 so improving the rule re-keys the whole ledger by recomputation and costs no
-re-vote. There is **no model judge**: the rule decides every match, and a
+re-vote. A **Data Flow**'s own identity is versioned apart from it: the ID
+carries both endpoints' full IDs and its label, `FLOW_ID_RULES` holds every
+version's shape, builder and decoder, and no version's decoder ever leaves the
+table because archived reports hold earlier spellings. Read a flow's label with
+`flow_label`, never by splitting the ID — two instruments split on the last
+colon and both stopped being right the day the endpoints gained their types. There is **no model judge**: the rule decides every match, and a
 human vote is the only ground truth on whether an unmatched finding is real —
 its reason code decides whether it moves an analysis number or a writing one.
 See `docs/agents/claim-identity.md`.

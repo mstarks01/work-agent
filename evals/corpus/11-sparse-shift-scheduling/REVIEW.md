@@ -77,12 +77,12 @@ Not part of the question, but the records cite these names, so you need them.
 
 | id | source | destination | protocol | authentication | in transit |
 |---|---|---|---|---|---|
-| flow:colleague-to-scheduling-web-app:view-shifts | entity:colleague | process:scheduling-web-app | unknown | unknown | unknown |
-| flow:store-manager-to-scheduling-web-app:build-rota | entity:store-manager | process:scheduling-web-app | unknown | unknown | unknown |
-| flow:scheduling-web-app-to-scheduling-service:rota-requests | process:scheduling-web-app | process:scheduling-service | unknown | unknown | unknown |
-| flow:scheduling-service-to-rota-database:read-write-rotas | process:scheduling-service | store:rota-database | unknown | unknown | unknown |
-| flow:scheduling-service-to-file-share:write-payroll-export | process:scheduling-service | store:file-share | unknown | unknown | unknown |
-| flow:payroll-system-to-file-share:collect-payroll-export | entity:payroll-system | store:file-share | unknown | unknown | unknown |
+| flow:entity:colleague>process:scheduling-web-app>view-shifts | entity:colleague | process:scheduling-web-app | unknown | unknown | unknown |
+| flow:entity:store-manager>process:scheduling-web-app>build-rota | entity:store-manager | process:scheduling-web-app | unknown | unknown | unknown |
+| flow:process:scheduling-web-app>process:scheduling-service>rota-requests | process:scheduling-web-app | process:scheduling-service | unknown | unknown | unknown |
+| flow:process:scheduling-service>store:rota-database>read-write-rotas | process:scheduling-service | store:rota-database | unknown | unknown | unknown |
+| flow:process:scheduling-service>store:file-share>write-payroll-export | process:scheduling-service | store:file-share | unknown | unknown | unknown |
+| flow:entity:payroll-system>store:file-share>collect-payroll-export | entity:payroll-system | store:file-share | unknown | unknown | unknown |
 
 **Trust boundaries**
 
@@ -99,7 +99,7 @@ Not part of the question, but the records cite these names, so you need them.
 **Assumptions**
 
 - `process:scheduling-web-app` — The scheduling web app is placed on the internal network because the schema requires a zone; the source places it nowhere. (basis: The placement of the service, the database and the share does not establish the web app's placement. The value is a placement the schema requires, not a source-backed fact.)
-- `flow:scheduling-web-app-to-scheduling-service:rota-requests` — The app both reads and writes rotas through the scheduling service. (basis: The interaction itself is described only as 'talks to'. Managers build rotas through the app and colleagues view their shifts through it, and the service is what reads and writes the rotas, so the app's path carries both.)
+- `flow:process:scheduling-web-app>process:scheduling-service>rota-requests` — The app both reads and writes rotas through the scheduling service. (basis: The interaction itself is described only as 'talks to'. Managers build rotas through the app and colleagues view their shifts through it, and the service is what reads and writes the rotas, so the app's path carries both.)
 - `entity:colleague` — The colleague is placed on the public internet because the schema requires a zone; the source does not place them. (basis: Personal phones and use of the app do not establish internet access; an internal connection or a VPN remains possible. The value is a placement the schema requires, not a source-backed fact.)
 - `entity:store-manager` — The store manager is placed on the public internet because the schema requires a zone; the source does not place them. (basis: Use of the same app does not establish internet access; an internal connection or a VPN remains possible. The value is a placement the schema requires, not a source-backed fact.)
 - `entity:payroll-system` — The payroll system is placed in a payroll team environment because the schema requires a zone; the source states only who runs it. (basis: Operation by another team does not establish a separate network or trust zone. The value is a placement the schema requires, not a source-backed fact.)
@@ -132,7 +132,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A1.** `V1.2.4` — The scheduling service reads and writes the rota database and nothing says how its queries are built.
 
-- `process:scheduling-service`, `store:rota-database`, `flow:scheduling-service-to-rota-database:read-write-rotas`
+- `process:scheduling-service`, `store:rota-database`, `flow:process:scheduling-service>store:rota-database>read-write-rotas`
 - A process reaching a store; query construction unstated.
 
 > mark:
@@ -142,7 +142,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A2.** `V3.3.1` — Colleagues reach the scheduling web app from their own phones and no cookie attribute is stated.
 
-- `entity:colleague`, `process:scheduling-web-app`, `flow:colleague-to-scheduling-web-app:view-shifts`
+- `entity:colleague`, `process:scheduling-web-app`, `flow:entity:colleague>process:scheduling-web-app>view-shifts`
 - The source says nobody documented how colleagues or managers sign in, which is the silence this requirement lands in. The attribute is set by whatever emits Set-Cookie, which is the application or the layer in front of it, so either route settles it.
 
 > mark:
@@ -189,7 +189,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A7.** `V12.2.1` — Colleagues reach the web app from their own phones and the source says nobody documented whether any of it is encrypted.
 
-- `entity:colleague`, `process:scheduling-web-app`, `flow:colleague-to-scheduling-web-app:view-shifts`
+- `entity:colleague`, `process:scheduling-web-app`, `flow:entity:colleague>process:scheduling-web-app>view-shifts`
 - The case that made #219 concrete: the app is stated to be a web app and its transport is stated to be unrecorded. The requirement applies for the first fact and is unsettled by the second.
 
 > mark:
@@ -224,7 +224,7 @@ on either of them. That is the finding this sitting exists for.
 
 **1.** An attacker signs in to the scheduling web app as a colleague and reads that colleague's shifts and details, because how colleagues are authenticated is unverified.
 
-- `flow:colleague-to-scheduling-web-app:view-shifts`, `entity:colleague`
+- `flow:entity:colleague>process:scheduling-web-app>view-shifts`, `entity:colleague`
 - severity: medium/medium · verb: `impersonate`
 - The source explicitly says nobody has documented how colleagues sign in. needs-info is the right verdict here; silence is not.
 
@@ -232,7 +232,7 @@ on either of them. That is the finding this sitting exists for.
 
 **2.** An attacker signs in as a store manager and builds that store's rota, because how managers are authenticated is unverified.
 
-- `flow:store-manager-to-scheduling-web-app:build-rota`, `entity:store-manager`
+- `flow:entity:store-manager>process:scheduling-web-app>build-rota`, `entity:store-manager`
 - severity: medium/high · verb: `impersonate`
 - Same unknown as the colleague lane but a materially higher impact, which is why the two are kept as separate references rather than one.
 
@@ -240,7 +240,7 @@ on either of them. That is the finding this sitting exists for.
 
 **3.** An attacker presents itself to the file share as the payroll system and collects the weekly payroll export, since how the share identifies a collector is unverified.
 
-- `flow:payroll-system-to-file-share:collect-payroll-export`, `store:file-share`
+- `flow:entity:payroll-system>store:file-share>collect-payroll-export`, `store:file-share`
 - severity: medium/high · verb: `impersonate`
 - This is the boundary crossing the source draws most clearly and says least about. The payroll team environment is a zone we are told nothing else about.
 
@@ -248,7 +248,7 @@ on either of them. That is the finding this sitting exists for.
 
 **4.** An attacker on the internal network calls the scheduling service while claiming to be the web app, because how the two identify each other is unverified.
 
-- `flow:scheduling-web-app-to-scheduling-service:rota-requests`
+- `flow:process:scheduling-web-app>process:scheduling-service>rota-requests`
 - severity: medium/high · verb: `impersonate`
 - Stated as undocumented in the closing paragraph, which is the sentence most likely to be dropped in extraction.
 
@@ -259,7 +259,7 @@ on either of them. That is the finding this sitting exists for.
 
 **5.** An attacker alters the payroll export while it sits on the file share, so the payroll system collects hours nobody worked.
 
-- `store:file-share`, `flow:payroll-system-to-file-share:collect-payroll-export`
+- `store:file-share`, `flow:entity:payroll-system>store:file-share>collect-payroll-export`
 - severity: medium/high · verb: `alter`
 - The export rests unattended between two independent trust zones, and nothing states any integrity control over it. This is the case's strongest finding.
 
@@ -267,7 +267,7 @@ on either of them. That is the finding this sitting exists for.
 
 **6.** An attacker who reaches the rota database changes rota entries directly, bypassing whatever the scheduling service enforces.
 
-- `store:rota-database`, `flow:scheduling-service-to-rota-database:read-write-rotas`
+- `store:rota-database`, `flow:process:scheduling-service>store:rota-database>read-write-rotas`
 - severity: low/high · verb: `alter`
 - Reaching the store and modifying it is a distinct claim from reading it; the pair is deliberately split across lanes.
 
@@ -275,7 +275,7 @@ on either of them. That is the finding this sitting exists for.
 
 **7.** An attacker positioned between a manager's device and the web app modifies rota changes in flight, because whether the traffic is encrypted is unverified.
 
-- `flow:store-manager-to-scheduling-web-app:build-rota`
+- `flow:entity:store-manager>process:scheduling-web-app>build-rota`
 - severity: low/medium · verb: `alter-in-transit`
 - Encryption in transit is stated as undocumented, not as absent; an analyst asserting there is no TLS here is unsupported.
 
@@ -286,7 +286,7 @@ on either of them. That is the finding this sitting exists for.
 
 **8.** A store manager denies having made a rota change that disadvantaged a colleague, and nothing in the model records who changed what.
 
-- `process:scheduling-service`, `flow:store-manager-to-scheduling-web-app:build-rota`
+- `process:scheduling-service`, `flow:entity:store-manager>process:scheduling-web-app>build-rota`
 - severity: medium/medium · verb: `unattributable`
 - No log or audit store appears anywhere in the source. Absence of a logging element is a legitimate repudiation finding; absence of a stated control is not.
 
@@ -294,7 +294,7 @@ on either of them. That is the finding this sitting exists for.
 
 **9.** Nobody can establish who collected a given payroll export from the file share, because no record of collections exists in the model.
 
-- `flow:payroll-system-to-file-share:collect-payroll-export`, `store:file-share`
+- `flow:entity:payroll-system>store:file-share>collect-payroll-export`, `store:file-share`
 - severity: medium/medium · verb: `unattributable`
 - Pairs with the spoofing claim on the same flow: one is getting in as payroll, this one is that nothing afterwards distinguishes them.
 
@@ -313,7 +313,7 @@ on either of them. That is the finding this sitting exists for.
 
 **11.** An attacker with access to the file share reads a whole store's payroll export in one file.
 
-- `store:file-share`, `flow:scheduling-service-to-file-share:write-payroll-export`
+- `store:file-share`, `flow:process:scheduling-service>store:file-share>write-payroll-export`
 - severity: medium/high · verb: `read`
 - Aggregation is the point: the export concentrates in one artifact what the database holds per colleague.
 
@@ -321,7 +321,7 @@ on either of them. That is the finding this sitting exists for.
 
 **12.** An attacker on the network path between a colleague's phone and the web app reads that colleague's shifts and details in transit.
 
-- `flow:colleague-to-scheduling-web-app:view-shifts`
+- `flow:entity:colleague>process:scheduling-web-app>view-shifts`
 - severity: low/medium · verb: `intercept`
 - The one flow that leaves the internal network on the colleague side, with encryption explicitly undocumented.
 
@@ -351,7 +351,7 @@ on either of them. That is the finding this sitting exists for.
 
 **15.** A colleague uses the shared app to build or change a rota as though they were a store manager, because the separation between the two roles is unverified.
 
-- `process:scheduling-web-app`, `flow:colleague-to-scheduling-web-app:view-shifts`
+- `process:scheduling-web-app`, `flow:entity:colleague>process:scheduling-web-app>view-shifts`
 - severity: medium/high · verb: `abuse-grant`
 - Both roles are stated to use the same app, and no authorization rule between them is stated anywhere. This is the finding that follows from the shared-app fact rather than from any missing control.
 
@@ -359,7 +359,7 @@ on either of them. That is the finding this sitting exists for.
 
 **16.** An attacker on the internal network calls the scheduling service directly and performs rota writes the web app would not have allowed.
 
-- `process:scheduling-service`, `flow:scheduling-web-app-to-scheduling-service:rota-requests`
+- `process:scheduling-service`, `flow:process:scheduling-web-app>process:scheduling-service>rota-requests`
 - severity: low/high · verb: `escalate`
 - The service is where writes actually happen, which the source says outright; whether it re-checks anything the app checked is undocumented.
 
@@ -410,9 +410,9 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "2507fd3081003c1c94427ef81dcea36f6ca92f5358c965789b49ec4af89b6a60",
-      "model.json": "11aa23312ad57b5257922c71f89d2ea02e07fa4061e2677fdfd9e5ea72617488",
-      "claims/asvs.json": "5aa40048cd72a41cfaf7079d760a9a6aee4bf16a197e22203d32d60c39a54e6f",
-      "claims/stride.json": "b56e600389930164b345d4859160bc6fd77bc59df466b5ecf0af5e22bb8d67b0"
+      "model.json": "252800813f3b60ff0937689d594ee0d29879b84595259d16ef4cd8f64e1e72f1",
+      "claims/asvs.json": "47f787e3c526f8ddc7da2eac4d1739f3685c9b9e926a2bd66c72c26b9d997700",
+      "claims/stride.json": "e9148f9977acf9da7ca98d98abbf9271b2749904a6ec04edcc5ff39a627e0e7b"
       }
     }
   }

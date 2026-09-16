@@ -37,7 +37,7 @@ LABEL = DEFAULT_DESCRIPTION_LABEL
 # The job's one source, as the executor hands it to the fan-in.
 SOURCES = {LABEL: "Customers log in to the web app, which stores orders."}
 # A flow the sample model really derives as a boundary crossing.
-CROSSING = "flow:customer-to-web-app:login"
+CROSSING = "flow:entity:customer>process:web-app>login"
 
 
 @pytest.fixture
@@ -50,7 +50,12 @@ def mitigation(summary="Set HttpOnly and Secure on cookies"):
 
 
 ELEMENT_IDS = frozenset(
-    {"entity:customer", "process:web-app", "store:orders-db", "flow:a-to-b:x"}
+    {
+        "entity:customer",
+        "process:web-app",
+        "store:orders-db",
+        "flow:process:a>process:b>x",
+    }
 )
 
 
@@ -213,7 +218,7 @@ class TestJoinDrafts:
                 self._conditional(
                     "D-02",
                     "the flow",
-                    "flow:web-app-to-orders-db:store-order",
+                    "flow:process:web-app>store:orders-db>store-order",
                     "encryption_in_transit",
                 ),
             ]
@@ -747,9 +752,9 @@ class TestSnapDrafts:
                 "process:web-app",
             ),
             (
-                Ground(kind="derived-fact", flow_id="Flow:A-to-B:X"),
+                Ground(kind="derived-fact", flow_id="Flow:Process:A>Process:B>X"),
                 "flow_id",
-                "flow:a-to-b:x",
+                "flow:process:a>process:b>x",
             ),
         ],
     )

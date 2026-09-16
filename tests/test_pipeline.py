@@ -294,7 +294,7 @@ def test_an_unfindable_quote_is_marked_on_the_report_and_still_renders():
                 "source_label": DEFAULT_DESCRIPTION_LABEL,
             }
         ],
-        evidence_refs=["crossing:flow:customer-to-web-app:login"],
+        evidence_refs=["crossing:flow:entity:customer>process:web-app>login"],
     )
     replies = happy_replies() | {
         graph.analyze_node_name("stride", "spoofing"): claims_json(proposal)
@@ -353,7 +353,7 @@ def test_a_composed_evidence_reference_is_marked_rather_than_fatal():
         "S-01",
         "spoofing",
         evidence_refs=[
-            "crossing:flow:customer-to-web-app:login",
+            "crossing:flow:entity:customer>process:web-app>login",
             "crossing:flow:ghost",
         ],
     )

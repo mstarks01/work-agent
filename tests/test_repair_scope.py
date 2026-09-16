@@ -36,7 +36,7 @@ def test_an_uncited_change_is_put_back_and_named():
     repaired["processes"][0]["technology"] = "rewritten while I was here"
 
     merged, restored = restore_unimplicated(
-        previous, repaired, ["flow:customer-to-web-app:login"]
+        previous, repaired, ["flow:entity:customer>process:web-app>login"]
     )
 
     assert (
@@ -62,13 +62,13 @@ def test_an_uncited_deletion_is_put_back_and_a_cited_one_stands():
     repaired["data_flows"] = []
 
     merged, restored = restore_unimplicated(
-        previous, repaired, ["flow:customer-to-web-app:login"]
+        previous, repaired, ["flow:entity:customer>process:web-app>login"]
     )
 
     assert [flow["id"] for flow in merged["data_flows"]] == [
-        "flow:web-app-to-orders-db:store-order"
+        "flow:process:web-app>store:orders-db>store-order"
     ]
-    assert restored == ["flow:web-app-to-orders-db:store-order"]
+    assert restored == ["flow:process:web-app>store:orders-db>store-order"]
 
 
 def test_an_added_element_is_kept():

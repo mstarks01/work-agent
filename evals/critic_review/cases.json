@@ -57,9 +57,9 @@
       "framework": "stride",
       "framework_version": "1.0",
       "title": "The settlement webhook may accept a forged paid notification",
-      "description": "`flow:card-processor-to-storefront-api:settlement-webhook` tells `process:storefront-api` that an order is paid. Nothing states how that callback is authenticated. If the API trusts an unauthenticated callback without independently verifying payment with the processor, an attacker who can reach the public endpoint could mark an unpaid order paid.",
+      "description": "`flow:entity:card-processor>process:storefront-api>settlement-webhook` tells `process:storefront-api` that an order is paid. Nothing states how that callback is authenticated. If the API trusts an unauthenticated callback without independently verifying payment with the processor, an attacker who can reach the public endpoint could mark an unpaid order paid.",
       "affected_element_ids": [
-        "flow:card-processor-to-storefront-api:settlement-webhook",
+        "flow:entity:card-processor>process:storefront-api>settlement-webhook",
         "process:storefront-api"
       ],
       "verb": "forge",
@@ -68,7 +68,7 @@
           "kind": "unknown-attribute",
           "text": "",
           "source_label": "",
-          "element_id": "flow:card-processor-to-storefront-api:settlement-webhook",
+          "element_id": "flow:entity:card-processor>process:storefront-api>settlement-webhook",
           "attribute": "authentication",
           "flow_id": "",
           "term": ""
@@ -93,7 +93,7 @@
       "mitigations": [
         {
           "summary": "Authenticate callbacks using the processor's supported verification mechanism, and validate payment details before updating the order",
-          "detail": "Use whatever verification the card processor supports for `flow:card-processor-to-storefront-api:settlement-webhook`; a signed callback is the usual form. Then have `process:storefront-api` check the payment details the callback carries against the order before it marks one paid, so authenticating the message and establishing the payment state stay two separate steps."
+          "detail": "Use whatever verification the card processor supports for `flow:entity:card-processor>process:storefront-api>settlement-webhook`; a signed callback is the usual form. Then have `process:storefront-api` check the payment details the callback carries against the order before it marks one paid, so authenticating the message and establishing the payment state stay two separate steps."
         }
       ]
     },
@@ -229,9 +229,9 @@
       "framework": "stride",
       "framework_version": "1.0",
       "title": "Anything that reaches the order service can submit an order",
-      "description": "`flow:storefront-api-to-order-service:submit-order` carries no authentication and is accepted on network position alone. Any workload that can reach `process:order-service` in the core network can submit an order as though it were `process:storefront-api`.",
+      "description": "`flow:process:storefront-api>process:order-service>submit-order` carries no authentication and is accepted on network position alone. Any workload that can reach `process:order-service` in the core network can submit an order as though it were `process:storefront-api`.",
       "affected_element_ids": [
-        "flow:storefront-api-to-order-service:submit-order",
+        "flow:process:storefront-api>process:order-service>submit-order",
         "process:order-service"
       ],
       "verb": "impersonate",
@@ -251,14 +251,14 @@
           "source_label": "",
           "element_id": "",
           "attribute": "",
-          "flow_id": "flow:storefront-api-to-order-service:submit-order",
+          "flow_id": "flow:process:storefront-api>process:order-service>submit-order",
           "term": ""
         },
         {
           "kind": "unknown-attribute",
           "text": "",
           "source_label": "",
-          "element_id": "flow:shopper-to-storefront-api:place-order",
+          "element_id": "flow:entity:shopper>process:storefront-api>place-order",
           "attribute": "encryption_in_transit",
           "flow_id": "",
           "term": ""
@@ -274,7 +274,7 @@
       "mitigations": [
         {
           "summary": "Authenticate every submit-order request, and authorize the verified caller to submit orders",
-          "detail": "`flow:storefront-api-to-order-service:submit-order` is accepted on network position alone. Authentication alone would still admit any workload that holds an identity, so `process:order-service` has to check that the caller it verified is one permitted to submit orders."
+          "detail": "`flow:process:storefront-api>process:order-service>submit-order` is accepted on network position alone. Authentication alone would still admit any workload that holds an identity, so `process:order-service` has to check that the caller it verified is one permitted to submit orders."
         }
       ]
     },
@@ -317,7 +317,7 @@
           "kind": "unknown-attribute",
           "text": "",
           "source_label": "",
-          "element_id": "flow:shopper-to-storefront-api:place-order",
+          "element_id": "flow:entity:shopper>process:storefront-api>place-order",
           "attribute": "encryption_in_transit",
           "flow_id": "",
           "term": ""
@@ -383,7 +383,7 @@
           "kind": "unknown-attribute",
           "text": "",
           "source_label": "",
-          "element_id": "flow:shopper-to-storefront-api:place-order",
+          "element_id": "flow:entity:shopper>process:storefront-api>place-order",
           "attribute": "encryption_in_transit",
           "flow_id": "",
           "term": ""
@@ -428,9 +428,9 @@
       "framework": "stride",
       "framework_version": "1.0",
       "title": "Anything on the core network can append a forged receipt",
-      "description": "`flow:order-service-to-receipt-archive:append-receipt` carries no authentication, so any workload in the core network can write an object into `store:receipt-archive` and enter a receipt for an order that was never placed.",
+      "description": "`flow:process:order-service>store:receipt-archive>append-receipt` carries no authentication, so any workload in the core network can write an object into `store:receipt-archive` and enter a receipt for an order that was never placed.",
       "affected_element_ids": [
-        "flow:order-service-to-receipt-archive:append-receipt",
+        "flow:process:order-service>store:receipt-archive>append-receipt",
         "store:receipt-archive"
       ],
       "verb": "forge",
@@ -454,7 +454,7 @@
       },
       "mitigations": [
         {
-          "summary": "Require a verified caller identity on `flow:order-service-to-receipt-archive:append-receipt`, and have `store:receipt-archive` refuse an anonymous write",
+          "summary": "Require a verified caller identity on `flow:process:order-service>store:receipt-archive>append-receipt`, and have `store:receipt-archive` refuse an anonymous write",
           "detail": "The claim is that anything on the core network can append an object. Bind each write to a caller the archive verifies, and refuse a write that carries no identity, so reaching the network is no longer enough to enter a receipt."
         }
       ]
@@ -483,10 +483,10 @@
       "framework": "stride",
       "framework_version": "1.0",
       "title": "An unauthenticated caller reaches the database through an identity wider than that path needs",
-      "description": "Two facts the model states. `flow:storefront-api-to-order-service:submit-order` carries no authentication and is accepted on network position alone. And `process:order-service` reaches `store:orders-db` over `flow:order-service-to-orders-db:read-write-orders` as a single application account holding full read/write. So whatever the submit path does to the database, it does under an identity that may read and write every order, and nothing narrows that identity to what the path requires. Any workload in the core network can drive that path, so the authority standing behind an unauthenticated caller is the account's, not the caller's.",
+      "description": "Two facts the model states. `flow:process:storefront-api>process:order-service>submit-order` carries no authentication and is accepted on network position alone. And `process:order-service` reaches `store:orders-db` over `flow:process:order-service>store:orders-db>read-write-orders` as a single application account holding full read/write. So whatever the submit path does to the database, it does under an identity that may read and write every order, and nothing narrows that identity to what the path requires. Any workload in the core network can drive that path, so the authority standing behind an unauthenticated caller is the account's, not the caller's.",
       "affected_element_ids": [
-        "flow:storefront-api-to-order-service:submit-order",
-        "flow:order-service-to-orders-db:read-write-orders",
+        "flow:process:storefront-api>process:order-service>submit-order",
+        "flow:process:order-service>store:orders-db>read-write-orders",
         "store:orders-db",
         "process:order-service"
       ],
@@ -516,7 +516,7 @@
           "source_label": "",
           "element_id": "",
           "attribute": "",
-          "flow_id": "flow:order-service-to-orders-db:read-write-orders",
+          "flow_id": "flow:process:order-service>store:orders-db>read-write-orders",
           "term": ""
         }
       ],
@@ -530,7 +530,7 @@
       "mitigations": [
         {
           "summary": "Rotate the shared account's password on a schedule and hold it in a secrets manager rather than an environment variable",
-          "detail": "Move the credential for `flow:order-service-to-orders-db:read-write-orders` out of the worker's environment into a secrets manager the order service reads at start-up, and rotate it on a fixed schedule so a disclosed password has a bounded life."
+          "detail": "Move the credential for `flow:process:order-service>store:orders-db>read-write-orders` out of the worker's environment into a secrets manager the order service reads at start-up, and rotate it on a fixed schedule so a disclosed password has a bounded life."
         }
       ]
     },

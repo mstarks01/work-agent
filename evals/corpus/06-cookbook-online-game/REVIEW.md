@@ -77,15 +77,15 @@ Not part of the question, but the records cite these names, so you need them.
 
 | id | source | destination | protocol | authentication | in transit |
 |---|---|---|---|---|---|
-| flow:player-to-game-client:launch-and-play | entity:player | process:game-client | local | unknown | unknown |
-| flow:game-client-to-lobby:matchmaking | process:game-client | process:lobby | TCP 1234 | unknown | unknown |
-| flow:game-client-to-game-server:gameplay-traffic | process:game-client | process:game-server | TCP 1235 | unknown | unknown |
-| flow:lobby-to-game-server:hand-over-match | process:lobby | process:game-server | unknown | unknown | unknown |
-| flow:lobby-to-player-database:read-players | process:lobby | store:player-database | unknown | unknown | unknown |
-| flow:game-server-to-stats-database:read-write-stats | process:game-server | store:stats-database | unknown | unknown | unknown |
-| flow:game-server-to-player-database:update-players | process:game-server | store:player-database | unknown | unknown | unknown |
-| flow:customer-support-staff-to-moderation-website:moderate-accounts | entity:customer-support-staff | process:moderation-website | unknown | unknown | unknown |
-| flow:moderation-website-to-player-database:read-write-players | process:moderation-website | store:player-database | unknown | unknown | unknown |
+| flow:entity:player>process:game-client>launch-and-play | entity:player | process:game-client | local | unknown | unknown |
+| flow:process:game-client>process:lobby>matchmaking | process:game-client | process:lobby | TCP 1234 | unknown | unknown |
+| flow:process:game-client>process:game-server>gameplay-traffic | process:game-client | process:game-server | TCP 1235 | unknown | unknown |
+| flow:process:lobby>process:game-server>hand-over-match | process:lobby | process:game-server | unknown | unknown | unknown |
+| flow:process:lobby>store:player-database>read-players | process:lobby | store:player-database | unknown | unknown | unknown |
+| flow:process:game-server>store:stats-database>read-write-stats | process:game-server | store:stats-database | unknown | unknown | unknown |
+| flow:process:game-server>store:player-database>update-players | process:game-server | store:player-database | unknown | unknown | unknown |
+| flow:entity:customer-support-staff>process:moderation-website>moderate-accounts | entity:customer-support-staff | process:moderation-website | unknown | unknown | unknown |
+| flow:process:moderation-website>store:player-database>read-write-players | process:moderation-website | store:player-database | unknown | unknown | unknown |
 
 **Trust boundaries**
 
@@ -123,7 +123,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A1.** `V1.2.4` — The moderation website reads and writes the player database directly and nothing says how its queries are built.
 
-- `process:moderation-website`, `store:player-database`, `flow:moderation-website-to-player-database:read-write-players`
+- `process:moderation-website`, `store:player-database`, `flow:process:moderation-website>store:player-database>read-write-players`
 - A process reaching a store is the fact that makes the requirement apply; the input settles nothing about query construction.
 
 > mark:
@@ -143,7 +143,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A3.** `V3.3.1` — The moderation website is browser-delivered and no cookie attribute is stated.
 
-- `entity:customer-support-staff`, `process:moderation-website`, `flow:customer-support-staff-to-moderation-website:moderate-accounts`
+- `entity:customer-support-staff`, `process:moderation-website`, `flow:entity:customer-support-staff>process:moderation-website>moderate-accounts`
 - `interface_kind: web` puts this system in the chapter. Expected rather than must-find because the source names no session mechanism at all. The attribute is set by whatever emits Set-Cookie, which is the application or the layer in front of it, so either route settles it.
 
 > mark:
@@ -195,7 +195,7 @@ on either of them. That is the finding this sitting exists for.
 
 **1.** An attacker connects to the exposed lobby port as another player, because how the lobby authenticates a client is unverified.
 
-- `flow:game-client-to-lobby:matchmaking`, `process:lobby`
+- `flow:process:game-client>process:lobby>matchmaking`, `process:lobby`
 - severity: high/high · verb: `impersonate`
 - An internet-exposed port with unknown authentication is the highest-signal fact in the model.
 
@@ -203,7 +203,7 @@ on either of them. That is the finding this sitting exists for.
 
 **2.** An attacker connects directly to a game server on its exposed port, bypassing the lobby, as a player who was never assigned to that match.
 
-- `flow:game-client-to-game-server:gameplay-traffic`, `process:game-server`
+- `flow:process:game-client>process:game-server>gameplay-traffic`, `process:game-server`
 - severity: high/high · verb: `impersonate`
 - The direct client-to-server path is a second entry point that skips whatever matchmaking establishes.
 
@@ -211,7 +211,7 @@ on either of them. That is the finding this sitting exists for.
 
 **3.** An attacker reaches the moderation website posing as a support agent, since its authentication is unverified.
 
-- `flow:customer-support-staff-to-moderation-website:moderate-accounts`, `process:moderation-website`
+- `flow:entity:customer-support-staff>process:moderation-website>moderate-accounts`, `process:moderation-website`
 - severity: medium/high · verb: `impersonate`
 - A tool that can act on any player account; its access control is entirely unstated.
 
@@ -222,7 +222,7 @@ on either of them. That is the finding this sitting exists for.
 
 **4.** A player modifies the game client on their own machine and sends manipulated gameplay actions that the servers accept.
 
-- `process:game-client`, `flow:game-client-to-game-server:gameplay-traffic`
+- `process:game-client`, `flow:process:game-client>process:game-server>gameplay-traffic`
 - severity: high/high · verb: `forge`
 - The defining threat of this domain: the client runs on hardware the operator explicitly does not control, so client-side state is attacker-controlled input.
 
@@ -230,7 +230,7 @@ on either of them. That is the finding this sitting exists for.
 
 **5.** An attacker alters match statistics in the stats database to change rankings or rewards.
 
-- `store:stats-database`, `flow:game-server-to-stats-database:read-write-stats`
+- `store:stats-database`, `flow:process:game-server>store:stats-database>read-write-stats`
 - severity: medium/medium · verb: `alter`
 - Competitive integrity is the business asset; write authentication on this path is unverified.
 
@@ -238,7 +238,7 @@ on either of them. That is the finding this sitting exists for.
 
 **6.** An attacker who influences a game server writes fabricated progression onto player records.
 
-- `store:player-database`, `flow:game-server-to-player-database:update-players`
+- `store:player-database`, `flow:process:game-server>store:player-database>update-players`
 - severity: medium/medium · verb: `forge`
 - Three separate writers reach this store, each with unverified authentication.
 
@@ -276,7 +276,7 @@ on either of them. That is the finding this sitting exists for.
 
 **10.** An attacker on the network path reads matchmaking and gameplay traffic, including player identifiers, because encryption on both client links is unverified.
 
-- `flow:game-client-to-lobby:matchmaking`, `flow:game-client-to-game-server:gameplay-traffic`
+- `flow:process:game-client>process:lobby>matchmaking`, `flow:process:game-client>process:game-server>gameplay-traffic`
 - severity: medium/medium · verb: `intercept`
 - Both links are recorded as bare port numbers — the model gives no transport protection at all.
 
@@ -303,7 +303,7 @@ on either of them. That is the finding this sitting exists for.
 
 **13.** An attacker floods the exposed lobby until players can no longer be matched into games.
 
-- `process:lobby`, `flow:game-client-to-lobby:matchmaking`
+- `process:lobby`, `flow:process:game-client>process:lobby>matchmaking`
 - severity: high/high · verb: `flood`
 - The lobby is a single availability-critical chokepoint that every session passes through.
 
@@ -311,7 +311,7 @@ on either of them. That is the finding this sitting exists for.
 
 **14.** An attacker floods a game server's exposed port and disrupts a match in progress for every player in it.
 
-- `process:game-server`, `flow:game-client-to-game-server:gameplay-traffic`
+- `process:game-server`, `flow:process:game-client>process:game-server>gameplay-traffic`
 - severity: high/medium · verb: `flood`
 - Directly reachable match servers are the domain's signature availability problem; a disrupted match cannot be retried.
 
@@ -397,9 +397,9 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "17e797d0315fdd53d5acf05962ca0ae8a23e08f84779f8528ade6422c34577a3",
-      "model.json": "2ec1e0cc0bc8e5b70e8b7f07f517c9785daf71713d20b3c0594f4ea4152648d6",
-      "claims/asvs.json": "972c7e0fb0ac301ed91e04d9d13461c5687ef21f80ffd84dbd93610c854fc2aa",
-      "claims/stride.json": "c065371d928c804a3f2a5e85ee6f406968c5a166ecbbcc1e2a1e4daa440c9fa7"
+      "model.json": "9ed1655a543f1dc23509b03f9d254993745597327444251a51e27d7f2adf90d3",
+      "claims/asvs.json": "79b1fb614daf429bf079268027870240a41c056ba1d41174eb35007f22006bf8",
+      "claims/stride.json": "68cbca75a6fc4d8ae365c1108cd252948cfbad0b50b518e7aa61ef2f360639c6"
       }
     }
   }

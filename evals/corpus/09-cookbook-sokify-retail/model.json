@@ -127,7 +127,7 @@
   ],
   "data_flows": [
     {
-      "id": "flow:customer-to-mobile-app:browse-and-order",
+      "id": "flow:entity:customer>process:mobile-app>browse-and-order",
       "name": "Browse and order",
       "description": "Customers browse the catalogue and place orders through the mobile app.",
       "assets": [
@@ -145,7 +145,7 @@
       "operations": "read-write"
     },
     {
-      "id": "flow:mobile-app-to-web-api:api-traffic",
+      "id": "flow:process:mobile-app>process:web-api>api-traffic",
       "name": "API traffic",
       "description": "The app talks to the web API over HTTP, not HTTPS; the source notes this is already on the list.",
       "assets": [
@@ -163,7 +163,7 @@
       "operations": "unknown"
     },
     {
-      "id": "flow:catalogue-spreadsheet-to-web-api:sql-statements",
+      "id": "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
       "name": "SQL statements",
       "description": "The macros in the catalogue spreadsheet send SQL statements straight to the web API to change prices and product copy.",
       "assets": [
@@ -181,7 +181,7 @@
       "operations": "write"
     },
     {
-      "id": "flow:web-api-to-user-database:customer-records",
+      "id": "flow:process:web-api>store:user-database>customer-records",
       "name": "Customer records",
       "description": "The web API keeps customers in the user database.",
       "assets": [
@@ -200,7 +200,7 @@
       "operations": "read-write"
     },
     {
-      "id": "flow:web-api-to-sims:order-handover",
+      "id": "flow:process:web-api>process:sims>order-handover",
       "name": "Order handover",
       "description": "When an order is placed the API hands the order over to SIMS.",
       "assets": [
@@ -219,7 +219,7 @@
       "operations": "write"
     },
     {
-      "id": "flow:sims-to-delivery-address-flat-file:address-write",
+      "id": "flow:process:sims>store:delivery-address-flat-file>address-write",
       "name": "Address write",
       "description": "SIMS writes the delivery address into a flat file kept alongside it.",
       "assets": [
@@ -237,7 +237,7 @@
       "operations": "write"
     },
     {
-      "id": "flow:sims-to-fax-gateway:dispatch-note",
+      "id": "flow:process:sims>process:fax-gateway>dispatch-note",
       "name": "Dispatch note",
       "description": "SIMS sends a dispatch note to the fax gateway for the order.",
       "assets": [
@@ -255,7 +255,7 @@
       "operations": "write"
     },
     {
-      "id": "flow:fax-gateway-to-customer:confirmation-fax",
+      "id": "flow:process:fax-gateway>entity:customer>confirmation-fax",
       "name": "Confirmation fax",
       "description": "The gateway dials the number stored against the order and faxes the customer a confirmation with their name and address on it; nobody checks it arrived at the right place.",
       "assets": [

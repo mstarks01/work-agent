@@ -94,14 +94,14 @@ Not part of the question, but the records cite these names, so you need them.
 
 | id | source | destination | protocol | authentication | in transit |
 |---|---|---|---|---|---|
-| flow:colleague-to-identity-broker:sign-in | entity:colleague | process:identity-broker | unknown | unknown | unknown |
-| flow:franchise-identity-provider-to-identity-broker:vouch-for-colleague | entity:franchise-identity-provider | process:identity-broker | unknown | the broker accepts the provider's assertion as a sign-in; which colleagues the provider may vouch for is not written down | unknown |
-| flow:colleague-to-store-admin-console:change-prices-and-void | entity:colleague | process:store-admin-console | unknown | the token alone: its store-manager group decides, the colleague's own store is never checked, and nothing calls back to the broker to re-check them | unknown |
-| flow:store-admin-console-to-identity-broker:fetch-public-key | process:store-admin-console | process:identity-broker | unknown | unknown | unknown |
-| flow:identity-broker-to-hr-system:nightly-group-pull | process:identity-broker | entity:hr-system | unknown | unknown | unknown |
-| flow:identity-broker-to-directory:read-write-directory | process:identity-broker | store:directory | unknown | unknown | unknown |
-| flow:identity-broker-to-key-store:read-signing-key | process:identity-broker | store:key-store | unknown | unknown | unknown |
-| flow:identity-broker-to-audit-log:write-sign-ins | process:identity-broker | store:audit-log | unknown | unknown | unknown |
+| flow:entity:colleague>process:identity-broker>sign-in | entity:colleague | process:identity-broker | unknown | unknown | unknown |
+| flow:entity:franchise-identity-provider>process:identity-broker>vouch-for-colleague | entity:franchise-identity-provider | process:identity-broker | unknown | the broker accepts the provider's assertion as a sign-in; which colleagues the provider may vouch for is not written down | unknown |
+| flow:entity:colleague>process:store-admin-console>change-prices-and-void | entity:colleague | process:store-admin-console | unknown | the token alone: its store-manager group decides, the colleague's own store is never checked, and nothing calls back to the broker to re-check them | unknown |
+| flow:process:store-admin-console>process:identity-broker>fetch-public-key | process:store-admin-console | process:identity-broker | unknown | unknown | unknown |
+| flow:process:identity-broker>entity:hr-system>nightly-group-pull | process:identity-broker | entity:hr-system | unknown | unknown | unknown |
+| flow:process:identity-broker>store:directory>read-write-directory | process:identity-broker | store:directory | unknown | unknown | unknown |
+| flow:process:identity-broker>store:key-store>read-signing-key | process:identity-broker | store:key-store | unknown | unknown | unknown |
+| flow:process:identity-broker>store:audit-log>write-sign-ins | process:identity-broker | store:audit-log | unknown | unknown | unknown |
 
 **Trust boundaries**
 
@@ -151,7 +151,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A1.** `V6.1.1` — The input carries no documentation of rate limiting or anti-automation on a sign-in colleagues reach from their own devices at home.
 
-- `entity:colleague`, `process:identity-broker`, `flow:colleague-to-identity-broker:sign-in`
+- `entity:colleague`, `process:identity-broker`, `flow:entity:colleague>process:identity-broker>sign-in`
 - A documentation requirement: the subject sits outside the running system, so needs-info by construction.
 
 > mark:
@@ -161,14 +161,14 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A2.** `V7.1.3` — The broker accepts a franchise provider's assertion as a sign-in and nothing documents the trust relationships in that federation.
 
-- `entity:franchise-identity-provider`, `process:identity-broker`, `flow:franchise-identity-provider-to-identity-broker:vouch-for-colleague`
+- `entity:franchise-identity-provider`, `process:identity-broker`, `flow:entity:franchise-identity-provider>process:identity-broker>vouch-for-colleague`
 - The source states the gap as which colleagues the provider may vouch for. This requirement asks for the documented relationship rather than the check itself.
 
 > mark:
 
 **A3.** `V7.4.2` — A leaver stops being a colleague on a nightly pull while their twelve-hour token stays usable, and nothing can end it early.
 
-- `entity:hr-system`, `process:identity-broker`, `flow:identity-broker-to-hr-system:nightly-group-pull`
+- `entity:hr-system`, `process:identity-broker`, `flow:process:identity-broker>entity:hr-system>nightly-group-pull`
 - The source states all three facts: nightly leaver processing, a twelve-hour lifetime, and no way to pull a token back. This requirement is the one they meet.
 
 > mark:
@@ -178,7 +178,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A4.** `V8.2.2` — The console reads the store-manager group from the token and never checks which store the holder belongs to.
 
-- `entity:colleague`, `process:store-admin-console`, `flow:colleague-to-store-admin-console:change-prices-and-void`
+- `entity:colleague`, `process:store-admin-console`, `flow:entity:colleague>process:store-admin-console>change-prices-and-void`
 - The source states the defect outright: a store-manager token works against every store. Data-specific access is the requirement it fails.
 
 > mark:
@@ -222,7 +222,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A9.** `V12.2.1` — Colleagues sign in from their own devices at home and no flow states its transport.
 
-- `entity:colleague`, `process:identity-broker`, `flow:colleague-to-identity-broker:sign-in`
+- `entity:colleague`, `process:identity-broker`, `flow:entity:colleague>process:identity-broker>sign-in`
 - The broker is stated to be reachable from outside and its transport is stated nowhere. Applicability comes from what the broker presents, not from this silence — see ADR 0014.
 
 > mark:
@@ -232,7 +232,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 **A10.** `V16.1.1` — An audit log exists and the input carries nothing written down about what it records or whether it covers the franchise route.
 
-- `process:identity-broker`, `store:audit-log`, `flow:identity-broker-to-audit-log:write-sign-ins`
+- `process:identity-broker`, `store:audit-log`, `flow:process:identity-broker>store:audit-log>write-sign-ins`
 - The source states the gap in the inventory's own terms, which is what this requirement asks for.
 
 > mark:
@@ -282,7 +282,7 @@ on either of them. That is the finding this sitting exists for.
 
 **2.** The franchise identity provider vouches for someone who is not a franchise colleague and the broker signs them in as that person, since nothing records which colleagues it may vouch for.
 
-- `flow:franchise-identity-provider-to-identity-broker:vouch-for-colleague`, `entity:franchise-identity-provider`
+- `flow:entity:franchise-identity-provider>process:identity-broker>vouch-for-colleague`, `entity:franchise-identity-provider`
 - severity: medium/high · verb: `impersonate`
 - A stated gap rather than an unknown: the source says outright that the restriction has not been written down, which is what makes this grounded rather than speculative.
 
@@ -290,7 +290,7 @@ on either of them. That is the finding this sitting exists for.
 
 **3.** An attacker signs in to the broker as a colleague, because whether colleagues are asked for a second factor is unverified.
 
-- `flow:colleague-to-identity-broker:sign-in`, `entity:colleague`
+- `flow:entity:colleague>process:identity-broker>sign-in`, `entity:colleague`
 - severity: medium/high · verb: `impersonate`
 - The front door, and explicitly undocumented in the closing paragraph; needs-info is the right verdict, not a confident finding either way.
 
@@ -298,7 +298,7 @@ on either of them. That is the finding this sitting exists for.
 
 **4.** An attacker who obtains a colleague's token acts as that colleague for the rest of its twelve hours, because nothing calls back to the broker and there is no way to pull a token back.
 
-- `flow:colleague-to-identity-broker:sign-in`, `process:store-admin-console`
+- `flow:entity:colleague>process:identity-broker>sign-in`, `process:store-admin-console`
 - severity: medium/high · verb: `use-credential`
 - Two stated qualifiers compound here, and neither is an unknown; the twelve-hour window is the stated blast radius of every other spoofing claim in this case.
 
@@ -306,7 +306,7 @@ on either of them. That is the finding this sitting exists for.
 
 **5.** An attacker serves the console a signing public key of their own so that tokens the attacker signed verify, since how the console fetches and trusts that key is unverified.
 
-- `flow:store-admin-console-to-identity-broker:fetch-public-key`, `process:store-admin-console`
+- `flow:process:store-admin-console>process:identity-broker>fetch-public-key`, `process:store-admin-console`
 - severity: low/high · verb: `forge`
 - The hinge of a claims-based design: the key fetch is what makes a signature mean anything, and the source describes it in one clause without saying how it is protected.
 
@@ -325,7 +325,7 @@ on either of them. That is the finding this sitting exists for.
 
 **7.** An attacker alters what the nightly pull returns so that groups are granted, or so that leavers are never removed.
 
-- `flow:identity-broker-to-hr-system:nightly-group-pull`, `entity:hr-system`
+- `flow:process:identity-broker>entity:hr-system>nightly-group-pull`, `entity:hr-system`
 - severity: low/high · verb: `alter-in-transit`
 - The pull crosses out of the corporate network to a system the source never locates, and it is the only stated path by which access is taken away.
 
@@ -333,7 +333,7 @@ on either of them. That is the finding this sitting exists for.
 
 **8.** An attacker on the path to the console alters a colleague's price change or void in flight, since protection of that traffic is unverified.
 
-- `flow:colleague-to-store-admin-console:change-prices-and-void`
+- `flow:entity:colleague>process:store-admin-console>change-prices-and-void`
 - severity: low/medium · verb: `alter-in-transit`
 - Kept distinct from the elevation claim on the same flow: this one is about altering a legitimate action, not about who is allowed to take it.
 
@@ -341,7 +341,7 @@ on either of them. That is the finding this sitting exists for.
 
 **9.** An attacker alters or removes sign-in records in the audit log so a sign-in leaves no trace.
 
-- `store:audit-log`, `flow:identity-broker-to-audit-log:write-sign-ins`
+- `store:audit-log`, `flow:process:identity-broker>store:audit-log>write-sign-ins`
 - severity: low/medium · verb: `delete`
 - Filed here as an integrity claim against the store; the consequence for attribution is a separate reference in the repudiation lane.
 
@@ -352,7 +352,7 @@ on either of them. That is the finding this sitting exists for.
 
 **10.** A franchise sign-in cannot be attributed to a person, because the identity was asserted by a provider we do not run and whether the log covers that route at all is unverified.
 
-- `flow:franchise-identity-provider-to-identity-broker:vouch-for-colleague`, `store:audit-log`
+- `flow:entity:franchise-identity-provider>process:identity-broker>vouch-for-colleague`, `store:audit-log`
 - severity: medium/medium · verb: `unattributable`
 - The source raises the franchise coverage question itself, which is the clearest signal in the text that this is the attribution gap worth reporting.
 
@@ -360,7 +360,7 @@ on either of them. That is the finding this sitting exists for.
 
 **11.** A price change or a void cannot be tied to the store it belongs to, because the console never establishes which store the token holder is from.
 
-- `process:store-admin-console`, `flow:colleague-to-store-admin-console:change-prices-and-void`
+- `process:store-admin-console`, `flow:entity:colleague>process:store-admin-console>change-prices-and-void`
 - severity: high/medium · verb: `unattributable`
 - High likelihood because it is the described steady state rather than an attack condition, and it is the accountability face of the case's central authorization gap.
 
@@ -403,7 +403,7 @@ on either of them. That is the finding this sitting exists for.
 
 **16.** An attacker on the path between a colleague and the broker reads the sign-in and the token that comes back, since protection of that traffic is unverified.
 
-- `flow:colleague-to-identity-broker:sign-in`
+- `flow:entity:colleague>process:identity-broker>sign-in`
 - severity: medium/high · verb: `intercept`
 - Colleagues are stated to sign in from their own devices at home, so this path is the least controlled one in the model and the token it carries is a bearer credential.
 
@@ -411,7 +411,7 @@ on either of them. That is the finding this sitting exists for.
 
 **17.** An attacker on the path of the nightly pull reads colleague and leaver records as they cross out of the corporate network.
 
-- `flow:identity-broker-to-hr-system:nightly-group-pull`
+- `flow:process:identity-broker>entity:hr-system>nightly-group-pull`
 - severity: low/medium · verb: `intercept`
 - A boundary crossing carrying personal data that the source describes without saying anything about how it is protected.
 
@@ -430,7 +430,7 @@ on either of them. That is the finding this sitting exists for.
 
 **19.** An attacker stops the nightly pull and group changes silently stop reaching the directory while everything else keeps working.
 
-- `flow:identity-broker-to-hr-system:nightly-group-pull`, `store:directory`
+- `flow:process:identity-broker>entity:hr-system>nightly-group-pull`, `store:directory`
 - severity: medium/medium · verb: `disable`
 - The failure is silent by construction: nothing in the described system reads the pull's success, so the first visible symptom is a leaver who still has access.
 
@@ -449,7 +449,7 @@ on either of them. That is the finding this sitting exists for.
 
 **21.** A colleague who is a store manager in one store changes prices and voids transactions in every store, because the console decides from the group alone and never checks which store they belong to.
 
-- `process:store-admin-console`, `flow:colleague-to-store-admin-console:change-prices-and-void`
+- `process:store-admin-console`, `flow:entity:colleague>process:store-admin-console>change-prices-and-void`
 - severity: high/high · verb: `abuse-grant`
 - The case's signature claim and the only one the source states as a completed fact rather than as a gap. High likelihood because no attacker step is required: a legitimate token already carries the authority.
 
@@ -457,7 +457,7 @@ on either of them. That is the finding this sitting exists for.
 
 **22.** A leaver keeps their access until the nightly pull runs, and a token issued before it goes on working for twelve hours after that.
 
-- `flow:identity-broker-to-hr-system:nightly-group-pull`, `entity:colleague`
+- `flow:process:identity-broker>entity:hr-system>nightly-group-pull`, `entity:colleague`
 - severity: high/high · verb: `abuse-grant`
 - Three stated facts compound into one window — nightly removal, twelve-hour tokens, no revocation — and no single sentence of the source contains it, which is what makes it the hardest claim in this case to reach.
 
@@ -516,9 +516,9 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "36115502847aa04640666b0dd9f458881e6f7f8968e4d499b58983b3403dc721",
-      "model.json": "a769eb180cca9d54be980349aa74c8a1f61fa0f6362d72d83aae1515cf23a738",
-      "claims/asvs.json": "083161f0dc258424d850b926b2ab1f7a820721ce152856c39855d12291b3816a",
-      "claims/stride.json": "9bd0d3203a0a3bcb8ca80ed0de9efbc1b1a35a6c621653e1206e65e19c3dd849"
+      "model.json": "772629991b2d031e5972fbfdb5abdb7b87aabdbfc942ea4c6033356a9db21b81",
+      "claims/asvs.json": "80d8f95844658dbd83985ff1c9ecd70a675f6dc5861fafe499164b82287a5e9a",
+      "claims/stride.json": "e7d9ea199f055777363e62b00eaf13504355343e6ce84bb5230556fb1ab77cfa"
       }
     }
   }

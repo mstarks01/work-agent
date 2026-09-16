@@ -87,7 +87,7 @@
   ],
   "data_flows": [
     {
-      "id": "flow:reader-to-web-server:page-requests",
+      "id": "flow:entity:reader>process:web-server>page-requests",
       "name": "Page requests",
       "description": "Readers request site pages from the web server over HTTPS; some readers are signed in.",
       "assets": [],
@@ -103,7 +103,7 @@
       "operations": "read"
     },
     {
-      "id": "flow:reader-to-cdn:asset-fetch",
+      "id": "flow:entity:reader>entity:cdn>asset-fetch",
       "name": "Asset fetch",
       "description": "Readers fetch images, stylesheets and downloads from the CDN over HTTP.",
       "assets": [],
@@ -119,7 +119,7 @@
       "operations": "read"
     },
     {
-      "id": "flow:web-server-to-mysql-database:cms-data",
+      "id": "flow:process:web-server>store:mysql-database>cms-data",
       "name": "CMS data",
       "description": "The web server stores and retrieves pages, accounts and comments in the MySQL database.",
       "assets": [
@@ -138,7 +138,7 @@
       "operations": "read-write"
     },
     {
-      "id": "flow:web-server-to-cdn-bucket:asset-publish",
+      "id": "flow:process:web-server>store:cdn-bucket>asset-publish",
       "name": "Asset publish",
       "description": "When new assets are published the web server pushes them to the CDN's bucket.",
       "assets": [
@@ -156,7 +156,7 @@
       "operations": "write"
     },
     {
-      "id": "flow:admin-to-mysql-database:direct-administration",
+      "id": "flow:entity:admin>store:mysql-database>direct-administration",
       "name": "Direct administration",
       "description": "The admin connects straight to the database box over an unsecured MySQL connection with no TLS, from arbitrary locations and with no jump host, bypassing the CMS.",
       "assets": [

@@ -5,7 +5,7 @@
     {
       "assertion": {
         "subject_type": "interaction",
-        "subject": "flow:colleague-to-scheduling-web-app:view-shifts",
+        "subject": "flow:entity:colleague>process:scheduling-web-app>view-shifts",
         "predicate": "authentication-mechanism",
         "value": "unknown",
         "reason": "hedged",
@@ -26,7 +26,7 @@
     {
       "assertion": {
         "subject_type": "interaction",
-        "subject": "flow:store-manager-to-scheduling-web-app:build-rota",
+        "subject": "flow:entity:store-manager>process:scheduling-web-app>build-rota",
         "predicate": "authentication-mechanism",
         "value": "unknown",
         "reason": "hedged",
@@ -47,7 +47,7 @@
     {
       "assertion": {
         "subject_type": "interaction",
-        "subject": "flow:scheduling-web-app-to-scheduling-service:rota-requests",
+        "subject": "flow:process:scheduling-web-app>process:scheduling-service>rota-requests",
         "predicate": "authentication-mechanism",
         "value": "unknown",
         "reason": "hedged",
@@ -68,7 +68,7 @@
     {
       "assertion": {
         "subject_type": "interaction",
-        "subject": "flow:payroll-system-to-file-share:collect-payroll-export",
+        "subject": "flow:entity:payroll-system>store:file-share>collect-payroll-export",
         "predicate": "authentication-mechanism",
         "value": "unknown",
         "reason": "hedged",
@@ -89,7 +89,7 @@
     {
       "assertion": {
         "subject_type": "interaction",
-        "subject": "flow:colleague-to-scheduling-web-app:view-shifts",
+        "subject": "flow:entity:colleague>process:scheduling-web-app>view-shifts",
         "predicate": "transport-encryption",
         "value": "unknown",
         "reason": "hedged",
@@ -110,7 +110,7 @@
     {
       "assertion": {
         "subject_type": "interaction",
-        "subject": "flow:store-manager-to-scheduling-web-app:build-rota",
+        "subject": "flow:entity:store-manager>process:scheduling-web-app>build-rota",
         "predicate": "transport-encryption",
         "value": "unknown",
         "reason": "hedged",
@@ -131,7 +131,7 @@
     {
       "assertion": {
         "subject_type": "interaction",
-        "subject": "flow:scheduling-web-app-to-scheduling-service:rota-requests",
+        "subject": "flow:process:scheduling-web-app>process:scheduling-service>rota-requests",
         "predicate": "transport-encryption",
         "value": "unknown",
         "reason": "hedged",
@@ -152,7 +152,7 @@
     {
       "assertion": {
         "subject_type": "interaction",
-        "subject": "flow:scheduling-service-to-rota-database:read-write-rotas",
+        "subject": "flow:process:scheduling-service>store:rota-database>read-write-rotas",
         "predicate": "transport-encryption",
         "value": "unknown",
         "reason": "hedged",
@@ -173,7 +173,7 @@
     {
       "assertion": {
         "subject_type": "interaction",
-        "subject": "flow:scheduling-service-to-file-share:write-payroll-export",
+        "subject": "flow:process:scheduling-service>store:file-share>write-payroll-export",
         "predicate": "transport-encryption",
         "value": "unknown",
         "reason": "hedged",
@@ -194,7 +194,7 @@
     {
       "assertion": {
         "subject_type": "interaction",
-        "subject": "flow:payroll-system-to-file-share:collect-payroll-export",
+        "subject": "flow:entity:payroll-system>store:file-share>collect-payroll-export",
         "predicate": "transport-encryption",
         "value": "unknown",
         "reason": "hedged",

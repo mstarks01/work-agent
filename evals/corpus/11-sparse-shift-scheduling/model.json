@@ -97,7 +97,7 @@
   ],
   "data_flows": [
     {
-      "id": "flow:colleague-to-scheduling-web-app:view-shifts",
+      "id": "flow:entity:colleague>process:scheduling-web-app>view-shifts",
       "name": "view shifts",
       "description": "Colleague opens the app to see their own shifts; the response rides the same interaction.",
       "assets": [
@@ -114,7 +114,7 @@
       "operations": "read"
     },
     {
-      "id": "flow:store-manager-to-scheduling-web-app:build-rota",
+      "id": "flow:entity:store-manager>process:scheduling-web-app>build-rota",
       "name": "build rota",
       "description": "Manager builds and changes the weekly rota for their store.",
       "assets": [
@@ -132,7 +132,7 @@
       "operations": "write"
     },
     {
-      "id": "flow:scheduling-web-app-to-scheduling-service:rota-requests",
+      "id": "flow:process:scheduling-web-app>process:scheduling-service>rota-requests",
       "name": "rota requests",
       "description": "The app asks the service for rota reads and writes.",
       "assets": [
@@ -150,7 +150,7 @@
       "operations": "read-write"
     },
     {
-      "id": "flow:scheduling-service-to-rota-database:read-write-rotas",
+      "id": "flow:process:scheduling-service>store:rota-database>read-write-rotas",
       "name": "read write rotas",
       "description": "The service reads and writes rotas and colleague details.",
       "assets": [
@@ -168,7 +168,7 @@
       "operations": "read-write"
     },
     {
-      "id": "flow:scheduling-service-to-file-share:write-payroll-export",
+      "id": "flow:process:scheduling-service>store:file-share>write-payroll-export",
       "name": "write payroll export",
       "description": "The service writes the weekly payroll export to the share.",
       "assets": [
@@ -185,7 +185,7 @@
       "operations": "write"
     },
     {
-      "id": "flow:payroll-system-to-file-share:collect-payroll-export",
+      "id": "flow:entity:payroll-system>store:file-share>collect-payroll-export",
       "name": "collect payroll export",
       "description": "The payroll system initiates the collection of the export from the share.",
       "assets": [
@@ -238,7 +238,7 @@
     },
     {
       "assumption": "The app both reads and writes rotas through the scheduling service.",
-      "element_id": "flow:scheduling-web-app-to-scheduling-service:rota-requests",
+      "element_id": "flow:process:scheduling-web-app>process:scheduling-service>rota-requests",
       "attribute": "operations",
       "basis": "The interaction itself is described only as 'talks to'. Managers build rotas through the app and colleagues view their shifts through it, and the service is what reads and writes the rotas, so the app's path carries both."
     },

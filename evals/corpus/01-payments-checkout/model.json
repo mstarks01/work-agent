@@ -89,7 +89,7 @@
   ],
   "data_flows": [
     {
-      "id": "flow:shopper-to-storefront-api:place-order",
+      "id": "flow:entity:shopper>process:storefront-api>place-order",
       "name": "place order",
       "description": "Shopper submits an order over an authenticated session.",
       "assets": [
@@ -107,7 +107,7 @@
       "operations": "write"
     },
     {
-      "id": "flow:card-processor-to-storefront-api:settlement-webhook",
+      "id": "flow:entity:card-processor>process:storefront-api>settlement-webhook",
       "name": "settlement webhook",
       "description": "Processor POSTs a settlement callback marking an order paid.",
       "assets": [
@@ -125,7 +125,7 @@
       "notes": "The source says the processor POSTs the callback and names no transport, so the protocol is unknown; the word POST is kept in the description rather than read as a protocol."
     },
     {
-      "id": "flow:storefront-api-to-order-service:submit-order",
+      "id": "flow:process:storefront-api>process:order-service>submit-order",
       "name": "submit order",
       "description": "Storefront API forwards a submitted order into the core zone for capture.",
       "assets": [
@@ -143,7 +143,7 @@
       "operations": "write"
     },
     {
-      "id": "flow:order-service-to-orders-db:read-write-orders",
+      "id": "flow:process:order-service>store:orders-db>read-write-orders",
       "name": "read write orders",
       "description": "Order service reads and writes order rows.",
       "assets": [
@@ -161,7 +161,7 @@
       "operations": "read-write"
     },
     {
-      "id": "flow:order-service-to-receipt-archive:append-receipt",
+      "id": "flow:process:order-service>store:receipt-archive>append-receipt",
       "name": "append receipt",
       "description": "Order service writes one receipt object per completed order.",
       "assets": [

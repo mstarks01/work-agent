@@ -5,7 +5,7 @@
     "affected_element_ids": [
       "entity:browser",
       "process:web-application",
-      "flow:browser-to-web-application:page-request"
+      "flow:entity:browser>process:web-application>page-request"
     ],
     "claim": "No security response header is described for the one encrypted browser-facing link.",
     "tier": "must-find",
@@ -20,7 +20,7 @@
     "requirement": "V3.3.1",
     "affected_element_ids": [
       "process:web-application",
-      "flow:browser-to-web-application:page-request"
+      "flow:entity:browser>process:web-application>page-request"
     ],
     "claim": "Nothing states whether the web application sets any cookie or with which attributes.",
     "tier": "expected",
@@ -48,7 +48,7 @@
     "affected_element_ids": [
       "process:background-worker-process",
       "store:message-queue",
-      "flow:background-worker-process-to-message-queue:consume-job"
+      "flow:process:background-worker-process>store:message-queue>consume-job"
     ],
     "claim": "Nothing states what bounds the work a queued job can consume.",
     "tier": "must-find",
@@ -70,7 +70,7 @@
     "affected_element_ids": [
       "process:web-application",
       "store:message-queue",
-      "flow:web-application-to-message-queue:enqueue-job"
+      "flow:process:web-application>store:message-queue>enqueue-job"
     ],
     "claim": "Every link except the browser one states no transport protection at all.",
     "tier": "expected",

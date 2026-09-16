@@ -12,16 +12,16 @@ Two stores carry a label. The data in motion carries none, and nothing says the 
   "direction": "question",
   "needs_evidence": "prose",
   "title": "Whether every sensitive data item has been classified is never stated",
-  "description": "V14.1.1 asks that every piece of sensitive data the application creates or handles has been identified and sorted into a protection level, with the regulation that applies to it taken into account. The model states a level for two stores: `store:accounts-db` is confidential and tagged `pii` and `financial`, and `store:audit-log` is internal. It states none for the data in motion — the payment instructions on `flow:customer-to-web-api:submit-payment` and the transfer records carrying customer IDs on `flow:web-api-to-ledger-service:post-transfer` — and nothing says the two store labels came out of an exercise that covered everything the system touches. The requirement applies and the input does not settle it. A fuller description would: the classification record the organisation keeps, or a statement that no such exercise took place.",
+  "description": "V14.1.1 asks that every piece of sensitive data the application creates or handles has been identified and sorted into a protection level, with the regulation that applies to it taken into account. The model states a level for two stores: `store:accounts-db` is confidential and tagged `pii` and `financial`, and `store:audit-log` is internal. It states none for the data in motion — the payment instructions on `flow:entity:customer>process:web-api>submit-payment` and the transfer records carrying customer IDs on `flow:process:web-api>process:ledger-service>post-transfer` — and nothing says the two store labels came out of an exercise that covered everything the system touches. The requirement applies and the input does not settle it. A fuller description would: the classification record the organisation keeps, or a statement that no such exercise took place.",
   "affected_element_ids": [
     "store:accounts-db",
     "store:audit-log",
-    "flow:customer-to-web-api:submit-payment",
-    "flow:web-api-to-ledger-service:post-transfer"
+    "flow:entity:customer>process:web-api>submit-payment",
+    "flow:process:web-api>process:ledger-service>post-transfer"
   ],
   "evidence_refs": [
-    "crossing:flow:customer-to-web-api:submit-payment",
-    "crossing:flow:web-api-to-ledger-service:post-transfer"
+    "crossing:flow:entity:customer>process:web-api>submit-payment",
+    "crossing:flow:process:web-api>process:ledger-service>post-transfer"
   ],
   "quotes": []
 }
@@ -40,10 +40,10 @@ A browser-facing requirement, applying on the same evidence chapter V3 uses. Its
   "affected_element_ids": [
     "entity:customer",
     "process:web-api",
-    "flow:customer-to-web-api:submit-payment"
+    "flow:entity:customer>process:web-api>submit-payment"
   ],
   "evidence_refs": [
-    "crossing:flow:customer-to-web-api:submit-payment"
+    "crossing:flow:entity:customer>process:web-api>submit-payment"
   ],
   "quotes": []
 }
