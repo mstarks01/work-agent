@@ -202,7 +202,7 @@ Completed on GitHub Issues (canonical):
   **The ledger splits one file per voter**
   ([#322](https://github.com/mstarks01/work-agent/issues/322)), so two vote PRs merge without
   conflict. **A Baseline lives at `evals/baselines/<derived-name>/`**
-  ([#321](https://github.com/mstarks01/work-agent/issues/321)), named by five identity parts that
+  ([#321](https://github.com/mstarks01/work-agent/issues/321)), named by the identity parts that
   CI recomputes; the case set must be the full corpus. **CI proves an artifact agrees with itself
   and with the repository, never that a model ran**
   ([#323](https://github.com/mstarks01/work-agent/issues/323)): five PR checks plus a

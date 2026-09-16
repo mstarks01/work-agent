@@ -108,7 +108,7 @@ CORPUS_DIR = REPO_ROOT / "evals" / "corpus"
 #   empty on a sweep that ran to the end (#334). A partial sweep that could
 #   not say so would read as a whole one.
 # * Version 3 adds ``frameworks``: the selection the sweep actually ran, one
-#   of a Baseline's five identity parts (#321), recoverable before only by
+#   of a Baseline's identity parts (#321), recoverable before only by
 #   inference over blocks that write their keys whether or not a framework ran.
 # * Version 2 adds the two keys that say which *repository state* produced a
 #   sweep, beside the ``provenance`` block that already said which models did.
@@ -494,7 +494,7 @@ def build(
         # every ID in the bundle came out of that code.
         "flow_identity_version": FLOW_ID_VERSION,
         # The selection that ran, off the graphs that were built — one of a
-        # Baseline's five identity parts (#321), so it is a field the code
+        # Baseline's identity parts (#321), so it is a field the code
         # reads rather than an inference over per-framework blocks.
         "frameworks": sorted(sweep.run.frameworks),
         # The cases the estimate gate's hold stopped before. Empty is the

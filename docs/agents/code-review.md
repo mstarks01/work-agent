@@ -166,6 +166,18 @@ Let a fix to a hot path sit long enough to read it once more. Minutes between
 the last keystroke and the merge is how the previous rounds shipped their
 defects.
 
+**Read it a second time for idiom, not only for the five classes.** The class
+read asks whether the fix is correct; this one asks whether it reads like the
+code around it. Load the `python-style` skill and check the fix against the
+conventions of the files it lands in — a name that means one thing here and
+another thing thirty lines up, a helper named for a verb it does not perform, a
+loop of asserts where the file beside it parametrizes, a block spelled twice
+where the class already holds the helper.
+
+None of that changes behaviour, which is exactly why the class read walks past
+it and why it survives into the tree. PR #991 passed its own five-class read
+and carried five of them; PR #992 is that second read.
+
 ### Prefer deleting a reader over adding a guard
 
 When the defect is a rule with two readers, make one reader call the other. A

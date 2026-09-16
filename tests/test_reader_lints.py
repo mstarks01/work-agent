@@ -346,3 +346,104 @@ def test_the_tier_comparison_scan_finds_one_when_there_is_one(tmp_path):
     )
 
     assert _tier_comparisons(module) == [3]
+
+
+# --- A message that tells its reader a word it already knew ------------------
+#
+# The fourth shape of the same class, found in the round over #917-#990: a
+# refusal message interpolating the very expression its own branch pinned to a
+# literal. `_resolve_row` printed `predicate.value` inside
+# `if predicate.value == "reference":`, so every refused reference read "names
+# no reference this predicate takes" whatever the predicate pointed at. The
+# fact the message carries is a constant, and the repair pass that reads it
+# learns nothing from it.
+
+#: Where a message is production output. Tests are excluded: a test may
+#: deliberately build such a string to drive a scan.
+MESSAGE_ROOTS = ("src", "evals", "webapp")
+
+
+def _pinned_by(test: ast.expr) -> list[tuple[str, str, str]]:
+    """Each ``x == "lit"`` or ``x in (...)`` an ``if`` test fixes, as dumps."""
+    parts = (
+        [test]
+        if isinstance(test, ast.Compare)
+        else [v for v in test.values if isinstance(v, ast.Compare)]
+        if isinstance(test, ast.BoolOp)
+        else []
+    )
+    fixed = []
+    for compare in parts:
+        if (
+            len(compare.ops) == 1
+            and isinstance(compare.ops[0], (ast.Eq, ast.In))
+            and isinstance(
+                compare.comparators[0], (ast.Constant, ast.Tuple, ast.List, ast.Set)
+            )
+            and isinstance(compare.left, (ast.Attribute, ast.Name))
+        ):
+            fixed.append(
+                (
+                    ast.dump(compare.left),
+                    ast.unparse(compare.left),
+                    ast.unparse(compare.comparators[0]),
+                )
+            )
+    return fixed
+
+
+def _constant_interpolations(tree: ast.AST) -> list[tuple[int, str, str]]:
+    """Every f-string field whose enclosing branch already fixed its value."""
+    found = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.If):
+            continue
+        fixed = _pinned_by(node.test)
+        if not fixed:
+            continue
+        for sub in ast.walk(node):
+            if not isinstance(sub, ast.JoinedStr):
+                continue
+            for value in sub.values:
+                if not isinstance(value, ast.FormattedValue):
+                    continue
+                for dump, expr, literal in fixed:
+                    if ast.dump(value.value) == dump:
+                        found.append((sub.lineno, expr, literal))
+    return found
+
+
+def test_no_message_interpolates_a_value_its_own_branch_pinned():
+    """A message whose field is a constant tells its reader nothing."""
+    found = []
+    for path in source_files(*MESSAGE_ROOTS):
+        for line, expr, literal in _constant_interpolations(parse(path)):
+            found.append(
+                f"{path.relative_to(REPO_ROOT)}:{line} interpolates {expr},"
+                f" which that branch pinned to {literal}"
+            )
+
+    assert not found, (
+        "these messages carry a field their own branch already fixed, so each"
+        f" one always prints the same word: {found}. Name the thing the branch"
+        " is about instead -- the referent's type, not the value kind."
+    )
+
+
+def test_the_constant_interpolation_scan_finds_one_when_there_is_one(tmp_path):
+    """Positive control, spelled as the defect was: the #991 refusal message."""
+    probe = tmp_path / "probe.py"
+    probe.write_text(
+        "def drop(predicate, value):\n"
+        '    if predicate.value == "reference":\n'
+        "        return (\n"
+        '            f"{value!r} names no {predicate.value} this predicate takes"\n'
+        "        )\n"
+        '    return ""\n',
+        encoding="utf-8",
+    )
+    found = _constant_interpolations(ast.parse(probe.read_text(encoding="utf-8")))
+
+    assert [(expr, literal) for _, expr, literal in found] == [
+        ("predicate.value", "'reference'")
+    ]
