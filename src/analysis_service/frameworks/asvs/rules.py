@@ -55,6 +55,7 @@ from analysis_service.analysis import (
     matches_term,
     states_a_protocol,
 )
+from analysis_service.assertions import AssertionCatalog
 from analysis_service.candidates import Match, Rule, clip_fact
 from analysis_service.frameworks import PreconditionResult
 from analysis_service.system_model import SystemModel
@@ -117,7 +118,7 @@ def _hits(model: SystemModel, test: PresenceTest) -> Iterator[Match]:
 def _rule_of(test: PresenceTest) -> Rule:
     """One presence test as the neutral :class:`~analysis_service.candidates.Rule`."""
 
-    def find(model: SystemModel) -> Iterator[Match]:
+    def find(model: SystemModel, catalog: AssertionCatalog) -> Iterator[Match]:
         return _hits(model, test)
 
     return Rule(
@@ -635,7 +636,9 @@ def _mentions_a_record(model: SystemModel) -> bool:
     )
 
 
-def _write_with_no_record(model: SystemModel) -> Iterator[Match]:
+def _write_with_no_record(
+    model: SystemModel, catalog: AssertionCatalog
+) -> Iterator[Match]:
     """A process writing an audited asset into a store, in a model naming no record.
 
     The V16 finding the corpus writes is that the record names the service and
@@ -659,7 +662,9 @@ def _write_with_no_record(model: SystemModel) -> Iterator[Match]:
         )
 
 
-def _crossing_from_an_entity(model: SystemModel) -> Iterator[Match]:
+def _crossing_from_an_entity(
+    model: SystemModel, catalog: AssertionCatalog
+) -> Iterator[Match]:
     """A boundary crossing whose source is an external entity.
 
     The V2 requirements ask which side enforces validation of what a caller
@@ -684,7 +689,9 @@ def _crossing_from_an_entity(model: SystemModel) -> Iterator[Match]:
         )
 
 
-def _unverified_transit(model: SystemModel) -> Iterator[Match]:
+def _unverified_transit(
+    model: SystemModel, catalog: AssertionCatalog
+) -> Iterator[Match]:
     """A flow whose transport protection the input never settled or ruled out.
 
     The transport term test reads ``protocol``, so a flow that says gRPC and

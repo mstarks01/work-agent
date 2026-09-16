@@ -1500,7 +1500,7 @@ def prepare_analysis(
             continue
         routes.append(nodes.run_route)
         loader = package_loaders[name]
-        candidates = generate_candidates(model, package.lanes, package.rules)
+        candidates = generate_candidates(model, package.lanes, package.rules, held)
         # Selected for every lane at once, because a lane's tie-break reads what
         # earlier lanes were sent: `select_per_lane` is the one reader of that
         # accumulation, so the offline coverage lint measures the selection this
