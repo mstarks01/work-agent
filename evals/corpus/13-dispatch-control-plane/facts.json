@@ -21,7 +21,7 @@
         "exclusive": false
       },
       "rationale": "Raised and unanswered: hedged.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -42,7 +42,7 @@
         "exclusive": false
       },
       "rationale": "Stated placement.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -63,7 +63,7 @@
         "exclusive": false
       },
       "rationale": "Stated placement.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -79,7 +79,7 @@
         "exclusive": false
       },
       "rationale": "Inferred, as model.json's assumption records: the source says the control plane is not reachable from the internet and nothing about the API's own reach.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -91,7 +91,7 @@
         "scope": [
           {
             "kind": "resource",
-            "value": "the live estate"
+            "value": "crew movements and depot work assignments"
           },
           {
             "kind": "operation",
@@ -108,8 +108,8 @@
         "explanation": "",
         "exclusive": false
       },
-      "rationale": "The grant the source states for an account in the privileged zone.",
-      "reviewed_by": null
+      "rationale": "The grant the source states for an account in the privileged zone, scoped to the two rights it names: moving a crew and changing a depot's work for the day.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -121,7 +121,7 @@
         "scope": [
           {
             "kind": "resource",
-            "value": "the live estate"
+            "value": "crew movements and depot work assignments"
           },
           {
             "kind": "operation",
@@ -138,8 +138,8 @@
         "explanation": "",
         "exclusive": false
       },
-      "rationale": "A stated absent grant with a scope: the corporate side holds none of the control plane's rights. Absence, scope and a principal the graph has no node for, in one row.",
-      "reviewed_by": null
+      "rationale": "A stated absent grant, scoped to the two rights the source names. It does not say a corporate laptop lacks every possible write permission.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -160,7 +160,7 @@
         "exclusive": false
       },
       "rationale": "The source states the control plane is the same company as the corporate side, and that everything but the partner is ours.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -181,7 +181,7 @@
         "exclusive": false
       },
       "rationale": "Everything but the partner is stated to be ours.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -202,7 +202,7 @@
         "exclusive": false
       },
       "rationale": "Raised and unanswered: whether the socket runs over TLS.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -216,14 +216,14 @@
         "quotes": [
           {
             "source_label": "System description",
-            "quote": "whether its handshake is authenticated"
+            "quote": "Nobody wrote down whether that socket runs over TLS, whether its handshake is authenticated"
           }
         ],
         "explanation": "",
         "exclusive": false
       },
-      "rationale": "Raised and unanswered: whether the handshake is authenticated.",
-      "reviewed_by": null
+      "rationale": "Raised and unanswered: whether the handshake is authenticated, cited with the statement of uncertainty it sits in.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -244,7 +244,7 @@
         "exclusive": false
       },
       "rationale": "Raised and unanswered: a gap somebody probed, as model.json's note says.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -265,7 +265,7 @@
         "exclusive": false
       },
       "rationale": "Stated transport protection on the partner pull.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -286,7 +286,7 @@
         "exclusive": false
       },
       "rationale": "Raised and unanswered in both directions.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -307,7 +307,7 @@
         "exclusive": false
       },
       "rationale": "Stated mechanism. The token's lifecycle is on the credential below.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -328,7 +328,7 @@
         "exclusive": false
       },
       "rationale": "The importer presents the token.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -349,7 +349,7 @@
         "exclusive": false
       },
       "rationale": "An explicit absence of rotation, stated.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -370,7 +370,7 @@
         "exclusive": false
       },
       "rationale": "The one ownership fact about the partner.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -380,18 +380,18 @@
         "value": "another company",
         "reason": null,
         "scope": [],
-        "basis": "stated",
+        "basis": "inferred",
         "quotes": [
           {
             "source_label": "System description",
             "quote": "A scheduling partner, which is another company"
           }
         ],
-        "explanation": "",
+        "explanation": "Conditional on the zone representing the partner's organizational ownership boundary: the source establishes the company distinction, not a platform or a network zone.",
         "exclusive": false
       },
-      "rationale": "The partner's zone is drawn from the same statement.",
-      "reviewed_by": null
+      "rationale": "Inferred, conditional on the zone standing for the partner's organizational ownership boundary. The source establishes that the partner is another company, not that a platform or network zone exists.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -412,28 +412,22 @@
         "exclusive": false
       },
       "rationale": "Stated placement.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
         "subject_type": "component",
         "subject": "store:schedule-archive",
         "predicate": "network-membership",
-        "value": "boundary:corporate-network",
-        "reason": null,
+        "value": "unknown",
+        "reason": "silent",
         "scope": [],
         "basis": "stated",
-        "quotes": [
-          {
-            "source_label": "System description",
-            "quote": "a folder on the corporate file store"
-          }
-        ],
-        "explanation": "",
+        "quotes": [],
         "exclusive": false
       },
-      "rationale": "Stated: a folder on the corporate file store.",
-      "reviewed_by": null
+      "rationale": "'A folder on the corporate file store' establishes affiliation and the folder-on-file-store relationship, not placement on the corporate network. model.json's zone is a placement the schema requires, recorded in its assumption with that relationship.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -445,27 +439,26 @@
         "scope": [],
         "basis": "inferred",
         "quotes": [],
-        "explanation": "Duty engineers sit on the corporate network and open the console in their browser; the source places the console nowhere else.",
+        "explanation": "The console is a single-page JavaScript app executing in the browsers of engineers on the corporate network.",
         "exclusive": false
       },
-      "rationale": "The console runs in the engineer's browser on the corporate network; the source places the console itself nowhere.",
-      "reviewed_by": null
+      "rationale": "Inferred: the console is a single-page JavaScript app executing in the browsers of engineers on the corporate network. This locates the browser execution, not the web host.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
         "subject_type": "component",
         "subject": "process:corporate-web-host",
         "predicate": "network-membership",
-        "value": "boundary:corporate-network",
-        "reason": null,
+        "value": "unknown",
+        "reason": "silent",
         "scope": [],
-        "basis": "inferred",
+        "basis": "stated",
         "quotes": [],
-        "explanation": "The source calls it our corporate web host and states no placement.",
         "exclusive": false
       },
-      "rationale": "'Our corporate web host' names the corporate side; no segment is stated.",
-      "reviewed_by": null
+      "rationale": "'Our corporate web host' does not establish network location. model.json's zone is a placement the schema requires, recorded in its assumption.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -480,23 +473,22 @@
         "exclusive": false
       },
       "rationale": "The source never places the database, and the API's access to it does not locate it. model.json's zone is a placement the schema requires, recorded as such in its assumption, and this row keeps it out of the required-fact denominator.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
         "subject_type": "component",
         "subject": "entity:scheduling-partner",
         "predicate": "network-membership",
-        "value": "boundary:scheduling-partner-platform",
-        "reason": null,
+        "value": "unknown",
+        "reason": "silent",
         "scope": [],
-        "basis": "inferred",
+        "basis": "stated",
         "quotes": [],
-        "explanation": "The scheduling partner is another company, and the model draws that company's platform as its own zone.",
         "exclusive": false
       },
-      "rationale": "The partner's zone is the model's drawing of 'another company'.",
-      "reviewed_by": null
+      "rationale": "Another company establishes an ownership boundary, not a network placement. model.json's zone is a placement the schema requires, recorded in its assumption.",
+      "reviewed_by": "mstarks01"
     }
   ],
   "disputed": []
