@@ -13,6 +13,15 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
+from analysis_service.assertions import (
+    ABSENT,
+    UNPROJECTED,
+    Assertion,
+    AssertionCatalog,
+    Qualifier,
+    Subject,
+    assertion_id,
+)
 from analysis_service.claims import (
     GROUND_TERM_MAX_CHARS,
     Ground,
@@ -21,6 +30,7 @@ from analysis_service.evidence import (
     absent_evidence_ref,
     crossing_evidence_ref,
     evidence_catalog,
+    ground_issues,
     render_catalog,
     render_element_roster,
     resolve_proposals,
@@ -33,6 +43,31 @@ from tests.factories import sample_draft, sample_proposal, valid_model
 
 ENCRYPTION_REF = "unknown:store:orders-db:encryption_at_rest"
 LOGIN_CROSSING_REF = "crossing:flow:customer-to-web-app:login"
+LOGIN_FLOW = "flow:customer-to-web-app:login"
+SHOPPERS = Subject(id="principal:shoppers", type="principal", label="shopper accounts")
+COOKIE = Subject(
+    id="credential:session-cookie", type="credential", label="session cookie"
+)
+
+
+def row(**overrides):
+    """One settled row the graph has no field for: no second factor for shoppers.
+
+    Inferred rather than stated so the fixture carries no span, which keeps
+    these tests about the catalog rather than about locating a quote.
+    """
+    fields = {
+        "subject": SHOPPERS.id,
+        "predicate": "mfa-requirement",
+        "value": ABSENT,
+        "basis": "inferred",
+        "explanation": "the description names password login and nothing else",
+    }
+    return Assertion(**{**fields, **overrides})
+
+
+def assertions(*rows, subjects=(SHOPPERS, COOKIE)):
+    return AssertionCatalog(subjects=list(subjects), entries=list(rows))
 
 
 class TestEvidenceCatalog:
@@ -72,6 +107,9 @@ class TestEvidenceCatalog:
         kinds = {ground.kind for ground in evidence_catalog(model).values()}
 
         assert kinds == {"unknown-attribute", "absent-attribute", "derived-fact"}
+
+        with_rows = evidence_catalog(model, assertions(row())).values()
+        assert {ground.kind for ground in with_rows} == kinds | {"assertion"}
 
     def test_a_control_the_input_states_is_absent_is_enumerated(self):
         """The gap #171 was filed for.
@@ -183,6 +221,97 @@ class TestEvidenceCatalog:
         with pytest.raises(ValueError, match="not a zoned element"):
             evidence_catalog(model)
 
+    def test_a_settled_row_the_graph_has_no_field_for_is_enumerated(self):
+        """The fact the layer exists to carry: "no MFA" as a row a claim may cite.
+
+        Ten of the corpus's 21 stated mechanism values state an absence, and
+        the catalog offered nothing for any of them because the attribute
+        read as ``stated``. The row's own identity is the reference, so the
+        row and the entry can never spell one fact two ways.
+        """
+        held = assertions(row())
+        catalog = evidence_catalog(valid_model(), held)
+
+        assert catalog[assertion_id(row())] == Ground(
+            kind="assertion", assertion=assertion_id(row())
+        )
+
+    def test_no_catalog_is_the_catalog_before_the_layer_existed(self):
+        """``None`` and an empty catalog both offer the model's own rows, and
+        nothing else — a job that ran no pass and a pass that settled nothing
+        show an agent the same table."""
+        model = valid_model()
+
+        assert evidence_catalog(model, None) == evidence_catalog(model)
+        assert evidence_catalog(model, assertions()) == evidence_catalog(model)
+
+    def test_a_predicate_with_a_graph_field_is_cited_through_the_field(self):
+        """One fact, one reader: a mechanism reaches every rule through
+        ``authentication``, so a second entry for it would be a second reader
+        of one fact, and the two could disagree."""
+        mechanism = row(
+            subject=LOGIN_FLOW,
+            predicate="authentication-mechanism",
+            value="email and password",
+        )
+        catalog = evidence_catalog(valid_model(), assertions(mechanism))
+
+        assert "authentication-mechanism" not in UNPROJECTED
+        assert assertion_id(mechanism) not in catalog
+
+    @pytest.mark.parametrize(
+        "unsettled",
+        [
+            row(value=UNKNOWN, reason="silent", explanation=""),
+            row(basis="legacy", explanation=""),
+            row(assessment="unsupported", assessor="reviewer/1"),
+            row(assessment="unresolved", assessor="reviewer/1"),
+        ],
+        ids=["unknown", "legacy", "unsupported", "unresolved"],
+    )
+    def test_a_row_nobody_may_rest_on_is_never_offered(self, unsettled):
+        """An unknown is a question, a legacy row is never support, and an
+        assessed-unsupported row is set aside — none is a fact an agent may
+        cite, so none is in the table an agent selects from."""
+        catalog = evidence_catalog(valid_model(), assertions(unsettled))
+
+        assert assertion_id(unsettled) not in catalog
+
+    def test_a_conflict_settles_nothing_on_either_side(self):
+        """Two rows that disagree stay visible in the catalog and ground nothing:
+        a definite entry for either would be the service picking a side no
+        adjudication recorded."""
+        absent = row()
+        required = row(value="required")
+        catalog = evidence_catalog(valid_model(), assertions(absent, required))
+
+        assert assertion_id(absent) not in catalog
+        assert assertion_id(required) not in catalog
+
+    def test_a_scoped_row_is_offered_with_its_scope_and_answers_nothing_wider(self):
+        """A second factor required for administrators is a fact — for
+        administrators. It sits beside an unscoped absence rather than
+        suppressing it, because the two are different questions."""
+        admins = row(
+            value="required",
+            scope=[Qualifier(kind="principal", value="administrators")],
+        )
+        catalog = evidence_catalog(valid_model(), assertions(row(), admins))
+
+        assert assertion_id(row()) in catalog
+        assert assertion_id(admins) in catalog
+        rendered = render_catalog(catalog, assertions(row(), admins))
+        assert "where principal is administrators" in rendered
+
+    def test_an_assertion_row_leaves_the_models_own_rows_untouched(self):
+        """Additive by construction: an unknown attribute on the login flow is
+        still a question the input left open, whatever the catalog settles
+        about the principal that uses it."""
+        with_rows = evidence_catalog(valid_model(), assertions(row()))
+        without = evidence_catalog(valid_model())
+
+        assert {ref: with_rows[ref] for ref in without} == without
+
     def test_a_model_with_nothing_unknown_and_no_crossing_is_empty_not_absent(self):
         empty = SystemModel(
             data_stores=[
@@ -260,6 +389,49 @@ class TestRenderCatalog:
         assert "`authentication` stated absent" in rendered
         assert "crosses a trust boundary" in rendered
 
+    def test_an_assertion_row_glosses_what_it_states_and_who_said_so(self):
+        """The one entry whose left column is a digest, so the right column
+        carries the subject, the predicate, the value and the basis. An
+        inference reads as one, and a graph-bound subject reads as its ID."""
+        inferred = row()
+        owned = Assertion(
+            subject="process:web-app",
+            predicate="tenant-ownership",
+            value=SHOPPERS.id,
+            basis="inferred",
+            explanation="the description reads as the shoppers' own deployment",
+        )
+        kept = Assertion(
+            subject=COOKIE.id,
+            predicate="credential-custody",
+            value="the browser's cookie jar",
+            basis="inferred",
+            explanation="a session cookie lives in the browser",
+        )
+        held = assertions(inferred, owned, kept)
+        rendered = render_catalog(evidence_catalog(valid_model(), held), held)
+
+        assert (
+            "`mfa-requirement` inferred absent for shopper accounts (principal)"
+            in rendered
+        )
+        assert (
+            "`tenant-ownership` inferred `shopper accounts` on `process:web-app`"
+            in (rendered)
+        )
+        assert (
+            "`credential-custody` inferred `the browser's cookie jar` for session"
+            " cookie (credential)" in rendered
+        )
+
+    def test_an_assertion_row_cannot_render_without_its_catalog(self):
+        """A bare identity is nothing an agent could select on, so the renderer
+        refuses rather than printing one."""
+        catalog = evidence_catalog(valid_model(), assertions(row()))
+
+        with pytest.raises(KeyError):
+            render_catalog(catalog)
+
     def test_an_empty_catalog_renders_no_rows(self):
         """A model with every control stated and no crossing is legal, if rare."""
         rendered = render_catalog({})
@@ -280,6 +452,28 @@ class TestRenderCatalog:
         positions = [rendered.index(f"| `{ref}` |") for ref in catalog]
 
         assert positions == sorted(positions)
+
+
+class TestAnAssertionGroundIsHeldToTheCatalog:
+    """The report's load check and the fan-in's, through the one reader."""
+
+    def test_a_ground_naming_a_settled_row_raises_nothing(self):
+        held = assertions(row())
+        draft = sample_draft(
+            grounds=[Ground(kind="assertion", assertion=assertion_id(row()))]
+        )
+
+        assert ground_issues([draft], valid_model(), held) == []
+
+    def test_a_ground_naming_a_row_the_catalog_does_not_settle_is_reported(self):
+        draft = sample_draft(
+            grounds=[Ground(kind="assertion", assertion=assertion_id(row()))]
+        )
+
+        (issue,) = ground_issues([draft], valid_model(), assertions())
+        assert "does not settle" in issue
+        (issue,) = ground_issues([draft], valid_model())
+        assert "does not settle" in issue
 
 
 class TestABadReferenceCostsItsEntryNotTheJob:

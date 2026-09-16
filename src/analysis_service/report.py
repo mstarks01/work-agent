@@ -38,6 +38,7 @@ from pydantic import (
     model_validator,
 )
 
+from analysis_service.assertions import AssertionRecord
 from analysis_service.charges import UPSTREAM_MAX_CHARS
 from analysis_service.claims import FrameworkAnalysis, FrameworkName, SharedElementName
 from analysis_service.evidence import ground_issues
@@ -956,6 +957,12 @@ class Report(BaseModel):
     # here predates the field. Envelope-level because it is about the shared
     # model, like ``shared_element_names``.
     model_repair: ModelRepair | None = None
+    # What the job's assertion pass produced, where the deployment ran one:
+    # the catalog every lane selected from, and the rows the resolver refused.
+    # ``None`` is a job that ran no pass. Envelope-level because the catalog
+    # is about the shared model, like the crossings — and, like them, what
+    # every block's assertion grounds resolve against on load.
+    assertions: AssertionRecord | None = None
     # What was in front of the agents that is *not* one framework's: the
     # instruction digest of the built graph, and the domain packs this job's
     # model earned. Context, not evidence — see :class:`AnalysisContext`. The
@@ -1038,7 +1045,11 @@ class Report(BaseModel):
         does not ride in through a file.
         """
         claims = [claim for block in self.analyses for claim in block.all_claims()]
-        return ground_issues(claims, self.system_model)
+        return ground_issues(
+            claims,
+            self.system_model,
+            None if self.assertions is None else self.assertions.catalog,
+        )
 
     def _envelope_issues(self) -> list[str]:
         issues = []

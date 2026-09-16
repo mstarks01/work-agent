@@ -104,6 +104,7 @@ GroundKind = Literal[
     "absent-attribute",
     "derived-fact",
     "absent-element",
+    "assertion",
 ]
 
 # How long a claim ID may be. **Not a grammar**: #163 ruled that ``id`` has no
@@ -374,6 +375,15 @@ class Ground(BaseModel):
       ``fact`` field: free text is verifiable by no gate, and it would become
       the escape hatch an agent reaches for when it has neither a quote nor an
       unknown — precisely the finding whose justification matters most.
+    * ``assertion`` — ``assertion`` alone: the computed identity of one
+      **Assertion** the job's catalog settles, for a predicate the graph has
+      no field for — a second factor stated absent, a credential stated
+      shared. A reference on the same terms as ``derived-fact``: the row's
+      subject, value, basis, scope and spans are read off the catalog the
+      report embeds, never copied here, so the ground cannot say more than the
+      row does. Only a settled row is ever catalogued
+      (:func:`~analysis_service.assertions.settled`), so an unknown, a
+      conflict, an unsupported row or a legacy one grounds nothing.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -387,6 +397,7 @@ class Ground(BaseModel):
     )  # both attribute branches
     flow_id: str = Field(default="", max_length=300)  # derived-fact
     term: str = Field(default="", max_length=GROUND_TERM_MAX_CHARS)  # absent-element
+    assertion: str = Field(default="", max_length=600)  # assertion
 
     # Which fields each branch requires. Everything not listed for a branch is
     # forbidden on it — a quote carrying an element_id is a shape error, not a
@@ -400,23 +411,39 @@ class Ground(BaseModel):
         "absent-attribute": ("element_id", "attribute"),
         "derived-fact": ("flow_id",),
         "absent-element": ("term",),
+        "assertion": ("assertion",),
     }
 
     @property
     def place(self) -> str:
         """The model element this ground points at, or ``""`` where it points at none.
 
-        Two branches name no place and they name none for different reasons. A
-        ``quote`` is a span of the submitter's words, which belongs to a source
-        rather than to an element. An ``absent-element`` is about the model as a
-        whole, and its ``term`` is a word rather than an ID — there is no element
-        to point at, which is the fact it exists to state.
+        Three branches name no place and they name none for different reasons.
+        A ``quote`` is a span of the submitter's words, which belongs to a
+        source rather than to an element. An ``absent-element`` is about the
+        model as a whole, and its ``term`` is a word rather than an ID — there
+        is no element to point at, which is the fact it exists to state. An
+        ``assertion`` names a row whose subject may be a principal or a
+        credential the graph has no node for, and which element it is about is
+        the catalog's to answer, not this record's.
 
         Read wherever a caller needs "which part of the model is this about",
         so a sixth branch answers here once instead of in each caller's own
         ``or`` chain.
         """
         return self.element_id or self.flow_id
+
+    @property
+    def referent(self) -> str:
+        """What this ground names: an element, a term, or an assertion.
+
+        The key two readers digest a non-quote ground under — the critic's
+        rating-disagreement check and the substance digest a vote binds to —
+        so a branch whose referent sits in a field ``place`` does not read is
+        told apart from every other ground of its kind here, once, rather than
+        by each digest's own ``or`` chain. Empty for a ``quote``.
+        """
+        return self.place or self.term or self.assertion
 
     @model_validator(mode="after")
     def _check_shape(self) -> Self:

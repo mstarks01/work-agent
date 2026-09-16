@@ -102,9 +102,12 @@ __all__ = [
     "REGISTRY",
     "REGISTRY_VERSION",
     "UNIVERSAL_TERMS",
+    "UNPROJECTED",
+    "Answer",
     "Assertion",
     "AssertionCatalog",
     "AssertionProposal",
+    "AssertionRecord",
     "Basis",
     "CatalogIssue",
     "CatalogIssueCode",
@@ -117,16 +120,19 @@ __all__ = [
     "QualifierKind",
     "QuoteProposal",
     "SpanSource",
+    "Standing",
     "Subject",
     "SubjectType",
     "SupportSpan",
     "UnknownReason",
+    "answer",
     "assertion_id",
     "catalog_issues",
     "conflicts",
     "project",
     "projection_fields",
     "resolve_catalog",
+    "settled",
     "span_source",
     "spans_for",
     "subject_id",
@@ -567,6 +573,24 @@ class CatalogIssue(BaseModel):
     row: int | None = None
 
 
+class AssertionRecord(BaseModel):
+    """What one job's assertion pass produced, kept on the **Report**.
+
+    ``catalog`` is what the resolver built and every consumer read, with each
+    row's basis and assessment on it. ``issues`` is what the resolver and the
+    gate refused, by row and by reason, so a reader of the report can tell a
+    fact the sources never stated from one the node proposed and lost. The
+    proposal itself is not kept here, for the reason the report keeps no raw
+    extraction: ``issues[].row`` counts distinct refused rows without it.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    proposed: int = Field(ge=0)
+    catalog: AssertionCatalog
+    issues: list[CatalogIssue] = Field(default_factory=list)
+
+
 @dataclass(frozen=True)
 class Conflict:
     """Assertions that disagree: one subject, one predicate, one scope.
@@ -815,6 +839,120 @@ def projection_fields() -> Mapping[str, str]:
             for name, predicate in REGISTRY.items()
             if predicate.projects_into
         }
+    )
+
+
+#: The predicates the graph has no field for. **Where a fact is cited is a
+#: property of the predicate**: a predicate with a graph field reaches every
+#: reader through that field — ``control_state`` decides for eleven of the
+#: fifteen — so a second entry for it would be a second reader of one fact.
+#: A predicate here has no such field, so its rows are cited as themselves,
+#: through the **Evidence Catalog** (ADR 0036). Read off :data:`REGISTRY`, so
+#: a predicate added tomorrow is classified by its field and never listed.
+UNPROJECTED: frozenset[str] = frozenset(
+    name for name, predicate in REGISTRY.items() if not predicate.projects_into
+)
+
+#: What a catalog holds about one subject under one predicate. ``unasked`` is
+#: no row at all; ``unknown`` is rows that all read :data:`UNKNOWN`;
+#: ``conflicting`` is a disagreement and nothing settled beside it;
+#: ``answered`` is at least one row a consumer may rest on.
+Standing = Literal["unasked", "answered", "unknown", "conflicting"]
+
+
+@dataclass(frozen=True)
+class Answer:
+    """What the catalog says about one subject under one predicate.
+
+    ``rows`` is every row, whatever its scope, value or assessment.
+    ``settled`` is the subset a consumer may rest a definite conclusion on,
+    by :func:`settled`'s one rule. ``conflicts`` is the disagreements on this
+    subject and predicate, kept visible rather than resolved.
+
+    A scoped row is settled **for its scope** and answers nothing wider: a
+    second factor required for administrators says nothing about shoppers,
+    and a reader that needs the unscoped fact reads ``scope`` on each row.
+    """
+
+    subject: str
+    predicate: str
+    rows: tuple[Assertion, ...]
+    settled: tuple[Assertion, ...]
+    conflicts: tuple[Conflict, ...]
+
+    @property
+    def standing(self) -> Standing:
+        if self.settled:
+            return "answered"
+        if self.conflicts:
+            return "conflicting"
+        return "unknown" if self.rows else "unasked"
+
+    def holding(self, value: str) -> tuple[Assertion, ...]:
+        """The settled rows whose value is ``value``, at any scope."""
+        return tuple(entry for entry in self.settled if entry.value == value)
+
+
+def settled(catalog: AssertionCatalog) -> tuple[Assertion, ...]:
+    """Every row a consumer may rest a definite conclusion on, in catalog order.
+
+    **The one reader of "may a consumer treat this row as a fact".** A row is
+    settled when it holds a value rather than :data:`UNKNOWN`, its predicate
+    is registered, its basis is support of some kind — ``legacy`` is never
+    support for anything (ADR 0034 rule 6) — its assessment is one
+    :data:`PROJECTS_UNDER` admits, and no other row disagrees with it at its
+    subject, predicate and scope. A conflict settles nothing on either side
+    until a recorded adjudication does, and an ``unsupported`` or
+    ``unresolved`` row is set aside rather than read as a fact.
+
+    ``inferred`` and ``derived`` rows are settled: they are this service's
+    conclusions rather than the source's, and every reader labels them by
+    ``basis`` rather than dropping them, so an inference is visible as one.
+    """
+    disputed = {
+        (conflict.subject, conflict.predicate, conflict.scope)
+        for conflict in conflicts(catalog)
+    }
+    return tuple(
+        entry
+        for entry in catalog.entries
+        if entry.predicate in REGISTRY
+        and entry.value != UNKNOWN
+        and entry.basis != "legacy"
+        and PROJECTS_UNDER[entry.assessment]
+        and (entry.subject, entry.predicate, _scope_key(entry.scope)) not in disputed
+    )
+
+
+def answer(catalog: AssertionCatalog, subject: str, predicate: str) -> Answer:
+    """What ``catalog`` holds about ``subject`` under ``predicate``.
+
+    The typed query every consumer asks instead of walking the rows: a
+    consumer that walked them would decide for itself which rows count, and
+    two consumers would decide differently. An answer is **per subject and
+    per predicate by construction**, so a control on one interaction can
+    never suppress an unknown on another, and a mechanism can never imply a
+    second factor, a grant or a rotation.
+    """
+    rows = tuple(
+        entry
+        for entry in catalog.entries
+        if entry.subject == subject and entry.predicate == predicate
+    )
+    return Answer(
+        subject=subject,
+        predicate=predicate,
+        rows=rows,
+        settled=tuple(
+            entry
+            for entry in settled(catalog)
+            if entry.subject == subject and entry.predicate == predicate
+        ),
+        conflicts=tuple(
+            conflict
+            for conflict in conflicts(catalog)
+            if conflict.subject == subject and conflict.predicate == predicate
+        ),
     )
 
 

@@ -41,6 +41,17 @@ same catalog on every run, and a ref in a log or a diff is readable without a
 lookup. Opaque IDs would cost that for nothing, because there is no secret here.
 There are only facts the agent is being shown anyway.
 
+A fourth family arrives with the job's **Assertion** catalog, where the job ran
+one. ``assertion:<predicate>~<subject>~<scope>~<value>`` is the row's own
+computed identity, used verbatim, and it is offered for a settled row of a
+predicate the graph has no field for — a second factor stated absent, a
+credential stated shared — because those facts reach no attribute a rule could
+read. A predicate with a graph field stays cited through that field: one fact,
+one reader (ADR 0036). Which rows settle is
+:func:`~analysis_service.assertions.settled`'s one rule, so an unknown, a
+conflict, an unsupported row or a legacy one is never in the table, and a
+claim can never rest on one.
+
 Model output is untrusted input (OWASP LLM05). A ref is used as a dictionary key
 and never parsed, interpolated, or matched by a pattern compiled from it, so the
 only thing an agent can do with the field is name an entry or fail to. There is
@@ -58,6 +69,16 @@ from analysis_service.analysis import (
     CONTROL_ATTRIBUTES,
     control_state,
     names_term,
+)
+from analysis_service.assertions import (
+    ABSENT,
+    GRAPH_BOUND,
+    UNPROJECTED,
+    Assertion,
+    AssertionCatalog,
+    Subject,
+    assertion_id,
+    settled,
 )
 from analysis_service.claims import (
     GROUND_TERM_MAX_CHARS,
@@ -90,6 +111,10 @@ EvidenceCatalog = dict[str, Ground]
 UNKNOWN_PREFIX = "unknown"
 ABSENT_PREFIX = "absent"
 CROSSING_PREFIX = "crossing"
+#: The prefix every assertion identity carries. Not composed here: the
+#: reference **is** :func:`~analysis_service.assertions.assertion_id`, so the
+#: catalog and the row can never spell one fact two ways.
+ASSERTION_PREFIX = "assertion"
 #: Not a catalog prefix: no entry is ever keyed by it, because a catalog
 #: enumerates what a model holds and an absence is not in it. It exists so an
 #: absence a model contradicts is reported in the same spelling as every other
@@ -117,7 +142,9 @@ def absent_element_ref(term: str) -> str:
     return f"{ABSENT_ELEMENT_PREFIX}:{term}"
 
 
-def evidence_catalog(model: SystemModel) -> EvidenceCatalog:
+def evidence_catalog(
+    model: SystemModel, assertions: AssertionCatalog | None = None
+) -> EvidenceCatalog:
     """Every mechanically derivable fact in one validated System Model.
 
     Two enumerations, in this order: each element's attributes the input left
@@ -127,6 +154,13 @@ def evidence_catalog(model: SystemModel) -> EvidenceCatalog:
     yields them. Both orders are properties of the model rather than of this
     call, so an identical model produces an identical catalog — which is what
     lets a ref be compared across runs, samples and reports.
+
+    A third enumeration follows where the job carried an assertion pass:
+    every settled row of a predicate in
+    :data:`~analysis_service.assertions.UNPROJECTED`, in the catalog's own
+    order. ``None`` is a job that ran no such pass, and it is the same catalog
+    as before the layer existed; an empty catalog is a pass that settled
+    nothing, which offers the same rows and says so on the report.
 
     Only the *type-specific* attributes are eligible
     (:func:`~analysis_service.system_model.attribute_names`). ``notes`` holding
@@ -158,6 +192,14 @@ def evidence_catalog(model: SystemModel) -> EvidenceCatalog:
             for crossing in model.boundary_crossings()
         }
     )
+    if assertions is not None:
+        catalog.update(
+            {
+                assertion_id(row): Ground(kind="assertion", assertion=assertion_id(row))
+                for row in settled(assertions)
+                if row.predicate in UNPROJECTED
+            }
+        )
     return catalog
 
 
@@ -200,7 +242,11 @@ def _attribute_entry(element: Element, attribute: str) -> tuple[str, Ground] | N
     return None
 
 
-def ground_issues(claims: Iterable[Claim], model: SystemModel) -> list[str]:
+def ground_issues(
+    claims: Iterable[Claim],
+    model: SystemModel,
+    assertions: AssertionCatalog | None = None,
+) -> list[str]:
     """Every catalogued ground these claims carry that ``model`` does not derive.
 
     **The one reader of "is this ground one the service could have written
@@ -227,7 +273,7 @@ def ground_issues(claims: Iterable[Claim], model: SystemModel) -> list[str]:
     ground naming a field the element's type does not carry is told so, and
     one naming a real field is told what the model says about it instead.
     """
-    catalog = evidence_catalog(model)
+    catalog = evidence_catalog(model, assertions)
     by_id = {element.id: element for element in model.elements()}
     issues = []
     for claim in claims:
@@ -262,6 +308,13 @@ def _one_ground_issue(
                 f" {ground.flow_id!r}, which is not a derived boundary crossing"
             )
         return ""
+    if ground.kind == "assertion":
+        if ground.assertion not in catalog:
+            return (
+                f"claim {claim_id!r} grounds an assertion {ground.assertion!r},"
+                " which the job's catalog does not settle"
+            )
+        return ""
     named = (
         "an unknown attribute"
         if ground.kind == "unknown-attribute"
@@ -292,7 +345,9 @@ def _one_ground_issue(
     )
 
 
-def render_catalog(catalog: Mapping[str, Ground]) -> str:
+def render_catalog(
+    catalog: Mapping[str, Ground], assertions: AssertionCatalog | None = None
+) -> str:
     """The catalog as a table an agent selects from rather than a list it reads.
 
     **Shape is the point, and it is a fix rather than a decoration.** Rendered
@@ -311,9 +366,26 @@ def render_catalog(catalog: Mapping[str, Ground]) -> str:
 
     Order is the catalog's own, which is the model's, so the same System Model
     renders the same table on every run.
+
+    ``assertions`` is the catalog the assertion rows came out of, read for
+    their gloss: an identity names a subject, a predicate and a digest, and
+    the agent needs the words. Required whenever the catalog holds one, and
+    a row with no catalog behind it fails here rather than rendering a bare
+    identity nobody could select on.
     """
+    rows_by_id = (
+        {}
+        if assertions is None
+        else {assertion_id(row): row for row in assertions.entries}
+    )
+    subjects = (
+        {}
+        if assertions is None
+        else {subject.id: subject for subject in assertions.subjects}
+    )
     rows = "\n".join(
-        f"| `{ref}` | {_gloss(ground)} |" for ref, ground in catalog.items()
+        f"| `{ref}` | {_gloss(ground, rows_by_id, subjects)} |"
+        for ref, ground in catalog.items()
     )
     return (
         f"{len(catalog)} facts, and this table is all of them.\n\n"
@@ -374,7 +446,11 @@ def _element_gloss(element: Element) -> str:
     return f"{kind} in `{element.trust_zone}`"
 
 
-def _gloss(ground: Ground) -> str:
+def _gloss(
+    ground: Ground,
+    rows: Mapping[str, Assertion],
+    subjects: Mapping[str, Subject],
+) -> str:
     """What one catalogued fact asserts.
 
     Deliberately short, and it does not repeat the element ID: that is the left
@@ -385,12 +461,41 @@ def _gloss(ground: Ground) -> str:
     *stated absent* is the sharpest of those distinctions and the cheapest to
     render: it is the difference between a question and an answer, and the
     prompt spends a whole procedure step on it.
+
+    An assertion row is the one entry whose left column is a digest, so its
+    gloss carries what the others leave to the ID: the subject, spelled as
+    the element ID for a graph-bound subject and as the label for one of the
+    layer's own; the predicate; the value; the basis, so an inference reads
+    as one; and the scope, so a fact stated for some principals is never read
+    as stated for all.
     """
     if ground.kind == "derived-fact":
         return "crosses a trust boundary"
     if ground.kind == "absent-attribute":
         return f"`{ground.attribute}` stated absent"
+    if ground.kind == "assertion":
+        return _assertion_gloss(rows[ground.assertion], subjects)
     return f"`{ground.attribute}` never stated"
+
+
+def _assertion_gloss(row: Assertion, subjects: Mapping[str, Subject]) -> str:
+    """One settled assertion in the fewest words that say what it states."""
+    subject = subjects.get(row.subject)
+    if subject is None or subject.type in GRAPH_BOUND:
+        about = f"on `{row.subject}`"
+    else:
+        about = f"for {subject.label} ({subject.type})"
+    referent = subjects.get(row.value)
+    if row.value == ABSENT:
+        value = "absent"
+    elif referent is not None and referent.type not in GRAPH_BOUND:
+        value = f"`{referent.label}`"
+    else:
+        value = f"`{row.value}`"
+    scope = "".join(
+        f", where {qualifier.kind} is {qualifier.value}" for qualifier in row.scope
+    )
+    return f"`{row.predicate}` {row.basis} {value} {about}{scope}"
 
 
 class Resolution(NamedTuple):
