@@ -125,7 +125,7 @@ the same `SystemModel` before the validity gate runs.
 | Transport | What `extract` writes | Selected by |
 | --- | --- | --- |
 | full | a `SystemModel` | the default |
-| compact-v3 | a compact wire form, expanded in code | `ANALYSIS_COMPACT_EXTRACTION` |
+| compact-v4 | a compact wire form, expanded in code | `ANALYSIS_COMPACT_EXTRACTION` |
 
 Nothing downstream of the gate can tell the two apart, which is the point and
 also the reason the report records which one ran, in
@@ -138,8 +138,17 @@ Whether the compact transport is worth running is a measurement, not a claim,
 and the measurement has been made three times. Five corpus sweeps per route put
 the saving at **3.3% of emitted tokens** for `compact-v3`, 4.5% and 4.8% for the
 two versions before it — each safer version saved less. `uv run python -m
-evals.bench.deterministic transport` prints 5.0% of *characters*, which is an
+evals.bench.deterministic transport` prints 5.6% of *characters*, which is an
 upper bound.
+
+`compact-v4` is the first version whose safety fix raises the saving rather than
+spending it. Version 3 failed the gate on two flow refs the model derived from
+the flow's endpoints, so two flows between one pair collided; version 4 names a
+flow's ref after its label. A label slug runs 17.4 characters over the blessed
+corpus against 33.2 for an endpoint pair, worth a further 1.04% of the full
+emission — and it is also what the bench has priced all along, so part of the
+gap between 5.6% offline and 3.3% live was the bench pricing a ref the model was
+not writing.
 
 The input side is close to free: the first live run measured 6,116 prompt tokens
 against the full route's 6,098 on the same case, because the compact schema is

@@ -1,10 +1,12 @@
-## Output format: compact-v3
+## Output format: compact-v4
 
 This job's schema replaces every element ID with a **ref**: a short handle you invent, written once on the element and again wherever something points at it. Code builds the real IDs from the names you give, exactly as rule 3 describes, so there is no `id` field here and you never write one.
 
 Write a ref as a **type letter, a colon and a short slug**: `p:api`, `s:orders-db`, `e:shopper`, `b:edge`, `f:login`. The letter says what kind of thing the ref names — `e` an external entity, `p` a process, `s` a data store, `f` a data flow, `b` a trust boundary — and it is the same type the ID would have spelled out. A ref is a handle for this response only, and expansion throws it away.
 
 **A ref is unique among the elements of its own type.** The letter keeps the types apart, so the card processor and the zone around it are `e:card-processor` and `b:card-processor` and neither is ambiguous — name them alike where the text does. Two elements of the *same* type may not share a ref: that one points at neither, so every reference to it fails and the whole model goes back for repair.
+
+**Name a flow's ref after the flow's label, not its endpoints.** The flow `view shifts` is `f:view-shifts`. Its full ID carries both endpoints *and* the label, so a ref built from the endpoints alone leaves out the half that tells two flows apart: where a colleague both reads and writes through one app, `f:colleague-to-app` names both flows and neither. Where two flows genuinely share a label, add the endpoint that differs — `f:read-configuration-builder` and `f:read-configuration-runner`.
 
 Four fields hold a ref and nothing else:
 

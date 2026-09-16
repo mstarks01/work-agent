@@ -564,7 +564,7 @@ class ExecutionEnvelope(BaseModel):
     review_independence: Literal["shared", "distinct_model", "distinct_provider"] = (
         "shared"
     )
-    extraction_format: Literal["full", "compact-v3"] | None = "full"
+    extraction_format: Literal["full", "compact-v4"] | None = "full"
 
 
 class ModelRepair(BaseModel):

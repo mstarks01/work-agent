@@ -588,6 +588,13 @@ def as_compact(model: dict) -> dict:
     file, in :mod:`analysis_service.compact` and in ADR 0035 until the third
     live sweep exposed it.
 
+    **A flow's name is its label, so this prices a label-derived flow ref** —
+    which is what ``compact-v4`` asks for and what ``compact-v3`` did not say.
+    Version 3 left the model to choose and it chose the endpoints, at 33.2
+    characters against a label's 17.4 over this corpus. So this figure ran ahead
+    of the emission by a further 1.04% of the full model for three live sweeps,
+    on top of the six-character ref #960 corrected.
+
     The cost is that the expansion is handed refs that *look* like names. It
     still rebuilds every identifier from the ``name`` field rather than from the
     ref, and ``tests/test_compact.py`` holds that property with a hand-written
@@ -659,7 +666,9 @@ def case_transport() -> None:
     """How much of an extraction's emission the compact transport removes.
 
     **Characters, not tokens, and an upper bound on both.** Five live sweeps of
-    ``compact-v3`` measured the token saving at **3.3%** where this prints 5.0%.
+    ``compact-v3`` measured the token saving at **3.3%** where this prints 5.6%.
+    Part of that gap is this bench pricing a flow ref the model was not writing;
+    ``compact-v4`` asks for the one priced here.
     Read what this prints as the most the transport could save, and the live
     number as what it does save. What it is *not* is a latency figure — #938
     stage 4 is the paired live comparison, and on this deployment's pinned
