@@ -157,3 +157,9 @@ The customer and the mobile app keep an inferred customer-device placement
 as an execution context, not a stated network segment. The web API's
 internet exposure stays inferred: customers use the mobile app to access the
 online shop through its web API, and HTTP alone establishes no exposure.
+
+## Ruling of 2026-09-16 (#961 step 6): the macros are the process
+
+`macros` and `spreadsheet macros` are aliases for `process:catalogue-spreadsheet`:
+the executable macros implement the spreadsheet's SQL writes, and a separate
+spreadsheet process is not required when they represent its behaviour.

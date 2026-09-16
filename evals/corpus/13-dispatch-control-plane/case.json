@@ -33,7 +33,13 @@
       "name": "scheduling partner",
       "excerpt": "A scheduling partner, which is another company",
       "ruling": "The source identifies the scheduling partner as another company. 'Platform' is an additional abstraction supplied by the corpus."
+    },
+    {
+      "element": "flow:dispatch-console-to-dispatch-api:dispatch-requests",
+      "name": "call api",
+      "excerpt": "The console calls the dispatch API.",
+      "ruling": "The ordinary console-to-API interaction. A flow alias pairs only between the same aligned endpoints, and it credits this flow alone: the WebSocket flow stands separately and one undifferentiated flow cannot receive credit for both. Ruled by the maintainer on 2026-09-16 (#961 step 6)."
     }
   ],
-  "notes": "Authored for issue #193, which named four things the corpus could not exercise. The zone shape is the first of them: the production control plane is the corpus's only privilege boundary, so it is the only case where elevation-of-privilege-privilege-zone-crossing fires on authority rather than on a second party, and three flows enter it \u2014 a browser call, a WebSocket and an hourly machine post. Same company on both sides, which is what separates this case from every tenant boundary the corpus already carried. The other three are ASVS lanes with no shape to read: the importer parses a partner's SOAP feed as XML, the console calls the API cross-origin from a different origin, and the live status channel is a WebSocket whose transport and handshake nobody wrote down. Far from the payments exemplar: the authority the case turns on is a zone rather than an account, and the strongest lead into that zone is an API token issued once at build time and never rotated."
+  "notes": "Authored for issue #193, which named four things the corpus could not exercise. The zone shape is the first of them: the production control plane is the corpus's only privilege boundary, so it is the only case where elevation-of-privilege-privilege-zone-crossing fires on authority rather than on a second party, and three flows enter it — a browser call, a WebSocket and an hourly machine post. Same company on both sides, which is what separates this case from every tenant boundary the corpus already carried. The other three are ASVS lanes with no shape to read: the importer parses a partner's SOAP feed as XML, the console calls the API cross-origin from a different origin, and the live status channel is a WebSocket whose transport and handshake nobody wrote down. Far from the payments exemplar: the authority the case turns on is a zone rather than an account, and the strongest lead into that zone is an API token issued once at build time and never rotated."
 }

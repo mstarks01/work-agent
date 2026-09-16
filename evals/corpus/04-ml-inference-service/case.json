@@ -40,6 +40,18 @@
       "name": "ML engineers",
       "excerpt": "ML engineers publish new model artifacts to the registry bucket.",
       "ruling": "The source names the publishers as ML engineers, in the plural. Ruled in the #961 step 3 review, an assistant-authored ruling the maintainer posted; it authorizes the aggregate actor's equivalence and not a merge of separately extracted engineers."
+    },
+    {
+      "element": "boundary:public-internet",
+      "name": "internet",
+      "excerpt": "that we expose on the internet",
+      "ruling": "The inferred internet interaction zone under the source's own word. 'External' is accepted only where its membership establishes the same meaning, which the membership rule reads; 'engineering' has no source support. Ruled by the maintainer on 2026-09-16 (#961 step 6)."
+    },
+    {
+      "element": "entity:calling-service",
+      "name": "other team's backend",
+      "excerpt": "Other teams' backends call our inference gateway",
+      "ruling": "The singular spelling of the ruled aggregate actor. 'Calling team's user' is not this element: the backend makes the API call, and its users supply content that may appear in prompts. Ruled by the maintainer on 2026-09-16 (#961 step 6)."
     }
   ]
 }

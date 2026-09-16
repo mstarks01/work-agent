@@ -677,10 +677,18 @@ class TestTheReviewedAliases:
         assert any("derives the element's own ID" in line for line in refused)
         assert accepted == []
 
-    def test_the_document_store_carries_no_alias_and_says_why(self):
-        """The one qualification the reader made. Naming it after the platform
-        would collapse the store into `boundary:vendor-platform`, the zone that
-        contains it, and the model wrote exactly that in four runs of six."""
+    def test_the_document_store_alias_keeps_the_store_type(self):
+        """The reader's one qualification on this case, and the ruling that bounds it.
+
+        Naming the store after the platform once had no alias, because the
+        model wrote the store as `boundary:vendor-platform`, the zone that
+        contains it, in four runs of six. The maintainer ruled on 2026-09-16
+        that `vendor platform` stands for the storage role the source states
+        (#961 step 6), and the alias keeps the store's type: it derives
+        `store:vendor-platform`, which is not the zone, so a model that wrote
+        the store as its zone still pairs nothing.
+        """
+        from analysis_service.system_model import make_element_id
         from evals.harness.reference import load_case
 
         case = load_case(verify_corpus.CORPUS_DIR / "12-overclaiming-supplier-portal")
@@ -689,13 +697,13 @@ class TestTheReviewedAliases:
             for element in case.model.elements()
             if element.id == "store:document-store"
         )
+        (alias,) = [a for a in case.meta.aliases if a.element == store.id]
 
-        assert not [a for a in case.meta.aliases if a.element == store.id]
-        assert "logical store" in store.notes
-        assert "not a separately identified" in store.notes
+        assert make_element_id("store", alias.name) == "store:vendor-platform"
         assert "boundary:vendor-platform" in {
             zone.id for zone in case.model.trust_boundaries
         }
+        assert "logical store" in store.notes
 
     def test_an_alias_may_quote_a_sentence_the_source_wraps(self, tmp_path):
         """A source hard-wraps its lines, so a quoted sentence carries a newline.

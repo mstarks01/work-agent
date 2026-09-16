@@ -107,6 +107,7 @@ Not part of the question, but the records cite these names, so you need them.
 **Reviewed aliases** — other names a reader ruled identify the same element, each with the words in the source that support it. An extraction using one is named differently, not wrong.
 
 - `boundary:payroll-team-environment — another team` — The source identifies the payroll system's operator as another team. The label preserves that case-specific ownership distinction without inventing a team name. Source: > The payroll system, which is run by another team
+- `process:scheduling-web-app — web app` — The source's own short form; one web app. Ruled by the maintainer on 2026-09-16 (#961 step 6). Source: > The web app talks to a scheduling service.
 
 ### Your list
 

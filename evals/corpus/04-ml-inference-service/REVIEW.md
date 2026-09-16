@@ -116,6 +116,8 @@ Not part of the question, but the records cite these names, so you need them.
 
 - `entity:calling-service — Other teams' backends` — The source names the callers as other teams' backends; the same slug covers the punctuation-normalized spelling. Ruled in the #961 step 3 review, an assistant-authored ruling the maintainer posted; it authorizes the aggregate actor's equivalence and not a merge of separately extracted teams. Source: > Other teams' backends call our inference gateway
 - `entity:ml-engineer — ML engineers` — The source names the publishers as ML engineers, in the plural. Ruled in the #961 step 3 review, an assistant-authored ruling the maintainer posted; it authorizes the aggregate actor's equivalence and not a merge of separately extracted engineers. Source: > ML engineers publish new model artifacts to the registry bucket.
+- `boundary:public-internet — internet` — The inferred internet interaction zone under the source's own word. 'External' is accepted only where its membership establishes the same meaning, which the membership rule reads; 'engineering' has no source support. Ruled by the maintainer on 2026-09-16 (#961 step 6). Source: > that we expose on the internet
+- `entity:calling-service — other team's backend` — The singular spelling of the ruled aggregate actor. 'Calling team's user' is not this element: the backend makes the API call, and its users supply content that may appear in prompts. Ruled by the maintainer on 2026-09-16 (#961 step 6). Source: > Other teams' backends call our inference gateway
 
 ### Your list
 

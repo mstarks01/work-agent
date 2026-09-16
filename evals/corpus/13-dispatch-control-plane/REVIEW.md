@@ -133,6 +133,7 @@ Not part of the question, but the records cite these names, so you need them.
 **Reviewed aliases** — other names a reader ruled identify the same element, each with the words in the source that support it. An extraction using one is named differently, not wrong.
 
 - `boundary:scheduling-partner-platform — scheduling partner` — The source identifies the scheduling partner as another company. 'Platform' is an additional abstraction supplied by the corpus. Source: > A scheduling partner, which is another company
+- `flow:dispatch-console-to-dispatch-api:dispatch-requests — call api` — The ordinary console-to-API interaction. A flow alias pairs only between the same aligned endpoints, and it credits this flow alone: the WebSocket flow stands separately and one undifferentiated flow cannot receive credit for both. Ruled by the maintainer on 2026-09-16 (#961 step 6). Source: > The console calls the dispatch API.
 
 ### Your list
 

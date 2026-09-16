@@ -126,6 +126,10 @@ Not part of the question, but the records cite these names, so you need them.
 - `process:deploy-controller` — The deploy controller is not reachable from the internet. (basis: Stated to run on the corporate network and to be reached by store servers over the retail WAN.)
 - `process:store-server` — The store servers are not reachable from the internet. (basis: Back-office servers reached over the retail WAN; the source states they do not get pushed to at all.)
 
+**Reviewed aliases** — other names a reader ruled identify the same element, each with the words in the source that support it. An extraction using one is named differently, not wrong.
+
+- `store:git-server — self-hosted git server` — The source's own fuller name for the same server; it stays distinct from the public package registry, which supplies dependencies. Ruled by the maintainer on 2026-09-16 (#961 step 6). Source: > Developers push their branches to our self-hosted git server
+
 ### Your list
 
 Write what could go wrong. Anything: an attack, a missing control, a question

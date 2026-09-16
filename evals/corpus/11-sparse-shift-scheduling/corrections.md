@@ -55,3 +55,11 @@ against `source.md`. Five values changed in `model.json` with the rulings:
 owner or tenant, so the reference reads ownership unknown and keeps that
 statement. The zone's `kind` of `tenant` is a graph-owned modelling
 judgement the ruling did not reach.
+
+## Ruling of 2026-09-16 (#961 step 6): the public internet is a placeholder
+
+The maintainer ruled that personal phones do not establish internet routing,
+and removed the public-internet membership expectation. The zone stays in
+`model.json` because the schema requires one, and the colleague's and the
+store manager's placements are assumptions, so the replay reads the zone as a
+placeholder. `own-phones` may describe devices and does not establish a zone.

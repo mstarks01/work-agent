@@ -98,7 +98,13 @@ from analysis_service.assertions import (
 )
 from analysis_service.grounding import normalize
 from analysis_service.system_model import DataFlow, SystemModel
-from evals.harness.alignment import Alignment, align, element_type, slug_key
+from evals.harness.alignment import (
+    Alignment,
+    align,
+    element_type,
+    placeholder_zones,
+    slug_key,
+)
 from evals.harness.artifact import EvalArtifact
 from evals.harness.modes import (
     AssertionResult,
@@ -119,6 +125,7 @@ Fate = Literal[
     "omitted",
     "ambiguous",
     "unresolved",
+    "placeholder",
 ]
 FATES: tuple[Fate, ...] = (
     "found",
@@ -130,11 +137,16 @@ FATES: tuple[Fate, ...] = (
     "omitted",
     "ambiguous",
     "unresolved",
+    "placeholder",
 )
 
 #: The fates a prompt change can aim at: the reference was not found, and the
-#: instrument could say what happened to it.
-LOSSES: frozenset[str] = frozenset(FATES) - {"found", "renamed"}
+#: instrument could say what happened to it. ``placeholder`` is outside: a
+#: zone the reference holds only because the schema requires one, which a
+#: reader ruled a producer need not draw, so nothing stood for it and nothing
+#: had to (:func:`~evals.harness.alignment.placeholder_zones`). A produced
+#: zone that pairs with one still reads ``found`` or ``renamed``.
+LOSSES: frozenset[str] = frozenset(FATES) - {"found", "renamed", "placeholder"}
 
 RowFate = Literal["found", "worded", "wrong_value", "rescoped", "omitted", "silent"]
 ROW_FATES: tuple[RowFate, ...] = (
@@ -250,12 +262,15 @@ def classify_elements(
     ambiguous = {
         one: entry.produced for entry in alignment.ambiguous for one in entry.reference
     }
+    placeholders = placeholder_zones(reference)
     unpaired = tuple(alignment.unaligned_produced)
     flows = {flow.id: flow for flow in reference.data_flows}
     loose_flows = [flow for flow in produced.data_flows if flow.id in set(unpaired)]
     loose_nodes = [one for one in unpaired if element_type(one) != DataFlow.id_prefix]
     for one in alignment.unaligned_reference:
-        if one in ambiguous:
+        if one in placeholders:
+            rows.append(ElementFate(one, "placeholder"))
+        elif one in ambiguous:
             rows.append(ElementFate(one, "ambiguous", candidates=ambiguous[one]))
         elif one in flows:
             rows.append(_flow_fate(flows[one], alignment.produced_of, loose_flows))

@@ -98,6 +98,11 @@ Not part of the question, but the records cite these names, so you need them.
 
 - `process:web-application` — The web application is reachable from the public internet. (basis: The browser is stated to reach it across the public internet.)
 
+**Reviewed aliases** — other names a reader ruled identify the same element, each with the words in the source that support it. An extraction using one is named differently, not wrong.
+
+- `entity:browser — user's browser` — The source's own words for the browser. Ruled by the maintainer on 2026-09-16 (#961 step 6). Source: > A user's browser talks to the web application
+- `process:background-worker-process — background worker` — The source drops the word 'process' on second mention; one worker. Ruled by the maintainer on 2026-09-16 (#961 step 6). Source: > The background worker reads and writes the database.
+
 ### Your list
 
 Write what could go wrong. Anything: an attack, a missing control, a question

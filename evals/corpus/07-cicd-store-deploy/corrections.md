@@ -112,3 +112,9 @@ same shape from two directions: the candidate reasons well about elements that
 an element contains rather than what it does. Both are asset-tag errors, both
 feed impact scoring, and both are cheap to address in `prompts/extract.md` if the
 pattern survives re-bootstrapping against the real `extract` node.
+
+## Ruling of 2026-09-16 (#961 step 6)
+
+`self-hosted git server` is an alias for `store:git-server`. The public package
+registry is a distinct element that supplies dependencies; neither replaces
+the other.
