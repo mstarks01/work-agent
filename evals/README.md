@@ -397,6 +397,20 @@ blessed element and every signed reference row:
 python -m evals.harness.run replay evals/emissions/*.json --out replay.json
 ```
 
+The assertion benchmark seeded the blessed model, so its proposals name
+blessed element IDs; a production job resolves them against the graph its own
+extraction produced. `bind` resolves each archived proposal against every
+archived extracted graph of the same case and names each row the graph
+refused: a `renamed` binding the alignment pairs with a produced element, an
+`omitted` subject the graph never held, or an own-subject row whose referent
+the graph lacks. Beside the fates it prints how many rows a lane could have
+cited over the extracted graphs against the blessed one:
+
+```sh
+python -m evals.harness.run bind evals/emissions/20260914T201030Z-assert-model-benchmark/*.json \
+  --graphs evals/emissions/*.json --out bind.json
+```
+
 A `run` fails (exits non-zero) **only** on a structural problem — a report that
 doesn't parse, references that don't resolve, a severity that contradicts the
 matrix, or a summary that disagrees with its own contents. Every quality metric

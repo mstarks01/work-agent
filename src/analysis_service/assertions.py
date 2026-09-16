@@ -133,6 +133,7 @@ __all__ = [
     "projection_fields",
     "resolve_catalog",
     "settled",
+    "snap_subject",
     "span_source",
     "spans_for",
     "subject_id",
@@ -1572,6 +1573,23 @@ def _subject(
     except ValueError:
         return None
     return Subject(id=identity, type=subject_type, label=written.strip())
+
+
+def snap_subject(
+    subject_type: SubjectType, written: str, model: SystemModel
+) -> str | None:
+    """The subject ID a proposal's word resolves to against ``model``, or ``None``.
+
+    The resolver's own subject rule, exposed for a reader that asks which
+    element a proposed row *would* bind to without resolving the whole
+    proposal — the binding replay asks it of the blessed model to name the
+    element an extracted graph refused. One reader: it calls what
+    :func:`resolve_catalog` calls.
+    """
+    element_ids = [element.id for element in model.elements()]
+    labels = {element.id: element.name for element in model.elements()}
+    subject = _subject(subject_type, written, element_ids, labels)
+    return None if subject is None else subject.id
 
 
 def _named(written: str, labels: Mapping[str, str], prefixes: Collection[str]) -> str:

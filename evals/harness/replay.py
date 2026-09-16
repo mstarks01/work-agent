@@ -78,20 +78,25 @@ from collections import Counter, defaultdict
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, get_args
 
 from analysis_service.assertions import (
     ABSENT,
     GRAPH_BOUND,
     REGISTRY,
     UNKNOWN,
+    UNPROJECTED,
     Assertion,
     AssertionCatalog,
+    AssertionRecord,
+    CatalogProposal,
     assertion_id,
     identity_parts,
+    settled,
+    snap_subject,
 )
 from analysis_service.system_model import DataFlow, SystemModel
-from evals.harness.alignment import Alignment, element_type, slug_key
+from evals.harness.alignment import Alignment, align, element_type, slug_key
 from evals.harness.artifact import EvalArtifact
 from evals.harness.modes import (
     AssertionResult,
@@ -461,6 +466,169 @@ def replay_assertions(
     )
 
 
+# --- Binding: the same proposal against the graphs extraction produced ---------
+#
+# The assertion benchmark seeded the blessed model, so every proposal names the
+# blessed element IDs and its rows resolve against a graph a production job
+# never has. Finding 9 of #961 asks the evaluator to run against the captured
+# extracted graphs as well, so a fact the node recorded and a binding the graph
+# could not take are counted apart.
+
+#: What one proposed row came to against an extracted graph. ``bound`` is a
+#: graph-bound row the extracted graph took. ``renamed`` is one whose subject
+#: it refused although the alignment pairs the blessed subject with a
+#: produced element, so an alias ruling or an alignment-aware resolver would
+#: bind it; ``omitted`` is one whose subject the graph holds no element for.
+#: ``referent_renamed`` and ``referent_omitted`` are the same two facts about
+#: a row's reference *value* — a zone a component sits in — with the subject
+#: itself bound. ``own`` is a row on one of the layer's own subjects, which
+#: no graph decides. ``refused`` is a row the blessed model refused too, or
+#: one the extracted graph refused for a reason that is not a binding.
+BindFate = Literal[
+    "bound",
+    "renamed",
+    "omitted",
+    "referent_renamed",
+    "referent_omitted",
+    "own",
+    "refused",
+]
+BIND_FATES: tuple[BindFate, ...] = get_args(BindFate)
+
+#: The binding losses, which the pooled table lists as targets.
+BIND_LOSSES: frozenset[str] = frozenset(
+    {"renamed", "omitted", "referent_renamed", "referent_omitted"}
+)
+
+
+@dataclass(frozen=True)
+class RowBinding:
+    """One proposed row and what one extracted graph made of it."""
+
+    row: int
+    subject: str
+    predicate: str
+    fate: BindFate
+    #: The produced element the blessed subject or referent aligns to, on a
+    #: ``renamed`` fate of either kind.
+    aligned: str = ""
+
+    def to_json(self) -> dict[str, Any]:
+        return {
+            "row": self.row,
+            "subject": self.subject,
+            "predicate": self.predicate,
+            "fate": self.fate,
+            "aligned": self.aligned,
+        }
+
+
+@dataclass(frozen=True)
+class BindingReplay:
+    """One archived proposal re-resolved against one archived extracted graph."""
+
+    case_id: str
+    graph: str
+    #: Whether the extraction emission parsed to a model; an emission that did
+    #: not binds nothing, and its rows are absent rather than all omitted.
+    parsed: bool
+    rows: tuple[RowBinding, ...]
+    #: The rows the evidence catalog would offer over the extracted graph and
+    #: this proposal, beside the same count over the blessed graph. The
+    #: consumer's own figure: what a lane would have been able to cite.
+    offered: int
+    offered_blessed: int
+
+    @property
+    def counts(self) -> Counter[str]:
+        return Counter(row.fate for row in self.rows)
+
+    def to_json(self) -> dict[str, Any]:
+        return {
+            "case": self.case_id,
+            "graph": self.graph,
+            "parsed": self.parsed,
+            "counts": {fate: self.counts[fate] for fate in BIND_FATES},
+            "offered": self.offered,
+            "offered_blessed": self.offered_blessed,
+            "rows": [row.to_json() for row in self.rows],
+        }
+
+
+def _offered(record: AssertionRecord) -> int:
+    """How many rows the evidence catalog would offer a lane from this record."""
+    return sum(row.predicate in UNPROJECTED for row in settled(record.catalog))
+
+
+def bind_assertions(
+    case: GoldenCase,
+    proposal: AssertionResult,
+    extraction: ExtractionResult,
+    graph: str,
+) -> BindingReplay:
+    """Resolve one archived proposal against one archived extracted graph.
+
+    ``graph`` names the extraction artifact the graph came from, so a pooled
+    table can say which sweep's graphs refused a binding. Which binding
+    failed is read off the resolver's own refusal code for the row: a
+    ``dangling-subject`` is the subject, an ``illegal-value`` on a reference
+    predicate is the referent, and either is charged to a rename the
+    alignment pairs or to an element the graph holds nothing for.
+
+    The proposal is resolved twice through the one reader production uses,
+    once against the blessed model and once against the extracted one, and
+    each row's fate is read off which of the two refused it. A row the
+    blessed model refused is ``refused`` whatever the graph did. A row only
+    the extracted graph refused is a binding failure, and the alignment says
+    which kind: the blessed subject aligned to a produced element is a
+    ``renamed`` binding an alias ruling would take, and one aligned to
+    nothing is a subject the graph ``omitted``.
+    """
+    sources = {source.label: source.text for source in case.sources}
+    proposed = CatalogProposal.model_validate(proposal.proposal)
+    blessed = AssertionRecord.of(proposed, case.model, sources)
+    if extraction.extracted is None:
+        return BindingReplay(case.id, graph, False, (), 0, _offered(blessed))
+    extracted = AssertionRecord.of(proposed, extraction.extracted, sources)
+    refused_blessed = {issue.row for issue in blessed.issues if issue.row is not None}
+    refused_extracted = {
+        issue.row for issue in extracted.issues if issue.row is not None
+    }
+    produced_of = align(case, extraction.extracted).produced_of
+    codes: dict[int, set[str]] = defaultdict(set)
+    for issue in extracted.issues:
+        if issue.row is not None:
+            codes[issue.row].add(issue.code)
+    rows = []
+    for index, row in enumerate(proposed.assertions):
+        fate: BindFate
+        aligned = ""
+        if index in refused_blessed:
+            fate = "refused"
+        elif index not in refused_extracted:
+            fate = "bound" if row.subject_type in GRAPH_BOUND else "own"
+        elif "dangling-subject" in codes[index]:
+            blessed_id = snap_subject(row.subject_type, row.subject, case.model)
+            aligned = produced_of.get(blessed_id or "", "")
+            fate = "renamed" if aligned else "omitted"
+        elif "illegal-value" in codes[index]:
+            referent_type = next(iter(REGISTRY[row.predicate].refers_to))
+            blessed_id = snap_subject(referent_type, row.value, case.model)
+            aligned = produced_of.get(blessed_id or "", "")
+            fate = "referent_renamed" if aligned else "referent_omitted"
+        else:
+            fate = "refused"
+        rows.append(RowBinding(index, row.subject, row.predicate, fate, aligned))
+    return BindingReplay(
+        case_id=case.id,
+        graph=graph,
+        parsed=True,
+        rows=tuple(rows),
+        offered=_offered(extracted),
+        offered_blessed=_offered(blessed),
+    )
+
+
 @dataclass(frozen=True)
 class Arm:
     """What one archived sweep was: the node's instruction and the models that ran it."""
@@ -610,6 +778,110 @@ def pooled_assertions(sweeps: Sequence[SweepReplay]) -> dict[str, Any]:
                 per_row.items(), key=lambda item: (-sum(item[1].values()), item[0])
             )
         ],
+    }
+
+
+@dataclass(frozen=True)
+class BindingSweep:
+    """One archived assertion sweep bound to every archived extracted graph given."""
+
+    artifact: str
+    arm: Arm
+    bindings: tuple[BindingReplay, ...]
+
+    def to_json(self) -> dict[str, Any]:
+        return {
+            "artifact": self.artifact,
+            "arm": self.arm.to_json(),
+            "bindings": [binding.to_json() for binding in self.bindings],
+        }
+
+
+def pooled_bindings(sweeps: Sequence[BindingSweep]) -> dict[str, Any]:
+    """Every binding fate over a set of sweeps, and the rows refused most."""
+    counts: Counter[str] = Counter()
+    per_row: dict[str, Counter[str]] = defaultdict(Counter)
+    pairs = unparsed = offered = offered_blessed = 0
+    for sweep in sweeps:
+        for binding in sweep.bindings:
+            pairs += 1
+            if not binding.parsed:
+                unparsed += 1
+                continue
+            counts.update(binding.counts)
+            offered += binding.offered
+            offered_blessed += binding.offered_blessed
+            for row in binding.rows:
+                if row.fate in BIND_LOSSES:
+                    key = f"{binding.case_id}/{row.subject}/{row.predicate}"
+                    per_row[key][row.fate] += 1
+    graph_bound = sum(counts[fate] for fate in ("bound", "renamed", "omitted"))
+    return {
+        "sweeps": len(sweeps),
+        "pairs": pairs,
+        "unparsed": unparsed,
+        "fates": {fate: counts[fate] for fate in BIND_FATES},
+        "bound_share": counts["bound"] / graph_bound if graph_bound else None,
+        "offered": offered,
+        "offered_blessed": offered_blessed,
+        "targets": [
+            {"row": row, "losses": sum(fates.values()), "by_fate": dict(fates)}
+            for row, fates in sorted(
+                per_row.items(), key=lambda item: (-sum(item[1].values()), item[0])
+            )
+        ],
+    }
+
+
+def render_bindings(sweeps: Sequence[BindingSweep], targets: int = 10) -> None:
+    """The pooled binding table, one per proposal arm."""
+    grouped: dict[Arm, list[BindingSweep]] = defaultdict(list)
+    for sweep in sweeps:
+        grouped[sweep.arm].append(sweep)
+    for arm, arm_sweeps in grouped.items():
+        pool = pooled_bindings(arm_sweeps)
+        print(f"\n== {arm.label}: {len(arm_sweeps)} proposal sweep(s)")
+        print(
+            f"  {pool['pairs']} proposal/graph pair(s), {pool['unparsed']} graph(s)"
+            " refused by today's gate"
+        )
+        print("  row fate             total")
+        for fate in BIND_FATES:
+            print(f"  {fate:<20} {pool['fates'][fate]:>5}")
+        share = pool["bound_share"]
+        print(
+            f"  bound share of graph-bound rows: {'n/a' if share is None else f'{share:.3f}'}"
+        )
+        print(
+            f"  rows a lane could cite: {pool['offered']} over the extracted graphs,"
+            f" {pool['offered_blessed']} over the blessed one"
+        )
+        if pool["targets"]:
+            print(f"  targets (top {targets} of {len(pool['targets'])}):")
+            for target in pool["targets"][:targets]:
+                fates = ", ".join(
+                    f"{fate} {n}" for fate, n in sorted(target["by_fate"].items())
+                )
+                print(f"    {target['losses']:>3}  {target['row']}  ({fates})")
+
+
+def binding_artifact(
+    sweeps: Sequence[BindingSweep], commit: str, clean: bool | None, corpus_digest: str
+) -> dict[str, Any]:
+    """The whole binding replay, with the coordinates it was scored under named first."""
+    grouped: dict[Arm, list[BindingSweep]] = defaultdict(list)
+    for sweep in sweeps:
+        grouped[sweep.arm].append(sweep)
+    return {
+        "coordinates": {
+            "repo_commit": {"commit": commit, "clean": clean},
+            "corpus_digest": corpus_digest,
+        },
+        "arms": [
+            {"arm": arm.to_json(), "bindings": pooled_bindings(arm_sweeps)}
+            for arm, arm_sweeps in grouped.items()
+        ],
+        "bindings": [sweep.to_json() for sweep in sweeps],
     }
 
 
