@@ -472,15 +472,14 @@
         "subject_type": "component",
         "subject": "store:dispatch-database",
         "predicate": "network-membership",
-        "value": "boundary:production-control-plane",
-        "reason": null,
+        "value": "unknown",
+        "reason": "silent",
         "scope": [],
-        "basis": "inferred",
+        "basis": "stated",
         "quotes": [],
-        "explanation": "The dispatch API, which the source places in the production control plane, reads and writes the database; the source places the database nowhere.",
         "exclusive": false
       },
-      "rationale": "The source never places the database; the API in the control plane reads and writes it. model.json records no assumption; see disputed.",
+      "rationale": "The source never places the database, and the API's access to it does not locate it. model.json's zone is a placement the schema requires, recorded as such in its assumption, and this row keeps it out of the required-fact denominator.",
       "reviewed_by": null
     },
     {
@@ -500,16 +499,5 @@
       "reviewed_by": null
     }
   ],
-  "disputed": [
-    {
-      "element_id": "store:dispatch-database",
-      "attribute": "trust_zone",
-      "blessed": "boundary:production-control-plane",
-      "proposed": "keep the value and record an assumption",
-      "kind": "defensible-inference",
-      "basis": "The source never places the database. The dispatch API, which is in the control plane, reads and writes it; the placement follows and is unrecorded.",
-      "ruling": null,
-      "reviewed_by": null
-    }
-  ]
+  "disputed": []
 }

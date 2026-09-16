@@ -298,7 +298,7 @@
         "explanation": "",
         "exclusive": false
       },
-      "rationale": "Stated mechanism. The source says 'single'; whether the account is shared between principals is the disputed reading below.",
+      "rationale": "Stated mechanism. The source says 'single'; one account used by one service does not establish that several principals hold it, so no credential-sharing row is drafted.",
       "reviewed_by": null
     },
     {
@@ -371,22 +371,6 @@
         "exclusive": false
       },
       "rationale": "Stated custody; registry version 2 added the predicate for this sentence.",
-      "reviewed_by": null
-    },
-    {
-      "assertion": {
-        "subject_type": "credential",
-        "subject": "application account password",
-        "predicate": "credential-sharing",
-        "value": "shared",
-        "reason": null,
-        "scope": [],
-        "basis": "inferred",
-        "quotes": [],
-        "explanation": "The source says the order service reads and writes with a single application account, so every instance and every operation presents one password.",
-        "exclusive": false
-      },
-      "rationale": "Inferred, not stated: one account serves every operation and every instance of the order service. The source says 'single', which is not 'shared'. model.json writes 'shared' into the attribute as if stated; see disputed.",
       "reviewed_by": null
     },
     {
@@ -504,36 +488,5 @@
       "reviewed_by": null
     }
   ],
-  "disputed": [
-    {
-      "element_id": "flow:order-service-to-receipt-archive:append-receipt",
-      "attribute": "protocol",
-      "blessed": "HTTPS",
-      "proposed": "keep HTTPS and record an assumption on this flow, or set unknown",
-      "kind": "defensible-inference",
-      "basis": "The source says 'That is on TLS' to a Cloud Storage bucket. TLS is stated and sits in encryption_in_transit; HTTPS is the transport a bucket write over TLS uses, which the source does not say. No assumption records the inference.",
-      "ruling": null,
-      "reviewed_by": null
-    },
-    {
-      "element_id": "flow:order-service-to-orders-db:read-write-orders",
-      "attribute": "protocol",
-      "blessed": "PostgreSQL wire protocol",
-      "proposed": "keep the value and record an assumption on this flow, or set unknown",
-      "kind": "defensible-inference",
-      "basis": "The source says the data lives in a PostgreSQL database that the order service reads and writes. The wire protocol follows from the product and is not stated. No assumption records the inference.",
-      "ruling": null,
-      "reviewed_by": null
-    },
-    {
-      "element_id": "flow:order-service-to-orders-db:read-write-orders",
-      "attribute": "authentication",
-      "blessed": "single shared application account with full read/write; password from an environment variable",
-      "proposed": "single application account with full read/write; password from an environment variable",
-      "kind": "defensible-inference",
-      "basis": "The source says 'a single application account'. 'Shared' is the drafter's reading that one account serves every instance and operation; it is not the source's word, and corrections.md records it as one of the two facts that carry the threat. The catalog keeps it as an inferred credential-sharing row.",
-      "ruling": null,
-      "reviewed_by": null
-    }
-  ]
+  "disputed": []
 }

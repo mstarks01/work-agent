@@ -69,21 +69,21 @@ Not part of the question, but the records cite these names, so you need them.
 | id | exposure | interface | zone | technology |
 |---|---|---|---|---|
 | process:inference-gateway | internet-facing | web | boundary:serving-edge | FastAPI on GKE |
-| process:model-server | internal | unknown | boundary:model-network | GPU inference server |
+| process:model-server | unknown | unknown | boundary:model-network | GPU inference server |
 
 **Data stores**
 
 | id | zone | at rest | classification |
 |---|---|---|---|
-| store:model-registry-bucket | boundary:model-network | unknown | internal |
+| store:model-registry-bucket | boundary:model-network | unknown | unknown |
 | store:redis-feature-store | boundary:model-network | unknown | confidential |
-| store:inference-log | boundary:serving-edge | unknown | confidential |
+| store:inference-log | boundary:serving-edge | unknown | unknown |
 
 **Data flows**
 
 | id | source | destination | protocol | authentication | in transit |
 |---|---|---|---|---|---|
-| flow:calling-service-to-inference-gateway:submit-inference-request | entity:calling-service | process:inference-gateway | HTTPS | per-team API key in a header, never expired or rotated | unknown |
+| flow:calling-service-to-inference-gateway:submit-inference-request | entity:calling-service | process:inference-gateway | unknown | per-team API key in a header; operator reports never having expired a key | unknown |
 | flow:inference-gateway-to-model-server:forward-request | process:inference-gateway | process:model-server | unknown | none; accepted by network position | unknown |
 | flow:model-server-to-model-registry-bucket:load-artifact | process:model-server | store:model-registry-bucket | object storage API | model server's own service account | unknown |
 | flow:model-server-to-redis-feature-store:read-features | process:model-server | store:redis-feature-store | Redis protocol | none | unknown |
@@ -98,10 +98,20 @@ Not part of the question, but the records cite these names, so you need them.
 | boundary:serving-edge | network |
 | boundary:model-network | network |
 
+**Recorded notes** — hedges, probed gaps and source disagreements live here, so read them before the sets.
+
+- `process:model-server` — The source says the model network is meant to be reachable only from the gateway, which is an intended restriction; nothing states whether the server itself can be reached from outside, so exposure stays unknown.
+
 **Assumptions**
 
-- `entity:ml-engineer` — ML engineers work from inside the model network rather than over the public internet. (basis: No remote-access path is described for artifact publication; the registry is stated to sit in the model network.)
-- `store:inference-log` — The inference log contains personal data. (basis: Stated to hold raw prompts carrying "whatever the calling team's users typed".)
+- `entity:ml-engineer` — The ML engineer is placed in the model network because the schema requires a zone; the source places neither the engineer nor the registry bucket. (basis: No statement locates the engineer or the bucket, and publishing to a bucket does not locate the publisher. The value is a placement the schema requires, not a source-backed fact.)
+- `store:inference-log` — The inference log may contain personal data. (basis: Stated to hold raw prompts carrying "whatever the calling team's users typed"; whether that text is personal is not stated, so the tag records a possibility.)
+- `store:redis-feature-store` — The Redis feature store holds confidential data under the scheme in prompts/extract.md. (basis: The source says it holds account age and spend bands per customer, which is customer-specific information; the classification is inferred under the scheme, not quoted.)
+
+**Reviewed aliases** — other names a reader ruled identify the same element, each with the words in the source that support it. An extraction using one is named differently, not wrong.
+
+- `entity:calling-service — Other teams' backends` — The source names the callers as other teams' backends; the same slug covers the punctuation-normalized spelling. Ruled in the #961 step 3 review, an assistant-authored ruling the maintainer posted; it authorizes the aggregate actor's equivalence and not a merge of separately extracted teams. Source: > Other teams' backends call our inference gateway
+- `entity:ml-engineer — ML engineers` — The source names the publishers as ML engineers, in the plural. Ruled in the #961 step 3 review, an assistant-authored ruling the maintainer posted; it authorizes the aggregate actor's equivalence and not a merge of separately extracted engineers. Source: > ML engineers publish new model artifacts to the registry bucket.
 
 ### Your list
 
@@ -127,7 +137,7 @@ The narrower question, per record: **does this requirement apply to this system,
 **A1.** `V4.1.1` — The inference gateway's response content types and method policy are never described.
 
 - `process:inference-gateway`
-- An internet-facing HTTPS surface exists and its contract is unstated.
+- An internet-facing web surface exists and its contract is unstated.
 
 > mark:
 
@@ -161,7 +171,7 @@ The narrower question, per record: **does this requirement apply to this system,
 
 ### configuration
 
-**A5.** `V13.2.1` — The calling service authenticates to the inference gateway with a per-team API key that is never expired or rotated, an unchanging credential on a backend link.
+**A5.** `V13.2.1` — The calling service authenticates to the inference gateway with a per-team API key that the operator has never expired, an unchanging credential on a backend link.
 
 - `entity:calling-service`, `flow:calling-service-to-inference-gateway:submit-inference-request`
 - Stated outright, so the ruling is plain. V6.2.10 is about user passwords and forbids forced rotation, so it was the wrong home for this fact.
@@ -440,8 +450,8 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
-      "model.json": "33af264a67f028a3684ba13f2b87061b0a7a9e8d716cb71914a1668d3c93d98a",
-      "claims/asvs.json": "cd157e2720c52ec5af8e1d19436f6f5f2c0d4e3b491f6a931ffdb4f32edd49a6",
+      "model.json": "d67780026525b19495710cb9104027c0eab4f39bc47e8306cdaba30b8fe03b8a",
+      "claims/asvs.json": "af1349bb41be071d6bf58fb4a243a79e50b8ef3e2ed6cd21b8600f01328bdd4e",
       "claims/stride.json": "288fe3576466a3adc2ee67154a9cfbdc919a60db6264466faba6b6092e05e47a"
       }
     }

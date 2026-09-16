@@ -23,3 +23,16 @@ written where the text said nothing** (1, 2, 3) or **detail flattened out of an
 attribute** (6). Under-reporting (4, 5) is the rarer direction. If this pattern
 holds across cases, extraction evals should weight "invented control" errors
 above "missing element" errors.
+
+## Rulings of 2026-09-16 (#961 step 3)
+
+The step 3 review on #961 ruled on the drafted `facts.json` and its disputed
+values. The review is assistant-authored and the maintainer posted it; it is
+not a human signature, and no row in `facts.json` is signed. Each edit below
+follows one ruling, and `facts.json` changed with it.
+
+| # | Path | Before | After | Ruling |
+|---|---|---|---|---|
+| 7 | `flow:order-service-to-receipt-archive:append-receipt.protocol` | `HTTPS` | `unknown` | "That is on TLS" establishes encryption, not the application protocol. TLS stays in `encryption_in_transit`. |
+| 8 | `flow:order-service-to-orders-db:read-write-orders.protocol` | `PostgreSQL wire protocol` | `unknown` | PostgreSQL names the database technology; the connection implementation is not stated. |
+| 9 | `flow:order-service-to-orders-db:read-write-orders.authentication` | `single shared application account ...` | `single application account ...` | One account used by one service does not establish that several principals hold it. |

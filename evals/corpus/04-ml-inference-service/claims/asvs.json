@@ -8,7 +8,7 @@
     "claim": "The inference gateway's response content types and method policy are never described.",
     "tier": "must-find",
     "disposition": "needs-code",
-    "notes": "An internet-facing HTTPS surface exists and its contract is unstated."
+    "notes": "An internet-facing web surface exists and its contract is unstated."
   },
   {
     "chapter": "file-handling",
@@ -55,7 +55,7 @@
       "entity:calling-service",
       "flow:calling-service-to-inference-gateway:submit-inference-request"
     ],
-    "claim": "The calling service authenticates to the inference gateway with a per-team API key that is never expired or rotated, an unchanging credential on a backend link.",
+    "claim": "The calling service authenticates to the inference gateway with a per-team API key that the operator has never expired, an unchanging credential on a backend link.",
     "tier": "must-find",
     "disposition": "gap-from-prose",
     "notes": "Stated outright, so the ruling is plain. V6.2.10 is about user passwords and forbids forced rotation, so it was the wrong home for this fact."

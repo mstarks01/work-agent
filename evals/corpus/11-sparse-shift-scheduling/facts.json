@@ -420,22 +420,6 @@
     },
     {
       "assertion": {
-        "subject_type": "component",
-        "subject": "process:scheduling-service",
-        "predicate": "internet-exposure",
-        "value": "internal",
-        "reason": null,
-        "scope": [],
-        "basis": "inferred",
-        "quotes": [],
-        "explanation": "The source places the scheduling service on the internal network and states nothing about its exposure.",
-        "exclusive": false
-      },
-      "rationale": "Inferred from the zone: the source places the service on the internal network and says nothing about its reach. model.json holds internal with no assumption; see disputed.",
-      "reviewed_by": null
-    },
-    {
-      "assertion": {
         "subject_type": "principal",
         "subject": "store managers",
         "predicate": "authorization-grant",
@@ -525,26 +509,5 @@
       "reviewed_by": null
     }
   ],
-  "disputed": [
-    {
-      "element_id": "flow:scheduling-web-app-to-scheduling-service:rota-requests",
-      "attribute": "operations",
-      "blessed": "read-write",
-      "proposed": "keep read-write and record an assumption, or set unknown",
-      "kind": "defensible-inference",
-      "basis": "The interaction is described only as 'talks to'; the reads and writes are attributed to the service. The app is the only stated path for the managers' writes and the colleagues' reads, so read-write is defensible and unrecorded.",
-      "ruling": null,
-      "reviewed_by": null
-    },
-    {
-      "element_id": "process:scheduling-service",
-      "attribute": "exposure",
-      "blessed": "internal",
-      "proposed": "keep internal and record an assumption",
-      "kind": "defensible-inference",
-      "basis": "The source places the service on the internal network and says nothing about its reach; case 13 records the same shape as an assumption.",
-      "ruling": null,
-      "reviewed_by": null
-    }
-  ]
+  "disputed": []
 }

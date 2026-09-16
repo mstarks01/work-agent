@@ -25,3 +25,15 @@ failure mode from the attribute-stranded-in-`source_excerpt` pattern that leads
 cases 02, 03 and 05. Corrections 1 and 2 are the familiar direction and
 one-interaction-one-flow errors, and correction 2 makes pull interactions three
 for three — the strongest single pattern the corpus has.
+
+## Rulings of 2026-09-16 (#961 step 3)
+
+The step 3 review on #961 ruled on the drafted `facts.json` and its disputed
+values. The review is assistant-authored and the maintainer posted it; it is
+not a human signature, and no row in `facts.json` is signed. Each edit below
+follows one ruling, and `facts.json` changed with it.
+
+| # | Path | Before | After | Ruling |
+|---|---|---|---|---|
+| 8 | `flow:scheduling-web-app-to-scheduling-service:rota-requests.operations` | `read-write`, no assumption | `read-write` + assumption | The interaction is described only as "talks to". Managers build rotas through the app and colleagues view shifts through it, and the service reads and writes the rotas, so the app's path carries both. A supported inference, and its basis is now visible. |
+| 9 | `process:scheduling-service.exposure` | `internal` | `unknown` | Network placement alone does not establish the absence of internet ingress. The internal-network membership stays stated. |

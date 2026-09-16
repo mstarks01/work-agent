@@ -134,7 +134,7 @@
         "explanation": "",
         "exclusive": false
       },
-      "rationale": "The source states writes: prices and product copy change. It states no reads, which is why the flow's operations value is disputed below.",
+      "rationale": "The source states writes: prices and product copy change. It states no reads, and the flow's operations value reads write.",
       "reviewed_by": null
     },
     {
@@ -287,16 +287,5 @@
       "reviewed_by": null
     }
   ],
-  "disputed": [
-    {
-      "element_id": "flow:catalogue-spreadsheet-to-web-api:sql-statements",
-      "attribute": "operations",
-      "blessed": "read-write",
-      "proposed": "write",
-      "kind": "explicit-fact",
-      "basis": "The stated actions are changing prices and product copy, which are writes. Reads are not stated.",
-      "ruling": null,
-      "reviewed_by": null
-    }
-  ]
+  "disputed": []
 }

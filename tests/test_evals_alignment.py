@@ -127,18 +127,34 @@ class TestAnUnruledRenameStaysUnaligned:
     retained. That number is right: no reader has ruled, and nothing infers a
     rename. What changed is that the score now says so — the two are
     unaligned, and the extras are unreviewed rather than additions.
+
+    The names the audit probed with, the source's own "Other teams' backends"
+    and "ML engineers", were ruled aliases on 2026-09-16 (#961 step 3), so
+    they now align and the second test says so. The unruled pair here is two
+    names the source never uses.
     """
 
     def test_nothing_is_inferred(self):
         golden = case("04")
-        model = renamed(golden.model, "entity:calling-service", "Other teams backends")
-        model = renamed(model, "entity:ml-engineer", "ML engineers")
+        model = renamed(golden.model, "entity:calling-service", "Consumer backends")
+        model = renamed(model, "entity:ml-engineer", "Model publishers")
         score = scored(golden, model)
 
         assert score.aliased == ()
         assert score.actor_recall == 0.0
         assert score.initiator_recall == 0.0
         assert set(score.extra_status.values()) == {"unreviewed"}
+
+    def test_a_ruled_alias_aligns_and_a_reader_decided_it(self):
+        golden = case("04")
+        model = renamed(golden.model, "entity:calling-service", "Other teams backends")
+        model = renamed(model, "entity:ml-engineer", "ML engineers")
+        score = scored(golden, model)
+
+        assert {pair.evidence for pair in score.aliased} == {"alias"}
+        assert score.actor_recall == 1.0
+        assert score.initiator_recall == 1.0
+        assert set(score.extra_status.values()) == {"equivalent"}
 
 
 class TestAnAliasKeepsItsType:

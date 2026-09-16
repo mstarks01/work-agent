@@ -539,7 +539,10 @@ not, or delete it. A row you are not sure about stays unsigned, and the
 lint names it rather than counting it. Then rule on each disputed value:
 set `ruling` to `change` or `keep` and sign it. Apply a `change` ruling to
 `model.json` and delete the entry; a `keep` ruling stays as a signed entry
-that says the question was asked.
+that says the question was asked. Where the schema requires a value the
+source never gives — a zone for an element nothing places — record an
+assumption on `model.json` that says so, and write the row as `unknown`: the
+value is a placeholder, and the gate keeps the pair out of the denominator.
 
 `python evals/verify_corpus.py` resolves every row through the assertion
 gate and prints how many rows each file holds and how many are unsigned.
