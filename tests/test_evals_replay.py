@@ -279,7 +279,9 @@ class TestEveryReferenceRowTakesOneFate:
         unsigned = replay.SignedReference(reference.catalog)
         signed = replay.SignedReference(
             reference.catalog,
-            subject_aliases={"principal:single-application-account": row.subject},
+            subject_aliases={
+                "principal:single-application-account": replay.AliasTarget(row.subject)
+            },
         )
 
         before = self.graded(golden, unsigned, [renamed])
@@ -305,7 +307,8 @@ class TestEveryReferenceRowTakesOneFate:
         )
         pointed = row.model_copy(update={"value": "credential:password"})
         signed = replay.SignedReference(
-            reference.catalog, subject_aliases={"credential:password": row.value}
+            reference.catalog,
+            subject_aliases={"credential:password": replay.AliasTarget(row.value)},
         )
 
         graded = self.graded(golden, signed, [pointed])
@@ -313,6 +316,26 @@ class TestEveryReferenceRowTakesOneFate:
         assert next(
             r.fate for r in graded.rows if r.reference == assertion_id(row)
         ) == ("found")
+
+    def test_a_value_alias_holds_only_under_the_subjects_the_ruling_names(
+        self, golden, reference
+    ):
+        """ "Password" is the application account's within its rows, not a shopper's."""
+        row = next(
+            e
+            for e in reference.entries
+            if e.predicate == "credential-presented"
+            and e.value == "credential:application-account-password"
+        )
+        bounded = replay.AliasTarget(row.value, frozenset({row.subject}))
+        signed = replay.SignedReference(
+            reference.catalog, subject_aliases={"credential:password": bounded}
+        )
+        theirs = row.model_copy(update={"value": "credential:password"})
+        shoppers = theirs.model_copy(update={"subject": "principal:shopper-accounts"})
+
+        assert replay.under_aliases(theirs, signed).value == row.value
+        assert replay.under_aliases(shoppers, signed).value == "credential:password"
 
     def test_a_signed_qualifier_alias_turns_a_rescoped_row_into_a_found_one(
         self, golden, reference
