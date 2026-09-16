@@ -18,8 +18,10 @@ from analysis_service.grounding import (
     REPAIR_THRESHOLD,
     index_source,
     locate_quote,
+    match_normalized,
     meaning_moved,
     normalize,
+    placements,
     prepare_source,
     repair_deadline,
     repair_prepared,
@@ -606,3 +608,52 @@ class TestTheLocatorOverTheCorpus:
                 window = text[spans[0].start : spans[-1].end]
                 assert verify_quote(element.source_excerpt, window)
         assert checked > 200
+
+
+class TestCountingWhereAQuoteCanSit:
+    """``placements`` answers how many copies of a quote a source holds.
+
+    The matcher takes the first copy, which is an answer rather than the
+    answer. A span built on it cites the first copy of a sentence a submission
+    repeats, and says nothing about which copy the statement rests on (#926).
+    """
+
+    TWICE = normalize(
+        "Nightly batch: the order service reads over TLS.\n"
+        "Receipts land in a bucket.\n"
+        "Failover: the order service reads over TLS.\n"
+    )
+
+    def test_a_quote_the_source_holds_once(self):
+        assert placements("Receipts land in a bucket", self.TWICE) == 1
+
+    def test_a_quote_the_source_holds_twice(self):
+        assert placements("the order service reads over TLS", self.TWICE) == 2
+
+    def test_a_quote_the_source_does_not_hold(self):
+        assert placements("nothing like this", self.TWICE) == 0
+
+    def test_the_count_stops_at_its_limit(self):
+        """A line repeated a thousand times costs the limit, not a thousand scans."""
+        many = normalize("the same line\n" * 1000)
+        assert placements("the same line", many) == 2
+        assert placements("the same line", many, limit=5) == 5
+
+    def test_it_counts_only_placements_the_matcher_accepts(self):
+        """One reader: a placement counted is a placement ``match_normalized`` takes.
+
+        Counting with a search of its own is how the two would come to
+        disagree about a quote that marks a cut.
+        """
+        for quote in (
+            "Receipts land in a bucket",
+            "the order service reads over TLS",
+            "Nightly batch … over TLS",
+            "nothing like this",
+        ):
+            found = placements(quote, self.TWICE)
+            assert (found > 0) == (match_normalized(quote, self.TWICE) is not None)
+
+    def test_a_cut_quote_counts_where_its_first_fragment_opens(self):
+        """A span asks where these words begin, so that is what is counted."""
+        assert placements("the order service … over TLS", self.TWICE) == 2
