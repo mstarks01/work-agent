@@ -214,7 +214,7 @@ async function openCase(id) {
   hide("readOnly");
   show("case");
   updateWalk(id);
-  const res = await fetch("/api/part-one?case=" + encodeURIComponent(id));
+  const res = await fetch("/api/part-one?case=" + encodeURIComponent(id), {headers: headers});
   const d = await res.json();
   // A second click while this one was in flight owns the stage now.
   if (current !== id) return;
@@ -422,7 +422,7 @@ function frameworkChoice(name, details) {
 }
 
 async function showSets(id) {
-  const res = await fetch("/api/part-two?case=" + encodeURIComponent(id));
+  const res = await fetch("/api/part-two?case=" + encodeURIComponent(id), {headers: headers});
   const sets = await res.json();
   if (current !== id) return;
   // Said beside the case rather than swallowed: a reader who cannot see why

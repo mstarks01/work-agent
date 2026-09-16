@@ -212,7 +212,12 @@ def create_app(session: Session, page: str, script: str) -> FastAPI:
         )
 
     @app.get("/api/part-one")
-    def part_one(case: CaseId) -> JSONResponse:
+    def part_one(request: Request, case: CaseId) -> JSONResponse:
+        # Serving a case pins the draft to the bytes served, so this reads and
+        # writes. It carries the pair every write carries: the origin check,
+        # and the token that says the caller read the page.
+        refuse_cross_origin(request)
+        require_token(request, session)
         prepared = open_case(session, case)
         held = held_draft(session, case)
         work = held or sittings.Draft(case=prepared.case_id)
@@ -294,7 +299,10 @@ def create_app(session: Session, page: str, script: str) -> FastAPI:
         return JSONResponse({"case": body.case, "state": held.state})
 
     @app.get("/api/part-two")
-    def part_two(case: CaseId) -> JSONResponse:
+    def part_two(request: Request, case: CaseId) -> JSONResponse:
+        # Pins the reference sets it serves, so it writes and takes the pair.
+        refuse_cross_origin(request)
+        require_token(request, session)
         prepared = open_case(session, case)
         held = held_draft(session, case)
         if held is None:

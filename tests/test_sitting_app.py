@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
@@ -90,6 +91,74 @@ standing = "contributor"
 [voters.sam]
 standing = "maintainer"
 """
+
+
+@dataclass(frozen=True)
+class ApiRequest:
+    """One request that reaches one route, and what kind of route it is."""
+
+    method: str
+    params: dict[str, str] | None = None
+    json: dict | None = None
+    writes: bool = False
+
+    def send(self, client: TestClient, path: str, headers: dict | None = None):
+        sent = {
+            name: value
+            for name, value in (("params", self.params), ("json", self.json))
+            if value is not None
+        }
+        return getattr(client, self.method)(path, headers=headers, **sent)
+
+
+#: One request per ``/api/`` route the sitting app carries, and whether that
+#: route writes. ``TestThePosture`` holds the keys to the app's own route
+#: table, so a route added later stops this module until somebody says which
+#: kind it is — a table nobody compares to its registry fails as quietly as
+#: the hand-written list it replaced.
+#:
+#: ``writes`` is the whole of the classification, because the guard pair
+#: follows from it: a handler that changes the draft store takes the origin
+#: check and the page token, whatever its HTTP method says.
+API_REQUESTS: dict[str, ApiRequest] = {
+    "/api/rail": ApiRequest("get", writes=False),
+    "/api/part-one": ApiRequest("get", params={"case": CASE}, writes=True),
+    "/api/part-two": ApiRequest("get", params={"case": CASE}, writes=True),
+    "/api/stage": ApiRequest("get", writes=False),
+    "/api/review-states": ApiRequest("get", writes=False),
+    "/api/read-only": ApiRequest("get", params={"case": CASE}, writes=False),
+    # Reads the operator's `gh` login, which is a fact about their machine
+    # rather than anything in the store. It takes the token for that reason
+    # and is tested for it in tests/test_sitting_feedback.py.
+    "/api/contribution-status": ApiRequest("get", writes=False),
+    "/api/own-list": ApiRequest(
+        "post", json={"case": CASE, "items": OWN_LIST}, writes=True
+    ),
+    "/api/draft": ApiRequest(
+        "post",
+        json={"case": CASE, "marks": {}, "missing": [], "notes": ""},
+        writes=True,
+    ),
+    "/api/finish": ApiRequest(
+        "post",
+        json={"case": CASE, "marks": {}, "missing": [], "notes": "not mine"},
+        writes=True,
+    ),
+    "/api/drop": ApiRequest("post", json={"case": CASE}, writes=True),
+    "/api/put-back": ApiRequest("post", json={"case": CASE}, writes=True),
+    "/api/reset": ApiRequest("post", json={"case": CASE}, writes=True),
+    "/api/contribution-preview": ApiRequest("post", json={}, writes=True),
+    "/api/contribute": ApiRequest("post", json={}, writes=True),
+}
+
+
+def store_bytes(root: Path) -> dict[str, bytes]:
+    """Every draft the store holds, so a read that writes one is visible."""
+    return {
+        str(path.relative_to(root)): path.read_bytes()
+        for path in sorted(root.rglob("*"))
+        if path.is_file()
+    }
 
 
 def browser(session):
@@ -383,55 +452,85 @@ class TestThePosture:
         csp = app.get("/").headers["Content-Security-Policy"]
         assert "frame-ancestors 'none'" in csp
 
+    def test_the_request_table_answers_for_every_api_route(self, client):
+        """A guard table nobody compares to the route list has a hole.
+
+        The two guard tests below run off :data:`API_REQUESTS`, and a route
+        the table does not name is a route neither of them reads. That is how
+        ``/api/part-one`` and ``/api/part-two`` came to write a draft with no
+        origin check and no token: both tables listed the POSTs by hand, so a
+        write inside a read was invisible to them. The table is held to the
+        app's own routes, so a route added tomorrow fails here until somebody
+        says which kind it is.
+        """
+        app, _, _ = client
+        carried = {
+            route.path
+            for route in app.app.routes
+            if getattr(route, "path", "").startswith("/api/")
+        }
+        assert carried == set(API_REQUESTS), "API_REQUESTS and the routes disagree"
+
     def test_every_writing_endpoint_refuses_a_cross_site_request(self, client):
-        """Not only ``/api/contribute``.
+        """Not only ``/api/contribute``, and not only the POSTs.
 
         ``/api/finish`` marks the draft finished, which is what a later press
         carries, so a foreign page that reaches it decides what that press
-        publishes. ``/api/own-list`` satisfies the
-        method's one rule, so a foreign page that reaches it opens the recorded
-        sets for whoever asks next.
+        publishes. ``/api/own-list`` satisfies the method's one rule, so a
+        foreign page that reaches it opens the recorded sets for whoever asks
+        next. ``/api/part-one`` re-pins the digests a record signs, so a
+        foreign page that reaches it can make a file that moved under the
+        reader read as one they were served.
         """
-        app, session, tree = client
-        writes = {
-            "/api/own-list": {"case": CASE, "items": OWN_LIST},
-            "/api/finish": {
-                "case": CASE,
-                "marks": {},
-                "missing": [],
-                "notes": "not mine",
-            },
-        }
-        for path, body in writes.items():
+        _, session, tree = client
+        bare = TestClient(create_app(session), base_url=LOOPBACK)
+        for path, request in API_REQUESTS.items():
+            if not request.writes:
+                continue
             for site in ("cross-site", "same-site", "none"):
-                refused = app.post(path, json=body, headers={"Sec-Fetch-Site": site})
+                refused = request.send(bare, path, {"Sec-Fetch-Site": site})
                 assert refused.status_code == 403, f"{path} accepted a {site} request"
 
         assert not draft_file(tree, CASE).exists(), "a refused request wrote a draft"
         assert not session.carried(), "a refused request recorded the sitting"
 
     def test_every_writing_endpoint_carries_the_page_token(self, tree):
-        """Not only the ones that name a case.
+        """Not only the ones that name a case, and not only the POSTs.
 
         ``/api/finish`` writes the reading document, appends to ``case.json``
         and puts the case on the list the press carries, and it writes the
         draft under the reader's own store. It asks a request the same
-        question every other write does.
+        question every other write does, and so does every read that pins what
+        it served.
         """
         session = session_for(tree, "ada", CASE)
         untokened = TestClient(
             create_app(session), base_url=LOOPBACK, headers=SAME_ORIGIN
         )
-        writes = {
-            "/api/own-list": {"case": CASE, "items": OWN_LIST},
-            "/api/draft": {"case": CASE, "marks": {}, "missing": [], "notes": ""},
-            "/api/finish": {"case": CASE, "marks": {}, "missing": [], "notes": ""},
-            "/api/drop": {"case": CASE},
-            "/api/put-back": {"case": CASE},
-        }
-        for path, body in writes.items():
-            assert untokened.post(path, json=body).status_code == 403, path
+        for path, request in API_REQUESTS.items():
+            if not request.writes:
+                continue
+            assert request.send(untokened, path).status_code == 403, path
         assert not draft_file(tree, CASE).exists()
+
+    def test_every_reading_endpoint_leaves_the_store_alone(self, client):
+        """Read-only is a fact about the handler, not a label on the table.
+
+        Checked rather than declared, because the label is what went wrong:
+        ``/api/part-one`` read as a read for as long as nobody asked what it
+        wrote. A route that calls itself a read and then touches the draft
+        store fails here, and the answer is the guard pair rather than a new
+        entry in a list.
+        """
+        app, _, tree = client
+        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
+        before = store_bytes(drafts_root(tree))
+        assert before, "nothing in the store to measure against"
+        for path, request in API_REQUESTS.items():
+            if request.writes:
+                continue
+            request.send(app, path)
+            assert store_bytes(drafts_root(tree)) == before, f"{path} wrote a draft"
 
     def test_a_bare_post_is_refused_too(self, tree):
         """No header at all is not the same as ``same-origin``.
@@ -1001,10 +1100,15 @@ class TestTheOwnListCarriesThePageToken:
         assert not draft_file(tree, CASE).exists()
 
     def test_the_refused_post_leaves_the_case_blind(self, tree):
-        """The refusal is the whole point: the sets stay shut behind it."""
-        app, _ = self.bare(tree)
-        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
-        assert app.get(f"/api/part-two?case={CASE}").status_code == 409
+        """The refusal is the whole point: the sets stay shut behind it.
+
+        Asked through the page's own client, because the sets now take the
+        token too. What is measured is that the refused own list wrote no
+        draft — so a reader who holds the token still finds the sets closed.
+        """
+        bare, session = self.bare(tree)
+        bare.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
+        assert browser(session).get(f"/api/part-two?case={CASE}").status_code == 409
 
     def test_the_page_s_own_token_opens_it(self, tree):
         session = session_for(tree, "ada")
@@ -1029,15 +1133,19 @@ class TestTheOwnListCarriesThePageToken:
         assert refused.status_code == 403
         assert "did not come from the app's page" in refused.json()["detail"]
 
-    def test_part_two_takes_no_token(self, tree):
-        """It is a read, it serves only what a passed gate already opened, and
-        the frame rule covers the page that would read it. A token here would
-        be a third opinion on the same question rather than a new control."""
+    def test_part_two_takes_the_token_because_it_writes(self, tree):
+        """Serving the sets re-pins the draft, so it is not a read.
+
+        It read as one for as long as nobody asked what it wrote. The pin says
+        which bytes the reader was served, and a record signs that — so a
+        request nobody read the page for can make a file that moved under the
+        reader read as one they were shown.
+        """
         session = session_for(tree, "ada")
         app = browser(session)
         app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         opened = TestClient(create_app(session), base_url=LOOPBACK)
-        assert opened.get(f"/api/part-two?case={CASE}").status_code == 200
+        assert opened.get(f"/api/part-two?case={CASE}").status_code == 403
 
 
 class TestTheWalkStaysBlind:
@@ -2540,6 +2648,43 @@ class TestARecordSignsWhatWasServed:
         assert held["opened_digests"]["claims/stride.json"] == self.digest_now(
             tree, "claims/stride.json"
         )
+
+    def test_a_request_that_never_read_the_page_re_pins_nothing(self, tree):
+        """The pin is a claim about what the reader saw, so only they move it.
+
+        A foreign page cannot read this response, but it could reach the route,
+        and reaching it was enough: the digests moved to the current bytes and
+        the finish then accepted a record signed over a file nobody had read.
+        Both parts pin, so both are asked.
+        """
+        session = session_for(tree, "ada")
+        app = browser(session)
+        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
+        marks = every_mark(app, CASE)
+        source = tree / "evals" / "corpus" / CASE / "source.md"
+        source.write_text(source.read_text("utf-8") + "\n\nA new trust boundary.\n")
+        pinned = json.loads(draft_file(tree, CASE).read_text("utf-8"))["opened_digests"]
+
+        stranger = TestClient(create_app(session), base_url=LOOPBACK)
+        for site in ("cross-site", "same-site", "none"):
+            headers = {"Sec-Fetch-Site": site}
+            assert (
+                stranger.get(f"/api/part-one?case={CASE}", headers=headers).status_code
+                == 403
+            )
+            assert (
+                stranger.get(f"/api/part-two?case={CASE}", headers=headers).status_code
+                == 403
+            )
+
+        held = json.loads(draft_file(tree, CASE).read_text("utf-8"))
+        assert held["opened_digests"] == pinned
+        refused = app.post(
+            "/api/finish",
+            json={"case": CASE, "marks": marks, "missing": [], "notes": "21 agree"},
+        )
+        assert refused.status_code == 409
+        assert "source.md" in refused.json()["detail"]
 
     def test_serving_part_one_pins_the_shared_files_and_not_the_sets(self, tree):
         """Each part pins what it shows. A moved set stays named until the
