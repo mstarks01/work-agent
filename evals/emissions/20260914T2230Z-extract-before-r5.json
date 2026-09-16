@@ -1,0 +1,2771 @@
+{
+  "artifact_version": 7,
+  "mode": "extraction",
+  "cases": [
+    "01-payments-checkout",
+    "02-iot-fleet-telemetry",
+    "03-batch-data-pipeline",
+    "04-ml-inference-service",
+    "05-cookbook-queue-webapp",
+    "06-cookbook-online-game",
+    "07-cicd-store-deploy",
+    "08-sso-identity-broker",
+    "09-cookbook-sokify-retail",
+    "10-cookbook-generic-cms",
+    "11-sparse-shift-scheduling",
+    "12-overclaiming-supplier-portal",
+    "13-dispatch-control-plane"
+  ],
+  "models": {
+    "tiers_config_version": 9,
+    "tiers": {
+      "base": {
+        "vendor": "openrouter",
+        "model": "openai/gpt-5.6-luna",
+        "upstreams": [
+          "openai/flex"
+        ]
+      },
+      "strong": {
+        "vendor": "openrouter",
+        "model": "openai/gpt-5.6-terra",
+        "upstreams": [
+          "openai/flex"
+        ]
+      },
+      "review": {
+        "vendor": "openrouter",
+        "model": "openai/gpt-5.6-terra",
+        "upstreams": [
+          "openai/flex"
+        ]
+      }
+    }
+  },
+  "gating": "tier-1-structural-only",
+  "certification": {
+    "certified": false,
+    "uncertified_nodes": [
+      {
+        "node": "extract",
+        "fingerprint": "e8b63a41b773ba7101ea0281e8074ce2af0b42c7cefd24835fd665eae9176124"
+      }
+    ],
+    "unexercised_tiers": []
+  },
+  "provenance": {
+    "identity_version": 2,
+    "build": {
+      "analysis-service": "0.1.0",
+      "google-adk": "2.5.0",
+      "google-genai": "2.11.0",
+      "litellm": "1.97.0"
+    },
+    "sampling_config_version": 5,
+    "tiers_config_version": 9,
+    "sampling": {
+      "base": {
+        "temperature": null,
+        "top_p": null,
+        "seed": null,
+        "max_output_tokens": 16384,
+        "candidate_count": 1,
+        "presence_penalty": null,
+        "frequency_penalty": null,
+        "thinking": null,
+        "constrain_output": true
+      },
+      "strong": {
+        "temperature": null,
+        "top_p": null,
+        "seed": null,
+        "max_output_tokens": 64000,
+        "candidate_count": 1,
+        "presence_penalty": null,
+        "frequency_penalty": null,
+        "thinking": null,
+        "constrain_output": true
+      },
+      "review": {
+        "temperature": null,
+        "top_p": null,
+        "seed": null,
+        "max_output_tokens": 64000,
+        "candidate_count": 1,
+        "presence_penalty": null,
+        "frequency_penalty": null,
+        "thinking": null,
+        "constrain_output": true
+      }
+    },
+    "node_runs": {
+      "extract": [
+        {
+          "node": "extract",
+          "tier": "base",
+          "requested_model": "openrouter/openai/gpt-5.6-luna",
+          "served_model": "openrouter/openai/gpt-5.6-luna",
+          "instruction_sha256": "26acfad50b94101502cb42717bc9b0ba98533a5eb95e8ba0b12ac1156487ccc7",
+          "generation_fingerprint": "e8b63a41b773ba7101ea0281e8074ce2af0b42c7cefd24835fd665eae9176124",
+          "served_upstream": "OpenAI"
+        },
+        {
+          "node": "extract",
+          "tier": "base",
+          "requested_model": "openrouter/openai/gpt-5.6-luna",
+          "served_model": "openrouter/openai/gpt-5.6-luna",
+          "instruction_sha256": "26acfad50b94101502cb42717bc9b0ba98533a5eb95e8ba0b12ac1156487ccc7",
+          "generation_fingerprint": "e8b63a41b773ba7101ea0281e8074ce2af0b42c7cefd24835fd665eae9176124",
+          "served_upstream": "OpenAI"
+        },
+        {
+          "node": "extract",
+          "tier": "base",
+          "requested_model": "openrouter/openai/gpt-5.6-luna",
+          "served_model": "openrouter/openai/gpt-5.6-luna",
+          "instruction_sha256": "26acfad50b94101502cb42717bc9b0ba98533a5eb95e8ba0b12ac1156487ccc7",
+          "generation_fingerprint": "e8b63a41b773ba7101ea0281e8074ce2af0b42c7cefd24835fd665eae9176124",
+          "served_upstream": "OpenAI"
+        },
+        {
+          "node": "extract",
+          "tier": "base",
+          "requested_model": "openrouter/openai/gpt-5.6-luna",
+          "served_model": "openrouter/openai/gpt-5.6-luna",
+          "instruction_sha256": "26acfad50b94101502cb42717bc9b0ba98533a5eb95e8ba0b12ac1156487ccc7",
+          "generation_fingerprint": "e8b63a41b773ba7101ea0281e8074ce2af0b42c7cefd24835fd665eae9176124",
+          "served_upstream": "OpenAI"
+        },
+        {
+          "node": "extract",
+          "tier": "base",
+          "requested_model": "openrouter/openai/gpt-5.6-luna",
+          "served_model": "openrouter/openai/gpt-5.6-luna",
+          "instruction_sha256": "26acfad50b94101502cb42717bc9b0ba98533a5eb95e8ba0b12ac1156487ccc7",
+          "generation_fingerprint": "e8b63a41b773ba7101ea0281e8074ce2af0b42c7cefd24835fd665eae9176124",
+          "served_upstream": "OpenAI"
+        },
+        {
+          "node": "extract",
+          "tier": "base",
+          "requested_model": "openrouter/openai/gpt-5.6-luna",
+          "served_model": "openrouter/openai/gpt-5.6-luna",
+          "instruction_sha256": "26acfad50b94101502cb42717bc9b0ba98533a5eb95e8ba0b12ac1156487ccc7",
+          "generation_fingerprint": "e8b63a41b773ba7101ea0281e8074ce2af0b42c7cefd24835fd665eae9176124",
+          "served_upstream": "OpenAI"
+        },
+        {
+          "node": "extract",
+          "tier": "base",
+          "requested_model": "openrouter/openai/gpt-5.6-luna",
+          "served_model": "openrouter/openai/gpt-5.6-luna",
+          "instruction_sha256": "26acfad50b94101502cb42717bc9b0ba98533a5eb95e8ba0b12ac1156487ccc7",
+          "generation_fingerprint": "e8b63a41b773ba7101ea0281e8074ce2af0b42c7cefd24835fd665eae9176124",
+          "served_upstream": "OpenAI"
+        },
+        {
+          "node": "extract",
+          "tier": "base",
+          "requested_model": "openrouter/openai/gpt-5.6-luna",
+          "served_model": "openrouter/openai/gpt-5.6-luna",
+          "instruction_sha256": "26acfad50b94101502cb42717bc9b0ba98533a5eb95e8ba0b12ac1156487ccc7",
+          "generation_fingerprint": "e8b63a41b773ba7101ea0281e8074ce2af0b42c7cefd24835fd665eae9176124",
+          "served_upstream": "OpenAI"
+        },
+        {
+          "node": "extract",
+          "tier": "base",
+          "requested_model": "openrouter/openai/gpt-5.6-luna",
+          "served_model": "openrouter/openai/gpt-5.6-luna",
+          "instruction_sha256": "26acfad50b94101502cb42717bc9b0ba98533a5eb95e8ba0b12ac1156487ccc7",
+          "generation_fingerprint": "e8b63a41b773ba7101ea0281e8074ce2af0b42c7cefd24835fd665eae9176124",
+          "served_upstream": "OpenAI"
+        },
+        {
+          "node": "extract",
+          "tier": "base",
+          "requested_model": "openrouter/openai/gpt-5.6-luna",
+          "served_model": "openrouter/openai/gpt-5.6-luna",
+          "instruction_sha256": "26acfad50b94101502cb42717bc9b0ba98533a5eb95e8ba0b12ac1156487ccc7",
+          "generation_fingerprint": "e8b63a41b773ba7101ea0281e8074ce2af0b42c7cefd24835fd665eae9176124",
+          "served_upstream": "OpenAI"
+        },
+        {
+          "node": "extract",
+          "tier": "base",
+          "requested_model": "openrouter/openai/gpt-5.6-luna",
+          "served_model": "openrouter/openai/gpt-5.6-luna",
+          "instruction_sha256": "26acfad50b94101502cb42717bc9b0ba98533a5eb95e8ba0b12ac1156487ccc7",
+          "generation_fingerprint": "e8b63a41b773ba7101ea0281e8074ce2af0b42c7cefd24835fd665eae9176124",
+          "served_upstream": "OpenAI"
+        },
+        {
+          "node": "extract",
+          "tier": "base",
+          "requested_model": "openrouter/openai/gpt-5.6-luna",
+          "served_model": "openrouter/openai/gpt-5.6-luna",
+          "instruction_sha256": "26acfad50b94101502cb42717bc9b0ba98533a5eb95e8ba0b12ac1156487ccc7",
+          "generation_fingerprint": "e8b63a41b773ba7101ea0281e8074ce2af0b42c7cefd24835fd665eae9176124",
+          "served_upstream": "OpenAI"
+        },
+        {
+          "node": "extract",
+          "tier": "base",
+          "requested_model": "openrouter/openai/gpt-5.6-luna",
+          "served_model": "openrouter/openai/gpt-5.6-luna",
+          "instruction_sha256": "26acfad50b94101502cb42717bc9b0ba98533a5eb95e8ba0b12ac1156487ccc7",
+          "generation_fingerprint": "e8b63a41b773ba7101ea0281e8074ce2af0b42c7cefd24835fd665eae9176124",
+          "served_upstream": "OpenAI"
+        }
+      ]
+    },
+    "generation_identities": {
+      "base": {
+        "requested_models": [
+          "openrouter/openai/gpt-5.6-luna"
+        ],
+        "served_models": [
+          "openrouter/openai/gpt-5.6-luna"
+        ],
+        "instruction_digests": [
+          "26acfad50b94101502cb42717bc9b0ba98533a5eb95e8ba0b12ac1156487ccc7"
+        ],
+        "fingerprints": [
+          "e8b63a41b773ba7101ea0281e8074ce2af0b42c7cefd24835fd665eae9176124"
+        ],
+        "nodes": [
+          "extract"
+        ]
+      }
+    }
+  },
+  "node_usage": {
+    "extract": {
+      "prompt_tokens": 77523,
+      "cached_prompt_tokens": 77484,
+      "completion_tokens": 53352,
+      "reasoning_tokens": 24330,
+      "total_tokens": 130875
+    }
+  },
+  "node_charges": {
+    "extract": 0.032789940000000004
+  },
+  "node_latency": {
+    "extract": {
+      "executions": 13,
+      "total_ms": 830294,
+      "slowest_ms": 80474,
+      "mean_ms": 63869
+    }
+  },
+  "structural_failures": [
+    "11-sparse-shift-scheduling: extraction is not a valid system model: invalid-reference: assumption names attribute 'The source states that a payroll export is written onto the file share; payroll information is a set', which 'store:file-share' does not carry; it declares ['technology', 'trust_zone', 'data_classification', 'encryption_at_rest', 'assets']"
+  ],
+  "mode_output": [
+    {
+      "case": "01-payments-checkout",
+      "recall": 0.5,
+      "precision": 0.467,
+      "endpoint_recall": 1.0,
+      "interaction_recall": 1.0,
+      "zone_recall": 0.0,
+      "sourced_zone_recall": 0.667,
+      "zone_partition_agreement": 0.933,
+      "endpoint_missing": [
+        "boundary:core-services",
+        "boundary:public-internet",
+        "boundary:storefront-dmz"
+      ],
+      "endpoint_extra": [
+        "boundary:core-network",
+        "boundary:internet",
+        "boundary:shoppers",
+        "boundary:third-party"
+      ],
+      "unsourced": [],
+      "sourced_recall": 1.0,
+      "aliased": [
+        {
+          "blessed": "boundary:core-services",
+          "extracted": "boundary:core-network",
+          "excerpt": "The order service is a Python worker in our core network"
+        },
+        {
+          "blessed": "boundary:public-internet",
+          "extracted": "boundary:internet",
+          "excerpt": "It is the only thing we expose to the internet."
+        }
+      ],
+      "possible_renames": [
+        "boundary:core-network",
+        "boundary:internet",
+        "boundary:shoppers",
+        "boundary:third-party",
+        "flow:card-processor-to-storefront-api:paid-webhook",
+        "flow:order-service-to-orders-db:read-and-write-orders",
+        "flow:order-service-to-receipt-archive:write-receipt",
+        "flow:shopper-to-storefront-api:browse-and-place-orders"
+      ],
+      "additions": [],
+      "initiator_recall": 1.0,
+      "initiators_missing": [],
+      "crossings_match": false,
+      "crossings_recall": 1.0,
+      "crossings_precision": 1.0,
+      "crossings_derivable": true,
+      "crossings_missing": [],
+      "missing": [
+        "boundary:core-services",
+        "boundary:public-internet",
+        "boundary:storefront-dmz",
+        "flow:card-processor-to-storefront-api:settlement-webhook",
+        "flow:order-service-to-orders-db:read-write-orders",
+        "flow:order-service-to-receipt-archive:append-receipt",
+        "flow:shopper-to-storefront-api:place-order"
+      ],
+      "extra": [
+        "boundary:core-network",
+        "boundary:internet",
+        "boundary:shoppers",
+        "boundary:third-party",
+        "flow:card-processor-to-storefront-api:paid-webhook",
+        "flow:order-service-to-orders-db:read-and-write-orders",
+        "flow:order-service-to-receipt-archive:write-receipt",
+        "flow:shopper-to-storefront-api:browse-and-place-orders"
+      ],
+      "scored_field_agreement": 0.714,
+      "control_state_agreement": 1.0,
+      "attributes_compared": 21,
+      "attributes_comparable": 47,
+      "comparison_coverage": 0.447,
+      "attributes_differing": [
+        {
+          "element": "entity:shopper",
+          "attribute": "assets",
+          "blessed": "pii",
+          "extracted": ""
+        },
+        {
+          "element": "entity:card-processor",
+          "attribute": "assets",
+          "blessed": "financial",
+          "extracted": ""
+        },
+        {
+          "element": "process:order-service",
+          "attribute": "assets",
+          "blessed": "financial",
+          "extracted": ""
+        },
+        {
+          "element": "store:orders-db",
+          "attribute": "assets",
+          "blessed": "financial, pii",
+          "extracted": "business-critical-data, financial, pii"
+        },
+        {
+          "element": "store:receipt-archive",
+          "attribute": "assets",
+          "blessed": "business-critical-data",
+          "extracted": "business-critical-data, financial"
+        },
+        {
+          "element": "flow:storefront-api-to-order-service:submit-order",
+          "attribute": "assets",
+          "blessed": "financial, pii",
+          "extracted": "business-critical-data, financial"
+        }
+      ],
+      "unbased_controls": [],
+      "basis_coverage": {
+        "stated": 5,
+        "measured": 5,
+        "uncited": 0,
+        "tokenless": 0,
+        "flagged": 0
+      },
+      "uncited": []
+    },
+    {
+      "case": "02-iot-fleet-telemetry",
+      "recall": 0.476,
+      "precision": 0.4,
+      "endpoint_recall": 0.941,
+      "interaction_recall": 0.875,
+      "zone_recall": 0.25,
+      "sourced_zone_recall": 0.5,
+      "zone_partition_agreement": 0.806,
+      "endpoint_missing": [
+        "boundary:analytics-core",
+        "boundary:field-network",
+        "boundary:ingest-edge",
+        "flow:fleet-operator-to-telemetry-lake"
+      ],
+      "endpoint_extra": [
+        "boundary:analytics-network",
+        "boundary:cloud",
+        "boundary:customer-site",
+        "boundary:gke",
+        "boundary:internet",
+        "flow:dashboard-to-telemetry-lake",
+        "flow:fleet-operator-to-dashboard",
+        "process:dashboard"
+      ],
+      "unsourced": [],
+      "sourced_recall": 0.941,
+      "aliased": [
+        {
+          "blessed": "boundary:analytics-core",
+          "extracted": "boundary:analytics-network",
+          "excerpt": "a Python consumer in our analytics network"
+        }
+      ],
+      "possible_renames": [
+        "boundary:analytics-network",
+        "boundary:cloud",
+        "boundary:customer-site",
+        "boundary:gke",
+        "boundary:internet",
+        "flow:dashboard-to-telemetry-lake:dashboard-queries-telemetry-lake",
+        "flow:device-gateway-to-device-registry:device-gateway-looks-up-device-in-device-registry",
+        "flow:device-gateway-to-pub-sub:device-gateway-forwards-accepted-readings-to-pub-sub",
+        "flow:field-technician-to-sensor-node:field-technician-services-sensor-node",
+        "flow:fleet-operator-to-dashboard:fleet-operator-views-dashboard",
+        "flow:sensor-node-to-device-gateway:sensor-node-publishes-readings-to-device-gateway",
+        "flow:sensor-node-to-firmware-bucket:sensor-node-polls-firmware-bucket",
+        "flow:telemetry-normalizer-to-pub-sub:telemetry-normalizer-picks-up-readings-from-pub-sub",
+        "flow:telemetry-normalizer-to-telemetry-lake:telemetry-normalizer-writes-readings-to-telemetry-lake"
+      ],
+      "additions": [
+        "process:dashboard"
+      ],
+      "initiator_recall": 1.0,
+      "initiators_missing": [],
+      "crossings_match": false,
+      "crossings_recall": 0.75,
+      "crossings_precision": 0.429,
+      "crossings_derivable": true,
+      "crossings_missing": [
+        "flow:fleet-operator-to-telemetry-lake"
+      ],
+      "missing": [
+        "boundary:analytics-core",
+        "boundary:field-network",
+        "boundary:ingest-edge",
+        "flow:device-gateway-to-device-registry:look-up-device",
+        "flow:device-gateway-to-pub-sub:forward-readings",
+        "flow:field-technician-to-sensor-node:local-service-session",
+        "flow:fleet-operator-to-telemetry-lake:query-dashboards",
+        "flow:sensor-node-to-device-gateway:publish-readings",
+        "flow:sensor-node-to-firmware-bucket:poll-firmware",
+        "flow:telemetry-normalizer-to-pub-sub:pick-up-readings",
+        "flow:telemetry-normalizer-to-telemetry-lake:load-readings"
+      ],
+      "extra": [
+        "boundary:analytics-network",
+        "boundary:cloud",
+        "boundary:customer-site",
+        "boundary:gke",
+        "boundary:internet",
+        "flow:dashboard-to-telemetry-lake:dashboard-queries-telemetry-lake",
+        "flow:device-gateway-to-device-registry:device-gateway-looks-up-device-in-device-registry",
+        "flow:device-gateway-to-pub-sub:device-gateway-forwards-accepted-readings-to-pub-sub",
+        "flow:field-technician-to-sensor-node:field-technician-services-sensor-node",
+        "flow:fleet-operator-to-dashboard:fleet-operator-views-dashboard",
+        "flow:sensor-node-to-device-gateway:sensor-node-publishes-readings-to-device-gateway",
+        "flow:sensor-node-to-firmware-bucket:sensor-node-polls-firmware-bucket",
+        "flow:telemetry-normalizer-to-pub-sub:telemetry-normalizer-picks-up-readings-from-pub-sub",
+        "flow:telemetry-normalizer-to-telemetry-lake:telemetry-normalizer-writes-readings-to-telemetry-lake",
+        "process:dashboard"
+      ],
+      "scored_field_agreement": 0.692,
+      "control_state_agreement": 0.875,
+      "attributes_compared": 26,
+      "attributes_comparable": 72,
+      "comparison_coverage": 0.361,
+      "attributes_differing": [
+        {
+          "element": "process:device-gateway",
+          "attribute": "assets",
+          "blessed": "",
+          "extracted": "credentials"
+        },
+        {
+          "element": "process:telemetry-normalizer",
+          "attribute": "exposure",
+          "blessed": "internal",
+          "extracted": "unknown"
+        },
+        {
+          "element": "process:telemetry-normalizer",
+          "attribute": "assets",
+          "blessed": "pii",
+          "extracted": "business-critical-data"
+        },
+        {
+          "element": "store:device-registry",
+          "attribute": "assets",
+          "blessed": "credentials",
+          "extracted": "business-critical-data, credentials"
+        },
+        {
+          "element": "store:telemetry-lake",
+          "attribute": "assets",
+          "blessed": "business-critical-data, pii",
+          "extracted": "business-critical-data"
+        },
+        {
+          "element": "store:firmware-bucket",
+          "attribute": "assets",
+          "blessed": "business-critical-data",
+          "extracted": ""
+        },
+        {
+          "element": "store:firmware-bucket",
+          "attribute": "data_classification",
+          "blessed": "stated",
+          "extracted": "unverified"
+        },
+        {
+          "element": "store:pub-sub",
+          "attribute": "assets",
+          "blessed": "pii",
+          "extracted": "business-critical-data"
+        }
+      ],
+      "unbased_controls": [],
+      "basis_coverage": {
+        "stated": 2,
+        "measured": 2,
+        "uncited": 0,
+        "tokenless": 0,
+        "flagged": 0
+      },
+      "uncited": []
+    },
+    {
+      "case": "03-batch-data-pipeline",
+      "recall": 0.375,
+      "precision": 0.375,
+      "endpoint_recall": 0.385,
+      "interaction_recall": 0.167,
+      "zone_recall": 0.667,
+      "sourced_zone_recall": 0.667,
+      "zone_partition_agreement": 1.0,
+      "endpoint_missing": [
+        "boundary:partner-network",
+        "entity:data-analyst",
+        "flow:data-analyst-to-claims-warehouse",
+        "flow:ingest-scheduler-to-airflow-metadata-database",
+        "flow:ingest-scheduler-to-landing-bucket",
+        "flow:ingest-scheduler-to-spark-transform-job",
+        "flow:spark-transform-job-to-claims-warehouse",
+        "process:ingest-scheduler",
+        "store:claims-warehouse"
+      ],
+      "endpoint_extra": [
+        "boundary:insurance-partners",
+        "entity:analyst",
+        "flow:airflow-scheduler-to-airflow-metadata-database",
+        "flow:airflow-scheduler-to-landing-bucket",
+        "flow:airflow-scheduler-to-spark-transform-job",
+        "flow:analyst-to-bigquery",
+        "flow:spark-transform-job-to-bigquery",
+        "process:airflow-scheduler",
+        "store:bigquery"
+      ],
+      "unsourced": [],
+      "sourced_recall": 0.615,
+      "aliased": [
+        {
+          "blessed": "entity:data-analyst",
+          "extracted": "entity:analyst",
+          "excerpt": "Analysts query the warehouse directly."
+        },
+        {
+          "blessed": "process:ingest-scheduler",
+          "extracted": "process:airflow-scheduler",
+          "excerpt": "An Airflow scheduler running in the landing network"
+        },
+        {
+          "blessed": "store:claims-warehouse",
+          "extracted": "store:bigquery",
+          "excerpt": "loads them into BigQuery"
+        }
+      ],
+      "possible_renames": [
+        "boundary:insurance-partners",
+        "entity:analyst",
+        "flow:airflow-scheduler-to-airflow-metadata-database:stores-configuration",
+        "flow:airflow-scheduler-to-landing-bucket:list-and-read",
+        "flow:airflow-scheduler-to-spark-transform-job:triggers-job",
+        "flow:analyst-to-bigquery:queries-warehouse",
+        "flow:insurance-partner-to-landing-bucket:daily-extract",
+        "flow:spark-transform-job-to-bigquery:loads-records",
+        "process:airflow-scheduler",
+        "store:bigquery"
+      ],
+      "additions": [],
+      "initiator_recall": 0.333,
+      "initiators_missing": [
+        "entity:data-analyst",
+        "process:ingest-scheduler"
+      ],
+      "crossings_match": false,
+      "crossings_recall": 0.5,
+      "crossings_precision": 0.5,
+      "crossings_derivable": true,
+      "crossings_missing": [
+        "flow:ingest-scheduler-to-spark-transform-job"
+      ],
+      "missing": [
+        "boundary:partner-network",
+        "entity:data-analyst",
+        "flow:data-analyst-to-claims-warehouse:run-queries",
+        "flow:ingest-scheduler-to-airflow-metadata-database:read-connections",
+        "flow:ingest-scheduler-to-landing-bucket:list-and-read-files",
+        "flow:ingest-scheduler-to-spark-transform-job:trigger-transform",
+        "flow:insurance-partner-to-landing-bucket:push-daily-extract",
+        "flow:spark-transform-job-to-claims-warehouse:load-records",
+        "process:ingest-scheduler",
+        "store:claims-warehouse"
+      ],
+      "extra": [
+        "boundary:insurance-partners",
+        "entity:analyst",
+        "flow:airflow-scheduler-to-airflow-metadata-database:stores-configuration",
+        "flow:airflow-scheduler-to-landing-bucket:list-and-read",
+        "flow:airflow-scheduler-to-spark-transform-job:triggers-job",
+        "flow:analyst-to-bigquery:queries-warehouse",
+        "flow:insurance-partner-to-landing-bucket:daily-extract",
+        "flow:spark-transform-job-to-bigquery:loads-records",
+        "process:airflow-scheduler",
+        "store:bigquery"
+      ],
+      "scored_field_agreement": 0.733,
+      "control_state_agreement": 1.0,
+      "attributes_compared": 15,
+      "attributes_comparable": 55,
+      "comparison_coverage": 0.273,
+      "attributes_differing": [
+        {
+          "element": "entity:insurance-partner",
+          "attribute": "assets",
+          "blessed": "health, pii",
+          "extracted": ""
+        },
+        {
+          "element": "process:spark-transform-job",
+          "attribute": "exposure",
+          "blessed": "internal",
+          "extracted": "unknown"
+        },
+        {
+          "element": "process:spark-transform-job",
+          "attribute": "assets",
+          "blessed": "health, pii",
+          "extracted": "pii"
+        },
+        {
+          "element": "store:landing-bucket",
+          "attribute": "assets",
+          "blessed": "health, pii",
+          "extracted": "pii"
+        }
+      ],
+      "unbased_controls": [],
+      "basis_coverage": {
+        "stated": 3,
+        "measured": 3,
+        "uncited": 0,
+        "tokenless": 0,
+        "flagged": 0
+      },
+      "uncited": []
+    },
+    {
+      "case": "04-ml-inference-service",
+      "recall": 0.5,
+      "precision": 0.5,
+      "endpoint_recall": 1.0,
+      "interaction_recall": 1.0,
+      "zone_recall": 0.333,
+      "sourced_zone_recall": 0.333,
+      "zone_partition_agreement": 0.429,
+      "endpoint_missing": [
+        "boundary:public-internet",
+        "boundary:serving-edge"
+      ],
+      "endpoint_extra": [
+        "boundary:cloud",
+        "entity:calling-team-s-users"
+      ],
+      "unsourced": [],
+      "sourced_recall": 1.0,
+      "aliased": [],
+      "possible_renames": [
+        "boundary:cloud",
+        "flow:calling-service-to-inference-gateway:inference-requests",
+        "flow:inference-gateway-to-inference-log:inference-request-and-response-log",
+        "flow:inference-gateway-to-model-server:forwarded-inference-request",
+        "flow:ml-engineer-to-model-registry-bucket:model-artifact-publish",
+        "flow:model-server-to-model-registry-bucket:model-artifact-load",
+        "flow:model-server-to-redis-feature-store:customer-feature-read"
+      ],
+      "additions": [
+        "entity:calling-team-s-users"
+      ],
+      "initiator_recall": 1.0,
+      "initiators_missing": [],
+      "crossings_match": false,
+      "crossings_recall": 0.5,
+      "crossings_precision": 0.5,
+      "crossings_derivable": true,
+      "crossings_missing": [
+        "flow:calling-service-to-inference-gateway"
+      ],
+      "missing": [
+        "boundary:public-internet",
+        "boundary:serving-edge",
+        "flow:calling-service-to-inference-gateway:submit-inference-request",
+        "flow:inference-gateway-to-inference-log:write-request-log",
+        "flow:inference-gateway-to-model-server:forward-request",
+        "flow:ml-engineer-to-model-registry-bucket:publish-artifact",
+        "flow:model-server-to-model-registry-bucket:load-artifact",
+        "flow:model-server-to-redis-feature-store:read-features"
+      ],
+      "extra": [
+        "boundary:cloud",
+        "entity:calling-team-s-users",
+        "flow:calling-service-to-inference-gateway:inference-requests",
+        "flow:inference-gateway-to-inference-log:inference-request-and-response-log",
+        "flow:inference-gateway-to-model-server:forwarded-inference-request",
+        "flow:ml-engineer-to-model-registry-bucket:model-artifact-publish",
+        "flow:model-server-to-model-registry-bucket:model-artifact-load",
+        "flow:model-server-to-redis-feature-store:customer-feature-read"
+      ],
+      "scored_field_agreement": 0.667,
+      "control_state_agreement": 0.667,
+      "attributes_compared": 21,
+      "attributes_comparable": 55,
+      "comparison_coverage": 0.382,
+      "attributes_differing": [
+        {
+          "element": "process:inference-gateway",
+          "attribute": "assets",
+          "blessed": "",
+          "extracted": "credentials"
+        },
+        {
+          "element": "process:model-server",
+          "attribute": "assets",
+          "blessed": "business-critical-data",
+          "extracted": ""
+        },
+        {
+          "element": "store:model-registry-bucket",
+          "attribute": "assets",
+          "blessed": "business-critical-data",
+          "extracted": ""
+        },
+        {
+          "element": "store:model-registry-bucket",
+          "attribute": "data_classification",
+          "blessed": "stated",
+          "extracted": "unverified"
+        },
+        {
+          "element": "store:redis-feature-store",
+          "attribute": "assets",
+          "blessed": "financial, pii",
+          "extracted": "pii"
+        },
+        {
+          "element": "store:inference-log",
+          "attribute": "assets",
+          "blessed": "pii",
+          "extracted": ""
+        },
+        {
+          "element": "store:inference-log",
+          "attribute": "data_classification",
+          "blessed": "stated",
+          "extracted": "unverified"
+        }
+      ],
+      "unbased_controls": [],
+      "basis_coverage": {
+        "stated": 2,
+        "measured": 2,
+        "uncited": 0,
+        "tokenless": 0,
+        "flagged": 0
+      },
+      "uncited": []
+    },
+    {
+      "case": "05-cookbook-queue-webapp",
+      "recall": 0.562,
+      "precision": 0.562,
+      "endpoint_recall": 0.846,
+      "interaction_recall": 0.833,
+      "zone_recall": 1.0,
+      "sourced_zone_recall": 1.0,
+      "zone_partition_agreement": 1.0,
+      "endpoint_missing": [
+        "entity:browser",
+        "flow:browser-to-web-application"
+      ],
+      "endpoint_extra": [
+        "entity:user-s-browser",
+        "flow:user-s-browser-to-web-application"
+      ],
+      "unsourced": [],
+      "sourced_recall": 0.846,
+      "aliased": [],
+      "possible_renames": [
+        "entity:user-s-browser",
+        "flow:background-worker-process-to-database:database-access",
+        "flow:background-worker-process-to-message-queue:pick-up-jobs",
+        "flow:background-worker-process-to-worker-config:read-worker-config",
+        "flow:user-s-browser-to-web-application:browser-requests",
+        "flow:web-application-to-message-queue:enqueue-jobs",
+        "flow:web-application-to-web-application-config:read-web-application-config"
+      ],
+      "additions": [],
+      "initiator_recall": 0.5,
+      "initiators_missing": [
+        "entity:browser"
+      ],
+      "crossings_match": false,
+      "crossings_recall": 0.5,
+      "crossings_precision": 0.5,
+      "crossings_derivable": true,
+      "crossings_missing": [
+        "flow:browser-to-web-application"
+      ],
+      "missing": [
+        "entity:browser",
+        "flow:background-worker-process-to-database:read-write-records",
+        "flow:background-worker-process-to-message-queue:consume-job",
+        "flow:background-worker-process-to-worker-config:read-configuration",
+        "flow:browser-to-web-application:page-request",
+        "flow:web-application-to-message-queue:enqueue-job",
+        "flow:web-application-to-web-application-config:read-configuration"
+      ],
+      "extra": [
+        "entity:user-s-browser",
+        "flow:background-worker-process-to-database:database-access",
+        "flow:background-worker-process-to-message-queue:pick-up-jobs",
+        "flow:background-worker-process-to-worker-config:read-worker-config",
+        "flow:user-s-browser-to-web-application:browser-requests",
+        "flow:web-application-to-message-queue:enqueue-jobs",
+        "flow:web-application-to-web-application-config:read-web-application-config"
+      ],
+      "scored_field_agreement": 0.667,
+      "control_state_agreement": 0.75,
+      "attributes_compared": 24,
+      "attributes_comparable": 56,
+      "comparison_coverage": 0.429,
+      "attributes_differing": [
+        {
+          "element": "process:background-worker-process",
+          "attribute": "exposure",
+          "blessed": "internal",
+          "extracted": "unknown"
+        },
+        {
+          "element": "process:background-worker-process",
+          "attribute": "assets",
+          "blessed": "business-critical-data",
+          "extracted": ""
+        },
+        {
+          "element": "store:message-queue",
+          "attribute": "assets",
+          "blessed": "business-critical-data",
+          "extracted": ""
+        },
+        {
+          "element": "store:database",
+          "attribute": "assets",
+          "blessed": "business-critical-data",
+          "extracted": ""
+        },
+        {
+          "element": "store:web-application-config",
+          "attribute": "assets",
+          "blessed": "credentials, secrets",
+          "extracted": "credentials"
+        },
+        {
+          "element": "store:web-application-config",
+          "attribute": "data_classification",
+          "blessed": "unverified",
+          "extracted": "stated"
+        },
+        {
+          "element": "store:worker-config",
+          "attribute": "assets",
+          "blessed": "credentials, secrets",
+          "extracted": "credentials"
+        },
+        {
+          "element": "store:worker-config",
+          "attribute": "data_classification",
+          "blessed": "unverified",
+          "extracted": "stated"
+        }
+      ],
+      "unbased_controls": [],
+      "basis_coverage": {
+        "stated": 1,
+        "measured": 1,
+        "uncited": 0,
+        "tokenless": 0,
+        "flagged": 0
+      },
+      "uncited": []
+    },
+    {
+      "case": "06-cookbook-online-game",
+      "recall": 0.5,
+      "precision": 0.5,
+      "endpoint_recall": 1.0,
+      "interaction_recall": 1.0,
+      "zone_recall": 0.667,
+      "sourced_zone_recall": 0.667,
+      "zone_partition_agreement": 0.821,
+      "endpoint_missing": [
+        "boundary:player-local-machine"
+      ],
+      "endpoint_extra": [
+        "boundary:player-machines"
+      ],
+      "unsourced": [],
+      "sourced_recall": 1.0,
+      "aliased": [],
+      "possible_renames": [
+        "boundary:player-machines",
+        "flow:customer-support-staff-to-moderation-website:customer-support-staff-use-moderation-website",
+        "flow:game-client-to-game-server:game-client-to-game-server-during-match",
+        "flow:game-client-to-lobby:game-client-to-lobby-for-matchmaking",
+        "flow:game-server-to-player-database:game-server-writes-player-database",
+        "flow:game-server-to-stats-database:game-server-reads-and-writes-stats-database",
+        "flow:lobby-to-game-server:lobby-hands-match-to-game-server",
+        "flow:lobby-to-player-database:lobby-reads-player-database",
+        "flow:moderation-website-to-player-database:moderation-website-reads-and-writes-player-database",
+        "flow:player-to-game-client:player-launches-and-plays-through-game-client"
+      ],
+      "additions": [],
+      "initiator_recall": 1.0,
+      "initiators_missing": [],
+      "crossings_match": false,
+      "crossings_recall": 0.667,
+      "crossings_precision": 0.667,
+      "crossings_derivable": true,
+      "crossings_missing": [
+        "flow:customer-support-staff-to-moderation-website"
+      ],
+      "missing": [
+        "boundary:player-local-machine",
+        "flow:customer-support-staff-to-moderation-website:moderate-accounts",
+        "flow:game-client-to-game-server:gameplay-traffic",
+        "flow:game-client-to-lobby:matchmaking",
+        "flow:game-server-to-player-database:update-players",
+        "flow:game-server-to-stats-database:read-write-stats",
+        "flow:lobby-to-game-server:hand-over-match",
+        "flow:lobby-to-player-database:read-players",
+        "flow:moderation-website-to-player-database:read-write-players",
+        "flow:player-to-game-client:launch-and-play"
+      ],
+      "extra": [
+        "boundary:player-machines",
+        "flow:customer-support-staff-to-moderation-website:customer-support-staff-use-moderation-website",
+        "flow:game-client-to-game-server:game-client-to-game-server-during-match",
+        "flow:game-client-to-lobby:game-client-to-lobby-for-matchmaking",
+        "flow:game-server-to-player-database:game-server-writes-player-database",
+        "flow:game-server-to-stats-database:game-server-reads-and-writes-stats-database",
+        "flow:lobby-to-game-server:lobby-hands-match-to-game-server",
+        "flow:lobby-to-player-database:lobby-reads-player-database",
+        "flow:moderation-website-to-player-database:moderation-website-reads-and-writes-player-database",
+        "flow:player-to-game-client:player-launches-and-plays-through-game-client"
+      ],
+      "scored_field_agreement": 0.769,
+      "control_state_agreement": 1.0,
+      "attributes_compared": 26,
+      "attributes_comparable": 73,
+      "comparison_coverage": 0.356,
+      "attributes_differing": [
+        {
+          "element": "entity:player",
+          "attribute": "assets",
+          "blessed": "pii",
+          "extracted": ""
+        },
+        {
+          "element": "process:game-client",
+          "attribute": "interface_kind",
+          "blessed": "non-web",
+          "extracted": "unknown"
+        },
+        {
+          "element": "process:game-server",
+          "attribute": "assets",
+          "blessed": "business-critical-data",
+          "extracted": ""
+        },
+        {
+          "element": "process:moderation-website",
+          "attribute": "assets",
+          "blessed": "pii",
+          "extracted": ""
+        },
+        {
+          "element": "store:player-database",
+          "attribute": "assets",
+          "blessed": "business-critical-data, pii",
+          "extracted": ""
+        },
+        {
+          "element": "store:stats-database",
+          "attribute": "assets",
+          "blessed": "business-critical-data",
+          "extracted": ""
+        }
+      ],
+      "unbased_controls": [],
+      "basis_coverage": {
+        "stated": 0,
+        "measured": 0,
+        "uncited": 0,
+        "tokenless": 0,
+        "flagged": 0
+      },
+      "uncited": []
+    },
+    {
+      "case": "07-cicd-store-deploy",
+      "recall": 0.895,
+      "precision": 0.85,
+      "endpoint_recall": 1.0,
+      "interaction_recall": 1.0,
+      "zone_recall": 1.0,
+      "sourced_zone_recall": 1.0,
+      "zone_partition_agreement": 1.0,
+      "endpoint_missing": [],
+      "endpoint_extra": [
+        "process:till-software"
+      ],
+      "unsourced": [],
+      "sourced_recall": 1.0,
+      "aliased": [],
+      "possible_renames": [
+        "flow:build-runner-to-deploy-controller:request-release",
+        "flow:store-server-to-deploy-controller:query-release"
+      ],
+      "additions": [
+        "process:till-software"
+      ],
+      "initiator_recall": 1.0,
+      "initiators_missing": [],
+      "crossings_match": false,
+      "crossings_recall": 1.0,
+      "crossings_precision": 1.0,
+      "crossings_derivable": true,
+      "crossings_missing": [],
+      "missing": [
+        "flow:build-runner-to-deploy-controller:set-current-release",
+        "flow:store-server-to-deploy-controller:poll-current-release"
+      ],
+      "extra": [
+        "flow:build-runner-to-deploy-controller:request-release",
+        "flow:store-server-to-deploy-controller:query-release",
+        "process:till-software"
+      ],
+      "scored_field_agreement": 0.807,
+      "control_state_agreement": 0.955,
+      "attributes_compared": 57,
+      "attributes_comparable": 67,
+      "comparison_coverage": 0.851,
+      "attributes_differing": [
+        {
+          "element": "process:build-runner",
+          "attribute": "exposure",
+          "blessed": "internal",
+          "extracted": "unknown"
+        },
+        {
+          "element": "process:build-runner",
+          "attribute": "assets",
+          "blessed": "business-critical-data, credentials",
+          "extracted": ""
+        },
+        {
+          "element": "process:deploy-controller",
+          "attribute": "exposure",
+          "blessed": "internal",
+          "extracted": "unknown"
+        },
+        {
+          "element": "process:deploy-controller",
+          "attribute": "assets",
+          "blessed": "business-critical-data",
+          "extracted": ""
+        },
+        {
+          "element": "process:store-server",
+          "attribute": "exposure",
+          "blessed": "internal",
+          "extracted": "unknown"
+        },
+        {
+          "element": "process:store-server",
+          "attribute": "assets",
+          "blessed": "business-critical-data",
+          "extracted": ""
+        },
+        {
+          "element": "flow:developer-to-build-runner:manual-rebuild",
+          "attribute": "assets",
+          "blessed": "",
+          "extracted": "business-critical-data"
+        },
+        {
+          "element": "flow:developer-to-build-runner:manual-rebuild",
+          "attribute": "operations",
+          "blessed": "write",
+          "extracted": "unknown"
+        },
+        {
+          "element": "flow:developer-to-build-runner:manual-rebuild",
+          "attribute": "authentication",
+          "blessed": "unverified",
+          "extracted": "stated"
+        },
+        {
+          "element": "flow:build-runner-to-public-package-registry:resolve-dependencies",
+          "attribute": "assets",
+          "blessed": "",
+          "extracted": "business-critical-data"
+        },
+        {
+          "element": "flow:store-server-to-image-registry:pull-image",
+          "attribute": "assets",
+          "blessed": "business-critical-data",
+          "extracted": ""
+        }
+      ],
+      "unbased_controls": [
+        {
+          "element_id": "flow:developer-to-build-runner:manual-rebuild",
+          "attribute": "authentication",
+          "value": "login mechanism unknown",
+          "source_label": "System description",
+          "tokens": [
+            "login",
+            "mechanism",
+            "unknown"
+          ]
+        }
+      ],
+      "basis_coverage": {
+        "stated": 2,
+        "measured": 2,
+        "uncited": 0,
+        "tokenless": 0,
+        "flagged": 1
+      },
+      "uncited": []
+    },
+    {
+      "case": "08-sso-identity-broker",
+      "recall": 0.474,
+      "precision": 0.375,
+      "endpoint_recall": 0.875,
+      "interaction_recall": 0.75,
+      "zone_recall": 0.333,
+      "sourced_zone_recall": 0.333,
+      "zone_partition_agreement": 0.786,
+      "endpoint_missing": [
+        "boundary:franchise-partner",
+        "boundary:outside-corporate-network",
+        "flow:identity-broker-to-hr-system",
+        "flow:store-admin-console-to-identity-broker"
+      ],
+      "endpoint_extra": [
+        "boundary:franchise-environment",
+        "boundary:home-devices",
+        "entity:franchise-colleague",
+        "flow:application-to-identity-broker",
+        "flow:franchise-colleague-to-franchise-identity-provider",
+        "flow:hr-system-to-identity-broker",
+        "flow:identity-broker-to-application",
+        "flow:identity-broker-to-store-admin-console",
+        "process:application"
+      ],
+      "unsourced": [],
+      "sourced_recall": 0.875,
+      "aliased": [],
+      "possible_renames": [
+        "boundary:franchise-environment",
+        "boundary:home-devices",
+        "flow:application-to-identity-broker:public-key-fetch",
+        "flow:colleague-to-identity-broker:colleague-sign-in",
+        "flow:colleague-to-store-admin-console:store-admin-console-use",
+        "flow:franchise-colleague-to-franchise-identity-provider:franchise-identity-provider-vouch",
+        "flow:franchise-identity-provider-to-identity-broker:franchise-sign-in-assertion",
+        "flow:hr-system-to-identity-broker:overnight-hr-changes",
+        "flow:identity-broker-to-application:application-token",
+        "flow:identity-broker-to-audit-log:sign-in-audit-records",
+        "flow:identity-broker-to-directory:directory-maintenance",
+        "flow:identity-broker-to-key-store:signing-key-access",
+        "flow:identity-broker-to-store-admin-console:store-admin-console-token"
+      ],
+      "additions": [
+        "entity:franchise-colleague",
+        "process:application"
+      ],
+      "initiator_recall": 1.0,
+      "initiators_missing": [],
+      "crossings_match": false,
+      "crossings_recall": 0.75,
+      "crossings_precision": 1.0,
+      "crossings_derivable": true,
+      "crossings_missing": [
+        "flow:identity-broker-to-hr-system"
+      ],
+      "missing": [
+        "boundary:franchise-partner",
+        "boundary:outside-corporate-network",
+        "flow:colleague-to-identity-broker:sign-in",
+        "flow:colleague-to-store-admin-console:change-prices-and-void",
+        "flow:franchise-identity-provider-to-identity-broker:vouch-for-colleague",
+        "flow:identity-broker-to-audit-log:write-sign-ins",
+        "flow:identity-broker-to-directory:read-write-directory",
+        "flow:identity-broker-to-hr-system:nightly-group-pull",
+        "flow:identity-broker-to-key-store:read-signing-key",
+        "flow:store-admin-console-to-identity-broker:fetch-public-key"
+      ],
+      "extra": [
+        "boundary:franchise-environment",
+        "boundary:home-devices",
+        "entity:franchise-colleague",
+        "flow:application-to-identity-broker:public-key-fetch",
+        "flow:colleague-to-identity-broker:colleague-sign-in",
+        "flow:colleague-to-store-admin-console:store-admin-console-use",
+        "flow:franchise-colleague-to-franchise-identity-provider:franchise-identity-provider-vouch",
+        "flow:franchise-identity-provider-to-identity-broker:franchise-sign-in-assertion",
+        "flow:hr-system-to-identity-broker:overnight-hr-changes",
+        "flow:identity-broker-to-application:application-token",
+        "flow:identity-broker-to-audit-log:sign-in-audit-records",
+        "flow:identity-broker-to-directory:directory-maintenance",
+        "flow:identity-broker-to-key-store:signing-key-access",
+        "flow:identity-broker-to-store-admin-console:store-admin-console-token",
+        "process:application"
+      ],
+      "scored_field_agreement": 0.435,
+      "control_state_agreement": 0.5,
+      "attributes_compared": 23,
+      "attributes_comparable": 67,
+      "comparison_coverage": 0.343,
+      "attributes_differing": [
+        {
+          "element": "entity:franchise-identity-provider",
+          "attribute": "assets",
+          "blessed": "credentials",
+          "extracted": "credentials, pii"
+        },
+        {
+          "element": "entity:hr-system",
+          "attribute": "assets",
+          "blessed": "pii",
+          "extracted": "business-critical-data, pii"
+        },
+        {
+          "element": "process:identity-broker",
+          "attribute": "exposure",
+          "blessed": "internet-facing",
+          "extracted": "unknown"
+        },
+        {
+          "element": "process:identity-broker",
+          "attribute": "interface_kind",
+          "blessed": "web",
+          "extracted": "unknown"
+        },
+        {
+          "element": "process:identity-broker",
+          "attribute": "assets",
+          "blessed": "credentials, secrets",
+          "extracted": "credentials, pii, secrets"
+        },
+        {
+          "element": "process:store-admin-console",
+          "attribute": "interface_kind",
+          "blessed": "web",
+          "extracted": "unknown"
+        },
+        {
+          "element": "process:store-admin-console",
+          "attribute": "assets",
+          "blessed": "business-critical-data, financial",
+          "extracted": "business-critical-data, credentials, financial"
+        },
+        {
+          "element": "store:directory",
+          "attribute": "assets",
+          "blessed": "pii",
+          "extracted": "business-critical-data, credentials, pii"
+        },
+        {
+          "element": "store:directory",
+          "attribute": "data_classification",
+          "blessed": "unverified",
+          "extracted": "stated"
+        },
+        {
+          "element": "store:key-store",
+          "attribute": "assets",
+          "blessed": "secrets",
+          "extracted": "credentials, secrets"
+        },
+        {
+          "element": "store:key-store",
+          "attribute": "data_classification",
+          "blessed": "unverified",
+          "extracted": "stated"
+        },
+        {
+          "element": "store:audit-log",
+          "attribute": "assets",
+          "blessed": "business-critical-data",
+          "extracted": "business-critical-data, pii"
+        },
+        {
+          "element": "store:audit-log",
+          "attribute": "data_classification",
+          "blessed": "unverified",
+          "extracted": "stated"
+        }
+      ],
+      "unbased_controls": [],
+      "basis_coverage": {
+        "stated": 1,
+        "measured": 1,
+        "uncited": 0,
+        "tokenless": 0,
+        "flagged": 0
+      },
+      "uncited": []
+    },
+    {
+      "case": "09-cookbook-sokify-retail",
+      "recall": 0.526,
+      "precision": 0.476,
+      "endpoint_recall": 0.75,
+      "interaction_recall": 0.75,
+      "zone_recall": 0.333,
+      "sourced_zone_recall": 0.667,
+      "zone_partition_agreement": 1.0,
+      "endpoint_missing": [
+        "boundary:marketing-office",
+        "boundary:sokify-internal-systems",
+        "flow:catalogue-spreadsheet-to-web-api",
+        "flow:sims-to-delivery-address-flat-file",
+        "process:catalogue-spreadsheet",
+        "store:delivery-address-flat-file"
+      ],
+      "endpoint_extra": [
+        "boundary:office",
+        "boundary:sokify",
+        "flow:sims-to-flat-file",
+        "flow:spreadsheet-macros-to-web-api",
+        "flow:spreadsheet-to-spreadsheet-macros",
+        "process:spreadsheet-macros",
+        "store:flat-file",
+        "store:spreadsheet"
+      ],
+      "unsourced": [],
+      "sourced_recall": 0.812,
+      "aliased": [
+        {
+          "blessed": "boundary:marketing-office",
+          "extracted": "boundary:office",
+          "excerpt": "The spreadsheet lives on a marketing laptop in the office."
+        },
+        {
+          "blessed": "store:delivery-address-flat-file",
+          "extracted": "store:flat-file",
+          "excerpt": "the flat file are encrypted"
+        }
+      ],
+      "possible_renames": [
+        "boundary:office",
+        "boundary:sokify",
+        "flow:fax-gateway-to-customer:confirmation",
+        "flow:mobile-app-to-web-api:api-requests",
+        "flow:sims-to-flat-file:delivery-address",
+        "flow:spreadsheet-macros-to-web-api:catalogue-updates",
+        "flow:spreadsheet-to-spreadsheet-macros:macro-execution",
+        "flow:web-api-to-sims:order",
+        "process:spreadsheet-macros",
+        "store:flat-file",
+        "store:spreadsheet"
+      ],
+      "additions": [],
+      "initiator_recall": 0.0,
+      "initiators_missing": [
+        "process:catalogue-spreadsheet"
+      ],
+      "crossings_match": false,
+      "crossings_recall": 0.667,
+      "crossings_precision": 0.667,
+      "crossings_derivable": true,
+      "crossings_missing": [
+        "flow:catalogue-spreadsheet-to-web-api"
+      ],
+      "missing": [
+        "boundary:marketing-office",
+        "boundary:sokify-internal-systems",
+        "flow:catalogue-spreadsheet-to-web-api:sql-statements",
+        "flow:fax-gateway-to-customer:confirmation-fax",
+        "flow:mobile-app-to-web-api:api-traffic",
+        "flow:sims-to-delivery-address-flat-file:address-write",
+        "flow:web-api-to-sims:order-handover",
+        "process:catalogue-spreadsheet",
+        "store:delivery-address-flat-file"
+      ],
+      "extra": [
+        "boundary:office",
+        "boundary:sokify",
+        "flow:fax-gateway-to-customer:confirmation",
+        "flow:mobile-app-to-web-api:api-requests",
+        "flow:sims-to-flat-file:delivery-address",
+        "flow:spreadsheet-macros-to-web-api:catalogue-updates",
+        "flow:spreadsheet-to-spreadsheet-macros:macro-execution",
+        "flow:web-api-to-sims:order",
+        "process:spreadsheet-macros",
+        "store:flat-file",
+        "store:spreadsheet"
+      ],
+      "scored_field_agreement": 0.735,
+      "control_state_agreement": 1.0,
+      "attributes_compared": 34,
+      "attributes_comparable": 69,
+      "comparison_coverage": 0.493,
+      "attributes_differing": [
+        {
+          "element": "entity:customer",
+          "attribute": "assets",
+          "blessed": "",
+          "extracted": "financial, pii"
+        },
+        {
+          "element": "process:mobile-app",
+          "attribute": "assets",
+          "blessed": "pii",
+          "extracted": "financial, pii"
+        },
+        {
+          "element": "process:web-api",
+          "attribute": "exposure",
+          "blessed": "internet-facing",
+          "extracted": "unknown"
+        },
+        {
+          "element": "process:sims",
+          "attribute": "interface_kind",
+          "blessed": "unknown",
+          "extracted": "non-web"
+        },
+        {
+          "element": "process:sims",
+          "attribute": "assets",
+          "blessed": "business-critical-data, pii",
+          "extracted": "business-critical-data"
+        },
+        {
+          "element": "flow:customer-to-mobile-app:browse-and-order",
+          "attribute": "assets",
+          "blessed": "pii",
+          "extracted": "financial, pii"
+        },
+        {
+          "element": "flow:customer-to-mobile-app:browse-and-order",
+          "attribute": "operations",
+          "blessed": "read-write",
+          "extracted": "write"
+        },
+        {
+          "element": "flow:web-api-to-user-database:customer-records",
+          "attribute": "operations",
+          "blessed": "read-write",
+          "extracted": "write"
+        },
+        {
+          "element": "boundary:customer-device",
+          "attribute": "kind",
+          "blessed": "network",
+          "extracted": "tenant"
+        }
+      ],
+      "unbased_controls": [],
+      "basis_coverage": {
+        "stated": 0,
+        "measured": 0,
+        "uncited": 0,
+        "tokenless": 0,
+        "flagged": 0
+      },
+      "uncited": []
+    },
+    {
+      "case": "10-cookbook-generic-cms",
+      "recall": 0.429,
+      "precision": 0.4,
+      "endpoint_recall": 0.545,
+      "interaction_recall": 0.4,
+      "zone_recall": 0.667,
+      "sourced_zone_recall": 0.667,
+      "zone_partition_agreement": 1.0,
+      "endpoint_missing": [
+        "boundary:public-internet",
+        "entity:reader",
+        "flow:reader-to-cdn",
+        "flow:reader-to-web-server",
+        "flow:web-server-to-cdn-bucket",
+        "store:cdn-bucket"
+      ],
+      "endpoint_extra": [
+        "boundary:public",
+        "entity:readers",
+        "flow:readers-to-cdn",
+        "flow:readers-to-web-server",
+        "flow:web-server-to-cdn-s-bucket",
+        "process:cms",
+        "store:cdn-s-bucket"
+      ],
+      "unsourced": [],
+      "sourced_recall": 0.636,
+      "aliased": [
+        {
+          "blessed": "store:cdn-bucket",
+          "extracted": "store:cdn-s-bucket",
+          "excerpt": "pushes them up to the CDN's bucket"
+        }
+      ],
+      "possible_renames": [
+        "boundary:public",
+        "entity:readers",
+        "flow:admin-to-mysql-database:direct-maintenance",
+        "flow:readers-to-cdn:asset-fetches",
+        "flow:readers-to-web-server:site-requests",
+        "flow:web-server-to-cdn-s-bucket:asset-push",
+        "flow:web-server-to-mysql-database:cms-database-access",
+        "store:cdn-s-bucket"
+      ],
+      "additions": [
+        "process:cms"
+      ],
+      "initiator_recall": 0.5,
+      "initiators_missing": [
+        "entity:reader"
+      ],
+      "crossings_match": false,
+      "crossings_recall": 0.25,
+      "crossings_precision": 0.25,
+      "crossings_derivable": true,
+      "crossings_missing": [
+        "flow:reader-to-cdn",
+        "flow:reader-to-web-server",
+        "flow:web-server-to-cdn-bucket"
+      ],
+      "missing": [
+        "boundary:public-internet",
+        "entity:reader",
+        "flow:admin-to-mysql-database:direct-administration",
+        "flow:reader-to-cdn:asset-fetch",
+        "flow:reader-to-web-server:page-requests",
+        "flow:web-server-to-cdn-bucket:asset-publish",
+        "flow:web-server-to-mysql-database:cms-data",
+        "store:cdn-bucket"
+      ],
+      "extra": [
+        "boundary:public",
+        "entity:readers",
+        "flow:admin-to-mysql-database:direct-maintenance",
+        "flow:readers-to-cdn:asset-fetches",
+        "flow:readers-to-web-server:site-requests",
+        "flow:web-server-to-cdn-s-bucket:asset-push",
+        "flow:web-server-to-mysql-database:cms-database-access",
+        "process:cms",
+        "store:cdn-s-bucket"
+      ],
+      "scored_field_agreement": 0.786,
+      "control_state_agreement": 0.5,
+      "attributes_compared": 14,
+      "attributes_comparable": 46,
+      "comparison_coverage": 0.304,
+      "attributes_differing": [
+        {
+          "element": "store:mysql-database",
+          "attribute": "assets",
+          "blessed": "business-critical-data, pii",
+          "extracted": "business-critical-data, credentials"
+        },
+        {
+          "element": "store:mysql-database",
+          "attribute": "data_classification",
+          "blessed": "unverified",
+          "extracted": "stated"
+        },
+        {
+          "element": "boundary:cdn",
+          "attribute": "kind",
+          "blessed": "network",
+          "extracted": "tenant"
+        }
+      ],
+      "unbased_controls": [],
+      "basis_coverage": {
+        "stated": 2,
+        "measured": 2,
+        "uncited": 0,
+        "tokenless": 0,
+        "flagged": 0
+      },
+      "uncited": []
+    },
+    {
+      "case": "11-sparse-shift-scheduling",
+      "recall": 0.5,
+      "precision": 0.5,
+      "endpoint_recall": 1.0,
+      "interaction_recall": 1.0,
+      "zone_recall": 0.333,
+      "sourced_zone_recall": 0.333,
+      "zone_partition_agreement": 0.762,
+      "endpoint_missing": [
+        "boundary:payroll-team-environment",
+        "boundary:public-internet"
+      ],
+      "endpoint_extra": [
+        "boundary:external-network",
+        "boundary:payroll-team"
+      ],
+      "unsourced": [],
+      "sourced_recall": 1.0,
+      "aliased": [],
+      "possible_renames": [
+        "boundary:external-network",
+        "boundary:payroll-team",
+        "flow:colleague-to-scheduling-web-app:colleague-views-shifts-in-scheduling-web-app",
+        "flow:payroll-system-to-file-share:payroll-system-collects-export-from-file-share",
+        "flow:scheduling-service-to-file-share:scheduling-service-writes-payroll-export-to-file-share",
+        "flow:scheduling-service-to-rota-database:scheduling-service-reads-and-writes-rotas-in-rota-database",
+        "flow:scheduling-web-app-to-scheduling-service:scheduling-web-app-talks-to-scheduling-service",
+        "flow:store-manager-to-scheduling-web-app:store-manager-builds-rota-in-scheduling-web-app"
+      ],
+      "additions": [],
+      "initiator_recall": 1.0,
+      "initiators_missing": [],
+      "crossings_match": false,
+      "crossings_recall": 0.333,
+      "crossings_precision": 0.5,
+      "crossings_derivable": true,
+      "crossings_missing": [
+        "flow:colleague-to-scheduling-web-app",
+        "flow:store-manager-to-scheduling-web-app"
+      ],
+      "missing": [
+        "boundary:payroll-team-environment",
+        "boundary:public-internet",
+        "flow:colleague-to-scheduling-web-app:view-shifts",
+        "flow:payroll-system-to-file-share:collect-payroll-export",
+        "flow:scheduling-service-to-file-share:write-payroll-export",
+        "flow:scheduling-service-to-rota-database:read-write-rotas",
+        "flow:scheduling-web-app-to-scheduling-service:rota-requests",
+        "flow:store-manager-to-scheduling-web-app:build-rota"
+      ],
+      "extra": [
+        "boundary:external-network",
+        "boundary:payroll-team",
+        "flow:colleague-to-scheduling-web-app:colleague-views-shifts-in-scheduling-web-app",
+        "flow:payroll-system-to-file-share:payroll-system-collects-export-from-file-share",
+        "flow:scheduling-service-to-file-share:scheduling-service-writes-payroll-export-to-file-share",
+        "flow:scheduling-service-to-rota-database:scheduling-service-reads-and-writes-rotas-in-rota-database",
+        "flow:scheduling-web-app-to-scheduling-service:scheduling-web-app-talks-to-scheduling-service",
+        "flow:store-manager-to-scheduling-web-app:store-manager-builds-rota-in-scheduling-web-app"
+      ],
+      "scored_field_agreement": 0.55,
+      "control_state_agreement": 0.5,
+      "attributes_compared": 20,
+      "attributes_comparable": 54,
+      "comparison_coverage": 0.37,
+      "attributes_differing": [
+        {
+          "element": "entity:colleague",
+          "attribute": "assets",
+          "blessed": "pii",
+          "extracted": ""
+        },
+        {
+          "element": "entity:payroll-system",
+          "attribute": "assets",
+          "blessed": "",
+          "extracted": "financial"
+        },
+        {
+          "element": "process:scheduling-web-app",
+          "attribute": "exposure",
+          "blessed": "internet-facing",
+          "extracted": "unknown"
+        },
+        {
+          "element": "process:scheduling-web-app",
+          "attribute": "assets",
+          "blessed": "pii",
+          "extracted": ""
+        },
+        {
+          "element": "process:scheduling-service",
+          "attribute": "exposure",
+          "blessed": "internal",
+          "extracted": "unknown"
+        },
+        {
+          "element": "process:scheduling-service",
+          "attribute": "assets",
+          "blessed": "business-critical-data, pii",
+          "extracted": ""
+        },
+        {
+          "element": "store:rota-database",
+          "attribute": "data_classification",
+          "blessed": "unverified",
+          "extracted": "stated"
+        },
+        {
+          "element": "store:file-share",
+          "attribute": "assets",
+          "blessed": "pii",
+          "extracted": "business-critical-data, financial"
+        },
+        {
+          "element": "store:file-share",
+          "attribute": "data_classification",
+          "blessed": "unverified",
+          "extracted": "stated"
+        }
+      ],
+      "unbased_controls": [],
+      "basis_coverage": {
+        "stated": 0,
+        "measured": 0,
+        "uncited": 0,
+        "tokenless": 0,
+        "flagged": 0
+      },
+      "uncited": []
+    },
+    {
+      "case": "12-overclaiming-supplier-portal",
+      "recall": 0.222,
+      "precision": 0.235,
+      "endpoint_recall": 0.357,
+      "interaction_recall": 0.333,
+      "zone_recall": 0.25,
+      "sourced_zone_recall": 0.25,
+      "zone_partition_agreement": 1.0,
+      "endpoint_missing": [
+        "boundary:cloud-account",
+        "boundary:public-internet",
+        "boundary:vendor-platform",
+        "entity:category-manager",
+        "entity:portal-vendor",
+        "entity:supplier",
+        "flow:category-manager-to-supplier-portal",
+        "flow:portal-vendor-to-landing-bucket",
+        "flow:supplier-portal-to-document-store",
+        "flow:supplier-to-supplier-portal",
+        "process:supplier-portal",
+        "store:document-store"
+      ],
+      "endpoint_extra": [
+        "boundary:our-cloud-account",
+        "boundary:supplier",
+        "boundary:vendor-s-platform",
+        "entity:category-managers",
+        "entity:suppliers",
+        "entity:vendor",
+        "flow:category-managers-to-supplier-document-portal",
+        "flow:suppliers-to-supplier-document-portal",
+        "flow:vendor-to-landing-bucket",
+        "process:supplier-document-portal",
+        "store:vendor-s-platform"
+      ],
+      "unsourced": [],
+      "sourced_recall": 0.5,
+      "aliased": [
+        {
+          "blessed": "entity:portal-vendor",
+          "extracted": "entity:vendor",
+          "excerpt": "The vendor hosts it"
+        },
+        {
+          "blessed": "process:supplier-portal",
+          "extracted": "process:supplier-document-portal",
+          "excerpt": "Supplier document portal."
+        }
+      ],
+      "possible_renames": [
+        "boundary:our-cloud-account",
+        "boundary:supplier",
+        "boundary:vendor-s-platform",
+        "entity:category-managers",
+        "entity:suppliers",
+        "entity:vendor",
+        "flow:category-managers-to-supplier-document-portal:category-managers-review-supplier-document-portal",
+        "flow:supplier-master-service-to-landing-bucket:supplier-master-service-loads-landing-bucket",
+        "flow:supplier-master-service-to-supplier-database:supplier-master-service-writes-supplier-database",
+        "flow:suppliers-to-supplier-document-portal:suppliers-upload-to-supplier-document-portal",
+        "flow:vendor-to-landing-bucket:vendor-pushes-nightly-extract-to-landing-bucket",
+        "process:supplier-document-portal",
+        "store:vendor-s-platform"
+      ],
+      "additions": [],
+      "initiator_recall": 0.25,
+      "initiators_missing": [
+        "entity:category-manager",
+        "entity:portal-vendor",
+        "entity:supplier"
+      ],
+      "crossings_match": false,
+      "crossings_recall": 0.0,
+      "crossings_precision": 0.0,
+      "crossings_derivable": true,
+      "crossings_missing": [
+        "flow:category-manager-to-supplier-portal",
+        "flow:portal-vendor-to-landing-bucket",
+        "flow:supplier-to-supplier-portal"
+      ],
+      "missing": [
+        "boundary:cloud-account",
+        "boundary:public-internet",
+        "boundary:vendor-platform",
+        "entity:category-manager",
+        "entity:portal-vendor",
+        "entity:supplier",
+        "flow:category-manager-to-supplier-portal:review-documents",
+        "flow:portal-vendor-to-landing-bucket:push-nightly-extract",
+        "flow:supplier-master-service-to-landing-bucket:load-extract",
+        "flow:supplier-master-service-to-supplier-database:write-supplier-records",
+        "flow:supplier-portal-to-document-store:store-documents",
+        "flow:supplier-to-supplier-portal:upload-documents",
+        "process:supplier-portal",
+        "store:document-store"
+      ],
+      "extra": [
+        "boundary:our-cloud-account",
+        "boundary:supplier",
+        "boundary:vendor-s-platform",
+        "entity:category-managers",
+        "entity:suppliers",
+        "entity:vendor",
+        "flow:category-managers-to-supplier-document-portal:category-managers-review-supplier-document-portal",
+        "flow:supplier-master-service-to-landing-bucket:supplier-master-service-loads-landing-bucket",
+        "flow:supplier-master-service-to-supplier-database:supplier-master-service-writes-supplier-database",
+        "flow:suppliers-to-supplier-document-portal:suppliers-upload-to-supplier-document-portal",
+        "flow:vendor-to-landing-bucket:vendor-pushes-nightly-extract-to-landing-bucket",
+        "process:supplier-document-portal",
+        "store:vendor-s-platform"
+      ],
+      "scored_field_agreement": 0.636,
+      "control_state_agreement": 0.5,
+      "attributes_compared": 11,
+      "attributes_comparable": 59,
+      "comparison_coverage": 0.186,
+      "attributes_differing": [
+        {
+          "element": "process:supplier-master-service",
+          "attribute": "exposure",
+          "blessed": "internal",
+          "extracted": "unknown"
+        },
+        {
+          "element": "process:supplier-master-service",
+          "attribute": "assets",
+          "blessed": "business-critical-data",
+          "extracted": "business-critical-data, pii"
+        },
+        {
+          "element": "store:landing-bucket",
+          "attribute": "data_classification",
+          "blessed": "unverified",
+          "extracted": "stated"
+        },
+        {
+          "element": "store:supplier-database",
+          "attribute": "data_classification",
+          "blessed": "unverified",
+          "extracted": "stated"
+        }
+      ],
+      "unbased_controls": [],
+      "basis_coverage": {
+        "stated": 5,
+        "measured": 5,
+        "uncited": 0,
+        "tokenless": 0,
+        "flagged": 0
+      },
+      "uncited": []
+    },
+    {
+      "case": "13-dispatch-control-plane",
+      "recall": 0.474,
+      "precision": 0.429,
+      "endpoint_recall": 0.8,
+      "interaction_recall": 0.75,
+      "zone_recall": 0.667,
+      "sourced_zone_recall": 1.0,
+      "zone_partition_agreement": 1.0,
+      "endpoint_missing": [
+        "boundary:scheduling-partner-platform",
+        "entity:duty-engineer",
+        "flow:duty-engineer-to-corporate-web-host",
+        "flow:duty-engineer-to-dispatch-console"
+      ],
+      "endpoint_extra": [
+        "boundary:scheduling-partner",
+        "entity:duty-engineers",
+        "flow:corporate-web-host-to-dispatch-console",
+        "flow:duty-engineers-to-corporate-web-host",
+        "flow:duty-engineers-to-dispatch-console",
+        "store:corporate-file-store"
+      ],
+      "unsourced": [],
+      "sourced_recall": 0.8,
+      "aliased": [
+        {
+          "blessed": "boundary:scheduling-partner-platform",
+          "extracted": "boundary:scheduling-partner",
+          "excerpt": "A scheduling partner, which is another company"
+        }
+      ],
+      "possible_renames": [
+        "boundary:scheduling-partner",
+        "entity:duty-engineers",
+        "flow:corporate-web-host-to-dispatch-console:serve-dispatch-console",
+        "flow:dispatch-api-to-dispatch-database:read-and-write-dispatch-database",
+        "flow:dispatch-console-to-dispatch-api:call-dispatch-api",
+        "flow:dispatch-console-to-dispatch-api:websocket-live-job-status",
+        "flow:duty-engineers-to-corporate-web-host:request-dispatch-console",
+        "flow:duty-engineers-to-dispatch-console:open-dispatch-console",
+        "flow:schedule-importer-to-dispatch-api:post-parsed-work-orders",
+        "flow:schedule-importer-to-schedule-archive:write-schedule-documents",
+        "flow:schedule-importer-to-scheduling-partner:pull-soap-feed"
+      ],
+      "additions": [
+        "store:corporate-file-store"
+      ],
+      "initiator_recall": 0.5,
+      "initiators_missing": [
+        "entity:duty-engineer"
+      ],
+      "crossings_match": false,
+      "crossings_recall": 1.0,
+      "crossings_precision": 1.0,
+      "crossings_derivable": true,
+      "crossings_missing": [],
+      "missing": [
+        "boundary:scheduling-partner-platform",
+        "entity:duty-engineer",
+        "flow:dispatch-api-to-dispatch-database:read-write-job-orders",
+        "flow:dispatch-console-to-dispatch-api:dispatch-requests",
+        "flow:dispatch-console-to-dispatch-api:live-job-status",
+        "flow:duty-engineer-to-corporate-web-host:load-console",
+        "flow:duty-engineer-to-dispatch-console:open-console",
+        "flow:schedule-importer-to-dispatch-api:post-work-orders",
+        "flow:schedule-importer-to-schedule-archive:store-schedule-documents",
+        "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed"
+      ],
+      "extra": [
+        "boundary:scheduling-partner",
+        "entity:duty-engineers",
+        "flow:corporate-web-host-to-dispatch-console:serve-dispatch-console",
+        "flow:dispatch-api-to-dispatch-database:read-and-write-dispatch-database",
+        "flow:dispatch-console-to-dispatch-api:call-dispatch-api",
+        "flow:dispatch-console-to-dispatch-api:websocket-live-job-status",
+        "flow:duty-engineers-to-corporate-web-host:request-dispatch-console",
+        "flow:duty-engineers-to-dispatch-console:open-dispatch-console",
+        "flow:schedule-importer-to-dispatch-api:post-parsed-work-orders",
+        "flow:schedule-importer-to-schedule-archive:write-schedule-documents",
+        "flow:schedule-importer-to-scheduling-partner:pull-soap-feed",
+        "store:corporate-file-store"
+      ],
+      "scored_field_agreement": 0.667,
+      "control_state_agreement": 0.75,
+      "attributes_compared": 24,
+      "attributes_comparable": 68,
+      "comparison_coverage": 0.353,
+      "attributes_differing": [
+        {
+          "element": "entity:scheduling-partner",
+          "attribute": "assets",
+          "blessed": "business-critical-data",
+          "extracted": ""
+        },
+        {
+          "element": "process:dispatch-console",
+          "attribute": "assets",
+          "blessed": "business-critical-data",
+          "extracted": ""
+        },
+        {
+          "element": "process:dispatch-api",
+          "attribute": "assets",
+          "blessed": "business-critical-data, pii",
+          "extracted": ""
+        },
+        {
+          "element": "process:schedule-importer",
+          "attribute": "exposure",
+          "blessed": "unknown",
+          "extracted": "internal"
+        },
+        {
+          "element": "process:schedule-importer",
+          "attribute": "assets",
+          "blessed": "business-critical-data, credentials",
+          "extracted": ""
+        },
+        {
+          "element": "store:dispatch-database",
+          "attribute": "assets",
+          "blessed": "business-critical-data, pii",
+          "extracted": "business-critical-data, credentials, pii"
+        },
+        {
+          "element": "store:dispatch-database",
+          "attribute": "data_classification",
+          "blessed": "unverified",
+          "extracted": "stated"
+        },
+        {
+          "element": "boundary:production-control-plane",
+          "attribute": "assets",
+          "blessed": "business-critical-data",
+          "extracted": ""
+        }
+      ],
+      "unbased_controls": [],
+      "basis_coverage": {
+        "stated": 2,
+        "measured": 2,
+        "uncited": 0,
+        "tokenless": 0,
+        "flagged": 0
+      },
+      "uncited": []
+    }
+  ],
+  "trusted": false,
+  "repo_commit": {
+    "commit": "116c654f29bbff802d8ef7d849d26ba0a4189797",
+    "clean": true
+  },
+  "corpus_digest": "bcf370d9ce7fcdab956a414cb88416c1f16aad463eec0ad967d068c6612e7750",
+  "frameworks": [
+    "asvs",
+    "stride"
+  ],
+  "stopped": [],
+  "series": {},
+  "completion": {
+    "attempted": 13,
+    "scored": 0,
+    "failed": 0,
+    "stopped_before": 0
+  },
+  "attribute_aggregate": {
+    "compared": 316,
+    "agreed": 220,
+    "agreement": 0.696,
+    "by_attribute": {
+      "boundary.kind": {
+        "compared": 21,
+        "agreed": 19,
+        "agreement": 0.905
+      },
+      "entity.kind": {
+        "compared": 22,
+        "agreed": 22,
+        "agreement": 1.0
+      },
+      "process.exposure": {
+        "compared": 30,
+        "agreed": 18,
+        "agreement": 0.6
+      },
+      "process.interface_kind": {
+        "compared": 30,
+        "agreed": 26,
+        "agreement": 0.867
+      },
+      "boundary.assets": {
+        "compared": 21,
+        "agreed": 20,
+        "agreement": 0.952
+      },
+      "entity.assets": {
+        "compared": 22,
+        "agreed": 12,
+        "agreement": 0.545
+      },
+      "flow.assets": {
+        "compared": 10,
+        "agreed": 5,
+        "agreement": 0.5
+      },
+      "process.assets": {
+        "compared": 30,
+        "agreed": 8,
+        "agreement": 0.267
+      },
+      "store.assets": {
+        "compared": 30,
+        "agreed": 8,
+        "agreement": 0.267
+      },
+      "flow.operations": {
+        "compared": 10,
+        "agreed": 7,
+        "agreement": 0.7
+      },
+      "flow.protocol": {
+        "compared": 10,
+        "agreed": 10,
+        "agreement": 1.0
+      },
+      "flow.authentication": {
+        "compared": 10,
+        "agreed": 9,
+        "agreement": 0.9
+      },
+      "flow.encryption_in_transit": {
+        "compared": 10,
+        "agreed": 10,
+        "agreement": 1.0
+      },
+      "store.encryption_at_rest": {
+        "compared": 30,
+        "agreed": 30,
+        "agreement": 1.0
+      },
+      "store.data_classification": {
+        "compared": 30,
+        "agreed": 16,
+        "agreement": 0.533
+      }
+    }
+  },
+  "grounds": [],
+  "grounds_failures": [],
+  "grounds_aggregate": null,
+  "coverage": [
+    {
+      "framework": "asvs",
+      "lane": "encoding-and-sanitization",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "validation-and-business-logic",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "web-frontend-security",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "api-and-web-service",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "file-handling",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "authentication",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "session-management",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "authorization",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "self-contained-tokens",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "oauth-and-oidc",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "cryptography",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "secure-communication",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "configuration",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "data-protection",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "secure-coding-and-architecture",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "security-logging-and-error-handling",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "webrtc",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "stride",
+      "lane": "spoofing",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "stride",
+      "lane": "tampering",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "stride",
+      "lane": "repudiation",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "stride",
+      "lane": "information-disclosure",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "stride",
+      "lane": "denial-of-service",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "stride",
+      "lane": "elevation-of-privilege",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    }
+  ],
+  "coverage_totals": {
+    "cases": 0,
+    "drafts": 0,
+    "rules_fired": 0,
+    "rules": 0,
+    "candidates": 0,
+    "candidates_cited": 0,
+    "elements": 0,
+    "elements_cited": 0,
+    "boundary_crossings": 0,
+    "boundary_crossings_cited": 0,
+    "unknown_controls": 0,
+    "unknown_controls_cited": 0,
+    "cited_rates": {
+      "candidates_cited": 0.0,
+      "elements_cited": 0.0,
+      "boundary_crossings_cited": 0.0,
+      "unknown_controls_cited": 0.0
+    }
+  },
+  "filler": {},
+  "instruction": [
+    {
+      "framework": "(shared)",
+      "node": "extract",
+      "tokens": 3239,
+      "sha256": "88f0740bd808297ea433450fc9b890f60d36e34d469ec8e5e8000a18c76a4bf8"
+    }
+  ],
+  "instruction_totals": {
+    "(shared)": {
+      "nodes": 1,
+      "tokens": 3239,
+      "largest": 3239
+    }
+  },
+  "applicability": [],
+  "applicability_aggregate": null,
+  "applicability_exemplar_delta": null,
+  "over_applied_for_promotion": [],
+  "disposition": [],
+  "disposition_aggregate": null,
+  "applicability_yield": [],
+  "applicability_yield_aggregate": null,
+  "attribution": [],
+  "attribution_aggregate": null,
+  "scores": [],
+  "exemplar_delta": null,
+  "unlisted_for_promotion": [],
+  "critic_yield": [],
+  "critic_yield_aggregate": null,
+  "losses": [],
+  "losses_aggregate": null,
+  "writing": [],
+  "writing_aggregate": {
+    "answered": 0,
+    "objections": 0,
+    "carried": 0,
+    "objection_rate": 0.0,
+    "by_framework": {},
+    "by_reason": {}
+  }
+}

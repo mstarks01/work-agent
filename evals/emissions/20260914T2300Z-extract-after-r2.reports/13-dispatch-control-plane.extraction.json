@@ -1,0 +1,706 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:duty-engineer",
+        "name": "duty engineer",
+        "description": "An engineer who uses the dispatch console.",
+        "assets": [],
+        "source_excerpt": "Duty engineers sit on the corporate network.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The text does not describe how an engineer signs in.",
+        "kind": "human",
+        "trust_zone": "boundary:corporate-network"
+      },
+      {
+        "id": "entity:scheduling-partner",
+        "name": "scheduling partner",
+        "description": "Another company that publishes tomorrow's planned work.",
+        "assets": [],
+        "source_excerpt": "A scheduling partner, which is another company, publishes tomorrow's planned work.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:scheduling-partner"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:dispatch-console",
+        "name": "dispatch console",
+        "description": "A single-page JavaScript application opened by duty engineers in a browser.",
+        "assets": [
+          "business-critical-data",
+          "availability-critical"
+        ],
+        "source_excerpt": "The console is a single-page JavaScript app",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The text does not state how engineers authenticate to the console.",
+        "technology": "JavaScript",
+        "trust_zone": "boundary:corporate-network",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:corporate-web-host",
+        "name": "corporate web host",
+        "description": "The corporate web host that serves the dispatch console.",
+        "assets": [
+          "business-critical-data",
+          "availability-critical"
+        ],
+        "source_excerpt": "our corporate web host serves it",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:dispatch-api",
+        "name": "dispatch API",
+        "description": "The API called by the dispatch console and schedule importer. It runs in the production control plane.",
+        "assets": [
+          "business-critical-data",
+          "availability-critical"
+        ],
+        "source_excerpt": "The dispatch API runs in the production control plane.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The control plane is not reachable from the internet.",
+        "technology": "API",
+        "trust_zone": "boundary:production-control-plane",
+        "exposure": "internal",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:schedule-importer",
+        "name": "schedule importer",
+        "description": "A process that pulls the scheduling partner's SOAP feed, parses XML, archives downloaded documents, and posts parsed work orders to the dispatch API.",
+        "assets": [
+          "business-critical-data",
+          "availability-critical"
+        ],
+        "source_excerpt": "Our schedule importer runs on the corporate network.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The text does not say how the partner identifies the importer or how the importer identifies the partner. The API token has not been rotated since it was issued.",
+        "technology": "XML parser",
+        "trust_zone": "boundary:corporate-network",
+        "exposure": "unknown",
+        "interface_kind": "non-web"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:dispatch-database",
+        "name": "dispatch database",
+        "description": "A database holding job orders, crew names, crew mobile numbers, and the token or session that created each job order.",
+        "assets": [
+          "pii",
+          "credentials",
+          "business-critical-data"
+        ],
+        "source_excerpt": "That database holds the job orders, the crew names and the crew mobile numbers.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "Every job order carries the token or session that created it, and nothing about the person behind that token. Protection at rest is not documented.",
+        "technology": "database",
+        "trust_zone": "boundary:production-control-plane",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:schedule-archive",
+        "name": "schedule archive",
+        "description": "A folder on the corporate file store containing each document downloaded from the scheduling partner.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "It writes each document it downloads into the schedule archive, a folder on the corporate file store.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "technology": "corporate file store",
+        "trust_zone": "boundary:corporate-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:duty-engineer-to-dispatch-console:open-console",
+        "name": "open console",
+        "description": "A duty engineer opens the dispatch console in a browser.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "They open the dispatch console in their browser.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The text does not state how the engineer signs in.",
+        "source": "entity:duty-engineer",
+        "destination": "process:dispatch-console",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:corporate-web-host-to-dispatch-console:serve-app",
+        "name": "serve app",
+        "description": "The corporate web host serves the dispatch console application.",
+        "assets": [
+          "business-critical-data",
+          "availability-critical"
+        ],
+        "source_excerpt": "our corporate web host serves it",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "process:corporate-web-host",
+        "destination": "process:dispatch-console",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "dispatch console application",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:dispatch-console-to-dispatch-api:call-api",
+        "name": "call API",
+        "description": "The dispatch console calls the dispatch API cross-origin.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "The console calls the dispatch API.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The API answers the console cross-origin. Allowed origins and whether credentials are allowed were not recorded.",
+        "source": "process:dispatch-console",
+        "destination": "process:dispatch-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "dispatch data",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:dispatch-console-to-dispatch-api:stream-status",
+        "name": "stream status",
+        "description": "The dispatch console opens and holds a WebSocket to the dispatch API for live job status.",
+        "assets": [
+          "business-critical-data",
+          "availability-critical"
+        ],
+        "source_excerpt": "The console also opens a WebSocket to the dispatch API and holds it open for live job status.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "Whether the socket runs over TLS, whether its handshake is authenticated, and whether it checks the engineer's session again after opening were not recorded.",
+        "source": "process:dispatch-console",
+        "destination": "process:dispatch-api",
+        "protocol": "WebSocket",
+        "authentication": "unknown",
+        "data_description": "live job status",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:dispatch-api-to-dispatch-database:read-and-write",
+        "name": "read and write",
+        "description": "The dispatch API reads from and writes to the dispatch database.",
+        "assets": [
+          "pii",
+          "credentials",
+          "business-critical-data"
+        ],
+        "source_excerpt": "The dispatch API reads and writes the dispatch database.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "process:dispatch-api",
+        "destination": "store:dispatch-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "job orders, crew names, crew mobile numbers, and creating tokens or sessions",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:schedule-importer-to-scheduling-partner:pull-feed",
+        "name": "pull feed",
+        "description": "The schedule importer pulls the scheduling partner's SOAP feed over HTTPS every hour.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "Every hour it pulls the partner's SOAP feed over HTTPS",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "How the partner identifies the importer and how the importer identifies the partner were not recorded.",
+        "source": "process:schedule-importer",
+        "destination": "entity:scheduling-partner",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "tomorrow's planned work in an XML document",
+        "encryption_in_transit": "HTTPS",
+        "operations": "read"
+      },
+      {
+        "id": "flow:schedule-importer-to-schedule-archive:write-documents",
+        "name": "write documents",
+        "description": "The schedule importer writes downloaded documents into the schedule archive.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "It writes each document it downloads into the schedule archive",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "process:schedule-importer",
+        "destination": "store:schedule-archive",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "downloaded XML documents containing planned work",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:schedule-importer-to-dispatch-api:post-work-orders",
+        "name": "post work orders",
+        "description": "The schedule importer posts parsed work orders to the dispatch API using an API token.",
+        "assets": [
+          "credentials",
+          "business-critical-data"
+        ],
+        "source_excerpt": "The importer then posts the parsed work orders to the same dispatch API the console calls.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The API token was issued when the importer was built and has not been rotated.",
+        "source": "process:schedule-importer",
+        "destination": "process:dispatch-api",
+        "protocol": "unknown",
+        "authentication": "API token",
+        "data_description": "parsed work orders",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:corporate-network",
+        "name": "corporate network",
+        "description": "The corporate network where duty engineers sit, the schedule importer runs, and the schedule archive is located.",
+        "assets": [],
+        "source_excerpt": "Duty engineers sit on the corporate network.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:production-control-plane",
+        "name": "production control plane",
+        "description": "The same-company zone holding the live estate, where an account can move a crew and change the work a depot does that day.",
+        "assets": [],
+        "source_excerpt": "The control plane is the same company and the same staff, but it is the zone that holds the live estate",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The control plane is not reachable from the internet.",
+        "kind": "privilege"
+      },
+      {
+        "id": "boundary:scheduling-partner",
+        "name": "scheduling partner",
+        "description": "The zone controlled by the scheduling partner, another company.",
+        "assets": [],
+        "source_excerpt": "A scheduling partner, which is another company",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "kind": "tenant"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The dispatch database is in the production control plane because it is the data store used by the dispatch API running in that privileged zone.",
+        "element_id": "store:dispatch-database",
+        "attribute": "trust_zone",
+        "basis": "The text places the dispatch API in the production control plane and describes the database as the API's read-write store, but does not explicitly locate the database."
+      },
+      {
+        "assumption": "The dispatch database's classification is confidential because it contains crew names, crew mobile numbers, job orders, and token or session values.",
+        "element_id": "store:dispatch-database",
+        "attribute": "data_classification",
+        "basis": "The stated contents include personal contact information and authentication-related token or session values."
+      },
+      {
+        "assumption": "The schedule archive's classification is business-sensitive and therefore confidential because it stores tomorrow's planned work.",
+        "element_id": "store:schedule-archive",
+        "attribute": "data_classification",
+        "basis": "The archive contains planned operational work documents, which are commercially sensitive business records."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:duty-engineer",
+        "name": "duty engineer",
+        "description": "An engineer who uses the dispatch console.",
+        "assets": [],
+        "source_excerpt": "Duty engineers sit on the corporate network.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The text does not describe how an engineer signs in.",
+        "kind": "human",
+        "trust_zone": "boundary:corporate-network"
+      },
+      {
+        "id": "entity:scheduling-partner",
+        "name": "scheduling partner",
+        "description": "Another company that publishes tomorrow's planned work.",
+        "assets": [],
+        "source_excerpt": "A scheduling partner, which is another company, publishes tomorrow's planned work.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:scheduling-partner"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:dispatch-console",
+        "name": "dispatch console",
+        "description": "A single-page JavaScript application opened by duty engineers in a browser.",
+        "assets": [
+          "business-critical-data",
+          "availability-critical"
+        ],
+        "source_excerpt": "The console is a single-page JavaScript app",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The text does not state how engineers authenticate to the console.",
+        "technology": "JavaScript",
+        "trust_zone": "boundary:corporate-network",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:corporate-web-host",
+        "name": "corporate web host",
+        "description": "The corporate web host that serves the dispatch console.",
+        "assets": [
+          "business-critical-data",
+          "availability-critical"
+        ],
+        "source_excerpt": "our corporate web host serves it",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:dispatch-api",
+        "name": "dispatch API",
+        "description": "The API called by the dispatch console and schedule importer. It runs in the production control plane.",
+        "assets": [
+          "business-critical-data",
+          "availability-critical"
+        ],
+        "source_excerpt": "The dispatch API runs in the production control plane.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The control plane is not reachable from the internet.",
+        "technology": "API",
+        "trust_zone": "boundary:production-control-plane",
+        "exposure": "internal",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:schedule-importer",
+        "name": "schedule importer",
+        "description": "A process that pulls the scheduling partner's SOAP feed, parses XML, archives downloaded documents, and posts parsed work orders to the dispatch API.",
+        "assets": [
+          "business-critical-data",
+          "availability-critical"
+        ],
+        "source_excerpt": "Our schedule importer runs on the corporate network.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The text does not say how the partner identifies the importer or how the importer identifies the partner. The API token has not been rotated since it was issued.",
+        "technology": "XML parser",
+        "trust_zone": "boundary:corporate-network",
+        "exposure": "unknown",
+        "interface_kind": "non-web"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:dispatch-database",
+        "name": "dispatch database",
+        "description": "A database holding job orders, crew names, crew mobile numbers, and the token or session that created each job order.",
+        "assets": [
+          "pii",
+          "credentials",
+          "business-critical-data"
+        ],
+        "source_excerpt": "That database holds the job orders, the crew names and the crew mobile numbers.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "Every job order carries the token or session that created it, and nothing about the person behind that token. Protection at rest is not documented.",
+        "technology": "database",
+        "trust_zone": "boundary:production-control-plane",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:schedule-archive",
+        "name": "schedule archive",
+        "description": "A folder on the corporate file store containing each document downloaded from the scheduling partner.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "It writes each document it downloads into the schedule archive, a folder on the corporate file store.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "technology": "corporate file store",
+        "trust_zone": "boundary:corporate-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:duty-engineer-to-dispatch-console:open-console",
+        "name": "open console",
+        "description": "A duty engineer opens the dispatch console in a browser.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "They open the dispatch console in their browser.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The text does not state how the engineer signs in.",
+        "source": "entity:duty-engineer",
+        "destination": "process:dispatch-console",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:corporate-web-host-to-dispatch-console:serve-app",
+        "name": "serve app",
+        "description": "The corporate web host serves the dispatch console application.",
+        "assets": [
+          "business-critical-data",
+          "availability-critical"
+        ],
+        "source_excerpt": "our corporate web host serves it",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "process:corporate-web-host",
+        "destination": "process:dispatch-console",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "dispatch console application",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:dispatch-console-to-dispatch-api:call-api",
+        "name": "call API",
+        "description": "The dispatch console calls the dispatch API cross-origin.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "The console calls the dispatch API.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The API answers the console cross-origin. Allowed origins and whether credentials are allowed were not recorded.",
+        "source": "process:dispatch-console",
+        "destination": "process:dispatch-api",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "dispatch data",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:dispatch-console-to-dispatch-api:stream-status",
+        "name": "stream status",
+        "description": "The dispatch console opens and holds a WebSocket to the dispatch API for live job status.",
+        "assets": [
+          "business-critical-data",
+          "availability-critical"
+        ],
+        "source_excerpt": "The console also opens a WebSocket to the dispatch API and holds it open for live job status.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "Whether the socket runs over TLS, whether its handshake is authenticated, and whether it checks the engineer's session again after opening were not recorded.",
+        "source": "process:dispatch-console",
+        "destination": "process:dispatch-api",
+        "protocol": "WebSocket",
+        "authentication": "unknown",
+        "data_description": "live job status",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:dispatch-api-to-dispatch-database:read-and-write",
+        "name": "read and write",
+        "description": "The dispatch API reads from and writes to the dispatch database.",
+        "assets": [
+          "pii",
+          "credentials",
+          "business-critical-data"
+        ],
+        "source_excerpt": "The dispatch API reads and writes the dispatch database.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "process:dispatch-api",
+        "destination": "store:dispatch-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "job orders, crew names, crew mobile numbers, and creating tokens or sessions",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:schedule-importer-to-scheduling-partner:pull-feed",
+        "name": "pull feed",
+        "description": "The schedule importer pulls the scheduling partner's SOAP feed over HTTPS every hour.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "Every hour it pulls the partner's SOAP feed over HTTPS",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "How the partner identifies the importer and how the importer identifies the partner were not recorded.",
+        "source": "process:schedule-importer",
+        "destination": "entity:scheduling-partner",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "tomorrow's planned work in an XML document",
+        "encryption_in_transit": "HTTPS",
+        "operations": "read"
+      },
+      {
+        "id": "flow:schedule-importer-to-schedule-archive:write-documents",
+        "name": "write documents",
+        "description": "The schedule importer writes downloaded documents into the schedule archive.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "It writes each document it downloads into the schedule archive",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "source": "process:schedule-importer",
+        "destination": "store:schedule-archive",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "downloaded XML documents containing planned work",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:schedule-importer-to-dispatch-api:post-work-orders",
+        "name": "post work orders",
+        "description": "The schedule importer posts parsed work orders to the dispatch API using an API token.",
+        "assets": [
+          "credentials",
+          "business-critical-data"
+        ],
+        "source_excerpt": "The importer then posts the parsed work orders to the same dispatch API the console calls.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The API token was issued when the importer was built and has not been rotated.",
+        "source": "process:schedule-importer",
+        "destination": "process:dispatch-api",
+        "protocol": "unknown",
+        "authentication": "API token",
+        "data_description": "parsed work orders",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:corporate-network",
+        "name": "corporate network",
+        "description": "The corporate network where duty engineers sit, the schedule importer runs, and the schedule archive is located.",
+        "assets": [],
+        "source_excerpt": "Duty engineers sit on the corporate network.",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:production-control-plane",
+        "name": "production control plane",
+        "description": "The same-company zone holding the live estate, where an account can move a crew and change the work a depot does that day.",
+        "assets": [],
+        "source_excerpt": "The control plane is the same company and the same staff, but it is the zone that holds the live estate",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "The control plane is not reachable from the internet.",
+        "kind": "privilege"
+      },
+      {
+        "id": "boundary:scheduling-partner",
+        "name": "scheduling partner",
+        "description": "The zone controlled by the scheduling partner, another company.",
+        "assets": [],
+        "source_excerpt": "A scheduling partner, which is another company",
+        "source_label": "System description",
+        "source_speaker": "unknown",
+        "notes": "",
+        "kind": "tenant"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The dispatch database is in the production control plane because it is the data store used by the dispatch API running in that privileged zone.",
+        "element_id": "store:dispatch-database",
+        "attribute": "trust_zone",
+        "basis": "The text places the dispatch API in the production control plane and describes the database as the API's read-write store, but does not explicitly locate the database."
+      },
+      {
+        "assumption": "The dispatch database's classification is confidential because it contains crew names, crew mobile numbers, job orders, and token or session values.",
+        "element_id": "store:dispatch-database",
+        "attribute": "data_classification",
+        "basis": "The stated contents include personal contact information and authentication-related token or session values."
+      },
+      {
+        "assumption": "The schedule archive's classification is business-sensitive and therefore confidential because it stores tomorrow's planned work.",
+        "element_id": "store:schedule-archive",
+        "attribute": "data_classification",
+        "basis": "The archive contains planned operational work documents, which are commercially sensitive business records."
+      }
+    ]
+  },
+  "issues": [
+    {
+      "code": "assumption-on-unknown",
+      "message": "assumption records an inference for 'data_classification' on 'store:schedule-archive', but that attribute is still unknown; an unknown value is not an inference and needs no assumption",
+      "element_id": "store:schedule-archive",
+      "field": "assumptions"
+    }
+  ]
+}
