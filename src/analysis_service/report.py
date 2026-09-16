@@ -38,7 +38,11 @@ from pydantic import (
     model_validator,
 )
 
-from analysis_service.assertions import AssertionRecord
+from analysis_service.assertions import (
+    PROJECTION_VERSION,
+    AssertionRecord,
+    contradiction_issues,
+)
 from analysis_service.charges import UPSTREAM_MAX_CHARS
 from analysis_service.claims import FrameworkAnalysis, FrameworkName, SharedElementName
 from analysis_service.evidence import ground_issues
@@ -1045,11 +1049,52 @@ class Report(BaseModel):
         does not ride in through a file.
         """
         claims = [claim for block in self.analyses for claim in block.all_claims()]
-        return ground_issues(
-            claims,
-            self.system_model,
-            None if self.assertions is None else self.assertions.catalog,
+        return (
+            ground_issues(
+                claims,
+                self.system_model,
+                None if self.assertions is None else self.assertions.catalog,
+            )
+            + self._contradiction_issues()
         )
+
+    def _contradiction_issues(self) -> list[str]:
+        """A loaded report still names every graph contradiction it carries.
+
+        The same rule ``_model_issues`` applies to grounds: the service that
+        wrote the report recorded these, and re-deriving them here is what
+        stops a report whose ``authentication`` says one thing and whose rows
+        say the opposite from riding in through a file with the finding
+        stripped out.
+
+        **``projection_version`` is what makes this safe to re-derive.**
+        :func:`~analysis_service.assertions.contradictions` recomputes the
+        projection with *this* service's rules, so a record written under
+        another version would be re-read under rules it never ran, and every
+        difference that caused would be reported as a contradiction the writer
+        hid. So a foreign record is left alone: its own issues stand as
+        written, and this check declines rather than guessing.
+        """
+        if self.assertions is None:
+            return []
+        if self.assertions.projection_version != PROJECTION_VERSION:
+            return []
+        found = {
+            issue.message
+            for issue in contradiction_issues(
+                self.assertions.catalog, self.system_model
+            )
+        }
+        recorded = {
+            issue.message
+            for issue in self.assertions.issues
+            if issue.code == "graph-contradiction"
+        }
+        return [
+            f"the embedded assertions do not name a contradiction this service"
+            f" derives: {message}"
+            for message in sorted(found - recorded)
+        ]
 
     def _envelope_issues(self) -> list[str]:
         issues = []

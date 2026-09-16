@@ -8,11 +8,13 @@ from pydantic import ValidationError
 
 from analysis_service.assertions import (
     ABSENT,
+    PROJECTION_VERSION,
     Assertion,
     AssertionCatalog,
     AssertionRecord,
     Subject,
     assertion_id,
+    contradiction_issues,
 )
 from analysis_service.claims import (
     CLAIM_BOUND_MARKS,
@@ -100,6 +102,33 @@ class TestSeverityMatrix:
         severity = Severity(likelihood="high", impact="high", justification="x")
 
         assert severity.model_dump()["level"] == "critical"
+
+
+#: A flow ``valid_model`` states an authentication mechanism on, and a catalog
+#: row stating that the mechanism is *not there*. The pair is the audit's own
+#: defect, which is why the report re-derives it on load rather than trusting
+#: the issues a writer recorded.
+_CONTRADICTED_FLOW = "flow:entity:customer>process:web-app>login"
+
+
+def _contradicting_record() -> AssertionRecord:
+    return AssertionRecord(
+        proposed=1,
+        catalog=AssertionCatalog(
+            subjects=[
+                Subject(id=_CONTRADICTED_FLOW, type="interaction", label="login")
+            ],
+            entries=[
+                Assertion(
+                    subject=_CONTRADICTED_FLOW,
+                    predicate="authentication-mechanism",
+                    value=ABSENT,
+                    basis="inferred",
+                    explanation="the description names no login step",
+                )
+            ],
+        ),
+    )
 
 
 class TestVerdictShapes:
@@ -508,6 +537,32 @@ class TestReportInvariants:
         assert report.assertions is record
         with pytest.raises(ValidationError, match="does not settle"):
             sample_report(threats=[threat])
+
+    def test_a_loaded_report_still_names_the_contradiction_it_carries(self):
+        """A report cannot arrive with the finding stripped out of its issues.
+
+        The same rule the grounds check applies: re-derive it here, so a file
+        is held to what the service that wrote it was held to.
+        """
+        record = _contradicting_record()
+        with pytest.raises(ValidationError, match="do not name a contradiction"):
+            sample_report(assertions=record)
+        named = record.model_copy(
+            update={"issues": contradiction_issues(record.catalog, valid_model())}
+        )
+        assert sample_report(assertions=named).assertions is named
+
+    def test_a_record_from_another_projection_version_is_left_alone(self):
+        """Re-deriving it would report the version's difference as a hidden fact.
+
+        ``project`` runs this service's rules, so a record written under other
+        rules would be re-read under rules it never ran. The check declines,
+        and the record's own issues stand as written.
+        """
+        foreign = _contradicting_record().model_copy(
+            update={"projection_version": PROJECTION_VERSION + 1}
+        )
+        assert sample_report(assertions=foreign).assertions is foreign
 
     def test_a_repaired_quote_must_say_what_the_texts_moved(self):
         """``moved`` is derived from two texts the block carries, so the block

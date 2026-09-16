@@ -276,6 +276,19 @@ bump, because that is the change a consumer cannot detect by reading its own
 fields and will otherwise misread silently. One bump covers a whole cutover,
 however many changes it carries.
 
+**There is no compatibility adapter, and that is the policy rather than an
+omission.** A major bump is a hard cutover: `Report` keeps `extra="forbid"`, so
+each version's shape refuses the other's payload and a consumer learns at the
+first parse rather than from a field that quietly means something new. An
+adapter would turn that refusal into a translation, and a translated report
+carries guarantees it was never written under. So an old report is readable by
+the version that wrote it and by nothing else, and a reader who needs both keeps
+both.
+
+That is also the whole answer for the assertion layer. It arrived inside 3.0,
+3.0 has never shipped, and so no report exists that predates it — `assertions:
+null` means a deployment that ran no pass, never a file older than the field.
+
 > **`schema_version` 2.0** added [`grounds`](#grounds--why-the-finding-was-raised)
 > on every threat and `unverified_grounds` on the report — both additive, and
 > minor on their own. What earns the major is that `nodes[].node` changed the
@@ -1106,6 +1119,18 @@ class TokenUsage:
 > this model, and a 3.0 payload carrying `analyses` is refused by the old one.
 > The no-shim behaviour falls out of the shapes rather than out of anything
 > reading `schema_version`.
+
+> **`schema_version` 3.0** also carries `assertions[].projection_version`: which
+> rules turned the catalog's rows into graph attributes. Its own number rather
+> than the catalog's `registry_version`, because the projection's loss rules live
+> in `project` and have already changed once with no registry change beside them.
+> It is what lets a loaded report be re-checked for contradictions against the
+> rules that produced it, and a record from another version is left alone rather
+> than re-read under rules it never ran. The same release adds a sixth thing
+> `assertions.issues` can say, `graph-contradiction`: the one code there that
+> refuses no row — it reports that a graph attribute and the rows authoritative
+> for it state opposite things, which is the defect the layer was built to make
+> visible.
 
 > **`schema_version` 3.0** also carries `assertions` on the envelope: the
 > assertion catalog the job's lanes selected from, with each row's basis and
