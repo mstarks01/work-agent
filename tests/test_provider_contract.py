@@ -8,7 +8,7 @@ supplies them **itself**: ``tests/factories.ScriptedLlm`` constructs an
 ``LlmResponse`` with a ``model_version`` and a ``usage_metadata`` written by
 hand, and ``tests/test_retry.py`` builds a ``RateLimitError`` with the headers
 it wants to read back. Each reader was therefore held against a shape the test
-had written, which is the two-readers-agreeing failure ``CLAUDE.md`` names —
+had written, which is the two-readers-agreeing failure ``AGENTS.md`` names —
 except that here the second reader is a stand-in for a third party, and the
 third party disagrees.
 

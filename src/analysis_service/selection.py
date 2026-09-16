@@ -4,7 +4,7 @@ A job names the frameworks it wants and the options each one needs. Three
 entry points read that list — the HTTP route, the first-run web app and the
 in-process engine — and each reading it its own way would let the route refuse
 a repeated name while the web app collapses one silently and the engine does
-not look. Two readers of one rule drift while both stay green (CLAUDE.md, *One rule,
+not look. Two readers of one rule drift while both stay green (AGENTS.md, *One rule,
 one reader*), so the rule lives here and every entry point calls it, then
 translates :class:`SelectionError` into its own refusal — a 422, a 400, an
 :class:`~analysis_service.engine.EngineInputError`.

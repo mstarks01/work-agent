@@ -35,7 +35,7 @@ artifacts, `/api/contribute` opened a pull request carrying only the JSON, and
 `_clean_local_record` then undid the three. The case-local format was written to
 be deleted.
 
-This is the failure `CLAUDE.md` names under **One rule, one reader**: two readers
+This is the failure `AGENTS.md` names under **One rule, one reader**: two readers
 of one rule, each with its own test agreeing with it, on the act that produces
 the corpus's only human evidence.
 
