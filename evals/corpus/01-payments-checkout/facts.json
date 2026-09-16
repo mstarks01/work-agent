@@ -419,7 +419,7 @@
     {
       "assertion": {
         "subject_type": "principal",
-        "subject": "order service",
+        "subject": "order service's own service account",
         "predicate": "authorization-grant",
         "value": "write receipts",
         "reason": null,
@@ -444,10 +444,10 @@
             "quote": "That is on TLS with the order service's own service account"
           }
         ],
-        "explanation": "The described write supports an effective permission held by the order service's own service account; no grant is stated as such.",
+        "explanation": "The described write supports an effective permission held by the service account the order service uses for the receipt archive; no grant is stated as such.",
         "exclusive": false
       },
-      "rationale": "Inferred: the source describes the write and names the account that performs it, which supports an effective permission; an authorization grant is not stated.",
+      "rationale": "Inferred: the source describes the write and names the account that performs it, which supports an effective permission held by that account; an authorization grant is not stated. The subject is the service account, not the order service itself, because a workload and the account it uses are not interchangeable identities (#961 alias ruling 3).",
       "reviewed_by": "mstarks01"
     },
     {
