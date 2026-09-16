@@ -159,27 +159,29 @@ class TestEveryBlessedElementTakesOneFate:
             "flow:storefront-api-to-receipt-archive:append-receipt",
         )
 
-    def test_a_flow_between_found_endpoints_under_another_label_is_unresolved(
+    def test_the_sole_flow_under_another_label_is_renamed_and_a_second_one_is_not(
         self, golden
     ):
+        """Rule 6 pairs one flow each side; beside a second flow it stays a ruling."""
         copy = golden.model.model_copy(deep=True)
-        flow = next(
-            f
-            for f in copy.data_flows
-            if f.id == "flow:order-service-to-receipt-archive:append-receipt"
-        )
+        flow_id = "flow:order-service-to-receipt-archive:append-receipt"
+        flow = next(f for f in copy.data_flows if f.id == flow_id)
         flow.name = "Nightly export"
         flow.operations = "read"
         model = normalize_element_ids(copy)
 
-        row = fates(golden, model)[
-            "flow:order-service-to-receipt-archive:append-receipt"
-        ]
+        alone = fates(golden, model)[flow_id]
 
-        assert row.fate == "unresolved"
-        assert row.candidates == (
-            "flow:order-service-to-receipt-archive:nightly-export",
-        )
+        assert alone.fate == "renamed"
+        assert alone.evidence == "sole"
+
+        # A second flow the discriminators cannot tell from the first, so
+        # neither rule 5 nor rule 6 has one flow to pair.
+        second = flow.model_copy(update={"name": "Audit copy", "operations": "read"})
+        copy.data_flows.append(second)
+        beside = fates(golden, normalize_element_ids(copy))[flow_id]
+
+        assert beside.fate == "unresolved"
 
     def test_a_flow_dropped_between_found_endpoints_is_omitted(self, golden):
         copy = golden.model.model_copy(deep=True)
