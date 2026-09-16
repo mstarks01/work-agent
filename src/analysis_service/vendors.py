@@ -362,7 +362,7 @@ _FLOATING_WORDS: dict[str, str] = {
 #:
 #: **A table, because the properties are vendor-neutral and the syntax is not.**
 #: This was the pattern ``arn:`` alone, which is one cloud's spelling standing
-#: in for a rule written about every cloud — the shape ``CLAUDE.md`` names, and
+#: in for a rule written about every cloud — the shape ``AGENTS.md`` names, and
 #: the one that let three Google forms through while refusing the AWS one.
 #: ``litellm.get_llm_provider`` resolves each entry below to a provider exactly
 #: as it resolves an ARN, so every refusal here is this service's own and

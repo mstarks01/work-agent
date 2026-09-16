@@ -59,7 +59,7 @@ correctness, and the recall instruments read claims alone.
 **Recall recovery has a mechanism.** The `place` and `unled` rows are the
 units this pass asks about a second time. The ceiling is those rows' must-find
 count, 33 on the first Baseline, and it is priced before any run as
-`CLAUDE.md` requires.
+`AGENTS.md` requires.
 
 **Cost rises by the unanswered count.** On a lane that answers most of what it
 is offered the second call is small; on a sparse case it can approach a

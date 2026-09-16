@@ -574,7 +574,7 @@ class TestTheLadderIsVendorNeutral:
     Keying on the status code removes the difference rather than tabulating it,
     so what this asserts is **agreement across the registry**, one row per
     ``(vendor, upstream status)``. It is a cross-reader test in the sense
-    ``CLAUDE.md`` means: this repository's rule against the installed library's
+    ``AGENTS.md`` means: this repository's rule against the installed library's
     behaviour, never against a remembered list of class names. A litellm bump
     that re-maps any of it fails here rather than on node one of a paid job.
     """

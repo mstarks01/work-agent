@@ -46,7 +46,7 @@ and 17 exemplar files had no token lint at all, and
 `lanes/authentication/skill.md` reached 3,239 tokens with nothing watching it.
 The lane-boundary digest test ran on STRIDE only; the ASVS digest sat at 1,980
 tokens against a 2,000 budget. `output.md`, `critic.md` and `disclaimer.md`
-carried no cap in any package. This is the failure `CLAUDE.md` names — a
+carried no cap in any package. This is the failure `AGENTS.md` names — a
 constant per kind, read by a lint that walks one package's tree, is a gap that
 opens the moment a second package arrives.
 
@@ -82,7 +82,7 @@ introduce. A shrink therefore costs one line here, and that is the price of an
 alarm that stays proportional to what it watches.
 
 **`covered_assets` walks `PACKAGES` and raises on a file whose kind has no
-key.** This is the registry check `CLAUDE.md` asks for. A table nobody compares
+key.** This is the registry check `AGENTS.md` asks for. A table nobody compares
 to its registry fails as quietly as the branch it replaced, so the comparison is
 code: a new asset kind cannot arrive uncapped, and a package the registry names
 cannot escape the lint.

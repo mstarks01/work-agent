@@ -27,7 +27,7 @@ once.
 A defect in a recent fix is the dominant class, and it sits inside one diff, so
 a reader of that diff before the merge is the instrument that fits it. Run-9's
 HIGH is the plainest case: the bound sat on a scan where the caller runs a body,
-and `CLAUDE.md` named that mistake two days before the fix shipped.
+and `AGENTS.md` named that mistake two days before the fix shipped.
 
 The rest of the table is the argument for the round. Run-9's LOW was a
 `RuntimeError` that `Path.resolve` raises on a symlink loop. It was legal in
@@ -160,7 +160,7 @@ attention that found the defect is spent by the time the repair is written.
 Read the fix diff against the five defect classes above, the same way a
 pre-merge review reads anybody else's diff. This includes the fix that closes a
 finding you reported an hour ago. Run 9 shipped a bound with no per-body limit,
-and `CLAUDE.md` carried that corollary two days before the fix merged.
+and `AGENTS.md` carried that corollary two days before the fix merged.
 
 Let a fix to a hot path sit long enough to read it once more. Minutes between
 the last keystroke and the merge is how the previous rounds shipped their

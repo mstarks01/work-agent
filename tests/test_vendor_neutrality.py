@@ -18,7 +18,7 @@ same identifier was legal on one vendor and refused on two others.
 **A one-vendor assumption is vacuously correct when it is written and silently
 wrong afterwards.** That is the same sentence
 ``tests/test_framework_neutrality.py`` opens with, about frameworks, and the
-lesson reached ``CLAUDE.md`` as prose while the *check* was built for frameworks
+lesson reached ``AGENTS.md`` as prose while the *check* was built for frameworks
 only. Vendors got the sentence and not the mechanism. This module is the
 mechanism.
 
@@ -44,7 +44,7 @@ Each layer catches a failure the others cannot.
 finds every module-level mapping keyed by a closed vendor vocabulary by reading
 the modules, rather than by listing the tables somebody remembered. A table that
 does not answer for every vendor fails, *including a table added tomorrow*. This
-is ``CLAUDE.md``'s "check the table against its registry" made automatic, so
+is ``AGENTS.md``'s "check the table against its registry" made automatic, so
 that a new table cannot fail as quietly as the branch it replaced.
 
 **2. Declaration — is naming a vendor here right?** The literal and identifier
@@ -338,7 +338,7 @@ def test_the_scan_finds_the_tables_we_already_know_about(tables):
 
 
 def test_every_vendor_keyed_table_answers_for_every_vendor(tables):
-    """The rule `CLAUDE.md` states, applied to tables nobody listed here.
+    """The rule `AGENTS.md` states, applied to tables nobody listed here.
 
     A table keyed by vendor is self-completing only while something compares it
     to the registry. This is that comparison, for every table at once, so a
