@@ -643,7 +643,9 @@ class RowBinding:
     predicate: str
     fate: BindFate
     #: The produced element the blessed subject or referent aligns to, on a
-    #: ``renamed`` fate of either kind.
+    #: ``renamed`` fate of either kind. A pairing this replay made across two
+    #: readings of one case, never a binding the resolver could have made:
+    #: see :func:`bind_assertions` for why production has only one reading.
     aligned: str = ""
 
     def to_json(self) -> dict[str, Any]:
@@ -713,9 +715,20 @@ def bind_assertions(
     each row's fate is read off which of the two refused it. A row the
     blessed model refused is ``refused`` whatever the graph did. A row only
     the extracted graph refused is a binding failure, and the alignment says
-    which kind: the blessed subject aligned to a produced element is a
-    ``renamed`` binding an alias ruling would take, and one aligned to
-    nothing is a subject the graph ``omitted``.
+    which kind: the blessed subject aligned to a produced element is
+    ``renamed``, and one aligned to nothing is a subject the graph
+    ``omitted``.
+
+    **A ``renamed`` row is a statement about extraction, and no ruling in the
+    resolver would take it.** It exists because this replay pairs a proposal
+    written against the *blessed* model with a *different* extracted graph —
+    the cross-product is the measurement. Production has one reading and not
+    two: ``read_model`` renders the validated model, ``assert`` proposes over
+    that same model, and ``prepare`` binds against it, so a subject naming an
+    element the graph does not hold under that spelling cannot arise. What a
+    ``renamed`` count measures is how often extraction spells a component
+    differently from the reviewed reading, which is #295's question rather
+    than this layer's.
     """
     sources = {source.label: source.text for source in case.sources}
     proposed = CatalogProposal.model_validate(proposal.proposal)
