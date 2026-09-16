@@ -436,5 +436,46 @@
       "reviewed_by": "mstarks01"
     }
   ],
-  "disputed": []
+  "disputed": [],
+  "aliases": {
+    "subjects": [
+      {
+        "subject": "principal:calling-team",
+        "names": [
+          "calling teams"
+        ],
+        "ruling": "The plural of the same party; the source says keys are issued per calling team.",
+        "reviewed_by": null
+      },
+      {
+        "subject": "credential:group-account",
+        "names": [
+          "shared group account"
+        ],
+        "ruling": "The source's own words: 'I think it is a shared group account'. The sharing is a fact on the credential, not part of its name.",
+        "reviewed_by": null
+      },
+      {
+        "subject": "artifact:model-artifact",
+        "names": [
+          "model artifacts"
+        ],
+        "ruling": "The plural of the same artifact; the source says 'loads model artifacts'.",
+        "reviewed_by": null
+      }
+    ],
+    "qualifiers": [
+      {
+        "kind": "operation",
+        "value": "write",
+        "names": [
+          "publish",
+          "publish artifact",
+          "publish model artifacts"
+        ],
+        "ruling": "The engineers' publish to the registry bucket is the write the reference names; the source says 'ML engineers publish new model artifacts to the registry bucket'.",
+        "reviewed_by": null
+      }
+    ]
+  }
 }

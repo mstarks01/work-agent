@@ -491,5 +491,35 @@
       "reviewed_by": "mstarks01"
     }
   ],
-  "disputed": []
+  "disputed": [],
+  "aliases": {
+    "subjects": [
+      {
+        "subject": "principal:an-account-in-the-control-plane",
+        "names": [
+          "control-plane account",
+          "accounts in the production control plane"
+        ],
+        "ruling": "The same account class without the article, and its plural in the production control plane; the source names the rights an account in the control plane holds.",
+        "reviewed_by": null
+      },
+      {
+        "subject": "principal:a-corporate-laptop",
+        "names": [
+          "corporate laptop"
+        ],
+        "ruling": "The same laptop without the article; the source says 'A corporate laptop holds none of those rights'.",
+        "reviewed_by": null
+      },
+      {
+        "subject": "principal:another-company",
+        "names": [
+          "scheduling partner"
+        ],
+        "ruling": "The source: 'A scheduling partner, which is another company'. The partner is the other company the platform's ownership points at.",
+        "reviewed_by": null
+      }
+    ],
+    "qualifiers": []
+  }
 }

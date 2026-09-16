@@ -504,5 +504,59 @@
       "reviewed_by": "mstarks01"
     }
   ],
-  "disputed": []
+  "disputed": [],
+  "aliases": {
+    "subjects": [],
+    "qualifiers": [
+      {
+        "kind": "resource",
+        "value": "the weekly rota for their store",
+        "names": [
+          "weekly rota for their store",
+          "weekly rota"
+        ],
+        "ruling": "The same rota with the article dropped, and without 'for their store'; the source names one rota per store.",
+        "reviewed_by": null
+      },
+      {
+        "kind": "operation",
+        "value": "write",
+        "names": [
+          "build and change"
+        ],
+        "ruling": "Store managers 'build the weekly rota'; building and changing it is the write.",
+        "reviewed_by": null
+      },
+      {
+        "kind": "resource",
+        "value": "the shifts they have been given",
+        "names": [
+          "shifts they have been given",
+          "their assigned shifts",
+          "their own shifts"
+        ],
+        "ruling": "The source: 'Colleagues use the same app to look at the shifts they have been given'; the three spellings name those shifts.",
+        "reviewed_by": null
+      },
+      {
+        "kind": "operation",
+        "value": "read",
+        "names": [
+          "view",
+          "collect"
+        ],
+        "ruling": "Looking at shifts is a read; the payroll system 'collects the export', which is a read of the export. Applies to every read grant on the case.",
+        "reviewed_by": null
+      },
+      {
+        "kind": "resource",
+        "value": "payroll export",
+        "names": [
+          "weekly payroll export"
+        ],
+        "ruling": "The same export; the source says 'once a week the scheduling service writes a payroll export'.",
+        "reviewed_by": null
+      }
+    ]
+  }
 }
