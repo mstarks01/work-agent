@@ -107,6 +107,22 @@ git tag -a reviewed/<date> <sha> -F -
 git push origin reviewed/<date>
 ```
 
+`<date>` is **the day the round ran**. Rounds run several times a day, so the
+name collides; a second round that day takes a letter, `reviewed/2026-08-27b`,
+and a third takes `c`.
+
+That rule went unwritten, and the names drifted six days ahead of the clock.
+The first rounds used the letter. From `reviewed/2026-09-04` the letter was
+dropped and each round took the next unused *date* instead, so six rounds cut
+on 2026-09-03 are named 09-04 through 09-09, and `reviewed/2026-09-22` was cut
+on 2026-09-14. Tags 04 through 22 keep those names: they are pushed, each tag
+message carries the true dates, and nothing reads the name. Take the letter
+from here on — today's plain name may already be spent.
+
+Sort by `creatordate` and never by name. The two orders agreed while the names
+drifted and stop agreeing once the letter comes back, and `creatordate` is the
+one that answers "since when".
+
 The message carries what a later reader cannot recover from the diff:
 
 - the range reviewed, as `<base>...<head>`, with the size at the time

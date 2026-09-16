@@ -69,6 +69,17 @@ SOURCE = (
 )
 SOURCES = {SOURCE_LABEL: SOURCE}
 
+# A source that states one fact twice, which is what makes a quote of it name
+# neither copy. Two sections of one runbook say the same sentence, which is how
+# a real submission repeats itself.
+REPEATED_LABEL = "Runbook"
+REPEATED = (
+    "Nightly batch: the order service reads the bucket over TLS.\n"
+    "Receipts land in a bucket the order service reads.\n"
+    "Failover: the order service reads the bucket over TLS.\n"
+)
+REPEATED_SOURCES = {REPEATED_LABEL: REPEATED}
+
 FLOW = "flow:entity:shopper>process:storefront-api>place-order"
 WEBHOOK = "flow:entity:card-processor>process:settlement-webhook>post-settlement"
 
@@ -76,6 +87,13 @@ WEBHOOK = "flow:entity:card-processor>process:settlement-webhook>post-settlement
 def span_for(quote):
     """The one span ``quote`` occupies in :data:`SOURCE`, refusing an absent one."""
     span = support_span(quote, SOURCE_LABEL, SOURCE)
+    assert span is not None, f"the fixture source does not hold {quote!r}"
+    return [span]
+
+
+def repeated_span(quote="the order service reads the bucket over TLS"):
+    """The span ``quote`` takes in :data:`REPEATED`, which holds it twice."""
+    span = support_span(quote, REPEATED_LABEL, REPEATED)
     assert span is not None, f"the fixture source does not hold {quote!r}"
     return [span]
 
@@ -508,6 +526,14 @@ REFUSALS: dict[str, tuple[str, AssertionCatalog, dict]] = {
         "offsets that do not hold the quote beside them",
         catalog([moved_span(start=0, end=8)]),
         {"sources": SOURCES},
+    ),
+    "ambiguous-span": (
+        (
+            "a source that states the fact twice holds the quote in both"
+            " places, so offsets into the first copy name neither"
+        ),
+        catalog([stated(support=repeated_span())]),
+        {"sources": REPEATED_SOURCES},
     ),
     "exclusive-without-support": (
         (
@@ -1038,6 +1064,78 @@ class TestResolvingAProposal:
         assert held.entries[0].value == "credential:session-cookie"
         assert "credential:session-cookie" in {s.id for s in held.subjects}
         assert catalog_issues(held, model=self.model(), sources=SOURCES) == []
+
+    def test_a_reference_value_naming_nothing_names_the_referent_type(self):
+        """The repair pass reads this message, so it names what it asked for.
+
+        It named the predicate's *value kind* instead, so every refusal of a
+        reference read "names no reference this predicate takes" whatever the
+        predicate pointed at. Its two siblings name the type.
+        """
+        _, issues = self.resolve(
+            self.row(
+                predicate="network-membership",
+                subject_type="component",
+                subject="process:storefront-api",
+                value="a zone nobody declared",
+            )
+        )
+        (issue,) = issues
+        assert issue.code == "illegal-value"
+        assert "names no zone" in issue.message
+
+    def test_a_quote_the_source_holds_twice_drops_as_ambiguous(self):
+        """#926: a repeated quote keeps its ambiguity rather than taking a side.
+
+        The matcher answers the first placement, which is *an* answer. A row
+        built on it cites the first copy and says nothing about which copy the
+        statement rests on, so the gate refuses it — and the reason is its own,
+        because "not found in the source" would send repair looking for a
+        quote that is in there twice.
+        """
+        held, issues = resolve_catalog(
+            CatalogProposal(
+                assertions=[
+                    self.row(
+                        predicate="transport-encryption",
+                        value="TLS",
+                        quotes=[
+                            QuoteProposal(
+                                source_label=REPEATED_LABEL,
+                                quote="the order service reads the bucket over TLS",
+                            )
+                        ],
+                    )
+                ]
+            ),
+            self.model(),
+            REPEATED_SOURCES,
+        )
+        assert held.entries == []
+        assert codes(issues) == ["ambiguous-span"]
+
+    def test_a_quote_the_source_holds_once_still_resolves(self):
+        """The other half of the bound: one placement is not ambiguous."""
+        held, issues = resolve_catalog(
+            CatalogProposal(
+                assertions=[
+                    self.row(
+                        predicate="transport-encryption",
+                        value="TLS",
+                        quotes=[
+                            QuoteProposal(
+                                source_label=REPEATED_LABEL,
+                                quote="Receipts land in a bucket",
+                            )
+                        ],
+                    )
+                ]
+            ),
+            self.model(),
+            REPEATED_SOURCES,
+        )
+        assert issues == []
+        assert len(held.entries) == 1
 
     def test_an_unknown_row_needs_no_quote(self):
         held, issues = self.resolve(

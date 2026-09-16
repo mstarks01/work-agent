@@ -261,6 +261,20 @@ RECRITIC_ROLE = "recritic"
 REREVIEW_ROLE = "rereview"
 CRITIC_FAILED_ROLE = "critic_failed"
 
+#: Every per-framework role, so :meth:`FrameworkNodes.node` names a set rather
+#: than a count. The count was written into that docstring as "six" and a
+#: seventh role arrived without it, which is a fact nothing read; a tuple is a
+#: fact ``tests/test_graph.py`` reads.
+ROLES: tuple[str, ...] = (
+    JOIN_ROLE,
+    MERGE_ROLE,
+    CRITIC_ROLE,
+    ROUTER_ROLE,
+    RECRITIC_ROLE,
+    REREVIEW_ROLE,
+    CRITIC_FAILED_ROLE,
+)
+
 
 # The per-lane artifacts, as ``{placeholder}`` in ``analyze.md`` against the
 # state-key prefix it resolves to. **The only place that correspondence
@@ -410,7 +424,7 @@ class FrameworkNodes:
         return tuple(Lane(self.name, lane) for lane in self.package.lanes)
 
     def node(self, role: str) -> str:
-        """This framework's graph node name for one of the six per-framework roles."""
+        """This framework's graph node name for one of :data:`ROLES`."""
         return f"{role}_{_identifier(self.name)}"
 
     def key(self, artifact: str) -> str:
