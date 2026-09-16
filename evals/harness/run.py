@@ -205,8 +205,11 @@ class _CaseOutcome:
     #: The assertion mode's counterparts to the two fields below.
     assertion: modes.AssertionScore | None = None
     assertion_result: modes.AssertionResult | None = None
-    #: The extraction the score above was taken over, carried so the sweep can
-    #: write it beside the artifact. ``None`` outside the extraction mode.
+    #: What ``extract`` emitted, carried so the sweep can write it beside the
+    #: artifact whichever way the case ended: the extraction mode's scored
+    #: result, an end-to-end case's first pass and repair, or the first pass
+    #: of a case whose model the graph refused. ``None`` on a mode that ran
+    #: no extraction, and on a fault before the gate.
     result: modes.ExtractionResult | None = None
     #: The extraction's own validity issues, which the fold reads apart: the
     #: citation half is scored and every other one is a malformed model.
@@ -398,14 +401,22 @@ async def _run_mode(
             # case is priced like a finished one. The raising node's own call
             # is the one figure no path meters, so the price is a floor.
             return _CaseOutcome(
-                case=case, executions=tuple(failed.node_runs), error=failed.cause
+                case=case,
+                executions=tuple(failed.node_runs),
+                error=failed.cause,
+                result=failed.extraction,
             )
         except Exception as error:  # noqa: BLE001 — every fault, so none is free
             # A refused model and a provider fault arrive the same way here and
             # are told apart by :data:`MEASURED` in the fold, which is the one
             # reader of that question.
             return _CaseOutcome(case=case, error=error)
-        return _CaseOutcome(case=case, executions=tuple(run.report.nodes), run=run)
+        return _CaseOutcome(
+            case=case,
+            executions=tuple(run.report.nodes),
+            run=run,
+            result=run.extraction,
+        )
 
     def fold(outcome: _CaseOutcome) -> bool:
         """Fold one case's outcome into the sweep. ``True`` where it stops it.
@@ -416,6 +427,11 @@ async def _run_mode(
         """
         case = outcome.case
         executions.extend(outcome.executions)
+        # Before the outcome is told apart, because the emission is kept
+        # whichever way the case ended: a refused model is written beside a
+        # finished one, and the replay grades both under one instrument.
+        if outcome.result is not None:
+            extracted[case.id] = outcome.result
         if outcome.error is not None:
             if not isinstance(outcome.error, MEASURED):
                 # Not a measurement: the provider or the transport failed, and
@@ -434,8 +450,6 @@ async def _run_mode(
         if outcome.extraction is not None:
             extractions.append(outcome.extraction)
             payloads.append(outcome.extraction.to_json())
-            if outcome.result is not None:
-                extracted[case.id] = outcome.result
             # The citation half is scored, not failed. It fires when the model
             # quotes a source wrongly, which production hands to ``repair`` and
             # this mode stops before; ``score.uncited`` carries every one into
@@ -1495,7 +1509,7 @@ def replay_artifact(
             **graded,
         )
 
-    if loaded.mode == "extraction":
+    if replay.NODE_OF[loaded.mode] == "extract":
         extracted = extractions_from_reports(path, held)
         return sweep(
             extractions=tuple(
@@ -2062,7 +2076,7 @@ def _replay_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "artifact",
         nargs="+",
-        help="archived extraction or assertion sweep artifacts, each with its"
+        help="archived extraction, end-to-end or assertion sweep artifacts, each with its"
         " .reports/ dir beside it",
     )
     parser.add_argument(

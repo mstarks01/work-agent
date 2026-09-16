@@ -13,6 +13,7 @@ shipped graph without a provider call.
 
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 
@@ -27,9 +28,12 @@ from analysis_service.assertions import (
     QuoteProposal,
     resolve_catalog,
 )
+from analysis_service.deployment import Deployment
+from analysis_service.graph import ENTRY_EXTRACT
 from analysis_service.report import Report
 from analysis_service.system_model import SystemModel
 from analysis_service.validation import ValidationIssue, parse_and_validate
+from evals.harness import modes
 from evals.harness.bundle import (
     reports_dir,
     write_assertions,
@@ -43,7 +47,8 @@ from evals.harness.modes import (
     score_extraction,
 )
 from evals.harness.reference import load_case
-from tests.test_evals_run_grounds import CASE_DIR, DEAD, sweep
+from evals.harness.run import _run_mode
+from tests.test_evals_run_grounds import CASE_DIR, DEAD, TEST_TIER_ENV, sweep
 
 
 @pytest.fixture(scope="module")
@@ -210,14 +215,58 @@ class TestAnExtractionSweepKeepsItsModels:
             "missing-citation"
         ] * (len(raw["processes"]))
 
-    def test_another_mode_writes_none_and_says_so(self, case, tmp_path, capsys):
-        """An analysis sweep keeps its model inside its report, not here."""
+    def test_a_mode_that_ran_no_extraction_writes_none_and_says_so(
+        self, case, tmp_path, capsys
+    ):
+        """An analysis sweep seeds the blessed model and has no emission to keep."""
         out = tmp_path / "artifact.json"
 
         write_extractions(str(out), "analysis", {})
 
         assert not reports_dir(out).exists()
         assert "no extractions written" in capsys.readouterr().out
+
+    def test_an_end_to_end_sweep_keeps_the_first_pass_and_the_repair(
+        self, case, tmp_path
+    ):
+        """#961 finding 14: the report's model is the one after the overlay."""
+        out = tmp_path / "artifact.json"
+        broken = case.model.model_dump(mode="json")
+        broken["data_flows"][0]["destination"] = "process:does-not-exist"
+        repaired = case.model.model_dump(mode="json")
+        result = ExtractionResult(
+            case_id=case.id, extracted=None, issues=(), raw=broken, repair=repaired
+        )
+
+        write_extractions(str(out), "end-to-end", {case.id: result})
+
+        written = json.loads(
+            (reports_dir(out) / f"{case.id}.extraction.json").read_text("utf-8")
+        )
+        assert written["raw"] == broken
+        assert written["repair"] == repaired
+
+    def test_a_refused_case_is_written_beside_the_finished_ones(
+        self, monkeypatch, case, tmp_path
+    ):
+        """The sweep keeps a first pass whichever way its case ended."""
+        from tests.test_evals_modes import build
+
+        models = {}
+        pipeline = build(case, ENTRY_EXTRACT, models)
+        broken = case.model.model_dump(mode="json")
+        broken["data_flows"][0]["destination"] = "process:does-not-exist"
+        models["extract"].reply = json.dumps(broken)
+        models["repair"].reply = json.dumps(broken)
+        monkeypatch.setattr(modes, "build_eval_pipeline", lambda *a, **k: pipeline)
+        deployment = Deployment.from_env(env=TEST_TIER_ENV)
+
+        run = asyncio.run(_run_mode([case], "end-to-end", deployment))
+
+        assert run.runs == {}
+        assert any("rejected the model" in failure for failure in run.failures)
+        assert run.extracted[case.id].raw == broken
+        assert run.extracted[case.id].repair == broken
 
 
 class TestTheAssertionsBesideTheArtifact:

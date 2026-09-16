@@ -649,8 +649,14 @@ class Arm:
         }
 
 
-#: The node whose emission each mode archives.
-NODE_OF: Mapping[str, str] = {"extraction": "extract", "assertions": "assert"}
+#: The node whose emission each mode archives. An end-to-end sweep keeps the
+#: first pass of the same node the extraction mode does, so it replays under
+#: the same fates; its repair's emission is archived and not graded here.
+NODE_OF: Mapping[str, str] = {
+    "extraction": "extract",
+    "end-to-end": "extract",
+    "assertions": "assert",
+}
 
 
 def arm_of(artifact: EvalArtifact) -> Arm:

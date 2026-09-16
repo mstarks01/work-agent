@@ -335,6 +335,15 @@ them. `extraction` mode stops at the validity gate, produces no report, and
 says so. Expect roughly 30–80 KB per report. These files are publishable: they
 carry corpus source text, which is in this repository.
 
+Every mode that runs `extract` also writes `artifact.reports/<case>.extraction.json`:
+what the node emitted under `raw`, the model and gate verdict beside it, and
+under `repair` what the repair node returned where the gate sent the first
+pass to it, else `null`. An `end-to-end` run writes it for a case the graph
+refused too, because a refused model is the emission most worth reading back.
+The report holds only the model after the repair overlay, so without this
+file nothing reconstructs the first pass. `replay` grades an `end-to-end`
+sweep's first pass under the same fates as an `extraction` sweep's.
+
 An `assertions` run reads the sources against the blessed model and writes one
 row per statement the sources make: subject, predicate, value, and the span of
 the source that says so. An `end-to-end` or `analysis` run on a deployment that
