@@ -21,7 +21,7 @@
         "exclusive": false
       },
       "rationale": "An explicit absence, stated: HTTP, not HTTPS.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -42,7 +42,7 @@
         "exclusive": false
       },
       "rationale": "The speaker asked and nobody could answer: a hedged unknown on the API itself, which covers every inbound interaction. model.json holds unknown on each flow.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -63,7 +63,7 @@
         "exclusive": false
       },
       "rationale": "An explicit absence, stated, and the one fact in the corpus that grades this predicate. It is not an authentication absence: the source says nothing about how the leg authenticates.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -77,14 +77,14 @@
         "quotes": [
           {
             "source_label": "System description",
-            "quote": "whether the user database and the flat file are encrypted"
+            "quote": "Nobody here can tell me what the API does about authentication, or whether the user database and the flat file are encrypted."
           }
         ],
         "explanation": "",
         "exclusive": false
       },
-      "rationale": "Raised and unanswered: hedged.",
-      "reviewed_by": null
+      "rationale": "Raised and unanswered: the whole sentence carries the uncertainty; the fragment about encryption alone does not.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -98,14 +98,14 @@
         "quotes": [
           {
             "source_label": "System description",
-            "quote": "whether the user database and the flat file are encrypted"
+            "quote": "Nobody here can tell me what the API does about authentication, or whether the user database and the flat file are encrypted."
           }
         ],
         "explanation": "",
         "exclusive": false
       },
-      "rationale": "Raised and unanswered: hedged.",
-      "reviewed_by": null
+      "rationale": "Raised and unanswered: the whole sentence carries the uncertainty; the fragment about encryption alone does not.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -124,18 +124,18 @@
             "value": "write"
           }
         ],
-        "basis": "stated",
+        "basis": "inferred",
         "quotes": [
           {
             "source_label": "System description",
             "quote": "The macros in it send SQL statements straight to the web API to change prices and product copy"
           }
         ],
-        "explanation": "",
+        "explanation": "The described action supports an effective permission held by the macros; an authorization grant is not stated.",
         "exclusive": false
       },
-      "rationale": "The source states writes: prices and product copy change. It states no reads, and the flow's operations value reads write.",
-      "reviewed_by": null
+      "rationale": "Inferred: the source states the macros change prices and product copy, which supports an effective permission; a grant is not stated. It states no reads, and the flow's operations value reads write.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -147,11 +147,11 @@
         "scope": [],
         "basis": "inferred",
         "quotes": [],
-        "explanation": "Customers browse and order through the mobile app, there is no website, and the app talks to the web API over HTTP from customers' own devices.",
+        "explanation": "Customers use the mobile app to access the online shop through its web API.",
         "exclusive": false
       },
-      "rationale": "Inferred, as model.json's assumption records: the app on customers' own devices is the only channel and it reaches the API over HTTP.",
-      "reviewed_by": null
+      "rationale": "Inferred, as model.json's assumption records: customers use the mobile app to access the online shop through its web API. HTTP alone establishes no internet exposure.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -172,7 +172,7 @@
         "exclusive": false
       },
       "rationale": "Stated placement: a marketing laptop in the office.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -184,11 +184,11 @@
         "scope": [],
         "basis": "inferred",
         "quotes": [],
-        "explanation": "Customers browse and order through the mobile app, and the model places the customer with the app on their own device.",
+        "explanation": "Customers browse and order through the mobile app; a customer-used device is inferred.",
         "exclusive": false
       },
-      "rationale": "Inferred: the customer orders through an app on their own device.",
-      "reviewed_by": null
+      "rationale": "Inferred execution context, not a stated network segment: customers browse and order through the mobile app, so a customer-used device is inferred.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -200,91 +200,86 @@
         "scope": [],
         "basis": "inferred",
         "quotes": [],
-        "explanation": "The app is the channel through which customers browse and order, and it reaches the web API over HTTP; the source names no other placement.",
+        "explanation": "Customers browse and order through the mobile app; a customer-used device is inferred.",
         "exclusive": false
       },
-      "rationale": "Inferred, as model.json's assumption records.",
-      "reviewed_by": null
+      "rationale": "Inferred execution context, not a stated network segment: customers browse and order through the mobile app, so a customer-used device is inferred.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
         "subject_type": "component",
         "subject": "process:web-api",
         "predicate": "network-membership",
-        "value": "boundary:sokify-internal-systems",
-        "reason": null,
+        "value": "unknown",
+        "reason": "silent",
         "scope": [],
-        "basis": "inferred",
+        "basis": "stated",
         "quotes": [],
-        "explanation": "The web API is one of Sokify's own systems and the source names no network segments.",
         "exclusive": false
       },
-      "rationale": "The source names no segment; the zone groups Sokify's own systems.",
-      "reviewed_by": null
+      "rationale": "Ownership, interaction and the absence of named segments do not establish shared network membership. model.json's zone is a placement the schema requires, recorded in its assumption.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
         "subject_type": "component",
         "subject": "process:sims",
         "predicate": "network-membership",
-        "value": "boundary:sokify-internal-systems",
-        "reason": null,
+        "value": "unknown",
+        "reason": "silent",
         "scope": [],
-        "basis": "inferred",
+        "basis": "stated",
         "quotes": [],
-        "explanation": "SIMS is Sokify's own stock and inventory system and the source names no network segments.",
         "exclusive": false
       },
-      "rationale": "'Our stock and inventory system' is Sokify's own; no segment is named.",
-      "reviewed_by": null
+      "rationale": "Ownership, interaction and the absence of named segments do not establish shared network membership. model.json's zone is a placement the schema requires, recorded in its assumption.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
         "subject_type": "component",
         "subject": "process:fax-gateway",
         "predicate": "network-membership",
-        "value": "boundary:sokify-internal-systems",
-        "reason": null,
+        "value": "unknown",
+        "reason": "silent",
         "scope": [],
-        "basis": "inferred",
+        "basis": "stated",
         "quotes": [],
-        "explanation": "The gateway is described as part of what SIMS does with an order; the source does not say whether it is operated in-house.",
         "exclusive": false
       },
-      "rationale": "The source does not say whether the gateway is in-house; model.json's note says so.",
-      "reviewed_by": null
+      "rationale": "Ownership, interaction and the absence of named segments do not establish shared network membership. model.json's zone is a placement the schema requires, recorded in its assumption.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
         "subject_type": "component",
         "subject": "store:user-database",
         "predicate": "network-membership",
-        "value": "boundary:sokify-internal-systems",
-        "reason": null,
+        "value": "unknown",
+        "reason": "silent",
         "scope": [],
-        "basis": "inferred",
+        "basis": "stated",
         "quotes": [],
-        "explanation": "The web API keeps customers in the user database, and the source names no network segments.",
         "exclusive": false
       },
-      "rationale": "The web API keeps customers in it; no segment is named.",
-      "reviewed_by": null
+      "rationale": "Ownership, interaction and the absence of named segments do not establish shared network membership. model.json's zone is a placement the schema requires, recorded in its assumption.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
         "subject_type": "component",
         "subject": "store:delivery-address-flat-file",
         "predicate": "network-membership",
-        "value": "boundary:sokify-internal-systems",
-        "reason": null,
+        "value": "unknown",
+        "reason": "silent",
         "scope": [],
-        "basis": "inferred",
+        "basis": "stated",
         "quotes": [],
-        "explanation": "The flat file is kept alongside SIMS, one of Sokify's own systems.",
         "exclusive": false
       },
-      "rationale": "Kept alongside SIMS, which is Sokify's own.",
-      "reviewed_by": null
+      "rationale": "The source states a relative placement, kept alongside SIMS, and SIMS itself has no established network zone, so the file's zone is unknown. model.json's zone is a placement the schema requires, recorded in its assumption with the relative placement.",
+      "reviewed_by": "mstarks01"
     }
   ],
   "disputed": []
