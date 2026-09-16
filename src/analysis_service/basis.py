@@ -83,7 +83,7 @@ is treated as one a person would keep.
 =====================================  ======  =======  ============
 rung                                   values  flagged  false-reject
 =====================================  ======  =======  ============
-every content token present                21       15        71.4%
+every content token present                21       14        66.7%
 **at least one content token present**     21        0         0.0%
 =====================================  ======  =======  ============
 
@@ -91,7 +91,7 @@ every content token present                21       15        71.4%
 the prose around the mechanism: ``"static per-partner key issued at onboarding,
 never rotated"`` names a key the source names, and then loses on ``issued``,
 ``onboarding`` and ``rotated`` — the writer's summary of a source that said the
-same thing in other words. Fifteen of the 21 fail that way. So the rule is the
+same thing in other words. Fourteen of the 21 fail that way. So the rule is the
 weak rung, and the strict one is recorded here to say it was measured rather
 than assumed.
 
@@ -107,7 +107,9 @@ every number in this table from the corpus it ships beside. The weak rung reads
 **The denominator moves when the corpus is corrected, which is the point of
 re-deriving it.** Case 09's fax leg stated a destination-verification gap in its
 ``authentication`` field, so a missing safeguard sat in this measurement as a
-stated control; ruling it to ``unknown`` (#925) took it out. Case 07 carried the
+stated control; ruling it to ``unknown`` (#925) took it out. The #961 step 3
+rulings reworded case 04's API-key value to what the source reports, and one
+strict flag left with the word the source never used. Case 07 carried the
 same family of fact as ``none`` and was never in here at all — one pair of
 inconsistent values, visible from this side as a denominator of 22 that should
 always have been 21.

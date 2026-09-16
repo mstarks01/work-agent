@@ -32,3 +32,14 @@ authority still changes, which is the reading `kind` was given four values to
 carry. Correction 4 repeats case 07's reversed pull and correction 9 repeats
 case 12's invented audit store — both landed on the elements a reader is most
 inclined to fill in for the author.
+
+## Rulings of 2026-09-16 (#961 step 3)
+
+The step 3 review on #961 ruled on the drafted `facts.json` and its disputed
+values. The review is assistant-authored and the maintainer posted it; it is
+not a human signature, and no row in `facts.json` is signed. Each edit below
+follows one ruling, and `facts.json` changed with it.
+
+| # | Path | Before | After | Ruling |
+|---|---|---|---|---|
+| 10 | `store:dispatch-database.trust_zone` | `boundary:production-control-plane`, no assumption | same value + a placeholder assumption | The API is placed in the control plane; the database is not. Access does not entail co-location. The zone stays because the schema needs one; `facts.json` reads it unknown. |

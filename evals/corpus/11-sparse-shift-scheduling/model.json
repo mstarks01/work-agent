@@ -60,7 +60,7 @@
       "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:internal-network",
-      "exposure": "internal",
+      "exposure": "unknown",
       "interface_kind": "unknown"
     }
   ],
@@ -241,6 +241,12 @@
       "element_id": "process:scheduling-web-app",
       "attribute": "trust_zone",
       "basis": "The source lists the service, database and share as internal and does not place the web app anywhere; it is grouped with them for want of any stated zone of its own."
+    },
+    {
+      "assumption": "The app both reads and writes rotas through the scheduling service.",
+      "element_id": "flow:scheduling-web-app-to-scheduling-service:rota-requests",
+      "attribute": "operations",
+      "basis": "The interaction itself is described only as 'talks to'. Managers build rotas through the app and colleagues view their shifts through it, and the service is what reads and writes the rotas, so the app's path carries both."
     }
   ]
 }

@@ -22,3 +22,24 @@ following the *name* rather than the described behaviour, and correction 3 shows
 an interaction being demoted into prose — the extraction failure that silently
 deletes a threat surface, since analysts can only file against elements that
 exist.
+
+## Rulings of 2026-09-16 (#961 step 3)
+
+The step 3 review on #961 ruled on the drafted `facts.json` and its disputed
+values. The review is assistant-authored and the maintainer posted it; it is
+not a human signature, and no row in `facts.json` is signed. Each edit below
+follows one ruling, and `facts.json` changed with it.
+
+| # | Path | Before | After | Ruling |
+|---|---|---|---|---|
+| 7 | `flow:calling-service-to-inference-gateway:submit-inference-request.authentication` | `... never expired or rotated` | `...; operator reports never having expired a key` | "We have never expired one" reports the operator's past actions. Neither rotation nor automatic expiry follows from it. The V13.2.1 reference claim says the same. |
+| 8 | `flow:calling-service-to-inference-gateway:submit-inference-request.protocol` | `HTTPS` | `unknown` | An internet-facing FastAPI service and an API-key header establish neither HTTPS nor transport encryption. The V4.1.1 note says the same. |
+| 9 | `process:model-server.exposure` | `internal` | `unknown` + note | "Meant to be reachable only from the gateway" is an intended restriction. Membership in the model network is stated; enforcement is not. |
+| 10 | `entity:ml-engineer` assumption | basis said the registry "is stated to sit in the model network" | a placeholder the schema requires | Publishing to a bucket does not locate the publisher, and the source never locates the bucket. The zone stays because the schema needs one; `facts.json` reads it unknown. |
+| 11 | `store:model-registry-bucket.data_classification` | `internal` | `unknown` | "Model artifacts" settles no sensitivity, and the scheme's `internal` needs a finding that disclosure harms no outside party. |
+| 12 | `store:redis-feature-store.data_classification` | `confidential`, no assumption | `confidential` + assumption | Customer-specific account age and spend bands support the inference; the classification is inferred under the scheme, not quoted. |
+| 13 | `store:inference-log.data_classification`, and its `assets` assumption | `confidential`; "contains personal data" | `unknown`; "may contain personal data" | Raw prompts may carry sensitive text, but their actual sensitivity is unspecified. |
+
+Two aliases were ruled for `case.json`: "Other teams' backends" for
+`entity:calling-service` and "ML engineers" for `entity:ml-engineer`. Both are
+the source's own words for the aggregate actor.

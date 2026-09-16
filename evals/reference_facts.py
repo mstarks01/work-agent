@@ -34,6 +34,14 @@ written where the source raises the predicate and does not answer it, which is
 the ``hedged`` reason, and not for every predicate the source is silent about.
 That is the rule ``prompts/assert.md`` gives the producer, so the reference and
 the produced catalog enumerate the same questions.
+
+A value the schema requires and the source never gives — a zone for an element
+nothing places — is a placeholder, not a fact. The model records it in its
+assumptions list, and the reference row for that pair reads ``unknown``, so a
+producer's placement is not graded as a fact the source states. A justified
+inference is different: its row carries an inferred basis and an explanation,
+and it agrees with the model. ``tests/test_reference_facts.py`` tells the two
+apart by the row, and admits neither where the model records no assumption.
 """
 
 from __future__ import annotations

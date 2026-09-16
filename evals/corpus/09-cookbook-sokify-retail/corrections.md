@@ -126,3 +126,14 @@ last session — derive the ID in code from the emitted name rather than asking
 the model to keep two fields in agreement — would have removed 21 of the 21
 errors seen across the three candidates. That is a `prompts/extract.md` change
 avoided, not a prompt change deferred.
+
+## Rulings of 2026-09-16 (#961 step 3)
+
+The step 3 review on #961 ruled on the drafted `facts.json` and its disputed
+values. The review is assistant-authored and the maintainer posted it; it is
+not a human signature, and no row in `facts.json` is signed. Each edit below
+follows one ruling, and `facts.json` changed with it.
+
+| # | Path | Before | After | Ruling |
+|---|---|---|---|---|
+| 6 | `flow:catalogue-spreadsheet-to-web-api:sql-statements.operations` | `read-write` | `write` | The macros change prices and product copy, which are writes. Reading is not stated. The value describes the supported operations, not proof the interface cannot read. |

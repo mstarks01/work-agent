@@ -27,5 +27,19 @@
       "exemplar_proximity": "far"
     }
   ],
-  "notes": "Far-domain case (ticket 009 decision 6). The external entities are machines rather than people, the crown-jewel asset is a model artifact loaded as code rather than a record set, and two threat shapes have no analogue in the payments exemplar at all: artifact-integrity supply chain, and model-mediated disclosure across tenants. Also the only case where a store created for debugging (the inference log) is more sensitive than the system's nominal data."
+  "notes": "Far-domain case (ticket 009 decision 6). The external entities are machines rather than people, the crown-jewel asset is a model artifact loaded as code rather than a record set, and two threat shapes have no analogue in the payments exemplar at all: artifact-integrity supply chain, and model-mediated disclosure across tenants. Also the only case where a store created for debugging (the inference log) is more sensitive than the system's nominal data.",
+  "aliases": [
+    {
+      "element": "entity:calling-service",
+      "name": "Other teams' backends",
+      "excerpt": "Other teams' backends call our inference gateway",
+      "ruling": "The source names the callers as other teams' backends; the same slug covers the punctuation-normalized spelling. Ruled in the #961 step 3 review, an assistant-authored ruling the maintainer posted; it authorizes the aggregate actor's equivalence and not a merge of separately extracted teams."
+    },
+    {
+      "element": "entity:ml-engineer",
+      "name": "ML engineers",
+      "excerpt": "ML engineers publish new model artifacts to the registry bucket.",
+      "ruling": "The source names the publishers as ML engineers, in the plural. Ruled in the #961 step 3 review, an assistant-authored ruling the maintainer posted; it authorizes the aggregate actor's equivalence and not a merge of separately extracted engineers."
+    }
+  ]
 }

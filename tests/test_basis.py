@@ -28,7 +28,7 @@ from evals.harness.reference import load_case
 # the prose and the code cannot drift apart.
 CORPUS_VALUES = 21
 CORPUS_FLAGGED_WEAK = 0
-CORPUS_FLAGGED_STRICT = 15
+CORPUS_FLAGGED_STRICT = 14
 
 
 def _model(**flow) -> SystemModel:
@@ -289,7 +289,7 @@ def test_the_published_weak_rung_rate_is_what_the_corpus_gives(corpus_values):
 
 
 def test_the_published_strict_rung_rate_is_what_the_corpus_gives(corpus_values):
-    """16 in 22, which is why the strict rung is recorded and not shipped."""
+    """14 in 21, which is why the strict rung is recorded and not shipped."""
     flagged = [
         case_id
         for case_id, tokens, source in corpus_values

@@ -292,6 +292,12 @@
       "element_id": "process:dispatch-api",
       "attribute": "exposure",
       "basis": "The source states the control plane is not reachable from the internet, and places the dispatch API in it; the source states nothing about the API's own exposure."
+    },
+    {
+      "assumption": "The dispatch database is placed in the production control plane because the schema requires a zone; the source does not place it.",
+      "element_id": "store:dispatch-database",
+      "attribute": "trust_zone",
+      "basis": "The dispatch API, which runs in the control plane, reads and writes the database. Access does not entail co-location, and no statement locates the database; the value is a placement the schema requires, not a source-backed fact."
     }
   ]
 }
