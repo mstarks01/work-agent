@@ -51,7 +51,12 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 from analysis_service.analysis import states_a_protocol
-from analysis_service.system_model import DataFlow, SystemModel, make_element_id
+from analysis_service.system_model import (
+    DataFlow,
+    SystemModel,
+    make_element_id,
+    normalize_name,
+)
 from evals.harness.reference import GoldenCase
 
 #: What a pair rests on, in the order the rules run.
@@ -211,7 +216,7 @@ def align(case: GoldenCase, produced: SystemModel | None) -> Alignment:
     pairs: list[Pair] = []
     ambiguous: list[Ambiguity] = []
     _align_nodes(case, reference_ids, produced_ids, pairs, ambiguous)
-    _align_flows(case.model, produced, pairs, ambiguous)
+    _align_flows(case, produced, pairs, ambiguous)
     aligned = {pair.reference for pair in pairs}
     found = {pair.produced for pair in pairs}
     return Alignment(
@@ -271,12 +276,24 @@ def _nodes(element_ids: Iterable[str]) -> Iterable[str]:
 
 
 def _align_flows(
-    reference: SystemModel,
+    case: GoldenCase,
     produced: SystemModel,
     pairs: list[Pair],
     ambiguous: list[Ambiguity],
 ) -> None:
-    """Rules 3 and 4, over the endpoint pairs the node rules resolved."""
+    """Rules 3 and 4, over the endpoint pairs the node rules resolved.
+
+    A flow alias is another label a reader ruled supported for one blessed
+    flow, and it is read between the same aligned endpoints the label rule
+    reads: a produced flow there under the alias's label pairs as ``alias``,
+    with the reader's excerpt. It never reaches across endpoints, because a
+    flow under a ruled label between other elements is a different flow.
+    """
+    reference = case.model
+    aliased: dict[str, list[tuple[str, str]]] = defaultdict(list)
+    for alias in case.meta.aliases:
+        if element_type(alias.element) == "flow":
+            aliased[alias.element].append((normalize_name(alias.name), alias.excerpt))
     produced_of = {pair.reference: pair.produced for pair in pairs}
     theirs: dict[tuple[str, str], list[DataFlow]] = defaultdict(list)
     for flow in produced.data_flows:
@@ -293,11 +310,22 @@ def _align_flows(
         rest: list[DataFlow] = []
         for flow in reference_flows:
             found = by_label.pop(_label(flow), None)
-            if found is None:
-                rest.append(flow)
-            else:
+            if found is not None:
                 evidence: Evidence = "exact" if found.id == flow.id else "label"
                 pairs.append(Pair(flow.id, found.id, evidence))
+                continue
+            ruled = next(
+                (
+                    (by_label.pop(label), excerpt)
+                    for label, excerpt in aliased[flow.id]
+                    if label in by_label
+                ),
+                None,
+            )
+            if ruled is None:
+                rest.append(flow)
+            else:
+                pairs.append(Pair(flow.id, ruled[0].id, "alias", ruled[1]))
         _discriminate(rest, list(by_label.values()), pairs, ambiguous)
 
 
