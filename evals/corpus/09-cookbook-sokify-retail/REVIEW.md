@@ -115,6 +115,11 @@ Not part of the question, but the records cite these names, so you need them.
 - `process:catalogue-spreadsheet` — The marketing laptop and its spreadsheet sit in a separate office zone from the server-side systems. (basis: "The spreadsheet lives on a marketing laptop in the office", distinct from where the web API and SIMS are described as running.)
 - `store:user-database` — The user database holds confidential data under the scheme in prompts/extract.md. (basis: The source says it holds the customer's name, address, and the card they paid with, which is personal and payment data.)
 - `store:delivery-address-flat-file` — The delivery address file holds confidential data under the scheme in prompts/extract.md. (basis: The source says only delivery addresses go in the file. A postal address identifies where a named customer lives.)
+- `process:web-api` — The web API is placed in the Sokify internal systems zone because the schema requires a zone; the source names no network segment. (basis: Ownership, interaction and the absence of named segments do not establish shared network membership. The value is a placement the schema requires, not a source-backed fact.)
+- `process:sims` — SIMS is placed in the Sokify internal systems zone because the schema requires a zone; the source names no network segment. (basis: Ownership, interaction and the absence of named segments do not establish shared network membership. The value is a placement the schema requires, not a source-backed fact.)
+- `process:fax-gateway` — The fax gateway is placed in the Sokify internal systems zone because the schema requires a zone; the source names no network segment and does not say who operates it. (basis: Ownership, interaction and the absence of named segments do not establish shared network membership. The value is a placement the schema requires, not a source-backed fact.)
+- `store:user-database` — The user database is placed in the Sokify internal systems zone because the schema requires a zone; the source names no network segment. (basis: Ownership, interaction and the absence of named segments do not establish shared network membership. The value is a placement the schema requires, not a source-backed fact.)
+- `store:delivery-address-flat-file` — The delivery address flat file is placed in the Sokify internal systems zone because the schema requires a zone; the source places it only relative to SIMS. (basis: The source says the file is kept alongside SIMS, which is a relative placement, and SIMS itself has no established network zone. The value is a placement the schema requires, not a source-backed fact.)
 
 **Reviewed aliases** — other names a reader ruled identify the same element, each with the words in the source that support it. An extraction using one is named differently, not wrong.
 
@@ -448,7 +453,7 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "603873a0d569ba3f0ac4a91a363086b54bae022cf432862d17be9eec9465e4ea",
-      "model.json": "152086d9505edaf6d92d5924825e3813cca7fa8dfba73b54bc67378fab3c08b4",
+      "model.json": "6c6748b25157286d45b10d64d9a36a6370f55a7f4d9f3bcc43ad974489ca0c1e",
       "claims/asvs.json": "fa211c11c2a82bf649b5518b6d7120ece7720af93b570fdcfb1a56b15a0b0adb",
       "claims/stride.json": "33f48cb7d16f23f0d627279af76e3c66acdf37011ca3fbd319b9a9965af07c2a"
       }

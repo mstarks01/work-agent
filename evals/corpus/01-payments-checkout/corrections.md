@@ -36,3 +36,20 @@ follows one ruling, and `facts.json` changed with it.
 | 7 | `flow:order-service-to-receipt-archive:append-receipt.protocol` | `HTTPS` | `unknown` | "That is on TLS" establishes encryption, not the application protocol. TLS stays in `encryption_in_transit`. |
 | 8 | `flow:order-service-to-orders-db:read-write-orders.protocol` | `PostgreSQL wire protocol` | `unknown` | PostgreSQL names the database technology; the connection implementation is not stated. |
 | 9 | `flow:order-service-to-orders-db:read-write-orders.authentication` | `single shared application account ...` | `single application account ...` | One account used by one service does not establish that several principals hold it. |
+
+## Signing of 2026-09-16 (#961 step 3)
+
+The maintainer signed every row of `facts.json` in a session, ruling on each
+against `source.md`. Three zones were ruled placements the schema requires
+rather than facts the source states, and `model.json` records each as an
+assumption:
+
+| # | Path | Ruling |
+|---|---|---|
+| 10 | `process:storefront-api.trust_zone` | Internet exposure does not establish a DMZ or a separate network zone. |
+| 11 | `store:orders-db.trust_zone` | The service accessing the database does not establish that they share a network. |
+| 12 | `store:receipt-archive.trust_zone` | Writing to the bucket does not place it in the service's network. |
+
+The shopper and the card processor keep an inferred public-internet
+placement: it records participation from outside through the one
+internet-exposed endpoint, not a hosting location.

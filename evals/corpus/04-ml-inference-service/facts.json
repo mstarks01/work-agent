@@ -21,7 +21,7 @@
         "exclusive": false
       },
       "rationale": "Stated outright, with the reason.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -42,7 +42,7 @@
         "exclusive": false
       },
       "rationale": "Stated mechanism. The key's lifecycle is recorded on the credential below.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -63,7 +63,7 @@
         "exclusive": false
       },
       "rationale": "Keys are issued per calling team, so the team is the principal that holds one.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -89,7 +89,7 @@
         "exclusive": false
       },
       "rationale": "Per team. The reviewer decides whether a team counts as one principal; the scope records the granularity the source gives.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -104,7 +104,7 @@
         "exclusive": false
       },
       "rationale": "The registry's expiry predicate asks whether the credential stops working on its own. 'We have never expired one' reports the operator's past actions and settles no lifetime; model.json keeps that sentence in the flow's authentication text.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -119,7 +119,7 @@
         "exclusive": false
       },
       "rationale": "The source speaks about the keys' lifecycle and never mentions rotation.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -140,7 +140,7 @@
         "exclusive": false
       },
       "rationale": "An explicit absence, stated.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -161,7 +161,7 @@
         "exclusive": false
       },
       "rationale": "Stated placement.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -181,7 +181,7 @@
         "exclusive": false
       },
       "rationale": "'Meant to be reachable only from the gateway' is an intended restriction, not a statement about the server's reach. model.json holds exposure unknown with the intent in its notes.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -202,7 +202,7 @@
         "exclusive": false
       },
       "rationale": "Stated mechanism on the artifact load.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -222,15 +222,15 @@
         "exclusive": false
       },
       "rationale": "'I don't believe anything verifies' qualifies the claim, and 'we just trust the bucket' does not settle that no check exists. A produced catalog that writes absent has upgraded a hedge.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
         "subject_type": "interaction",
         "subject": "flow:model-server-to-redis-feature-store:read-features",
         "predicate": "authentication-mechanism",
-        "value": "absent",
-        "reason": null,
+        "value": "unknown",
+        "reason": "hedged",
         "scope": [],
         "basis": "stated",
         "quotes": [
@@ -242,8 +242,8 @@
         "explanation": "",
         "exclusive": false
       },
-      "rationale": "An explicit absence, stated: no password on Redis.",
-      "reviewed_by": null
+      "rationale": "'Redis has no password on it' establishes the absence of password authentication, not the absence of every mechanism, so the mechanism is unknown and the sentence is kept as the words spoken about it.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -257,14 +257,14 @@
         "quotes": [
           {
             "source_label": "System description",
-            "quote": "it is only reachable inside the model network"
+            "quote": "which the model server reads from a Redis feature store on the same network"
           }
         ],
         "explanation": "",
         "exclusive": false
       },
-      "rationale": "Stated placement.",
-      "reviewed_by": null
+      "rationale": "Stated: the store is on the same network as the model server, which the source places in the model network. Membership is established by that sentence; reachability alone would not establish it.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -285,23 +285,22 @@
         "exclusive": false
       },
       "rationale": "Stated reach. A store carries no exposure field, so this projects nowhere and is kept because the source states it.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
         "subject_type": "component",
         "subject": "store:model-registry-bucket",
         "predicate": "network-membership",
-        "value": "boundary:model-network",
-        "reason": null,
+        "value": "unknown",
+        "reason": "silent",
         "scope": [],
-        "basis": "inferred",
+        "basis": "stated",
         "quotes": [],
-        "explanation": "The model server, which the source places in the model network, loads artifacts from the bucket at startup; the source places the bucket nowhere.",
         "exclusive": false
       },
-      "rationale": "The source never places the bucket. model.json's assumption on the ML engineer says the registry 'is stated to sit in the model network'; it is not. See disputed.",
-      "reviewed_by": null
+      "rationale": "Loading artifacts from a bucket does not establish co-location. model.json's zone is a placement the schema requires, recorded in its assumption.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -316,7 +315,7 @@
         "exclusive": false
       },
       "rationale": "The source places neither the engineer nor the bucket, and publishing to a bucket does not locate the publisher. model.json's zone is a placement the schema requires, recorded as such in its assumption, and this row keeps it out of the required-fact denominator.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -332,39 +331,37 @@
         "exclusive": false
       },
       "rationale": "Two of the calling services are in a different cloud and the gateway is exposed to reach them.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
         "subject_type": "component",
         "subject": "process:inference-gateway",
         "predicate": "network-membership",
-        "value": "boundary:serving-edge",
-        "reason": null,
+        "value": "unknown",
+        "reason": "silent",
         "scope": [],
-        "basis": "inferred",
+        "basis": "stated",
         "quotes": [],
-        "explanation": "The gateway is the internet-exposed component and the model gives that tier its own zone.",
         "exclusive": false
       },
-      "rationale": "The source names no zone for the gateway; the serving edge is the model's tier for the exposed component.",
-      "reviewed_by": null
+      "rationale": "Internet exposure does not establish a separate serving-edge network. model.json's zone is a placement the schema requires, recorded in its assumption.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
         "subject_type": "component",
         "subject": "store:inference-log",
         "predicate": "network-membership",
-        "value": "boundary:serving-edge",
-        "reason": null,
+        "value": "unknown",
+        "reason": "silent",
         "scope": [],
-        "basis": "inferred",
+        "basis": "stated",
         "quotes": [],
-        "explanation": "The gateway writes the inference log, and the model places the gateway in the serving edge.",
         "exclusive": false
       },
-      "rationale": "The source never places the log; the gateway writes it.",
-      "reviewed_by": null
+      "rationale": "Writing to BigQuery does not place it in the gateway's network. model.json's zone is a placement the schema requires, recorded in its assumption.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -385,7 +382,7 @@
         "exclusive": false
       },
       "rationale": "The speaker is unsure: a hedged unknown with the words hedged.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -406,7 +403,7 @@
         "exclusive": false
       },
       "rationale": "'I think it is a shared group account' voices a value without stating it. A produced catalog that writes shared here has upgraded a hedge.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -425,18 +422,18 @@
             "value": "write"
           }
         ],
-        "basis": "stated",
+        "basis": "inferred",
         "quotes": [
           {
             "source_label": "System description",
             "quote": "ML engineers publish new model artifacts to the registry bucket."
           }
         ],
-        "explanation": "",
+        "explanation": "Publishing supports an effective permission held by ML engineers; the grant itself is not stated.",
         "exclusive": false
       },
-      "rationale": "The grant the source states, to the registry bucket.",
-      "reviewed_by": null
+      "rationale": "Inferred: the source states that ML engineers publish, which supports an effective permission; an authorization grant is not stated.",
+      "reviewed_by": "mstarks01"
     }
   ],
   "disputed": []

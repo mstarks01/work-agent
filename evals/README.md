@@ -42,13 +42,16 @@ the case (ADR 24).
 `tests/test_case_review.py` fails a new case that arrives without a sitting, and
 fails a read file that changes under its recorded digest.
 
-**The reference facts are drafts.** Five cases carry a `facts.json`, one row per
-fact the sources state, in the shape the assertion node proposes, plus the
-blessed values the drafter disputes. An agent drafted every row, and no row is
-signed; `tests/test_reference_facts.py` skips its gate while one is unsigned.
-`python evals/verify_corpus.py` prints how many rows each file holds and how
-many are unsigned. Until a person signs them, no required-fact recall or
-unsupported-assertion figure exists (`BLESSING.md` step 7).
+**Five cases carry signed reference facts.** Cases 01, 04, 09, 11 and 13 carry a
+`facts.json`, one row per fact the sources state, in the shape the assertion
+node proposes. An agent drafted every row, and the maintainer ruled on each
+against the source and signed it on 2026-09-16; the rulings and the model
+values they changed are in each case's `corrections.md`. A zone the schema
+requires and the source never gives reads `unknown` there, so a producer's
+placement is not graded as a fact. `python evals/verify_corpus.py` prints how
+many rows each file holds and how many are unsigned, and
+`tests/test_reference_facts.py` skips its gate for any case with an unsigned
+row (`BLESSING.md` step 7).
 
 So every agreement figure the suite produces is **self-consistency, not
 accuracy**: it measures how closely a rule reproduces the recorded

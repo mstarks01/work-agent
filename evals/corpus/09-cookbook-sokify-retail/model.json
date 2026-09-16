@@ -335,6 +335,36 @@
       "element_id": "store:delivery-address-flat-file",
       "attribute": "data_classification",
       "basis": "The source says only delivery addresses go in the file. A postal address identifies where a named customer lives."
+    },
+    {
+      "assumption": "The web API is placed in the Sokify internal systems zone because the schema requires a zone; the source names no network segment.",
+      "element_id": "process:web-api",
+      "attribute": "trust_zone",
+      "basis": "Ownership, interaction and the absence of named segments do not establish shared network membership. The value is a placement the schema requires, not a source-backed fact."
+    },
+    {
+      "assumption": "SIMS is placed in the Sokify internal systems zone because the schema requires a zone; the source names no network segment.",
+      "element_id": "process:sims",
+      "attribute": "trust_zone",
+      "basis": "Ownership, interaction and the absence of named segments do not establish shared network membership. The value is a placement the schema requires, not a source-backed fact."
+    },
+    {
+      "assumption": "The fax gateway is placed in the Sokify internal systems zone because the schema requires a zone; the source names no network segment and does not say who operates it.",
+      "element_id": "process:fax-gateway",
+      "attribute": "trust_zone",
+      "basis": "Ownership, interaction and the absence of named segments do not establish shared network membership. The value is a placement the schema requires, not a source-backed fact."
+    },
+    {
+      "assumption": "The user database is placed in the Sokify internal systems zone because the schema requires a zone; the source names no network segment.",
+      "element_id": "store:user-database",
+      "attribute": "trust_zone",
+      "basis": "Ownership, interaction and the absence of named segments do not establish shared network membership. The value is a placement the schema requires, not a source-backed fact."
+    },
+    {
+      "assumption": "The delivery address flat file is placed in the Sokify internal systems zone because the schema requires a zone; the source places it only relative to SIMS.",
+      "element_id": "store:delivery-address-flat-file",
+      "attribute": "trust_zone",
+      "basis": "The source says the file is kept alongside SIMS, which is a relative placement, and SIMS itself has no established network zone. The value is a placement the schema requires, not a source-backed fact."
     }
   ]
 }

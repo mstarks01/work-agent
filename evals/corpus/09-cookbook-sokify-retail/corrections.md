@@ -137,3 +137,23 @@ follows one ruling, and `facts.json` changed with it.
 | # | Path | Before | After | Ruling |
 |---|---|---|---|---|
 | 6 | `flow:catalogue-spreadsheet-to-web-api:sql-statements.operations` | `read-write` | `write` | The macros change prices and product copy, which are writes. Reading is not stated. The value describes the supported operations, not proof the interface cannot read. |
+
+## Signing of 2026-09-16 (#961 step 3)
+
+The maintainer signed every row of `facts.json` in a session, ruling on each
+against `source.md`. Five zones were ruled placements the schema requires
+rather than facts the source states, and `model.json` records each as an
+assumption:
+
+| # | Path | Ruling |
+|---|---|---|
+| 7 | `process:web-api.trust_zone` | Ownership, interaction and the absence of named segments do not establish shared network membership. |
+| 8 | `process:sims.trust_zone` | The same. |
+| 9 | `process:fax-gateway.trust_zone` | The same, and the source does not say who operates the gateway. |
+| 10 | `store:user-database.trust_zone` | The same. |
+| 11 | `store:delivery-address-flat-file.trust_zone` | "Kept alongside SIMS" is a relative placement that survives; SIMS itself has no established zone. |
+
+The customer and the mobile app keep an inferred customer-device placement
+as an execution context, not a stated network segment. The web API's
+internet exposure stays inferred: customers use the mobile app to access the
+online shop through its web API, and HTTP alone establishes no exposure.

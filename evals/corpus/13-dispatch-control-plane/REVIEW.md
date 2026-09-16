@@ -126,6 +126,9 @@ Not part of the question, but the records cite these names, so you need them.
 
 - `process:dispatch-api` — The dispatch API is not reachable from the internet. (basis: The source states the control plane is not reachable from the internet, and places the dispatch API in it; the source states nothing about the API's own exposure.)
 - `store:dispatch-database` — The dispatch database is placed in the production control plane because the schema requires a zone; the source does not place it. (basis: The dispatch API, which runs in the control plane, reads and writes the database. Access does not entail co-location, and no statement locates the database; the value is a placement the schema requires, not a source-backed fact.)
+- `store:schedule-archive` — The schedule archive is placed on the corporate network because the schema requires a zone; the source states a folder on the corporate file store. (basis: 'A folder on the corporate file store' establishes affiliation and the folder-on-file-store relationship, not placement on the corporate network. The value is a placement the schema requires, not a source-backed fact.)
+- `process:corporate-web-host` — The corporate web host is placed on the corporate network because the schema requires a zone; the source does not place it. (basis: 'Our corporate web host' does not establish network location. The value is a placement the schema requires, not a source-backed fact.)
+- `entity:scheduling-partner` — The scheduling partner is placed in a partner platform zone because the schema requires a zone; the source states only that it is another company. (basis: Another company establishes an ownership boundary, not a network placement. The value is a placement the schema requires, not a source-backed fact.)
 
 **Reviewed aliases** — other names a reader ruled identify the same element, each with the words in the source that support it. An extraction using one is named differently, not wrong.
 
@@ -436,7 +439,7 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
-      "model.json": "bfb025e066ae89e84576a81a35150cab6ccbbc76be95c3781e3b1487acfbca4d",
+      "model.json": "8bf208f98e3e38a99809426a5e5c946658b9944cc602a4bcba63dcb7c9910922",
       "claims/asvs.json": "21223b93d65a21e5b8de043940250783cfd9408246e5c1825bef5b8cf4c3ec45",
       "claims/stride.json": "07a43e4387e0f3d490edbdf732259e37957f4a09394d4e23e5203fca2d4558f3"
       }
