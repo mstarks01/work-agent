@@ -25,6 +25,7 @@ from dataclasses import dataclass
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from analysis_service.assertions import AssertionCatalog
 from analysis_service.system_model import SystemModel
 
 __all__ = [
@@ -101,9 +102,9 @@ class Rule:
     rule_id: str
     lane: str
     question: str
-    find: Callable[[SystemModel], Iterator[Match]]
+    find: Callable[[SystemModel, AssertionCatalog], Iterator[Match]]
 
-    def fire(self, model: SystemModel) -> list[Candidate]:
+    def fire(self, model: SystemModel, catalog: AssertionCatalog) -> list[Candidate]:
         """Every candidate this rule produces for this model, in model order."""
         return [
             Candidate(
@@ -112,12 +113,15 @@ class Rule:
                 element_ids=element_ids,
                 facts=facts,
             )
-            for element_ids, facts in self.find(model)
+            for element_ids, facts in self.find(model, catalog)
         ]
 
 
 def generate_candidates(
-    model: SystemModel, lanes: Sequence[str], rules: Sequence[Rule]
+    model: SystemModel,
+    lanes: Sequence[str],
+    rules: Sequence[Rule],
+    catalog: AssertionCatalog | None = None,
 ) -> dict[str, CandidateSet]:
     """One package's rules evaluated against the model, grouped into its lanes.
 
@@ -125,15 +129,28 @@ def generate_candidates(
     empty candidate set is the honest statement that deterministic analysis
     surfaced no structural lead here, and it is a different thing from a lane
     that was never offered any.
+
+    **A rule reads the graph and the catalog, because some facts are in only
+    one of them.** Ten of the sixteen predicates project into no graph
+    attribute, so a rule that took the model alone could never see a second
+    factor, a grant or a rotation — the facts the assertion layer exists to
+    capture. A rule still decides for itself whether it reads the catalog, and
+    most read only the graph.
+
+    ``catalog`` of ``None`` is a job whose deployment ran no assertion pass. It
+    becomes an empty catalog here rather than in each rule, so "no pass ran"
+    and "the pass found nothing" reach a rule as the same thing — which they
+    are, to a rule — and no rule carries a branch for it.
     """
-    return {lane: _candidate_set(lane, model, rules) for lane in lanes}
+    held = catalog if catalog is not None else AssertionCatalog()
+    return {lane: _candidate_set(lane, model, rules, held) for lane in lanes}
 
 
 def _candidate_set(
-    lane: str, model: SystemModel, rules: Sequence[Rule]
+    lane: str, model: SystemModel, rules: Sequence[Rule], catalog: AssertionCatalog
 ) -> CandidateSet:
     in_lane = [rule for rule in rules if rule.lane == lane]
-    fired = [candidate for rule in in_lane for candidate in rule.fire(model)]
+    fired = [candidate for rule in in_lane for candidate in rule.fire(model, catalog)]
     return CandidateSet(
         lane=lane,
         questions={

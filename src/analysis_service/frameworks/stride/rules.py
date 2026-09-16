@@ -1,4 +1,4 @@
-"""STRIDE's eleven deterministic candidate rules.
+"""STRIDE's twelve deterministic candidate rules.
 
 A **Candidate** is not a finding. It is a mechanically evaluated condition over
 the validated System Model — "this flow crosses a trust boundary and its
@@ -26,7 +26,7 @@ The representation is deliberately small. It is a tuple of
 lane it belongs to, the question it puts to that agent, and a plain function
 from model to matches. There is no rule DSL, no condition tree and no engine,
 because the thing a maintainer needs to do most often is read one rule and
-decide whether it is right, and a table of eleven functions is the
+decide whether it is right, and a table of twelve functions is the
 representation that makes that cheapest. Adding a rule means writing a function
 and appending to :data:`RULES`.
 
@@ -55,6 +55,7 @@ from analysis_service.analysis import (
     sensitive_assets,
     zone_kinds,
 )
+from analysis_service.assertions import ABSENT, AssertionCatalog, answer
 from analysis_service.candidates import Match, Rule, clip_fact
 from analysis_service.system_model import SystemModel
 
@@ -92,7 +93,9 @@ _clip = clip_fact
 # --- Spoofing ---------------------------------------------------------------
 
 
-def _unverified_boundary_auth(model: SystemModel) -> Iterator[Match]:
+def _unverified_boundary_auth(
+    model: SystemModel, catalog: AssertionCatalog
+) -> Iterator[Match]:
     crossing_ids = crossing_flow_ids(model)
     zones = {crossing.flow_id: crossing for crossing in model.boundary_crossings()}
     for flow in model.data_flows:
@@ -111,7 +114,9 @@ def _unverified_boundary_auth(model: SystemModel) -> Iterator[Match]:
         )
 
 
-def _unverified_external_caller(model: SystemModel) -> Iterator[Match]:
+def _unverified_external_caller(
+    model: SystemModel, catalog: AssertionCatalog
+) -> Iterator[Match]:
     external = {
         entity.id
         for entity in model.external_entities
@@ -130,10 +135,55 @@ def _unverified_external_caller(model: SystemModel) -> Iterator[Match]:
         )
 
 
+def _second_factor_stated_absent(
+    model: SystemModel, catalog: AssertionCatalog
+) -> Iterator[Match]:
+    """A flow the sources say needs no second factor.
+
+    **The first rule here that reads the catalog, and it has to.**
+    ``mfa-requirement`` projects into no graph attribute, so the fact reaches a
+    reader as a row or not at all: a flow whose ``authentication`` reads
+    ``"session cookie"`` is a stated control on every graph reading of it, and
+    that the submitter also said there is no second factor is nowhere in the
+    model. That is the substitution #926 was opened for — an explicit lack of
+    MFA becoming a control — and it is a spoofing lead rather than a report of
+    a contradiction, because the two facts agree: there is one factor.
+
+    It asks :func:`~analysis_service.assertions.answer` rather than walking the
+    rows, so which rows count is ``settled``'s rule and not a second one here.
+    An absence is a positive claim about the world, so ``basis`` rides in the
+    facts: what the source stated and what this service inferred are different
+    leads, and the agent sees which it has.
+
+    **It fires only where the subject is a flow.** ``mfa-requirement`` also
+    takes a principal, and a principal is not an element, so a row about one
+    reaches no candidate — a candidate names elements. That is the measured
+    common case rather than an edge: over 15 archived proposal/graph pairs, 15
+    of 18 MFA rows sat on the principal ``shopper accounts`` and 3 on a flow.
+    Placing the other 15 needs a ruling that aligns a principal to an entity,
+    which is a separate change to the resolver and not a branch here.
+    """
+    for flow in model.data_flows:
+        held = answer(catalog, flow.id, "mfa-requirement").holding(ABSENT)
+        if not held:
+            continue
+        yield (
+            (flow.id, flow.source, flow.destination),
+            {
+                "authentication": _clip(flow.authentication),
+                "authentication_state": control_state(flow.authentication),
+                "second_factor": ABSENT,
+                "second_factor_basis": held[0].basis,
+            },
+        )
+
+
 # --- Tampering --------------------------------------------------------------
 
 
-def _unprotected_transit_crossing(model: SystemModel) -> Iterator[Match]:
+def _unprotected_transit_crossing(
+    model: SystemModel, catalog: AssertionCatalog
+) -> Iterator[Match]:
     crossing_ids = crossing_flow_ids(model)
     for flow in model.data_flows:
         if flow.id not in crossing_ids or not is_unverified(flow.encryption_in_transit):
@@ -149,7 +199,9 @@ def _unprotected_transit_crossing(model: SystemModel) -> Iterator[Match]:
         )
 
 
-def _unverified_write_to_store(model: SystemModel) -> Iterator[Match]:
+def _unverified_write_to_store(
+    model: SystemModel, catalog: AssertionCatalog
+) -> Iterator[Match]:
     """A store an unverified caller may write, by the flow's own ``operations``.
 
     A :class:`~analysis_service.system_model.DataFlow`'s direction is who
@@ -199,7 +251,9 @@ def _unverified_write_to_store(model: SystemModel) -> Iterator[Match]:
 # --- Repudiation ------------------------------------------------------------
 
 
-def _unattributable_action(model: SystemModel) -> Iterator[Match]:
+def _unattributable_action(
+    model: SystemModel, catalog: AssertionCatalog
+) -> Iterator[Match]:
     """Unverified callers writing into an element that holds a graded asset."""
     by_id = {element.id: element for element in model.elements()}
     for flow in model.data_flows:
@@ -222,7 +276,9 @@ def _unattributable_action(model: SystemModel) -> Iterator[Match]:
 # --- Information disclosure -------------------------------------------------
 
 
-def _unprotected_sensitive_transit(model: SystemModel) -> Iterator[Match]:
+def _unprotected_sensitive_transit(
+    model: SystemModel, catalog: AssertionCatalog
+) -> Iterator[Match]:
     """An unprotected flow whose own tags, or whose endpoints', name an asset.
 
     **The flow's own ``assets`` are read first, because they are the closest
@@ -262,7 +318,9 @@ def _unprotected_sensitive_transit(model: SystemModel) -> Iterator[Match]:
         )
 
 
-def _store_at_rest_unverified(model: SystemModel) -> Iterator[Match]:
+def _store_at_rest_unverified(
+    model: SystemModel, catalog: AssertionCatalog
+) -> Iterator[Match]:
     for store in model.data_stores:
         if not is_unverified(store.encryption_at_rest):
             continue
@@ -280,7 +338,9 @@ def _store_at_rest_unverified(model: SystemModel) -> Iterator[Match]:
 # --- Denial of service ------------------------------------------------------
 
 
-def _internet_exposed_process(model: SystemModel) -> Iterator[Match]:
+def _internet_exposed_process(
+    model: SystemModel, catalog: AssertionCatalog
+) -> Iterator[Match]:
     for process in internet_exposed_elements(model):
         yield (
             (process.id,),
@@ -292,7 +352,9 @@ def _internet_exposed_process(model: SystemModel) -> Iterator[Match]:
         )
 
 
-def _shared_dependency(model: SystemModel) -> Iterator[Match]:
+def _shared_dependency(
+    model: SystemModel, catalog: AssertionCatalog
+) -> Iterator[Match]:
     """Elements several distinct callers flow into: one stall stalls them all."""
     for element in model.elements():
         flows = inbound_flows(model, element.id)
@@ -312,7 +374,9 @@ def _shared_dependency(model: SystemModel) -> Iterator[Match]:
 # --- Elevation of privilege -------------------------------------------------
 
 
-def _privilege_zone_crossing(model: SystemModel) -> Iterator[Match]:
+def _privilege_zone_crossing(
+    model: SystemModel, catalog: AssertionCatalog
+) -> Iterator[Match]:
     """Crossings that change authority, and which way the flow runs.
 
     One candidate per crossing at most. A flow leaving one tenant zone for
@@ -357,7 +421,9 @@ def _privilege_zone_crossing(model: SystemModel) -> Iterator[Match]:
         )
 
 
-def _inbound_from_exposed_process(model: SystemModel) -> Iterator[Match]:
+def _inbound_from_exposed_process(
+    model: SystemModel, catalog: AssertionCatalog
+) -> Iterator[Match]:
     """What an internet-facing process can command in another zone.
 
     The structural half of a foothold: whoever holds the exposed process holds
@@ -400,6 +466,16 @@ RULES: tuple[Rule, ...] = (
             " party, and what does the receiver do with the events?"
         ),
         find=_unverified_external_caller,
+    ),
+    Rule(
+        rule_id="spoofing-second-factor-stated-absent",
+        lane="spoofing",
+        question=(
+            "The sources say this interaction needs no second factor, and the"
+            " graph shows the one it does use. What can an attacker who holds"
+            " that single factor do, and what would a second one have stopped?"
+        ),
+        find=_second_factor_stated_absent,
     ),
     Rule(
         rule_id="tampering-unprotected-transit-crossing",

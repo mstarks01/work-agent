@@ -7,11 +7,13 @@ candidate is a lead, and nothing downstream can turn one into a finding.
 
 import pytest
 
+from analysis_service.assertions import ABSENT, Assertion, AssertionCatalog, Subject
 from analysis_service.candidates import Candidate, generate_candidates
 from analysis_service.claims import Ground
 from analysis_service.frameworks.stride import STRIDE
 from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
 from analysis_service.system_model import (
+    UNKNOWN,
     DataFlow,
     DataStore,
     ExternalEntity,
@@ -27,14 +29,20 @@ from analysis_service.system_model import (
 RULES = STRIDE.rules
 
 
-def candidates(model) -> dict:
+RULE = "spoofing-second-factor-stated-absent"
+
+
+def candidates(model, catalog=None) -> dict:
     """Every STRIDE lane's candidate set for one model.
 
     The one place this suite binds the neutral engine to STRIDE's own lanes and
     rules, so a test below reads the way it did before the engine stopped
     knowing which framework it was firing for.
+
+    ``catalog`` defaults to none, which is a job whose deployment ran no
+    assertion pass — the shape almost every test here is about.
     """
-    return generate_candidates(model, STRIDE.lanes, RULES)
+    return generate_candidates(model, STRIDE.lanes, RULES, catalog)
 
 
 def flow(source, destination, label, **overrides):
@@ -159,10 +167,10 @@ def model():
     )
 
 
-def fired(model, rule_id):
+def fired(model, rule_id, catalog=None):
     return [
         candidate
-        for candidate_set in candidates(model).values()
+        for candidate_set in candidates(model, catalog).values()
         for candidate in candidate_set.candidates
         if candidate.rule_id == rule_id
     ]
@@ -407,3 +415,99 @@ class TestCandidatesAreNotFindings:
             if "from analysis_service.candidates import" in path.read_text()
         }
         assert importers == {"coverage.py", "fan_in.py", "graph.py"}
+
+
+class TestTheRuleThatReadsTheCatalog:
+    """`spoofing-second-factor-stated-absent`: the first rule to read a row.
+
+    It exists because `mfa-requirement` projects into no graph attribute, so
+    the fact reaches a reader as a row or not at all. Its edges are where the
+    value is: what it must *not* fire on decides whether the lead means
+    anything.
+    """
+
+    FLOW = "flow:entity:customer>process:api>submit"
+
+    def catalog_of(self, value, *, subject=None, basis="stated", predicate=None):
+        subject = subject or self.FLOW
+        return AssertionCatalog(
+            subjects=[
+                Subject(
+                    id=subject,
+                    type="interaction" if subject.startswith("flow:") else "principal",
+                    label="submit",
+                )
+            ],
+            entries=[
+                Assertion(
+                    subject=subject,
+                    predicate=predicate or "mfa-requirement",
+                    value=value,
+                    basis=basis,
+                    explanation="the description names one factor",
+                )
+            ],
+        )
+
+    def test_it_fires_on_a_stated_absence(self, model):
+        hits = fired(model, RULE, self.catalog_of(ABSENT))
+        assert [hit.element_ids[0] for hit in hits] == [self.FLOW]
+
+    def test_it_carries_the_basis_so_an_inference_is_visible(self, model):
+        """An absence is a positive claim, and who made it changes the lead."""
+        hits = fired(model, RULE, self.catalog_of(ABSENT, basis="inferred"))
+        assert hits[0].facts["second_factor_basis"] == "inferred"
+
+    def test_a_required_second_factor_does_not_fire(self, model):
+        assert fired(model, RULE, self.catalog_of("required")) == []
+
+    def test_an_unknown_does_not_fire(self, model):
+        """Silence about a second factor is not a stated absence."""
+        assert (
+            fired(
+                model,
+                RULE,
+                AssertionCatalog(
+                    subjects=[
+                        Subject(id=self.FLOW, type="interaction", label="submit")
+                    ],
+                    entries=[
+                        Assertion(
+                            subject=self.FLOW,
+                            predicate="mfa-requirement",
+                            value=UNKNOWN,
+                            basis="stated",
+                            reason="silent",
+                        )
+                    ],
+                ),
+            )
+            == []
+        )
+
+    def test_no_catalog_fires_nothing(self, model):
+        """Every job on a deployment that has not set the flag."""
+        assert fired(model, RULE) == []
+
+    def test_a_row_on_a_principal_reaches_no_candidate(self, model):
+        """A candidate names elements, and a principal is not one.
+
+        The measured common case rather than an edge: 15 of 18 archived MFA
+        rows sat on a principal. Placing those needs a ruling in the resolver.
+        """
+        held = self.catalog_of(ABSENT, subject="principal:shopper-accounts")
+        assert fired(model, RULE, held) == []
+
+    def test_another_predicate_on_the_same_flow_does_not_fire_it(self, model):
+        """The query is per subject *and* per predicate."""
+        held = self.catalog_of(ABSENT, predicate="credential-rotation")
+        assert fired(model, RULE, held) == []
+
+    def test_the_graph_rules_are_indifferent_to_the_catalog(self, model):
+        """Widening `Rule` moved no existing rule's behaviour."""
+        without = {c.rule_id for c in candidates(model)["spoofing"].candidates}
+        with_rows = {
+            c.rule_id
+            for c in candidates(model, self.catalog_of(ABSENT))["spoofing"].candidates
+        }
+        assert with_rows - without == {RULE}

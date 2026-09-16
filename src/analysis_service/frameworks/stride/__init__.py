@@ -72,6 +72,12 @@ NOTES: dict[str, tuple[str, ...]] = {
     "identity-at-a-boundary": (
         "spoofing-unverified-boundary-auth",
         "spoofing-unverified-external-caller",
+        # A stated absence of a second factor is this note's subject twice
+        # over: its "credential versus identity" paragraph is about what one
+        # factor proves, and its guardrail already separates an unknown
+        # control from a stated absence, which is the distinction the rule
+        # fires on.
+        "spoofing-second-factor-stated-absent",
     ),
     "callback-and-webhook-trust": ("spoofing-unverified-external-caller",),
     "transport-protection": (
@@ -98,6 +104,11 @@ CASES: dict[str, tuple[str, ...]] = {
         "spoofing-unverified-boundary-auth",
         "information-disclosure-store-at-rest-unverified",
         "tampering-unprotected-transit-crossing",
+        # The case teaches the reading the rule depends on. A row saying no
+        # second factor is required is a stated absence, so the threat is not
+        # conditional — which is the half of this case an agent gets wrong in
+        # the other direction.
+        "spoofing-second-factor-stated-absent",
     ),
     "stated-control-outside-the-model": (
         "spoofing-unverified-boundary-auth",
