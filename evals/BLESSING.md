@@ -532,6 +532,16 @@ predicate, a value, a scope, a basis and the quotes that carry it — and a
 not establishing. An agent drafts both, and `drafted_by` says so. Nothing
 in the file is a reference until a person rules on it.
 
+The file may also carry `aliases`: under `subjects`, other names a produced
+row may use for a principal, a credential or an artifact the reference names
+(an element's aliases stay in `case.json`); under `qualifiers`, other
+spellings of one scope value, by kind. Each ruling carries `names`, a
+`ruling` in words and `reviewed_by`. The replay rewrites a produced row's
+subject, a value that points at an aliased subject, and each scope qualifier
+to the reference's spelling before it compares the rows, and only where the
+alias is signed. A produced row on a subject nobody ruled an alias for reads
+`unreviewed`, never `found`.
+
 Read the source, then rule on each row: does the source state this, about
 this subject, at this scope, with this basis? Write your GitHub login into
 the row's `reviewed_by` where it does. Correct the row first where it does

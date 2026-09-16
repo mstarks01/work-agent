@@ -51,17 +51,30 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Final, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from analysis_service.assertions import (
+    GRAPH_BOUND,
+    SUBJECT_PREFIXES,
     AssertionCatalog,
     AssertionProposal,
     CatalogProposal,
+    QualifierKind,
     catalog_issues,
     resolve_catalog,
+    subject_id,
 )
 from analysis_service.system_model import SystemModel
 from evals.harness.reference import CorpusError
+
+#: The ID prefixes of the graph-bound subject types, whose aliases are the
+#: case's element aliases, and of the layer's own, which this file may alias.
+GRAPH_BOUND_PREFIXES: frozenset[str] = frozenset().union(
+    *(SUBJECT_PREFIXES[kind] for kind in GRAPH_BOUND)
+)
+OWN_PREFIXES: frozenset[str] = frozenset().union(
+    *(SUBJECT_PREFIXES[kind] for kind in SUBJECT_PREFIXES if kind not in GRAPH_BOUND)
+)
 
 #: The file a case carries its reference facts in, beside ``model.json``.
 FACTS_FILE = "facts.json"
@@ -122,6 +135,78 @@ class Dispute(BaseModel):
     reviewed_by: str | None = None
 
 
+class SubjectAlias(BaseModel):
+    """Other names a produced row may carry for one of the layer's own subjects.
+
+    The counterpart of a case's element aliases, for a principal, a credential
+    or an artifact: a subject the model names in words, whose ID is the slug
+    of whatever it wrote. ``subject`` is the reference's own ID, and each of
+    ``names`` slugs to another ID a reviewer rules names the same thing. A
+    signed alias rewrites a produced row's subject, and a reference value
+    that points at the subject, to the reference's spelling before the rows
+    are compared; an unsigned one is a draft and rewrites nothing.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    subject: str = Field(min_length=1)
+    names: list[str] = Field(min_length=1)
+    ruling: str = Field(min_length=1)
+    reviewed_by: str | None = None
+
+    @field_validator("subject")
+    @classmethod
+    def _own_subject(cls, value: str) -> str:
+        prefix = value.split(":", 1)[0]
+        if prefix in GRAPH_BOUND_PREFIXES:
+            raise ValueError(
+                f"{value!r} is an element; an element alias belongs in case.json"
+            )
+        if prefix not in OWN_PREFIXES:
+            raise ValueError(f"{value!r} names no subject type")
+        return value
+
+    @property
+    def subject_type(self) -> str:
+        return self.subject.split(":", 1)[0]
+
+    @property
+    def alias_ids(self) -> list[str]:
+        """The IDs the names slug to, through the resolver's own subject rule."""
+        return [subject_id(self.subject_type, name) for name in self.names]
+
+
+class QualifierAlias(BaseModel):
+    """Other spellings a produced scope qualifier may carry for one reference value.
+
+    A qualifier holds free text a model wrote, and its key is a digest of the
+    normalized text, so ``read-write`` and ``read and write`` are two scopes.
+    A signed alias rewrites the produced spelling to the reference's before
+    the scopes are compared.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    kind: QualifierKind
+    value: str = Field(min_length=1)
+    names: list[str] = Field(min_length=1)
+    ruling: str = Field(min_length=1)
+    reviewed_by: str | None = None
+
+
+class ReferenceAliases(BaseModel):
+    """The alias rulings a case's reference carries, for subjects and scopes."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    subjects: list[SubjectAlias] = Field(default_factory=list)
+    qualifiers: list[QualifierAlias] = Field(default_factory=list)
+
+    @property
+    def entries(self) -> list[SubjectAlias | QualifierAlias]:
+        return [*self.subjects, *self.qualifiers]
+
+
 class ReferenceFacts(BaseModel):
     """One case's reference facts and its disputed values, as drafted or signed."""
 
@@ -131,6 +216,11 @@ class ReferenceFacts(BaseModel):
     drafted_by: Literal["agent-stand-in"] = DRAFTER
     rows: list[FactRow] = Field(min_length=1)
     disputed: list[Dispute] = Field(default_factory=list)
+    aliases: ReferenceAliases = Field(default_factory=ReferenceAliases)
+
+    @property
+    def unsigned_aliases(self) -> int:
+        return sum(entry.reviewed_by is None for entry in self.aliases.entries)
 
 
 def facts_path(case_dir: Path) -> Path:

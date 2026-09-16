@@ -493,5 +493,75 @@
       "reviewed_by": "mstarks01"
     }
   ],
-  "disputed": []
+  "disputed": [],
+  "aliases": {
+    "subjects": [
+      {
+        "subject": "principal:application-account",
+        "names": [
+          "single application account"
+        ],
+        "ruling": "The source says 'a single application account'; the model keeps the count word in the name. One account.",
+        "reviewed_by": null
+      },
+      {
+        "subject": "principal:anything-that-can-reach-the-order-service",
+        "names": [
+          "anything that can reach the service",
+          "anything that can reach it"
+        ],
+        "ruling": "The source says 'the order service accepts anything that can reach it'; the three spellings name the same open set of callers.",
+        "reviewed_by": null
+      },
+      {
+        "subject": "principal:order-service",
+        "names": [
+          "order service's own service account"
+        ],
+        "ruling": "The receipt write is 'with the order service's own service account'; the account is the identity the order service acts under, and the source names no other principal for it.",
+        "reviewed_by": null
+      },
+      {
+        "subject": "credential:application-account-password",
+        "names": [
+          "password"
+        ],
+        "ruling": "The source names one password, the application account's, and 'the password' in the text refers to it.",
+        "reviewed_by": null
+      }
+    ],
+    "qualifiers": [
+      {
+        "kind": "resource",
+        "value": "orders-db",
+        "names": [
+          "orders db"
+        ],
+        "ruling": "The store's ID with and without the hyphen.",
+        "reviewed_by": null
+      },
+      {
+        "kind": "operation",
+        "value": "read-write",
+        "names": [
+          "read/write",
+          "read and write"
+        ],
+        "ruling": "The source says 'full read/write'; the three spellings are one grant.",
+        "reviewed_by": null
+      },
+      {
+        "kind": "operation",
+        "value": "submit order",
+        "names": [
+          "submit orders",
+          "call",
+          "gRPC call",
+          "gRPC calls"
+        ],
+        "ruling": "The order service takes one operation, the order submitted over gRPC; a spelling that names the transport names the same operation.",
+        "reviewed_by": null
+      }
+    ]
+  }
 }
