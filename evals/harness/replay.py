@@ -374,17 +374,35 @@ def unsigned_rows(corpus_dir: Path, case: GoldenCase) -> int | None:
 
 
 @dataclass(frozen=True)
+class AliasTarget:
+    """What a signed subject alias rewrites to, and under which produced subjects.
+
+    ``within`` bounds the rewrite of a *value* that names the alias: empty
+    means under any produced subject. A produced row whose own subject is
+    the alias is rewritten whatever its context, because the row is about
+    the thing itself.
+    """
+
+    subject: str
+    within: frozenset[str] = frozenset()
+
+    def applies_under(self, produced_subject: str) -> bool:
+        return not self.within or produced_subject in self.within
+
+
+@dataclass(frozen=True)
 class SignedReference:
     """A case's signed reference catalog and the alias rulings signed beside it.
 
-    ``subject_aliases`` maps an alias subject ID to the reference's own, and
-    ``qualifier_aliases`` maps a qualifier's kind and normalized alias
-    spelling to the reference's value. Only a signed alias is in either map:
-    an unsigned one is a draft, and a draft rewrites nothing.
+    ``subject_aliases`` maps an alias subject ID to the reference's own and
+    the context it holds under, and ``qualifier_aliases`` maps a qualifier's
+    kind and normalized alias spelling to the reference's value. Only a
+    signed alias is in either map: an unsigned one is a draft, and a draft
+    rewrites nothing.
     """
 
     catalog: AssertionCatalog
-    subject_aliases: Mapping[str, str] = field(default_factory=dict)
+    subject_aliases: Mapping[str, AliasTarget] = field(default_factory=dict)
     qualifier_aliases: Mapping[tuple[str, str], str] = field(default_factory=dict)
 
     @property
@@ -405,7 +423,7 @@ def signed_reference(corpus_dir: Path, case: GoldenCase) -> SignedReference | No
     return SignedReference(
         catalog=reference_catalog(facts, case.model, sources),
         subject_aliases={
-            alias_id: ruling.subject
+            alias_id: AliasTarget(ruling.subject, frozenset(ruling.within))
             for ruling in facts.aliases.subjects
             if ruling.reviewed_by is not None
             for alias_id in ruling.alias_ids
@@ -425,22 +443,24 @@ def under_aliases(produced: Assertion, reference: SignedReference) -> Assertion:
     The one place an alias is applied, before any comparison: the subject,
     a value that points at one of the layer's own subjects, and each scope
     qualifier are each rewritten to the reference's spelling where a signed
-    ruling names the produced one. Everything else is left as written.
+    ruling names the produced one. A value is rewritten only under the
+    produced subjects the ruling holds for. Everything else is left as
+    written.
     """
     predicate = REGISTRY[produced.predicate]
     refers_to_own = predicate.value == "reference" and not (
         predicate.refers_to & GRAPH_BOUND
     )
+    own = reference.subject_aliases.get(produced.subject)
+    subject = produced.subject if own is None else own.subject
+    value = produced.value
+    target = reference.subject_aliases.get(value) if refers_to_own else None
+    if target is not None and target.applies_under(subject):
+        value = target.subject
     return produced.model_copy(
         update={
-            "subject": reference.subject_aliases.get(
-                produced.subject, produced.subject
-            ),
-            "value": (
-                reference.subject_aliases.get(produced.value, produced.value)
-                if refers_to_own
-                else produced.value
-            ),
+            "subject": subject,
+            "value": value,
             "scope": [
                 qualifier.model_copy(
                     update={

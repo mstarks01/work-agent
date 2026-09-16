@@ -53,3 +53,22 @@ assumption:
 The shopper and the card processor keep an inferred public-internet
 placement: it records participation from outside through the one
 internet-exposed endpoint, not a hosting location.
+
+## Alias rulings of 2026-09-16 (#961 step 6)
+
+Seven alias rulings were drafted on `facts.json` for the subjects and scope
+values the model spells otherwise. The maintainer had an assistant review
+them against `source.md` and posted the decisions on #961; the review says
+it is not a human signature, and `reviewed_by` on each accepted alias names
+that review. A signed alias is active in the replay.
+
+| # | Target | Decision |
+|---|---|---|
+| 13 | `principal:application-account` ← "single application account" | Accepted. |
+| 14 | `principal:anything-that-can-reach-the-order-service` ← "anything that can reach the service", "anything that can reach it" | Accepted within this case's order-service context. |
+| 15 | `principal:order-service` ← "order service's own service account" | Rejected and removed. A workload and the account it uses are not interchangeable identities. The review prefers a reference row on `principal:order-service-service-account` ("order service's own service account"), `write receipts`, scope receipt-archive/write, basis inferred, in place of the workload-level grant. That is a change to a signed row and waits for the maintainer's signature; the row stands as signed until then. |
+| 16 | `credential:application-account-password` ← "password" | Accepted within the application account's rows and the orders-db flow (`within`). A bare "password" on a shopper is not rewritten. |
+| 17 | resource `orders-db` ← "orders db" | Accepted. |
+| 18 | operation `read-write` ← "read/write", "read and write" | Accepted. |
+| 19 | operation `submit order` ← "submit orders" | Accepted for the plural only; "call" and the gRPC spellings were rejected as naming the transport, not the operation. |
+
