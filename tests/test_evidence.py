@@ -23,6 +23,7 @@ from analysis_service.assertions import (
     assertion_id,
 )
 from analysis_service.claims import (
+    CONDITIONAL_GROUNDS,
     GROUND_TERM_MAX_CHARS,
     Ground,
 )
@@ -37,7 +38,11 @@ from analysis_service.evidence import (
     unknown_evidence_ref,
 )
 from analysis_service.frameworks.stride import STRIDE
-from analysis_service.frameworks.stride.record import ThreatProposal, ThreatProposals
+from analysis_service.frameworks.stride.record import (
+    DraftThreat,
+    ThreatProposal,
+    ThreatProposals,
+)
 from analysis_service.system_model import UNKNOWN, DataStore, SystemModel
 from tests.factories import sample_draft, sample_proposal, valid_model
 
@@ -270,20 +275,66 @@ class TestEvidenceCatalog:
     @pytest.mark.parametrize(
         "unsettled",
         [
-            row(value=UNKNOWN, reason="silent", explanation=""),
             row(basis="legacy", explanation=""),
             row(assessment="unsupported", assessor="reviewer/1"),
             row(assessment="unresolved", assessor="reviewer/1"),
         ],
-        ids=["unknown", "legacy", "unsupported", "unresolved"],
+        ids=["legacy", "unsupported", "unresolved"],
     )
     def test_a_row_nobody_may_rest_on_is_never_offered(self, unsettled):
-        """An unknown is a question, a legacy row is never support, and an
+        """A legacy row is never support, and an
         assessed-unsupported row is set aside — none is a fact an agent may
         cite, so none is in the table an agent selects from."""
         catalog = evidence_catalog(valid_model(), assertions(unsettled))
 
         assert assertion_id(unsettled) not in catalog
+
+    def test_an_open_question_is_offered_as_one(self):
+        """The gap this closes: a fact the sources were asked and left open.
+
+        An element attribute nobody stated is already offered, so an agent can
+        raise a conditional claim on it. A predicate with no graph field had no
+        such offer, and its subject may be a principal, so the attribute walk
+        above could never reach it.
+        """
+        open_row = row(value=UNKNOWN, reason="silent", explanation="")
+        catalog = evidence_catalog(valid_model(), assertions(open_row))
+
+        assert catalog[assertion_id(open_row)].kind == "unknown-assertion"
+
+    def test_a_settled_row_and_an_open_one_are_different_entries(self):
+        """The identity carries the value, so the two never collide."""
+        settled_row = row()
+        open_row = row(value=UNKNOWN, reason="silent", explanation="")
+        catalog = evidence_catalog(valid_model(), assertions(settled_row, open_row))
+
+        assert catalog[assertion_id(settled_row)].kind == "assertion"
+        assert catalog[assertion_id(open_row)].kind == "unknown-assertion"
+
+    def test_a_claim_cannot_rest_on_an_open_question_by_calling_it_settled(self):
+        """Both kinds are offered, so membership alone cannot tell them apart."""
+        open_row = row(value=UNKNOWN, reason="silent", explanation="")
+        claim = sample_draft(
+            grounds=[Ground(kind="assertion", assertion=assertion_id(open_row))]
+        )
+
+        issues = ground_issues([claim], valid_model(), assertions(open_row))
+
+        assert issues and "leaves that row open" in issues[0]
+
+    def test_a_claim_cannot_call_a_settled_fact_an_open_question_either(self):
+        """The mirror, because either direction misreads the catalog."""
+        settled_row = row()
+        held = assertions(settled_row)
+        claim = sample_draft(
+            grounds=[
+                Ground(kind="unknown-assertion", assertion=assertion_id(settled_row))
+            ]
+        )
+
+        issues = ground_issues([claim], valid_model(), held)
+
+        assert issues and "settles that row" in issues[0]
 
     def test_a_conflict_settles_nothing_on_either_side(self):
         """Two rows that disagree stay visible in the catalog and ground nothing:
@@ -479,9 +530,9 @@ class TestAnAssertionGroundIsHeldToTheCatalog:
         )
 
         (issue,) = ground_issues([draft], valid_model(), assertions())
-        assert "does not settle" in issue
+        assert "does not offer" in issue
         (issue,) = ground_issues([draft], valid_model())
-        assert "does not settle" in issue
+        assert "does not offer" in issue
 
 
 class TestABadReferenceCostsItsEntryNotTheJob:
@@ -985,3 +1036,35 @@ class TestAnAbsenceIsAGround:
     def test_a_proposal_citing_nothing_at_all_is_still_refused(self):
         with pytest.raises(ValidationError, match="justifies itself with nothing"):
             sample_proposal("S-01", evidence_refs=[], quotes=[], absent_elements=[])
+
+
+class TestWhichGroundsMakeAClaimConditional:
+    """`CONDITIONAL_GROUNDS` is the one reader, and a seventh kind must join it.
+
+    The mark it feeds licenses a threat to offer no countermeasure. So a kind
+    missing from the set reads as a well-formed claim rather than as an error,
+    which is why the set is named once and checked here rather than spelled at
+    each seam.
+    """
+
+    def _marks(self, ground):
+        return DraftThreat.claim_marks([sample_draft(grounds=[ground], mitigations=[])])
+
+    def test_an_open_assertion_licenses_a_threat_with_no_countermeasure(self):
+        """You cannot name a control for a fact nobody has stated yet."""
+        ground = Ground(
+            kind="unknown-assertion",
+            assertion="assertion:mfa-requirement~principal:shoppers~any~unknown",
+        )
+        assert self._marks(ground).missing_mitigations == []
+
+    def test_a_settled_assertion_does_not(self):
+        """A fact in hand: "put the control in" is always available."""
+        ground = Ground(
+            kind="assertion",
+            assertion="assertion:mfa-requirement~principal:shoppers~any~absent",
+        )
+        assert self._marks(ground).missing_mitigations != []
+
+    def test_the_set_holds_the_two_questions_and_neither_absence(self):
+        assert CONDITIONAL_GROUNDS == {"unknown-attribute", "unknown-assertion"}

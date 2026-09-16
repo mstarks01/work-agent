@@ -22,6 +22,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from analysis_service.actions import ActionVerb
 from analysis_service.claims import (
+    CONDITIONAL_GROUNDS,
     MAX_ELEMENTS_PER_PROPOSAL,
     REASON_MAX_CHARS,
     AnalysisMarks,
@@ -203,11 +204,17 @@ class DraftThreat(Claim):
         the licensed empty and the unlicensed one are told apart by the draft's
         own grounds, with no judgement asked of anybody.
 
-        ``absent-attribute`` is deliberately not read here, though it names the
-        same two fields. A control the submitter said is *not there* is a fact
-        already in hand, and "put the control in" is a countermeasure the agent
-        can always name — so a threat resting on one and offering nothing is the
-        unlicensed empty, which is exactly what this mark is for.
+        Which grounds are conditional is
+        :data:`~analysis_service.claims.CONDITIONAL_GROUNDS`, read rather than
+        spelled here: an assertion row the sources left open licenses the empty
+        for the same reason an unstated attribute does, and a set written out
+        at this seam would have answered for one and not the other.
+
+        ``absent-attribute`` is deliberately outside that set, though it names
+        the same two fields. A control the submitter said is *not there* is a
+        fact already in hand, and "put the control in" is a countermeasure the
+        agent can always name — so a threat resting on one and offering nothing
+        is the unlicensed empty, which is exactly what this mark is for.
         """
         return AnalysisMarks(
             missing_mitigations=[
@@ -216,7 +223,7 @@ class DraftThreat(Claim):
                 if isinstance(draft, DraftThreat)
                 and not draft.mitigations
                 and not any(
-                    ground.kind == "unknown-attribute" for ground in draft.grounds
+                    ground.kind in CONDITIONAL_GROUNDS for ground in draft.grounds
                 )
             ]
         )

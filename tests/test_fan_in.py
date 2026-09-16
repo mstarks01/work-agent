@@ -102,7 +102,7 @@ class TestJoinDrafts:
 
         joined = join_drafts({"spoofing": [draft]}, STRIDE, model, assertions=held)
         assert joined.drafts == [draft]
-        with pytest.raises(DraftJoinError, match="does not settle"):
+        with pytest.raises(DraftJoinError, match="does not offer"):
             join_drafts({"spoofing": [draft]}, STRIDE, model)
 
     def test_a_claim_naming_only_absent_elements_is_dropped_and_marked(self, model):
