@@ -646,7 +646,7 @@ def rating_disagreements(drafts: Sequence[Claim]) -> dict[str, list[str]]:
             continue
         ratings[draft.id] = rating
         facts = frozenset(
-            (ground.kind, ground.place or ground.term, ground.attribute)
+            (ground.kind, ground.referent, ground.attribute)
             for ground in draft.grounds
             if ground.kind != "quote"
         )

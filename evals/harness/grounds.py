@@ -83,6 +83,7 @@ _KINDS: tuple[GroundKind, ...] = (
     "unknown-attribute",
     "absent-attribute",
     "derived-fact",
+    "assertion",
 )
 
 

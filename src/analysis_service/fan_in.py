@@ -43,6 +43,7 @@ from collections.abc import Collection, Iterable, Mapping, Sequence
 from types import MappingProxyType
 from typing import NamedTuple
 
+from analysis_service.assertions import AssertionCatalog
 from analysis_service.candidates import generate_candidates
 from analysis_service.claims import (
     BEYOND_GROUNDS,
@@ -112,6 +113,7 @@ def fan_in(
     model: SystemModel,
     sources: Mapping[str, str] = _NO_TEXTS,
     ruled_out: Mapping[str, str] = _NO_TEXTS,
+    assertions: AssertionCatalog | None = None,
 ) -> FanIn:
     """Merge one framework's lane batches into the drafts its critic sees.
 
@@ -136,7 +138,10 @@ def fan_in(
     prepare against the reason; a draft on one is refused here whatever the
     agent read in its scope line, because a claim on it would put the same
     unit on the report twice, once as a claim and once as not applicable
-    (#443).
+    (#443). ``assertions`` is the job's assertion catalog where it ran one:
+    the evidence catalog is derived from the model *and* this, so it is
+    handed in exactly as ``prepare`` held it — code resolved it once from the
+    node's proposal, and a second resolution here would be a second reader.
 
     Raises :class:`DraftJoinError` when a lane emitted more than
     :data:`~analysis_service.claims.MAX_CLAIMS_PER_BATCH` proposals. This is
@@ -165,7 +170,7 @@ def fan_in(
             f"a {package.name} lane agent emitted more than"
             f" {MAX_CLAIMS_PER_BATCH} proposals: {counts}"
         )
-    catalog = evidence_catalog(model)
+    catalog = evidence_catalog(model, assertions)
     invalid = {
         lane: invalid_proposal_marks(batch.invalid, package, lane)
         for lane, batch in batches.items()
@@ -229,7 +234,7 @@ def fan_in(
     drafts_by_lane = {
         lane: resolution.drafts for lane, resolution in resolutions.items()
     }
-    joined = join_drafts(drafts_by_lane, package, model, sources)
+    joined = join_drafts(drafts_by_lane, package, model, sources, assertions)
     refused = [
         DroppedClaim.of(
             claim_id=draft.id,
@@ -672,6 +677,7 @@ def join_drafts(
     package: FrameworkPackage,
     system_model: SystemModel,
     sources: Mapping[str, str] = MappingProxyType({}),
+    assertions: AssertionCatalog | None = None,
 ) -> JoinedDrafts:
     """Merge one framework's lane agents' drafts into the list its critic sees.
 
@@ -722,7 +728,9 @@ def join_drafts(
     parameter: a hand-authored model driven through the in-process engine has
     no sources to check against, and inventing a set would fail it on a
     citation that is not wrong. Empty means the text check does not run — no
-    quote is marked and no claim is dropped on one.
+    quote is marked and no claim is dropped on one. ``assertions`` is what
+    :func:`fan_in` was handed, so an assertion ground resolves against the
+    same catalog the agent selected from.
     """
     # One index for the whole fan-in. Each check below asks the model who
     # carries an ID and what a flow runs between, once per claim and once per
@@ -736,7 +744,7 @@ def join_drafts(
     )
     unique, duplicates = _drop_duplicate_ids(snapped)
     referenced = _resolve_element_references(unique, known_ids)
-    issues = ground_issues(referenced.drafts, system_model)
+    issues = ground_issues(referenced.drafts, system_model, assertions)
     if issues:
         raise DraftJoinError("; ".join(issues))
     bounded = _bound_element_references(referenced.drafts, index)

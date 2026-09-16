@@ -151,16 +151,15 @@ def _ground_parts(ground: Ground) -> tuple[str, ...]:
     longer span of the same sentence is making the same argument, and the
     grounding ladder already proves the span is present.
 
-    The place comes from :attr:`~analysis_service.claims.Ground.place`, which is
-    that question's one reader. A second ``or`` chain here read the same two
-    fields, so a sixth branch carrying a new place field would have updated
-    ``place`` and left this digesting an empty string — two grounds at two
-    places sharing one value, and a re-argued claim reading live. ``term``
-    stays outside it, because ``place`` answers ``""`` for an
-    ``absent-element`` on purpose: that branch names the whole model and has no
-    element to point at.
+    The referent comes from :attr:`~analysis_service.claims.Ground.referent`,
+    which is that question's one reader: the element a ground points at, or
+    the term or the assertion it names where it points at none. A second
+    ``or`` chain here read the same fields, so a branch carrying a new naming
+    field would have updated the property and left this digesting an empty
+    string — two grounds naming two things sharing one value, and a re-argued
+    claim reading live.
     """
-    return (ground.kind, ground.place or ground.term, ground.attribute)
+    return (ground.kind, ground.referent, ground.attribute)
 
 
 def structural(claim: Claim, version: int = STRUCTURAL_VERSION) -> str:

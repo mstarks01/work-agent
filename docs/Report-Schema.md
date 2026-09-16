@@ -46,13 +46,14 @@ class Report:
     ]  # different-typed elements sharing one name slug
     elements_analyzed: int
     model_repair: ModelRepair | None  # what the repair pass could change, and did
+    assertions: AssertionRecord | None  # the assertion catalog the lanes read, and the rows refused
     analysis_context: (
         AnalysisContext | None
     )  # what informed the analysis (never what proves it)
     analyses: list[FrameworkAnalysis]  # one block per framework, in the job's own order
 ```
 
-**A field sits where the thing it describes sits.** Nine fields describe the job
+**A field sits where the thing it describes sits.** Ten fields describe the job
 or the shared model and stayed on the envelope. Eight describe one framework's
 output and moved onto the block. `analysis_context` split on the same rule: the
 instruction digest describes the built graph and the domain packs describe the
@@ -327,12 +328,21 @@ compiler. See [ADR 0004](adr/0004-evidence-references.md).
 
 ```python
 class Ground:
-    kind: "quote" | "unknown-attribute" | "absent-attribute" | "derived-fact"
+    kind: (
+        "quote"
+        | "unknown-attribute"
+        | "absent-attribute"
+        | "derived-fact"
+        | "absent-element"
+        | "assertion"
+    )
     text: str  # quote: the verbatim span, ≤1000 chars
     source_label: str  # quote: names one of input.sources
     element_id: str  # either attribute kind: resolves in system_model
     attribute: str  # either attribute kind: the attribute relied on
     flow_id: str  # derived-fact: a data flow in system_model
+    term: str  # absent-element: a word no element's text names
+    assertion: str  # assertion: a row's identity in assertions.catalog
 ```
 
 | `kind` | Carries | Reads as |
@@ -341,6 +351,18 @@ class Ground:
 | `unknown-attribute` | `element_id` + `attribute` | this fact was never stated, so the threat stands unrefuted |
 | `absent-attribute` | `element_id` + `attribute` | the input states this control is not there |
 | `derived-fact` | `flow_id` | this flow's boundary crossing is the fact relied on |
+| `absent-element` | `term` | no element's text names this thing |
+| `assertion` | `assertion` | the sources state this fact, which the model has no field for |
+
+An `assertion` ground is a reference on the same terms as a `derived-fact`: it
+names a row in `assertions.catalog` by the row's computed identity, and the
+row's subject, predicate, value, basis, scope and support spans are read there.
+On load the report checks the row is one the catalog *settles* — it holds a
+value rather than `unknown`, its basis is support of some kind, no assessment
+set it aside, and no other row disagrees at its subject, predicate and scope —
+and refuses the report otherwise. A report whose `assertions` is `None` settles
+nothing, so a claim citing one is refused the way a claim citing a crossing the
+model does not derive is.
 
 **One flat model, not a discriminated union.** Fields belonging to the other
 kinds are empty strings, and a record carrying a field its own kind does not
@@ -1084,6 +1106,14 @@ class TokenUsage:
 > this model, and a 3.0 payload carrying `analyses` is refused by the old one.
 > The no-shim behaviour falls out of the shapes rather than out of anything
 > reading `schema_version`.
+
+> **`schema_version` 3.0** also carries `assertions` on the envelope: the
+> assertion catalog the job's lanes selected from, with each row's basis and
+> assessment, and the rows the resolver and the gate refused. `None` on a job
+> that ran no assertion pass, which is every job on a deployment that has not
+> selected one. A sixth `Ground` kind, `assertion`, references a row in it.
+> Additive on the same argument as `model_repair`, and it rides 3.0 for the
+> reason `absent-attribute` does: 3.0 has never shipped.
 
 > **`schema_version` 2.10** corrected what `coverage[].elements_cited` counts,
 > and holds every `*_cited` half to the total beside it. The definition above is
