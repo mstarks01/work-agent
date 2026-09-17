@@ -55,8 +55,9 @@ from evals.harness.arms import (
     shown_tokens,
     subject_kind,
     to_json,
-    unsupported_rate,
+    unreviewed_share,
     write_runs,
+    wrong_rate,
 )
 from evals.harness.replay import PRODUCED_FATES, ROW_FATES, SignedReference
 from tests.factories import PROJECT_ROOT
@@ -99,6 +100,8 @@ def run(
     valid: bool = True,
     unreviewed: int = 0,
     matched: int = 0,
+    wrong_value: int = 0,
+    misattached: int = 0,
 ) -> ArmRun:
     """One run with the fates a test is about and zeroes everywhere else."""
     fates: dict[str, int] = dict.fromkeys(ROW_FATES, 0)
@@ -106,7 +109,9 @@ def run(
     fates["omitted"] = required - found
     produced: dict[str, int] = dict.fromkeys(PRODUCED_FATES, 0)
     produced["unreviewed"] = unreviewed
-    produced["matched"] = matched
+    produced["found"] = matched
+    produced["wrong_value"] = wrong_value
+    produced["misattached"] = misattached
     return ArmRun(
         case_id=case_id,
         arm=arm,
@@ -205,10 +210,19 @@ class TestTheEndpoint:
     def test_a_case_with_no_required_row_is_recovered(self) -> None:
         assert run("01", "A", found=0, required=0).recall == 1.0
 
-    def test_unsupported_counts_every_row_no_reference_took(self) -> None:
+    def test_a_row_nobody_adjudicated_is_outside_the_wrong_rate(self) -> None:
+        """An unreviewed row is coverage, never an error."""
         runs = [run("01", "A", 1, 1, matched=3, unreviewed=1)]
-        assert unsupported_rate(runs, "A") == 0.25
-        assert unsupported_rate(runs, "B") == 0.0
+        assert wrong_rate(runs, "A") == 0.0
+        assert unreviewed_share(runs, "A") == 0.25
+        assert wrong_rate(runs, "B") == 0.0
+        assert unreviewed_share(runs, "B") == 0.0
+
+    def test_the_wrong_rate_counts_what_the_reference_disagrees_with(self) -> None:
+        """A row the reference took at the wrong value is a wrong claim."""
+        runs = [run("01", "A", 1, 1, matched=1, wrong_value=2, misattached=1)]
+        assert wrong_rate(runs, "A") == 0.75
+        assert unreviewed_share(runs, "A") == 0.0
 
 
 class TestTheInterval:

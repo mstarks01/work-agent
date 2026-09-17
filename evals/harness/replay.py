@@ -55,11 +55,18 @@ produced rows on the same subject and predicate:
 * ``rescoped``: the same subject and predicate at another scope.
 * ``omitted``: no produced row on the subject and predicate.
 
-A produced row no reference row took is ``misattached`` where a reference row
-carries its predicate and value on another subject, and ``unreviewed``
-otherwise: the reference lists what the sources state and not everything they
-do not, so a row outside it is a candidate for a ruling and never an error by
-inference. A row the resolver dropped is ``rejected``.
+A produced row takes the fate of the reference row that consumed it, under the
+same names, so a row a reference answered with ``wrong_value`` is an
+adjudicated wrong claim and not an answer. A row no reference row took is
+``misattached`` where a reference row carries its predicate and value on
+another subject, and ``unreviewed`` otherwise: the reference lists what the
+sources state and not everything they do not, so a row outside it is a
+candidate for a ruling and never an error by inference. A row the resolver
+dropped is ``rejected``.
+
+**An unreviewed row is not a wrong one.** :data:`ADJUDICATED` is the only
+denominator a precision figure may use, and the share of rows outside it is
+reported beside that figure as the adjudication coverage.
 
 **A reference an agent drafted grades nothing.** A case whose facts file
 carries an unsigned row is skipped by name, and the skip is printed.
@@ -157,6 +164,12 @@ FATES: tuple[Fate, ...] = (
 #: zone that pairs with one still reads ``found`` or ``renamed``.
 LOSSES: frozenset[str] = frozenset(FATES) - {"found", "renamed", "placeholder"}
 
+#: The fates a produced row can answer a reference row with, which is every
+#: fate that is not an absence. Named apart from :data:`RowFate` because one
+#: value serves two questions: what became of the reference row, and what the
+#: produced row that took it was adjudicated to be.
+AnsweredFate = Literal["found", "worded", "wrong_value", "rescoped"]
+
 RowFate = Literal["found", "worded", "wrong_value", "rescoped", "omitted", "silent"]
 ROW_FATES: tuple[RowFate, ...] = (
     "found",
@@ -176,8 +189,37 @@ ROW_FATES: tuple[RowFate, ...] = (
 #: reads ``wrong_value``, which is the defect that matters.
 ROW_LOSSES: frozenset[str] = frozenset({"wrong_value", "rescoped", "omitted"})
 
-ProducedFate = Literal["matched", "misattached", "unreviewed"]
-PRODUCED_FATES: tuple[ProducedFate, ...] = ("matched", "misattached", "unreviewed")
+#: What one produced row came to. The first four are the fate of the reference
+#: row that consumed it, spelled the same way, so the two vocabularies are one
+#: and a row a reference took with the wrong value reads as **wrong** rather
+#: than as an answer. ``misattached`` is a row whose predicate and value the
+#: reference carries on another subject. ``unreviewed`` is a row nothing signed
+#: rules on, which is not an error.
+ProducedFate = Literal[
+    "found",
+    "worded",
+    "wrong_value",
+    "rescoped",
+    "misattached",
+    "unreviewed",
+]
+PRODUCED_FATES: tuple[ProducedFate, ...] = (
+    "found",
+    "worded",
+    "wrong_value",
+    "rescoped",
+    "misattached",
+    "unreviewed",
+)
+
+#: The produced rows a reviewer's reference rules on, right or wrong. The
+#: denominator of a precision figure, because a row outside it carries no
+#: adjudication and a rate that counted it would move when the reference grew.
+ADJUDICATED: frozenset[str] = frozenset(PRODUCED_FATES) - {"unreviewed"}
+
+#: The adjudicated rows the reference disagrees with: a wrong value, a wrong
+#: scope, or the right fact on the wrong subject.
+ADJUDICATED_WRONG: frozenset[str] = ADJUDICATED - {"found", "worded"}
 
 
 @dataclass(frozen=True)
@@ -585,7 +627,7 @@ def _compares_exactly(predicate: str) -> bool:
     return registered.value == "reference" and bool(registered.refers_to & GRAPH_BOUND)
 
 
-def _row_fate(reference: Assertion, candidate: Assertion) -> RowFate:
+def _row_fate(reference: Assertion, candidate: Assertion) -> AnsweredFate:
     """How one produced row on the reference's subject and predicate answers it."""
     ours, theirs = identity_parts(reference), identity_parts(candidate)
     if ours.scope != theirs.scope:
@@ -600,8 +642,8 @@ def _row_fate(reference: Assertion, candidate: Assertion) -> RowFate:
 
 #: The fate a reference row takes when several produced rows sit on its
 #: subject and predicate: the best answer available, in this order.
-_PREFERRED: tuple[RowFate, ...] = ("found", "worded", "wrong_value", "rescoped")
-_PREFERENCE: Mapping[RowFate, int] = {
+_PREFERRED: tuple[AnsweredFate, ...] = ("found", "worded", "wrong_value", "rescoped")
+_PREFERENCE: Mapping[AnsweredFate, int] = {
     fate: rank for rank, fate in enumerate(_PREFERRED)
 }
 
@@ -621,6 +663,7 @@ def replay_assertions(
         aliased = under_aliases(entry, reference)
         available[aliased.subject, aliased.predicate].append(aliased)
     rows = []
+    answered: dict[str, ProducedFate] = {}
     for ours in reference.entries:
         candidates = available[ours.subject, ours.predicate]
         if not candidates:
@@ -634,11 +677,13 @@ def replay_assertions(
             key=lambda pair: _PREFERENCE[pair[0]],
         )
         candidates.remove(theirs)
+        taken = assertion_id(theirs)
+        answered[taken] = fate
         rows.append(
             ReferenceRowFate(
                 assertion_id(ours),
                 fate,
-                assertion_id(theirs),
+                taken,
                 basis_overstated=ours.basis == "inferred" and theirs.basis == "stated",
             )
         )
@@ -655,9 +700,9 @@ def replay_assertions(
                 if (parts.predicate, parts.value) in elsewhere
                 else "unreviewed"
             )
-    for row in rows:
-        if row.produced:
-            produced[row.produced] = "matched"
+    # The fate of the reference row that took it, so a produced row the
+    # reference disagrees with is counted as wrong rather than as an answer.
+    produced.update(answered)
     return AssertionReplay(
         case_id=case.id,
         rows=tuple(rows),
