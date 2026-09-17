@@ -1001,11 +1001,16 @@ class HeadNode:
 
 
 #: The LLM nodes a head can carry, and what each is given. Keyed by node, so a
-#: node that joins an arm is priced by what it reads rather than by where it
+#: node that joins an arm is read by what it is given rather than by where it
 #: sits. ``repair`` is absent: it runs only where the validity gate refuses a
-#: model, so counting it in every case would price a failure that usually does
-#: not happen — a run's repair rate is a measurement, and this is an estimate
-#: of the pass that always runs.
+#: model, so counting it in every case would report a failure that usually does
+#: not happen — a run's repair rate is a measurement, and this is a reading of
+#: the pass that always runs.
+#:
+#: **A repair that does run is not a small share.** One pre-flight of arm A over
+#: case 01 ran it, and it carried 27,588 of that case's 95,790 prompt tokens.
+#: A reader comparing this table to a finished run's usage is comparing a head
+#: that always runs against one that may have repaired.
 HEAD_NODES: Mapping[str, HeadNode] = MappingProxyType(
     {
         "extract": HeadNode(compose_extract_prompt, ("sources",)),
@@ -1030,8 +1035,11 @@ def shown_tokens(
     ``rows`` is the catalog a reading node would be shown, and on a case the
     run has not happened for, the **signed reference's** catalog stands in for
     it. That is a proxy and it is named as one: a produced catalog is usually
-    smaller, so the figure over-states rather than under-states, which is the
-    only safe direction for a number somebody consents to spend against.
+    smaller, so this one artifact reads high.
+
+    That says nothing about the total, which reads **low** against a real call:
+    :func:`input_report` has the measurement and the reason. Nothing here is
+    safe to consent to a spend against.
     """
     rows = 0 if reference is None else estimate_tokens(render_rows(reference.catalog))
     return MappingProxyType(
@@ -1116,10 +1124,18 @@ def input_report(
 ) -> str:
     """What every arm is given over a set of cases, against the baseline's.
 
-    **It prices the input and says so.** A run's cost is this plus what the
-    models write, and nothing offline knows the second — so the ratio here
-    bounds #1003's fifth gate on one side and settles it on neither. A reader
-    taking it for the whole gate has left out the half that is usually larger.
+    **A ratio between arms, and never a cost.** The figure is the composed
+    instruction plus the artifacts a node's placeholders render — the nominal
+    content of one turn. What a node's calls actually send is far larger: on
+    case 01 arm A's head reads about 7,800 tokens here, and the same head's
+    calls sent 95,790 prompt tokens. An agent node runs a loop, and every turn
+    of it re-sends what came before.
+
+    So the ratios answer which arm is given more, and a reader who multiplies
+    any figure here by a unit price is out by more than an order of magnitude.
+    Cost is read from a finished run's recorded usage —
+    :func:`~evals.harness.baseline.price_sweep` — or from the charge a gateway
+    reports, and this module computes neither.
     """
     totals = {
         arm: sum(
@@ -1134,9 +1150,18 @@ def input_report(
         "",
         (
             "Static instruction plus what each head node is shown, through the"
-            " functions the graph renders with. Output is not estimated here,"
+            " functions the graph renders with. Output is not counted here,"
             " and the lane agents and critics are excluded because every arm"
             " runs the same ones."
+        ),
+        "",
+        (
+            "**A ratio between arms, and never a cost.** An agent node runs a"
+            " loop and re-sends what came before, so a real call carries far"
+            " more than one turn's nominal content: arm A's head reads about"
+            " 7,800 tokens for case 01 here and sent 95,790 in a pre-flight."
+            " A repair the validity gate triggers is outside this table too."
+            " Read a cost off a finished run's usage, never off this."
         ),
         "",
         f"| arm | nodes | tokens | against {baseline} |",
