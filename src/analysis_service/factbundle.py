@@ -461,11 +461,11 @@ def resolve_bundle(bundle: SourceFactBundle, sources: Mapping[str, str]) -> Reso
     ``rejected`` rather than silently absent, which is what makes the
     disposition count equal the input count.
 
-    The catalog half is the existing resolver, called rather than copied:
-    :func:`~analysis_service.assertions.resolve_catalog` runs the gate's own
-    per-row rules, so a fact this route keeps is one the production route would
-    keep too, and #1003's comparison measures the extraction order rather than
-    two spellings of one gate.
+    The catalog half is the existing reader, called rather than copied:
+    :meth:`~analysis_service.assertions.AssertionRecord.of` resolves the
+    proposal and runs the gate over what it built, so a fact this route keeps
+    is one the production route would keep too, and #1003's comparison measures
+    the extraction order rather than two spellings of one gate.
     """
     refused = _version_issue(bundle) or _cap_issue(bundle)
     if refused is not None:

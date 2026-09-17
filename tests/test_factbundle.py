@@ -730,6 +730,40 @@ class TestOneAmbiguityReader:
         )
         assert [issue.code for issue in issues] == ["ambiguous-span"]
 
+    def test_a_fact_quoting_a_repeated_line_is_refused_too(self) -> None:
+        """The mention path and the fact path refuse one shape, by one rule."""
+        twice = "The queue is here. The queue is here. It sits in the core network."
+        bundle = SourceFactBundle(
+            mentions=[
+                mention(
+                    "z1", "core network", "network-zone", quotes=quote("core network")
+                ),
+                mention("m2", "queue", "store", quotes=quote("It sits in")),
+            ],
+            facts=[
+                FactProposal(
+                    handle="p1",
+                    subject_kind="mention",
+                    subject="m2",
+                    predicate="network-membership",
+                    value="z1",
+                    basis="stated",
+                    quotes=quote("It sits in the core network"),
+                ),
+                FactProposal(
+                    handle="f1",
+                    subject_kind="mention",
+                    subject="m2",
+                    predicate="storage-encryption",
+                    value="AES-256",
+                    basis="stated",
+                    quotes=quote("The queue is here"),
+                ),
+            ],
+        )
+        row = row_for(resolved(bundle, {LABEL: twice}), "f1")
+        assert (row.disposition, row.code) == ("rejected", "ambiguous-span")
+
     def test_the_bundle_reads_the_same_function(self) -> None:
         folded = span_source(LABEL, self.TWICE)
         assert folded is not None
