@@ -249,8 +249,10 @@ class ArmRun:
     #: run produced that no reference row took.
     produced: Mapping[str, int] = field(default_factory=dict)
     #: The required rows this run answered, by identity. The counts above say
-    #: *how many*; these say *which*, which is what a paired comparison between
-    #: two arms needs — 41 rows carry a direction that five cases cannot.
+    #: *how many*; these say *which*, which is what a row-by-row reading between
+    #: two arms needs. It is a **diagnostic**: the rows sit inside the same five
+    #: cases, so they are correlated, and counting more of them adds no
+    #: independent system description to the interval.
     found_rows: tuple[str, ...] = ()
     #: The required rows this run stated on the same fact under another flow
     #: label, and which the strict matcher therefore scored as missed. Kept
@@ -464,14 +466,20 @@ def unreviewed_share(runs: Collection[ArmRun], arm: str) -> float:
 class RowTally:
     """One comparison counted per reference row rather than per case.
 
-    **The reading that carries a direction before an interval can.** The
-    endpoint averages five cases; this counts 41 rows, and a row one arm answers
-    more often than the other is a discordant pair — the unit a sign test reads
-    and the unit a reader's eye reads too.
+    **A reading that shows a direction the endpoint's interval cannot.** The
+    endpoint averages the cases; this counts the reference rows inside them, and
+    a row one arm answers more often than the other is a discordant pair — the
+    unit a reader's eye reads.
+
+    **It is a diagnostic and never a second endpoint.** The rows are nested in
+    the same handful of cases, so they are correlated: a sign test over them
+    would treat one system description as many observations, which is the
+    mistake the cluster bootstrap exists to avoid.
 
     ``contested`` is the rows some arm answered at least once. The rest were
-    answered by nobody, ever: they depress both arms identically, so they carry
-    no direction and only widen the mean's spread.
+    answered by nobody, ever, so they contribute nothing to a paired difference;
+    they scale each case's denominator, which is a reason to report them rather
+    than to drop them.
     """
 
     left: str

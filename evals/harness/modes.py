@@ -1454,11 +1454,12 @@ class AssertionResult:
 class AssertionScore:
     """What one case's assertion run produced, counted rather than graded.
 
-    **No agreement figure, because there is nothing to agree with.** No corpus
-    case carries a reference catalog, so every number here is a count of what
-    the run did: how many rows survived, which predicates they covered, and how
-    much of the model they reached. A figure comparing this to a reference
-    waits for a reference somebody signed (#926 Phase 6).
+    **No agreement figure here, because this mode counts rather than grades.**
+    Every number is a reading of what the run did: how many rows survived, which
+    predicates they covered, and how much of the model they reached.
+    :func:`~evals.harness.replay.replay_assertions` is the one reader that
+    compares a run to a signed reference, and it runs over the cases whose facts
+    a reviewer signed.
 
     ``absences`` is the one number that answers the audit directly. It counts
     rows whose value is ``absent`` — a control the sources say is **not there**
