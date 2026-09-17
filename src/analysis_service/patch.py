@@ -251,6 +251,15 @@ def apply_patch(
     retractions apply to the catalog the batch started from, the additions merge
     on top, and the result runs the two gates every arm shares.
 
+    **A batch lands whole or not at all.** One refused operation discards every
+    other one, and ``model`` and ``record`` are the ones the caller passed in.
+    A correction is a retraction and an addition that replaces it, and nothing
+    in the batch says which addition replaces which retraction — so a rule that
+    applied what it could would delete a row whose replacement the resolver
+    refused, and the catalog would lose a fact to a repair pass. Each refusal
+    still carries its own code and message, so what the review got wrong is
+    readable off the outcomes.
+
     **The dependency walk runs once, before the resolver.** After it, the
     resolver *is* the reader of a broken reference: a row whose element it
     refused draws ``dangling-endpoint`` or ``dangling-subject`` from the same
@@ -293,6 +302,15 @@ def apply_patch(
             message=row.message,
         )
 
+    outcomes = _outcomes(batch.operations, refused)
+    if refused:
+        return PatchResult(
+            model,
+            record,
+            (*_rolled_back(outcomes), _refused_row(refused)),
+            rolled_back=True,
+        )
+
     retracted = without(
         record.catalog,
         [
@@ -309,7 +327,6 @@ def apply_patch(
         proposed=record.proposed + resolution.record.proposed,
         issues=[*record.issues, *resolution.record.issues],
     )
-    outcomes = _outcomes(batch.operations, refused)
 
     broken = _gate_refusals(resolution.model, catalog, sources)
     if broken:
@@ -594,6 +611,18 @@ def _rolled_back(
             }
         )
         for outcome in outcomes
+    )
+
+
+def _refused_row(refused: Mapping[str, OperationOutcome]) -> OperationOutcome:
+    """The batch-level row naming which operations discarded it."""
+    return OperationOutcome(
+        state="refused",
+        code="operation-refused",
+        message=(
+            f"{', '.join(sorted(refused))} did not land, so the batch was"
+            " discarded and the original output stands"
+        ),
     )
 
 
