@@ -263,6 +263,14 @@ disabled by default and unmeasured.
 | --- | --- |
 | `ANALYSIS_SOURCE_REVIEW` | Read the sources once more and patch what they support. Off by default. |
 
+The experiment is scored on the catalog, and no lane writes one, so the eval
+harness carries a **head-only** entry: `run.py run --mode heads` runs one arm's
+reading node, the validity gate, the bounded repair and whichever passes the
+deployment selects, resolves the catalog through the seam `prepare` resolves
+through, and stops. Measured against a recorded STRIDE sweep, running the lanes
+as well would cost roughly seventeen times as much for findings the endpoint
+never reads.
+
 ## Models
 
 Every LLM node runs on one of two **model tiers** — named for the job they do,

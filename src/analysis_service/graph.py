@@ -262,6 +262,9 @@ READ_CATALOG_NODE = "reading"
 #: What applies the batch, transactionally: see
 #: :func:`~analysis_service.patch.apply_patch`.
 APPLY_NODE = "apply"
+#: The head-only entry's terminal node: resolve the catalog this head produced
+#: and stop, so #1003's endpoint is scored without paying for the lanes.
+CATALOG_NODE = "catalog"
 READ_MODEL_NODE = "read"
 VALIDATE_NODE = "validate"
 REPAIR_NODE = "repair"
@@ -529,7 +532,7 @@ def tier_node_by_graph_node(
 
 # --- Routes -----------------------------------------------------------------
 
-Entry = Literal["extract", "prepare", "extract-only", "assert-only"]
+Entry = Literal["extract", "prepare", "extract-only", "assert-only", "head-only"]
 
 ENTRY_EXTRACT: Entry = "extract"
 ENTRY_PREPARE: Entry = "prepare"
@@ -548,6 +551,37 @@ ENTRY_ASSERT_ONLY: Entry = "assert-only"
 #: The entries that build a ``prepare`` node, and so the ones an assertion
 #: pass can sit in front of.
 PREPARING_ENTRIES: frozenset[Entry] = frozenset({ENTRY_EXTRACT, ENTRY_PREPARE})
+
+ENTRY_HEAD_ONLY: Entry = "head-only"
+"""#1003's arm entry: run one arm's head — the reading node, the validity gate,
+the bounded repair, and whichever of the two passes this graph carries — then
+resolve the catalog and stop.
+
+**The primary endpoint is scored on the catalog, and no lane writes one.** An
+end-to-end run would pay every lane agent and every critic on the judgement
+tier to produce findings the endpoint never reads: measured against a recorded
+STRIDE sweep, that is roughly seventeen times the spend of the head alone. So
+the comparison runs the half it grades.
+
+It is not the assertion eval mode. That one seeds a blessed model and asks what
+the sources state about it; this one extracts the model too, which is the half
+the arms differ in."""
+
+#: The entries whose graph ends in a resolved catalog, and so the ones an
+#: assertion pass or a source review has a reader in. Derived from the two
+#: that end in one, because "would anything read this pass" is the question
+#: both guards ask and neither should answer twice.
+CATALOGUING_ENTRIES: frozenset[Entry] = PREPARING_ENTRIES | {ENTRY_HEAD_ONLY}
+
+#: The entries whose graph builds a reading node, and so the ones a transport
+#: and a strategy are properties of. **One reader**: the builder asks it to
+#: decide what to build, and
+#: :meth:`~analysis_service.deployment.Deployment.pipeline` asks it to decide
+#: what to pass — and a deployment that answered it a second way would hand a
+#: graph a strategy the graph then refused to build for.
+EXTRACTING_ENTRIES: frozenset[Entry] = frozenset(
+    {ENTRY_EXTRACT, ENTRY_EXTRACT_ONLY, ENTRY_HEAD_ONLY}
+)
 """The assertion eval mode: render a **Valid System Model** seeded in state,
 run ``assert`` over it and the sources, and stop.
 
@@ -2746,6 +2780,35 @@ def _apply_node_func(keys: GraphKeys) -> Callable[..., Any]:
     return apply
 
 
+def park_catalog(ctx, keys: GraphKeys, valid_model: dict) -> dict[str, Any]:
+    """Resolve the catalog this head produced, park it, and stop.
+
+    The head-only entry's terminal node, and it decides nothing of its own:
+    :func:`_resolve_assertions` is the seam every catalog reaches a reader
+    through, so an arm scored here answered the rules an arm that ran the lanes
+    would have answered. A graph carrying the review pass has its record parked
+    already and this re-gates it; one carrying only an extraction pass resolves
+    the proposal against the model the gate passed.
+    """
+    record = _resolve_assertions(
+        keys.state(ctx), SystemModel.model_validate(valid_model)
+    )
+    return {
+        "rows": len(record.catalog.entries),
+        "subjects": len(record.catalog.subjects),
+        "issues": len(record.issues),
+    }
+
+
+def _catalog_node_func(keys: GraphKeys) -> Callable[..., Any]:
+    """The terminal catalog node, with this graph's key families bound to it."""
+
+    def catalog(valid_model: dict, ctx) -> dict[str, Any]:
+        return park_catalog(ctx, keys, valid_model)
+
+    return catalog
+
+
 def _assert_node(
     prompt_loader: MarkdownLoader,
     resolve_model: ModelResolver,
@@ -3035,13 +3098,18 @@ def build_pipeline(
         ENTRY_PREPARE,
         ENTRY_EXTRACT_ONLY,
         ENTRY_ASSERT_ONLY,
+        ENTRY_HEAD_ONLY,
     ):
         raise ValueError(f"unknown graph entry point: {entry!r}")
     if extraction_format not in EXTRACTION_FORMATS:
         raise ValueError(f"unknown extraction format: {extraction_format!r}")
     if extraction_strategy not in EXTRACTION_STRATEGIES:
         raise ValueError(f"unknown extraction strategy: {extraction_strategy!r}")
-    extracts = entry in (ENTRY_EXTRACT, ENTRY_EXTRACT_ONLY)
+    extracts = entry in EXTRACTING_ENTRIES
+    # Whether this graph runs the lanes. The head-only entry stops at the
+    # catalog, so it builds no ``prepare``, no fan-out and no framework
+    # subgraph — and every node below that line is absent rather than unfired.
+    analyses = entry != ENTRY_HEAD_ONLY
     facts_first = extraction_strategy == FACTS_FIRST
     if facts_first and not extracts:
         raise ValueError(
@@ -3061,10 +3129,14 @@ def build_pipeline(
         )
     # Every route that leaves a catalog behind, which is what the review reads.
     catalogs = assertions or facts_first
-    if source_review and entry not in PREPARING_ENTRIES:
+    if source_review and entry not in CATALOGUING_ENTRIES:
         raise ValueError(
-            f"entry {entry!r} builds no prepare node, so nothing would read a"
-            " source review"
+            f"entry {entry!r} ends in no catalog, so nothing would read a source review"
+        )
+    if entry == ENTRY_HEAD_ONLY and not catalogs:
+        raise ValueError(
+            "the head-only entry is scored on the catalog its head produces,"
+            " and this graph builds no node that produces one"
         )
     if source_review and not catalogs:
         raise ValueError(
@@ -3076,9 +3148,9 @@ def build_pipeline(
             f"entry {entry!r} builds no extract node, so it cannot be built for"
             f" the {extraction_format!r} transport"
         )
-    if assertions and entry not in PREPARING_ENTRIES:
+    if assertions and entry not in CATALOGUING_ENTRIES:
         raise ValueError(
-            f"entry {entry!r} builds no prepare node, so nothing would read"
+            f"entry {entry!r} ends in no catalog, so nothing would read"
             " an assertion pass"
         )
     if not frameworks:
@@ -3120,12 +3192,36 @@ def build_pipeline(
         return pipeline(Workflow(name=name, edges=[(START, read, catalog)]), [catalog])
 
     keys = GraphKeys.of(frameworks)
-    disclaimers = {
-        framework: package_loaders[framework].load(DISCLAIMER_DOC).strip()
-        for framework in frameworks
-    }
-    prepare = prepare_node(keys, frameworks, domain_loader, package_loaders, assertions)
-    assemble = _node(_assemble_node_func(keys, frameworks, disclaimers), ASSEMBLE_NODE)
+    # The tail: the analysing graph's ``prepare`` and its fan-out, or the one
+    # terminal node that resolves the catalog and stops. Named once, so every
+    # edge that carries a valid model is written once whichever graph this is.
+    subgraphs: list[_FrameworkSubgraph] = []
+    assemble = None
+    if analyses:
+        disclaimers = {
+            framework: package_loaders[framework].load(DISCLAIMER_DOC).strip()
+            for framework in frameworks
+        }
+        tail: Any = prepare_node(
+            keys, frameworks, domain_loader, package_loaders, assertions
+        )
+        assemble = _node(
+            _assemble_node_func(keys, frameworks, disclaimers), ASSEMBLE_NODE
+        )
+        subgraphs = [
+            _framework_subgraph(
+                FrameworkNodes(framework),
+                keys=keys,
+                prompt_loader=prompt_loader,
+                package_loader=package_loaders[framework],
+                tier_nodes=tier_nodes,
+                resolve_model=resolve_model,
+                resolve_sampling=resolve_sampling,
+            )
+            for framework in frameworks
+        ]
+    else:
+        tail = _node(_catalog_node_func(keys), CATALOG_NODE)
     # Where the valid model goes next: straight to ``prepare``, or through the
     # assertion pass first. One name for both, so the three edges that carry
     # a valid model are written once whichever graph this is.
@@ -3148,24 +3244,11 @@ def build_pipeline(
         assertion_nodes = [*assertion_nodes, reread]
         passes.append((reading, [reading, reread, apply_node]))
     chain = [node for _, nodes in passes for node in nodes]
-    pass_edges: list[tuple[Any, ...]] = [(*chain, prepare)] if chain else []
-    first = passes[0][0] if passes else prepare
-
-    subgraphs = [
-        _framework_subgraph(
-            FrameworkNodes(framework),
-            keys=keys,
-            prompt_loader=prompt_loader,
-            package_loader=package_loaders[framework],
-            tier_nodes=tier_nodes,
-            resolve_model=resolve_model,
-            resolve_sampling=resolve_sampling,
-        )
-        for framework in frameworks
-    ]
+    pass_edges: list[tuple[Any, ...]] = [(*chain, tail)] if chain else []
+    first = passes[0][0] if passes else tail
 
     extraction_nodes: list[LlmAgent] = []
-    if entry == ENTRY_EXTRACT:
+    if extracts:
         # The head differs and nothing after it does. ``facts`` writes a bundle
         # and ``resolve`` writes the model at the key ``extract`` writes it at,
         # so one validity gate, one bounded repair and one rejection serve both
@@ -3223,14 +3306,15 @@ def build_pipeline(
     for sub in subgraphs:
         fan_out[sub.nodes.run_route] = sub.agents
         fan_out[sub.nodes.skip_route] = assemble
+    analysis_edges: list[tuple[Any, ...]] = []
+    if assemble is not None:
+        analysis_edges = [
+            (tail, fan_out),
+            *(edge for sub in subgraphs for edge in sub.edges(assemble)),
+        ]
     workflow = Workflow(
         name=name,
-        edges=[
-            *head_edges,
-            *pass_edges,
-            (prepare, fan_out),
-            *(edge for sub in subgraphs for edge in sub.edges(assemble)),
-        ],
+        edges=[*head_edges, *pass_edges, *analysis_edges],
     )
     llm_nodes = [
         *extraction_nodes,
