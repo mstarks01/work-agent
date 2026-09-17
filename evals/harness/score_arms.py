@@ -87,8 +87,20 @@ def score(
                 # not score as if it had only run the half it finished.
                 runs.append(ArmRun.unusable(case.id, reference, arm=arm, repeat=repeat))
                 continue
-            graded = replay.replay_assertions(case, reference, produced[case.id])
-            runs.append(ArmRun.of(graded, reference, arm=arm, repeat=repeat))
+            result = produced[case.id]
+            graded = replay.replay_assertions(case, reference, result)
+            runs.append(
+                ArmRun.of(
+                    graded,
+                    reference,
+                    arm=arm,
+                    repeat=repeat,
+                    # Beside the strict fates, never instead of them: the gap
+                    # between the two figures is #1015's naming measurement.
+                    aligned=replay.aligned_rows(reference, result),
+                    catalog=result.catalog,
+                )
+            )
     return runs, skipped
 
 

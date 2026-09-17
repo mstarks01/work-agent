@@ -49,7 +49,12 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any
 
-from analysis_service.assertions import UNKNOWN, assertion_id
+from analysis_service.assertions import (
+    SUBJECT_PREFIXES,
+    UNKNOWN,
+    AssertionCatalog,
+    assertion_id,
+)
 from analysis_service.deployment import (
     ASSERTIONS_VAR,
     FACTS_FIRST_EXTRACTION_VAR,
@@ -163,6 +168,30 @@ BOOTSTRAP_DRAWS = 10_000
 BOOTSTRAP_SEED = 1003
 
 
+#: Which subject family each element ID prefix names, inverted from the
+#: service's own table rather than listed again — so a subject type added to
+#: the registry is counted here the day it lands, under the name the registry
+#: gives it.
+KIND_OF_PREFIX: Mapping[str, str] = MappingProxyType(
+    {
+        prefix: subject_type
+        for subject_type, prefixes in SUBJECT_PREFIXES.items()
+        for prefix in prefixes
+    }
+)
+
+
+def subject_kind(subject: str) -> str:
+    """Which family of subject one ID names, or ``""`` for a prefix nothing claims.
+
+    **What an arm wrote *about*, which is a different question from whether the
+    reference agreed.** A count by kind is not gated by the matcher, so it
+    carries direction at a sample size the endpoint cannot — which is how the
+    pilot saw a prompt's missing subject rule while its recall said nothing.
+    """
+    return KIND_OF_PREFIX.get(subject.split(":", 1)[0], "")
+
+
 def required_rows(reference: SignedReference) -> tuple[str, ...]:
     """Every reference row the primary endpoint's denominator counts.
 
@@ -204,6 +233,17 @@ class ArmRun:
     #: :data:`~evals.harness.replay.PRODUCED_FATES` -> count, over every row the
     #: run produced that no reference row took.
     produced: Mapping[str, int] = field(default_factory=dict)
+    #: The required rows this run answered, by identity. The counts above say
+    #: *how many*; these say *which*, which is what a paired comparison between
+    #: two arms needs — 41 rows carry a direction that five cases cannot.
+    found_rows: tuple[str, ...] = ()
+    #: The required rows this run stated on the same fact under another flow
+    #: label, and which the strict matcher therefore scored as missed. Kept
+    #: apart from :attr:`found_rows` so the strict figure never moves (#1015).
+    aligned_rows: tuple[str, ...] = ()
+    #: What the run wrote about, by :func:`subject_kind`, over every row of its
+    #: catalog. Ungated by the reference, so it carries direction cheaply.
+    kinds: Mapping[str, int] = field(default_factory=dict)
     valid: bool = True
     cost_usd: float = 0.0
     seconds: float = 0.0
@@ -220,6 +260,20 @@ class ArmRun:
             return 1.0
         return self.recovered / self.required
 
+    @property
+    def aligned_recall(self) -> float:
+        """Recall crediting a row stated under another flow label.
+
+        Reported **beside** :attr:`recall` and never instead of it, which is
+        what #1015 settles: the strict figure is what every archived number
+        means, and the gap between the two is the naming measurement.
+        """
+        if not self.required:
+            return 1.0
+        if not self.valid:
+            return 0.0
+        return (len(self.found_rows) + len(self.aligned_rows)) / self.required
+
     @classmethod
     def of(
         cls,
@@ -231,6 +285,8 @@ class ArmRun:
         valid: bool = True,
         cost_usd: float = 0.0,
         seconds: float = 0.0,
+        aligned: Collection[str] = (),
+        catalog: AssertionCatalog | None = None,
     ) -> ArmRun:
         """One run, read off the replay that graded it.
 
@@ -246,6 +302,17 @@ class ArmRun:
         produced: dict[str, int] = dict.fromkeys(PRODUCED_FATES, 0)
         for fate in replay.produced.values():
             produced[fate] += 1
+        answered = tuple(
+            sorted(
+                row.reference
+                for row in replay.rows
+                if row.reference in required and row.fate == "found"
+            )
+        )
+        kinds: dict[str, int] = {}
+        for entry in () if catalog is None else catalog.entries:
+            kind = subject_kind(entry.subject)
+            kinds[kind] = kinds.get(kind, 0) + 1
         return cls(
             case_id=replay.case_id,
             arm=arm,
@@ -253,6 +320,10 @@ class ArmRun:
             required=len(required),
             fates=MappingProxyType(fates),
             produced=MappingProxyType(produced),
+            found_rows=answered,
+            # Only what the strict matcher missed, so the two never double-count.
+            aligned_rows=tuple(sorted(set(aligned) & required - set(answered))),
+            kinds=MappingProxyType(kinds),
             valid=valid,
             cost_usd=cost_usd,
             seconds=seconds,
@@ -291,7 +362,9 @@ class ArmRun:
         )
 
 
-def case_recall(runs: Collection[ArmRun], arm: str) -> dict[str, float]:
+def case_recall(
+    runs: Collection[ArmRun], arm: str, *, aligned: bool = False
+) -> dict[str, float]:
     """One arm's mean recall per case, averaging that case's repeats first.
 
     **The averaging order is the whole of why this function exists.** Five
@@ -302,13 +375,20 @@ def case_recall(runs: Collection[ArmRun], arm: str) -> dict[str, float]:
     by_case: dict[str, list[float]] = {}
     for run in runs:
         if run.arm == arm:
-            by_case.setdefault(run.case_id, []).append(run.recall)
+            value = run.aligned_recall if aligned else run.recall
+            by_case.setdefault(run.case_id, []).append(value)
     return {case: statistics.fmean(values) for case, values in by_case.items()}
 
 
-def macro_recall(runs: Collection[ArmRun], arm: str) -> float:
-    """One arm's macro-average recall: the mean over cases, each averaged first."""
-    per_case = case_recall(runs, arm)
+def macro_recall(runs: Collection[ArmRun], arm: str, *, aligned: bool = False) -> float:
+    """One arm's macro-average recall: the mean over cases, each averaged first.
+
+    ``aligned`` reads :attr:`ArmRun.aligned_recall` instead, which credits a row
+    stated under another flow label. Two figures from one aggregation rather
+    than two aggregations, so the only thing that differs between them is the
+    matcher (#1015).
+    """
+    per_case = case_recall(runs, arm, aligned=aligned)
     return statistics.fmean(per_case.values()) if per_case else 0.0
 
 
@@ -338,6 +418,78 @@ def unsupported_rate(runs: Collection[ArmRun], arm: str) -> float:
         count for one in produced for fate, count in one.items() if fate != "matched"
     )
     return unmatched / total
+
+
+@dataclass(frozen=True)
+class RowTally:
+    """One comparison counted per reference row rather than per case.
+
+    **The reading that carries a direction before an interval can.** The
+    endpoint averages five cases; this counts 41 rows, and a row one arm answers
+    more often than the other is a discordant pair — the unit a sign test reads
+    and the unit a reader's eye reads too.
+
+    ``contested`` is the rows some arm answered at least once. The rest were
+    answered by nobody, ever: they depress both arms identically, so they carry
+    no direction and only widen the mean's spread.
+    """
+
+    left: str
+    right: str
+    left_ahead: int
+    right_ahead: int
+    tied: int
+    contested: int
+
+    @property
+    def discordant(self) -> int:
+        """The pairs that carry the direction."""
+        return self.left_ahead + self.right_ahead
+
+
+def answered(runs: Collection[ArmRun], arm: str) -> Mapping[str, int]:
+    """How many of one arm's runs answered each required row, by identity."""
+    counted: dict[str, int] = {}
+    for run in runs:
+        if run.arm != arm:
+            continue
+        for row in run.found_rows:
+            counted[row] = counted.get(row, 0) + 1
+    return counted
+
+
+def row_tally(runs: Collection[ArmRun], left: str, right: str) -> RowTally:
+    """``left`` against ``right``, row by row, over the rows both arms faced.
+
+    A row counts as one arm's only where that arm answered it in **more** of its
+    runs than the other did, so a row both find every time and a row neither
+    ever finds are both ties. Only rows from cases both arms ran are compared,
+    for the reason :func:`paired_difference` pairs on shared cases.
+    """
+    shared = {run.case_id for run in runs if run.arm == left} & {
+        run.case_id for run in runs if run.arm == right
+    }
+    rows: set[str] = set()
+    required: dict[str, int] = {}
+    for run in runs:
+        if run.case_id in shared and run.arm in (left, right):
+            rows |= set(run.found_rows) | set(run.aligned_rows)
+            required[run.case_id] = run.required
+    ours, theirs = answered(runs, left), answered(runs, right)
+    # Every required row of every shared case, not only the answered ones: a row
+    # nobody found is a tie that has to be counted to say how many were dead.
+    total = sum(required.values())
+    left_ahead = sum(1 for row in rows if ours.get(row, 0) > theirs.get(row, 0))
+    right_ahead = sum(1 for row in rows if theirs.get(row, 0) > ours.get(row, 0))
+    contested = len({row for row in rows if ours.get(row) or theirs.get(row)})
+    return RowTally(
+        left=left,
+        right=right,
+        left_ahead=left_ahead,
+        right_ahead=right_ahead,
+        tied=total - left_ahead - right_ahead,
+        contested=contested,
+    )
 
 
 @dataclass(frozen=True)
@@ -455,13 +607,24 @@ def report(
     person, and an interval spanning zero is *inconclusive* rather than passed.
     """
     arms = [arm for arm in ARMS if any(run.arm == arm for run in runs)]
-    lines = ["## Arms", "", "| arm | cases | runs | recall | failed | unsupported |"]
-    lines.append("| --- | --- | --- | --- | --- | --- |")
+    lines = [
+        "## Arms",
+        "",
+        (
+            "`aligned` credits a row stated on the same fact under another flow"
+            " label (#1015). It sits beside `recall` and never replaces it."
+        ),
+        "",
+        "| arm | cases | runs | recall | aligned | failed | unsupported |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
+    ]
     for arm in arms:
         ours = [run for run in runs if run.arm == arm]
         lines.append(
             f"| {arm} | {len(case_recall(runs, arm))} | {len(ours)} |"
-            f" {macro_recall(runs, arm):.3f} | {failure_rate(runs, arm):.3f} |"
+            f" {macro_recall(runs, arm):.3f} |"
+            f" {macro_recall(runs, arm, aligned=True):.3f} |"
+            f" {failure_rate(runs, arm):.3f} |"
             f" {unsupported_rate(runs, arm):.3f} |"
         )
     lines += ["", "## Error classes", "", "| arm | " + " | ".join(ROW_FATES) + " |"]
@@ -489,6 +652,52 @@ def report(
             f"| {found.left} − {found.right} | {found.cases} |"
             f" {found.difference:+.3f} | {found.low:+.3f} to {found.high:+.3f} |"
         )
+    kinds = sorted({kind for run in runs for kind in run.kinds})
+    if kinds:
+        lines += [
+            "",
+            "## What each arm wrote about",
+            "",
+            (
+                "Rows produced by subject kind, ungated by the reference — so"
+                " this carries a direction at a sample size the endpoint cannot."
+            ),
+            "",
+            "| arm | " + " | ".join(kinds) + " | total |",
+            "| --- |" + " --- |" * (len(kinds) + 1),
+        ]
+        for arm in arms:
+            counted = {
+                kind: sum(run.kinds.get(kind, 0) for run in runs if run.arm == arm)
+                for kind in kinds
+            }
+            lines.append(
+                f"| {arm} | "
+                + " | ".join(str(counted[kind]) for kind in kinds)
+                + f" | {sum(counted.values())} |"
+            )
+    lines += [
+        "",
+        "## Row by row",
+        "",
+        (
+            "Each comparison counted over reference rows rather than cases. A"
+            " discordant pair is a row one arm answers in more of its runs than"
+            " the other; `contested` is the rows some arm answered at least"
+            " once, and the rest carry no direction."
+        ),
+        "",
+        "| comparison | left ahead | right ahead | tied | contested |",
+        "| --- | --- | --- | --- | --- |",
+    ]
+    for left, right in planned:
+        tally = row_tally(runs, left, right)
+        if not tally.tied and not tally.discordant:
+            continue
+        lines.append(
+            f"| {left} − {right} | {tally.left_ahead} | {tally.right_ahead} |"
+            f" {tally.tied} | {tally.contested} |"
+        )
     lines += ["", "## Per case", "", "| case | " + " | ".join(arms) + " |"]
     lines.append("| --- |" + " --- |" * len(arms))
     recalls = {arm: case_recall(runs, arm) for arm in arms}
@@ -515,7 +724,13 @@ def _fate_totals(runs: Collection[ArmRun], arm: str) -> Mapping[str, int]:
 #: file written under another spelling is refused rather than read part-way:
 #: the fate names are the endpoint's own vocabulary, and a file keyed by an
 #: older set would silently score zero for a class that was renamed.
-ARTIFACT_VERSION = 1
+#:
+#: Version 2 adds the rows a run answered and the rows it stated under another
+#: flow label, both by identity, and what it wrote about by subject kind. A
+#: version 1 file carries none of them, so the paired comparison and the
+#: aligned figure would read as empty rather than as absent — which is why the
+#: loader refuses it rather than defaulting.
+ARTIFACT_VERSION = 2
 
 
 class ArmsError(ValueError):
@@ -531,6 +746,9 @@ def to_json(run: ArmRun) -> dict[str, Any]:
         "required": run.required,
         "fates": {fate: run.fates.get(fate, 0) for fate in ROW_FATES},
         "produced": {fate: run.produced.get(fate, 0) for fate in PRODUCED_FATES},
+        "found_rows": list(run.found_rows),
+        "aligned_rows": list(run.aligned_rows),
+        "kinds": dict(run.kinds),
         "valid": run.valid,
         "cost_usd": run.cost_usd,
         "seconds": run.seconds,
@@ -596,6 +814,9 @@ def _run_of(path: Path, index: int, row: Mapping[str, Any]) -> ArmRun:
         required=int(row["required"]),
         fates=MappingProxyType(dict(fates)),
         produced=MappingProxyType(dict(produced)),
+        found_rows=tuple(row.get("found_rows", ())),
+        aligned_rows=tuple(row.get("aligned_rows", ())),
+        kinds=MappingProxyType(dict(row.get("kinds", {}))),
         valid=bool(row.get("valid", True)),
         cost_usd=float(row.get("cost_usd", 0.0)),
         seconds=float(row.get("seconds", 0.0)),
