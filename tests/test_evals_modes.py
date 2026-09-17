@@ -45,6 +45,7 @@ from analysis_service.graph import (
     ENTRY_ASSERT_ONLY,
     ENTRY_EXTRACT,
     ENTRY_EXTRACT_ONLY,
+    ENTRY_HEAD_ONLY,
     ENTRY_PREPARE,
     EXTRACT_NODE,
     Analysis,
@@ -1053,6 +1054,7 @@ def test_every_mode_maps_to_a_graph_entry():
         "assertions": ENTRY_ASSERT_ONLY,
         "analysis": ENTRY_PREPARE,
         "end-to-end": ENTRY_EXTRACT,
+        "heads": ENTRY_HEAD_ONLY,
     }
 
 

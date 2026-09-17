@@ -155,8 +155,8 @@ class TestWhatTheBuilderRefuses:
         with pytest.raises(ValueError, match="builds no node that produces one"):
             built(source_review=True)
 
-    def test_an_entry_that_never_prepares(self) -> None:
-        with pytest.raises(ValueError, match="builds no prepare node"):
+    def test_an_entry_that_ends_in_no_catalog(self) -> None:
+        with pytest.raises(ValueError, match="ends in no catalog"):
             built(
                 entry=graph.ENTRY_EXTRACT_ONLY,
                 extraction_strategy=FACTS_FIRST,
