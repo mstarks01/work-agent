@@ -414,6 +414,7 @@ async def _run_mode(
                 executions=tuple(failed.node_runs),
                 error=failed.cause,
                 result=failed.extraction,
+                assertion_result=failed.assertion,
             )
         except Exception as error:  # noqa: BLE001 — every fault, so none is free
             # A refused model and a provider fault arrive the same way here and
@@ -437,10 +438,14 @@ async def _run_mode(
         case = outcome.case
         executions.extend(outcome.executions)
         # Before the outcome is told apart, because the emission is kept
-        # whichever way the case ended: a refused model is written beside a
-        # finished one, and the replay grades both under one instrument.
+        # whichever way the case ended: a refused model and a head that reached
+        # no catalog are written beside a finished case, and the replay grades
+        # them under one instrument. A failed run is the one most worth reading
+        # back, so it is the one a sweep must not drop.
         if outcome.result is not None:
             extracted[case.id] = outcome.result
+        if outcome.assertion_result is not None:
+            resolved[case.id] = outcome.assertion_result
         if outcome.error is not None:
             if not isinstance(outcome.error, MEASURED):
                 # Not a measurement: the provider or the transport failed, and
@@ -453,8 +458,6 @@ async def _run_mode(
         if outcome.assertion is not None:
             assertion_scores.append(outcome.assertion)
             payloads.append(outcome.assertion.to_json())
-            if outcome.assertion_result is not None:
-                resolved[case.id] = outcome.assertion_result
             return False
         if outcome.extraction is not None:
             extractions.append(outcome.extraction)
