@@ -115,6 +115,7 @@ __all__ = [
     "AssertionProposal",
     "AssertionRecord",
     "Basis",
+    "CatalogCoverage",
     "CatalogIssue",
     "CatalogIssueCode",
     "CatalogProposal",
@@ -135,6 +136,7 @@ __all__ = [
     "answer",
     "apply_projection",
     "assertion_id",
+    "catalog_coverage",
     "catalog_issues",
     "conflicts",
     "contradiction_issues",
@@ -2038,6 +2040,66 @@ def contradictions(
                 )
             )
     return tuple(found)
+
+
+@dataclass(frozen=True)
+class CatalogCoverage:
+    """What one job's assertion pass reached, and what it left untouched.
+
+    **Derived, never stored.** ADR 0034 rejected a stored coverage record for
+    the reason it rejected a stored conflict record: it is a second reader of
+    the rows, and its own test would agree with it. This is computed from the
+    catalog and the model every time somebody asks.
+
+    It exists because of what the same record says about absence: *absence from
+    the catalog is never an absent control — it is a predicate nobody asked
+    about.* A reader with no way to see how much was asked reads a short
+    catalog as a quiet system. Measured on the archived sweeps, the pass
+    reproduces about half of what a reader says the sources state, and nothing
+    in a report said so.
+
+    ``reachable`` and ``settled`` are the honest denominator and numerator: the
+    element attributes some predicate could speak to on *this* model, and how
+    many the catalog actually settles. ``open`` counts the questions the
+    sources raised and left unanswered, which is coverage stated as rows.
+    ``own_subjects`` counts what the graph has no place for at all — a fact
+    about a principal or a credential — because that is the part of the catalog
+    a reader cannot find anywhere else.
+    """
+
+    reachable: int
+    settled: int
+    open: int
+    own_subjects: int
+
+
+def catalog_coverage(catalog: AssertionCatalog, model: SystemModel) -> CatalogCoverage:
+    """How much of what this model's attributes could hold the catalog reached."""
+    fields = set(projection_fields().values())
+    reachable = sum(
+        1
+        for element in model.elements()
+        for attribute in fields
+        if hasattr(element, attribute)
+    )
+    settled_rows = settled(catalog)
+    graph_bound = {
+        subject.id for subject in catalog.subjects if subject.type in GRAPH_BOUND
+    }
+    return CatalogCoverage(
+        reachable=reachable,
+        settled=len(
+            {
+                (projection.element_id, projection.attribute)
+                for projection in project(catalog)
+                if projection.reason in SETTLING_REASONS
+            }
+        ),
+        open=sum(1 for entry in catalog.entries if entry.value == UNKNOWN),
+        own_subjects=sum(
+            1 for entry in settled_rows if entry.subject not in graph_bound
+        ),
+    )
 
 
 def contradiction_issues(

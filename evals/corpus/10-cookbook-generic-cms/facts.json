@@ -1,0 +1,263 @@
+{
+ "case": "10-cookbook-generic-cms",
+ "drafted_by": "agent-stand-in",
+ "rows": [
+  {
+   "assertion": {
+    "subject_type": "interaction",
+    "subject": "flow:entity:reader>process:web-server>page-requests",
+    "predicate": "transport-encryption",
+    "value": "HTTPS",
+    "reason": null,
+    "scope": [],
+    "basis": "stated",
+    "quotes": [
+     {
+      "source_label": "System description",
+      "quote": "readers hit the web server over HTTPS"
+     }
+    ],
+    "explanation": "",
+    "exclusive": false
+   },
+   "rationale": "Stated directly.",
+   "reviewed_by": null
+  },
+  {
+   "assertion": {
+    "subject_type": "interaction",
+    "subject": "flow:entity:reader>entity:cdn>asset-fetch",
+    "predicate": "transport-encryption",
+    "value": "absent",
+    "reason": null,
+    "scope": [],
+    "basis": "stated",
+    "quotes": [
+     {
+      "source_label": "System description",
+      "quote": "Readers fetch\nthose from the CDN over HTTP."
+     }
+    ],
+    "explanation": "",
+    "exclusive": false
+   },
+   "rationale": "HTTP against the HTTPS named one sentence earlier: an explicit absence, not a silence.",
+   "reviewed_by": null
+  },
+  {
+   "assertion": {
+    "subject_type": "component",
+    "subject": "store:mysql-database",
+    "predicate": "network-membership",
+    "value": "boundary:hosted-network",
+    "reason": null,
+    "scope": [],
+    "basis": "stated",
+    "quotes": [
+     {
+      "source_label": "System description",
+      "quote": "keeps pages, accounts and comments in a MySQL\ndatabase on the same hosted network"
+     }
+    ],
+    "explanation": "",
+    "exclusive": false
+   },
+   "rationale": "Stated directly.",
+   "reviewed_by": null
+  },
+  {
+   "assertion": {
+    "subject_type": "component",
+    "subject": "process:web-server",
+    "predicate": "network-membership",
+    "value": "boundary:hosted-network",
+    "reason": null,
+    "scope": [],
+    "basis": "stated",
+    "quotes": [
+     {
+      "source_label": "System description",
+      "quote": "keeps pages, accounts and comments in a MySQL\ndatabase on the same hosted network"
+     }
+    ],
+    "explanation": "",
+    "exclusive": false
+   },
+   "rationale": "'The same hosted network' places the web server too.",
+   "reviewed_by": null
+  },
+  {
+   "assertion": {
+    "subject_type": "interaction",
+    "subject": "flow:entity:admin>store:mysql-database>direct-administration",
+    "predicate": "transport-encryption",
+    "value": "absent",
+    "reason": null,
+    "scope": [],
+    "basis": "stated",
+    "quotes": [
+     {
+      "source_label": "System description",
+      "quote": "That is an unsecured MySQL connection straight to the box, no TLS on it"
+     }
+    ],
+    "explanation": "",
+    "exclusive": false
+   },
+   "rationale": "Stated twice over: unsecured, and no TLS.",
+   "reviewed_by": null
+  },
+  {
+   "assertion": {
+    "subject_type": "component",
+    "subject": "entity:admin",
+    "predicate": "network-membership",
+    "value": "boundary:public-internet",
+    "reason": null,
+    "scope": [],
+    "basis": "stated",
+    "quotes": [
+     {
+      "source_label": "System description",
+      "quote": "they do it from wherever they happen to be \u2014 there is no jump host"
+     }
+    ],
+    "explanation": "",
+    "exclusive": false
+   },
+   "rationale": "The admin's position is stated as anywhere, with the control that would narrow it named absent.",
+   "reviewed_by": null
+  },
+  {
+   "assertion": {
+    "subject_type": "interaction",
+    "subject": "flow:process:web-server>store:cdn-bucket>asset-publish",
+    "predicate": "authentication-mechanism",
+    "value": "unknown",
+    "reason": "silent",
+    "scope": [],
+    "basis": "stated",
+    "quotes": [
+     {
+      "source_label": "System description",
+      "quote": "Nothing here tells you how the push to the CDN is authenticated"
+     }
+    ],
+    "explanation": "",
+    "exclusive": false
+   },
+   "rationale": "Named as not stated.",
+   "reviewed_by": null
+  },
+  {
+   "assertion": {
+    "subject_type": "component",
+    "subject": "store:mysql-database",
+    "predicate": "storage-encryption",
+    "value": "unknown",
+    "reason": "hedged",
+    "scope": [],
+    "basis": "stated",
+    "quotes": [
+     {
+      "source_label": "System description",
+      "quote": "I could\nnot tell you whether the database is encrypted on disk"
+     }
+    ],
+    "explanation": "",
+    "exclusive": false
+   },
+   "rationale": "The speaker raised it and could not answer.",
+   "reviewed_by": null
+  },
+  {
+   "assertion": {
+    "subject_type": "component",
+    "subject": "entity:reader",
+    "predicate": "network-membership",
+    "value": "boundary:public-internet",
+    "reason": null,
+    "scope": [],
+    "basis": "stated",
+    "quotes": [
+     {
+      "source_label": "System description",
+      "quote": "Public site: readers hit the web server over HTTPS, some of them signed in."
+     }
+    ],
+    "explanation": "",
+    "exclusive": false
+   },
+   "rationale": "A public site's readers are on the public internet, stated by 'public site'.",
+   "reviewed_by": null
+  },
+  {
+   "assertion": {
+    "subject_type": "component",
+    "subject": "process:web-server",
+    "predicate": "internet-exposure",
+    "value": "internet-facing",
+    "reason": null,
+    "scope": [],
+    "basis": "stated",
+    "quotes": [
+     {
+      "source_label": "System description",
+      "quote": "Public site: readers hit the web server over HTTPS, some of them signed in."
+     }
+    ],
+    "explanation": "",
+    "exclusive": false
+   },
+   "rationale": "The same sentence states that the public reaches it.",
+   "reviewed_by": null
+  },
+  {
+   "assertion": {
+    "subject_type": "interaction",
+    "subject": "flow:entity:reader>process:web-server>page-requests",
+    "predicate": "authentication-mechanism",
+    "value": "a sign-in some readers have and others do not",
+    "reason": null,
+    "scope": [],
+    "basis": "stated",
+    "quotes": [
+     {
+      "source_label": "System description",
+      "quote": "Public site: readers hit the web server over HTTPS, some of them signed in."
+     }
+    ],
+    "explanation": "",
+    "exclusive": false
+   },
+   "rationale": "'Some of them signed in' states that a sign-in exists and that it is not required.",
+   "reviewed_by": null
+  }
+ ],
+ "disputed": [
+  {
+   "element_id": "entity:cdn",
+   "attribute": "trust_zone",
+   "blessed": "boundary:cdn",
+   "proposed": "record as an inference",
+   "kind": "defensible-inference",
+   "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
+   "ruling": null,
+   "reviewed_by": null
+  },
+  {
+   "element_id": "store:cdn-bucket",
+   "attribute": "trust_zone",
+   "blessed": "boundary:cdn",
+   "proposed": "record as an inference",
+   "kind": "defensible-inference",
+   "basis": "The bucket is named as the CDN's; which zone that is remains the model's reading. No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
+   "ruling": null,
+   "reviewed_by": null
+  }
+ ],
+ "aliases": {
+  "subjects": [],
+  "qualifiers": []
+ }
+}

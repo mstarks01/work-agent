@@ -1,0 +1,366 @@
+{
+ "case": "02-iot-fleet-telemetry",
+ "drafted_by": "agent-stand-in",
+ "rows": [
+  {
+   "assertion": {
+    "subject_type": "interaction",
+    "subject": "flow:entity:sensor-node>process:device-gateway>publish-readings",
+    "predicate": "authentication-mechanism",
+    "value": "pre-shared key",
+    "reason": null,
+    "scope": [],
+    "basis": "stated",
+    "quotes": [
+     {
+      "source_label": "System description",
+      "quote": "Nodes authenticate to the broker with a pre-shared key."
+     }
+    ],
+    "explanation": "",
+    "exclusive": false
+   },
+   "rationale": "Stated outright, and the only authentication the ingest path names.",
+   "reviewed_by": null
+  },
+  {
+   "assertion": {
+    "subject_type": "principal",
+    "subject": "principal:sensor-nodes",
+    "predicate": "credential-presented",
+    "value": "credential:pre-shared-key",
+    "reason": null,
+    "scope": [],
+    "basis": "stated",
+    "quotes": [
+     {
+      "source_label": "System description",
+      "quote": "Nodes authenticate to the broker with a pre-shared key."
+     }
+    ],
+    "explanation": "",
+    "exclusive": false
+   },
+   "rationale": "Each sensor node presents the key. Recorded on the principal that presents it rather than as a second predicate on the interaction, so the flow's authentication projects a value instead of a degraded unknown.",
+   "reviewed_by": null
+  },
+  {
+   "assertion": {
+    "subject_type": "credential",
+    "subject": "credential:pre-shared-key",
+    "predicate": "credential-sharing",
+    "value": "shared",
+    "reason": null,
+    "scope": [],
+    "basis": "stated",
+    "quotes": [
+     {
+      "source_label": "System description",
+      "quote": "The key is per fleet, not per device."
+     }
+    ],
+    "explanation": "",
+    "exclusive": false
+   },
+   "rationale": "Per fleet is the definition of shared: every node presents one credential.",
+   "reviewed_by": null
+  },
+  {
+   "assertion": {
+    "subject_type": "credential",
+    "subject": "credential:pre-shared-key",
+    "predicate": "credential-rotation",
+    "value": "not-rotated",
+    "reason": null,
+    "scope": [],
+    "basis": "stated",
+    "quotes": [
+     {
+      "source_label": "System description",
+      "quote": "Nobody has rotated it since deployment."
+     }
+    ],
+    "explanation": "",
+    "exclusive": false
+   },
+   "rationale": "A stated absence of rotation, not an unknown.",
+   "reviewed_by": null
+  },
+  {
+   "assertion": {
+    "subject_type": "component",
+    "subject": "process:device-gateway",
+    "predicate": "internet-exposure",
+    "value": "internet-facing",
+    "reason": null,
+    "scope": [],
+    "basis": "stated",
+    "quotes": [
+     {
+      "source_label": "System description",
+      "quote": "expose to the internet because the nodes dial in from anywhere"
+     }
+    ],
+    "explanation": "",
+    "exclusive": false
+   },
+   "rationale": "Stated as the reason for the design, so it is not an inference.",
+   "reviewed_by": null
+  },
+  {
+   "assertion": {
+    "subject_type": "component",
+    "subject": "process:device-gateway",
+    "predicate": "network-membership",
+    "value": "boundary:ingest-edge",
+    "reason": null,
+    "scope": [],
+    "basis": "stated",
+    "quotes": [
+     {
+      "source_label": "System description",
+      "quote": "an MQTT broker we run on GKE and expose to the internet"
+     }
+    ],
+    "explanation": "",
+    "exclusive": false
+   },
+   "rationale": "The broker is the ingest edge; the model puts it there.",
+   "reviewed_by": null
+  },
+  {
+   "assertion": {
+    "subject_type": "component",
+    "subject": "process:telemetry-normalizer",
+    "predicate": "network-membership",
+    "value": "boundary:analytics-core",
+    "reason": null,
+    "scope": [],
+    "basis": "stated",
+    "quotes": [
+     {
+      "source_label": "System description",
+      "quote": "a Python consumer in our analytics network"
+     }
+    ],
+    "explanation": "",
+    "exclusive": false
+   },
+   "rationale": "Named directly: the analytics network.",
+   "reviewed_by": null
+  },
+  {
+   "assertion": {
+    "subject_type": "component",
+    "subject": "store:firmware-bucket",
+    "predicate": "internet-exposure",
+    "value": "internet-facing",
+    "reason": null,
+    "scope": [],
+    "basis": "stated",
+    "quotes": [
+     {
+      "source_label": "System description",
+      "quote": "The bucket is public read, because making the nodes authenticate to it was awkward."
+     }
+    ],
+    "explanation": "",
+    "exclusive": false
+   },
+   "rationale": "Public read is reachable from the internet, stated with its reason.",
+   "reviewed_by": null
+  },
+  {
+   "assertion": {
+    "subject_type": "interaction",
+    "subject": "flow:entity:sensor-node>store:firmware-bucket>poll-firmware",
+    "predicate": "authentication-mechanism",
+    "value": "absent",
+    "reason": null,
+    "scope": [],
+    "basis": "stated",
+    "quotes": [
+     {
+      "source_label": "System description",
+      "quote": "The bucket is public read, because making the nodes authenticate to it was awkward."
+     }
+    ],
+    "explanation": "",
+    "exclusive": false
+   },
+   "rationale": "An explicit absence: the speaker says authenticating was dropped, not that it is unknown.",
+   "reviewed_by": null
+  },
+  {
+   "assertion": {
+    "subject_type": "interaction",
+    "subject": "flow:entity:sensor-node>store:firmware-bucket>poll-firmware",
+    "predicate": "signature-verification",
+    "value": "unknown",
+    "reason": "hedged",
+    "scope": [],
+    "basis": "stated",
+    "quotes": [
+     {
+      "source_label": "System description",
+      "quote": "I do not know whether the nodes check a signature on the image before installing it."
+     }
+    ],
+    "explanation": "",
+    "exclusive": false
+   },
+   "rationale": "The speaker raised it and could not answer: a hedged unknown, not an absence.",
+   "reviewed_by": null
+  },
+  {
+   "assertion": {
+    "subject_type": "interaction",
+    "subject": "flow:entity:field-technician>entity:sensor-node>local-service-session",
+    "predicate": "authentication-mechanism",
+    "value": "unknown",
+    "reason": "hedged",
+    "scope": [],
+    "basis": "stated",
+    "quotes": [
+     {
+      "source_label": "System description",
+      "quote": "I don't know what authentication that console has, if any."
+     }
+    ],
+    "explanation": "",
+    "exclusive": false
+   },
+   "rationale": "Raised and unanswered. 'If any' is a doubt, not a stated absence.",
+   "reviewed_by": null
+  },
+  {
+   "assertion": {
+    "subject_type": "interaction",
+    "subject": "flow:entity:fleet-operator>store:telemetry-lake>query-dashboards",
+    "predicate": "authentication-mechanism",
+    "value": "company SSO",
+    "reason": null,
+    "scope": [],
+    "basis": "stated",
+    "quotes": [
+     {
+      "source_label": "System description",
+      "quote": "signed in with company SSO"
+     }
+    ],
+    "explanation": "",
+    "exclusive": false
+   },
+   "rationale": "Stated for the operator path and only that path.",
+   "reviewed_by": null
+  },
+  {
+   "assertion": {
+    "subject_type": "component",
+    "subject": "entity:fleet-operator",
+    "predicate": "network-membership",
+    "value": "boundary:corporate-network",
+    "reason": null,
+    "scope": [],
+    "basis": "stated",
+    "quotes": [
+     {
+      "source_label": "System description",
+      "quote": "look at dashboards over BigQuery from the corporate network"
+     }
+    ],
+    "explanation": "",
+    "exclusive": false
+   },
+   "rationale": "The operator's own position is stated.",
+   "reviewed_by": null
+  },
+  {
+   "assertion": {
+    "subject_type": "component",
+    "subject": "entity:sensor-node",
+    "predicate": "network-membership",
+    "value": "boundary:field-network",
+    "reason": null,
+    "scope": [],
+    "basis": "stated",
+    "quotes": [
+     {
+      "source_label": "System description",
+      "quote": "We have a few thousand sensor nodes installed on customer sites."
+     }
+    ],
+    "explanation": "",
+    "exclusive": false
+   },
+   "rationale": "Customer sites are the field network the model names.",
+   "reviewed_by": null
+  }
+ ],
+ "disputed": [
+  {
+   "element_id": "entity:field-technician",
+   "attribute": "trust_zone",
+   "blessed": "boundary:field-network",
+   "proposed": "record as an inference",
+   "kind": "defensible-inference",
+   "basis": "Servicing nodes over a local console implies being where the nodes are. No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
+   "ruling": null,
+   "reviewed_by": null
+  },
+  {
+   "element_id": "process:telemetry-normalizer",
+   "attribute": "exposure",
+   "blessed": "internal",
+   "proposed": "record as an inference",
+   "kind": "defensible-inference",
+   "basis": "No sentence states its reachability. Sitting in an internal network implies it, which is an inference rather than a statement.",
+   "ruling": null,
+   "reviewed_by": null
+  },
+  {
+   "element_id": "store:device-registry",
+   "attribute": "trust_zone",
+   "blessed": "boundary:ingest-edge",
+   "proposed": "record as an inference",
+   "kind": "defensible-inference",
+   "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
+   "ruling": null,
+   "reviewed_by": null
+  },
+  {
+   "element_id": "store:telemetry-lake",
+   "attribute": "trust_zone",
+   "blessed": "boundary:analytics-core",
+   "proposed": "record as an inference",
+   "kind": "defensible-inference",
+   "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
+   "ruling": null,
+   "reviewed_by": null
+  },
+  {
+   "element_id": "store:firmware-bucket",
+   "attribute": "trust_zone",
+   "blessed": "boundary:ingest-edge",
+   "proposed": "record as an inference",
+   "kind": "defensible-inference",
+   "basis": "Public read makes its placement arguable as well as unstated. No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
+   "ruling": null,
+   "reviewed_by": null
+  },
+  {
+   "element_id": "store:pub-sub",
+   "attribute": "trust_zone",
+   "blessed": "boundary:ingest-edge",
+   "proposed": "keep; model.json already records it as an assumption",
+   "kind": "defensible-inference",
+   "basis": "The model itself carries an assumption on this attribute, so it is not held as stated.",
+   "ruling": null,
+   "reviewed_by": null
+  }
+ ],
+ "aliases": {
+  "subjects": [],
+  "qualifiers": []
+ }
+}

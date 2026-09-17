@@ -21,6 +21,7 @@ from analysis_service.assertions import (
     Qualifier,
     Subject,
     assertion_id,
+    catalog_coverage,
 )
 from analysis_service.claims import (
     CONDITIONAL_GROUNDS,
@@ -44,7 +45,12 @@ from analysis_service.frameworks.stride.record import (
     ThreatProposals,
 )
 from analysis_service.system_model import UNKNOWN, DataStore, SystemModel
-from tests.factories import sample_draft, sample_proposal, valid_model
+from tests.factories import (
+    sample_draft,
+    sample_proposal,
+    sample_report,
+    valid_model,
+)
 
 ENCRYPTION_REF = "unknown:store:orders-db:encryption_at_rest"
 LOGIN_CROSSING_REF = "crossing:flow:entity:customer>process:web-app>login"
@@ -1068,3 +1074,63 @@ class TestWhichGroundsMakeAClaimConditional:
 
     def test_the_set_holds_the_two_questions_and_neither_absence(self):
         assert CONDITIONAL_GROUNDS == {"unknown-attribute", "unknown-assertion"}
+
+
+class TestWhatTheAssertionPassReached:
+    """Coverage as a derived count, because a short catalog and a quiet system
+    look identical without one.
+
+    ADR 0034 rejected storing this. It is computed from the rows and the model,
+    so it cannot drift from what it summarises.
+    """
+
+    def test_a_job_that_ran_no_pass_reports_nothing(self):
+        """`None` is every job on a deployment that has not set the flag."""
+        assert sample_report().assertion_coverage is None
+
+    def test_the_denominator_is_what_this_model_could_hold(self):
+        """Not what the corpus holds, and not what the pass happened to ask."""
+        held = catalog_coverage(AssertionCatalog(), valid_model())
+
+        assert held.reachable == 9 and held.settled == 0
+
+    def test_a_settled_row_counts_against_that_denominator(self):
+        """A row on a flow, under a predicate that has a graph field."""
+        mechanism = row(
+            subject=LOGIN_FLOW, predicate="authentication-mechanism", value="mTLS"
+        )
+        flow = Subject(id=LOGIN_FLOW, type="interaction", label="login")
+        held = catalog_coverage(assertions(mechanism, subjects=(flow,)), valid_model())
+
+        assert held.settled == 1
+
+    def test_an_open_question_is_counted_and_never_settles_an_attribute(self):
+        """Coverage stated as rows: the sources raised it and left it open."""
+        held = catalog_coverage(
+            assertions(row(value=UNKNOWN, reason="silent", explanation="")),
+            valid_model(),
+        )
+
+        assert held.open == 1 and held.settled == 0
+
+    def test_a_fact_about_a_principal_is_counted_apart(self):
+        """The part of the catalog a reader can find nowhere else."""
+        held = AssertionCatalog(
+            subjects=[
+                Subject(
+                    id="principal:shoppers", type="principal", label="shopper accounts"
+                )
+            ],
+            entries=[
+                Assertion(
+                    subject="principal:shoppers",
+                    predicate="mfa-requirement",
+                    value=ABSENT,
+                    basis="inferred",
+                    explanation="the description names password login only",
+                )
+            ],
+        )
+        counted = catalog_coverage(held, valid_model())
+
+        assert counted.own_subjects == 1 and counted.settled == 0

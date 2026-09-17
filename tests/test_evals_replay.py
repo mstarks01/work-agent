@@ -579,11 +579,22 @@ class TestEveryReferenceRowTakesOneFate:
 
 
 class TestAnUnsignedReferenceGradesNothing:
-    def test_a_case_without_a_facts_file_is_none(self):
-        golden = case("02")
+    def test_a_case_without_a_facts_file_is_none(self, tmp_path):
+        """A corpus root holding the case and no reference at all.
 
-        assert replay.unsigned_rows(CORPUS, golden) is None
-        assert replay.signed_reference(CORPUS, golden) is None
+        Built here rather than named, because naming a corpus case that
+        happens to lack a reference makes this test fail the day somebody
+        writes one — which is the day the corpus got better.
+        """
+        golden = case("01")
+        target = tmp_path / golden.id
+        target.mkdir()
+        for path in (CORPUS / golden.id).iterdir():
+            if path.is_file() and path.name != "facts.json":
+                (target / path.name).write_bytes(path.read_bytes())
+
+        assert replay.unsigned_rows(tmp_path, golden) is None
+        assert replay.signed_reference(tmp_path, golden) is None
 
     def test_an_unsigned_row_withholds_the_catalog(self, tmp_path):
         golden = case("01")
