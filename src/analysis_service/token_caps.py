@@ -105,6 +105,10 @@ TOKEN_CAPS: dict[str, int] = {
     # that a cap here alarms rather than rations.
     "prompts/extract-compact": 750,
     "prompts/repair": 900,
+    # The source-driven review body (#1003 arms C and D). The role and predicate
+    # tables beside it are rendered, as they are for the facts-first body, so
+    # neither moves this number.
+    "prompts/reread": 1500,
     # The assertion body alone. The predicate table beside it is rendered from
     # `assertions.REGISTRY` rather than written here, so a predicate added
     # tomorrow moves the composed instruction and never this file.

@@ -49,10 +49,11 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from analysis_service.assertions import (
+    GATE_REFUSALS,
     AssertionCatalog,
     AssertionRecord,
     assertion_id,
-    catalog_issues,
+    gate_issues,
     merged,
     without,
 )
@@ -301,9 +302,11 @@ def apply_patch(
         ],
     )
     catalog = merged(retracted, resolution.record.catalog)
-    built = AssertionRecord(
+    built = AssertionRecord.over(
+        catalog,
+        resolution.model,
+        sources,
         proposed=record.proposed + resolution.record.proposed,
-        catalog=catalog,
         issues=[*record.issues, *resolution.record.issues],
     )
     outcomes = _outcomes(batch.operations, refused)
@@ -561,12 +564,17 @@ def _gate_refusals(
     The two gates every arm already runs, over the result rather than over the
     patch: a batch that builds a model the validity gate refuses, or a catalog
     the assertion gate refuses, is a batch this service cannot hand on.
+
+    :data:`~analysis_service.assertions.GATE_REFUSALS` is what counts, so the
+    one code that is not a refusal does not discard a batch: a row standing
+    beside a graph attribute that says the opposite is the defect the assertion
+    layer exists to show, and dropping the batch would hide it.
     """
     codes: list[str] = [issue.code for issue in validate(model, sources=sources)]
     codes += [
         issue.code
-        for issue in catalog_issues(catalog, model=model, sources=sources)
-        if issue.code != "graph-contradiction"
+        for issue in gate_issues(catalog, model, sources)
+        if issue.code in GATE_REFUSALS
     ]
     return tuple(sorted(set(codes)))
 

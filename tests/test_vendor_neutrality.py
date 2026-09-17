@@ -767,6 +767,7 @@ NODE_OUTPUT_SCHEMAS: dict[str, str] = {
     ),
     "CatalogProposal": "named directly: CatalogProposal",
     "SourceFactBundle": "named directly: SourceFactBundle, by `facts`",
+    "PatchBatch": "named directly: PatchBatch, by `reread`",
     "schemas.proposals": "every package's `proposals`, read from SCHEMAS",
     "schemas.rulings": "every package's `rulings`, read from SCHEMAS",
 }
@@ -805,12 +806,14 @@ def _model_facing_schemas() -> dict[str, type[BaseModel]]:
     from analysis_service.factbundle import SourceFactBundle
     from analysis_service.frameworks import PACKAGES, schemas_for
     from analysis_service.graph import EXTRACTION_SCHEMAS
+    from analysis_service.patch import PatchBatch
 
     found: dict[str, type[BaseModel]] = {
         cls.__name__: cls for cls in EXTRACTION_SCHEMAS.values()
     }
     found["CatalogProposal"] = CatalogProposal
     found["SourceFactBundle"] = SourceFactBundle
+    found["PatchBatch"] = PatchBatch
     for name in PACKAGES:
         schemas = schemas_for(name)
         for role in ("proposals", "rulings"):

@@ -158,6 +158,12 @@ ASSERTIONS_VAR = "ANALYSIS_ASSERTIONS"
 #: it is refused together with ``ANALYSIS_ASSERTIONS``: a second pass over the
 #: model the bundle built would extract one thing twice.
 FACTS_FIRST_EXTRACTION_VAR = "ANALYSIS_FACTS_FIRST_EXTRACTION"
+#: Run the bounded source review on every job (#1003 arms C and D): ``reread``
+#: reads the sources once more against the model and the catalog, and ``apply``
+#: applies the typed operations it proposes or discards the batch whole. Off by
+#: default. It reads a catalog, so it needs a route that produces one — either
+#: ``ANALYSIS_ASSERTIONS`` or ``ANALYSIS_FACTS_FIRST_EXTRACTION``.
+SOURCE_REVIEW_VAR = "ANALYSIS_SOURCE_REVIEW"
 
 
 def _path(env: Mapping[str, str], var: str, default: Path) -> Path:
@@ -245,6 +251,9 @@ class Deployment:
     #: for the reason the transport is: a report with the pass and one without
     #: are compared with everything else held fixed.
     assertions: bool = False
+    #: Whether every job runs the bounded source review. A property of the
+    #: deployment for the reason the pass ahead of it is.
+    source_review: bool = False
     # Held only to derive each vendor's credentials when the adapters are built.
     # Out of repr and equality: a deployment in a log must not carry a key. A
     # copy taken by :meth:`from_env`, never the caller's live mapping: a
@@ -305,6 +314,7 @@ class Deployment:
                 FACTS_FIRST if _flag(env, FACTS_FIRST_EXTRACTION_VAR) else GRAPH_FIRST
             ),
             assertions=_flag(env, ASSERTIONS_VAR),
+            source_review=_flag(env, SOURCE_REVIEW_VAR),
             env=MappingProxyType(dict(env)),
         )
 
@@ -421,6 +431,16 @@ class Deployment:
                 self.assertions
                 and entry in PREPARING_ENTRIES
                 and self.extraction_strategy != FACTS_FIRST
+            ),
+            # The review reads a catalog, so an install that asks for it on a
+            # route producing none gets the route it configured and no review —
+            # the same shape the assertion flag takes on an entry that never
+            # prepares. The builder refuses the pair outright; this is what
+            # keeps a deployment from asking for it.
+            source_review=(
+                self.source_review
+                and entry in PREPARING_ENTRIES
+                and (self.assertions or self.extraction_strategy == FACTS_FIRST)
             ),
         )
 
