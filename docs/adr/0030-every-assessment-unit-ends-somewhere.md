@@ -89,7 +89,7 @@ instrument already is, and it recovers nothing.
 
 ## Priced on the first Baseline
 
-Offline, 2026-09-09, over `352b72d-gpt-5.6-terra-2f7e336d`. Units unanswered
+Offline, 2026-09-09, over `d4edd64-gpt-5.6-terra-fd1c49af`. Units unanswered
 today, across 13 cases: 121 of 323 candidates and 85 of 258 crossings were
 cited by no draft, about 16 units per case across six lanes. Elements: 555
 of 1,338, which is why an element is not a unit. What the pass can recover,

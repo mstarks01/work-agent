@@ -12,7 +12,7 @@ proposal below.
 
 **Method.** Three kinds of evidence, kept apart.
 
-1. **The repository, at `8729415`.** `src/analysis_service/system_model.py`,
+1. **The repository, at `c901d7e`.** `src/analysis_service/system_model.py`,
    `analysis.py`, `frameworks/stride/rules.py` and `frameworks/asvs/rules.py`.
 2. **The 13 blessed corpus models**, `evals/corpus/*/model.json`, 223 elements.
    Every count comes from `probe_model_vocabulary.py` beside this file. Run it from the
@@ -540,6 +540,6 @@ package carries.
 ## Provenance
 
 Every number in Parts 1 and 2 recomputes from `probe_model_vocabulary.py` against
-`evals/corpus/*/model.json` at `8729415`. The external schema facts come from the sources
+`evals/corpus/*/model.json` at `c901d7e`. The external schema facts come from the sources
 named in the method, read on 2026-09-04. CycloneDX 1.7 was read from the published JSON
 schema rather than from a page about it.

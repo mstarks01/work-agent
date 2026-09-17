@@ -42,7 +42,7 @@ the end of this guide.
 ## The five defect classes
 
 Every finding in this repository's record — ten audit rounds, the range review
-of `reviewed/2026-09-09...35ae7a0` and the whole-tree hunt that followed it —
+of `reviewed/2026-09-09...5571f4e` and the whole-tree hunt that followed it —
 falls into one of five classes. They are distinct because each has its own test
 and its own repair.
 

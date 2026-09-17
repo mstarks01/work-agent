@@ -18,7 +18,7 @@ requirement applicable? This file records facts. It rules nothing. The taxonomy 
    the applicability test reads. The tallies below recompute from that file. The judgement in
    it is mine; the requirement text it classifies is the standard's.
 
-The repo side of every comparison is `src/stride_service/system_model.py` at `7c77fe6`.
+The repo side of every comparison is `src/stride_service/system_model.py` at `8256a9f`.
 
 ---
 
@@ -173,7 +173,7 @@ control's typed properties, not the control's address.** #162 owns that distinct
 ### Today's model carries no L1 applicability fact outright
 
 The last column of the CSV compares each requirement's applicability test against the
-`SystemModel` at `7c77fe6`. The result:
+`SystemModel` at `8256a9f`. The result:
 
 | Model carries the fact | Count |
 |---|---:|

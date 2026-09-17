@@ -70,7 +70,7 @@ emission size, in characters, on hand-corrected models.
 
 **The first live run**, on 2026-09-15: case `01-payments-checkout`, five
 full-route extractions and two compact, `openrouter/openai/gpt-5.6-luna` pinned
-to `openai/flex`, repo `971fc7b`, $0.0166.
+to `openai/flex`, repo `7fde6f5`, $0.0166.
 
 | | full (n=5) | compact (n=2) |
 | --- | --- | --- |

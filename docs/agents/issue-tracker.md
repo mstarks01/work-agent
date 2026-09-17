@@ -182,7 +182,7 @@ Completed on GitHub Issues (canonical):
   reader's recorded words are evidence that the method ran, and #388 puts another reader's document
   outside what any later change may edit. A vocabulary sweep stops at that file.
 
-  The prototype tip is preserved as `archive/prototype/sitting-screens` @ `23b496e`, per the tag
+  The prototype tip is preserved as `archive/prototype/sitting-screens` @ `d13e737`, per the tag
   convention below. **Out of scope and not graduating**: hosting the app or any network write beyond
   the `gh` submit path; changing what a Case Sitting is; `webapp/review.py`, which keeps no draft; a
   sitting PR editing the case sources it signs, filed as
@@ -236,7 +236,7 @@ Completed on GitHub Issues (canonical):
   gate, replaced by `--accept-cost`. #335 ruled the place for the ceiling text before #334 ruled
   its content.
 
-  Research findings sit at `archive/research/contribution-price-data` @ `890bc93`, per the tag
+  Research findings sit at `archive/research/contribution-price-data` @ `662112d`, per the tag
   convention below. **Out of scope and not graduating**: calibration pair labels and new golden
   cases (both are ordinary PRs), any merge gate that reads contributed data, baselines over
   private off-corpus cases, and a hosted submission service.
@@ -405,8 +405,8 @@ Completed on GitHub Issues (canonical):
   strippable. Provenance weighting by source kind and service-side retention of submitted text
   were ruled out while charting.
 
-  Prototypes: `prototype/quote-verification` @ `6ed8d77` (#80's measurement, re-runnable) and
-  `prototype/grounds-display` @ `94bac96` (#84's three variants, losers included). Both throwaway
+  Prototypes: `prototype/quote-verification` @ `7273bb2` (#80's measurement, re-runnable) and
+  `prototype/grounds-display` @ `516756a` (#84's three variants, losers included). Both throwaway
   and both due the `archive/` tag treatment described at the end of this section.
 
 - [#49 — Map: accept call transcripts as job input](https://github.com/mstarks01/work-agent/issues/49)
@@ -461,8 +461,8 @@ Completed on GitHub Issues (canonical):
   timings, so the field would be empty exactly on compliant input). And **the tree beat the
   charted list**: #57's verification found the ticket's own inventory wrong in five places and
   missed four modules, `execution.py` and `__init__.py` among them. Findings live on
-  `archive/research/transcript-exports` @ `935fc57` and `archive/prototype/multi-source-render`
-  @ `e4a17a6`.
+  `archive/research/transcript-exports` @ `906cb59` and `archive/prototype/multi-source-render`
+  @ `4fb54d6`.
 
   Two questions were left in fog deliberately, both needing real extractions rather than argument:
   what the validity gate should do with a **rambling call** that never settles into a system, and

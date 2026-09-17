@@ -10,7 +10,7 @@ a control attribute holds actually carry?
 
 **Method.** Two kinds of evidence, kept apart.
 
-1. **The repository, at `b027793`.** The reader inventory in Part 2 comes from
+1. **The repository, at `f86ca62`.** The reader inventory in Part 2 comes from
    reading the modules named there. Each row cites a file and a line.
 2. **The 13 blessed corpus models**, `evals/corpus/*/model.json`, 227 elements.
    Every count in Part 1 comes from `probe_assertion_facts.py` beside this file.
@@ -117,7 +117,7 @@ any part of it.
 
 ## Part 2 — Every production reader of the migrated facts
 
-Read at `b027793`. "The fact" column names what the reader takes from the value.
+Read at `f86ca62`. "The fact" column names what the reader takes from the value.
 
 | # | Reader | Site | The fact it takes | A value with two facts |
 | --- | --- | --- | --- | --- |

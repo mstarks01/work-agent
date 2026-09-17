@@ -23,13 +23,13 @@ same reason, so a lint cannot rewrite an artifact an ADR points at.
 | `litellm-reasoning-surface.md` + two `probe_litellm_reasoning_*.py` | #15 | 2026-07-28 | `litellm==1.93.0` |
 | `transcript-exports.md` | #51 | 2026-07-31 | — |
 | `asvs-representation.md` + `asvs-l1-subjects.csv` | #160 | 2026-08-12 | — |
-| `system-model-evolution.md` + `probe_model_vocabulary.py` | #483 | 2026-09-04 | repo `8729415`, CycloneDX 1.7 |
-| `repository-evidence.md` | #484 | 2026-09-08 | repo `8085c43`, SARIF 2.1.0 errata 01, GitHub REST 2022-11-28 |
-| `openrouter-served-model.md` + `probe_openrouter_served_model.py` | #806 | 2026-09-11 | `litellm==1.97.0`, repo `d16a6c4`, OpenRouter live API |
-| `openrouter-pricing.md` + `probe_openrouter_pricing.py` | #822 | 2026-09-11 | `litellm==1.97.0`, repo `242ceb0`, OpenRouter live catalogue |
+| `system-model-evolution.md` + `probe_model_vocabulary.py` | #483 | 2026-09-04 | repo `c901d7e`, CycloneDX 1.7 |
+| `repository-evidence.md` | #484 | 2026-09-08 | repo `a7553a1`, SARIF 2.1.0 errata 01, GitHub REST 2022-11-28 |
+| `openrouter-served-model.md` + `probe_openrouter_served_model.py` | #806 | 2026-09-11 | `litellm==1.97.0`, repo `b9c9be8`, OpenRouter live API |
+| `openrouter-pricing.md` + `probe_openrouter_pricing.py` | #822 | 2026-09-11 | `litellm==1.97.0`, repo `d7cfe17`, OpenRouter live catalogue |
 | `openrouter-reported-charge.md` + `probe_openrouter_reported_charge.py` | #822 | 2026-09-11 | `litellm==1.97.0`, ADK 2.5.0, OpenRouter live API |
-| `assertion-readers.md` + `probe_assertion_facts.py` | #926 | 2026-09-14 | repo `b027793` |
-| `structured-output-shapes.md` + `probe_structured_output_shapes.py` | #942 | 2026-09-14 | `litellm==1.97.0`, repo `5d2cf5a`, Google AI Studio via OpenRouter |
+| `assertion-readers.md` + `probe_assertion_facts.py` | #926 | 2026-09-14 | repo `f86ca62` |
+| `structured-output-shapes.md` + `probe_structured_output_shapes.py` | #942 | 2026-09-14 | `litellm==1.97.0`, repo `bf5fc4d`, Google AI Studio via OpenRouter |
 
 ## The one staleness you must know about
 
