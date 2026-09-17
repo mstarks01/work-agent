@@ -349,6 +349,75 @@ class TestPlacement:
         assert assumed[0].attribute == "trust_zone"
         assert validate(resolution.model, sources={LABEL: NOTE}) == []
 
+    def test_a_placement_the_catalog_refuses_places_nothing(self) -> None:
+        """A quote no source holds states no placement, and shapes no graph.
+
+        The catalog refuses the row as ``unsupported-assertion``. A graph built
+        from the same row would hold a zone the catalog does not, so the two
+        artifacts would disagree about one fact.
+        """
+        bundle = worker_bundle()
+        bundle.facts[0] = bundle.facts[0].model_copy(
+            update={"quotes": quote("a citation the source never carries")}
+        )
+
+        resolution = resolved(bundle)
+
+        found = resolution.model.get("process:worker")
+        assert found is not None
+        assert found.trust_zone == "boundary:core-network"
+        assert [
+            assumption.attribute
+            for assumption in resolution.model.assumptions
+            if assumption.element_id == "process:worker"
+        ] == ["trust_zone"]
+
+    def test_an_unknown_placement_is_a_value_and_not_a_zone_handle(self) -> None:
+        """ "We do not know where it sits" keeps the component the source names.
+
+        Reading the sentinel as a zone handle loses the worker to
+        ``dangling-zone``, its interaction to ``dangling-endpoint`` and every
+        fact about it to ``dangling-subject`` — three losses from one open
+        question.
+        """
+        bundle = worker_bundle()
+        bundle.facts[0] = bundle.facts[0].model_copy(
+            update={"value": UNKNOWN, "reason": "silent", "quotes": []}
+        )
+
+        resolution = resolved(bundle)
+
+        assert resolution.model.get("process:worker") is not None
+        assert row_for(resolution, "i1").disposition == "consumed"
+
+    def test_a_component_no_zone_can_hold_leaves_its_facts_as_questions(self) -> None:
+        """The graph cannot place it; the sources still state what they state."""
+        text = f"{NOTE} The admin network is elsewhere."
+        bundle = SourceFactBundle(
+            mentions=[
+                mention("z1", "core network", "network-zone"),
+                mention("z2", "admin network", "privilege-zone"),
+                mention("m1", "worker", "process", quotes=quote("A worker")),
+            ],
+            facts=[
+                FactProposal(
+                    handle="p1",
+                    subject_kind="mention",
+                    subject="m1",
+                    predicate="internet-exposure",
+                    value="internal",
+                    basis="stated",
+                    quotes=quote("A worker"),
+                )
+            ],
+        )
+
+        resolution = resolved(bundle, {LABEL: text})
+
+        row = row_for(resolution, "p1")
+        assert (row.disposition, row.code) == ("unresolved", "unplaced-subject")
+        assert row in resolution.gaps
+
     def test_two_zones_and_no_fact_leaves_a_component_unsupported(self) -> None:
         text = "A worker. The core network and the admin network."
         bundle = SourceFactBundle(
@@ -363,7 +432,7 @@ class TestPlacement:
         assert row in resolved(bundle, {LABEL: text}).gaps
 
     def test_two_placements_of_one_component_settle_nothing(self) -> None:
-        text = "A worker. The core network and the admin network."
+        text = f"{NOTE} The admin network is elsewhere."
         bundle = SourceFactBundle(
             mentions=[
                 mention("z1", "core network", "network-zone"),

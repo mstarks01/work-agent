@@ -53,6 +53,7 @@ from typing import Literal, get_args, get_origin
 from pydantic import BaseModel, ConfigDict, Field
 
 from analysis_service.assertions import (
+    ABSENT,
     GRAPH_BOUND,
     MAX_ASSERTIONS,
     MAX_QUALIFIERS,
@@ -568,9 +569,9 @@ def resolve_bundle(
     repeated = _repeated_handles(bundle)
     rows: list[DispositionRow] = []
 
-    stated, competing = _stated_placements(bundle, repeated)
-    zones, zoned, assumptions = _mentions(
-        bundle, prepared, repeated, stated, competing, held, rows
+    stated, competing, bases = _stated_placements(bundle, prepared, repeated)
+    zones, zoned, assumptions, unplaced = _mentions(
+        bundle, prepared, repeated, stated, competing, bases, held, rows
     )
     flows = _interactions(bundle, prepared, repeated, zoned, held, rows)
     model = SystemModel(
@@ -588,7 +589,7 @@ def resolve_bundle(
         assumptions=[*held.assumptions, *assumptions],
     )
     proposal, record = _facts(
-        bundle, sources, model, zones, zoned, flows, repeated, rows
+        bundle, sources, model, zones, zoned, flows, repeated, unplaced, rows
     )
     rows.extend(
         DispositionRow(
@@ -772,9 +773,33 @@ def _cite(
     return None, code, message
 
 
+def _places(fact: FactProposal, prepared: Mapping[str, SpanSource]) -> bool:
+    """Whether one placement row may decide where the graph puts its subject.
+
+    **A row the catalog will refuse must not shape the graph first.** The
+    placement a component takes and the assertion recording it come from one
+    row, so the two answers have to rest on the same reading of it.
+
+    Three refusals, in what each one says about the row. A value of
+    :data:`~analysis_service.system_model.UNKNOWN` or
+    :data:`~analysis_service.assertions.ABSENT` is an **epistemic value** and
+    never a zone handle: the row says the sources leave the placement open, and
+    reading it as the name of a zone would look for a zone called "unknown". A
+    row carrying a scope places its subject under a condition, and the graph's
+    ``trust_zone`` holds one zone under none. A ``stated`` row whose quotes
+    locate in no source states nothing, by :func:`_cite` — the same reader the
+    element citations and the assertion spans use.
+    """
+    if fact.value in (UNKNOWN, ABSENT) or fact.scope:
+        return False
+    return fact.basis != "stated" or _cite(fact.quotes, prepared)[0] is not None
+
+
 def _stated_placements(
-    bundle: SourceFactBundle, repeated: Collection[str]
-) -> tuple[Mapping[str, str], frozenset[str]]:
+    bundle: SourceFactBundle,
+    prepared: Mapping[str, SpanSource],
+    repeated: Collection[str],
+) -> tuple[Mapping[str, str], frozenset[str], Mapping[str, str]]:
     """Which zone handle each mention's facts place it in, and which disagree.
 
     Read from the fact rows, because :data:`PLACEMENT_PREDICATES` is the one
@@ -782,19 +807,25 @@ def _stated_placements(
     nothing — the predicate's multiplicity is ``one`` and the catalog would
     call them a conflict — so the component is returned as competing rather
     than placed by whichever row came first.
+
+    :func:`_places` decides which rows are read at all. The third return is the
+    basis each placement rests on, so :func:`_place` can mark an inferred one:
+    a zone nobody stated is an assumption whether code chose it or a reader did.
     """
     stated: dict[str, str] = {}
+    bases: dict[str, str] = {}
     competing: set[str] = set()
     for fact in bundle.facts:
         if fact.handle in repeated or fact.predicate not in PLACEMENT_PREDICATES:
             continue
-        if fact.subject_kind != "mention":
+        if fact.subject_kind != "mention" or not _places(fact, prepared):
             continue
         held = stated.get(fact.subject)
         if held is not None and held != fact.value:
             competing.add(fact.subject)
         stated[fact.subject] = fact.value
-    return stated, frozenset(competing)
+        bases[fact.subject] = fact.basis
+    return stated, frozenset(competing), bases
 
 
 def _mentions(
@@ -803,9 +834,15 @@ def _mentions(
     repeated: Collection[str],
     stated: Mapping[str, str],
     competing: Collection[str],
+    bases: Mapping[str, str],
     held: SystemModel,
     rows: list[DispositionRow],
-) -> tuple[dict[str, TrustBoundary], dict[str, ZonedElement], list[Assumption]]:
+) -> tuple[
+    dict[str, TrustBoundary],
+    dict[str, ZonedElement],
+    list[Assumption],
+    frozenset[str],
+]:
     """Turn every mention into a zone or a placed element, or say why not.
 
     Two passes, because placement reads the zones: the first builds every
@@ -848,6 +885,7 @@ def _mentions(
         element.id: element for element in held.zoned_elements()
     }
     assumptions: list[Assumption] = []
+    unplaced_handles: set[str] = set()
     sole = next(iter(zones.values())).id if len(zones) == 1 else ""
     for handle, (mention, element) in unplaced.items():
         placed, assumption, code, message = _place(
@@ -855,10 +893,12 @@ def _mentions(
             element,
             zones,
             stated.get(handle, ""),
+            bases.get(handle, ""),
             handle in competing,
             sole,
         )
         if placed is None:
+            unplaced_handles.add(handle)
             rows.append(
                 DispositionRow(
                     handle=handle,
@@ -880,7 +920,7 @@ def _mentions(
                 target=placed.id,
             )
         )
-    return zones, zoned, assumptions
+    return zones, zoned, assumptions, frozenset(unplaced_handles)
 
 
 def _build_mention(
@@ -964,10 +1004,18 @@ def _place(
     element: ZonedElement,
     zones: Mapping[str, TrustBoundary],
     placement: str,
+    basis: str,
     competing: bool,
     sole: str,
 ) -> tuple[ZonedElement | None, Assumption | None, str, str]:
-    """Put one component in its zone, or say why the graph cannot hold it."""
+    """Put one component in its zone, or say why the graph cannot hold it.
+
+    **A zone no source states is an assumption, whoever chose it.** A reader
+    who inferred the placement and code taking the one zone a bundle names are
+    the same fact about the graph: the sources did not put the component there.
+    Both leave an :class:`~analysis_service.system_model.Assumption` on
+    ``trust_zone``, which is what a reader of the model has to see.
+    """
     if competing:
         return (
             None,
@@ -988,7 +1036,17 @@ def _place(
                 "dangling-zone",
                 f"zone handle {placement!r} names no zone mention of this bundle",
             )
-        return element.model_copy(update={"trust_zone": boundary.id}), None, "", ""
+        assumed = (
+            None
+            if basis == "stated"
+            else Assumption(
+                assumption=f"{mention.text} sits in {boundary.name}",
+                element_id=element.id,
+                attribute="trust_zone",
+                basis=f"no source places this component; the placement is {basis}",
+            )
+        )
+        return element.model_copy(update={"trust_zone": boundary.id}), assumed, "", ""
     if not sole:
         return (
             None,
@@ -1231,13 +1289,21 @@ def _facts(
     zoned: Mapping[str, ZonedElement],
     flows: Mapping[str, DataFlow],
     repeated: Collection[str],
+    unplaced: Collection[str],
     rows: list[DispositionRow],
 ) -> tuple[CatalogProposal, AssertionRecord]:
     """Turn every fact into an assertion, through the existing resolver.
 
     A fact whose subject or reference handle reached no output is ``rejected``
     here, before the catalog sees it: what it is about does not exist, so the
-    row has nothing to say. Everything else goes to
+    row has nothing to say.
+
+    **A component the bundle named and the graph could not place is a question,
+    not a missing handle.** The sources say the thing exists and say this about
+    it; what failed is the graph's required ``trust_zone``. Those rows are
+    ``unresolved`` under ``unplaced-subject``, so a reader counting what a route
+    lost can tell "nobody read this" from "the model cannot hold it", and the
+    sidecar carries the fact rather than dropping it. Everything else goes to
     :meth:`~analysis_service.assertions.AssertionRecord.of`, the one reader of
     what a proposal came to — the production ``prepare`` node, the assertion
     eval mode and the offline replay all ask it, so a resolver change moves
@@ -1257,13 +1323,19 @@ def _facts(
         subject, subject_type, code, message = _subject(fact, zones, zoned, flows)
         value, value_code, value_message = _referent(fact, zones, zoned, flows)
         if subject is None or value is None:
+            open_question = fact.subject in unplaced and fact.subject_kind == "mention"
             rows.append(
                 DispositionRow(
                     handle=fact.handle,
                     kind="fact",
-                    disposition="rejected",
-                    code=code or value_code,
-                    message=message or value_message,
+                    disposition="unresolved" if open_question else "rejected",
+                    code="unplaced-subject" if open_question else (code or value_code),
+                    message=(
+                        f"the sources state this about {fact.subject!r}, and the"
+                        " graph holds no zone to place that component in"
+                        if open_question
+                        else message or value_message
+                    ),
                 )
             )
             continue
