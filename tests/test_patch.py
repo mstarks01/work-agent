@@ -552,6 +552,49 @@ class TestCorrections:
 class TestRollback:
     """A batch whose result fails a gate leaves the original output standing."""
 
+    def test_a_refused_replacement_keeps_the_row_it_would_have_replaced(self) -> None:
+        """A correction whose new row the resolver refuses deletes nothing.
+
+        The retraction and the addition that replaces it are two operations, and
+        nothing in the batch pairs them. Applying what lands would drop the
+        original and keep neither, so the batch is discarded whole and the
+        catalog is the one the caller passed in.
+        """
+        model, record = base()
+        held = assertion_id(record.catalog.entries[0])
+        proposed = place("o2", "store:queue")
+        assert proposed.assertion is not None
+        replacement = proposed.model_copy(
+            update={
+                "assertion": proposed.assertion.model_copy(
+                    update={"quotes": quote("a citation the source never carries")}
+                )
+            }
+        )
+        result = apply_patch(
+            PatchBatch(
+                operations=[
+                    Operation(
+                        handle="o1",
+                        kind="retract-assertion",
+                        reason="the placement is wrong and this replaces it",
+                        retract=held,
+                    ),
+                    replacement,
+                ]
+            ),
+            model,
+            record,
+            SOURCES,
+        )
+
+        assert result.rolled_back
+        assert result.record is record
+        assert len(result.record.catalog.entries) == 1
+        assert outcome_for(result, "o2").code == "unsupported-assertion"
+        assert outcome_for(result, "o1").code == "batch-rolled-back"
+        assert any(outcome.code == "operation-refused" for outcome in result.outcomes)
+
     def test_a_gate_refusal_discards_the_whole_batch(self) -> None:
         """A review over a graph the gate already refuses changes nothing."""
         broken = SystemModel(
