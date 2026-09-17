@@ -165,6 +165,7 @@ from analysis_service.evidence import (
     evidence_catalog,
     render_catalog,
     render_element_roster,
+    render_rows,
 )
 from analysis_service.factbundle import SourceFactBundle, resolve_bundle
 from analysis_service.fan_in import fan_in
@@ -188,6 +189,7 @@ from analysis_service.knowledge import (
 )
 from analysis_service.markdown_loader import MarkdownLoader, estimate_tokens
 from analysis_service.model_tiers import ReviewIndependence, TierName
+from analysis_service.patch import PatchBatch, apply_patch
 from analysis_service.prompts import (
     compose_analyze_prompt,
     compose_assert_prompt,
@@ -196,6 +198,7 @@ from analysis_service.prompts import (
     compose_facts_prompt,
     compose_recritic_prompt,
     compose_repair_prompt,
+    compose_reread_prompt,
 )
 from analysis_service.report import (
     AnalysisContext,
@@ -250,6 +253,15 @@ FACTS_NODE = "facts"
 #: not a model: see :func:`~analysis_service.factbundle.resolve_bundle`.
 RESOLVE_NODE = "resolve"
 ASSERT_NODE = "assert"
+#: The source-driven review pass (#1003 arms C and D): the sources read once
+#: more against the artifacts built from them, out comes a ``PatchBatch``.
+REREAD_NODE = "reread"
+#: What renders the model and the catalog for that pass, and parks the record
+#: the applicator patches. Code, not a model.
+READ_CATALOG_NODE = "reading"
+#: What applies the batch, transactionally: see
+#: :func:`~analysis_service.patch.apply_patch`.
+APPLY_NODE = "apply"
 READ_MODEL_NODE = "read"
 VALIDATE_NODE = "validate"
 REPAIR_NODE = "repair"
@@ -502,6 +514,10 @@ def tier_node_by_graph_node(
         # operator keeping two rows in step.
         FACTS_NODE: "extract",
         REPAIR_NODE: "repair",
+        # The review pass resolves on the **repair** tier row, because it is a
+        # bounded repair pass: one call, over artifacts and the sources they
+        # came from, ending in a patch code applies or discards.
+        REREAD_NODE: "repair",
         ASSERT_NODE: "assert",
         **{
             node: tier
@@ -663,6 +679,15 @@ STATE_MODEL_REPAIR = "model_repair"
 
 # What the facts-first node emits: a ``SourceFactBundle``, in local handles,
 # before code resolves it into a model and a proposal.
+# The catalog rendered for the review pass, beside the model it was built over.
+# A rendered key: written once, read by a model, never read back here.
+STATE_ASSERTION_ROWS = "assertion_rows"
+# What ``reread`` emits: a ``PatchBatch``, before code applies or discards it.
+STATE_PATCH_BATCH = "patch_batch"
+# What ``apply`` made of that batch: one ``OperationOutcome`` per operation, and
+# whether the batch was discarded whole. Written by ``apply``, read by a driver.
+STATE_PATCH_OUTCOMES = "patch_outcomes"
+
 STATE_SOURCE_FACTS = "source_facts"
 # What ``resolve`` made of every row of that bundle: one ``DispositionRow`` per
 # input row, so a fact that reached neither the graph nor the catalog is
@@ -761,6 +786,7 @@ SHARED_RENDERED_KEYS: frozenset[str] = frozenset(
         STATE_DOMAIN_SKILLS,
         STATE_PREVIOUS_MODEL,
         STATE_VALIDATION_ISSUES,
+        STATE_ASSERTION_ROWS,
     }
 )
 
@@ -771,6 +797,8 @@ SHARED_STRUCTURED_KEYS: frozenset[str] = frozenset(
         STATE_SOURCE_TEXTS,
         STATE_SOURCE_FACTS,
         STATE_BUNDLE_DISPOSITIONS,
+        STATE_PATCH_BATCH,
+        STATE_PATCH_OUTCOMES,
         STATE_EXTRACTED_MODEL,
         STATE_FIRST_PASS,
         STATE_ASSERTION_PROPOSAL,
@@ -1654,19 +1682,39 @@ def prepare_analysis(
 
 
 def _resolve_assertions(state: SessionState, model: SystemModel) -> AssertionRecord:
-    """What the ``assert`` node ahead of ``prepare`` proposed, resolved and parked."""
-    proposed = state.get(STATE_ASSERTION_PROPOSAL)
-    if proposed is None:
-        raise SilentNodeError(
-            f"nothing was written to {STATE_ASSERTION_PROPOSAL!r}, so the"
-            " assertion pass this deployment selected never ran."
-            f" {_TRUNCATION_HINT}"
+    """The catalog this job runs on: built once, gated once, parked once.
+
+    **One seam, and two ways to reach it.** ``assert`` and ``resolve`` each
+    leave a proposal, which is resolved here against the model the validity
+    gate passed. A graph carrying the review pass leaves an
+    :class:`~analysis_service.assertions.AssertionRecord` instead, because
+    ``apply`` built it over the model it patched — and it is put through
+    :meth:`~analysis_service.assertions.AssertionRecord.over` here rather than
+    trusted, so a catalog a lane selects from answered the same rules whichever
+    node produced it. There is no path that reaches ``prepare`` ungated.
+    """
+    sources = state.get(STATE_SOURCE_TEXTS) or {}
+    held = state.get(STATE_ASSERTION_CATALOG)
+    if held is not None:
+        patched = AssertionRecord.model_validate(held)
+        record = AssertionRecord.over(
+            patched.catalog,
+            model,
+            sources,
+            proposed=patched.proposed,
+            issues=patched.issues,
         )
-    record = AssertionRecord.of(
-        CatalogProposal.model_validate(proposed),
-        model,
-        state.get(STATE_SOURCE_TEXTS) or {},
-    )
+    else:
+        proposed = state.get(STATE_ASSERTION_PROPOSAL)
+        if proposed is None:
+            raise SilentNodeError(
+                f"nothing was written to {STATE_ASSERTION_PROPOSAL!r}, so the"
+                " assertion pass this deployment selected never ran."
+                f" {_TRUNCATION_HINT}"
+            )
+        record = AssertionRecord.of(
+            CatalogProposal.model_validate(proposed), model, sources
+        )
     state.put(STATE_ASSERTION_CATALOG, record.model_dump(mode="json"))
     return record
 
@@ -2575,6 +2623,129 @@ def _resolve_node_func(keys: GraphKeys) -> Callable[..., Any]:
     return resolve
 
 
+def _reread_node(
+    prompt_loader: MarkdownLoader,
+    resolve_model: ModelResolver,
+    resolve_sampling: SamplingResolver,
+) -> LlmAgent:
+    """The source-driven review node: the sources and the artifacts in, a batch out."""
+    return _llm_node(
+        name=REREAD_NODE,
+        tier_node="repair",
+        instruction=compose_reread_prompt(prompt_loader),
+        output_schema=PatchBatch,
+        output_key=STATE_PATCH_BATCH,
+        resolve_model=resolve_model,
+        resolve_sampling=resolve_sampling,
+    )
+
+
+def read_for_review(
+    ctx,
+    keys: GraphKeys,
+    valid_model: dict,
+    source_texts: dict | None = None,
+) -> dict[str, Any]:
+    """Render what the review pass reads, and park the record it will patch.
+
+    The model and the rows go to rendered keys, through the two functions every
+    other reader of them calls, so no agent is shown a model or a row another
+    agent would not recognise. The record itself is parked structurally,
+    because ``apply`` patches it and ``prepare`` gates whatever comes out.
+
+    It resolves the proposal here rather than leaving that to ``prepare``. The
+    review has to see identities it can retract, and an identity exists only
+    once the rows are resolved — so the resolution moves ahead of the pass that
+    reads it, and ``prepare`` then reads the record this produced.
+    """
+    state = keys.state(ctx)
+    proposed = state.get(STATE_ASSERTION_PROPOSAL)
+    if proposed is None:
+        raise SilentNodeError(
+            f"nothing was written to {STATE_ASSERTION_PROPOSAL!r}, so the review"
+            f" pass has no catalog to read. {_TRUNCATION_HINT}"
+        )
+    model = SystemModel.model_validate(valid_model)
+    record = AssertionRecord.of(
+        CatalogProposal.model_validate(proposed), model, source_texts or {}
+    )
+    state.prompt(STATE_SYSTEM_MODEL, render_model(valid_model))
+    state.prompt(STATE_ASSERTION_ROWS, render_rows(record.catalog))
+    state.put(STATE_ASSERTION_CATALOG, record.model_dump(mode="json"))
+    return {"elements": len(model.elements()), "rows": len(record.catalog.entries)}
+
+
+def apply_source_review(
+    ctx,
+    keys: GraphKeys,
+    valid_model: dict,
+    patch_batch: dict | None = None,
+    source_texts: dict | None = None,
+) -> dict[str, Any]:
+    """Apply what the review proposed, or leave the artifacts as they were.
+
+    :func:`~analysis_service.patch.apply_patch` decides both, and this node only
+    parks what it answered. A discarded batch writes the model and the record
+    back unchanged, which is what makes the failure cost visible rather than
+    silent: the outcomes say every operation was rolled back and why.
+    """
+    if patch_batch is None:
+        raise SilentNodeError(
+            f"nothing was written to {STATE_PATCH_BATCH!r}, so the review pass"
+            f" this deployment selected never ran. {_TRUNCATION_HINT}"
+        )
+    state = keys.state(ctx)
+    held = state.get(STATE_ASSERTION_CATALOG)
+    if held is None:
+        raise SilentNodeError(
+            f"nothing was written to {STATE_ASSERTION_CATALOG!r}, so there is no"
+            " record for the review to patch"
+        )
+    result = apply_patch(
+        PatchBatch.model_validate(patch_batch),
+        SystemModel.model_validate(valid_model),
+        AssertionRecord.model_validate(held),
+        source_texts or {},
+    )
+    state.put(STATE_VALID_MODEL, result.model.model_dump(mode="json"))
+    state.put(STATE_ASSERTION_CATALOG, result.record.model_dump(mode="json"))
+    state.put(
+        STATE_PATCH_OUTCOMES,
+        {
+            "rolled_back": result.rolled_back,
+            "outcomes": [
+                outcome.model_dump(mode="json") for outcome in result.outcomes
+            ],
+        },
+    )
+    return {"applied": len(result.applied), "rolled_back": result.rolled_back}
+
+
+def _read_for_review_func(keys: GraphKeys) -> Callable[..., Any]:
+    """The review's reading node, with this graph's key families bound to it."""
+
+    def reading(
+        valid_model: dict, ctx, source_texts: dict | None = None
+    ) -> dict[str, Any]:
+        return read_for_review(ctx, keys, valid_model, source_texts)
+
+    return reading
+
+
+def _apply_node_func(keys: GraphKeys) -> Callable[..., Any]:
+    """The patch applicator, with this graph's key families bound to it."""
+
+    def apply(
+        valid_model: dict,
+        ctx,
+        patch_batch: dict | None = None,
+        source_texts: dict | None = None,
+    ) -> dict[str, Any]:
+        return apply_source_review(ctx, keys, valid_model, patch_batch, source_texts)
+
+    return apply
+
+
 def _assert_node(
     prompt_loader: MarkdownLoader,
     resolve_model: ModelResolver,
@@ -2797,6 +2968,7 @@ def build_pipeline(
     extraction_format: ExtractionFormat = FULL_FORMAT,
     extraction_strategy: ExtractionStrategy = GRAPH_FIRST,
     assertions: bool = False,
+    source_review: bool = False,
     name: str = "analysis_pipeline",
 ) -> Pipeline:
     """Wire the whole graph: prompts, skills, and models onto the topology.
@@ -2849,6 +3021,14 @@ def build_pipeline(
     carries what the sources state, so a second pass over the model it built
     would be a second extraction of one thing — the appended pass #1003 rules
     out, and two readings of one question besides.
+
+    ``source_review`` puts the bounded repair pass (#1003 arms C and D) between
+    the catalog and ``prepare``: ``reading`` renders the model and the rows,
+    ``reread`` proposes typed operations over the sources, and ``apply`` applies
+    the batch or discards it whole. **One pass for both arms**, on either
+    strategy, so what a C-against-D comparison measures is the extraction order
+    and never two applicators. It is refused on a graph that produces no catalog
+    for it to read, and on one that never prepares.
     """
     if entry not in (
         ENTRY_EXTRACT,
@@ -2878,6 +3058,18 @@ def build_pipeline(
             f"the {extraction_strategy!r} strategy already reads what the"
             " sources state, so an assertion pass over the model it built"
             " would extract one thing twice"
+        )
+    # Every route that leaves a catalog behind, which is what the review reads.
+    catalogs = assertions or facts_first
+    if source_review and entry not in PREPARING_ENTRIES:
+        raise ValueError(
+            f"entry {entry!r} builds no prepare node, so nothing would read a"
+            " source review"
+        )
+    if source_review and not catalogs:
+        raise ValueError(
+            "a source review reads the catalog beside the model, and this graph"
+            " builds no node that produces one"
         )
     if not extracts and extraction_format != FULL_FORMAT:
         raise ValueError(
@@ -2937,16 +3129,27 @@ def build_pipeline(
     # Where the valid model goes next: straight to ``prepare``, or through the
     # assertion pass first. One name for both, so the three edges that carry
     # a valid model are written once whichever graph this is.
+    # What sits between the validity gate and ``prepare``, in the order a valid
+    # model passes through it. Each pass names its own head and its own tail, so
+    # a graph carrying both chains them and one carrying neither goes straight
+    # to ``prepare``; the three edges that carry a valid model are written once
+    # whichever graph this is.
     assertion_nodes: list[LlmAgent] = []
-    pass_edges: list[tuple[Any, ...]] = []
+    passes: list[tuple[Any, list[Any]]] = []
     if assertions:
         read = _node(_read_model_node_func(keys), READ_MODEL_NODE)
         assert_node = _assert_node(prompt_loader, resolve_model, resolve_sampling)
         assertion_nodes = [assert_node]
-        pass_edges = [(read, assert_node, prepare)]
-        first = read
-    else:
-        first = prepare
+        passes.append((read, [read, assert_node]))
+    if source_review:
+        reading = _node(_read_for_review_func(keys), READ_CATALOG_NODE)
+        reread = _reread_node(prompt_loader, resolve_model, resolve_sampling)
+        apply_node = _node(_apply_node_func(keys), APPLY_NODE)
+        assertion_nodes = [*assertion_nodes, reread]
+        passes.append((reading, [reading, reread, apply_node]))
+    chain = [node for _, nodes in passes for node in nodes]
+    pass_edges: list[tuple[Any, ...]] = [(*chain, prepare)] if chain else []
+    first = passes[0][0] if passes else prepare
 
     subgraphs = [
         _framework_subgraph(

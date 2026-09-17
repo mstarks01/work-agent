@@ -435,6 +435,31 @@ def render_catalog(
     )
 
 
+def render_rows(catalog: AssertionCatalog) -> str:
+    """Every assertion row as a table, keyed by the identity a patch names.
+
+    Not :func:`render_catalog`, which is what a **Lane Agent** may *cite*: that
+    table holds settled rows of predicates the graph has no field for, because
+    a fact with a field is cited through the field. #1003's review pass asks a
+    different question — what has this job recorded, and is any of it on the
+    wrong subject — so it reads every row, unsettled ones included, and needs
+    the identity a ``retract-assertion`` operation names.
+
+    The gloss is :func:`_assertion_gloss`, the same words the evidence table
+    renders, so one row never reads two ways to two agents.
+    """
+    subjects = {subject.id: subject for subject in catalog.subjects}
+    rows = "\n".join(
+        f"| `{assertion_id(row)}` | {_assertion_gloss(row, subjects)} |"
+        for row in catalog.entries
+    )
+    return (
+        f"{len(catalog.entries)} statements, and this table is all of them.\n\n"
+        "| identity | what it states |\n| --- | --- |\n"
+        f"{rows}\n"
+    )
+
+
 def render_element_roster(model: SystemModel) -> str:
     """Every element ID a claim may name, as a table to select from.
 
