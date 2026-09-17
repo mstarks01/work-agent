@@ -75,10 +75,14 @@ from analysis_service.graph import (
     ENTRY_PREPARE,
     STATE_ASSERTION_CATALOG,
     STATE_ASSERTION_PROPOSAL,
+    STATE_BUNDLE_DISPOSITIONS,
     STATE_EXTRACTED_MODEL,
     STATE_FIRST_PASS,
     STATE_FRAMEWORK_OPTIONS,
+    STATE_PATCH_OUTCOMES,
     STATE_REPAIR_BASELINE,
+    STATE_SOURCE_FACTS,
+    STATE_SOURCE_INVENTORY,
     STATE_SOURCE_TEXTS,
     STATE_VALID_MODEL,
     Entry,
@@ -1433,6 +1437,27 @@ def _first_pass(
     )
 
 
+#: The graph state a head-only run keeps beside its catalog, by the key the node
+#: that wrote it uses. A **table**, so a stage added to a head is archived by
+#: adding a row here rather than by editing a writer that lists what it knows
+#: about — and a key nothing wrote is absent rather than empty.
+#:
+#: Each one answers a question the catalog alone cannot. The raw bundle and
+#: inventory are what the model emitted, which resolving has already dropped
+#: rows from. The dispositions say what every input row came to. The extracted
+#: model is the graph the rows bound against, and the valid model is the graph
+#: after any repair. The patch outcomes say what a review pass changed, and
+#: whether its batch was discarded.
+ARCHIVED_STATE: tuple[str, ...] = (
+    STATE_SOURCE_FACTS,
+    STATE_SOURCE_INVENTORY,
+    STATE_BUNDLE_DISPOSITIONS,
+    STATE_EXTRACTED_MODEL,
+    STATE_VALID_MODEL,
+    STATE_PATCH_OUTCOMES,
+)
+
+
 @dataclass(frozen=True)
 class AssertionResult:
     """One assertion run: what was proposed, what resolved, and what ran.
@@ -1441,6 +1466,11 @@ class AssertionResult:
     :attr:`ExtractionResult.raw` is kept: it is the only thing a re-score
     cannot recompute, because resolving has already dropped rows and located
     spans. ``issues`` is why each dropped row dropped.
+
+    ``stages`` is what every earlier node of the run wrote, by
+    :data:`ARCHIVED_STATE`. A head that reads the sources facts-first composes
+    its proposal out of a bundle code resolved, so the proposal alone cannot say
+    what the model read or where a row was lost between the two.
     """
 
     case_id: str
@@ -1448,6 +1478,7 @@ class AssertionResult:
     catalog: AssertionCatalog
     issues: tuple[CatalogIssue, ...]
     node_runs: tuple[NodeRun, ...] = ()
+    stages: Mapping[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -1632,6 +1663,7 @@ async def run_heads(case: GoldenCase, pipeline: Pipeline) -> AssertionResult:
         catalog=record.catalog,
         issues=tuple(record.issues),
         node_runs=tuple(graph_run.node_runs),
+        stages={key: state[key] for key in ARCHIVED_STATE if key in state},
     )
 
 

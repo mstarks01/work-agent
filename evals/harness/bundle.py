@@ -178,6 +178,12 @@ def write_assertions(
       recomputed by a reader because a degraded value is only explainable with
       the rows that would not fit, and the counts in the artifact carry the
       totals without them.
+    * ``stages`` — what every earlier node of the run wrote, by
+      :data:`~evals.harness.modes.ARCHIVED_STATE`. A head that reads the sources
+      facts-first composes its proposal out of a bundle code resolved, so a
+      replay that held the proposal alone could not re-run the resolver over
+      what the model actually emitted, or say where between the two a fact was
+      lost. It is empty for a run whose head wrote none of those keys.
 
     **These files are publishable** on the same reading the reports are: they
     carry quotes of corpus source text, which is in this repository. The same
@@ -206,6 +212,7 @@ def write_assertions(
                     "projection": [
                         asdict(projection) for projection in project(result.catalog)
                     ],
+                    "stages": dict(result.stages),
                 },
             ),
             "utf-8",
@@ -429,6 +436,7 @@ def assertions_from_reports(
             proposal=lifted,
             catalog=record.catalog,
             issues=tuple(record.issues),
+            stages=written.get("stages", {}),
         )
     return results
 
