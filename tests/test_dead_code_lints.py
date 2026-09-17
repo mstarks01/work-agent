@@ -85,12 +85,6 @@ TEST_ONLY: dict[str, str] = {
         " instrument a later candidate rule is priced through"
     ),
     "DirectionResult": "what measure_direction returns",
-    "write_runs": (
-        "the writer of the arm-comparison runs file, whose reader ships: the"
-        " two are driven against each other so the format has one spelling,"
-        " and the sweep that will call it is not built while no run is"
-        " authorised"
-    ),
     "is_stale": (
         "backs the gate that holds evals/baselines/README.md to the merged Baselines"
     ),
