@@ -441,6 +441,25 @@ class TestEveryReferenceRowTakesOneFate:
             r.fate for r in graded.rows if r.reference == assertion_id(row)
         ) == ("found")
 
+    def test_a_subject_alias_also_rewrites_a_zone_a_row_is_placed_in(
+        self, golden, reference
+    ):
+        """A zone ruled to be the reference's zone is that zone in a value too.
+
+        A network-membership row names its zone by **Element ID**. The subject
+        of the row is the component, so a ruling about the zone reaches this row
+        only through its value, and a matcher that rewrote subjects alone would
+        leave a signed alias unable to repair the reference beside it.
+        """
+        row = next(e for e in reference.entries if e.predicate == "network-membership")
+        named = row.model_copy(update={"value": "boundary:core-network"})
+        signed = replay.SignedReference(
+            reference.catalog,
+            subject_aliases={"boundary:core-network": replay.AliasTarget(row.value)},
+        )
+
+        assert replay.under_aliases(named, signed).value == row.value
+
     def test_a_value_alias_holds_only_under_the_subjects_the_ruling_names(
         self, golden, reference
     ):
