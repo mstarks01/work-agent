@@ -154,6 +154,11 @@ class CaseFailure(GraphFailed):
     artifact the way it writes a finished case's, because a refused model is
     the emission most worth reading back (#961). ``None`` where the fault
     came before the gate or the graph ran none.
+
+    ``assertion`` is the same fact about a head-only run: the stages it wrote
+    before it reached no catalog. A head that fails is the run most worth
+    reading back, because the stages say which of them lost the rows — and a
+    sweep that archived nothing for it left the question unanswerable.
     """
 
     def __init__(
@@ -161,9 +166,11 @@ class CaseFailure(GraphFailed):
         cause: Exception,
         node_runs: Sequence[NodeRun],
         extraction: ExtractionResult | None = None,
+        assertion: AssertionResult | None = None,
     ) -> None:
         super().__init__(cause, node_runs)
         self.extraction = extraction
+        self.assertion = assertion
 
 
 @dataclass(frozen=True)
@@ -1648,6 +1655,7 @@ async def run_heads(case: GoldenCase, pipeline: Pipeline) -> AssertionResult:
         pipeline, case.sources, {STATE_FRAMEWORK_OPTIONS: case_framework_options(case)}
     )
     state = graph_run.final_state
+    stages = {key: state[key] for key in ARCHIVED_STATE if key in state}
     if STATE_ASSERTION_CATALOG not in state:
         outcome = result_of(state)
         detail = (
@@ -1655,7 +1663,21 @@ async def run_heads(case: GoldenCase, pipeline: Pipeline) -> AssertionResult:
             if isinstance(outcome, Rejected)
             else "the head produced no catalog"
         )
-        raise EvalRunError(f"{case.id}: {detail}")
+        # Carried out with the failure, for the reason a refused model is: the
+        # stages say where the rows went, and a run that archived nothing for a
+        # failed case left that unanswerable.
+        raise CaseFailure(
+            EvalRunError(f"{case.id}: {detail}"),
+            graph_run.node_runs,
+            assertion=AssertionResult(
+                case_id=case.id,
+                proposal=state.get(STATE_ASSERTION_PROPOSAL, {}),
+                catalog=AssertionCatalog(),
+                issues=(),
+                node_runs=tuple(graph_run.node_runs),
+                stages=stages,
+            ),
+        )
     record = AssertionRecord.model_validate(state[STATE_ASSERTION_CATALOG])
     return AssertionResult(
         case_id=case.id,
@@ -1663,7 +1685,7 @@ async def run_heads(case: GoldenCase, pipeline: Pipeline) -> AssertionResult:
         catalog=record.catalog,
         issues=tuple(record.issues),
         node_runs=tuple(graph_run.node_runs),
-        stages={key: state[key] for key in ARCHIVED_STATE if key in state},
+        stages=stages,
     )
 
 
