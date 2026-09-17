@@ -436,7 +436,11 @@ class TestTheInputEstimate:
         for arm in ARMS:
             assert f"| {arm} |" in built
         assert "1.00x" in built
-        assert "Output is not estimated here" in built
+        assert "Output is not counted here" in built
+        # The report must say what it is not, because a reader who multiplies
+        # a figure here by a unit price is out by more than an order of
+        # magnitude.
+        assert "never a cost" in built
 
     def test_the_command_writes_and_prints_the_estimate(
         self, tmp_path: Path, capsys
