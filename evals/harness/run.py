@@ -64,6 +64,7 @@ from analysis_service.report import (
     usage_by_node,
 )
 from evals.harness import (
+    arms,
     comparison,
     consent,
     envelope,
@@ -2298,6 +2299,12 @@ COMMANDS: dict[str, Command] = {
         help="rebuild evals/baselines/README.md from the merged Baselines"
         " (no credentials)",
         run=comparison.command_comparison,
+    ),
+    "compare-arms": Command(
+        help="recompute #1003's extraction-arm comparison from a saved runs"
+        " file (no credentials)",
+        run=arms.command_compare_arms,
+        arguments=arms.arguments,
     ),
 }
 
