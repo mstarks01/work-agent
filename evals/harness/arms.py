@@ -58,6 +58,7 @@ from analysis_service.assertions import (
 from analysis_service.deployment import (
     ASSERTIONS_VAR,
     FACTS_FIRST_EXTRACTION_VAR,
+    FACTS_SPLIT_EXTRACTION_VAR,
     SOURCE_REVIEW_VAR,
 )
 from analysis_service.evidence import render_rows
@@ -67,7 +68,9 @@ from analysis_service.prompts import (
     compose_assert_prompt,
     compose_extract_prompt,
     compose_facts_prompt,
+    compose_inventory_prompt,
     compose_reread_prompt,
+    compose_rows_prompt,
 )
 from analysis_service.sources import render_sources
 from evals.harness.reference import GoldenCase, load_corpus
@@ -124,6 +127,16 @@ ARMS: Mapping[str, ArmRule] = MappingProxyType(
             variables=MappingProxyType(
                 {FACTS_FIRST_EXTRACTION_VAR: "true", SOURCE_REVIEW_VAR: "true"}
             ),
+        ),
+        # Not one of #1003's four. Its arms move the reading order and the
+        # number of calls together — graph-first is two calls and facts-first is
+        # one — so no comparison between them can say which a difference belongs
+        # to. This is the cell that separates them: the facts-first order, in
+        # two calls.
+        "E": ArmRule(
+            question="is the gap the reading order, or the number of calls?",
+            head=("inventory", "reading_inventory", "rows", "resolve", "prepare"),
+            variables=MappingProxyType({FACTS_SPLIT_EXTRACTION_VAR: "true"}),
         ),
     }
 )
@@ -942,6 +955,8 @@ HEAD_NODES: Mapping[str, HeadNode] = MappingProxyType(
     {
         "extract": HeadNode(compose_extract_prompt, ("sources",)),
         "facts": HeadNode(compose_facts_prompt, ("sources",)),
+        "inventory": HeadNode(compose_inventory_prompt, ("sources",)),
+        "rows": HeadNode(compose_rows_prompt, ("sources", "inventory")),
         "assert": HeadNode(compose_assert_prompt, ("sources", "model")),
         "reread": HeadNode(compose_reread_prompt, ("sources", "model", "rows")),
     }
@@ -967,6 +982,12 @@ def shown_tokens(
     return MappingProxyType(
         {
             "sources": estimate_tokens(render_sources(case.sources)),
+            # What the split route's second call is shown. A produced inventory
+            # is smaller than the blessed model it stands in for, so this
+            # over-states rather than under-states.
+            "inventory": estimate_tokens(
+                render_model(case.model.model_dump(mode="json"))
+            ),
             "model": estimate_tokens(render_model(case.model.model_dump(mode="json"))),
             "rows": rows,
         }

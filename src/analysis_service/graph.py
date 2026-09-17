@@ -167,7 +167,12 @@ from analysis_service.evidence import (
     render_element_roster,
     render_rows,
 )
-from analysis_service.factbundle import SourceFactBundle, resolve_bundle
+from analysis_service.factbundle import (
+    DispositionRow,
+    SourceFactBundle,
+    joined,
+    resolve_bundle,
+)
 from analysis_service.fan_in import fan_in
 from analysis_service.frameworks import (
     DISCLAIMER_DOC,
@@ -196,9 +201,11 @@ from analysis_service.prompts import (
     compose_critic_prompt,
     compose_extract_prompt,
     compose_facts_prompt,
+    compose_inventory_prompt,
     compose_recritic_prompt,
     compose_repair_prompt,
     compose_reread_prompt,
+    compose_rows_prompt,
 )
 from analysis_service.report import (
     AnalysisContext,
@@ -249,9 +256,15 @@ EXTRACT_NODE = "extract"
 #: The facts-first extraction node (#1003 arm B): the sources in, a **Source
 #: Fact Bundle** out, and no graph ID anywhere in it.
 FACTS_NODE = "facts"
+#: The split route's first call (#1003 arm E): what the sources name.
+INVENTORY_NODE = "inventory"
+#: The split route's second call: what the sources say about that inventory.
+ROWS_NODE = "rows"
 #: What turns that bundle into the artifacts the rest of the graph reads. Code,
 #: not a model: see :func:`~analysis_service.factbundle.resolve_bundle`.
 RESOLVE_NODE = "resolve"
+#: What renders the split route's inventory for its second call. Code.
+READ_INVENTORY_NODE = "reading_inventory"
 ASSERT_NODE = "assert"
 #: The source-driven review pass (#1003 arms C and D): the sources read once
 #: more against the artifacts built from them, out comes a ``PatchBatch``.
@@ -516,6 +529,12 @@ def tier_node_by_graph_node(
         # key for both is how that holds by construction rather than by an
         # operator keeping two rows in step.
         FACTS_NODE: "extract",
+        # Both calls of the split route sit on the extraction tier row, for the
+        # reason the single call does: they are the extraction stage under
+        # another division of labour, and #1003 asks that comparable semantic
+        # stages run one model configuration.
+        INVENTORY_NODE: "extract",
+        ROWS_NODE: "extract",
         REPAIR_NODE: "repair",
         # The review pass resolves on the **repair** tier row, because it is a
         # bounded repair pass: one call, over artifacts and the sources they
@@ -596,13 +615,33 @@ what the sources *state*, not whether two calls named one component alike."""
 #: Bundle** in local handles and ``resolve`` turns it into the same artifacts.
 #: Both end at the same validity gate and the same bounded repair, so what a
 #: comparison between them measures is the reading order.
-ExtractionStrategy = Literal["graph-first", "facts-first"]
+ExtractionStrategy = Literal["graph-first", "facts-first", "facts-split"]
 
 GRAPH_FIRST: ExtractionStrategy = "graph-first"
 FACTS_FIRST: ExtractionStrategy = "facts-first"
 
+FACTS_SPLIT: ExtractionStrategy = "facts-split"
+"""The facts-first reading, in two calls rather than one.
+
+``facts-first`` asks one call to name what the sources hold **and** state what
+they say about it. ``graph-first`` splits that same work across ``extract`` and
+``assert``. A comparison between those two therefore moves the reading order
+and the number of calls together, and #1003's own design cannot say which of
+them a difference belongs to.
+
+This route holds the order and splits the calls: ``inventory`` names the
+things, the interactions and the zones, and ``rows`` states the facts about
+them. Against the other two it is the cell that separates the confound."""
+
 #: Every strategy, derived from the literal so the two cannot disagree.
 EXTRACTION_STRATEGIES: frozenset[str] = frozenset(get_args(ExtractionStrategy))
+
+#: The strategies that read the sources facts-first, however many calls they
+#: spread the reading over. **The one reader of "does this graph carry its own
+#: assertion rows"**: both shapes do, so both refuse an appended assertion pass
+#: and both satisfy a source review's need for a catalog. A comparison that
+#: named one of them would have let the other quietly take a second pass.
+FACTS_STRATEGIES: frozenset[str] = frozenset({FACTS_FIRST, FACTS_SPLIT})
 
 
 ROUTE_VALID = "valid"
@@ -711,8 +750,6 @@ STATE_REPAIR_BASELINE = "repair_baseline"
 # written by ``revalidate`` and carried onto the report by ``assemble``.
 STATE_MODEL_REPAIR = "model_repair"
 
-# What the facts-first node emits: a ``SourceFactBundle``, in local handles,
-# before code resolves it into a model and a proposal.
 # The catalog rendered for the review pass, beside the model it was built over.
 # A rendered key: written once, read by a model, never read back here.
 STATE_ASSERTION_ROWS = "assertion_rows"
@@ -722,7 +759,15 @@ STATE_PATCH_BATCH = "patch_batch"
 # whether the batch was discarded whole. Written by ``apply``, read by a driver.
 STATE_PATCH_OUTCOMES = "patch_outcomes"
 
+# What the facts-first node emits: a ``SourceFactBundle``, in local handles,
+# before code resolves it into a model and a proposal.
 STATE_SOURCE_FACTS = "source_facts"
+# What the split route's first call emits, kept apart from the second's so the
+# join reads each call for the half it owns.
+STATE_SOURCE_INVENTORY = "source_inventory"
+# That inventory rendered for the second call. A rendered key: written once,
+# read by a model, never read back here.
+STATE_INVENTORY = "inventory"
 # What ``resolve`` made of every row of that bundle: one ``DispositionRow`` per
 # input row, so a fact that reached neither the graph nor the catalog is
 # attributable rather than missing. Written by ``resolve`` and read by a driver.
@@ -821,6 +866,7 @@ SHARED_RENDERED_KEYS: frozenset[str] = frozenset(
         STATE_PREVIOUS_MODEL,
         STATE_VALIDATION_ISSUES,
         STATE_ASSERTION_ROWS,
+        STATE_INVENTORY,
     }
 )
 
@@ -830,6 +876,7 @@ SHARED_STRUCTURED_KEYS: frozenset[str] = frozenset(
     {
         STATE_SOURCE_TEXTS,
         STATE_SOURCE_FACTS,
+        STATE_SOURCE_INVENTORY,
         STATE_BUNDLE_DISPOSITIONS,
         STATE_PATCH_BATCH,
         STATE_PATCH_OUTCOMES,
@@ -2601,11 +2648,85 @@ def _facts_node(
     )
 
 
+def _inventory_node(
+    prompt_loader: MarkdownLoader,
+    resolve_model: ModelResolver,
+    resolve_sampling: SamplingResolver,
+) -> LlmAgent:
+    """The split route's first call: what the sources name, and nothing about it."""
+    return _llm_node(
+        name=INVENTORY_NODE,
+        tier_node="extract",
+        instruction=compose_inventory_prompt(prompt_loader),
+        output_schema=SourceFactBundle,
+        output_key=STATE_SOURCE_INVENTORY,
+        resolve_model=resolve_model,
+        resolve_sampling=resolve_sampling,
+    )
+
+
+def _rows_node(
+    prompt_loader: MarkdownLoader,
+    resolve_model: ModelResolver,
+    resolve_sampling: SamplingResolver,
+) -> LlmAgent:
+    """The split route's second call: what the sources say about that inventory."""
+    return _llm_node(
+        name=ROWS_NODE,
+        tier_node="extract",
+        instruction=compose_rows_prompt(prompt_loader),
+        output_schema=SourceFactBundle,
+        output_key=STATE_SOURCE_FACTS,
+        resolve_model=resolve_model,
+        resolve_sampling=resolve_sampling,
+    )
+
+
+def render_inventory(inventory: dict) -> str:
+    """The first call's emission as the second call reads it.
+
+    Fenced, for the reason a model is fenced: it is built from caller words and
+    handed straight back to a model. Its ``facts`` list is dropped rather than
+    shown — the second call owns that half, and showing it an empty one invites
+    it to read the absence as a gap to fill.
+    """
+    return render_fenced(
+        {
+            field: inventory.get(field, [])
+            for field in ("mentions", "interactions", "unresolved")
+        }
+    )
+
+
+def read_inventory(ctx, keys: GraphKeys, source_inventory: dict | None = None) -> dict:
+    """Render the inventory for the call that states facts about it."""
+    if source_inventory is None:
+        raise SilentNodeError(
+            f"nothing was written to {STATE_SOURCE_INVENTORY!r}, so the second"
+            f" call has no inventory to read. {_TRUNCATION_HINT}"
+        )
+    keys.state(ctx).prompt(STATE_INVENTORY, render_inventory(source_inventory))
+    return {
+        "mentions": len(source_inventory.get("mentions", [])),
+        "interactions": len(source_inventory.get("interactions", [])),
+    }
+
+
+def _read_inventory_func(keys: GraphKeys) -> Callable[..., Any]:
+    """The inventory renderer, with this graph's key families bound to it."""
+
+    def reading(ctx, source_inventory: dict | None = None) -> dict[str, Any]:
+        return read_inventory(ctx, keys, source_inventory)
+
+    return reading
+
+
 def resolve_source_facts(
     ctx,
     keys: GraphKeys,
     source_facts: dict | None = None,
     source_texts: dict | None = None,
+    source_inventory: dict | None = None,
 ) -> dict[str, Any]:
     """Turn one bundle into the artifacts the rest of the graph already reads.
 
@@ -2630,14 +2751,20 @@ def resolve_source_facts(
             f" source facts to resolve. {_TRUNCATION_HINT}"
         )
     state = keys.state(ctx)
-    resolution = resolve_bundle(
-        SourceFactBundle.model_validate(source_facts), source_texts or {}
-    )
+    bundle = SourceFactBundle.model_validate(source_facts)
+    ignored: tuple[DispositionRow, ...] = ()
+    if source_inventory is not None:
+        # The split route: each call is read for the half it owns, and a call
+        # that answered the other half is reported rather than merged in.
+        bundle, ignored = joined(
+            SourceFactBundle.model_validate(source_inventory), bundle
+        )
+    resolution = resolve_bundle(bundle, source_texts or {})
     state.put(STATE_EXTRACTED_MODEL, resolution.model.model_dump(mode="json"))
     state.put(STATE_ASSERTION_PROPOSAL, resolution.proposal.model_dump(mode="json"))
     state.put(
         STATE_BUNDLE_DISPOSITIONS,
-        [row.model_dump(mode="json") for row in resolution.dispositions],
+        [row.model_dump(mode="json") for row in (*ignored, *resolution.dispositions)],
     )
     return {
         "elements": len(resolution.model.elements()),
@@ -2650,9 +2777,14 @@ def _resolve_node_func(keys: GraphKeys) -> Callable[..., Any]:
     """The bundle resolver, with this graph's key families bound to it."""
 
     def resolve(
-        ctx, source_facts: dict | None = None, source_texts: dict | None = None
+        ctx,
+        source_facts: dict | None = None,
+        source_texts: dict | None = None,
+        source_inventory: dict | None = None,
     ) -> dict[str, Any]:
-        return resolve_source_facts(ctx, keys, source_facts, source_texts)
+        return resolve_source_facts(
+            ctx, keys, source_facts, source_texts, source_inventory
+        )
 
     return resolve
 
@@ -3106,11 +3238,15 @@ def build_pipeline(
     if extraction_strategy not in EXTRACTION_STRATEGIES:
         raise ValueError(f"unknown extraction strategy: {extraction_strategy!r}")
     extracts = entry in EXTRACTING_ENTRIES
+    split = extraction_strategy == FACTS_SPLIT
     # Whether this graph runs the lanes. The head-only entry stops at the
     # catalog, so it builds no ``prepare``, no fan-out and no framework
     # subgraph — and every node below that line is absent rather than unfired.
     analyses = entry != ENTRY_HEAD_ONLY
-    facts_first = extraction_strategy == FACTS_FIRST
+    # Both facts-first shapes: one call or two, the reading order is the same
+    # and everything after ``resolve`` is identical. Derived rather than listed,
+    # so a third facts-first spelling is covered by the strategy it names.
+    facts_first = extraction_strategy in (FACTS_FIRST, FACTS_SPLIT)
     if facts_first and not extracts:
         raise ValueError(
             f"entry {entry!r} builds no extraction node, so it cannot be built"
@@ -3253,7 +3389,20 @@ def build_pipeline(
         # and ``resolve`` writes the model at the key ``extract`` writes it at,
         # so one validity gate, one bounded repair and one rejection serve both
         # strategies — which is the property #1003 needs to compare them.
-        if facts_first:
+        # What sits between the reading node and ``resolve``. Empty on every
+        # route but the split one, which renders its inventory and then states
+        # facts about it.
+        between: list[Any] = []
+        second: LlmAgent | None = None
+        if split:
+            extract = _inventory_node(prompt_loader, resolve_model, resolve_sampling)
+            second = _rows_node(prompt_loader, resolve_model, resolve_sampling)
+            between = [
+                _node(_read_inventory_func(keys), READ_INVENTORY_NODE),
+                second,
+            ]
+            resolve = _node(_resolve_node_func(keys), RESOLVE_NODE)
+        elif facts_first:
             extract = _facts_node(prompt_loader, resolve_model, resolve_sampling)
             resolve = _node(_resolve_node_func(keys), RESOLVE_NODE)
         else:
@@ -3275,11 +3424,13 @@ def build_pipeline(
         revalidate = _node(_validate_node_func(keys, FULL_FORMAT), REVALIDATE_NODE)
         reject = _node(_reject_node_func(keys), REJECT_NODE)
         extraction_nodes = [extract, repair]
+        if second is not None:
+            extraction_nodes.append(second)
         # ``list[tuple[Any, ...]]`` because ADK does not export the alias for
         # a chain element, and a routing-map literal only infers its declared
         # key type under an expected type -- which a bare local has none of.
         head_edges: list[tuple[Any, ...]] = [
-            (START, extract, resolve, validate)
+            (START, extract, *between, resolve, validate)
             if facts_first
             else (START, extract, validate),
             (

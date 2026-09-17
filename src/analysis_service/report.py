@@ -579,7 +579,9 @@ class ExecutionEnvelope(BaseModel):
         "shared"
     )
     extraction_format: Literal["full", "compact-v4"] | None = "full"
-    extraction_strategy: Literal["graph-first", "facts-first"] | None = "graph-first"
+    extraction_strategy: Literal["graph-first", "facts-first", "facts-split"] | None = (
+        "graph-first"
+    )
 
 
 class ModelRepair(BaseModel):
