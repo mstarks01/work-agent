@@ -110,6 +110,13 @@ HANDLE_PATTERN = r"^[a-z][a-z0-9_]{0,31}$"
 #: How long a handle may run, matching :data:`HANDLE_PATTERN`.
 MAX_HANDLE_CHARS = 32
 
+#: How long a reference may run. A reference field is **either** a handle of
+#: this bundle or an **Element ID** a base model already holds, which is what
+#: lets one resolver serve an empty graph and a patch over an existing one.
+#: No pattern, because the two shapes are disjoint and :func:`_bound` is the
+#: reader that decides which arrived — a pattern here would be a second one.
+MAX_REFERENCE_CHARS = 300
+
 
 @dataclass(frozen=True)
 class RoleRule:
@@ -285,13 +292,17 @@ class InteractionProposal(BaseModel):
     verb, and becomes the flow's label — so two interactions between one pair
     of endpoints stay separately addressable under
     :func:`~analysis_service.system_model.make_flow_id`.
+
+    Each endpoint is a mention handle of this bundle or an **Element ID** the
+    base model holds, so an interaction can be added between two components
+    that are already there.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     handle: str = Field(pattern=HANDLE_PATTERN)
-    initiator: str = Field(pattern=HANDLE_PATTERN)
-    receiver: str = Field(pattern=HANDLE_PATTERN)
+    initiator: str = Field(min_length=1, max_length=MAX_REFERENCE_CHARS)
+    receiver: str = Field(min_length=1, max_length=MAX_REFERENCE_CHARS)
     action: str = Field(min_length=1, max_length=200)
     protocol: str = Field(default=UNKNOWN, max_length=200)
     quotes: list[QuoteProposal] = Field(default_factory=list, max_length=MAX_SPANS)
@@ -451,7 +462,11 @@ def unstated_fields(
     return unstated
 
 
-def resolve_bundle(bundle: SourceFactBundle, sources: Mapping[str, str]) -> Resolution:
+def resolve_bundle(
+    bundle: SourceFactBundle,
+    sources: Mapping[str, str],
+    base: SystemModel | None = None,
+) -> Resolution:
     """Build the graph and the catalog one bundle describes, and account for it.
 
     Four passes, in the order their dependencies run: handles are checked once
@@ -460,6 +475,15 @@ def resolve_bundle(bundle: SourceFactBundle, sources: Mapping[str, str]) -> Reso
     whatever the first two produced. A row whose dependency failed is
     ``rejected`` rather than silently absent, which is what makes the
     disposition count equal the input count.
+
+    ``base`` is a graph the bundle adds to rather than replaces. Arm B leaves
+    it out and builds from nothing; the patch route
+    (:mod:`analysis_service.patch`) passes the model an arm already produced,
+    so a source-backed component omitted from that model is added **through
+    this same code**. Every element of ``base`` is already taken, already a
+    candidate zone, and already resolvable by its **Element ID** wherever a
+    bundle row names a reference — which is how a new interaction reaches two
+    components that are there and a new fact reaches one.
 
     The catalog half is the existing reader, called rather than copied:
     :meth:`~analysis_service.assertions.AssertionRecord.of` resolves the
@@ -471,15 +495,16 @@ def resolve_bundle(bundle: SourceFactBundle, sources: Mapping[str, str]) -> Reso
     if refused is not None:
         return Resolution(SystemModel(), _empty_record(), (refused,))
 
+    held = base if base is not None else SystemModel()
     prepared = _prepared(sources)
     repeated = _repeated_handles(bundle)
     rows: list[DispositionRow] = []
 
     stated, competing = _stated_placements(bundle, repeated)
     zones, zoned, assumptions = _mentions(
-        bundle, prepared, repeated, stated, competing, rows
+        bundle, prepared, repeated, stated, competing, held, rows
     )
-    flows = _interactions(bundle, prepared, repeated, zoned, rows)
+    flows = _interactions(bundle, prepared, repeated, zoned, held, rows)
     model = SystemModel(
         external_entities=[
             element for element in zoned.values() if isinstance(element, ExternalEntity)
@@ -492,7 +517,7 @@ def resolve_bundle(bundle: SourceFactBundle, sources: Mapping[str, str]) -> Reso
         ],
         data_flows=list(flows.values()),
         trust_boundaries=list(zones.values()),
-        assumptions=list(assumptions),
+        assumptions=[*held.assumptions, *assumptions],
     )
     record = _facts(bundle, sources, model, zones, zoned, flows, repeated, rows)
     rows.extend(
@@ -708,6 +733,7 @@ def _mentions(
     repeated: Collection[str],
     stated: Mapping[str, str],
     competing: Collection[str],
+    held: SystemModel,
     rows: list[DispositionRow],
 ) -> tuple[dict[str, TrustBoundary], dict[str, ZonedElement], list[Assumption]]:
     """Turn every mention into a zone or a placed element, or say why not.
@@ -719,9 +745,15 @@ def _mentions(
     several it is ``unsupported``, because choosing between zones to obtain a
     binding is the failure #1003 names.
     """
-    zones: dict[str, TrustBoundary] = {}
+    # Keyed by handle for what this bundle builds and by **Element ID** for
+    # what ``base`` already held. The two shapes are disjoint —
+    # :data:`HANDLE_PATTERN` admits no colon — so one table serves both, and
+    # :func:`_bound` needs no second lookup to know which arrived.
+    zones: dict[str, TrustBoundary] = {
+        boundary.id: boundary for boundary in held.trust_boundaries
+    }
     unplaced: dict[str, tuple[MentionProposal, ZonedElement]] = {}
-    taken: set[str] = set()
+    taken: set[str] = {element.id for element in held.elements()}
 
     for mention in bundle.mentions:
         if mention.handle in repeated:
@@ -742,7 +774,9 @@ def _mentions(
         else:
             unplaced[mention.handle] = (mention, built)
 
-    zoned: dict[str, ZonedElement] = {}
+    zoned: dict[str, ZonedElement] = {
+        element.id: element for element in held.zoned_elements()
+    }
     assumptions: list[Assumption] = []
     sole = next(iter(zones.values())).id if len(zones) == 1 else ""
     for handle, (mention, element) in unplaced.items():
@@ -910,11 +944,12 @@ def _interactions(
     prepared: Mapping[str, SpanSource],
     repeated: Collection[str],
     zoned: Mapping[str, ZonedElement],
+    held: SystemModel,
     rows: list[DispositionRow],
 ) -> dict[str, DataFlow]:
     """Turn every interaction into a Data Flow between two placed elements."""
-    flows: dict[str, DataFlow] = {}
-    taken: set[str] = set()
+    flows: dict[str, DataFlow] = {flow.id: flow for flow in held.data_flows}
+    taken: set[str] = set(flows)
     for interaction in bundle.interactions:
         if interaction.handle in repeated:
             continue

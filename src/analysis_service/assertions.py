@@ -927,6 +927,72 @@ def spans_for(quote: str, prepared: SpanSource) -> tuple[SupportSpan, ...]:
     )
 
 
+def merged(held: AssertionCatalog, found: AssertionCatalog) -> AssertionCatalog:
+    """Two catalogs as one, by the rule :func:`resolve_catalog` already merges by.
+
+    **The one reader of "these rows and those rows are one catalog".** Rows
+    that share an identity become one row carrying both spans, through
+    :func:`_merge`, so two catalogs stating one fact keep both provenances
+    rather than becoming a duplicate the gate refuses.
+
+    The subject table is rebuilt from the rows that survive, never unioned
+    blindly: a subject nothing names is a row the caller does not hold, and a
+    table carrying it would say the catalog is about something it is silent on.
+    ``held``'s spelling of a subject stands where both name one, because the
+    caller's existing labels are the ones a report already printed.
+    """
+    kept: dict[str, Assertion] = {}
+    for entry in (*held.entries, *found.entries):
+        identity = assertion_id(entry)
+        standing = kept.get(identity)
+        kept[identity] = entry if standing is None else _merge(standing, entry)
+    labels = {subject.id: subject for subject in (*found.subjects, *held.subjects)}
+    return _catalog(list(kept.values()), labels)
+
+
+def without(catalog: AssertionCatalog, identities: Collection[str]) -> AssertionCatalog:
+    """The catalog with those rows retracted, and no subject left behind.
+
+    A retraction is how a correction is spelled, because an identity is
+    computed from the row's own parts: changing a value makes a different row,
+    so a caller drops one identity and adds another rather than editing a row
+    in place. Nothing here checks that ``identities`` names anything — a caller
+    that wants a stale retraction reported asks :func:`answer` first.
+    """
+    dropped = frozenset(identities)
+    kept = [entry for entry in catalog.entries if assertion_id(entry) not in dropped]
+    labels = {subject.id: subject for subject in catalog.subjects}
+    return _catalog(kept, labels)
+
+
+def _catalog(
+    entries: list[Assertion], labels: Mapping[str, Subject]
+) -> AssertionCatalog:
+    """One catalog over ``entries``, carrying the subjects they name.
+
+    **The one reader of which subjects a set of rows declares.** The table is
+    derived, for the reason :class:`CatalogProposal` gives: two places to spell
+    one subject eventually spell it two ways.
+
+    A row names **two** subjects where its predicate's value is a reference —
+    what the row is about, and what it points at. A credential nothing is
+    stated about is still a subject, because a row presenting it names it, and
+    a table that dropped it would leave that row pointing at nothing.
+
+    A subject ``labels`` does not hold stays out, which the gate then reports
+    as ``dangling-subject`` rather than this inventing a label nobody wrote.
+    """
+    named = set()
+    for entry in entries:
+        named.add(entry.subject)
+        predicate = REGISTRY.get(entry.predicate)
+        if predicate is not None and predicate.value == "reference":
+            named.add(entry.value)
+    named -= UNIVERSAL_TERMS
+    subjects = [labels[subject] for subject in sorted(named) if subject in labels]
+    return AssertionCatalog(subjects=subjects, entries=entries)
+
+
 def ambiguous_quote(quote: str, haystack: str) -> bool:
     """Whether ``haystack`` holds ``quote`` in more than one place.
 
@@ -1652,11 +1718,12 @@ def resolve_catalog(
         held = kept.get(identity)
         kept[identity] = entry if held is None else _merge(held, entry)
 
-    catalog = AssertionCatalog(
-        subjects=sorted(subjects.values(), key=lambda subject: subject.id),
-        entries=list(kept.values()),
-    )
-    return catalog, issues
+    # Through :func:`_catalog`, so how a subject table is derived from rows is
+    # written down once. It also drops a subject whose only row the gate then
+    # refused: the subject was recorded while the row was being built, and a
+    # table naming something no row is about says the catalog holds a fact it
+    # does not.
+    return _catalog(list(kept.values()), subjects), issues
 
 
 def _prepare(sources: Mapping[str, str]) -> Mapping[str, SpanSource]:
