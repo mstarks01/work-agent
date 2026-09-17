@@ -164,15 +164,18 @@ class TestTheRegistryAnswersItsVocabularies:
         """A predicate cannot be authoritative for a field that does not exist."""
         assert set(projection_fields().values()) <= set(all_attribute_names())
 
-    def test_eleven_of_the_seventeen_predicates_project_into_nothing(self):
+    def test_eleven_of_the_eighteen_predicates_project_into_nothing(self):
         """ADR 0034's figure, re-derived rather than asserted in its prose.
 
         It is the whole argument for the catalog: the graph has no field for
         most of what this release scopes. `represented-by` is the eleventh, and
         it could have no field by construction — it says which element a
         subject *is*, and no element has an attribute for that.
+
+        The eleven do not move when a predicate is added for a field the graph
+        already holds, which is what `data-classification` is.
         """
-        assert len(REGISTRY) == 17
+        assert len(REGISTRY) == 18
         assert len(REGISTRY) - len(projection_fields()) == 11
 
     def test_two_predicates_can_project_into_one_field(self):

@@ -28,6 +28,8 @@ from analysis_service.assertions import (
     QuoteProposal,
     ambiguous_quote,
     conflicts,
+    project,
+    projection_fields,
     resolve_catalog,
     span_source,
 )
@@ -546,6 +548,39 @@ class TestInteractions:
         )
         resolution = resolved(bundle, {LABEL: text})
         assert len({flow.id for flow in resolution.model.data_flows}) == 2
+
+    def test_a_store_keeps_the_classification_a_fact_states(self) -> None:
+        """ASVS's classified-store rule reads the attribute, so a route must fill it.
+
+        A predicate that projects into `data_classification` is the only way a
+        facts-first route can; without one the store reaches every framework at
+        `unknown` and the rule has nothing to fire on.
+        """
+        bundle = worker_bundle()
+        bundle.facts.append(
+            FactProposal(
+                handle="p_class",
+                subject_kind="mention",
+                subject="m2",
+                predicate="data-classification",
+                value="pii",
+                basis="stated",
+                quotes=quote(NOTE),
+            )
+        )
+
+        resolution = resolved(bundle)
+
+        row = row_for(resolution, "p_class")
+        assert row.disposition in LANDED, (row.code, row.message)
+        # The resolver keeps the row; `prepare` is what writes an attribute, so
+        # the projection is the seam that carries it to the graph.
+        assert projection_fields()["data-classification"] == "data_classification"
+        assert [
+            (one.element_id, one.attribute, one.value)
+            for one in project(resolution.record.catalog)
+            if one.attribute == "data_classification"
+        ] == [("store:queue", "data_classification", "pii")]
 
     def test_a_flow_keeps_what_the_interaction_does_to_the_data(self) -> None:
         """STRIDE's store-tampering rule skips a read-only path, and reads this.

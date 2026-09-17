@@ -160,7 +160,12 @@ __all__ = [
 #: changes what a row means, and a reader comparing two runs has to know.
 #:
 #: Version 3 adds ``represented-by``.
-REGISTRY_VERSION = 3
+#:
+#: Version 4 adds ``data-classification``. A store's classification is a
+#: fact the sources state and a framework rule reads, and no predicate
+#: carried it — so a route that builds its own graph left the attribute at
+#: ``unknown`` and ASVS's classified-store rule had nothing to fire on.
+REGISTRY_VERSION = 4
 
 #: The projection's version: which graph attribute each predicate is
 #: authoritative for, and what :func:`project` does when the rows do not fit one
@@ -425,6 +430,17 @@ REGISTRY: Mapping[str, Predicate] = MappingProxyType(
             subjects=frozenset({"component"}),
             value="text",
             projects_into="encryption_at_rest",
+        ),
+        # Free text rather than a vocabulary, because the reader is a rule that
+        # searches the words: ASVS's CLASSIFIED_STORE_TEST looks for
+        # "confidential", "restricted", "pii" and the rest inside the attribute.
+        # A closed set here would decide, ahead of every framework, which
+        # classifications a source may state.
+        "data-classification": Predicate(
+            meaning="what kind of data this component holds",
+            subjects=frozenset({"component"}),
+            value="text",
+            projects_into="data_classification",
         ),
         "signature-verification": Predicate(
             meaning="whether the receiver checks who signed the artifact it took",

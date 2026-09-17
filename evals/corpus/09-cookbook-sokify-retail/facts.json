@@ -280,6 +280,48 @@
       },
       "rationale": "The source states a relative placement, kept alongside SIMS, and SIMS itself has no established network zone, so the file's zone is unknown. model.json's zone is a placement the schema requires, recorded in its assumption with the relative placement.",
       "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:user-database",
+        "predicate": "data-classification",
+        "value": "confidential",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "name, address, and the card they paid with"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The source lists what the database holds about a customer.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:delivery-address-flat-file",
+        "predicate": "data-classification",
+        "value": "confidential",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "only addresses go in that file, nothing else"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The source says the file holds delivery addresses.",
+      "reviewed_by": "mstarks01"
     }
   ],
   "disputed": []

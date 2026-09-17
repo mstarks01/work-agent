@@ -1089,10 +1089,16 @@ class TestWhatTheAssertionPassReached:
         assert sample_report().assertion_coverage is None
 
     def test_the_denominator_is_what_this_model_could_hold(self):
-        """Not what the corpus holds, and not what the pass happened to ask."""
+        """Not what the corpus holds, and not what the pass happened to ask.
+
+        The count is every (subject, predicate) slot this model admits, so a
+        predicate added for a subject type it carries raises it. That is the
+        denominator doing its job: a new question the layer can ask is one more
+        thing a quiet catalog has left unanswered.
+        """
         held = catalog_coverage(AssertionCatalog(), valid_model())
 
-        assert held.reachable == 9 and held.settled == 0
+        assert held.reachable == 10 and held.settled == 0
 
     def test_a_settled_row_counts_against_that_denominator(self):
         """A row on a flow, under a predicate that has a graph field."""

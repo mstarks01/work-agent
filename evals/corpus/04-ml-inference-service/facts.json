@@ -434,6 +434,27 @@
       },
       "rationale": "Inferred: the source states that ML engineers publish, which supports an effective permission; an authorization grant is not stated.",
       "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:redis-feature-store",
+        "predicate": "data-classification",
+        "value": "confidential",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The features include account age and spend bands per customer"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The source says the store holds per-customer financial attributes.",
+      "reviewed_by": "mstarks01"
     }
   ],
   "disputed": [],
