@@ -1,0 +1,354 @@
+{
+ "case": "03-batch-data-pipeline",
+ "drafted_by": "agent-stand-in",
+ "rows": [
+  {
+   "assertion": {
+    "subject_type": "interaction",
+    "subject": "flow:entity:insurance-partner>store:landing-bucket>push-daily-extract",
+    "predicate": "authentication-mechanism",
+    "value": "static key issued at onboarding",
+    "reason": null,
+    "scope": [],
+    "basis": "stated",
+    "quotes": [
+     {
+      "source_label": "System description",
+      "quote": "Each partner has a static key we issued when they onboarded"
+     }
+    ],
+    "explanation": "",
+    "exclusive": false
+   },
+   "rationale": "Stated for the partner push and only that path.",
+   "reviewed_by": null
+  },
+  {
+   "assertion": {
+    "subject_type": "principal",
+    "subject": "principal:insurance-partners",
+    "predicate": "credential-presented",
+    "value": "credential:partner-static-key",
+    "reason": null,
+    "scope": [],
+    "basis": "stated",
+    "quotes": [
+     {
+      "source_label": "System description",
+      "quote": "Each partner has a static key we issued when they onboarded"
+     }
+    ],
+    "explanation": "",
+    "exclusive": false
+   },
+   "rationale": "Each partner presents its own key. Recorded on the principal that presents it rather than as a second predicate on the interaction, so the flow's authentication projects a value instead of a degraded unknown.",
+   "reviewed_by": null
+  },
+  {
+   "assertion": {
+    "subject_type": "credential",
+    "subject": "credential:partner-static-key",
+    "predicate": "credential-rotation",
+    "value": "not-rotated",
+    "reason": null,
+    "scope": [],
+    "basis": "stated",
+    "quotes": [
+     {
+      "source_label": "System description",
+      "quote": "the keys have not changed since"
+     }
+    ],
+    "explanation": "",
+    "exclusive": false
+   },
+   "rationale": "A stated absence of rotation rather than an unknown.",
+   "reviewed_by": null
+  },
+  {
+   "assertion": {
+    "subject_type": "interaction",
+    "subject": "flow:entity:insurance-partner>store:landing-bucket>push-daily-extract",
+    "predicate": "transport-encryption",
+    "value": "SFTP",
+    "reason": null,
+    "scope": [],
+    "basis": "stated",
+    "quotes": [
+     {
+      "source_label": "System description",
+      "quote": "They push files into a landing bucket over SFTP."
+     }
+    ],
+    "explanation": "",
+    "exclusive": false
+   },
+   "rationale": "SFTP is stated as the transport for this flow.",
+   "reviewed_by": null
+  },
+  {
+   "assertion": {
+    "subject_type": "interaction",
+    "subject": "flow:process:ingest-scheduler>store:landing-bucket>list-and-read-files",
+    "predicate": "destination-verification",
+    "value": "absent",
+    "reason": null,
+    "scope": [],
+    "basis": "stated",
+    "quotes": [
+     {
+      "source_label": "System description",
+      "quote": "It does not check that a file came from the partner whose folder it landed in."
+     }
+    ],
+    "explanation": "",
+    "exclusive": false
+   },
+   "rationale": "An explicit absence: the check is named and said not to happen.",
+   "reviewed_by": null
+  },
+  {
+   "assertion": {
+    "subject_type": "component",
+    "subject": "process:ingest-scheduler",
+    "predicate": "network-membership",
+    "value": "boundary:landing-network",
+    "reason": null,
+    "scope": [],
+    "basis": "stated",
+    "quotes": [
+     {
+      "source_label": "System description",
+      "quote": "An Airflow scheduler running in the landing network"
+     }
+    ],
+    "explanation": "",
+    "exclusive": false
+   },
+   "rationale": "Stated directly.",
+   "reviewed_by": null
+  },
+  {
+   "assertion": {
+    "subject_type": "component",
+    "subject": "process:spark-transform-job",
+    "predicate": "network-membership",
+    "value": "boundary:warehouse-network",
+    "reason": null,
+    "scope": [],
+    "basis": "stated",
+    "quotes": [
+     {
+      "source_label": "System description",
+      "quote": "the scheduler triggers a Spark transform job in the warehouse network"
+     }
+    ],
+    "explanation": "",
+    "exclusive": false
+   },
+   "rationale": "Stated directly.",
+   "reviewed_by": null
+  },
+  {
+   "assertion": {
+    "subject_type": "credential",
+    "subject": "credential:partner-static-key",
+    "predicate": "credential-custody",
+    "value": "Airflow's own metadata database",
+    "reason": null,
+    "scope": [],
+    "basis": "stated",
+    "quotes": [
+     {
+      "source_label": "System description",
+      "quote": "Airflow keeps its connection strings and the partner keys in its own metadata database."
+     }
+    ],
+    "explanation": "",
+    "exclusive": false
+   },
+   "rationale": "Where the credential is kept, stated.",
+   "reviewed_by": null
+  },
+  {
+   "assertion": {
+    "subject_type": "component",
+    "subject": "entity:data-analyst",
+    "predicate": "network-membership",
+    "value": "boundary:warehouse-network",
+    "reason": null,
+    "scope": [],
+    "basis": "stated",
+    "quotes": [
+     {
+      "source_label": "System description",
+      "quote": "They are on the warehouse network and authenticate with SSO"
+     }
+    ],
+    "explanation": "",
+    "exclusive": false
+   },
+   "rationale": "The analyst's own position, stated in the same sentence as the mechanism.",
+   "reviewed_by": null
+  },
+  {
+   "assertion": {
+    "subject_type": "interaction",
+    "subject": "flow:entity:data-analyst>store:claims-warehouse>run-queries",
+    "predicate": "authentication-mechanism",
+    "value": "SSO",
+    "reason": null,
+    "scope": [],
+    "basis": "stated",
+    "quotes": [
+     {
+      "source_label": "System description",
+      "quote": "They are on the warehouse network and authenticate with SSO"
+     }
+    ],
+    "explanation": "",
+    "exclusive": false
+   },
+   "rationale": "Stated for the analyst path.",
+   "reviewed_by": null
+  },
+  {
+   "assertion": {
+    "subject_type": "principal",
+    "subject": "principal:data-analysts",
+    "predicate": "authorization-grant",
+    "value": "the whole dataset, including member-identifying columns",
+    "reason": null,
+    "scope": [
+     {
+      "kind": "resource",
+      "value": "claims warehouse"
+     },
+     {
+      "kind": "operation",
+      "value": "query"
+     }
+    ],
+    "basis": "stated",
+    "quotes": [
+     {
+      "source_label": "System description",
+      "quote": "the grant is dataset-wide \u2014 we have not split member-identifying columns out"
+     }
+    ],
+    "explanation": "",
+    "exclusive": false
+   },
+   "rationale": "A grant stated with its breadth, and the speaker names what was not separated.",
+   "reviewed_by": null
+  },
+  {
+   "assertion": {
+    "subject_type": "component",
+    "subject": "store:landing-bucket",
+    "predicate": "storage-encryption",
+    "value": "unknown",
+    "reason": "hedged",
+    "scope": [],
+    "basis": "stated",
+    "quotes": [
+     {
+      "source_label": "System description",
+      "quote": "I don't know how the landing bucket is encrypted or whether the Airflow\nmetadata database is encrypted at rest."
+     }
+    ],
+    "explanation": "",
+    "exclusive": false
+   },
+   "rationale": "The speaker raised the landing bucket and could not answer. 'Both are on defaults as far as I know' is a hedge, not a statement.",
+   "reviewed_by": null
+  },
+  {
+   "assertion": {
+    "subject_type": "component",
+    "subject": "store:airflow-metadata-database",
+    "predicate": "storage-encryption",
+    "value": "unknown",
+    "reason": "hedged",
+    "scope": [],
+    "basis": "stated",
+    "quotes": [
+     {
+      "source_label": "System description",
+      "quote": "I don't know how the landing bucket is encrypted or whether the Airflow\nmetadata database is encrypted at rest."
+     }
+    ],
+    "explanation": "",
+    "exclusive": false
+   },
+   "rationale": "The speaker raised the Airflow metadata database and could not answer. 'Both are on defaults as far as I know' is a hedge, not a statement.",
+   "reviewed_by": null
+  }
+ ],
+ "disputed": [
+  {
+   "element_id": "entity:insurance-partner",
+   "attribute": "trust_zone",
+   "blessed": "boundary:partner-network",
+   "proposed": "record as an inference",
+   "kind": "defensible-inference",
+   "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
+   "ruling": null,
+   "reviewed_by": null
+  },
+  {
+   "element_id": "process:ingest-scheduler",
+   "attribute": "exposure",
+   "blessed": "internal",
+   "proposed": "record as an inference",
+   "kind": "defensible-inference",
+   "basis": "No sentence states its reachability. Sitting in an internal network implies it, which is an inference rather than a statement.",
+   "ruling": null,
+   "reviewed_by": null
+  },
+  {
+   "element_id": "process:spark-transform-job",
+   "attribute": "exposure",
+   "blessed": "internal",
+   "proposed": "record as an inference",
+   "kind": "defensible-inference",
+   "basis": "No sentence states its reachability. Sitting in an internal network implies it, which is an inference rather than a statement.",
+   "ruling": null,
+   "reviewed_by": null
+  },
+  {
+   "element_id": "store:landing-bucket",
+   "attribute": "trust_zone",
+   "blessed": "boundary:landing-network",
+   "proposed": "record as an inference",
+   "kind": "defensible-inference",
+   "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
+   "ruling": null,
+   "reviewed_by": null
+  },
+  {
+   "element_id": "store:airflow-metadata-database",
+   "attribute": "trust_zone",
+   "blessed": "boundary:landing-network",
+   "proposed": "record as an inference",
+   "kind": "defensible-inference",
+   "basis": "Airflow keeping its own metadata database implies the scheduler's network. No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
+   "ruling": null,
+   "reviewed_by": null
+  },
+  {
+   "element_id": "store:claims-warehouse",
+   "attribute": "trust_zone",
+   "blessed": "boundary:warehouse-network",
+   "proposed": "record as an inference",
+   "kind": "defensible-inference",
+   "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
+   "ruling": null,
+   "reviewed_by": null
+  }
+ ],
+ "aliases": {
+  "subjects": [],
+  "qualifiers": []
+ }
+}
