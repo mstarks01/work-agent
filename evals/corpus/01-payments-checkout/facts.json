@@ -491,6 +491,27 @@
       },
       "rationale": "The speaker raises the question and does not answer it: a hedged unknown, which a produced catalog must retain rather than fill.",
       "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:orders-db",
+        "predicate": "data-classification",
+        "value": "confidential",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Orders, shopper addresses and card-last-four live in a PostgreSQL database"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The source names what the store holds: order records, postal addresses and a card fragment.",
+      "reviewed_by": "mstarks01"
     }
   ],
   "disputed": [],
