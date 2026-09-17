@@ -39,7 +39,7 @@ from analysis_service.frameworks import PACKAGES
 from analysis_service.frameworks.stride.record import Threat
 from analysis_service.report import Report
 from analysis_service.system_model import FLOW_ID_RULES
-from evals.harness import flow_ids, modes
+from evals.harness import flow_ids, modes, replay
 from evals.harness.archive import archive_bytes
 from evals.harness.reference import GoldenCase
 
@@ -162,9 +162,10 @@ def write_assertions(
 ) -> None:
     """Persist every assertion run beside the artifact, so it can be re-read.
 
-    :func:`write_extractions`'s counterpart for the assertion mode, and it
-    keeps the same three things for the same reason: what the model emitted,
-    what code built from it, and why each dropped row dropped.
+    :func:`write_extractions`'s counterpart for every mode that ends in a
+    catalog — the assertion mode and #1003's head-only mode — and it keeps the
+    same three things for the same reason: what the model emitted, what code
+    built from it, and why each dropped row dropped.
 
     * ``proposal`` — what ``assert`` emitted. The only one that cannot be
       recomputed: resolving has already located spans and dropped rows, and a
@@ -182,7 +183,11 @@ def write_assertions(
     carry quotes of corpus source text, which is in this repository. The same
     path carries a submitter's own words the moment it runs outside the corpus.
     """
-    if mode != "assertions":
+    # Every mode that keeps a catalog, read off the table the replay reads:
+    # the head-only mode keeps one too, and a writer with its own list of modes
+    # would have archived nothing for it — which is what happened, and is
+    # invisible until a replay finds an empty directory.
+    if replay.KEEPS.get(mode) != "catalog":
         return
     directory = reports_dir(out)
     directory.mkdir(parents=True, exist_ok=True)
