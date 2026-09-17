@@ -98,7 +98,15 @@ from analysis_service.assertions import (
     snap_subject,
 )
 from analysis_service.grounding import normalize
-from analysis_service.system_model import DataFlow, SystemModel, flow_label
+from analysis_service.system_model import (
+    FLOW_DELIMITER,
+    DataFlow,
+    FlowIdError,
+    SystemModel,
+    flow_id_version,
+    flow_label,
+    parse_flow_id,
+)
 from evals.harness.alignment import (
     Alignment,
     align,
@@ -384,6 +392,66 @@ class AssertionReplay:
             "rows": [row.to_json() for row in self.rows],
             "produced": dict(self.produced),
         }
+
+
+def unlabelled(subject: str) -> str:
+    """One subject with a flow's label dropped, and anything else unchanged.
+
+    A **Data Flow**'s identity carries its label (ADR 0037), which is right:
+    two flows between one pair of endpoints must stay separately addressable.
+    An **Assertion** about a flow inherits that, so a row on the same two
+    endpoints under another verb is a different subject — and a label is a word
+    the model picks out of free text.
+
+    This is the key a *representation-equivalent* match reads. It is not the
+    identity and it never replaces one: nothing keyed on this is an assertion
+    ID, and :func:`replay_assertions` does not use it.
+    """
+    if not subject.startswith(f"{DataFlow.id_prefix}:"):
+        return subject
+    try:
+        parts = parse_flow_id(subject, flow_id_version(subject))
+    except (FlowIdError, ValueError):
+        return subject
+    return f"{parts.source}{FLOW_DELIMITER}{parts.destination}"
+
+
+def aligned_rows(reference: SignedReference, result: AssertionResult) -> frozenset[str]:
+    """Reference rows this run stated on the same fact under another flow label.
+
+    **Beside the strict fates, never instead of them.**
+    :func:`replay_assertions` is unchanged and every archived number it produced
+    still stands; this answers the second question #1015 asks — how much of what
+    an arm missed it actually wrote down under a different word for the edge.
+
+    A row counts only where all four identifying parts agree once the flow label
+    is set aside: the endpoints, the predicate, the scope and the canonical
+    value. Matching on endpoints and predicate alone would credit a row that
+    named the same interaction and said the wrong thing about it.
+
+    Signed aliases apply first, through :func:`under_aliases`, so a reviewer's
+    ruling is read before this looser key is.
+    """
+    produced = set()
+    for entry in result.catalog.entries:
+        aliased = under_aliases(entry, reference)
+        try:
+            parts = identity_parts(aliased)
+        except KeyError:
+            continue
+        produced.add(
+            (unlabelled(parts.subject), parts.predicate, parts.scope, parts.value)
+        )
+    found = set()
+    for entry in reference.entries:
+        try:
+            parts = identity_parts(entry)
+        except KeyError:
+            continue
+        key = (unlabelled(parts.subject), parts.predicate, parts.scope, parts.value)
+        if key in produced:
+            found.add(assertion_id(entry))
+    return frozenset(found)
 
 
 def unsigned_rows(corpus_dir: Path, case: GoldenCase) -> int | None:
