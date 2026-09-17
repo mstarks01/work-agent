@@ -48,9 +48,17 @@ predicate the graph has no field for — a second factor stated absent, a
 credential stated shared — because those facts reach no attribute a rule could
 read. A predicate with a graph field stays cited through that field: one fact,
 one reader (ADR 0036). Which rows settle is
-:func:`~analysis_service.assertions.settled`'s one rule, so an unknown, a
-conflict, an unsupported row or a legacy one is never in the table, and a
-claim can never rest on one.
+:func:`~analysis_service.assertions.settled`'s one rule, so a conflict, an
+unsupported row or a legacy one is never in the table, and a claim can never
+rest on one.
+
+An **unknown** row is in the table and is a different thing. It is offered under
+the same identity and a ``unknown-assertion`` ground, because the sources were
+asked about that fact and left it open, and an agent may raise a *conditional*
+claim on it exactly as it may on an element attribute nobody stated. Which of
+the two an entry is, is the entry's own ``Ground.kind``, so a claim that grounds
+a settled row on an open question — or the reverse — is refused by comparing
+its kind against the table rather than by a second reading of ``settled``.
 
 Model output is untrusted input (OWASP LLM05). A ref is used as a dictionary key
 and never parsed, interpolated, or matched by a pattern compiled from it, so the
@@ -94,6 +102,7 @@ from analysis_service.claims import (
 )
 from analysis_service.frameworks import FrameworkPackage, schemas_for
 from analysis_service.system_model import (
+    UNKNOWN,
     DataFlow,
     Element,
     SystemModel,
@@ -198,6 +207,20 @@ def evidence_catalog(
                 assertion_id(row): Ground(kind="assertion", assertion=assertion_id(row))
                 for row in settled(assertions)
                 if row.predicate in UNPROJECTED
+            }
+        )
+        # The open questions, after the settled rows and never merged with
+        # them. A row reaches here when its value is the unknown sentinel and
+        # its predicate has no graph field: the one class of fact that had no
+        # offer of any kind, because the attribute enumeration above walks
+        # elements and this row's subject may be a principal.
+        catalog.update(
+            {
+                assertion_id(row): Ground(
+                    kind="unknown-assertion", assertion=assertion_id(row)
+                )
+                for row in assertions.entries
+                if row.predicate in UNPROJECTED and row.value == UNKNOWN
             }
         )
     return catalog
@@ -308,11 +331,29 @@ def _one_ground_issue(
                 f" {ground.flow_id!r}, which is not a derived boundary crossing"
             )
         return ""
-    if ground.kind == "assertion":
-        if ground.assertion not in catalog:
+    if ground.kind in ("assertion", "unknown-assertion"):
+        held = catalog.get(ground.assertion)
+        if held is None:
             return (
                 f"claim {claim_id!r} grounds an assertion {ground.assertion!r},"
-                " which the job's catalog does not settle"
+                " which the job's catalog does not offer"
+            )
+        # The kind is checked against the table's own entry, not re-derived.
+        # Both kinds are keyed by the row's identity, so membership alone would
+        # let a claim rest on an open question by calling it settled — the one
+        # substitution `settled` exists to prevent.
+        if held.kind != ground.kind:
+            # Both halves are read off the catalog's entry, which this branch
+            # did not pin. Naming the claimed kind as well would print one of
+            # two fixed words and say the same thing twice.
+            stated = (
+                "settles that row, so it is a fact in hand"
+                if held.kind == "assertion"
+                else "leaves that row open, so it is a question"
+            )
+            return (
+                f"claim {claim_id!r} grounds {ground.assertion!r} the other way"
+                f" round: the job's catalog {stated}"
             )
         return ""
     named = (
@@ -474,16 +515,42 @@ def _gloss(
         return f"`{ground.attribute}` stated absent"
     if ground.kind == "assertion":
         return _assertion_gloss(rows[ground.assertion], subjects)
+    if ground.kind == "unknown-assertion":
+        return _open_question_gloss(rows[ground.assertion], subjects)
     return f"`{ground.attribute}` never stated"
+
+
+def _open_question_gloss(row: Assertion, subjects: Mapping[str, Subject]) -> str:
+    """One row the sources left open, in the words that say it is a question.
+
+    It names the ``reason`` rather than the value, because the value is the
+    unknown sentinel and carries nothing: what an agent needs is whether the
+    sources were silent, hedged, cut off, or never measured it. That is the
+    same distinction the attribute half of this table draws between *never
+    stated* and *stated absent*, at the seam where the fact has no attribute.
+    """
+    return (
+        f"`{row.predicate}` {_about(row, subjects)}: not stated"
+        f"{f' ({row.reason})' if row.reason else ''}"
+    )
+
+
+def _about(row: Assertion, subjects: Mapping[str, Subject]) -> str:
+    """Which subject a row is about, spelled for the reader.
+
+    One spelling for both glosses: an ID for a subject the graph holds, and a
+    label and type for one of this layer's own, which has no ID a reader would
+    recognise.
+    """
+    subject = subjects.get(row.subject)
+    if subject is None or subject.type in GRAPH_BOUND:
+        return f"on `{row.subject}`"
+    return f"for {subject.label} ({subject.type})"
 
 
 def _assertion_gloss(row: Assertion, subjects: Mapping[str, Subject]) -> str:
     """One settled assertion in the fewest words that say what it states."""
-    subject = subjects.get(row.subject)
-    if subject is None or subject.type in GRAPH_BOUND:
-        about = f"on `{row.subject}`"
-    else:
-        about = f"for {subject.label} ({subject.type})"
+    about = _about(row, subjects)
     referent = subjects.get(row.value)
     if row.value == ABSENT:
         value = "absent"

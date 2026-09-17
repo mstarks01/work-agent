@@ -366,6 +366,7 @@ class Ground:
 | `derived-fact` | `flow_id` | this flow's boundary crossing is the fact relied on |
 | `absent-element` | `term` | no element's text names this thing |
 | `assertion` | `assertion` | the sources state this fact, which the model has no field for |
+| `unknown-assertion` | `assertion` | the sources were asked this and left it open, and the model has no field for it |
 
 An `assertion` ground is a reference on the same terms as a `derived-fact`: it
 names a row in `assertions.catalog` by the row's computed identity, and the
@@ -1119,6 +1120,18 @@ class TokenUsage:
 > this model, and a 3.0 payload carrying `analyses` is refused by the old one.
 > The no-shim behaviour falls out of the shapes rather than out of anything
 > reading `schema_version`.
+
+> **`schema_version` 3.0** also carries a seventh `Ground` kind,
+> `unknown-assertion`: a row of the assertion catalog whose value is the unknown
+> sentinel, for a predicate the model has no field for. It is the assertion
+> layer's `unknown-attribute`, and it exists for the same reason — an element
+> attribute nobody stated is offered as a fact an agent may raise a
+> *conditional* claim on, and a predicate with no graph field had no such offer,
+> so a question the sources explicitly left open reached nobody. A separate kind
+> rather than a flag on `assertion`, because a settled row is a fact in hand and
+> an open row is a question: the fields are identical and the fact is not.
+> `CONDITIONAL_GROUNDS` is the one reader of which kinds make a claim
+> conditional, and both `unknown` kinds are in it.
 
 > **`schema_version` 3.0** also carries `assertions[].projection_version`: which
 > rules turned the catalog's rows into graph attributes. Its own number rather

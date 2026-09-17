@@ -535,7 +535,7 @@ class TestReportInvariants:
 
         report = sample_report(threats=[threat], assertions=record)
         assert report.assertions is record
-        with pytest.raises(ValidationError, match="does not settle"):
+        with pytest.raises(ValidationError, match="does not offer"):
             sample_report(threats=[threat])
 
     def test_a_loaded_report_still_names_the_contradiction_it_carries(self):

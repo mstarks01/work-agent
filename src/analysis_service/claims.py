@@ -105,7 +105,25 @@ GroundKind = Literal[
     "derived-fact",
     "absent-element",
     "assertion",
+    "unknown-assertion",
 ]
+
+#: The grounds that make a claim **conditional**: the fact it rests on is one
+#: nobody has stated, so the claim holds only if the answer turns out one way.
+#:
+#: **One reader for "is this claim conditional".** A consumer that spelled the
+#: set itself would answer for the kinds it knew and silently exclude a kind
+#: added later — and the consumer that matters licenses a threat to offer no
+#: countermeasure, so the hole reads as a well-formed claim rather than as an
+#: error. The two entries are the two questions: an attribute of an element
+#: nobody filled in, and a row of the assertion layer the sources left open.
+#:
+#: A *stated absence* is not here, under either spelling. "The control is not
+#: there" is a fact in hand, and "put the control in" is a countermeasure an
+#: agent can always name.
+CONDITIONAL_GROUNDS: frozenset[str] = frozenset(
+    {"unknown-attribute", "unknown-assertion"}
+)
 
 # How long a claim ID may be. **Not a grammar**: #163 ruled that ``id`` has no
 # shared one, because each package composes its own from its own ``id_format``
@@ -382,8 +400,20 @@ class Ground(BaseModel):
       subject, value, basis, scope and spans are read off the catalog the
       report embeds, never copied here, so the ground cannot say more than the
       row does. Only a settled row is ever catalogued
-      (:func:`~analysis_service.assertions.settled`), so an unknown, a
-      conflict, an unsupported row or a legacy one grounds nothing.
+      (:func:`~analysis_service.assertions.settled`), so a conflict, an
+      unsupported row or a legacy one grounds nothing.
+    * ``unknown-assertion`` — ``assertion`` alone, for a row whose value is
+      :data:`~analysis_service.system_model.UNKNOWN`: the sources were asked
+      about this fact and left it open. **The assertion layer's
+      ``unknown-attribute``**, and it exists for the same reason that kind
+      does. An element attribute nobody stated is offered as a fact an agent
+      may raise a *conditional* claim on; a predicate with no graph field had
+      no such offer, so a second factor the sources explicitly left open
+      reached nobody at all.
+      It is a separate kind rather than a flag on ``assertion`` because the two
+      readings differ: a settled row is a fact in hand, and an unknown row is a
+      question. The fields are identical and the fact is not, which is the
+      argument ``absent-attribute`` already makes against ``unknown-attribute``.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -412,6 +442,7 @@ class Ground(BaseModel):
         "derived-fact": ("flow_id",),
         "absent-element": ("term",),
         "assertion": ("assertion",),
+        "unknown-assertion": ("assertion",),
     }
 
     @property
