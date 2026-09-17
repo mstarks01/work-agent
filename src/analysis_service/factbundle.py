@@ -62,6 +62,7 @@ from analysis_service.assertions import (
     UNPROJECTED,
     AssertionCatalog,
     AssertionProposal,
+    AssertionRecord,
     Basis,
     CatalogIssueCode,
     CatalogProposal,
@@ -71,7 +72,6 @@ from analysis_service.assertions import (
     SubjectType,
     UnknownReason,
     ambiguous_quote,
-    resolve_catalog,
     span_source,
     spans_for,
 )
@@ -402,10 +402,14 @@ class Resolution:
     :func:`~analysis_service.validation.validate` is still the gate, and every
     arm of #1003 runs the same one. A bundle that named no zone yields a model
     with no Trust Boundary, which that gate refuses.
+
+    ``record`` is the **AssertionRecord** every existing evidence and projection
+    consumer already reads, which is what keeps this route out of their code: an
+    arm hands it on, and nothing downstream learns where the catalog came from.
     """
 
     model: SystemModel
-    catalog: AssertionCatalog
+    record: AssertionRecord
     dispositions: tuple[DispositionRow, ...]
 
     @property
@@ -465,7 +469,7 @@ def resolve_bundle(bundle: SourceFactBundle, sources: Mapping[str, str]) -> Reso
     """
     refused = _version_issue(bundle) or _cap_issue(bundle)
     if refused is not None:
-        return Resolution(SystemModel(), AssertionCatalog(), (refused,))
+        return Resolution(SystemModel(), _empty_record(), (refused,))
 
     prepared = _prepared(sources)
     repeated = _repeated_handles(bundle)
@@ -490,7 +494,7 @@ def resolve_bundle(bundle: SourceFactBundle, sources: Mapping[str, str]) -> Reso
         trust_boundaries=list(zones.values()),
         assumptions=list(assumptions),
     )
-    catalog = _facts(bundle, sources, model, zones, zoned, flows, repeated, rows)
+    record = _facts(bundle, sources, model, zones, zoned, flows, repeated, rows)
     rows.extend(
         DispositionRow(
             handle=row.handle,
@@ -512,7 +516,12 @@ def resolve_bundle(bundle: SourceFactBundle, sources: Mapping[str, str]) -> Reso
         )
         for handle, kind in _repeated_rows(bundle, repeated)
     )
-    return Resolution(model, catalog, tuple(rows))
+    return Resolution(model, record, tuple(rows))
+
+
+def _empty_record() -> AssertionRecord:
+    """The record a bundle nothing was read from produced."""
+    return AssertionRecord(proposed=0, catalog=AssertionCatalog())
 
 
 def _version_issue(bundle: SourceFactBundle) -> DispositionRow | None:
@@ -1118,15 +1127,18 @@ def _facts(
     flows: Mapping[str, DataFlow],
     repeated: Collection[str],
     rows: list[DispositionRow],
-) -> AssertionCatalog:
+) -> AssertionRecord:
     """Turn every fact into an assertion, through the existing resolver.
 
     A fact whose subject or reference handle reached no output is ``rejected``
     here, before the catalog sees it: what it is about does not exist, so the
     row has nothing to say. Everything else goes to
-    :func:`~analysis_service.assertions.resolve_catalog`, and what that refuses
-    comes back by row index — ``unsupported`` where the registry holds no such
-    predicate, ``rejected`` for every other reason.
+    :meth:`~analysis_service.assertions.AssertionRecord.of`, the one reader of
+    what a proposal came to — the production ``prepare`` node, the assertion
+    eval mode and the offline replay all ask it, so a resolver change moves
+    this route with them. What it refuses comes back by row index:
+    ``unsupported`` where the registry holds no such predicate, ``rejected``
+    for every other reason.
 
     A row the catalog kept is ``consumed`` where its predicate projects into a
     graph field and ``preserved`` where it does not, which is the split
@@ -1166,11 +1178,9 @@ def _facts(
         )
         handles.append(fact.handle)
 
-    catalog, issues = resolve_catalog(
-        CatalogProposal(assertions=proposals), model, sources
-    )
+    record = AssertionRecord.of(CatalogProposal(assertions=proposals), model, sources)
     refused: dict[int, tuple[DispositionCode, str, str]] = {}
-    for issue in issues:
+    for issue in record.issues:
         if issue.row is None or issue.row in refused:
             continue
         refused[issue.row] = (
@@ -1202,4 +1212,4 @@ def _facts(
                 target=proposal.subject,
             )
         )
-    return catalog
+    return record

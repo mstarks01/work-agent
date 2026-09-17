@@ -190,6 +190,12 @@ class TestCitations:
         assert validate(resolution.model, sources={LABEL: NOTE}) == []
         assert resolution.gaps == ()
 
+    def test_the_record_is_what_a_consumer_already_reads(self) -> None:
+        """The adapter hands on the shape every evidence consumer takes today."""
+        resolution = resolved(worker_bundle())
+        assert resolution.record.issues == []
+        assert resolution.record.proposed == len(resolution.record.catalog.entries)
+
     def test_an_element_carries_the_words_it_was_taken_from(self) -> None:
         resolution = resolved(worker_bundle())
         found = resolution.model.get("process:worker")
@@ -572,7 +578,7 @@ class TestFacts:
         assert row_for(resolution, "f1").disposition == "preserved"
         assert any(
             subject.id == "credential:queue-token"
-            for subject in resolution.catalog.subjects
+            for subject in resolution.record.catalog.subjects
         )
 
     def test_an_absence_a_silence_and_a_hedge_stay_apart(self) -> None:
@@ -611,7 +617,7 @@ class TestFacts:
         resolution = resolved(bundle)
         held = {
             (entry.predicate, entry.value, entry.reason)
-            for entry in resolution.catalog.entries
+            for entry in resolution.record.catalog.entries
         }
         assert ("storage-encryption", "absent", None) in held
         assert ("transport-encryption", UNKNOWN, "silent") in held
@@ -643,7 +649,7 @@ class TestFacts:
             ]
         )
         resolution = resolved(bundle, {LABEL: NOTE, "Kickoff call": call})
-        found = conflicts(resolution.catalog)
+        found = conflicts(resolution.record.catalog)
         assert [conflict.predicate for conflict in found] == ["storage-encryption"]
 
     def test_an_identification_this_service_inferred_is_refused(self) -> None:
@@ -696,6 +702,7 @@ class TestHandles:
         assert resolution.dispositions[0].code == "too-many-rows"
         assert resolution.dispositions[0].kind == "bundle"
         assert resolution.model == SystemModel()
+        assert resolution.record.proposed == 0
 
 
 class TestOneAmbiguityReader:
