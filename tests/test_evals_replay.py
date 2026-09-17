@@ -257,7 +257,7 @@ class TestEveryReferenceRowTakesOneFate:
         graded = self.graded(golden, reference, reference.entries)
 
         assert {row.fate for row in graded.rows} == {"found"}
-        assert set(graded.produced.values()) == {"matched"}
+        assert set(graded.produced.values()) == {"found"}
 
     def test_a_reworded_text_value_is_a_readers_question(self, golden, reference):
         row = next(e for e in reference.entries if e.predicate == "storage-encryption")
@@ -291,6 +291,25 @@ class TestEveryReferenceRowTakesOneFate:
 
         assert graded.counts["wrong_value"] == 1
 
+    def test_a_wrong_value_is_a_wrong_claim_and_not_an_answer(self, golden, reference):
+        """The reference calls the component internal; the run calls it exposed.
+
+        The produced row carries the reference row's own fate, so a precision
+        figure reading :data:`~evals.harness.replay.ADJUDICATED_WRONG` counts
+        it. A row the reference disagrees with is not an answer to it.
+        """
+        row = next(
+            e
+            for e in reference.entries
+            if e.predicate == "internet-exposure" and e.value == "internal"
+        )
+        flipped = row.model_copy(update={"value": "internet-facing"})
+
+        graded = self.graded(golden, reference, [flipped])
+
+        assert graded.produced == {assertion_id(flipped): "wrong_value"}
+        assert set(graded.produced.values()) <= replay.ADJUDICATED_WRONG
+
     def test_a_signed_subject_alias_pairs_a_row_named_otherwise(
         self, golden, reference
     ):
@@ -318,7 +337,7 @@ class TestEveryReferenceRowTakesOneFate:
         # Unsigned, the row sits on a subject nobody ruled on: its grant is one
         # the reference carries elsewhere, so it reads as a misattachment.
         assert before.produced == {assertion_id(renamed): "misattached"}
-        assert after.produced == {assertion_id(row): "matched"}
+        assert after.produced == {assertion_id(row): "found"}
         assert next(r.fate for r in after.rows if r.reference == assertion_id(row)) == (
             "found"
         )

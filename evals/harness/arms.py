@@ -75,6 +75,8 @@ from analysis_service.prompts import (
 from analysis_service.sources import render_sources
 from evals.harness.reference import GoldenCase, load_corpus
 from evals.harness.replay import (
+    ADJUDICATED,
+    ADJUDICATED_WRONG,
     PRODUCED_FATES,
     ROW_FATES,
     AssertionReplay,
@@ -413,24 +415,49 @@ def failure_rate(runs: Collection[ArmRun], arm: str) -> float:
     return sum(not run.valid for run in ours) / len(ours)
 
 
-def unsupported_rate(runs: Collection[ArmRun], arm: str) -> float:
-    """Produced rows no reference row took, per produced row.
+def wrong_rate(runs: Collection[ArmRun], arm: str) -> float:
+    """Adjudicated wrong claims, per adjudicated claim.
 
-    The non-inferiority number #1003's second gate reads. A row is ``matched``
-    where a reference row took it, ``misattached`` where it sat on a subject the
-    reference puts elsewhere, and ``unreviewed`` where nothing signed says
-    whether it is real — and the last is *not* evidence of a wrong fact, only of
-    one nobody adjudicated. The gate reads the rate and the counts together for
-    that reason.
+    The non-inferiority number #1003's second gate reads, over the rows a
+    reviewer's reference actually rules on. A row is wrong where the reference
+    took it at the wrong value or the wrong scope, or carries its predicate and
+    value on another subject; it is right where the reference took it as the
+    fact it states, in either spelling.
+
+    **The denominator excludes the rows nobody adjudicated.** A route that
+    writes many rows outside the reference would otherwise read as wrong for
+    writing them, and a route that writes few would read as right for staying
+    silent. :func:`unreviewed_share` reports how much of the output that
+    denominator leaves out, and the gate reads the two together.
+    """
+    produced = [run.produced for run in runs if run.arm == arm]
+    ruled = sum(
+        count for one in produced for fate, count in one.items() if fate in ADJUDICATED
+    )
+    if not ruled:
+        return 0.0
+    wrong = sum(
+        count
+        for one in produced
+        for fate, count in one.items()
+        if fate in ADJUDICATED_WRONG
+    )
+    return wrong / ruled
+
+
+def unreviewed_share(runs: Collection[ArmRun], arm: str) -> float:
+    """Produced rows no signed reference rules on, per produced row.
+
+    **The adjudication coverage of :func:`wrong_rate`, never an error rate.**
+    The reference lists what the sources state and not everything they do not,
+    so a row outside it is a candidate for a ruling. A high share says the
+    precision figure rests on little of what the arm wrote.
     """
     produced = [run.produced for run in runs if run.arm == arm]
     total = sum(sum(one.values()) for one in produced)
     if not total:
         return 0.0
-    unmatched = sum(
-        count for one in produced for fate, count in one.items() if fate != "matched"
-    )
-    return unmatched / total
+    return sum(one.get("unreviewed", 0) for one in produced) / total
 
 
 @dataclass(frozen=True)
@@ -628,8 +655,15 @@ def report(
             " label (#1015). It sits beside `recall` and never replaces it."
         ),
         "",
-        "| arm | cases | runs | recall | aligned | failed | unsupported |",
-        "| --- | --- | --- | --- | --- | --- | --- |",
+        (
+            "`wrong` is the share of the produced rows the reference rules on"
+            " that it disagrees with, and `unreviewed` is the share of all"
+            " produced rows it rules on at all. Read them together: a low"
+            " `wrong` over few adjudicated rows says little."
+        ),
+        "",
+        "| arm | cases | runs | recall | aligned | failed | wrong | unreviewed |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for arm in arms:
         ours = [run for run in runs if run.arm == arm]
@@ -638,7 +672,8 @@ def report(
             f" {macro_recall(runs, arm):.3f} |"
             f" {macro_recall(runs, arm, aligned=True):.3f} |"
             f" {failure_rate(runs, arm):.3f} |"
-            f" {unsupported_rate(runs, arm):.3f} |"
+            f" {wrong_rate(runs, arm):.3f} |"
+            f" {unreviewed_share(runs, arm):.3f} |"
         )
     lines += ["", "## Error classes", "", "| arm | " + " | ".join(ROW_FATES) + " |"]
     lines.append("| --- |" + " --- |" * len(ROW_FATES))
@@ -743,7 +778,14 @@ def _fate_totals(runs: Collection[ArmRun], arm: str) -> Mapping[str, int]:
 #: version 1 file carries none of them, so the paired comparison and the
 #: aligned figure would read as empty rather than as absent — which is why the
 #: loader refuses it rather than defaulting.
-ARTIFACT_VERSION = 2
+#:
+#: Version 3 keys the produced counts by
+#: :data:`~evals.harness.replay.PRODUCED_FATES`, which separates a row the
+#: reference took at the wrong value or the wrong scope from one it took as the
+#: fact it states. A version 2 file carries a single ``matched`` column over
+#: both, so the loader refuses it rather than reading that column as a count of
+#: right answers.
+ARTIFACT_VERSION = 3
 
 
 class ArmsError(ValueError):
