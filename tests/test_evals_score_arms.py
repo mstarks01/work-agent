@@ -121,6 +121,32 @@ class TestScoring:
         assert self.run(tmp_path, f"A={artifact}") == 1
         assert "is not one arm's head" in capsys.readouterr().err
 
+    def test_a_case_the_sweep_ran_and_lost_stays_in_the_denominator(
+        self, tmp_path: Path, corpus_case
+    ) -> None:
+        """#1003: never silently remove a failed case from the denominator."""
+        from evals.harness.reference import load_corpus
+
+        other = "04-ml-inference-service"
+        second = next(
+            case for case in load_corpus(Path("evals") / "corpus") if case.id == other
+        )
+        # One case archives a catalog; the other ran and lost its model, so the
+        # sweep names it and no file sits beside the artifact for it.
+        sweep(tmp_path, second)
+        artifact = write_sweep_document(
+            tmp_path / "A-r1.json",
+            sweep_document(cases=(corpus_case.id, other)) | {"mode": "heads"},
+        )
+        assert self.run(tmp_path, f"A={artifact}") == 0
+
+        runs = {run.case_id: run for run in load_runs(tmp_path / "runs.json")}
+        assert set(runs) == {corpus_case.id, other}
+        lost = runs[corpus_case.id]
+        assert not lost.valid
+        assert lost.recall == 0.0
+        assert lost.required > 0, "the case's own denominator still counts"
+
     def test_a_case_nobody_signed_is_named_rather_than_scored(
         self, tmp_path: Path, capsys
     ) -> None:

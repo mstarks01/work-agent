@@ -51,7 +51,13 @@ def score(
     cases: Sequence[GoldenCase],
     corpus_dir: Path,
 ) -> tuple[list[ArmRun], dict[str, str]]:
-    """Every run these sweeps hold, and every case that nothing grades."""
+    """Every run these sweeps hold, and every case that nothing grades.
+
+    **A case the sweep ran and did not archive is a failed run, not an absent
+    one.** The artifact names every case the sweep attempted, so the two are
+    distinguishable, and the difference decides whether an arm's failure shows
+    up as a lower recall or as no recall at all.
+    """
     runs: list[ArmRun] = []
     skipped: dict[str, str] = {}
     for arm, repeat, path in specs:
@@ -64,8 +70,6 @@ def score(
         held = [case for case in cases if case.id in loaded.cases]
         produced = heads_from_reports(path, held)
         for case in held:
-            if case.id not in produced:
-                continue
             reference = replay.signed_reference(corpus_dir, case)
             if reference is None:
                 unsigned = replay.unsigned_rows(corpus_dir, case)
@@ -74,6 +78,14 @@ def score(
                     if unsigned is None
                     else f"{unsigned} unsigned reference row(s)"
                 )
+                continue
+            if case.id not in produced:
+                # The sweep ran this case and archived no catalog for it, which
+                # is a job that produced nothing usable. #1003 asks that such a
+                # run recover none of the case's required facts rather than
+                # leave the denominator: an arm that fails half the time must
+                # not score as if it had only run the half it finished.
+                runs.append(ArmRun.unusable(case.id, reference, arm=arm, repeat=repeat))
                 continue
             graded = replay.replay_assertions(case, reference, produced[case.id])
             runs.append(ArmRun.of(graded, reference, arm=arm, repeat=repeat))
