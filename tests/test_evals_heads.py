@@ -208,6 +208,22 @@ class TestRunningIt:
             entry.predicate == "network-membership" for entry in result.catalog.entries
         )
 
+    def test_the_facts_first_head_keeps_what_each_stage_wrote(
+        self, corpus_case
+    ) -> None:
+        """The proposal is code's, so the bundle behind it has to be kept.
+
+        Without these a replay cannot re-run the resolver over what the model
+        emitted, and a fact missing from the catalog cannot be charged to the
+        reading, the resolution or the gate.
+        """
+        result, _ = self.run(corpus_case, FACTS_FIRST)
+
+        assert set(result.stages) <= set(modes.ARCHIVED_STATE)
+        assert modes.STATE_SOURCE_FACTS in result.stages
+        assert modes.STATE_BUNDLE_DISPOSITIONS in result.stages
+        assert modes.STATE_EXTRACTED_MODEL in result.stages
+
     def test_the_catalog_it_parks_is_the_one_prepare_would_gate(
         self, corpus_case
     ) -> None:

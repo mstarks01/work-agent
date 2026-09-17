@@ -18,7 +18,7 @@ from evals.harness import modes, replay
 from evals.harness.bundle import reports_dir, write_assertions
 
 
-def result(case_id: str = "01-payments-checkout") -> modes.AssertionResult:
+def result(case_id: str = "01-payments-checkout", **overrides) -> modes.AssertionResult:
     return modes.AssertionResult(
         case_id=case_id,
         proposal={"assertions": []},
@@ -34,6 +34,7 @@ def result(case_id: str = "01-payments-checkout") -> modes.AssertionResult:
             ],
         ),
         issues=(),
+        **overrides,
     )
 
 
@@ -49,6 +50,34 @@ def test_every_catalog_mode_archives_its_run(tmp_path: Path, mode: str) -> None:
     assert written.exists(), f"a {mode} sweep archived nothing for a replay to read"
     held = json.loads(written.read_text(encoding="utf-8"))
     assert held["catalog"]["entries"]
+
+
+def test_a_run_keeps_every_stage_it_wrote(tmp_path: Path) -> None:
+    """The catalog alone cannot say what the model emitted or what was lost.
+
+    A facts-first head composes its proposal out of a bundle code resolved, so
+    a replay holding the proposal alone cannot re-run the resolver over what
+    arrived, or attribute a missing fact to a stage.
+    """
+    stages = {key: {"kept": key} for key in modes.ARCHIVED_STATE}
+    out = str(tmp_path / "sweep.json")
+    write_assertions(out, "heads", {"01-payments-checkout": result(stages=stages)})
+
+    held = json.loads(
+        (reports_dir(out) / "01-payments-checkout.assertions.json").read_text("utf-8")
+    )
+    assert held["stages"] == stages
+    assert set(held["stages"]) == set(modes.ARCHIVED_STATE)
+
+
+def test_a_head_that_wrote_no_stage_archives_none(tmp_path: Path) -> None:
+    out = str(tmp_path / "sweep.json")
+    write_assertions(out, "heads", {"01-payments-checkout": result()})
+
+    held = json.loads(
+        (reports_dir(out) / "01-payments-checkout.assertions.json").read_text("utf-8")
+    )
+    assert held["stages"] == {}
 
 
 @pytest.mark.parametrize(
