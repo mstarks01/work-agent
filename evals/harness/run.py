@@ -98,6 +98,7 @@ from evals.harness.baseline import BASELINES_DIR
 from evals.harness.bundle import (
     assertions_from_reports,
     extractions_from_reports,
+    heads_from_reports,
     optional_block,
     runs_from_reports,
     stride_threats,
@@ -1515,7 +1516,7 @@ def replay_artifact(
             **graded,
         )
 
-    if replay.NODE_OF[loaded.mode] == "extract":
+    if replay.KEEPS[loaded.mode] == "extraction":
         extracted = extractions_from_reports(path, held)
         return sweep(
             extractions=tuple(
@@ -1524,7 +1525,14 @@ def replay_artifact(
                 if case.id in extracted
             )
         )
-    proposed = assertions_from_reports(path, held)
+    # A head-only sweep extracted its own model, so its rows name that model's
+    # element IDs and the archived catalog is what a replay grades. Every other
+    # assertion sweep was shown the blessed model and re-resolves against it.
+    proposed = (
+        heads_from_reports(path, held)
+        if loaded.mode == "heads"
+        else assertions_from_reports(path, held)
+    )
     graded, skipped = [], {}
     for case in held:
         if case.id not in proposed:

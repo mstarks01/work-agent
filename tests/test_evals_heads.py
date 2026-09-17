@@ -33,16 +33,9 @@ from analysis_service.system_model import (
 )
 from evals.harness import modes
 from evals.harness.artifact import REPO_ROOT
-from evals.harness.reference import load_corpus
 from tests.factories import EVAL_MODEL, ScriptedLlm
 from tests.test_deployment import VERTEX_ENV
 from tests.test_evals_modes import scripted_assertions
-
-
-@pytest.fixture(scope="module")
-def case():
-    """One corpus case, whose blessed model every scripted reply is built from."""
-    return load_corpus(REPO_ROOT / "evals" / "corpus")[0]
 
 
 def role_of(element: Element) -> str:
@@ -110,7 +103,9 @@ def scripted_bundle(model: SystemModel) -> str:
     return json.dumps({"mentions": mentions, "interactions": [], "facts": facts})
 
 
-def head_pipeline(case, strategy: ExtractionStrategy, models: dict[str, ScriptedLlm]):
+def head_pipeline(
+    corpus_case, strategy: ExtractionStrategy, models: dict[str, ScriptedLlm]
+):
     """A head-only pipeline for one strategy, on scripted models.
 
     The resolver is keyed by **tier** node, which is all a built graph hands it.
@@ -119,11 +114,11 @@ def head_pipeline(case, strategy: ExtractionStrategy, models: dict[str, Scripted
     """
     replies = {
         "extract": (
-            scripted_bundle(case.model)
+            scripted_bundle(corpus_case.model)
             if strategy == FACTS_FIRST
-            else json.dumps(case.model.model_dump(mode="json"))
+            else json.dumps(corpus_case.model.model_dump(mode="json"))
         ),
-        "assert": scripted_assertions(case),
+        "assert": scripted_assertions(corpus_case),
     }
 
     def resolve(tier_node: str) -> BaseLlm:
@@ -159,10 +154,10 @@ class TestTheHeadOnlyGraph:
     """What it carries, and what it deliberately does not."""
 
     @pytest.mark.parametrize("strategy", (GRAPH_FIRST, FACTS_FIRST))
-    def test_it_carries_no_lane_and_no_critic(self, case, strategy) -> None:
+    def test_it_carries_no_lane_and_no_critic(self, corpus_case, strategy) -> None:
         """The endpoint reads the catalog, so the judgement tier is not billed."""
         models: dict[str, ScriptedLlm] = {}
-        pipeline = head_pipeline(case, strategy, models)
+        pipeline = head_pipeline(corpus_case, strategy, models)
         nodes = carried(pipeline)
 
         assert not nodes & LANES
@@ -171,9 +166,9 @@ class TestTheHeadOnlyGraph:
         assert graph.CATALOG_NODE in nodes
 
     @pytest.mark.parametrize("strategy", (GRAPH_FIRST, FACTS_FIRST))
-    def test_its_llm_nodes_are_the_head_s(self, case, strategy) -> None:
+    def test_its_llm_nodes_are_the_head_s(self, corpus_case, strategy) -> None:
         models: dict[str, ScriptedLlm] = {}
-        pipeline = head_pipeline(case, strategy, models)
+        pipeline = head_pipeline(corpus_case, strategy, models)
         wanted = (
             {graph.FACTS_NODE, graph.REPAIR_NODE}
             if strategy == FACTS_FIRST
@@ -185,24 +180,24 @@ class TestTheHeadOnlyGraph:
 class TestRunningIt:
     """Driven to completion on scripted models, over real corpus text."""
 
-    def run(self, case, strategy) -> tuple[modes.AssertionResult, Mapping]:
+    def run(self, corpus_case, strategy) -> tuple[modes.AssertionResult, Mapping]:
         models: dict[str, ScriptedLlm] = {}
-        pipeline = head_pipeline(case, strategy, models)
-        return asyncio.run(modes.run_heads(case, pipeline)), models
+        pipeline = head_pipeline(corpus_case, strategy, models)
+        return asyncio.run(modes.run_heads(corpus_case, pipeline)), models
 
-    def test_the_graph_first_head_ends_holding_a_catalog(self, case) -> None:
-        result, _ = self.run(case, GRAPH_FIRST)
+    def test_the_graph_first_head_ends_holding_a_catalog(self, corpus_case) -> None:
+        result, _ = self.run(corpus_case, GRAPH_FIRST)
 
-        assert result.case_id == case.id
+        assert result.case_id == corpus_case.id
         assert result.catalog.entries
         assert {entry.predicate for entry in result.catalog.entries} <= {
             "authentication-mechanism",
             "mfa-requirement",
         }
 
-    def test_the_facts_first_head_ends_holding_a_catalog(self, case) -> None:
+    def test_the_facts_first_head_ends_holding_a_catalog(self, corpus_case) -> None:
         """A bundle in local handles, resolved and gated, with no assert node."""
-        result, models = self.run(case, FACTS_FIRST)
+        result, models = self.run(corpus_case, FACTS_FIRST)
 
         assert "assert" not in models
         assert result.catalog.entries
@@ -210,9 +205,11 @@ class TestRunningIt:
             entry.predicate == "network-membership" for entry in result.catalog.entries
         )
 
-    def test_the_catalog_it_parks_is_the_one_prepare_would_gate(self, case) -> None:
+    def test_the_catalog_it_parks_is_the_one_prepare_would_gate(
+        self, corpus_case
+    ) -> None:
         """The terminal node reads the seam, so a head run is gated like a job."""
-        result, _ = self.run(case, FACTS_FIRST)
+        result, _ = self.run(corpus_case, FACTS_FIRST)
         refused = {issue.code for issue in result.issues}
 
         assert "wrong-registry-version" not in refused
@@ -225,9 +222,9 @@ class TestRunningIt:
         )
         assert record.catalog.subjects
 
-    def test_every_node_it_ran_is_a_head_node(self, case) -> None:
+    def test_every_node_it_ran_is_a_head_node(self, corpus_case) -> None:
         """Code nodes run too; what never runs is a lane or the tail below it."""
-        result, _ = self.run(case, FACTS_FIRST)
+        result, _ = self.run(corpus_case, FACTS_FIRST)
         ran = {run.node for run in result.node_runs}
 
         assert ran <= {

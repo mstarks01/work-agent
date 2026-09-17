@@ -26,3 +26,18 @@ def _selected_tiers(monkeypatch: pytest.MonkeyPatch) -> None:
     """
     for var, value in (TEST_TIER_ENV | TEST_CREDENTIAL_ENV).items():
         monkeypatch.setenv(var, value)
+
+
+@pytest.fixture(scope="session")
+def corpus_case():
+    """The first corpus case, loaded once, for the tests that drive a real one.
+
+    In the conftest rather than in either file that wants it: two modules each
+    loading the corpus is two spellings of one fixture, and the duplicate-body
+    lint is right to refuse them. Session-scoped because loading the corpus
+    reads every case's files and nothing here mutates what it hands back.
+    """
+    from evals.harness.artifact import REPO_ROOT
+    from evals.harness.reference import load_corpus
+
+    return load_corpus(REPO_ROOT / "evals" / "corpus")[0]

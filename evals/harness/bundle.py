@@ -27,7 +27,9 @@ from pathlib import Path
 from typing import Any
 
 from analysis_service.assertions import (
+    AssertionCatalog,
     AssertionRecord,
+    CatalogIssue,
     CatalogProposal,
     project,
 )
@@ -422,6 +424,37 @@ def assertions_from_reports(
             proposal=lifted,
             catalog=record.catalog,
             issues=tuple(record.issues),
+        )
+    return results
+
+
+def heads_from_reports(
+    artifact: Path, cases: Sequence[GoldenCase]
+) -> dict[str, modes.AssertionResult]:
+    """Read a finished head-only sweep's saved catalogs back, as they were built.
+
+    **The archived catalog, not the proposal re-resolved.**
+    :func:`assertions_from_reports` re-resolves against ``case.model`` because
+    an assertion sweep was *shown* that model; a head-only sweep extracted its
+    own, and its rows name that model's element IDs. Resolving them against the
+    blessed model would bind almost nothing and read as an arm that recovered
+    almost nothing — a silent zero in the one number #1003 exists to compare.
+
+    So the catalog the run's own terminal node gated is what a replay grades,
+    and the rows are compared to the reference through the signed subject
+    aliases, which is where a reviewer has already ruled whether two names are
+    one subject.
+    """
+    results = {}
+    for case, written in _case_files(artifact, cases, ".assertions.json"):
+        results[case.id] = modes.AssertionResult(
+            case_id=case.id,
+            proposal=written.get("proposal", {}),
+            catalog=AssertionCatalog.model_validate(written["catalog"]),
+            issues=tuple(
+                CatalogIssue.model_validate(issue)
+                for issue in written.get("issues", ())
+            ),
         )
     return results
 
