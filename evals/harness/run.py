@@ -2300,6 +2300,12 @@ COMMANDS: dict[str, Command] = {
         " (no credentials)",
         run=comparison.command_comparison,
     ),
+    "price-arms": Command(
+        help="estimate what each of #1003's extraction arms is given, before"
+        " a run is authorised (no credentials)",
+        run=arms.command_price_arms,
+        arguments=arms.price_arguments,
+    ),
     "compare-arms": Command(
         help="recompute #1003's extraction-arm comparison from a saved runs"
         " file (no credentials)",

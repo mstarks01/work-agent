@@ -43,7 +43,7 @@ import json
 import random
 import statistics
 import sys
-from collections.abc import Collection, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import MappingProxyType
@@ -55,11 +55,23 @@ from analysis_service.deployment import (
     FACTS_FIRST_EXTRACTION_VAR,
     SOURCE_REVIEW_VAR,
 )
+from analysis_service.evidence import render_rows
+from analysis_service.graph import render_model
+from analysis_service.markdown_loader import MarkdownLoader, estimate_tokens
+from analysis_service.prompts import (
+    compose_assert_prompt,
+    compose_extract_prompt,
+    compose_facts_prompt,
+    compose_reread_prompt,
+)
+from analysis_service.sources import render_sources
+from evals.harness.reference import GoldenCase, load_corpus
 from evals.harness.replay import (
     PRODUCED_FATES,
     ROW_FATES,
     AssertionReplay,
     SignedReference,
+    signed_reference,
 )
 
 
@@ -590,6 +602,50 @@ def _run_of(path: Path, index: int, row: Mapping[str, Any]) -> ArmRun:
     )
 
 
+def price_arguments(parser: argparse.ArgumentParser) -> None:
+    """Where the cases are, and where the estimate goes."""
+    parser.add_argument(
+        "--corpus",
+        type=Path,
+        default=Path("evals") / "corpus",
+        help="the corpus directory to estimate over",
+    )
+    parser.add_argument(
+        "--prompts",
+        type=Path,
+        default=Path("prompts"),
+        help="the prompt root the instructions are composed from",
+    )
+    parser.add_argument(
+        "--out",
+        type=Path,
+        default=None,
+        help="write the estimate here as well as printing it",
+    )
+
+
+def command_price_arms(args: argparse.Namespace) -> int:
+    """Estimate what each arm is given, before anybody authorises a run.
+
+    No provider, no credential, no spend: the instructions are composed from
+    the tree and the rendered artifacts come from the corpus through the
+    functions the graph renders with. It answers the input half of #1003's cost
+    gate and says plainly that it answers no more than that.
+    """
+    cases = load_corpus(args.corpus)
+    references = {}
+    for case in cases:
+        found = signed_reference(args.corpus, case)
+        if found is not None:
+            references[case.id] = found
+    built = input_report(cases, MarkdownLoader(args.prompts), references)
+    if args.out is not None:
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(built, encoding="utf-8")
+    print(built, end="")
+    return 0
+
+
 def arguments(parser: argparse.ArgumentParser) -> None:
     """The one input and the optional output of the offline comparison."""
     parser.add_argument(
@@ -624,3 +680,174 @@ def command_compare_arms(args: argparse.Namespace) -> int:
         args.out.write_text(built, encoding="utf-8")
     print(built, end="")
     return 0
+
+
+# --- What an arm is given, before anybody pays for what it writes ------------
+#
+# #1003's fifth gate holds each arm's end-to-end cost within twice arm A's. The
+# output half of that cannot be known before a run. The **input** half can, and
+# exactly: a node's static instruction is composed from files in the tree, and
+# what it is shown is rendered from the case by the same functions the graph
+# calls. So the ratio between the arms on the input side is computable with no
+# provider, no credential and no spend — which is what AGENTS.md asks for
+# before a run is authorised.
+#
+# The lane agents and the critics are absent on purpose. Every arm ends at one
+# `prepare` and one fan-out, so they cost the same on all four; what differs is
+# the head, and the head is what this prices.
+
+
+@dataclass(frozen=True)
+class HeadNode:
+    """One LLM node of an arm's head: its instruction, and what it is shown.
+
+    ``compose`` is the function the graph builds the node's instruction with,
+    named rather than re-composed here, so a prompt edit moves this estimate
+    the moment it lands. ``shown`` names the rendered artifacts the node's
+    placeholders carry, keyed into :func:`shown_tokens`.
+    """
+
+    compose: Callable[[MarkdownLoader], str]
+    shown: tuple[str, ...]
+
+
+#: The LLM nodes a head can carry, and what each is given. Keyed by node, so a
+#: node that joins an arm is priced by what it reads rather than by where it
+#: sits. ``repair`` is absent: it runs only where the validity gate refuses a
+#: model, so counting it in every case would price a failure that usually does
+#: not happen — a run's repair rate is a measurement, and this is an estimate
+#: of the pass that always runs.
+HEAD_NODES: Mapping[str, HeadNode] = MappingProxyType(
+    {
+        "extract": HeadNode(compose_extract_prompt, ("sources",)),
+        "facts": HeadNode(compose_facts_prompt, ("sources",)),
+        "assert": HeadNode(compose_assert_prompt, ("sources", "model")),
+        "reread": HeadNode(compose_reread_prompt, ("sources", "model", "rows")),
+    }
+)
+
+
+def shown_tokens(
+    case: GoldenCase, reference: SignedReference | None = None
+) -> Mapping[str, int]:
+    """What each rendered artifact costs a node on one case, in tokens.
+
+    Rendered through the functions the graph itself calls, so an estimate here
+    and a real call differ by the transport's own overhead and not by two
+    spellings of one artifact.
+
+    ``rows`` is the catalog a reading node would be shown, and on a case the
+    run has not happened for, the **signed reference's** catalog stands in for
+    it. That is a proxy and it is named as one: a produced catalog is usually
+    smaller, so the figure over-states rather than under-states, which is the
+    only safe direction for a number somebody consents to spend against.
+    """
+    rows = 0 if reference is None else estimate_tokens(render_rows(reference.catalog))
+    return MappingProxyType(
+        {
+            "sources": estimate_tokens(render_sources(case.sources)),
+            "model": estimate_tokens(render_model(case.model.model_dump(mode="json"))),
+            "rows": rows,
+        }
+    )
+
+
+@dataclass(frozen=True)
+class NodeInput:
+    """One node's input on one case: what it is told, and what it is shown."""
+
+    node: str
+    instruction: int
+    shown: int
+
+    @property
+    def tokens(self) -> int:
+        return self.instruction + self.shown
+
+
+@dataclass(frozen=True)
+class ArmInput:
+    """What one arm's head is given on one case, node by node."""
+
+    arm: str
+    case_id: str
+    nodes: tuple[NodeInput, ...]
+
+    @property
+    def tokens(self) -> int:
+        """The whole head's input on this case. Output is not in it."""
+        return sum(node.tokens for node in self.nodes)
+
+
+def head_nodes(arm: str) -> tuple[str, ...]:
+    """The LLM nodes of one arm's head, in the order it runs them.
+
+    Read off :attr:`ArmRule.head` and narrowed to :data:`HEAD_NODES`, so the
+    code nodes an arm carries — the readings, the resolver, the applicator —
+    cost nothing here because they call nobody.
+    """
+    return tuple(node for node in ARMS[arm].head if node in HEAD_NODES)
+
+
+def arm_input(
+    arm: str,
+    case: GoldenCase,
+    loader: MarkdownLoader,
+    reference: SignedReference | None = None,
+) -> ArmInput:
+    """What one arm's head is given on one case."""
+    shown = shown_tokens(case, reference)
+    return ArmInput(
+        arm=arm,
+        case_id=case.id,
+        nodes=tuple(
+            NodeInput(
+                node=node,
+                instruction=estimate_tokens(HEAD_NODES[node].compose(loader)),
+                shown=sum(shown[name] for name in HEAD_NODES[node].shown),
+            )
+            for node in head_nodes(arm)
+        ),
+    )
+
+
+def input_report(
+    cases: Sequence[GoldenCase],
+    loader: MarkdownLoader,
+    references: Mapping[str, SignedReference] = MappingProxyType({}),
+    baseline: str = "A",
+) -> str:
+    """What every arm is given over a set of cases, against the baseline's.
+
+    **It prices the input and says so.** A run's cost is this plus what the
+    models write, and nothing offline knows the second — so the ratio here
+    bounds #1003's fifth gate on one side and settles it on neither. A reader
+    taking it for the whole gate has left out the half that is usually larger.
+    """
+    totals = {
+        arm: sum(
+            arm_input(arm, case, loader, references.get(case.id)).tokens
+            for case in cases
+        )
+        for arm in ARMS
+    }
+    floor = totals.get(baseline, 0)
+    lines = [
+        f"## Input tokens over {len(cases)} cases",
+        "",
+        (
+            "Static instruction plus what each head node is shown, through the"
+            " functions the graph renders with. Output is not estimated here,"
+            " and the lane agents and critics are excluded because every arm"
+            " runs the same ones."
+        ),
+        "",
+        f"| arm | nodes | tokens | against {baseline} |",
+        "| --- | --- | --- | --- |",
+    ]
+    for arm, total in totals.items():
+        ratio = f"{total / floor:.2f}x" if floor else "—"
+        lines.append(
+            f"| {arm} | {', '.join(head_nodes(arm)) or '—'} | {total} | {ratio} |"
+        )
+    return "\n".join(lines) + "\n"

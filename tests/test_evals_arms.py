@@ -24,30 +24,38 @@ from analysis_service.assertions import (
     assertion_id,
 )
 from analysis_service.deployment import Deployment
+from analysis_service.markdown_loader import MarkdownLoader
 from evals.harness.arms import (
     ARMS,
     ARTIFACT_VERSION,
     BOOTSTRAP_SEED,
     COMPARISONS,
     CORRECTED_LEVEL,
+    HEAD_NODES,
     LEVEL,
     ArmRun,
     ArmsError,
+    arm_input,
     case_recall,
     command_compare_arms,
+    command_price_arms,
     comparisons,
     corrected_level,
     failure_rate,
+    head_nodes,
+    input_report,
     load_runs,
     macro_recall,
     paired_difference,
     report,
     required_rows,
+    shown_tokens,
     to_json,
     unsupported_rate,
     write_runs,
 )
 from evals.harness.replay import PRODUCED_FATES, ROW_FATES, SignedReference
+from tests.factories import PROJECT_ROOT
 from tests.test_deployment import VERTEX_ENV
 from tests.test_facts_route import FRAMEWORKS
 from tests.test_graph import nodes_by_name
@@ -356,9 +364,85 @@ class TestTheReport:
         assert "records no run" in capsys.readouterr().err
 
 
+class TestTheInputEstimate:
+    """What each arm is given, and the ratio #1003's cost gate reads one half of."""
+
+    def case(self):
+        from evals.harness.reference import load_corpus
+
+        return load_corpus(PROJECT_ROOT / "evals" / "corpus")[0]
+
+    def loader(self) -> MarkdownLoader:
+        return MarkdownLoader(PROJECT_ROOT / "prompts")
+
+    @pytest.mark.parametrize("arm", sorted(ARMS))
+    def test_the_table_names_exactly_the_head_s_llm_nodes(self, arm: str) -> None:
+        """A node that calls a model and is not priced would be a silent hole."""
+        pipeline = Deployment.from_env(
+            env=VERTEX_ENV | dict(ARMS[arm].variables)
+        ).pipeline(FRAMEWORKS)
+        calling = set(ARMS[arm].head) & set(pipeline.node_models)
+
+        assert calling == set(head_nodes(arm))
+
+    def test_the_code_nodes_cost_nothing(self) -> None:
+        """A resolver and an applicator call nobody, so they are not priced."""
+        for arm in ARMS:
+            assert set(head_nodes(arm)) <= set(HEAD_NODES)
+            assert "resolve" not in head_nodes(arm)
+            assert "apply" not in head_nodes(arm)
+
+    def test_a_node_is_told_and_shown(self) -> None:
+        found = arm_input("A", self.case(), self.loader())
+        by_node = {node.node: node for node in found.nodes}
+
+        assert set(by_node) == {"extract", "assert"}
+        assert by_node["extract"].instruction > 0
+        assert by_node["extract"].shown > 0
+        assert found.tokens == sum(node.tokens for node in found.nodes)
+
+    def test_a_node_shown_more_is_given_more(self) -> None:
+        """`assert` reads the model beside the sources, and `extract` does not."""
+        found = arm_input("A", self.case(), self.loader())
+        by_node = {node.node: node for node in found.nodes}
+        assert by_node["assert"].shown > by_node["extract"].shown
+
+    def test_a_case_with_no_signed_reference_shows_no_rows(self) -> None:
+        shown = shown_tokens(self.case())
+        assert shown["rows"] == 0
+        assert shown["sources"] > 0
+        assert shown["model"] > 0
+
+    def test_the_report_names_every_arm_against_the_baseline(self) -> None:
+        built = input_report([self.case()], self.loader())
+        for arm in ARMS:
+            assert f"| {arm} |" in built
+        assert "1.00x" in built
+        assert "Output is not estimated here" in built
+
+    def test_the_command_writes_and_prints_the_estimate(
+        self, tmp_path: Path, capsys
+    ) -> None:
+        import argparse
+
+        out = tmp_path / "estimate.md"
+        code = command_price_arms(
+            argparse.Namespace(
+                corpus=PROJECT_ROOT / "evals" / "corpus",
+                prompts=PROJECT_ROOT / "prompts",
+                out=out,
+            )
+        )
+
+        assert code == 0
+        assert out.read_text() == capsys.readouterr().out
+        assert "## Input tokens over" in out.read_text()
+
+
 def test_the_command_is_registered() -> None:
     """A command nobody can reach is a report nobody re-runs."""
     from evals.harness.run import COMMANDS
 
     assert "compare-arms" in COMMANDS
+    assert "price-arms" in COMMANDS
     assert graph.PREPARE_NODE in HEAD
