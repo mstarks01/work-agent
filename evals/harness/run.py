@@ -75,6 +75,7 @@ from evals.harness import (
     ledger,
     losses,
     modes,
+    oracle,
     pairing,
     queue,
     replay,
@@ -2330,6 +2331,12 @@ COMMANDS: dict[str, Command] = {
         " file (no credentials)",
         run=arms.command_compare_arms,
         arguments=arms.arguments,
+    ),
+    "oracle": Command(
+        help="put a perfect reading of every signed case through the"
+        " deterministic path and charge each loss to a stage (no credentials)",
+        run=oracle.command_oracle,
+        arguments=oracle.arguments,
     ),
 }
 
