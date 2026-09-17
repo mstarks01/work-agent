@@ -927,6 +927,23 @@ def spans_for(quote: str, prepared: SpanSource) -> tuple[SupportSpan, ...]:
     )
 
 
+def ambiguous_quote(quote: str, haystack: str) -> bool:
+    """Whether ``haystack`` holds ``quote`` in more than one place.
+
+    **The one reader of "does this quote name where it sits".** A submission
+    that says one thing twice holds the quote in both places, and offsets into
+    the first copy say nothing about which copy the row rests on. The gate asks
+    it of a span's fragment and :mod:`analysis_service.factbundle` asks it of a
+    mention's citation, so a repeated line is refused the same way whichever
+    route proposed it.
+
+    ``haystack`` is the folded text — :attr:`SpanSource.indexed`'s or a
+    :class:`_Checked`'s — because that is what
+    :func:`~analysis_service.grounding.placements` counts in.
+    """
+    return placements(quote, haystack) > 1
+
+
 def conflicts(catalog: AssertionCatalog) -> tuple[Conflict, ...]:
     """Every group of assertions that disagree about one subject and predicate.
 
@@ -1409,7 +1426,7 @@ def _span_issues(
                 )
             )
             continue
-        if placements(span.quote, source.haystack) > 1:
+        if ambiguous_quote(span.quote, source.haystack):
             issues.append(
                 CatalogIssue(
                     code="ambiguous-span",
