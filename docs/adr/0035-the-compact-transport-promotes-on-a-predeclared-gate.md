@@ -1,11 +1,13 @@
 # 35. The compact transport promotes on a predeclared gate
 
-- **Status**: accepted; applied once, 2026-09-15
+- **Status**: accepted; applied four times. **Its per-case veto is unsound and
+  must be replaced before the gate is applied again** — see the fourth
+  application below.
 - **Date**: 2026-09-15
-- **Outcome so far**: applied twice, **failed twice**, and the route has not
-  promoted. The primary figure passes decisively each time — 4.5% then 4.8%
-  fewer emitted tokens, 2.69 then 2.87 standard deviations. Everything else is
-  the transport paying for it.
+- **Outcome so far**: applied four times, and the route has not promoted. The
+  primary figure passes every time — 4.5%, 4.8%, 3.3%, 3.7% fewer emitted
+  tokens. Versions 1 to 3 paid for it elsewhere; version 4 did not, and fails
+  only a criterion that does not work.
   - `compact-v1` failed three criteria: `duplicate-ref` 16 against a ceiling of
     0, first-pass validity 0.800 against a floor of 0.927, and the per-case veto
     on three cases. Every quality margin held.
@@ -21,7 +23,26 @@
     refs a model derived from endpoints, so parallel flows collided) and on the
     per-case veto, which rests on case 11: recall 0.450 against a 0.562 floor,
     endpoint recall 0.769 against a flat 1.000.
-- **What three applications settled.** The primary figure passed every time and
+  - `compact-v4` named what a flow's ref is after — its label, not its
+    endpoints — and **failed one criterion of eleven**, the best of the four.
+    `duplicate-ref` reached **0 of 65**, the primary figure was the largest yet
+    at **−3.7%, 1.44 standard deviations**, every quality margin held, and
+    first-pass validity tied the full arm at 0.938. It is the only version whose
+    safety fix *raised* the saving rather than spending it. The one failure was
+    the per-case veto, on 8 cases and 21 shortfalls.
+- **The per-case veto does not work, and the fourth application is what showed
+  it.** Every one of those 21 shortfalls ran from 0.004 to 0.075. Measured on
+  the full arm alone: dropping one of its five sweeps moves a floor by a mean
+  of **0.092**, up to 0.250; and **11% of the full arm's own readings sit below
+  a floor built from the other four sweeps of the same arm**, by a mean of
+  0.092. Re-running the veto with each full sweep left out in turn swings the
+  worst shortfall from 0.075 to 0.218 on the same data. So a minimum of five
+  runs is too noisy to be a threshold, the criterion cannot tell the compact
+  arm from the full route, and it charged all four versions with failures of a
+  size the full route produces against itself. **Replace it with a margin below
+  the full arm's *mean*, sized from the spread** — the shape the six quality
+  margins already use and the only part of this record that held.
+- **What four applications settled.** The primary figure passed every time and
   shrank every time — 4.5%, 4.8%, then **3.3%** — because each version that made
   the format safer put identifier text back. The quality cost is element naming,
   it is caused by dropping the `id` field, and dropping `id` is what the saving
@@ -138,6 +159,13 @@ something this record does not cover.
 
 **A per-case veto.** One case falling below its own baseline spread vetoes the
 change, whatever the corpus mean does, on `evals/TUNING.md` step 5's rule.
+
+> **This criterion is unsound as written and was applied four times before that
+> was measured.** "Its own baseline spread" was read as the full arm's lowest of
+> five readings, and a minimum of five is not a threshold: 11% of the full arm's
+> own readings fall below a floor built from the other four sweeps of that same
+> arm. A replacement must be a margin below the full arm's **mean**, sized from
+> the spread. Nothing else in this record changes.
 
 ### The failure rates
 

@@ -89,7 +89,14 @@ TOKEN_CAPS: dict[str, int] = {
     # whole cost of the route on the input side, paid on every extraction call
     # and cacheable, against the output it removes — see
     # :mod:`analysis_service.compact`.
-    "prompts/extract-compact": 600,
+    #
+    # Raised from 600 for `compact-v4`'s flow-ref rule. Version 3 left a flow's
+    # ref to the model and it derived one from the endpoints, so two flows
+    # between one pair collided and the route failed its gate on
+    # `duplicate-ref`. The paragraph that fixes it costs about 90 input tokens
+    # against 1.04% of the corpus emission it removes, on ADR 0016's reading
+    # that a cap here alarms rather than rations.
+    "prompts/extract-compact": 750,
     "prompts/repair": 900,
     # The assertion body alone. The predicate table beside it is rendered from
     # `assertions.REGISTRY` rather than written here, so a predicate added
