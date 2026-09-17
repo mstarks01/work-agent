@@ -368,6 +368,19 @@ class Ground:
 | `assertion` | `assertion` | the sources state this fact, which the model has no field for |
 | `unknown-assertion` | `assertion` | the sources were asked this and left it open, and the model has no field for it |
 
+**What the assertion pass reached.** A reader of `assertions` has no way to tell
+a system with few stated facts from a pass that asked few questions, and the two
+look identical. `Report.assertion_coverage` answers it, derived from the rows and
+the model rather than stored beside them: `reachable` is the element attributes
+some predicate could speak to on *this* model, `settled` is how many the catalog
+answers, `open` counts the questions the sources raised and left unanswered, and
+`own_subjects` counts the facts about a principal or a credential that the graph
+has no place for at all. `None` on a job that ran no pass.
+
+It is a count and not a score. Absence from the catalog is never an absent
+control — it is a predicate nobody asked about — and this is what lets a reader
+see how much was asked.
+
 An `assertion` ground is a reference on the same terms as a `derived-fact`: it
 names a row in `assertions.catalog` by the row's computed identity, and the
 row's subject, predicate, value, basis, scope and support spans are read there.

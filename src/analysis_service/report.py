@@ -41,6 +41,8 @@ from pydantic import (
 from analysis_service.assertions import (
     PROJECTION_VERSION,
     AssertionRecord,
+    CatalogCoverage,
+    catalog_coverage,
     contradiction_issues,
 )
 from analysis_service.charges import UPSTREAM_MAX_CHARS
@@ -1057,6 +1059,22 @@ class Report(BaseModel):
             )
             + self._contradiction_issues()
         )
+
+    @property
+    def assertion_coverage(self) -> CatalogCoverage | None:
+        """How much of this model the job's assertion pass reached, or ``None``.
+
+        ``None`` on a job that ran no pass, which is every job on a deployment
+        that has not set ``ANALYSIS_ASSERTIONS``. A reader that sees a number
+        here can tell a system with few stated facts from a pass that asked
+        few questions, and those look identical without it.
+
+        Derived on demand rather than stored beside the rows, on ADR 0034's
+        rule against a second reader of one fact.
+        """
+        if self.assertions is None:
+            return None
+        return catalog_coverage(self.assertions.catalog, self.system_model)
 
     def _contradiction_issues(self) -> list[str]:
         """A loaded report still names every graph contradiction it carries.
