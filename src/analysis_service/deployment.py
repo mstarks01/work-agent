@@ -76,6 +76,8 @@ from analysis_service.graph import (
     ENTRY_EXTRACT,
     EXTRACTING_ENTRIES,
     FACTS_FIRST,
+    FACTS_SPLIT,
+    FACTS_STRATEGIES,
     GRAPH_FIRST,
     Entry,
     ExtractionStrategy,
@@ -158,12 +160,36 @@ ASSERTIONS_VAR = "ANALYSIS_ASSERTIONS"
 #: it is refused together with ``ANALYSIS_ASSERTIONS``: a second pass over the
 #: model the bundle built would extract one thing twice.
 FACTS_FIRST_EXTRACTION_VAR = "ANALYSIS_FACTS_FIRST_EXTRACTION"
+#: Split the facts-first reading across two calls (#1003 arm E): ``inventory``
+#: names what the sources hold and ``rows`` states what they say about it. Off
+#: by default. It selects the facts-first *order* and differs only in how many
+#: calls the reading is spread over, so it is read instead of the variable
+#: above rather than beside it.
+FACTS_SPLIT_EXTRACTION_VAR = "ANALYSIS_FACTS_SPLIT_EXTRACTION"
 #: Run the bounded source review on every job (#1003 arms C and D): ``reread``
 #: reads the sources once more against the model and the catalog, and ``apply``
 #: applies the typed operations it proposes or discards the batch whole. Off by
 #: default. It reads a catalog, so it needs a route that produces one — either
 #: ``ANALYSIS_ASSERTIONS`` or ``ANALYSIS_FACTS_FIRST_EXTRACTION``.
 SOURCE_REVIEW_VAR = "ANALYSIS_SOURCE_REVIEW"
+
+
+def _strategy(env: Mapping[str, str]) -> ExtractionStrategy:
+    """Which reading order and division of labour this install selects.
+
+    A table read in order rather than a chain of conditions, so a strategy
+    added to the vocabulary is selected by a row here. The split route names
+    the facts-first *order* and differs only in how many calls it spreads the
+    reading over, so the two variables are alternatives: an install setting
+    both gets the split, which is the more specific of the two.
+    """
+    for var, strategy in (
+        (FACTS_SPLIT_EXTRACTION_VAR, FACTS_SPLIT),
+        (FACTS_FIRST_EXTRACTION_VAR, FACTS_FIRST),
+    ):
+        if _flag(env, var):
+            return strategy
+    return GRAPH_FIRST
 
 
 def _path(env: Mapping[str, str], var: str, default: Path) -> Path:
@@ -310,9 +336,7 @@ class Deployment:
             extraction_format=(
                 COMPACT_FORMAT if _flag(env, COMPACT_EXTRACTION_VAR) else FULL_FORMAT
             ),
-            extraction_strategy=(
-                FACTS_FIRST if _flag(env, FACTS_FIRST_EXTRACTION_VAR) else GRAPH_FIRST
-            ),
+            extraction_strategy=_strategy(env),
             assertions=_flag(env, ASSERTIONS_VAR),
             source_review=_flag(env, SOURCE_REVIEW_VAR),
             env=MappingProxyType(dict(env)),
@@ -430,7 +454,7 @@ class Deployment:
             assertions=(
                 self.assertions
                 and entry in CATALOGUING_ENTRIES
-                and self.extraction_strategy != FACTS_FIRST
+                and self.extraction_strategy not in FACTS_STRATEGIES
             ),
             # The review reads a catalog, so an install that asks for it on a
             # route producing none gets the route it configured and no review —
@@ -440,7 +464,7 @@ class Deployment:
             source_review=(
                 self.source_review
                 and entry in CATALOGUING_ENTRIES
-                and (self.assertions or self.extraction_strategy == FACTS_FIRST)
+                and (self.assertions or self.extraction_strategy in FACTS_STRATEGIES)
             ),
         )
 

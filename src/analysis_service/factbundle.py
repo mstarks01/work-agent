@@ -469,6 +469,67 @@ def unstated_fields(
     return unstated
 
 
+#: Which half of a bundle each call of a split reading owns. A call that filled
+#: the other half is not read for it: two producers of one list would let a
+#: later call quietly restate what an earlier one settled, and #1003's split
+#: exists to give each call **one** job. Keyed by the field, so a fifth list
+#: added to the schema has to be assigned before a split route can carry it.
+OWNED_BY: Mapping[str, str] = MappingProxyType(
+    {
+        "mentions": "inventory",
+        "interactions": "inventory",
+        "facts": "rows",
+        "unresolved": "both",
+    }
+)
+
+
+def joined(
+    inventory: SourceFactBundle, rows: SourceFactBundle
+) -> tuple[SourceFactBundle, tuple[DispositionRow, ...]]:
+    """One bundle from a split reading's two emissions, and what each ignored.
+
+    **Each call is read only for the half it owns.** A reading split in two is
+    the answer to a question #1003 cannot ask of its own arms: whether the gap
+    between graph-first and facts-first is the reading order or the number of
+    calls the work is spread over. It is only an answer if each call does one
+    job, so a mention proposed by the facts call and a fact proposed by the
+    inventory call are dropped here — and reported, because a call answering
+    the wrong half is a fact about the prompt rather than noise.
+
+    ``unresolved`` is the one list both may write. A question is an output in
+    its own right and either call can raise one; nothing downstream reads them
+    as a set, so two sources cannot disagree about it.
+    """
+    ignored = []
+    for field, owner in OWNED_BY.items():
+        for call, held in (("inventory", inventory), ("rows", rows)):
+            if owner in (call, "both"):
+                continue
+            for row in getattr(held, field):
+                ignored.append(
+                    DispositionRow(
+                        handle=row.handle,
+                        kind="bundle",
+                        disposition="rejected",
+                        code="wrong-call",
+                        message=(
+                            f"the {call} call proposed a {field} row, which the"
+                            f" {owner} call owns"
+                        ),
+                    )
+                )
+    return (
+        SourceFactBundle(
+            mentions=list(inventory.mentions),
+            interactions=list(inventory.interactions),
+            facts=list(rows.facts),
+            unresolved=[*inventory.unresolved, *rows.unresolved],
+        ),
+        tuple(ignored),
+    )
+
+
 def resolve_bundle(
     bundle: SourceFactBundle,
     sources: Mapping[str, str],

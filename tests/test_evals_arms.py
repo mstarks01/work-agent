@@ -336,7 +336,7 @@ class TestTheReport:
         payload = json.loads(
             write_runs(tmp_path / "runs.json", self.runs()).read_text()
         )
-        payload["runs"][0]["arm"] = "E"
+        payload["runs"][0]["arm"] = "Z"
         path = tmp_path / "bad.json"
         path.write_text(json.dumps(payload))
         with pytest.raises(ArmsError, match="not one of"):

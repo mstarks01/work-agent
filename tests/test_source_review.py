@@ -50,6 +50,9 @@ SOURCES = {LABEL: NOTE}
 HEAD = (
     graph.EXTRACT_NODE,
     graph.FACTS_NODE,
+    graph.INVENTORY_NODE,
+    graph.READ_INVENTORY_NODE,
+    graph.ROWS_NODE,
     graph.RESOLVE_NODE,
     graph.READ_MODEL_NODE,
     graph.ASSERT_NODE,
