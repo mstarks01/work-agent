@@ -7,8 +7,8 @@ so every ``"id": "process:payment-api"`` a model writes is a field
 :func:`~analysis_service.system_model.normalize_element_ids` overwrites, and every
 reference to it is the same long string again.
 
-**Measured at 3.3% of the emitted tokens**, over five corpus sweeps per route
-on 2026-09-15, and that is the figure to use. ``uv run python -m
+**Measured at 3.7% of the emitted tokens**, over five corpus sweeps per route
+on 2026-09-16, and that is the figure to use. ``uv run python -m
 evals.bench.deterministic transport`` prints 5.0% of *characters*, which is an
 upper bound: the corpus models are hand-corrected, and characters are not
 tokens.
