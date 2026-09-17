@@ -2980,8 +2980,18 @@ def _read_model_node_func(keys: GraphKeys) -> Callable[..., Any]:
 def _instruction(skills: str, prompt: str) -> str:
     """Skill text then prompt text: what to know, then what to do with it.
 
-    Stable-first order, so a framework's lane agents and every job for one lane
-    share the longest possible cacheable prefix (tickets 006 and 013).
+    **The prefix this shares is across jobs for one lane, and never across the
+    lanes of one job.** The skill text is a lane's own, so the first bytes of
+    two lanes' instructions already differ; what one lane repeats from case to
+    case is its skill, the rubric and ``analyze.md`` down to the first
+    job-varying placeholder.
+
+    The lanes of one job read one **System Model** and one set of sources
+    between them, and ``analyze.md`` lays those out after ``{scope}``, which
+    :data:`LANE_ARTIFACTS` makes per lane. So the material every lane shares
+    sits behind the first thing that separates them, and a provider that caches
+    on a common prefix reaches none of it. Reordering the block is a prompt
+    change and needs the measurement any prompt change needs.
     """
     return f"{skills.strip()}\n\n{prompt.strip()}\n"
 
