@@ -785,7 +785,12 @@ def _fate_totals(runs: Collection[ArmRun], arm: str) -> Mapping[str, int]:
 #: fact it states. A version 2 file carries a single ``matched`` column over
 #: both, so the loader refuses it rather than reading that column as a count of
 #: right answers.
-ARTIFACT_VERSION = 3
+#:
+#: Version 4 adds ``wrong_certainty`` to the fates: a row recovered at the right
+#: value under another claim about what the source supports. A version 3 file
+#: counts those rows as ``found``, so its recall is the figure this fate exists
+#: to separate out.
+ARTIFACT_VERSION = 4
 
 
 class ArmsError(ValueError):

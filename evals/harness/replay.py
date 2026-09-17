@@ -50,6 +50,9 @@ produced rows on the same subject and predicate:
 * ``worded``: the same scope and the same state — both stated, both absent,
   both unknown — where the predicate's value is free text or names one of the
   layer's own subjects, so the two spellings are a reader's question.
+* ``wrong_certainty``: the same scope and the same value, claimed with another
+  force — a stated fact called an inference, an unknown hedged on one side and
+  silent on the other, or an exclusivity the reference holds and the row drops.
 * ``wrong_value``: the same scope and a value that disagrees: a different
   state, or a different term or graph-bound reference.
 * ``rescoped``: the same subject and predicate at another scope.
@@ -168,12 +171,21 @@ LOSSES: frozenset[str] = frozenset(FATES) - {"found", "renamed", "placeholder"}
 #: fate that is not an absence. Named apart from :data:`RowFate` because one
 #: value serves two questions: what became of the reference row, and what the
 #: produced row that took it was adjudicated to be.
-AnsweredFate = Literal["found", "worded", "wrong_value", "rescoped"]
+AnsweredFate = Literal["found", "worded", "wrong_certainty", "wrong_value", "rescoped"]
 
-RowFate = Literal["found", "worded", "wrong_value", "rescoped", "omitted", "silent"]
+RowFate = Literal[
+    "found",
+    "worded",
+    "wrong_certainty",
+    "wrong_value",
+    "rescoped",
+    "omitted",
+    "silent",
+]
 ROW_FATES: tuple[RowFate, ...] = (
     "found",
     "worded",
+    "wrong_certainty",
     "wrong_value",
     "rescoped",
     "omitted",
@@ -187,7 +199,9 @@ ROW_FATES: tuple[RowFate, ...] = (
 #: raised, and the prompt tells the model to write no such row, so nobody
 #: produced it and nobody should have. A produced value against one still
 #: reads ``wrong_value``, which is the defect that matters.
-ROW_LOSSES: frozenset[str] = frozenset({"wrong_value", "rescoped", "omitted"})
+ROW_LOSSES: frozenset[str] = frozenset(
+    {"wrong_certainty", "wrong_value", "rescoped", "omitted"}
+)
 
 #: What one produced row came to. The first four are the fate of the reference
 #: row that consumed it, spelled the same way, so the two vocabularies are one
@@ -198,6 +212,7 @@ ROW_LOSSES: frozenset[str] = frozenset({"wrong_value", "rescoped", "omitted"})
 ProducedFate = Literal[
     "found",
     "worded",
+    "wrong_certainty",
     "wrong_value",
     "rescoped",
     "misattached",
@@ -206,6 +221,7 @@ ProducedFate = Literal[
 PRODUCED_FATES: tuple[ProducedFate, ...] = (
     "found",
     "worded",
+    "wrong_certainty",
     "wrong_value",
     "rescoped",
     "misattached",
@@ -387,10 +403,11 @@ class ReferenceRowFate:
     reference: str
     fate: RowFate
     produced: str = ""
-    #: The reference rules the fact inferred and the produced row calls it
-    #: stated. A grant is never stated, a credential's presentation is
-    #: implied by its issue (#961 step 3), and a row claiming otherwise
-    #: overstates what its span carries.
+    #: Which way one ``wrong_certainty`` runs: the reference rules the fact
+    #: inferred and the produced row calls it stated. A grant is never stated, a
+    #: credential's presentation is implied by its issue (#961 step 3), and a
+    #: row claiming otherwise overstates what its span carries. Read off the
+    #: fate, so the two never disagree about whether the rows differ at all.
     basis_overstated: bool = False
 
     def to_json(self) -> dict[str, Any]:
@@ -640,22 +657,51 @@ def _compares_exactly(predicate: str) -> bool:
     return registered.value == "reference" and bool(registered.refers_to & GRAPH_BOUND)
 
 
+def _same_certainty(reference: Assertion, candidate: Assertion) -> bool:
+    """Whether two rows claim their value with the same force.
+
+    Three fields, and each one is a claim about what the source supports rather
+    than about the value. ``basis`` says whether the source states the fact or a
+    reader inferred it. ``reason`` says why an unknown is unknown — the source
+    raised the question and left it open, or never raised it. ``exclusive`` says
+    the source closes the world for this predicate, which is a claim about every
+    other subject.
+
+    A run that recovers the value and drops one of these has recovered less than
+    the reference holds, so the fate is :data:`AnsweredFate` ``wrong_certainty``
+    and never ``found``.
+    """
+    return (
+        reference.basis == candidate.basis
+        and reference.reason == candidate.reason
+        and reference.exclusive == candidate.exclusive
+    )
+
+
 def _row_fate(reference: Assertion, candidate: Assertion) -> AnsweredFate:
     """How one produced row on the reference's subject and predicate answers it."""
     ours, theirs = identity_parts(reference), identity_parts(candidate)
     if ours.scope != theirs.scope:
         return "rescoped"
-    if ours.value == theirs.value:
-        return "found"
-    same_state = _state(reference.value) == _state(candidate.value) == "stated"
-    if same_state and not _compares_exactly(reference.predicate):
-        return "worded"
-    return "wrong_value"
+    agrees = ours.value == theirs.value
+    if not agrees:
+        same_state = _state(reference.value) == _state(candidate.value) == "stated"
+        if not same_state or _compares_exactly(reference.predicate):
+            return "wrong_value"
+    if not _same_certainty(reference, candidate):
+        return "wrong_certainty"
+    return "found" if agrees else "worded"
 
 
 #: The fate a reference row takes when several produced rows sit on its
 #: subject and predicate: the best answer available, in this order.
-_PREFERRED: tuple[AnsweredFate, ...] = ("found", "worded", "wrong_value", "rescoped")
+_PREFERRED: tuple[AnsweredFate, ...] = (
+    "found",
+    "worded",
+    "wrong_certainty",
+    "wrong_value",
+    "rescoped",
+)
 _PREFERENCE: Mapping[AnsweredFate, int] = {
     fate: rank for rank, fate in enumerate(_PREFERRED)
 }
@@ -727,7 +773,11 @@ def replay_assertions(
                 assertion_id(ours),
                 fate,
                 taken,
-                basis_overstated=ours.basis == "inferred" and theirs.basis == "stated",
+                basis_overstated=(
+                    fate == "wrong_certainty"
+                    and ours.basis == "inferred"
+                    and theirs.basis == "stated"
+                ),
             )
         )
     elsewhere = {
