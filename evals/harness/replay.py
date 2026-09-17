@@ -585,21 +585,26 @@ def signed_reference(corpus_dir: Path, case: GoldenCase) -> SignedReference | No
 def under_aliases(produced: Assertion, reference: SignedReference) -> Assertion:
     """The produced row in the reference's spellings, where a signed alias rules.
 
-    The one place an alias is applied, before any comparison: the subject,
-    a value that points at one of the layer's own subjects, and each scope
-    qualifier are each rewritten to the reference's spelling where a signed
-    ruling names the produced one. A value and a qualifier are rewritten
-    only under the produced subjects the ruling holds for. Everything else
-    is left as written.
+    The one place an alias is applied, before any comparison: the subject, a
+    value that points at another subject, and each scope qualifier are each
+    rewritten to the reference's spelling where a signed ruling names the
+    produced one. A value and a qualifier are rewritten only under the produced
+    subjects the ruling holds for. Everything else is left as written.
+
+    **A ruling holds wherever the ID it names appears.** A zone the reviewer
+    ruled is the reference's zone under another spelling is that zone in the
+    subject of one row and in the value of the membership row beside it, and
+    rewriting only the subject would leave a correct alias unable to repair the
+    reference it points at. The alias is keyed by the whole **Element ID**, so a
+    ruling about a zone reaches no value naming a process.
     """
     predicate = REGISTRY[produced.predicate]
-    refers_to_own = predicate.value == "reference" and not (
-        predicate.refers_to & GRAPH_BOUND
-    )
     own = reference.subject_aliases.get(produced.subject)
     subject = produced.subject if own is None else own.to
     value = produced.value
-    target = reference.subject_aliases.get(value) if refers_to_own else None
+    target = (
+        reference.subject_aliases.get(value) if predicate.value == "reference" else None
+    )
     if target is not None and target.applies_under(subject):
         value = target.to
     scope = []
