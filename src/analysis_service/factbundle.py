@@ -414,12 +414,19 @@ class Resolution:
     arm of #1003 runs the same one. A bundle that named no zone yields a model
     with no Trust Boundary, which that gate refuses.
 
-    ``record`` is the **AssertionRecord** every existing evidence and projection
-    consumer already reads, which is what keeps this route out of their code: an
-    arm hands it on, and nothing downstream learns where the catalog came from.
+    ``proposal`` is the rows whose handles resolved, in the shape the ``assert``
+    node emits — so a pipeline hands it to ``prepare`` at the key that node
+    writes, and ``prepare`` resolves it through the seam it always used. There
+    is no second injection point for an already-resolved catalog.
+
+    ``record`` is what those rows came to **here**, over the model this bundle
+    built. It is the reader of the dispositions and of an offline comparison; a
+    pipeline that repairs the model resolves the proposal again over the model
+    the gate passed, which is the model the rows should bind to.
     """
 
     model: SystemModel
+    proposal: CatalogProposal
     record: AssertionRecord
     dispositions: tuple[DispositionRow, ...]
 
@@ -493,7 +500,7 @@ def resolve_bundle(
     """
     refused = _version_issue(bundle) or _cap_issue(bundle)
     if refused is not None:
-        return Resolution(SystemModel(), _empty_record(), (refused,))
+        return Resolution(SystemModel(), CatalogProposal(), _empty_record(), (refused,))
 
     held = base if base is not None else SystemModel()
     prepared = _prepared(sources)
@@ -519,7 +526,9 @@ def resolve_bundle(
         trust_boundaries=list(zones.values()),
         assumptions=[*held.assumptions, *assumptions],
     )
-    record = _facts(bundle, sources, model, zones, zoned, flows, repeated, rows)
+    proposal, record = _facts(
+        bundle, sources, model, zones, zoned, flows, repeated, rows
+    )
     rows.extend(
         DispositionRow(
             handle=row.handle,
@@ -541,7 +550,7 @@ def resolve_bundle(
         )
         for handle, kind in _repeated_rows(bundle, repeated)
     )
-    return Resolution(model, record, tuple(rows))
+    return Resolution(model, proposal, record, tuple(rows))
 
 
 def _empty_record() -> AssertionRecord:
@@ -1162,7 +1171,7 @@ def _facts(
     flows: Mapping[str, DataFlow],
     repeated: Collection[str],
     rows: list[DispositionRow],
-) -> AssertionRecord:
+) -> tuple[CatalogProposal, AssertionRecord]:
     """Turn every fact into an assertion, through the existing resolver.
 
     A fact whose subject or reference handle reached no output is ``rejected``
@@ -1213,7 +1222,8 @@ def _facts(
         )
         handles.append(fact.handle)
 
-    record = AssertionRecord.of(CatalogProposal(assertions=proposals), model, sources)
+    proposal = CatalogProposal(assertions=proposals)
+    record = AssertionRecord.of(proposal, model, sources)
     refused: dict[int, tuple[DispositionCode, str, str]] = {}
     for issue in record.issues:
         if issue.row is None or issue.row in refused:
@@ -1223,7 +1233,7 @@ def _facts(
             issue.code,
             issue.message,
         )
-    for index, (handle, proposal) in enumerate(zip(handles, proposals, strict=True)):
+    for index, (handle, row) in enumerate(zip(handles, proposals, strict=True)):
         stopped = refused.get(index)
         if stopped is not None:
             disposition, code, message = stopped
@@ -1242,9 +1252,9 @@ def _facts(
                 handle=handle,
                 kind="fact",
                 disposition=(
-                    "preserved" if proposal.predicate in UNPROJECTED else "consumed"
+                    "preserved" if row.predicate in UNPROJECTED else "consumed"
                 ),
-                target=proposal.subject,
+                target=row.subject,
             )
         )
-    return record
+    return proposal, record

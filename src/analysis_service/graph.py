@@ -116,7 +116,7 @@ import logging
 from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, get_args
 
 import anyio.to_thread
 from google.adk.agents import LlmAgent
@@ -166,6 +166,7 @@ from analysis_service.evidence import (
     render_catalog,
     render_element_roster,
 )
+from analysis_service.factbundle import SourceFactBundle, resolve_bundle
 from analysis_service.fan_in import fan_in
 from analysis_service.frameworks import (
     DISCLAIMER_DOC,
@@ -192,6 +193,7 @@ from analysis_service.prompts import (
     compose_assert_prompt,
     compose_critic_prompt,
     compose_extract_prompt,
+    compose_facts_prompt,
     compose_recritic_prompt,
     compose_repair_prompt,
 )
@@ -241,6 +243,12 @@ logger = logging.getLogger(__name__)
 # preparation, one assembly. #162 ruled that one **Valid System Model** serves
 # every framework a job selects, so nothing here is per-framework.
 EXTRACT_NODE = "extract"
+#: The facts-first extraction node (#1003 arm B): the sources in, a **Source
+#: Fact Bundle** out, and no graph ID anywhere in it.
+FACTS_NODE = "facts"
+#: What turns that bundle into the artifacts the rest of the graph reads. Code,
+#: not a model: see :func:`~analysis_service.factbundle.resolve_bundle`.
+RESOLVE_NODE = "resolve"
 ASSERT_NODE = "assert"
 READ_MODEL_NODE = "read"
 VALIDATE_NODE = "validate"
@@ -487,6 +495,12 @@ def tier_node_by_graph_node(
     """
     return {
         EXTRACT_NODE: "extract",
+        # The facts-first node resolves on the **extraction** tier row, because
+        # it is the extraction stage under another order. #1003 asks that
+        # comparable semantic stages run the same model configuration, and one
+        # key for both is how that holds by construction rather than by an
+        # operator keeping two rows in step.
+        FACTS_NODE: "extract",
         REPAIR_NODE: "repair",
         ASSERT_NODE: "assert",
         **{
@@ -525,6 +539,21 @@ The model is seeded rather than extracted for the reason :data:`ENTRY_PREPARE`
 seeds one: a row this node could not bind to an element would otherwise be
 unattributable between the two readings, and the question this mode asks is
 what the sources *state*, not whether two calls named one component alike."""
+
+#: Which order a graph reads its sources in. ``graph-first`` is production and
+#: every arm-A run: ``extract`` emits a **System Model** in one pass.
+#: ``facts-first`` is #1003's arm B, where ``facts`` emits a **Source Fact
+#: Bundle** in local handles and ``resolve`` turns it into the same artifacts.
+#: Both end at the same validity gate and the same bounded repair, so what a
+#: comparison between them measures is the reading order.
+ExtractionStrategy = Literal["graph-first", "facts-first"]
+
+GRAPH_FIRST: ExtractionStrategy = "graph-first"
+FACTS_FIRST: ExtractionStrategy = "facts-first"
+
+#: Every strategy, derived from the literal so the two cannot disagree.
+EXTRACTION_STRATEGIES: frozenset[str] = frozenset(get_args(ExtractionStrategy))
+
 
 ROUTE_VALID = "valid"
 ROUTE_INVALID = "invalid"
@@ -632,6 +661,14 @@ STATE_REPAIR_BASELINE = "repair_baseline"
 # written by ``revalidate`` and carried onto the report by ``assemble``.
 STATE_MODEL_REPAIR = "model_repair"
 
+# What the facts-first node emits: a ``SourceFactBundle``, in local handles,
+# before code resolves it into a model and a proposal.
+STATE_SOURCE_FACTS = "source_facts"
+# What ``resolve`` made of every row of that bundle: one ``DispositionRow`` per
+# input row, so a fact that reached neither the graph nor the catalog is
+# attributable rather than missing. Written by ``resolve`` and read by a driver.
+STATE_BUNDLE_DISPOSITIONS = "bundle_dispositions"
+
 STATE_EXTRACTED_MODEL = "extracted_model"
 # What ``extract`` emitted, kept apart from the key it arrived in. ``repair``
 # writes its own emission over :data:`STATE_EXTRACTED_MODEL`, so after a
@@ -732,6 +769,8 @@ SHARED_RENDERED_KEYS: frozenset[str] = frozenset(
 SHARED_STRUCTURED_KEYS: frozenset[str] = frozenset(
     {
         STATE_SOURCE_TEXTS,
+        STATE_SOURCE_FACTS,
+        STATE_BUNDLE_DISPOSITIONS,
         STATE_EXTRACTED_MODEL,
         STATE_FIRST_PASS,
         STATE_ASSERTION_PROPOSAL,
@@ -1008,6 +1047,7 @@ class Analysis:
                 build=dict(build_identity()),
                 review_independence=pipeline.review_independence,
                 extraction_format=pipeline.extraction_format,
+                extraction_strategy=pipeline.extraction_strategy,
             ),
             analyses=list(self.analyses),
         )
@@ -2365,6 +2405,12 @@ class Pipeline:
     #: default of ``"full"`` there would be a fact with no reader: the report
     #: would name a transport nothing in that run used.
     extraction_format: ExtractionFormat | None = FULL_FORMAT
+    #: Which order the head of this graph reads its sources in, on the same
+    #: reasoning: a reader who worked it out from the report's own System Model
+    #: would find the two strategies identical by construction, because both
+    #: pass the same gate and produce the same shape. ``None`` on a graph with
+    #: no extraction node, for the reason the transport is ``None`` there.
+    extraction_strategy: ExtractionStrategy | None = GRAPH_FIRST
 
 
 def _generate_content_config(sampling: TierSampling) -> types.GenerateContentConfig:
@@ -2449,6 +2495,84 @@ def _extract_node(
         resolve_model=resolve_model,
         resolve_sampling=resolve_sampling,
     )
+
+
+def _facts_node(
+    prompt_loader: MarkdownLoader,
+    resolve_model: ModelResolver,
+    resolve_sampling: SamplingResolver,
+) -> LlmAgent:
+    """The facts-first extraction node: the sources in, one bundle out.
+
+    It sees no model and no graph ID, which is the whole of what #1003 arm B
+    changes at this end. Everything after :func:`resolve_source_facts` is the
+    route arm A runs.
+    """
+    return _llm_node(
+        name=FACTS_NODE,
+        tier_node="extract",
+        instruction=compose_facts_prompt(prompt_loader),
+        output_schema=SourceFactBundle,
+        output_key=STATE_SOURCE_FACTS,
+        resolve_model=resolve_model,
+        resolve_sampling=resolve_sampling,
+    )
+
+
+def resolve_source_facts(
+    ctx,
+    keys: GraphKeys,
+    source_facts: dict | None = None,
+    source_texts: dict | None = None,
+) -> dict[str, Any]:
+    """Turn one bundle into the artifacts the rest of the graph already reads.
+
+    Three writes, and none of them is new machinery. The model goes to
+    :data:`STATE_EXTRACTED_MODEL`, which is where ``extract`` puts its emission,
+    so the validity gate and the bounded repair behind it run unchanged. The
+    rows whose handles resolved go to :data:`STATE_ASSERTION_PROPOSAL`, which is
+    where the ``assert`` node puts its proposal, so ``prepare`` resolves them
+    through the seam it always used — **there is no second way to inject a
+    catalog**, and the gate cannot be stepped around. The dispositions go to
+    :data:`STATE_BUNDLE_DISPOSITIONS` for a driver that asks what every input
+    row came to.
+
+    The proposal rather than the resolved record, because a model that fails the
+    gate is repaired and the rows should bind to the model the gate passed. The
+    record this stage computed is what #1003's offline comparison reads; the
+    job's catalog is what ``prepare`` builds from the same rows.
+    """
+    if source_facts is None:
+        raise SilentNodeError(
+            f"nothing was written to {STATE_SOURCE_FACTS!r}, so there are no"
+            f" source facts to resolve. {_TRUNCATION_HINT}"
+        )
+    state = keys.state(ctx)
+    resolution = resolve_bundle(
+        SourceFactBundle.model_validate(source_facts), source_texts or {}
+    )
+    state.put(STATE_EXTRACTED_MODEL, resolution.model.model_dump(mode="json"))
+    state.put(STATE_ASSERTION_PROPOSAL, resolution.proposal.model_dump(mode="json"))
+    state.put(
+        STATE_BUNDLE_DISPOSITIONS,
+        [row.model_dump(mode="json") for row in resolution.dispositions],
+    )
+    return {
+        "elements": len(resolution.model.elements()),
+        "assertions": len(resolution.proposal.assertions),
+        "gaps": len(resolution.gaps),
+    }
+
+
+def _resolve_node_func(keys: GraphKeys) -> Callable[..., Any]:
+    """The bundle resolver, with this graph's key families bound to it."""
+
+    def resolve(
+        ctx, source_facts: dict | None = None, source_texts: dict | None = None
+    ) -> dict[str, Any]:
+        return resolve_source_facts(ctx, keys, source_facts, source_texts)
+
+    return resolve
 
 
 def _assert_node(
@@ -2671,6 +2795,7 @@ def build_pipeline(
     frameworks: Sequence[FrameworkName],
     entry: Entry = ENTRY_EXTRACT,
     extraction_format: ExtractionFormat = FULL_FORMAT,
+    extraction_strategy: ExtractionStrategy = GRAPH_FIRST,
     assertions: bool = False,
     name: str = "analysis_pipeline",
 ) -> Pipeline:
@@ -2711,6 +2836,19 @@ def build_pipeline(
     property of the deployment (``ANALYSIS_ASSERTIONS``) for the reason the
     transport is, and it is refused on an entry that never prepares, because
     a pass nothing reads would spend a submitter's money.
+
+    ``extraction_strategy`` selects which order the head of the graph reads in.
+    ``graph-first`` is production and changes nothing. ``facts-first`` (#1003
+    arm B) replaces ``extract`` with ``facts`` and ``resolve``: the node emits a
+    **Source Fact Bundle** in local handles, and code turns it into the model
+    the validity gate reads and the proposal ``prepare`` resolves. Everything
+    from the gate onward is the same graph, which is what makes a comparison
+    between the two a comparison of reading order.
+
+    **A facts-first graph is refused an ``assert`` node.** Its bundle already
+    carries what the sources state, so a second pass over the model it built
+    would be a second extraction of one thing — the appended pass #1003 rules
+    out, and two readings of one question besides.
     """
     if entry not in (
         ENTRY_EXTRACT,
@@ -2721,7 +2859,26 @@ def build_pipeline(
         raise ValueError(f"unknown graph entry point: {entry!r}")
     if extraction_format not in EXTRACTION_FORMATS:
         raise ValueError(f"unknown extraction format: {extraction_format!r}")
+    if extraction_strategy not in EXTRACTION_STRATEGIES:
+        raise ValueError(f"unknown extraction strategy: {extraction_strategy!r}")
     extracts = entry in (ENTRY_EXTRACT, ENTRY_EXTRACT_ONLY)
+    facts_first = extraction_strategy == FACTS_FIRST
+    if facts_first and not extracts:
+        raise ValueError(
+            f"entry {entry!r} builds no extraction node, so it cannot be built"
+            f" for the {extraction_strategy!r} strategy"
+        )
+    if facts_first and extraction_format != FULL_FORMAT:
+        raise ValueError(
+            f"the {extraction_strategy!r} strategy writes a bundle rather than a"
+            f" model, so it has no {extraction_format!r} transport"
+        )
+    if facts_first and assertions:
+        raise ValueError(
+            f"the {extraction_strategy!r} strategy already reads what the"
+            " sources state, so an assertion pass over the model it built"
+            " would extract one thing twice"
+        )
     if not extracts and extraction_format != FULL_FORMAT:
         raise ValueError(
             f"entry {entry!r} builds no extract node, so it cannot be built for"
@@ -2752,9 +2909,13 @@ def build_pipeline(
             tier_nodes=tier_nodes,
             review_independence=binding.review_independence,
             extraction_format=extraction_format if extracts else None,
+            extraction_strategy=extraction_strategy if extracts else None,
         )
 
     if entry == ENTRY_EXTRACT_ONLY:
+        if facts_first:
+            facts = _facts_node(prompt_loader, resolve_model, resolve_sampling)
+            return pipeline(Workflow(name=name, edges=[(START, facts)]), [facts])
         extract = _extract_node(
             prompt_loader, resolve_model, resolve_sampling, extraction_format
         )
@@ -2802,9 +2963,17 @@ def build_pipeline(
 
     extraction_nodes: list[LlmAgent] = []
     if entry == ENTRY_EXTRACT:
-        extract = _extract_node(
-            prompt_loader, resolve_model, resolve_sampling, extraction_format
-        )
+        # The head differs and nothing after it does. ``facts`` writes a bundle
+        # and ``resolve`` writes the model at the key ``extract`` writes it at,
+        # so one validity gate, one bounded repair and one rejection serve both
+        # strategies — which is the property #1003 needs to compare them.
+        if facts_first:
+            extract = _facts_node(prompt_loader, resolve_model, resolve_sampling)
+            resolve = _node(_resolve_node_func(keys), RESOLVE_NODE)
+        else:
+            extract = _extract_node(
+                prompt_loader, resolve_model, resolve_sampling, extraction_format
+            )
         repair = _llm_node(
             name=REPAIR_NODE,
             tier_node="repair",
@@ -2824,7 +2993,9 @@ def build_pipeline(
         # a chain element, and a routing-map literal only infers its declared
         # key type under an expected type -- which a bare local has none of.
         head_edges: list[tuple[Any, ...]] = [
-            (START, extract, validate),
+            (START, extract, resolve, validate)
+            if facts_first
+            else (START, extract, validate),
             (
                 validate,
                 {

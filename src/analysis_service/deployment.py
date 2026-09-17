@@ -74,8 +74,11 @@ from analysis_service.frameworks import validate_packages
 from analysis_service.graph import (
     ENTRY_EXTRACT,
     ENTRY_EXTRACT_ONLY,
+    FACTS_FIRST,
+    GRAPH_FIRST,
     PREPARING_ENTRIES,
     Entry,
+    ExtractionStrategy,
     ModelResolver,
     Pipeline,
     build_pipeline,
@@ -148,6 +151,13 @@ COMPACT_EXTRACTION_VAR = "ANALYSIS_COMPACT_EXTRACTION"
 #: variable and one restart is the rollback: a report built without the pass
 #: carries ``assertions: null`` and every other field it carried before.
 ASSERTIONS_VAR = "ANALYSIS_ASSERTIONS"
+#: Read the sources facts-first (#1003 arm B): ``facts`` emits a **Source Fact
+#: Bundle** and ``resolve`` turns it into the model the validity gate reads and
+#: the proposal ``prepare`` resolves. Off by default, so an install that sets
+#: nothing runs the graph it always ran. It carries its own assertion rows, so
+#: it is refused together with ``ANALYSIS_ASSERTIONS``: a second pass over the
+#: model the bundle built would extract one thing twice.
+FACTS_FIRST_EXTRACTION_VAR = "ANALYSIS_FACTS_FIRST_EXTRACTION"
 
 
 def _path(env: Mapping[str, str], var: str, default: Path) -> Path:
@@ -227,6 +237,10 @@ class Deployment:
     #: everything else held fixed, so letting a submission pick one would make
     #: two reports incomparable for a reason neither of them records.
     extraction_format: ExtractionFormat = FULL_FORMAT
+    #: Which order this install asks the head of the graph to read in, on the
+    #: same reasoning as the transport: the two strategies are compared with
+    #: everything else held fixed.
+    extraction_strategy: ExtractionStrategy = GRAPH_FIRST
     #: Whether every job runs the assertion pass. A property of the deployment
     #: for the reason the transport is: a report with the pass and one without
     #: are compared with everything else held fixed.
@@ -286,6 +300,9 @@ class Deployment:
             require_certified=_flag(env, REQUIRE_CERTIFIED_VAR),
             extraction_format=(
                 COMPACT_FORMAT if _flag(env, COMPACT_EXTRACTION_VAR) else FULL_FORMAT
+            ),
+            extraction_strategy=(
+                FACTS_FIRST if _flag(env, FACTS_FIRST_EXTRACTION_VAR) else GRAPH_FIRST
             ),
             assertions=_flag(env, ASSERTIONS_VAR),
             env=MappingProxyType(dict(env)),
@@ -390,10 +407,21 @@ class Deployment:
             # extract — so this install's choice reaches the graphs that have one
             # and the others are built for the route they actually run.
             extraction_format=self.extraction_format if extracts else FULL_FORMAT,
+            # The same rule as the transport: only a graph with an extraction
+            # node carries a strategy, and the builder refuses one on a graph
+            # that has none.
+            extraction_strategy=(self.extraction_strategy if extracts else GRAPH_FIRST),
             # The pass sits ahead of ``prepare``, so only an entry that builds
             # one carries it; the extraction and assertion eval entries run
             # their one node and stop.
-            assertions=self.assertions and entry in PREPARING_ENTRIES,
+            # A facts-first graph carries its own rows, and the builder refuses
+            # the two together — so an install that sets both variables gets the
+            # strategy it asked for and no appended pass.
+            assertions=(
+                self.assertions
+                and entry in PREPARING_ENTRIES
+                and self.extraction_strategy != FACTS_FIRST
+            ),
         )
 
     @cached_property

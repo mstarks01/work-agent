@@ -34,8 +34,11 @@ therefore share the longest possible cacheable prefix.
 
 from __future__ import annotations
 
+import re
+
 from analysis_service.assertions import REGISTRY, Predicate, referent_type
 from analysis_service.compact import COMPACT_FORMAT, FULL_FORMAT
+from analysis_service.factbundle import ROLES
 from analysis_service.frameworks import OUTPUT_DOC
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.skills import lane_exemplars_doc
@@ -49,6 +52,10 @@ ANALYZE_PROMPT_NAME = "analyze"
 CRITIC_PROMPT_NAME = "critic"
 RECRITIC_PROMPT_NAME = "recritic"
 EXTRACT_PROMPT_NAME = "extract"
+#: The facts-first extraction body (#1003 arm B). A prompt body of its own and
+#: not a delta on ``extract.md``: the two read the same sources and write
+#: different things, so there is no shared body for one to append to.
+EXTRACT_FACTS_PROMPT_NAME = "extract-facts"
 #: The compact transport's delta, appended after ``extract.md``. Not a prompt
 #: body: it carries no Role, Input or Procedure of its own, because the whole
 #: point is that both extraction routes read one body and differ only in what
@@ -58,6 +65,7 @@ REPAIR_PROMPT_NAME = "repair"
 ASSERT_PROMPT_NAME = "assert"
 PROMPT_BODY_NAMES: tuple[str, ...] = (
     EXTRACT_PROMPT_NAME,
+    EXTRACT_FACTS_PROMPT_NAME,
     REPAIR_PROMPT_NAME,
     ASSERT_PROMPT_NAME,
     ANALYZE_PROMPT_NAME,
@@ -162,6 +170,24 @@ def compose_extract_prompt(
     return "\n\n".join(part.strip() for part in parts) + "\n"
 
 
+def compose_facts_prompt(loader: MarkdownLoader) -> str:
+    """The facts-first prompt: the body, then the roles, then the predicates.
+
+    Both tables are rendered from the code that reads them, for the reason
+    :func:`compose_assert_prompt` renders one: a role's element and a
+    predicate's value form are facts
+    :data:`~analysis_service.factbundle.ROLES` and
+    :data:`~analysis_service.assertions.REGISTRY` already hold, and a second
+    copy in prose is the copy nothing checks.
+    """
+    parts = [
+        loader.load(EXTRACT_FACTS_PROMPT_NAME),
+        render_roles(),
+        render_predicates(),
+    ]
+    return "\n\n".join(part.strip() for part in parts) + "\n"
+
+
 def compose_repair_prompt(loader: MarkdownLoader) -> str:
     """The one-shot repair prompt: validator issues plus the original input."""
     return loader.load(REPAIR_PROMPT_NAME).strip() + "\n"
@@ -178,6 +204,40 @@ def compose_assert_prompt(loader: MarkdownLoader) -> str:
     """
     parts = [loader.load(ASSERT_PROMPT_NAME), render_predicates()]
     return "\n\n".join(part.strip() for part in parts) + "\n"
+
+
+def render_roles() -> str:
+    """The structural role vocabulary as the table a model reads.
+
+    One row per role: what element it names, and which of that element's
+    required fields the role itself settles. The second column is what makes
+    eight roles out of five element types — an **External Entity** is a human
+    or an external system and a **Trust Boundary** separates by network,
+    privilege or tenancy, and neither field admits ``unknown``, so the role has
+    to say.
+    """
+    rows = [
+        "## The roles",
+        "",
+        ("One role where the text settles what a thing is, and two where it does not."),
+        "",
+        "| Role | Element | Settles |",
+        "| --- | --- | --- |",
+    ]
+    for role, rule in ROLES.items():
+        settled = (
+            ", ".join(
+                f"`{field}` is `{value}`" for field, value in sorted(rule.fixed.items())
+            )
+            or "nothing further"
+        )
+        rows.append(f"| `{role}` | {_element_words(rule.element)} | {settled} |")
+    return "\n".join(rows)
+
+
+def _element_words(element_type: type) -> str:
+    """One element class's name as the glossary writes it: ``Data Store``."""
+    return re.sub(r"(?<!^)(?=[A-Z])", " ", element_type.__name__)
 
 
 def render_predicates() -> str:

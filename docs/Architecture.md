@@ -175,6 +175,40 @@ one variable and a restart.
 | --- | --- |
 | `ANALYSIS_COMPACT_EXTRACTION` | Ask `extract` for the compact wire form. Off by default. |
 
+## The extraction strategy
+
+The transport above changes how `extract` spells one answer. A **strategy**
+changes what the reading node is asked for. `ANALYSIS_FACTS_FIRST_EXTRACTION`
+replaces `extract` with two nodes: `facts` reads the sources and writes a
+**Source Fact Bundle** — the things the text names, the interactions between
+them, one statement at a time, and the questions it leaves open, all under
+short handles the model invents — and `resolve` turns that bundle into the
+same `SystemModel` the validity gate reads and a catalog proposal `prepare`
+resolves. From the gate onward the graph is identical, which is what makes a
+comparison between the two strategies a comparison of reading order.
+
+| Strategy | What the reading node writes | Selected by |
+| --- | --- | --- |
+| graph-first | a `SystemModel` in one pass | the default |
+| facts-first | a `SourceFactBundle`, resolved in code | `ANALYSIS_FACTS_FIRST_EXTRACTION` |
+
+`facts` runs on the same tier row as `extract`, because it is the extraction
+stage under another order and the comparison needs both on one model. The
+report records which strategy ran, in
+[`execution.extraction_strategy`](Report-Schema.md#execution).
+
+The strategy carries its own assertion rows, so it is refused together with
+`ANALYSIS_ASSERTIONS`: a second pass over the model the bundle built would
+read one thing twice. It is refused with the compact transport for the same
+kind of reason — the bundle is not a model, so it has no compact wire form.
+
+This is an experiment ([#1003](https://github.com/mstarks01/work-agent/issues/1003)),
+disabled by default and unmeasured. No run has compared the two.
+
+| Variable | Effect |
+| --- | --- |
+| `ANALYSIS_FACTS_FIRST_EXTRACTION` | Read the sources facts-first. Off by default. |
+
 ## The assertion pass
 
 `ANALYSIS_ASSERTIONS` puts one more `base`-tier call into every job, between
