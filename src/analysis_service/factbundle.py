@@ -96,7 +96,7 @@ from analysis_service.validation import MAX_ELEMENTS
 #: it. Not the **Claim** identity version and not
 #: :data:`~analysis_service.system_model.FLOW_ID_VERSION`: those rule what an
 #: ID means, and this rules what a bundle row may carry.
-BUNDLE_VERSION = 1
+BUNDLE_VERSION = 2
 
 #: The structural vocabulary's version, apart from :data:`BUNDLE_VERSION`
 #: because a role added to :data:`ROLES` changes what a bundle can say without
@@ -294,6 +294,13 @@ class InteractionProposal(BaseModel):
     of endpoints stay separately addressable under
     :func:`~analysis_service.system_model.make_flow_id`.
 
+    ``operations`` is what the initiator does to the receiver's data, in the
+    closed vocabulary :class:`~analysis_service.system_model.DataFlow` holds.
+    **A field, because a rule reads it**: STRIDE's store-tampering rule skips a
+    read-only path, and a route that could not say which paths are read-only
+    would take that rule's answer away from every job it ran. It is the verb's
+    effect rather than the verb, which is why ``action`` cannot stand for it.
+
     Each endpoint is a mention handle of this bundle or an **Element ID** the
     base model holds, so an interaction can be added between two components
     that are already there.
@@ -306,6 +313,7 @@ class InteractionProposal(BaseModel):
     receiver: str = Field(min_length=1, max_length=MAX_REFERENCE_CHARS)
     action: str = Field(min_length=1, max_length=200)
     protocol: str = Field(default=UNKNOWN, max_length=200)
+    operations: Literal["read", "write", "read-write", "unknown"] = "unknown"
     quotes: list[QuoteProposal] = Field(default_factory=list, max_length=MAX_SPANS)
 
 
@@ -1162,9 +1170,10 @@ def _build_interaction(
                 "source": source.id,
                 "destination": destination.id,
                 "protocol": interaction.protocol,
+                "operations": interaction.operations,
                 "source_excerpt": cited.quote,
                 "source_label": cited.label,
-                **unstated_fields(DataFlow, ("protocol",)),
+                **unstated_fields(DataFlow, ("protocol", "operations")),
             }
         ),
         "",

@@ -38,6 +38,7 @@ from analysis_service.factbundle import (
     MAX_MENTIONS,
     PLACEMENT_PREDICATES,
     REFUSAL_DISPOSITIONS,
+    ROLE_VERSION,
     ROLES,
     ZONE_ROLES,
     DispositionCode,
@@ -490,6 +491,28 @@ class TestInteractions:
         resolution = resolved(bundle, {LABEL: text})
         assert len({flow.id for flow in resolution.model.data_flows}) == 2
 
+    def test_a_flow_keeps_what_the_interaction_does_to_the_data(self) -> None:
+        """STRIDE's store-tampering rule skips a read-only path, and reads this.
+
+        The verb is the flow's label and says nothing decidable about the data,
+        so a route that emitted only a verb would take that rule's answer away
+        from every job it ran.
+        """
+        bundle = worker_bundle()
+        bundle.interactions[0] = bundle.interactions[0].model_copy(
+            update={"operations": "read"}
+        )
+
+        resolution = resolved(bundle)
+
+        assert [flow.operations for flow in resolution.model.data_flows] == ["read"]
+
+    def test_an_interaction_that_says_nothing_about_the_data_reads_unknown(
+        self,
+    ) -> None:
+        resolution = resolved(worker_bundle())
+        assert [flow.operations for flow in resolution.model.data_flows] == [UNKNOWN]
+
     def test_two_interactions_of_one_verb_are_one_flow(self) -> None:
         bundle = worker_bundle()
         bundle.interactions.append(
@@ -751,9 +774,15 @@ class TestHandles:
         assert {row.code for row in rows} == {"duplicate-handle"}
         assert {row.kind for row in rows} == {"mention", "unresolved"}
 
-    @pytest.mark.parametrize("field", ("bundle_version", "role_version"))
-    def test_another_spelling_of_the_schema_is_refused_whole(self, field: str) -> None:
-        bundle = worker_bundle(**{field: 2})
+    @pytest.mark.parametrize(
+        ("field", "current"),
+        (("bundle_version", BUNDLE_VERSION), ("role_version", ROLE_VERSION)),
+    )
+    def test_another_spelling_of_the_schema_is_refused_whole(
+        self, field: str, current: int
+    ) -> None:
+        """Read off the constant, so a version bump does not make this vacuous."""
+        bundle = worker_bundle(**{field: current + 1})
         resolution = resolved(bundle)
         assert len(resolution.dispositions) == 1
         assert resolution.dispositions[0].code == "wrong-version"
