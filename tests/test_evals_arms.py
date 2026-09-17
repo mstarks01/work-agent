@@ -13,6 +13,7 @@ a vocabulary it does not know.
 
 import json
 from pathlib import Path
+from typing import get_args
 
 import pytest
 
@@ -25,6 +26,7 @@ from analysis_service.assertions import (
 )
 from analysis_service.deployment import Deployment
 from analysis_service.markdown_loader import MarkdownLoader
+from analysis_service.system_model import Element
 from evals.harness.arms import (
     ARMS,
     ARTIFACT_VERSION,
@@ -49,7 +51,9 @@ from evals.harness.arms import (
     paired_difference,
     report,
     required_rows,
+    row_tally,
     shown_tokens,
+    subject_kind,
     to_json,
     unsupported_rate,
     write_runs,
@@ -437,6 +441,120 @@ class TestTheInputEstimate:
         assert code == 0
         assert out.read_text() == capsys.readouterr().out
         assert "## Input tokens over" in out.read_text()
+
+
+class TestTheAlignedReading:
+    """The second figure #1015 asks for, beside the strict one and never over it."""
+
+    def run_with(self, found: int, aligned: int, required: int = 10) -> ArmRun:
+        fates: dict[str, int] = dict.fromkeys(ROW_FATES, 0)
+        fates["found"] = found
+        fates["omitted"] = required - found
+        return ArmRun(
+            case_id="01",
+            arm="A",
+            repeat=0,
+            required=required,
+            fates=fates,
+            produced=dict.fromkeys(PRODUCED_FATES, 0),
+            found_rows=tuple(f"found-{i}" for i in range(found)),
+            aligned_rows=tuple(f"aligned-{i}" for i in range(aligned)),
+        )
+
+    def test_the_strict_figure_does_not_move(self) -> None:
+        run = self.run_with(found=4, aligned=3)
+        assert run.recall == 0.4
+
+    def test_the_aligned_figure_credits_the_relabelled_rows(self) -> None:
+        run = self.run_with(found=4, aligned=3)
+        assert run.aligned_recall == 0.7
+
+    def test_a_failed_run_recovers_nothing_either_way(self) -> None:
+        run = self.run_with(found=0, aligned=3)
+        stopped = ArmRun(
+            case_id=run.case_id,
+            arm=run.arm,
+            repeat=0,
+            required=run.required,
+            fates=run.fates,
+            produced=run.produced,
+            aligned_rows=run.aligned_rows,
+            valid=False,
+        )
+        assert stopped.recall == 0.0
+        assert stopped.aligned_recall == 0.0
+
+    def test_the_macro_reads_whichever_figure_it_is_asked_for(self) -> None:
+        runs = [self.run_with(found=4, aligned=3)]
+        assert macro_recall(runs, "A") == 0.4
+        assert macro_recall(runs, "A", aligned=True) == 0.7
+
+
+class TestTheRowTally:
+    """A comparison counted over rows, which carries a direction before an interval."""
+
+    def runs(self) -> list[ArmRun]:
+        """Two arms over one case: B answers two rows A misses, A answers three."""
+
+        def one(arm: str, rows: tuple[str, ...], repeat: int) -> ArmRun:
+            fates: dict[str, int] = dict.fromkeys(ROW_FATES, 0)
+            fates["found"] = len(rows)
+            fates["omitted"] = 8 - len(rows)
+            return ArmRun(
+                case_id="01",
+                arm=arm,
+                repeat=repeat,
+                required=8,
+                fates=fates,
+                produced=dict.fromkeys(PRODUCED_FATES, 0),
+                found_rows=rows,
+            )
+
+        shared = ("r1", "r2")
+        return [
+            one("A", (*shared, "a1", "a2", "a3"), 0),
+            one("B", (*shared, "b1", "b2"), 0),
+        ]
+
+    def test_each_arm_is_ahead_on_the_rows_only_it_answered(self) -> None:
+        tally = row_tally(self.runs(), "B", "A")
+        assert tally.left_ahead == 2
+        assert tally.right_ahead == 3
+        assert tally.discordant == 5
+
+    def test_rows_both_answer_are_ties(self) -> None:
+        tally = row_tally(self.runs(), "B", "A")
+        assert tally.contested == 7
+        assert tally.tied == 8 - 5
+
+    def test_a_row_nobody_answered_carries_no_direction(self) -> None:
+        """One required row of eight went unanswered; it is a tie, not a loss."""
+        tally = row_tally(self.runs(), "B", "A")
+        assert tally.contested < 8
+        assert tally.left_ahead + tally.right_ahead + tally.tied == 8
+
+    def test_two_arms_that_never_met_tally_nothing(self) -> None:
+        tally = row_tally([one for one in self.runs() if one.arm == "A"], "B", "A")
+        assert tally.discordant == 0
+
+
+class TestWhatAnArmWroteAbout:
+    """A count by subject kind, which no matcher gates."""
+
+    def test_a_kind_is_read_off_the_registry_s_own_prefixes(self) -> None:
+        assert subject_kind("flow:a>b>c") == "interaction"
+        assert subject_kind("process:worker") == "component"
+        assert subject_kind("boundary:core") == "zone"
+        assert subject_kind("principal:shopper") == "principal"
+
+    def test_a_prefix_nothing_claims_names_no_kind(self) -> None:
+        assert subject_kind("nonsense:thing") == ""
+        assert subject_kind("bare") == ""
+
+    def test_every_graph_prefix_resolves(self) -> None:
+        """The table is the service's, inverted, so no element type is unnamed."""
+        for element_type in get_args(Element):
+            assert subject_kind(f"{element_type.id_prefix}:thing")
 
 
 def test_the_command_is_registered() -> None:
