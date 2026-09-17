@@ -107,7 +107,10 @@ def scripted_bundle(model: SystemModel) -> str:
 
 
 def head_pipeline(
-    corpus_case, strategy: ExtractionStrategy, models: dict[str, ScriptedLlm]
+    corpus_case,
+    strategy: ExtractionStrategy,
+    models: dict[str, ScriptedLlm],
+    **overrides: str,
 ):
     """A head-only pipeline for one strategy, on scripted models.
 
@@ -123,6 +126,9 @@ def head_pipeline(
         ),
         "assert": scripted_assertions(corpus_case),
     }
+    # A head that emits nothing usable is how a failed run is driven: the node
+    # answers and the graph still reaches no catalog.
+    replies.update(overrides)
 
     def resolve(tier_node: str) -> BaseLlm:
         models[tier_node] = ScriptedLlm(
@@ -223,6 +229,28 @@ class TestRunningIt:
         assert modes.STATE_SOURCE_FACTS in result.stages
         assert modes.STATE_BUNDLE_DISPOSITIONS in result.stages
         assert modes.STATE_EXTRACTED_MODEL in result.stages
+
+    def test_a_head_that_reaches_no_catalog_still_carries_its_stages(
+        self, corpus_case
+    ) -> None:
+        """The failed run is the one most worth reading back.
+
+        A head that produced nothing is where a reader most needs the stages:
+        they say which of them lost the rows. The failure carries them out the
+        way a refused model is carried out.
+        """
+        models: dict[str, ScriptedLlm] = {}
+        pipeline = head_pipeline(corpus_case, FACTS_FIRST, models, extract="{}")
+
+        with pytest.raises(modes.CaseFailure) as failed:
+            asyncio.run(modes.run_heads(corpus_case, pipeline))
+
+        assert isinstance(failed.value.cause, modes.EvalRunError)
+        carried = failed.value.assertion
+        assert carried is not None
+        assert carried.case_id == corpus_case.id
+        assert not carried.catalog.entries
+        assert set(carried.stages) <= set(modes.ARCHIVED_STATE)
 
     def test_the_catalog_it_parks_is_the_one_prepare_would_gate(
         self, corpus_case
