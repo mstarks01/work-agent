@@ -79,6 +79,7 @@ from evals.harness.replay import (
     ADJUDICATED_WRONG,
     PRODUCED_FATES,
     ROW_FATES,
+    UNRULED,
     AssertionReplay,
     SignedReference,
     signed_reference,
@@ -429,7 +430,7 @@ def wrong_rate(runs: Collection[ArmRun], arm: str) -> float:
     **The denominator excludes the rows nobody adjudicated.** A route that
     writes many rows outside the reference would otherwise read as wrong for
     writing them, and a route that writes few would read as right for staying
-    silent. :func:`unreviewed_share` reports how much of the output that
+    silent. :func:`unruled_share` reports how much of the output that
     denominator leaves out, and the gate reads the two together.
     """
     produced = [run.produced for run in runs if run.arm == arm]
@@ -447,19 +448,26 @@ def wrong_rate(runs: Collection[ArmRun], arm: str) -> float:
     return wrong / ruled
 
 
-def unreviewed_share(runs: Collection[ArmRun], arm: str) -> float:
-    """Produced rows no signed reference rules on, per produced row.
+def unruled_share(runs: Collection[ArmRun], arm: str) -> float:
+    """Produced rows no reference row took, per produced row.
 
     **The adjudication coverage of :func:`wrong_rate`, never an error rate.**
     The reference lists what the sources state and not everything they do not,
     so a row outside it is a candidate for a ruling. A high share says the
     precision figure rests on little of what the arm wrote.
+
+    :data:`~evals.harness.replay.UNRULED` is the set, and ``misattached`` is in
+    it: that fate fires where the reference holds no row on the produced row's
+    subject and predicate, so it reports a lead rather than a verdict.
     """
     produced = [run.produced for run in runs if run.arm == arm]
     total = sum(sum(one.values()) for one in produced)
     if not total:
         return 0.0
-    return sum(one.get("unreviewed", 0) for one in produced) / total
+    return (
+        sum(count for one in produced for fate, count in one.items() if fate in UNRULED)
+        / total
+    )
 
 
 @dataclass(frozen=True)
@@ -664,13 +672,14 @@ def report(
         ),
         "",
         (
-            "`wrong` is the share of the produced rows the reference rules on"
-            " that it disagrees with, and `unreviewed` is the share of all"
-            " produced rows it rules on at all. Read them together: a low"
-            " `wrong` over few adjudicated rows says little."
+            "`wrong` is the share of the produced rows a reference row took"
+            " that it disagrees with, and `unruled` is the share of all"
+            " produced rows no reference row took. Read them together: a low"
+            " `wrong` over few adjudicated rows says little. A row the"
+            " reference is silent about is unruled and never wrong."
         ),
         "",
-        "| arm | cases | runs | recall | aligned | failed | wrong | unreviewed |",
+        "| arm | cases | runs | recall | aligned | failed | wrong | unruled |",
         "| --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for arm in arms:
@@ -681,7 +690,7 @@ def report(
             f" {macro_recall(runs, arm, aligned=True):.3f} |"
             f" {failure_rate(runs, arm):.3f} |"
             f" {wrong_rate(runs, arm):.3f} |"
-            f" {unreviewed_share(runs, arm):.3f} |"
+            f" {unruled_share(runs, arm):.3f} |"
         )
     lines += ["", "## Error classes", "", "| arm | " + " | ".join(ROW_FATES) + " |"]
     lines.append("| --- |" + " --- |" * len(ROW_FATES))
