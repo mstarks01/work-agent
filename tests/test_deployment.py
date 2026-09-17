@@ -310,7 +310,7 @@ def test_the_flag_selects_the_compact_schema_and_the_prompt_that_describes_it():
 
     assert pipeline.extraction_format == COMPACT_FORMAT
     assert nodes[graph.EXTRACT_NODE].output_schema is CompactSystemModel
-    assert "compact-v3" in nodes[graph.EXTRACT_NODE].instruction
+    assert "compact-v4" in nodes[graph.EXTRACT_NODE].instruction
 
 
 def test_the_repair_node_writes_a_full_model_on_either_route():
@@ -320,7 +320,7 @@ def test_the_repair_node_writes_a_full_model_on_either_route():
     nodes = {node.name: node for node in pipeline.workflow.graph.nodes}
 
     assert nodes[graph.REPAIR_NODE].output_schema is SystemModel
-    assert "compact-v3" not in nodes[graph.REPAIR_NODE].instruction
+    assert "compact-v4" not in nodes[graph.REPAIR_NODE].instruction
 
 
 def test_an_entry_that_extracts_nothing_records_no_transport():

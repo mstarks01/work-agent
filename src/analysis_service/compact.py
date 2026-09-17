@@ -7,8 +7,8 @@ so every ``"id": "process:payment-api"`` a model writes is a field
 :func:`~analysis_service.system_model.normalize_element_ids` overwrites, and every
 reference to it is the same long string again.
 
-**Measured at 3.3% of the emitted tokens**, over five corpus sweeps per route
-on 2026-09-15, and that is the figure to use. ``uv run python -m
+**Measured at 3.7% of the emitted tokens**, over five corpus sweeps per route
+on 2026-09-16, and that is the figure to use. ``uv run python -m
 evals.bench.deterministic transport`` prints 5.0% of *characters*, which is an
 upper bound: the corpus models are hand-corrected, and characters are not
 tokens.
@@ -121,12 +121,12 @@ from analysis_service.validation import (
 #: re-spelled once, in :class:`~analysis_service.report.ExecutionEnvelope`, which
 #: holds no import from this module; ``tests/test_compact.py`` holds the two to
 #: each other.
-ExtractionFormat = Literal["full", "compact-v3"]
+ExtractionFormat = Literal["full", "compact-v4"]
 
 #: The full-model route: the model writes a :class:`SystemModel` itself.
 FULL_FORMAT: ExtractionFormat = "full"
 
-#: The compact route, version 3. Each earlier version is out of the tree, and
+#: The compact route, version 4. Each earlier version is out of the tree, and
 #: each was retired by a measurement rather than an argument — nothing persisted
 #: is in this format, so every change is a cutover rather than a migration.
 #:
@@ -136,15 +136,24 @@ FULL_FORMAT: ExtractionFormat = "full"
 #: scope could decide; that removed the `duplicate-ref` it was aimed at and
 #: **caused nine failures of a kind neither the full route nor version 1 ever
 #: produced** — an inference written on the flow carrying the data rather than
-#: the store holding it. Version 3 puts the type back in the ref, which is what
-#: a full-model ID's prefix always was, and puts the assumption back where it
-#: never failed.
+#: the store holding it. Version 3 put the type back in the ref, which is what
+#: a full-model ID's prefix always was, and put the assumption back where it
+#: never failed; it failed the gate on two flow refs the model had derived from
+#: the flow's *endpoints*, so two flows between one pair collided.
+#:
+#: **Version 4 says what a flow's ref is named after, and nothing else changes.**
+#: The schema, the adapter and every other rule are version 3's. A flow's ref is
+#: its label, because a label is what tells two flows between one pair apart,
+#: and ``prompts/extract-compact.md`` says so where it introduces the ref. This
+#: is the only version whose safety fix also *increased* the saving: a label
+#: slug runs 17.4 characters against 33.2 for an endpoint pair over the blessed
+#: corpus, worth 1.04% of the full emission on top of the transport's own.
 #:
 #: **Versioned in its name**, because a reader of
 #: an archived report has to be able to tell which wire form produced it, and
 #: because ``prompts/extract-compact.md`` names this string — so a format change
 #: moves the composed instruction and therefore every node's fingerprint.
-COMPACT_FORMAT: ExtractionFormat = "compact-v3"
+COMPACT_FORMAT: ExtractionFormat = "compact-v4"
 
 #: Every extraction transport a graph can be built for.
 EXTRACTION_FORMATS: tuple[ExtractionFormat, ...] = (FULL_FORMAT, COMPACT_FORMAT)

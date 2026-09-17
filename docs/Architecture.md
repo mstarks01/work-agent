@@ -125,7 +125,7 @@ the same `SystemModel` before the validity gate runs.
 | Transport | What `extract` writes | Selected by |
 | --- | --- | --- |
 | full | a `SystemModel` | the default |
-| compact-v3 | a compact wire form, expanded in code | `ANALYSIS_COMPACT_EXTRACTION` |
+| compact-v4 | a compact wire form, expanded in code | `ANALYSIS_COMPACT_EXTRACTION` |
 
 Nothing downstream of the gate can tell the two apart, which is the point and
 also the reason the report records which one ran, in
@@ -135,15 +135,34 @@ references and copies fields; it decides no fact. `repair` writes a full
 format conversion.
 
 Whether the compact transport is worth running is a measurement, not a claim,
-and the measurement has been made three times. Five corpus sweeps per route put
-the saving at **3.3% of emitted tokens** for `compact-v3`, 4.5% and 4.8% for the
-two versions before it — each safer version saved less. `uv run python -m
-evals.bench.deterministic transport` prints 5.0% of *characters*, which is an
-upper bound.
+and the measurement has been made four times. Five corpus sweeps per route put
+the saving at **3.7% of emitted tokens** for `compact-v4` — 27,462 against
+26,435 over the thirteen cases, 1.44 standard deviations of the full route's own
+spread — against 3.3%, 4.8% and 4.5% for the three versions before it. `uv run
+python -m evals.bench.deterministic transport` prints 5.6% of *characters*,
+which is an upper bound.
+
+`compact-v4` is the first version whose safety fix raises the saving rather than
+spending it. Version 3 failed the gate on two flow refs the model derived from
+the flow's endpoints, so two flows between one pair collided; version 4 names a
+flow's ref after its label. A label slug runs 17.4 characters over the blessed
+corpus against 33.2 for an endpoint pair, worth a further 1.04% of the full
+emission — and it is also what the bench has priced all along, so part of the
+gap between 5.6% offline and 3.3% live was the bench pricing a ref the model was
+not writing.
 
 The input side is close to free: the first live run measured 6,116 prompt tokens
 against the full route's 6,098 on the same case, because the compact schema is
 smaller by about what the delta prompt adds.
+
+`compact-v4` clears ten of the gate's eleven criteria, including
+`duplicate-ref` at 0 of 65 and first-pass validity tied with the full route at
+0.938. The one it fails is the per-case veto, which the same run showed does not
+work: 11% of the full route's own readings fall below a floor built from four
+other sweeps of that route. So the route fails no criterion the gate can
+resolve, and it stays off on the argument rather than on the test — 3.7% of one
+node's output tokens, a second code path, and a latency this deployment cannot
+measure.
 
 The route has failed its own predeclared gate three times —
 [ADR 0035](adr/0035-the-compact-transport-promotes-on-a-predeclared-gate.md)
