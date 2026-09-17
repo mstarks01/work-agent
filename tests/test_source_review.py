@@ -296,8 +296,11 @@ class TestTheApplyNode:
         )
         outcomes = ctx.state[graph.STATE_PATCH_OUTCOMES]
 
-        assert outcomes["rolled_back"] is False
-        assert [row["code"] for row in outcomes["outcomes"]] == ["stale-precondition"]
+        assert outcomes["rolled_back"] is True
+        assert [row["code"] for row in outcomes["outcomes"]] == [
+            "stale-precondition",
+            "operation-refused",
+        ]
         patched = SystemModel.model_validate(ctx.state[graph.STATE_VALID_MODEL])
         assert patched.get("process:worker") is None
 
