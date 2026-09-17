@@ -56,6 +56,13 @@ EXTRACT_PROMPT_NAME = "extract"
 #: not a delta on ``extract.md``: the two read the same sources and write
 #: different things, so there is no shared body for one to append to.
 EXTRACT_FACTS_PROMPT_NAME = "extract-facts"
+#: The split facts-first route's two bodies (#1003 arm E). The same reading in
+#: two calls: one names what the sources hold and one states what they say
+#: about it. Two bodies rather than one with a delta, because neither call is
+#: asked to do what the other does and a shared body would tell each of them
+#: about the other's job.
+EXTRACT_INVENTORY_PROMPT_NAME = "extract-inventory"
+EXTRACT_ROWS_PROMPT_NAME = "extract-rows"
 #: The compact transport's delta, appended after ``extract.md``. Not a prompt
 #: body: it carries no Role, Input or Procedure of its own, because the whole
 #: point is that both extraction routes read one body and differ only in what
@@ -70,6 +77,8 @@ ASSERT_PROMPT_NAME = "assert"
 PROMPT_BODY_NAMES: tuple[str, ...] = (
     EXTRACT_PROMPT_NAME,
     EXTRACT_FACTS_PROMPT_NAME,
+    EXTRACT_INVENTORY_PROMPT_NAME,
+    EXTRACT_ROWS_PROMPT_NAME,
     REPAIR_PROMPT_NAME,
     REREAD_PROMPT_NAME,
     ASSERT_PROMPT_NAME,
@@ -196,6 +205,27 @@ def compose_facts_prompt(loader: MarkdownLoader) -> str:
 def compose_repair_prompt(loader: MarkdownLoader) -> str:
     """The one-shot repair prompt: validator issues plus the original input."""
     return loader.load(REPAIR_PROMPT_NAME).strip() + "\n"
+
+
+def compose_inventory_prompt(loader: MarkdownLoader) -> str:
+    """The split route's first call: the body, then the roles.
+
+    No predicate table. This call writes no fact, so a table of what a fact may
+    say would be text it is paid for and told not to use — and #1003's split
+    only measures what it means to if each call is given one job.
+    """
+    parts = [loader.load(EXTRACT_INVENTORY_PROMPT_NAME), render_roles()]
+    return "\n\n".join(part.strip() for part in parts) + "\n"
+
+
+def compose_rows_prompt(loader: MarkdownLoader) -> str:
+    """The split route's second call: the body, then the predicates.
+
+    No role table, for the reason the first call carries no predicates: this
+    call names no mention and types nothing.
+    """
+    parts = [loader.load(EXTRACT_ROWS_PROMPT_NAME), render_predicates()]
+    return "\n\n".join(part.strip() for part in parts) + "\n"
 
 
 def compose_reread_prompt(loader: MarkdownLoader) -> str:

@@ -192,6 +192,16 @@ comparison between the two strategies a comparison of reading order.
 | --- | --- | --- |
 | graph-first | a `SystemModel` in one pass | the default |
 | facts-first | a `SourceFactBundle`, resolved in code | `ANALYSIS_FACTS_FIRST_EXTRACTION` |
+| facts-split | the same bundle, across two calls | `ANALYSIS_FACTS_SPLIT_EXTRACTION` |
+
+The third exists because the first two differ in **two** ways at once: the
+reading order, and how many calls the work is spread over — graph-first runs
+`extract` and `assert`, facts-first runs one node that does both. A comparison
+between them cannot say which of those a difference belongs to. `facts-split`
+holds the order and splits the calls: `inventory` names the things, the
+interactions and the zones, and `rows` states the facts about them. Each call is
+read only for the half it owns, and a call that answered the other half is
+reported rather than merged in.
 
 `facts` runs on the same tier row as `extract`, because it is the extraction
 stage under another order and the comparison needs both on one model. The

@@ -1021,8 +1021,10 @@ class TokenUsage:
   reader cannot tell them apart from the report's own model; this is the field
   that says. It is `null` when the run extracted nothing. Beside it,
   `extraction_strategy` says which *order* that node read in — `graph-first`
-  writes a `SystemModel` in one pass, and `facts-first` writes a Source Fact
-  Bundle that code resolves into one. The two also produce the same shape, so
+  writes a `SystemModel` in one pass, `facts-first` writes a Source Fact Bundle
+  that code resolves into one, and `facts-split` writes that bundle across two
+  calls, one naming what the sources hold and one stating what they say about
+  it. The two also produce the same shape, so
   the same reasoning applies, and it is `null` under the same condition.
 
 - **`usage`** is what the provider reported the call cost, in vendor-neutral

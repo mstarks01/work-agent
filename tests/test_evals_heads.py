@@ -20,8 +20,10 @@ from google.adk.models.base_llm import BaseLlm
 from analysis_service import graph
 from analysis_service.assertions import AssertionRecord
 from analysis_service.deployment import Deployment
-from analysis_service.factbundle import ROLES
+from analysis_service.factbundle import OWNED_BY, ROLES, SourceFactBundle, joined
 from analysis_service.graph import FACTS_FIRST, GRAPH_FIRST, ExtractionStrategy
+from analysis_service.markdown_loader import MarkdownLoader
+from analysis_service.prompts import compose_inventory_prompt, compose_rows_prompt
 from analysis_service.sampling import load_sampling
 from analysis_service.system_model import (
     DataStore,
@@ -36,6 +38,7 @@ from evals.harness.artifact import REPO_ROOT
 from tests.factories import EVAL_MODEL, ScriptedLlm
 from tests.test_deployment import VERTEX_ENV
 from tests.test_evals_modes import scripted_assertions
+from tests.test_facts_route import FRAMEWORKS
 
 
 def role_of(element: Element) -> str:
@@ -238,3 +241,120 @@ class TestRunningIt:
         assert graph.CATALOG_NODE in ran
         assert not ran & LANES
         assert graph.PREPARE_NODE not in ran
+
+
+class TestTheSplitHead:
+    """#1003 arm E: the facts-first order, spread over two calls.
+
+    Its arms move the reading order and the number of calls together, so no
+    comparison between them can say which a difference belongs to. This is the
+    cell that separates them, and what these hold is that it really is that
+    cell: the facts-first order, two model calls, one bundle out.
+    """
+
+    def built(self):
+        env = dict(VERTEX_ENV) | {"ANALYSIS_FACTS_SPLIT_EXTRACTION": "true"}
+        return modes.build_eval_pipeline(
+            graph.ENTRY_HEAD_ONLY,
+            deployment=Deployment.from_env(env=env),
+            resolve_model=lambda tier: ScriptedLlm(
+                model=EVAL_MODEL, reply="{}", seen=[]
+            ),
+            sampling=load_sampling(REPO_ROOT / "config" / "sampling.toml"),
+        )
+
+    def test_it_runs_two_calls_where_one_call_runs_one(self) -> None:
+        pipeline = self.built()
+        calls = set(pipeline.node_models) - {graph.REPAIR_NODE}
+
+        assert calls == {graph.INVENTORY_NODE, graph.ROWS_NODE}
+
+    def test_both_calls_resolve_on_the_extraction_tier(self) -> None:
+        """One tier row for the stage, however the work is divided."""
+        tiers = graph.tier_node_by_graph_node(FRAMEWORKS)
+        assert (
+            tiers[graph.INVENTORY_NODE]
+            == tiers[graph.ROWS_NODE]
+            == tiers[graph.EXTRACT_NODE]
+        )
+
+    def test_it_reads_facts_first(self) -> None:
+        pipeline = self.built()
+        assert pipeline.extraction_strategy == graph.FACTS_SPLIT
+        assert graph.EXTRACT_NODE not in pipeline.node_models
+        assert graph.ASSERT_NODE not in pipeline.node_models
+
+    def test_the_second_call_is_shown_the_first_call_s_inventory(self) -> None:
+        composed = compose_rows_prompt(MarkdownLoader(REPO_ROOT / "prompts"))
+        assert "{inventory}" in composed
+        assert "## The predicates" in composed
+
+    def test_the_first_call_is_told_no_predicate(self) -> None:
+        """It writes no fact, so a table of what a fact may say is text it
+        is paid for and told not to use."""
+        composed = compose_inventory_prompt(MarkdownLoader(REPO_ROOT / "prompts"))
+        assert "## The roles" in composed
+        assert "## The predicates" not in composed
+
+
+class TestTheJoin:
+    """Each call read for the half it owns, and what the other half costs."""
+
+    def bundle(self, **rows) -> SourceFactBundle:
+        return SourceFactBundle.model_validate(rows)
+
+    def mention(self, handle: str) -> dict:
+        return {
+            "handle": handle,
+            "text": "worker",
+            "roles": ["process"],
+            "quotes": [{"source_label": "S", "quote": "a worker"}],
+        }
+
+    def fact(self, handle: str) -> dict:
+        return {
+            "handle": handle,
+            "subject_kind": "mention",
+            "subject": "m1",
+            "predicate": "internet-exposure",
+            "value": "internal",
+            "basis": "stated",
+            "quotes": [{"source_label": "S", "quote": "a worker"}],
+        }
+
+    def test_each_list_comes_from_the_call_that_owns_it(self) -> None:
+        inventory = self.bundle(mentions=[self.mention("m1")])
+        rows = self.bundle(facts=[self.fact("f1")])
+        built, ignored = joined(inventory, rows)
+
+        assert [row.handle for row in built.mentions] == ["m1"]
+        assert [row.handle for row in built.facts] == ["f1"]
+        assert ignored == ()
+
+    def test_a_call_that_answered_the_other_half_is_reported(self) -> None:
+        """A second producer of one list would let a later call restate it."""
+        inventory = self.bundle(
+            mentions=[self.mention("m1")], facts=[self.fact("stray")]
+        )
+        rows = self.bundle(mentions=[self.mention("late")], facts=[self.fact("f1")])
+        built, ignored = joined(inventory, rows)
+
+        assert [row.handle for row in built.mentions] == ["m1"]
+        assert [row.handle for row in built.facts] == ["f1"]
+        assert {row.handle for row in ignored} == {"stray", "late"}
+        assert {row.code for row in ignored} == {"wrong-call"}
+
+    def test_either_call_may_raise_a_question(self) -> None:
+        question = {"handle": "u1", "question": "which queue?"}
+        built, ignored = joined(
+            self.bundle(unresolved=[question]),
+            self.bundle(unresolved=[{**question, "handle": "u2"}]),
+        )
+        assert [row.handle for row in built.unresolved] == ["u1", "u2"]
+        assert ignored == ()
+
+    def test_every_list_is_owned_by_someone(self) -> None:
+        assert set(OWNED_BY) == set(SourceFactBundle.model_fields) - {
+            "bundle_version",
+            "role_version",
+        }

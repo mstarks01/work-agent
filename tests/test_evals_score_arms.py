@@ -69,7 +69,7 @@ class TestTheSpec:
         assert parse_spec(f"{arm}=/tmp/x.json")[0] == arm
 
     @pytest.mark.parametrize(
-        "spec", ("/tmp/a.json", "A=", "E=/tmp/a.json", "A:later=/tmp/a.json")
+        "spec", ("/tmp/a.json", "A=", "Z=/tmp/a.json", "A:later=/tmp/a.json")
     )
     def test_a_spec_this_cannot_read_is_refused(self, spec: str) -> None:
         with pytest.raises(ValueError):
