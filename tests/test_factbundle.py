@@ -454,6 +454,27 @@ class TestPlacement:
         assert (row.disposition, row.code) == ("unresolved", "unplaced-subject")
         assert row in resolution.gaps
 
+    def test_an_unknown_zone_is_a_value_the_catalog_keeps(self) -> None:
+        """ "The sources do not say which zone" is a fact a reference records.
+
+        `_places` reads the sentinel as an epistemic value, and `_referent`
+        reads it the same way: one rule, two sites. Reading it as a zone handle
+        at either one refuses the row as a dangling reference.
+        """
+        bundle = worker_bundle()
+        bundle.facts[0] = bundle.facts[0].model_copy(
+            update={"value": UNKNOWN, "reason": "silent", "quotes": []}
+        )
+
+        resolution = resolved(bundle)
+
+        row = row_for(resolution, bundle.facts[0].handle)
+        assert row.disposition in LANDED, (row.code, row.message)
+        assert any(
+            entry.predicate == "network-membership" and entry.value == UNKNOWN
+            for entry in resolution.record.catalog.entries
+        )
+
     def test_two_zones_and_no_fact_leaves_a_component_unsupported(self) -> None:
         text = "A worker. The core network and the admin network."
         bundle = SourceFactBundle(

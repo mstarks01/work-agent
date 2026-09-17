@@ -46,10 +46,11 @@ holds and marks it ``inferred``. The reference records the same component's zone
 as ``unknown``, so the matcher charges the assertion as a wrong claim — which is
 right, and is the cost the schema imposes on every route.
 
-A **row whose value is the unknown sentinel on a graph-bound predicate** cannot
-be written at all: the resolver reads the value as a zone handle and refuses it
-as ``dangling-value``. Those rows sit outside the primary denominator, and
-:attr:`CaseCharge.inexpressible` counts them.
+A **row the oracle cannot name a subject for** is the only shape left that it
+cannot write: a reference subject no mention of the bundle built, which
+:attr:`CaseCharge.inexpressible` counts. A row whose value is the unknown
+sentinel on a graph-bound predicate is written like any other — the sentinel is
+an epistemic value and the resolver reads it as one.
 
 ## What this instrument cannot see
 
@@ -87,7 +88,6 @@ from analysis_service.assertions import (
     spans_for,
 )
 from analysis_service.factbundle import (
-    GRAPH_REFERENTS,
     FactProposal,
     InteractionProposal,
     MentionProposal,
@@ -388,9 +388,6 @@ def author(case: GoldenCase, reference: SignedReference) -> _Authored:
     for index, entry in enumerate(reference.entries):
         kind = _subject_kind(entry.subject, handles)
         if not kind:
-            inexpressible.append(assertion_id(entry))
-            continue
-        if entry.predicate in GRAPH_REFERENTS and entry.value in (UNKNOWN, ABSENT):
             inexpressible.append(assertion_id(entry))
             continue
         facts.append(_proposal(f"f{index}", kind, entry, handles))
