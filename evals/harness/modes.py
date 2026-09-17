@@ -71,7 +71,9 @@ from analysis_service.graph import (
     ENTRY_ASSERT_ONLY,
     ENTRY_EXTRACT,
     ENTRY_EXTRACT_ONLY,
+    ENTRY_HEAD_ONLY,
     ENTRY_PREPARE,
+    STATE_ASSERTION_CATALOG,
     STATE_ASSERTION_PROPOSAL,
     STATE_EXTRACTED_MODEL,
     STATE_FIRST_PASS,
@@ -1593,6 +1595,45 @@ async def run_assertions(case: GoldenCase, pipeline: Pipeline) -> AssertionResul
     )
 
 
+async def run_heads(case: GoldenCase, pipeline: Pipeline) -> AssertionResult:
+    """Mode 5: run one arm's head over the sources and stop at the catalog.
+
+    **What #1003's primary endpoint is scored on, and nothing else.** The arm
+    extracts its own model — that is the half the arms differ in — and the
+    graph stops at the terminal ``catalog`` node, so no lane agent and no
+    critic is billed for findings the endpoint never reads.
+
+    Nothing is seeded. The assertion mode seeds a blessed model because its
+    question is what the sources state about one; this mode's question is what
+    a whole head recovers, so seeding would answer half of it in advance.
+
+    The catalog is read back rather than resolved here: ``park_catalog`` has
+    already put it through :func:`~analysis_service.graph._resolve_assertions`,
+    the seam every catalog reaches a reader through, and resolving it a second
+    time here would be a second answer to what one proposal came to.
+    """
+    graph_run = await run_graph(
+        pipeline, case.sources, {STATE_FRAMEWORK_OPTIONS: case_framework_options(case)}
+    )
+    state = graph_run.final_state
+    if STATE_ASSERTION_CATALOG not in state:
+        outcome = result_of(state)
+        detail = (
+            _rejection(outcome)
+            if isinstance(outcome, Rejected)
+            else "the head produced no catalog"
+        )
+        raise EvalRunError(f"{case.id}: {detail}")
+    record = AssertionRecord.model_validate(state[STATE_ASSERTION_CATALOG])
+    return AssertionResult(
+        case_id=case.id,
+        proposal=state.get(STATE_ASSERTION_PROPOSAL, {}),
+        catalog=record.catalog,
+        issues=tuple(record.issues),
+        node_runs=tuple(graph_run.node_runs),
+    )
+
+
 def score_assertions(case: GoldenCase, result: AssertionResult) -> AssertionScore:
     """Count what one assertion run produced. Nothing here grades it."""
     catalog = result.catalog
@@ -2212,6 +2253,11 @@ MODE_ENTRIES: dict[str, Entry] = {
     "assertions": ENTRY_ASSERT_ONLY,
     "analysis": ENTRY_PREPARE,
     "end-to-end": ENTRY_EXTRACT,
+    # #1003's arm mode: one arm's head, stopped at the catalog its endpoint is
+    # scored on. It is the end-to-end graph with the lanes left off rather than
+    # a route of its own, so an arm measured here ran the nodes an arm measured
+    # end to end would have run.
+    "heads": ENTRY_HEAD_ONLY,
 }
 
 #: The modes whose graph runs ``extract``, and so the ones whose sweep keeps
@@ -2220,7 +2266,7 @@ MODE_ENTRIES: dict[str, Entry] = {
 EXTRACTING_MODES: frozenset[str] = frozenset(
     mode
     for mode, entry in MODE_ENTRIES.items()
-    if entry in {ENTRY_EXTRACT, ENTRY_EXTRACT_ONLY}
+    if entry in {ENTRY_EXTRACT, ENTRY_EXTRACT_ONLY, ENTRY_HEAD_ONLY}
 )
 
 #: The modes whose graph ends in a :class:`Report`. ``extraction`` stops at the

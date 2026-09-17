@@ -374,8 +374,12 @@ async def _run_mode(
         is decided in the fold below, where ``stopped_before`` is decided too.
         """
         try:
-            if mode == "assertions":
-                resolved = await modes.run_assertions(case, pipeline)
+            if mode in ("assertions", "heads"):
+                resolved = (
+                    await modes.run_assertions(case, pipeline)
+                    if mode == "assertions"
+                    else await modes.run_heads(case, pipeline)
+                )
                 return _CaseOutcome(
                     case=case,
                     executions=tuple(resolved.node_runs),

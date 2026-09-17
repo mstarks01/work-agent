@@ -72,11 +72,11 @@ from analysis_service.errors import ConfigError
 from analysis_service.framework_config import load_frameworks
 from analysis_service.frameworks import validate_packages
 from analysis_service.graph import (
+    CATALOGUING_ENTRIES,
     ENTRY_EXTRACT,
-    ENTRY_EXTRACT_ONLY,
+    EXTRACTING_ENTRIES,
     FACTS_FIRST,
     GRAPH_FIRST,
-    PREPARING_ENTRIES,
     Entry,
     ExtractionStrategy,
     ModelResolver,
@@ -397,7 +397,7 @@ class Deployment:
         entry, which is the one a job pays for twice.
         """
         selection = self.selection(frameworks)
-        extracts = entry in (ENTRY_EXTRACT, ENTRY_EXTRACT_ONLY)
+        extracts = entry in EXTRACTING_ENTRIES
         if resolve_model is None:
             adapters = build_tier_adapters(
                 self.tiers, self.sampling, self.resilience, env=self.env
@@ -429,7 +429,7 @@ class Deployment:
             # strategy it asked for and no appended pass.
             assertions=(
                 self.assertions
-                and entry in PREPARING_ENTRIES
+                and entry in CATALOGUING_ENTRIES
                 and self.extraction_strategy != FACTS_FIRST
             ),
             # The review reads a catalog, so an install that asks for it on a
@@ -439,7 +439,7 @@ class Deployment:
             # keeps a deployment from asking for it.
             source_review=(
                 self.source_review
-                and entry in PREPARING_ENTRIES
+                and entry in CATALOGUING_ENTRIES
                 and (self.assertions or self.extraction_strategy == FACTS_FIRST)
             ),
         )
