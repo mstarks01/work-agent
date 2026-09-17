@@ -89,14 +89,14 @@ class TestTheCeiling:
 class TestWhatTheOracleCannotWrite:
     """The two shapes a bundle cannot carry, each one a finding."""
 
-    def test_an_unknown_graph_reference_is_inexpressible(self, charged) -> None:
-        """A signed row saying the zone is unknown cannot be written at all.
+    def test_every_signed_row_can_be_written(self, charged) -> None:
+        """Nothing a reviewer signed is outside what a bundle can carry.
 
-        The resolver reads a graph-bound value as a handle, so the sentinel is
-        refused as a dangling one. The rows sit outside the primary denominator
-        and are counted rather than hidden.
+        A row saying the zone is unknown is the shape that tests it: the
+        sentinel is an epistemic value and the resolver reads it as one, on a
+        graph-bound predicate as anywhere else.
         """
-        assert sum(len(case.inexpressible) for case in charged)
+        assert not [row for case in charged for row in case.inexpressible]
 
     def test_a_component_no_source_places_needs_an_asserted_zone(self, charged) -> None:
         """The graph requires a zone, so something has to assert one."""
@@ -135,13 +135,12 @@ class TestWhatTheOracleCannotWrite:
 class TestTheSentinelsAreValues:
     """The rule the bundle reads two ways, named where it is tested."""
 
-    @pytest.mark.parametrize("sentinel", (UNKNOWN, ABSENT))
-    def test_a_sentinel_is_never_written_as_a_handle(self, sentinel: str) -> None:
-        """ "Absent" is a value a predicate takes and never the name of a zone.
+    def test_a_sentinel_is_written_on_a_graph_bound_predicate(self) -> None:
+        """ "We do not know which zone" is a fact, and a bundle carries it.
 
-        A row saying the storage is unencrypted carries the sentinel and is
-        written. A row saying the zone is unknown carries it where the resolver
-        reads a handle, so the oracle leaves that row out and counts it.
+        Reading the sentinel as the name of a zone refuses the row as a
+        dangling one, which loses every signed row of that shape — twenty of
+        them across the five signed cases.
         """
         case = next(one for one in load_corpus(CORPUS) if one.id.startswith("01"))
         reference = signed_reference(CORPUS, case)
@@ -151,10 +150,10 @@ class TestTheSentinelsAreValues:
         bound = [
             fact
             for fact in written.bundle.facts
-            if fact.predicate in GRAPH_REFERENTS and fact.value == sentinel
+            if fact.predicate in GRAPH_REFERENTS and fact.value == UNKNOWN
         ]
-        assert not bound
-        assert written.inexpressible
+        assert bound
+        assert not written.inexpressible
 
     def test_a_sentinel_on_an_ordinary_predicate_is_written(self) -> None:
         case = next(one for one in load_corpus(CORPUS) if one.id.startswith("01"))

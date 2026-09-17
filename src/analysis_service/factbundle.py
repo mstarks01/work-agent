@@ -1295,6 +1295,12 @@ def _referent(
     """
     if fact.predicate not in GRAPH_REFERENTS:
         return fact.value, "", ""
+    if fact.value in (UNKNOWN, ABSENT):
+        # An epistemic value, never a handle — the same rule :func:`_places`
+        # reads. "The sources do not say which zone this sits in" is a fact a
+        # reference records and a bundle has to be able to carry; reading the
+        # sentinel as the name of a zone refuses the row as a dangling one.
+        return fact.value, "", ""
     wanted = next(iter(REGISTRY[fact.predicate].refers_to))
     found = _bound(fact.value, zones, zoned, flows)
     if found is None:
