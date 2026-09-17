@@ -810,19 +810,49 @@ class Arm:
 #: The node whose emission each mode archives. An end-to-end sweep keeps the
 #: first pass of the same node the extraction mode does, so it replays under
 #: the same fates; its repair's emission is archived and not graded here.
-NODE_OF: Mapping[str, str] = {
-    "extraction": "extract",
-    "end-to-end": "extract",
-    "assertions": "assert",
+#: Which node's instruction places a sweep on an arm, by mode. A tuple because
+#: one mode's graph can be built two ways: #1003's head-only mode reads its
+#: sources through ``extract`` or through ``facts``, and which of them a sweep
+#: ran is the very thing that separates its arms — so the reader takes whichever
+#: the sweep actually carries and refuses a sweep carrying both.
+NODE_OF: Mapping[str, tuple[str, ...]] = {
+    "extraction": ("extract",),
+    "end-to-end": ("extract",),
+    "assertions": ("assert",),
+    "heads": ("extract", "facts"),
+}
+
+
+#: What each replayable mode keeps beside its artifact, and so which emission a
+#: replay grades. **Apart from** :data:`NODE_OF`, which answers a different
+#: question — which node's instruction places the sweep on an arm. The two gave
+#: one answer only while a mode's reading node and its kept emission moved
+#: together; #1003's head-only mode reads through ``extract`` or ``facts`` and
+#: keeps a catalog either way.
+KEEPS: Mapping[str, str] = {
+    "extraction": "extraction",
+    "end-to-end": "extraction",
+    "assertions": "catalog",
+    "heads": "catalog",
 }
 
 
 def arm_of(artifact: EvalArtifact) -> Arm:
     """Which prompt and which models an archived sweep ran, off its own record."""
-    node = NODE_OF[artifact.mode]
-    digests = {
-        row["sha256"] for row in artifact.block("instruction") if row["node"] == node
-    }
+    rows = artifact.block("instruction")
+    named = [
+        node
+        for node in NODE_OF[artifact.mode]
+        if any(row["node"] == node for row in rows)
+    ]
+    if len(named) != 1:
+        raise ValueError(
+            f"{artifact.path}: the instruction block names {len(named)} of"
+            f" {list(NODE_OF[artifact.mode])}, so the sweep cannot be placed on"
+            " one arm"
+        )
+    node = named[0]
+    digests = {row["sha256"] for row in rows if row["node"] == node}
     if len(digests) != 1:
         raise ValueError(
             f"{artifact.path}: the instruction block names {len(digests)} digests"
