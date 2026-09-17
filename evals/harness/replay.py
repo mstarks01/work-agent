@@ -461,29 +461,36 @@ def unlabelled(subject: str) -> str:
 def aligned_rows(reference: SignedReference, result: AssertionResult) -> frozenset[str]:
     """Reference rows this run stated on the same fact under another flow label.
 
-    **Beside the strict fates, never instead of them.**
-    :func:`replay_assertions` is unchanged and every archived number it produced
-    still stands; this answers the second question #1015 asks — how much of what
-    an arm missed it actually wrote down under a different word for the edge.
+    **Beside the strict fates, never instead of them.** This answers the second
+    question #1015 asks — how much of what an arm missed it actually wrote down
+    under a different word for the edge.
 
     A row counts only where all four identifying parts agree once the flow label
     is set aside: the endpoints, the predicate, the scope and the canonical
     value. Matching on endpoints and predicate alone would credit a row that
     named the same interaction and said the wrong thing about it.
 
+    **One produced row answers one reference row.** Two interactions between one
+    pair of endpoints are two facts — an ordinary request and a WebSocket, each
+    carrying its own transport — and dropping the label makes them one key. A
+    produced row is therefore consumed as it is credited, so a single generic
+    row credits one of them and the rest stay missed. Where two reference rows
+    collapse to one key, the count of credited rows is what this reading means;
+    which of them is named is arbitrary between equals.
+
     Signed aliases apply first, through :func:`under_aliases`, so a reviewer's
     ruling is read before this looser key is.
     """
-    produced = set()
+    produced: Counter[tuple[str, str, str, str]] = Counter()
     for entry in result.catalog.entries:
         aliased = under_aliases(entry, reference)
         try:
             parts = identity_parts(aliased)
         except KeyError:
             continue
-        produced.add(
-            (unlabelled(parts.subject), parts.predicate, parts.scope, parts.value)
-        )
+        produced[
+            unlabelled(parts.subject), parts.predicate, parts.scope, parts.value
+        ] += 1
     found = set()
     for entry in reference.entries:
         try:
@@ -491,7 +498,8 @@ def aligned_rows(reference: SignedReference, result: AssertionResult) -> frozens
         except KeyError:
             continue
         key = (unlabelled(parts.subject), parts.predicate, parts.scope, parts.value)
-        if key in produced:
+        if produced[key]:
+            produced[key] -= 1
             found.add(assertion_id(entry))
     return frozenset(found)
 
@@ -648,6 +656,37 @@ _PREFERENCE: Mapping[AnsweredFate, int] = {
 }
 
 
+def _assigned(
+    entries: Sequence[Assertion], available: Mapping[tuple[str, str], list[Assertion]]
+) -> dict[int, tuple[AnsweredFate, Assertion]]:
+    """Which produced row answers each reference row, by position in ``entries``.
+
+    **Every exact answer is assigned before any approximate one.** The fates run
+    from best to worst, and each pass gives one produced row to every reference
+    row it answers at that level, so a row the run answered exactly cannot lose
+    its answer to an earlier reference row that had a worse use for it. Reading
+    the array once and taking each row's best available candidate makes the
+    score depend on the order the reference happens to list its rows.
+
+    A produced row is removed from ``available`` as it is assigned, so one row
+    answers one reference row. Between two reference rows one candidate answers
+    at the same level, which of them takes it is arbitrary; the count is not.
+    """
+    taken: dict[int, tuple[AnsweredFate, Assertion]] = {}
+    for level in _PREFERRED:
+        for index, ours in enumerate(entries):
+            if index in taken:
+                continue
+            candidates = available[ours.subject, ours.predicate]
+            theirs = next(
+                (one for one in candidates if _row_fate(ours, one) == level), None
+            )
+            if theirs is not None:
+                candidates.remove(theirs)
+                taken[index] = (level, theirs)
+    return taken
+
+
 def replay_assertions(
     case: GoldenCase, reference: SignedReference, result: AssertionResult
 ) -> AssertionReplay:
@@ -656,27 +695,26 @@ def replay_assertions(
     Every produced row is read under the reference's signed aliases first,
     so a principal the model named otherwise, a credential a value points at
     under another name, and a scope spelled another way are compared as the
-    reviewer ruled they should be. The fates are then the plain matcher's.
+    reviewer ruled they should be. The fates are then the plain matcher's,
+    assigned by :func:`_assigned` so that no reference row's exact answer is
+    spent on another row that had only a worse use for it.
     """
     available: dict[tuple[str, str], list[Assertion]] = defaultdict(list)
     for entry in result.catalog.entries:
         aliased = under_aliases(entry, reference)
         available[aliased.subject, aliased.predicate].append(aliased)
+    assigned = _assigned(reference.entries, available)
     rows = []
     answered: dict[str, ProducedFate] = {}
-    for ours in reference.entries:
-        candidates = available[ours.subject, ours.predicate]
-        if not candidates:
+    for index, ours in enumerate(reference.entries):
+        found = assigned.get(index)
+        if found is None:
             unasked = ours.value == UNKNOWN and ours.reason == "silent"
             rows.append(
                 ReferenceRowFate(assertion_id(ours), "silent" if unasked else "omitted")
             )
             continue
-        fate, theirs = min(
-            ((_row_fate(ours, one), one) for one in candidates),
-            key=lambda pair: _PREFERENCE[pair[0]],
-        )
-        candidates.remove(theirs)
+        fate, theirs = found
         taken = assertion_id(theirs)
         answered[taken] = fate
         rows.append(
