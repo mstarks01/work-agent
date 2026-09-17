@@ -2315,8 +2315,8 @@ COMMANDS: dict[str, Command] = {
         run=comparison.command_comparison,
     ),
     "price-arms": Command(
-        help="estimate what each of #1003's extraction arms is given, before"
-        " a run is authorised (no credentials)",
+        help="what each of #1003's extraction arms is given, as a ratio between"
+        " them — not a cost, see input_report (no credentials)",
         run=arms.command_price_arms,
         arguments=arms.price_arguments,
     ),
