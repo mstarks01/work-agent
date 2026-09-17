@@ -16,6 +16,7 @@ import pytest
 
 from analysis_service.assertions import (
     ABSENT,
+    UNKNOWN,
     Assertion,
     AssertionCatalog,
     assertion_id,
@@ -386,6 +387,48 @@ class TestEveryReferenceRowTakesOneFate:
 
         assert graded.produced == {assertion_id(flipped): "wrong_value"}
         assert set(graded.produced.values()) <= replay.ADJUDICATED_WRONG
+
+    def test_an_inferred_answer_to_a_stated_fact_is_not_found(self, golden, reference):
+        """The source states the fact and the run says it worked it out."""
+        row = next(e for e in reference.entries if e.predicate == "storage-encryption")
+        guessed = row.model_copy(
+            update={"basis": "inferred", "explanation": "a guess", "support": []}
+        )
+
+        graded = self.graded(golden, reference, [guessed])
+
+        fate = next(r.fate for r in graded.rows if r.reference == assertion_id(row))
+        assert fate == "wrong_certainty"
+        assert graded.counts["found"] == 0
+
+    def test_dropping_an_exclusivity_the_reference_holds_is_not_found(
+        self, golden, reference
+    ):
+        """ "The only thing we expose" is a claim about every other subject."""
+        row = next(e for e in reference.entries if e.predicate == "storage-encryption")
+        held = row.model_copy(update={"exclusive": True})
+        signed = replay.SignedReference(
+            AssertionCatalog(subjects=reference.subjects, entries=[held])
+        )
+
+        graded = self.graded(golden, signed, [row])
+
+        assert [r.fate for r in graded.rows] == ["wrong_certainty"]
+
+    def test_a_hedged_unknown_answered_as_silent_is_not_found(self, golden, reference):
+        """A question the source raised is not a question it never raised."""
+        row = next(e for e in reference.entries if e.predicate == "storage-encryption")
+        hedged = row.model_copy(
+            update={"value": UNKNOWN, "reason": "hedged", "support": []}
+        )
+        silent = hedged.model_copy(update={"reason": "silent"})
+        signed = replay.SignedReference(
+            AssertionCatalog(subjects=reference.subjects, entries=[hedged])
+        )
+
+        graded = self.graded(golden, signed, [silent])
+
+        assert [r.fate for r in graded.rows] == ["wrong_certainty"]
 
     def test_a_signed_subject_alias_pairs_a_row_named_otherwise(
         self, golden, reference
