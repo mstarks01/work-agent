@@ -1,6 +1,6 @@
 # An OpenRouter response repeats the slug it was asked for (#806)
 
-Probed 2026-09-11 against `litellm==1.97.0`, repo `d16a6c4`, and OpenRouter's
+Probed 2026-09-11 against `litellm==1.97.0`, repo `b9c9be8`, and OpenRouter's
 live API. Produced by `probe_openrouter_served_model.py` in this directory,
 plus two unbilled `GET`s recorded below. Four billed completions of one output
 token each, $0.000105 total.

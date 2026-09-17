@@ -149,11 +149,11 @@ any remote ref:
 
 | Commit | Document |
 | --- | --- |
-| `e3ffd53` | `docs/research/adk-nongemini-adapters.md` (#4) |
-| `42e2192` | `docs/research/litellm-sole-adapter.md` (#8) |
-| `3a1d711` | `docs/research/vendor-sampling-support.md` (#12) |
-| `24047f0` | the `get_optional_params` gate probe (#13) |
-| `47d3c82` | the `reasoning_effort` surface probe (#15) |
+| `4e273ce` | `docs/research/adk-nongemini-adapters.md` (#4) |
+| `d0b5fd4` | `docs/research/litellm-sole-adapter.md` (#8) |
+| `f39d238` | `docs/research/vendor-sampling-support.md` (#12) |
+| `7b795f8` | the `get_optional_params` gate probe (#13) |
+| `267ce78` | the `reasoning_effort` surface probe (#15) |
 
 They survived only because one working copy had not been garbage collected. The
 documents now live in `docs/research/`, restored at their latest content along
