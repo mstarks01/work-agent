@@ -67,9 +67,11 @@ sources state and not everything they do not, so a row outside it is a
 candidate for a ruling and never an error by inference. A row the resolver
 dropped is ``rejected``.
 
-**An unreviewed row is not a wrong one.** :data:`ADJUDICATED` is the only
-denominator a precision figure may use, and the share of rows outside it is
-reported beside that figure as the adjudication coverage.
+**A row no reference row took is not a wrong one.** :data:`ADJUDICATED` is the
+only denominator a precision figure may use, and :data:`UNRULED` — the rows
+outside it — is reported beside that figure as the adjudication coverage. That
+holds for ``misattached`` as much as for ``unreviewed``: it fires where the
+reference is silent on a subject and predicate, and silence is not disagreement.
 
 **A reference an agent drafted grades nothing.** A case whose facts file
 carries an unsigned row is skipped by name, and the skip is printed.
@@ -228,13 +230,26 @@ PRODUCED_FATES: tuple[ProducedFate, ...] = (
     "unreviewed",
 )
 
-#: The produced rows a reviewer's reference rules on, right or wrong. The
-#: denominator of a precision figure, because a row outside it carries no
-#: adjudication and a rate that counted it would move when the reference grew.
-ADJUDICATED: frozenset[str] = frozenset(PRODUCED_FATES) - {"unreviewed"}
+#: The produced rows no reference row took. Both are **leads for a ruling and
+#: never errors**: ``misattached`` says a reference row carries this predicate
+#: and value on another subject, which is a reason to look and not a verdict;
+#: ``unreviewed`` says nothing signed mentions it at all.
+UNRULED: frozenset[str] = frozenset({"misattached", "unreviewed"})
 
-#: The adjudicated rows the reference disagrees with: a wrong value, a wrong
-#: scope, or the right fact on the wrong subject.
+#: The produced rows a reference row took, right or wrong. The denominator of a
+#: precision figure, because a row no reference row took carries no adjudication
+#: and a rate that counted it would move when the reference grew.
+#:
+#: **``misattached`` is outside it.** That fate fires exactly where the
+#: reference holds no row on the produced row's subject and predicate — it is
+#: silence, and a reference lists what the sources state rather than everything
+#: they do not. Over three live arms, 49 of 50 such rows sat on a subject and
+#: predicate the reference says nothing about. Charging them as wrong claims
+#: charges a route for reading more than a reviewer ruled on.
+ADJUDICATED: frozenset[str] = frozenset(PRODUCED_FATES) - UNRULED
+
+#: The rows a reference row took and disagreed with: a wrong value, a wrong
+#: scope, or a value claimed with another force.
 ADJUDICATED_WRONG: frozenset[str] = ADJUDICATED - {"found", "worded"}
 
 

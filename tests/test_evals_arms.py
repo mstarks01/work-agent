@@ -55,7 +55,7 @@ from evals.harness.arms import (
     shown_tokens,
     subject_kind,
     to_json,
-    unreviewed_share,
+    unruled_share,
     write_runs,
     wrong_rate,
 )
@@ -214,15 +214,26 @@ class TestTheEndpoint:
         """An unreviewed row is coverage, never an error."""
         runs = [run("01", "A", 1, 1, matched=3, unreviewed=1)]
         assert wrong_rate(runs, "A") == 0.0
-        assert unreviewed_share(runs, "A") == 0.25
+        assert unruled_share(runs, "A") == 0.25
         assert wrong_rate(runs, "B") == 0.0
-        assert unreviewed_share(runs, "B") == 0.0
+        assert unruled_share(runs, "B") == 0.0
 
     def test_the_wrong_rate_counts_what_the_reference_disagrees_with(self) -> None:
         """A row the reference took at the wrong value is a wrong claim."""
-        runs = [run("01", "A", 1, 1, matched=1, wrong_value=2, misattached=1)]
-        assert wrong_rate(runs, "A") == 0.75
-        assert unreviewed_share(runs, "A") == 0.0
+        runs = [run("01", "A", 1, 1, matched=1, wrong_value=2)]
+        assert wrong_rate(runs, "A") == 2 / 3
+        assert unruled_share(runs, "A") == 0.0
+
+    def test_a_misattached_row_is_a_lead_and_never_a_wrong_claim(self) -> None:
+        """It fires where the reference is silent, and silence is not disagreement.
+
+        The fate says a reference row carries this predicate and value on
+        another subject. Over three live arms, 49 of 50 such rows sat on a
+        subject and predicate the reference says nothing about.
+        """
+        runs = [run("01", "A", 1, 1, matched=1, wrong_value=1, misattached=8)]
+        assert wrong_rate(runs, "A") == 0.5
+        assert unruled_share(runs, "A") == 0.8
 
 
 class TestTheInterval:
