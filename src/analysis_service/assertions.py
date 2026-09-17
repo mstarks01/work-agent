@@ -84,6 +84,7 @@ from analysis_service.sources import text_digest
 from analysis_service.system_model import (
     ELEMENT_ID,
     UNKNOWN,
+    Assumption,
     DataFlow,
     Element,
     SystemModel,
@@ -91,6 +92,7 @@ from analysis_service.system_model import (
     ZonedElement,
     normalize_name,
 )
+from analysis_service.validation import validate
 
 __all__ = [
     "ABSENT",
@@ -104,6 +106,7 @@ __all__ = [
     "PROJECTION_VERSION",
     "REGISTRY",
     "REGISTRY_VERSION",
+    "SETTLING_REASONS",
     "UNIVERSAL_TERMS",
     "UNPROJECTED",
     "Answer",
@@ -130,6 +133,7 @@ __all__ = [
     "SupportSpan",
     "UnknownReason",
     "answer",
+    "apply_projection",
     "assertion_id",
     "catalog_issues",
     "conflicts",
@@ -152,7 +156,9 @@ __all__ = [
 #: whenever a predicate is added, removed, re-spelled, or has its value
 #: vocabulary, scope requirement or multiplicity changed — each of those
 #: changes what a row means, and a reader comparing two runs has to know.
-REGISTRY_VERSION = 2
+#:
+#: Version 3 adds ``represented-by``.
+REGISTRY_VERSION = 3
 
 #: The projection's version: which graph attribute each predicate is
 #: authoritative for, and what :func:`project` does when the rows do not fit one
@@ -315,6 +321,18 @@ class Predicate:
     requires: tuple[str, ...] = ()
     multiplicity: Multiplicity = "one"
     projects_into: str = ""
+    #: Whether the sources must *state* this predicate's value, so an inference
+    #: is refused rather than recorded.
+    #:
+    #: **For a predicate whose value is an identification.** Most predicates
+    #: describe a subject, and this service inferring one is a conclusion a
+    #: reader can weigh by its ``basis``. A predicate that says *this subject
+    #: is that element* is different: a wrong one does not produce a weak
+    #: fact, it moves every fact about the subject onto the wrong element, and
+    #: a reader has no way to see that it moved. A ``stated`` row with a real
+    #: value already needs a span the gate verifies against the source text,
+    #: so requiring the basis is what puts the identification behind a quote.
+    stated_only: bool = False
 
     def admits(self, value: str, known_subjects: Collection[str]) -> bool:
         """Whether ``value`` is legal for this predicate.
@@ -444,6 +462,20 @@ REGISTRY: Mapping[str, Predicate] = MappingProxyType(
             subjects=frozenset({"component", "zone"}),
             value="reference",
             refers_to=frozenset({"principal"}),
+        ),
+        # The one predicate that says a subject *is* an element rather than
+        # describing one. It is what lets a fact about a class of accounts
+        # reach a rule, which reads elements and nothing else. `stated_only`,
+        # because an identification this service guessed would move every fact
+        # about that principal onto the wrong element with nothing to show it
+        # had moved.
+        "represented-by": Predicate(
+            meaning="which element of the model stands for this principal,"
+            " where the sources say the two are the same thing",
+            subjects=frozenset({"principal"}),
+            value="reference",
+            refers_to=frozenset({"component"}),
+            stated_only=True,
         ),
     }
 )
@@ -601,6 +633,9 @@ CatalogIssueCode = Literal[
     "unverifiable-span",
     "ambiguous-span",
     "unassessed-assessor",
+    # A predicate whose value identifies rather than describes, carrying a
+    # value this service inferred. See `Predicate.stated_only`.
+    "inference-refused",
     # Not a refused row. The row stands and stays citable; this says the graph
     # attribute beside it states the opposite, which is the defect this layer
     # was built to make visible rather than one to drop a fact over.
@@ -1219,6 +1254,12 @@ def _entry_issues(
     # when the sources do not answer. A `hedged` unknown may still carry the
     # words somebody hedged with, which is why the span is optional rather than
     # refused.
+    if predicate.stated_only and entry.basis not in ("stated", "legacy"):
+        refuse(
+            "inference-refused",
+            f"{entry.predicate!r} says which element a subject is, so the"
+            f" sources have to state it; this row's basis is {entry.basis!r}",
+        )
     if entry.basis == "stated" and entry.value != UNKNOWN and not entry.support:
         refuse(
             "unsupported-assertion",
@@ -2018,6 +2059,99 @@ def contradiction_issues(
         )
         for found in contradictions(catalog, model)
     ]
+
+
+#: The projection reasons under which a projected value replaces the graph's
+#: own. Both are the catalog answering: the sources stated the value, or stated
+#: that the control is not there.
+#:
+#: **Every other reason declines, and a decline leaves the attribute alone.**
+#: :func:`project` writes ``unknown`` when the rows do not fit one string —
+#: a conflict, two values, two predicates, a scoped value, a row set aside.
+#: Writing that ``unknown`` into the graph would erase what extraction stated
+#: and put nothing in its place. Measured over the archived assertion sweeps:
+#: applying every projection would have replaced 55 stated attributes with
+#: ``unknown``, against 7 it corrected. Applying only these two corrects the 7
+#: and erases none.
+SETTLING_REASONS: frozenset[str] = frozenset({"stated", "absent"})
+
+
+def apply_projection(
+    model: SystemModel, catalog: AssertionCatalog
+) -> tuple[SystemModel, tuple[Projection, ...]]:
+    """The model with each settled projection written into its attribute.
+
+    **The migration ADR 0034 defers to Phase 4, taken one reader at a time.**
+    The catalog becomes authoritative for a migrated fact and the element
+    attribute becomes a value code computes — but only where the catalog
+    actually answers. Where :func:`project` declines, the attribute extraction
+    wrote stands and the rows stay in the catalog for a reader to see.
+
+    Returns the model and the projections that were applied, so a caller can
+    record what moved rather than diff two models to find out.
+
+    **An applied projection whose rows are inferred writes an Assumption.** An
+    :class:`~analysis_service.system_model.Assumption` is the record of a value
+    this service inferred into a graph attribute, and a projection resting on
+    an ``inferred`` row is exactly that. Without the entry the model would
+    carry an inference with nothing naming it, which is the state the gate
+    refuses for every other inferred attribute.
+
+    Measured, over every archived assertion sweep: 210 settled projections
+    already agreed with the blessed model, 7 disagreed, and every one of the 7
+    was the catalog reading a stated absence where the graph read ``unknown``.
+    That is the substitution this layer exists to remove, and it is the whole
+    of what this function changes.
+    """
+    applied = tuple(
+        projection
+        for projection in project(catalog)
+        if projection.reason in SETTLING_REASONS
+    )
+    if not applied:
+        return model, ()
+    updated = _projected_model(model, catalog, applied)
+    # **Fail closed on the model, not on the rows.** A projected ``trust_zone``
+    # is a reference, and a row naming a zone this model does not hold would
+    # leave a dangling endpoint that ``boundary_crossings`` refuses — after
+    # every consumer downstream has been handed the model. So the result is put
+    # back through the shared gate, and a model the gate refuses is discarded
+    # whole: the graph keeps what extraction wrote and the rows stay in the
+    # catalog, which is the state this function exists to improve on rather
+    # than a state it may leave worse.
+    if validate(updated):
+        return model, ()
+    return updated, applied
+
+
+def _projected_model(
+    model: SystemModel, catalog: AssertionCatalog, applied: tuple[Projection, ...]
+) -> SystemModel:
+    """``model`` with each applied projection written in, before the gate sees it."""
+    updated = model.model_copy(deep=True)
+    elements = {element.id: element for element in updated.elements()}
+    rows = {assertion_id(entry): entry for entry in catalog.entries}
+    for projection in applied:
+        element = elements.get(projection.element_id)
+        if element is None or not hasattr(element, projection.attribute):
+            continue
+        setattr(element, projection.attribute, projection.value)
+        bases = {rows[ref].basis for ref in projection.rows if ref in rows}
+        if "inferred" in bases and not any(
+            entry.element_id == projection.element_id
+            and entry.attribute == projection.attribute
+            for entry in updated.assumptions
+        ):
+            updated.assumptions.append(
+                Assumption(
+                    assumption=f"{projection.attribute} is {projection.value}",
+                    element_id=projection.element_id,
+                    attribute=projection.attribute,
+                    basis="inferred by the assertion pass from the sources"
+                    f" ({', '.join(sorted(projection.rows))})"[:1000],
+                )
+            )
+    return updated
 
 
 def _attributes_of(element_id: str) -> frozenset[str]:

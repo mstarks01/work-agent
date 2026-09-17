@@ -291,6 +291,13 @@ GROUNDS: dict[str, Ground] = {
         kind="assertion",
         assertion="assertion:mfa-requirement~principal:shoppers~any~absent",
     ),
+    # The same row left open. It digests apart from the one above because the
+    # kind is part of the entry: a claim re-argued after the sources answered
+    # the question is not the claim that rested on the question.
+    "unknown-assertion": Ground(
+        kind="unknown-assertion",
+        assertion="assertion:mfa-requirement~principal:shoppers~any~unknown",
+    ),
 }
 
 

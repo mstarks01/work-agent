@@ -130,6 +130,7 @@ from analysis_service.assertions import (
     AssertionCatalog,
     AssertionRecord,
     CatalogProposal,
+    apply_projection,
 )
 from analysis_service.basis import unbased_controls
 from analysis_service.candidates import generate_candidates
@@ -1457,10 +1458,21 @@ def prepare_analysis(
     nothing.
     """
     model = SystemModel.model_validate(valid_model)
-    crossings = model.boundary_crossings()
     state = keys.state(ctx)
     record = _resolve_assertions(state, model) if assertions else None
     held = None if record is None else record.catalog
+    if held is not None:
+        # ADR 0034's migration, applied where the catalog answers. The model
+        # every consumer reads from here on is the projected one, and it is put
+        # back on ``STATE_VALID_MODEL`` so the lane agents' model, the report's
+        # embedded model and the model a ground resolves against stay one
+        # value. A zone predicate projects into ``trust_zone``, so the
+        # crossings below are derived after this and never before.
+        model, projected = apply_projection(model, held)
+        if projected:
+            valid_model = model.model_dump(mode="json")
+            state.put(STATE_VALID_MODEL, valid_model)
+    crossings = model.boundary_crossings()
     catalog = evidence_catalog(model, held)
     packs = select_domain_packs(model)
 

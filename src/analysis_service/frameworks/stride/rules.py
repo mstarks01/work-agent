@@ -55,7 +55,12 @@ from analysis_service.analysis import (
     sensitive_assets,
     zone_kinds,
 )
-from analysis_service.assertions import ABSENT, AssertionCatalog, answer
+from analysis_service.assertions import (
+    ABSENT,
+    Assertion,
+    AssertionCatalog,
+    answer,
+)
 from analysis_service.candidates import Match, Rule, clip_fact
 from analysis_service.system_model import SystemModel
 
@@ -155,16 +160,18 @@ def _second_factor_stated_absent(
     facts: what the source stated and what this service inferred are different
     leads, and the agent sees which it has.
 
-    **It fires only where the subject is a flow.** ``mfa-requirement`` also
-    takes a principal, and a principal is not an element, so a row about one
-    reaches no candidate — a candidate names elements. That is the measured
-    common case rather than an edge: over 15 archived proposal/graph pairs, 15
-    of 18 MFA rows sat on the principal ``shopper accounts`` and 3 on a flow.
-    Placing the other 15 needs a ruling that aligns a principal to an entity,
-    which is a separate change to the resolver and not a branch here.
+    **A row about a principal reaches the flows that principal originates.**
+    ``mfa-requirement`` takes a principal as well as an interaction, and over
+    15 archived proposal/graph pairs 15 of 18 rows sat on the principal
+    ``shopper accounts`` against 3 on a flow. A candidate names elements, so
+    such a row reached nothing until the catalog could say which element the
+    principal *is*: a settled ``represented-by``, which the sources must state
+    rather than this service infer. The lead then lands on every flow out of
+    that element, because that is where a single factor is presented.
     """
     for flow in model.data_flows:
-        held = answer(catalog, flow.id, "mfa-requirement").holding(ABSENT)
+        stated_on = answer(catalog, flow.id, "mfa-requirement").holding(ABSENT)
+        held = stated_on or _principal_absence(catalog, flow.source)
         if not held:
             continue
         yield (
@@ -174,8 +181,33 @@ def _second_factor_stated_absent(
                 "authentication_state": control_state(flow.authentication),
                 "second_factor": ABSENT,
                 "second_factor_basis": held[0].basis,
+                "second_factor_subject": "interaction" if stated_on else "principal",
             },
         )
+
+
+def _principal_absence(
+    catalog: AssertionCatalog, element_id: str
+) -> tuple[Assertion, ...]:
+    """Rows saying a principal this element stands for needs no second factor.
+
+    The identification is read from the catalog and never guessed here: a
+    principal reaches an element only through a settled ``represented-by``,
+    whose own gate rule refuses a basis this service inferred. So a wrong lead
+    needs a source that states the wrong thing, rather than a rule that decided
+    two names looked alike.
+    """
+    return tuple(
+        row
+        for subject in catalog.subjects
+        if subject.type == "principal"
+        and element_id
+        in {
+            entry.value
+            for entry in answer(catalog, subject.id, "represented-by").settled
+        }
+        for row in answer(catalog, subject.id, "mfa-requirement").holding(ABSENT)
+    )
 
 
 # --- Tampering --------------------------------------------------------------
