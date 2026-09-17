@@ -62,11 +62,16 @@ EXTRACT_FACTS_PROMPT_NAME = "extract-facts"
 #: they are asked to write. See :mod:`analysis_service.compact`.
 EXTRACT_COMPACT_PROMPT_NAME = "extract-compact"
 REPAIR_PROMPT_NAME = "repair"
+#: The source-driven review body (#1003 arms C and D). It reads the sources
+#: against artifacts already built from them and proposes typed operations; see
+#: :mod:`analysis_service.patch` for what an operation may do.
+REREAD_PROMPT_NAME = "reread"
 ASSERT_PROMPT_NAME = "assert"
 PROMPT_BODY_NAMES: tuple[str, ...] = (
     EXTRACT_PROMPT_NAME,
     EXTRACT_FACTS_PROMPT_NAME,
     REPAIR_PROMPT_NAME,
+    REREAD_PROMPT_NAME,
     ASSERT_PROMPT_NAME,
     ANALYZE_PROMPT_NAME,
     CRITIC_PROMPT_NAME,
@@ -191,6 +196,18 @@ def compose_facts_prompt(loader: MarkdownLoader) -> str:
 def compose_repair_prompt(loader: MarkdownLoader) -> str:
     """The one-shot repair prompt: validator issues plus the original input."""
     return loader.load(REPAIR_PROMPT_NAME).strip() + "\n"
+
+
+def compose_reread_prompt(loader: MarkdownLoader) -> str:
+    """The reread prompt: the body, then the roles, then the predicates.
+
+    The same two rendered tables the facts-first prompt carries, because an
+    operation that adds an element names a role and one that adds a statement
+    names a predicate. Rendered rather than restated, so a role or a predicate
+    added tomorrow reaches both prompts and neither file moves.
+    """
+    parts = [loader.load(REREAD_PROMPT_NAME), render_roles(), render_predicates()]
+    return "\n\n".join(part.strip() for part in parts) + "\n"
 
 
 def compose_assert_prompt(loader: MarkdownLoader) -> str:

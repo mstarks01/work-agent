@@ -24,7 +24,8 @@ flowchart TD
     repair --> revalidate{{revalidate}}
     revalidate -- valid --> assert
     revalidate -- invalid --> reject([rejected])
-    assert --> prepare[prepare]
+    assert --> reread["reread<br/>(base, ANALYSIS_SOURCE_REVIEW)"]
+    reread --> prepare[prepare]
 
     prepare --> analyze["lane agents, in parallel<br/>one per lane of each framework<br/>(strong)"]
     analyze --> merge["merge<br/>(per framework)"]
@@ -233,6 +234,34 @@ same report. The pass is off by default, and a report built without it carries
 | Variable | Effect |
 | --- | --- |
 | `ANALYSIS_ASSERTIONS` | Run the assertion pass on every job. Off by default. |
+
+## The source review
+
+`ANALYSIS_SOURCE_REVIEW` puts a bounded repair pass between the catalog and
+`prepare`. `reading` renders the model and every recorded statement, `reread`
+reads the sources once more against them and proposes typed operations — add an
+element, add an interaction, add a statement, retract one, or mark a question
+open — and `apply` applies the batch or discards it whole. A correction is a
+retraction and an addition, because a statement's identity is computed from its
+own parts.
+
+Nothing lands on a stale reading. Every operation names what it assumes about
+the artifacts it was written against, an operation that reaches a refused one is
+refused with it, and a batch whose result fails the validity or catalog gate is
+discarded entirely, with the artifacts the pass was shown left standing. The
+outcomes say which happened.
+
+The pass reads a catalog, so it needs a route that produces one — either
+`ANALYSIS_ASSERTIONS` or `ANALYSIS_FACTS_FIRST_EXTRACTION`. One pass serves
+both, on purpose: it is the same three nodes over either head, so a comparison
+between them measures the extraction order and never two applicators.
+
+This is an experiment ([#1003](https://github.com/mstarks01/work-agent/issues/1003)),
+disabled by default and unmeasured.
+
+| Variable | Effect |
+| --- | --- |
+| `ANALYSIS_SOURCE_REVIEW` | Read the sources once more and patch what they support. Off by default. |
 
 ## Models
 

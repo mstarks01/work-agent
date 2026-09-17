@@ -62,7 +62,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Collection, Mapping
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Literal, NamedTuple, get_args
@@ -721,11 +721,39 @@ class AssertionRecord(BaseModel):
         is where that contract meets real model output.
         """
         catalog, issues = resolve_catalog(proposal, model, sources)
-        issues = [*issues, *catalog_issues(catalog, model=model, sources=sources)]
-        return cls(
+        return cls.over(
+            catalog,
+            model,
+            sources,
             proposed=len(proposal.assertions),
+            issues=issues,
+        )
+
+    @classmethod
+    def over(
+        cls,
+        catalog: AssertionCatalog,
+        model: SystemModel,
+        sources: Mapping[str, str],
+        *,
+        proposed: int,
+        issues: Sequence[CatalogIssue] = (),
+    ) -> AssertionRecord:
+        """One record over a catalog something else built, with the gate run on it.
+
+        **The way a catalog nobody resolved here still answers the gate.** The
+        patch applicator merges rows into a catalog and #1003's review route
+        hands one to ``prepare``; each reaches a lane through this, so a catalog
+        an agent selects from answered the same rules whichever code built it.
+
+        ``issues`` is what its builder already refused, kept in front of what
+        the gate says now, so a reader sees a row lost in construction apart
+        from a fault in what was built.
+        """
+        return cls(
+            proposed=proposed,
             catalog=catalog,
-            issues=[*issues, *contradiction_issues(catalog, model)],
+            issues=[*issues, *gate_issues(catalog, model, sources)],
         )
 
 
@@ -925,6 +953,25 @@ def spans_for(quote: str, prepared: SpanSource) -> tuple[SupportSpan, ...]:
         )
         for fragment, span in zip(fragments(quote), located, strict=True)
     )
+
+
+def gate_issues(
+    catalog: AssertionCatalog, model: SystemModel, sources: Mapping[str, str]
+) -> list[CatalogIssue]:
+    """Everything the gate says about one catalog and the graph beside it.
+
+    **The one reader of "does this catalog pass".**
+    :meth:`AssertionRecord.over` runs it on what a resolver built and
+    :mod:`analysis_service.patch` runs it on what a batch produced, so two
+    catalogs reaching one lane answered one set of rules. The two halves are
+    different questions — :func:`catalog_issues` reads the rows, and
+    :func:`contradiction_issues` reads them against the graph's own attributes
+    — and a caller that wants only one asks for it by name.
+    """
+    return [
+        *catalog_issues(catalog, model=model, sources=sources),
+        *contradiction_issues(catalog, model),
+    ]
 
 
 def merged(held: AssertionCatalog, found: AssertionCatalog) -> AssertionCatalog:
