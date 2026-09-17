@@ -85,6 +85,13 @@ TOKEN_CAPS: dict[str, int] = {
     # against rules it was never given — the defect the audit is about, in the
     # contract rather than in the code.
     "prompts/extract": 3600,
+    # The facts-first body (#1003 arm B). It carries the reading rules a second
+    # time rather than appending to `extract.md`, because the two routes read
+    # the same sources and write different things: one emits a System Model and
+    # one emits handles, so there is no shared body for a delta to ride on. The
+    # role and predicate tables beside it are rendered from `factbundle.ROLES`
+    # and `assertions.REGISTRY`, so neither moves this number.
+    "prompts/extract-facts": 2600,
     # The compact transport's delta, appended after the body above. It is the
     # whole cost of the route on the input side, paid on every extraction call
     # and cacheable, against the output it removes — see

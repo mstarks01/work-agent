@@ -1019,7 +1019,11 @@ class TokenUsage:
   `extraction_format` — which transport `extract` wrote in, `full` or
   `compact-v4`. The two produce the same `SystemModel` by construction, so a
   reader cannot tell them apart from the report's own model; this is the field
-  that says. It is `null` when the run extracted nothing.
+  that says. It is `null` when the run extracted nothing. Beside it,
+  `extraction_strategy` says which *order* that node read in — `graph-first`
+  writes a `SystemModel` in one pass, and `facts-first` writes a Source Fact
+  Bundle that code resolves into one. The two also produce the same shape, so
+  the same reasoning applies, and it is `null` under the same condition.
 
 - **`usage`** is what the provider reported the call cost, in vendor-neutral
   field names. `null` for code-only nodes, and for any LLM node whose provider

@@ -561,6 +561,14 @@ class ExecutionEnvelope(BaseModel):
     seeded a model instead. It is outside the fingerprint because the two routes
     read different composed instructions, so ``instruction_sha256`` already
     tells them apart.
+
+    ``extraction_strategy`` is the order that node read in: ``graph-first``
+    emits a System Model in one pass, and ``facts-first`` (#1003 arm B) emits a
+    **Source Fact Bundle** that code resolves into one. It is recorded for the
+    reason the transport is — the two produce the same shape, so a reader who
+    inferred the route from the embedded model would find them identical — and
+    it is outside the fingerprint for the same reason too. ``None`` means the
+    run extracted nothing.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -571,6 +579,7 @@ class ExecutionEnvelope(BaseModel):
         "shared"
     )
     extraction_format: Literal["full", "compact-v4"] | None = "full"
+    extraction_strategy: Literal["graph-first", "facts-first"] | None = "graph-first"
 
 
 class ModelRepair(BaseModel):
