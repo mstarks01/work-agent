@@ -79,6 +79,7 @@ from evals.harness import (
     queue,
     replay,
     roster,
+    score_arms,
     standings,
     submit,
     verb_pricing,
@@ -2317,6 +2318,12 @@ COMMANDS: dict[str, Command] = {
         " a run is authorised (no credentials)",
         run=arms.command_price_arms,
         arguments=arms.price_arguments,
+    ),
+    "score-arms": Command(
+        help="replay #1003's archived arm sweeps into the runs file the"
+        " comparison reads (no credentials)",
+        run=score_arms.command_score_arms,
+        arguments=score_arms.arguments,
     ),
     "compare-arms": Command(
         help="recompute #1003's extraction-arm comparison from a saved runs"
