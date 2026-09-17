@@ -373,22 +373,51 @@ class UnresolvedProposal(BaseModel):
     quotes: list[QuoteProposal] = Field(default_factory=list, max_length=MAX_SPANS)
 
 
-class SourceFactBundle(BaseModel):
+class _BundleRows(BaseModel):
+    """The four tables a reading writes, shared by the emission and the bundle."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    mentions: list[MentionProposal] = Field(default_factory=list)
+    interactions: list[InteractionProposal] = Field(default_factory=list)
+    facts: list[FactProposal] = Field(default_factory=list)
+    unresolved: list[UnresolvedProposal] = Field(default_factory=list)
+
+
+class SourceFactBundle(_BundleRows):
     """What the sources state, in local handles, with no graph in sight.
 
     The stage that writes it is shown the labelled sources and this vocabulary,
     and nothing else: no reference graph, no expected facts, no aliases, no
     case identifier.
+
+    The two versions are code's, stamped by default. A node emits
+    :class:`EmittedFactBundle`, which carries neither.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     bundle_version: int = Field(default=BUNDLE_VERSION, ge=1)
     role_version: int = Field(default=ROLE_VERSION, ge=1)
-    mentions: list[MentionProposal] = Field(default_factory=list)
-    interactions: list[InteractionProposal] = Field(default_factory=list)
-    facts: list[FactProposal] = Field(default_factory=list)
-    unresolved: list[UnresolvedProposal] = Field(default_factory=list)
+
+
+class EmittedFactBundle(_BundleRows):
+    """What a reading node is asked to write: the rows, and no version.
+
+    **A schema's version is code's statement about the shape it wrote, and
+    never a fact a model reads out of a source.** A node whose output schema
+    carries the field invites a model to guess one, and a resolver that fails
+    closed on the guess drops every row of the whole route the day the version
+    moves — the rows arrive well formed and the bundle is refused entire.
+
+    So the nodes emit this, and :class:`SourceFactBundle` stamps the current
+    version by default when the emission is validated into it.
+    :func:`_version_issue` still guards an artifact that carries a version of
+    its own, which is what that check is for: reading a bundle somebody saved
+    under another spelling.
+    """
+
+    model_config = ConfigDict(extra="forbid")
 
 
 # --- What the resolver answers ----------------------------------------------

@@ -20,6 +20,7 @@ from analysis_service.binding import NodeBinding
 from analysis_service.compact import COMPACT_FORMAT
 from analysis_service.deployment import FACTS_FIRST_EXTRACTION_VAR, Deployment
 from analysis_service.factbundle import (
+    EmittedFactBundle,
     FactProposal,
     MentionProposal,
     SourceFactBundle,
@@ -110,7 +111,9 @@ class TestTheBuiltGraph:
         assert graph.FACTS_NODE in nodes
         assert graph.RESOLVE_NODE in nodes
         assert graph.EXTRACT_NODE not in nodes
-        assert nodes[graph.FACTS_NODE].output_schema is SourceFactBundle
+        # The emission, not the bundle: a model is asked for rows and never
+        # for the schema's own version.
+        assert nodes[graph.FACTS_NODE].output_schema is EmittedFactBundle
         # The same gate, the same bounded repair and the same rejection.
         for name in (graph.VALIDATE_NODE, graph.REPAIR_NODE, graph.REJECT_NODE):
             assert name in nodes

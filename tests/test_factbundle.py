@@ -42,6 +42,7 @@ from analysis_service.factbundle import (
     ROLES,
     ZONE_ROLES,
     DispositionCode,
+    EmittedFactBundle,
     FactProposal,
     InteractionProposal,
     MentionProposal,
@@ -181,6 +182,40 @@ class TestVocabulary:
 
     def test_a_bundle_defaults_to_the_current_spelling(self) -> None:
         assert SourceFactBundle().bundle_version == BUNDLE_VERSION
+
+
+class TestWhatANodeIsAskedFor:
+    """A model writes rows. The schema's version is code's."""
+
+    def test_the_emission_schema_carries_no_version(self) -> None:
+        """A model that guesses a version breaks the route the day it moves.
+
+        The rows arrive well formed and `_version_issue` refuses the bundle
+        entire, so every row of the whole route is lost to a field no source
+        states.
+        """
+        emitted = set(EmittedFactBundle.model_json_schema()["properties"])
+        assert "bundle_version" not in emitted
+        assert "role_version" not in emitted
+
+    def test_an_emission_validates_into_a_bundle_at_the_current_version(
+        self,
+    ) -> None:
+        emitted = EmittedFactBundle.model_validate(
+            worker_bundle().model_dump(exclude={"bundle_version", "role_version"})
+        )
+        bundle = SourceFactBundle.model_validate(emitted.model_dump())
+        assert bundle.bundle_version == BUNDLE_VERSION
+        assert bundle.role_version == ROLE_VERSION
+        assert resolved(bundle).record.catalog.entries
+
+    def test_the_emission_and_the_bundle_carry_the_same_rows(self) -> None:
+        """One definition of the four tables, so neither can gain a row alone."""
+        rows = set(EmittedFactBundle.model_fields)
+        assert rows == set(SourceFactBundle.model_fields) - {
+            "bundle_version",
+            "role_version",
+        }
 
 
 class TestCitations:
