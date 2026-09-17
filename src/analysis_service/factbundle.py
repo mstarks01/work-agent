@@ -1,0 +1,1205 @@
+"""The **Source Fact Bundle**: what the sources state, before any graph ID exists.
+
+The prototype half of #1003's arm B. Today's extraction reads the sources and
+emits a **System Model** in one step, so every fact it keeps has to fit a node
+the same pass invented, and the assertion pass then reads that graph and cannot
+introduce a component the graph left out. This module is the other order: a
+stage names what the sources say in **local handles**, and code resolves those
+handles into canonical IDs afterwards.
+
+Nothing here runs in production. ``build_pipeline`` has no route to it and
+there is no prompt for it yet: this is the schema and the resolver a route will
+call, so #1003's offline acceptance tests run before any paid model does. The
+names are experimental interfaces, and :data:`BUNDLE_VERSION` says which
+spelling an artifact was written under.
+
+**The resolver constructs, and every input row gets a
+:class:`DispositionRow`.** That is the contract the experiment measures
+against: a fact that disappears between the bundle, the graph and the catalog
+is a loss nobody can attribute, so a row reaching no output says which of the
+five dispositions it took and why. :attr:`Resolution.gaps` is the sidecar that
+carries them, outside the graph, because the System Model has no field for a
+fact it could not hold.
+
+Three rules decide the hard cases, and each one refuses rather than guesses.
+
+**A mention with more than one role stays unresolved.** Competing referents are
+preserved, never settled by array order: the bundle stage may decide
+coreference, and where it declined, code does not decide for it.
+
+**A component with no stated placement is placed only where the bundle names
+exactly one zone**, and that placement is recorded as an
+:class:`~analysis_service.system_model.Assumption` on ``trust_zone`` — the
+convention ``prompts/extract.md`` rule 6 already uses for a required field the
+sources do not state, and the one
+:class:`~analysis_service.system_model.BoundaryCrossing` reads to mark an
+inferred endpoint. Every other unplaced component is ``unsupported``.
+
+**The resolver invents no Trust Boundary.** Where the bundle names no zone at
+all, the model holds none and
+:func:`~analysis_service.validation.validate` refuses it with
+``no-trust-zones`` — visibly, through the gate every arm shares. Naming the one
+zone that covers the system as described is the extraction stage's job, because
+only that stage holds a source span to cite for it.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Collection, Mapping, Sequence
+from dataclasses import dataclass
+from types import MappingProxyType
+from typing import Literal, get_args, get_origin
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from analysis_service.assertions import (
+    GRAPH_BOUND,
+    MAX_ASSERTIONS,
+    MAX_QUALIFIERS,
+    MAX_SPANS,
+    MAX_VALUE_CHARS,
+    REGISTRY,
+    UNPROJECTED,
+    AssertionCatalog,
+    AssertionProposal,
+    Basis,
+    CatalogIssueCode,
+    CatalogProposal,
+    Qualifier,
+    QuoteProposal,
+    SpanSource,
+    SubjectType,
+    UnknownReason,
+    ambiguous_quote,
+    resolve_catalog,
+    span_source,
+    spans_for,
+)
+from analysis_service.system_model import (
+    UNKNOWN,
+    Assumption,
+    DataFlow,
+    DataStore,
+    Element,
+    ExternalEntity,
+    Process,
+    SystemModel,
+    TrustBoundary,
+    ZonedElement,
+    make_element_id,
+    make_flow_id,
+)
+from analysis_service.validation import MAX_ELEMENTS
+
+#: The bundle schema's own version, recorded beside any artifact written from
+#: it. Not the **Claim** identity version and not
+#: :data:`~analysis_service.system_model.FLOW_ID_VERSION`: those rule what an
+#: ID means, and this rules what a bundle row may carry.
+BUNDLE_VERSION = 1
+
+#: The structural vocabulary's version, apart from :data:`BUNDLE_VERSION`
+#: because a role added to :data:`ROLES` changes what a bundle can say without
+#: changing the shape it says it in.
+ROLE_VERSION = 1
+
+#: What a local handle may be spelled as. Short, because it is a reference
+#: inside one bundle and is never persisted: the canonical ID a handle resolves
+#: to is what an artifact carries.
+HANDLE_PATTERN = r"^[a-z][a-z0-9_]{0,31}$"
+
+#: How long a handle may run, matching :data:`HANDLE_PATTERN`.
+MAX_HANDLE_CHARS = 32
+
+
+@dataclass(frozen=True)
+class RoleRule:
+    """Which element class one structural role names, and what it settles.
+
+    ``fixed`` holds the fields the role itself decides. Two element classes
+    declare a required ``kind`` whose vocabulary has no ``unknown`` member — an
+    **External Entity** is a human or an external system, and a **Trust
+    Boundary** separates by network, privilege or tenancy — so a role that left
+    them open would make the resolver choose a value no source stated. The
+    vocabulary carries the distinction instead, which is why there are eight
+    roles and not four.
+    """
+
+    #: A component or a zone, never a **Data Flow**: an interaction names a
+    #: flow, and a mention names one of its endpoints. The annotation is what
+    #: says so, so a role that tried would fail the checker rather than a test.
+    element: type[TrustBoundary | ZonedElement]
+    fixed: Mapping[str, str]
+
+
+#: What a mention can be: one role per element class, with the two External
+#: Entity kinds and the four Trust Boundary kinds spelled out.
+Role = Literal[
+    "person",
+    "external-system",
+    "process",
+    "store",
+    "network-zone",
+    "privilege-zone",
+    "tenant-zone",
+    "other-zone",
+]
+
+#: Which element each role builds. A table rather than a branch: a role added
+#: here projects the day it lands, and ``tests/test_factbundle.py`` holds the
+#: table against :data:`Role` so neither side can gain an entry alone.
+ROLES: Mapping[str, RoleRule] = MappingProxyType(
+    {
+        "person": RoleRule(ExternalEntity, MappingProxyType({"kind": "human"})),
+        "external-system": RoleRule(
+            ExternalEntity, MappingProxyType({"kind": "external-system"})
+        ),
+        "process": RoleRule(Process, MappingProxyType({})),
+        "store": RoleRule(DataStore, MappingProxyType({})),
+        "network-zone": RoleRule(TrustBoundary, MappingProxyType({"kind": "network"})),
+        "privilege-zone": RoleRule(
+            TrustBoundary, MappingProxyType({"kind": "privilege"})
+        ),
+        "tenant-zone": RoleRule(TrustBoundary, MappingProxyType({"kind": "tenant"})),
+        "other-zone": RoleRule(TrustBoundary, MappingProxyType({"kind": "other"})),
+    }
+)
+
+#: The roles that name a zone, read off the table so a zone role added tomorrow
+#: is one of these without being listed again.
+ZONE_ROLES: frozenset[str] = frozenset(
+    role for role, rule in ROLES.items() if rule.element is TrustBoundary
+)
+
+#: The predicates whose value names a **graph** subject, so a bundle spells it
+#: as a handle and the resolver rewrites it to the ID that handle became. Read
+#: off the registry: a reference predicate pointing at a component, an
+#: interaction or a zone is one of these, and one pointing at a principal, a
+#: credential or an artifact is not, because those subjects are named rather
+#: than built.
+GRAPH_REFERENTS: frozenset[str] = frozenset(
+    name
+    for name, predicate in REGISTRY.items()
+    if predicate.refers_to and predicate.refers_to <= GRAPH_BOUND
+)
+
+#: The predicates that say where a component sits. **The one reader of
+#: placement**: a mention carries no zone field, so a component's
+#: ``trust_zone`` and the catalog row behind it come from one fact. Read off
+#: the graph field rather than by name, so a second placement predicate is
+#: covered the day it is registered.
+PLACEMENT_PREDICATES: frozenset[str] = frozenset(
+    name
+    for name, predicate in REGISTRY.items()
+    if predicate.projects_into == "trust_zone"
+)
+
+#: The element fields code fills rather than the role: identity and a flow's
+#: endpoints. Every other field a class requires takes
+#: :data:`~analysis_service.system_model.UNKNOWN`, ``trust_zone`` included —
+#: it starts there and :func:`_place` is the only thing that writes it, so an
+#: element whose placement no fact states never leaves the resolver.
+_SET_BY_CODE: frozenset[str] = frozenset({"id", "name", "source", "destination"})
+
+#: What became of one bundle row. ``consumed`` reached the graph, ``preserved``
+#: reached the catalog beside it, ``unresolved`` kept a question the bundle
+#: raised, ``rejected`` failed a check code runs, and ``unsupported`` named a
+#: fact neither target schema can express.
+DispositionCode = Literal[
+    "consumed",
+    "preserved",
+    "unresolved",
+    "rejected",
+    "unsupported",
+]
+
+#: The dispositions that reached an output. Derived nowhere else, because
+#: :attr:`Resolution.gaps` is its complement.
+LANDED: frozenset[str] = frozenset({"consumed", "preserved"})
+
+#: Which table a disposition row is about. ``bundle`` is the whole submission,
+#: for a bound no single row broke.
+RowKind = Literal["bundle", "mention", "interaction", "fact", "unresolved"]
+
+#: Which disposition each catalog refusal takes. ``unknown-predicate`` is the
+#: one refusal that is a property of the *target schema* rather than of the
+#: row: the registry holds no question for that fact, so it is unrepresented
+#: rather than wrong. Keyed by code and held against
+#: :data:`~analysis_service.assertions.CatalogIssueCode`, so a code added to
+#: that registry is classified here before anything reads it.
+REFUSAL_DISPOSITIONS: Mapping[str, DispositionCode] = MappingProxyType(
+    {
+        code: ("unsupported" if code == "unknown-predicate" else "rejected")
+        for code in get_args(CatalogIssueCode)
+    }
+)
+
+#: The most mentions and the most interactions one bundle may carry, each at
+#: the element cap, because each one can become an element. The real bound is
+#: :func:`~analysis_service.validation.validate`'s; this stops the resolver
+#: walking a model that gate would refuse anyway.
+MAX_MENTIONS = MAX_ELEMENTS
+MAX_INTERACTIONS = MAX_ELEMENTS
+
+#: The most facts one bundle may carry: the catalog's own cap, imported rather
+#: than respelled, since every fact is a proposed assertion.
+MAX_FACTS = MAX_ASSERTIONS
+
+#: The most open questions one bundle may carry.
+MAX_UNRESOLVED = 100
+
+
+# --- What the extraction stage emits ----------------------------------------
+#
+# The **Proposal** shape, for the reason ``assertions.CatalogProposal`` gives:
+# a model names its evidence in its own spelling and code decides where those
+# words sit, so a span cannot claim a position the source does not hold. No
+# offsets anywhere here, and no graph IDs anywhere here.
+
+
+class MentionProposal(BaseModel):
+    """One thing a source names, with the role or roles it could play.
+
+    ``handle`` is local to this bundle. ``roles`` carries more than one entry
+    where the stage read the mention two ways and declined to settle it, and
+    the resolver then keeps the ambiguity rather than taking the first.
+
+    **There is no zone field.** Where a component sits is a fact the predicate
+    registry already registers, and a second field for it here would be a
+    second reader of one question: a fact row states the placement, the
+    resolver reads it to build ``trust_zone``, and the same row reaches the
+    catalog carrying its own span.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    handle: str = Field(pattern=HANDLE_PATTERN)
+    text: str = Field(min_length=1, max_length=200)
+    roles: list[Role] = Field(default_factory=list, max_length=len(get_args(Role)))
+    quotes: list[QuoteProposal] = Field(default_factory=list, max_length=MAX_SPANS)
+
+
+class InteractionProposal(BaseModel):
+    """One interaction between two mentions, in the direction it is initiated.
+
+    ``action`` is what the initiator does at the receiver, in the source's own
+    verb, and becomes the flow's label — so two interactions between one pair
+    of endpoints stay separately addressable under
+    :func:`~analysis_service.system_model.make_flow_id`.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    handle: str = Field(pattern=HANDLE_PATTERN)
+    initiator: str = Field(pattern=HANDLE_PATTERN)
+    receiver: str = Field(pattern=HANDLE_PATTERN)
+    action: str = Field(min_length=1, max_length=200)
+    protocol: str = Field(default=UNKNOWN, max_length=200)
+    quotes: list[QuoteProposal] = Field(default_factory=list, max_length=MAX_SPANS)
+
+
+class FactProposal(BaseModel):
+    """One fact a source states about one subject.
+
+    ``subject_kind`` says which table ``subject`` reads from, so the handle
+    namespace never has to carry the type: ``mention`` and ``interaction`` name
+    a row of this bundle, and the other three name the assertion layer's own
+    subjects by the words the source used.
+
+    ``value`` reads by the predicate, as it does for an
+    :class:`~analysis_service.assertions.AssertionProposal` — with one
+    difference this stage needs: where the predicate refers to a **graph**
+    subject, the value is a *handle* of this bundle rather than a written name,
+    because no graph ID exists yet for it to name. The resolver rewrites it to
+    the ID the handle became. :data:`GRAPH_REFERENTS` is the set, read off the
+    registry.
+
+    Everything else is
+    :class:`~analysis_service.assertions.AssertionProposal`, field for field.
+    The predicate registry is the service's and this stage may not extend it: a
+    fact outside it stays source material rather than being forced into the
+    nearest wrong predicate.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    handle: str = Field(pattern=HANDLE_PATTERN)
+    subject_kind: Literal[
+        "mention", "interaction", "principal", "credential", "artifact"
+    ]
+    subject: str = Field(min_length=1, max_length=300)
+    predicate: str = Field(min_length=1, max_length=60)
+    value: str = Field(min_length=1, max_length=MAX_VALUE_CHARS)
+    reason: UnknownReason | None = None
+    scope: list[Qualifier] = Field(default_factory=list, max_length=MAX_QUALIFIERS)
+    basis: Basis
+    quotes: list[QuoteProposal] = Field(default_factory=list, max_length=MAX_SPANS)
+    explanation: str = Field(default="", max_length=1000)
+    exclusive: bool = False
+
+
+class UnresolvedProposal(BaseModel):
+    """One question the extraction stage raised and did not answer.
+
+    A missing referent, two readings it would not choose between, a
+    contradiction across sources, or a request the vocabulary cannot carry. It
+    is an output in its own right: the row a graph-first extraction has nowhere
+    to put, and #1003's measurement of hedge and conflict preservation reads it.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    handle: str = Field(pattern=HANDLE_PATTERN)
+    question: str = Field(min_length=1, max_length=1000)
+    quotes: list[QuoteProposal] = Field(default_factory=list, max_length=MAX_SPANS)
+
+
+class SourceFactBundle(BaseModel):
+    """What the sources state, in local handles, with no graph in sight.
+
+    The stage that writes it is shown the labelled sources and this vocabulary,
+    and nothing else: no reference graph, no expected facts, no aliases, no
+    case identifier.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    bundle_version: int = Field(default=BUNDLE_VERSION, ge=1)
+    role_version: int = Field(default=ROLE_VERSION, ge=1)
+    mentions: list[MentionProposal] = Field(default_factory=list)
+    interactions: list[InteractionProposal] = Field(default_factory=list)
+    facts: list[FactProposal] = Field(default_factory=list)
+    unresolved: list[UnresolvedProposal] = Field(default_factory=list)
+
+
+# --- What the resolver answers ----------------------------------------------
+
+
+class DispositionRow(BaseModel):
+    """What became of one bundle row, and why.
+
+    One row per input row, always. ``target`` names what it became — an
+    **Element ID**, a flow ID, or the subject ID a fact bound to — and is empty
+    for every disposition but ``consumed`` and ``preserved``. ``code`` and
+    ``message`` name the check that stopped it, and are empty for the two that
+    did not stop.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    handle: str = Field(default="", max_length=MAX_HANDLE_CHARS)
+    kind: RowKind
+    disposition: DispositionCode
+    target: str = Field(default="", max_length=300)
+    code: str = Field(default="", max_length=60)
+    message: str = Field(default="", max_length=1000)
+
+
+@dataclass(frozen=True)
+class Resolution:
+    """One bundle, resolved: a graph, a catalog, and what every row came to.
+
+    ``model`` is a candidate and not a **Valid System Model**:
+    :func:`~analysis_service.validation.validate` is still the gate, and every
+    arm of #1003 runs the same one. A bundle that named no zone yields a model
+    with no Trust Boundary, which that gate refuses.
+    """
+
+    model: SystemModel
+    catalog: AssertionCatalog
+    dispositions: tuple[DispositionRow, ...]
+
+    @property
+    def gaps(self) -> tuple[DispositionRow, ...]:
+        """Every row that reached neither the graph nor the catalog.
+
+        The sidecar #1003 asks for, derived from the disposition rows rather
+        than collected beside them, so nothing can report a gap the
+        dispositions do not hold or hide one they do.
+        """
+        return tuple(row for row in self.dispositions if row.disposition not in LANDED)
+
+
+def unstated_fields(
+    element_type: type[Element], fixed: Collection[str]
+) -> dict[str, str]:
+    """Every field ``element_type`` requires that neither the role nor code fills.
+
+    Each one takes :data:`~analysis_service.system_model.UNKNOWN`, which is the
+    value the extraction contract already asks for where a source is silent.
+
+    **It raises on a required field whose vocabulary has no such member.** A
+    closed field with no ``unknown`` is a fact a role has to settle, and a new
+    one added to the schema must be classified in :data:`ROLES` rather than
+    take whichever literal happens to come first. Read off the classes, so a
+    field added to any of the five is covered the day it lands.
+    """
+    unstated = {}
+    for name, field in element_type.model_fields.items():
+        if not field.is_required() or name in fixed or name in _SET_BY_CODE:
+            continue
+        annotation = field.annotation
+        if get_origin(annotation) is Literal and UNKNOWN not in get_args(annotation):
+            raise ValueError(
+                f"{element_type.__name__}.{name} is required and admits no"
+                f" {UNKNOWN!r}; a role in ROLES has to settle it"
+            )
+        unstated[name] = UNKNOWN
+    return unstated
+
+
+def resolve_bundle(bundle: SourceFactBundle, sources: Mapping[str, str]) -> Resolution:
+    """Build the graph and the catalog one bundle describes, and account for it.
+
+    Four passes, in the order their dependencies run: handles are checked once
+    across every table, mentions become elements, interactions become flows
+    between elements that were placed, and facts become assertions about
+    whatever the first two produced. A row whose dependency failed is
+    ``rejected`` rather than silently absent, which is what makes the
+    disposition count equal the input count.
+
+    The catalog half is the existing resolver, called rather than copied:
+    :func:`~analysis_service.assertions.resolve_catalog` runs the gate's own
+    per-row rules, so a fact this route keeps is one the production route would
+    keep too, and #1003's comparison measures the extraction order rather than
+    two spellings of one gate.
+    """
+    refused = _version_issue(bundle) or _cap_issue(bundle)
+    if refused is not None:
+        return Resolution(SystemModel(), AssertionCatalog(), (refused,))
+
+    prepared = _prepared(sources)
+    repeated = _repeated_handles(bundle)
+    rows: list[DispositionRow] = []
+
+    stated, competing = _stated_placements(bundle, repeated)
+    zones, zoned, assumptions = _mentions(
+        bundle, prepared, repeated, stated, competing, rows
+    )
+    flows = _interactions(bundle, prepared, repeated, zoned, rows)
+    model = SystemModel(
+        external_entities=[
+            element for element in zoned.values() if isinstance(element, ExternalEntity)
+        ],
+        processes=[
+            element for element in zoned.values() if isinstance(element, Process)
+        ],
+        data_stores=[
+            element for element in zoned.values() if isinstance(element, DataStore)
+        ],
+        data_flows=list(flows.values()),
+        trust_boundaries=list(zones.values()),
+        assumptions=list(assumptions),
+    )
+    catalog = _facts(bundle, sources, model, zones, zoned, flows, repeated, rows)
+    rows.extend(
+        DispositionRow(
+            handle=row.handle,
+            kind="unresolved",
+            disposition="unresolved",
+            code="open-question",
+            message=row.question,
+        )
+        for row in bundle.unresolved
+        if row.handle not in repeated
+    )
+    rows.extend(
+        DispositionRow(
+            handle=handle,
+            kind=kind,
+            disposition="rejected",
+            code="duplicate-handle",
+            message=f"handle {handle!r} is claimed by more than one row",
+        )
+        for handle, kind in _repeated_rows(bundle, repeated)
+    )
+    return Resolution(model, catalog, tuple(rows))
+
+
+def _version_issue(bundle: SourceFactBundle) -> DispositionRow | None:
+    """A bundle written under another spelling of the schema, refused whole.
+
+    **Fail closed, and read no older version.** The shape and the role
+    vocabulary each say what a row means, so resolving a bundle under the wrong
+    one would bind facts by a rule its writer did not use. There is no
+    migration: a bundle is model output, and re-running the stage costs less
+    than a reader that guesses which spelling arrived.
+    """
+    for field, held, current in (
+        ("bundle_version", bundle.bundle_version, BUNDLE_VERSION),
+        ("role_version", bundle.role_version, ROLE_VERSION),
+    ):
+        if held != current:
+            return DispositionRow(
+                kind="bundle",
+                disposition="rejected",
+                code="wrong-version",
+                message=(
+                    f"{field} {held} is not {current}; this resolver reads one"
+                    " spelling of the schema"
+                ),
+            )
+    return None
+
+
+def _cap_issue(bundle: SourceFactBundle) -> DispositionRow | None:
+    """The one bound a bundle broke, or ``None``.
+
+    Checked first and returned alone, as the validity gate's element cap is: a
+    bundle too large to resolve is not made acceptable by naming which of its
+    four hundred rows also failed a check.
+    """
+    for kind, count, cap in (
+        ("mention", len(bundle.mentions), MAX_MENTIONS),
+        ("interaction", len(bundle.interactions), MAX_INTERACTIONS),
+        ("fact", len(bundle.facts), MAX_FACTS),
+        ("unresolved", len(bundle.unresolved), MAX_UNRESOLVED),
+    ):
+        if count > cap:
+            return DispositionRow(
+                kind="bundle",
+                disposition="rejected",
+                code="too-many-rows",
+                message=f"{count} {kind} rows proposed; the cap is {cap}",
+            )
+    return None
+
+
+def _handles(bundle: SourceFactBundle) -> tuple[tuple[str, RowKind], ...]:
+    """Every row's handle with the table it came from, in table order.
+
+    **The one reader of "which rows does this bundle hold".** Both the repeated-
+    handle rules read it, so a fifth table added to the schema reaches them
+    together rather than one at a time.
+    """
+    rows: list[tuple[str, RowKind]] = []
+    rows.extend((row.handle, "mention") for row in bundle.mentions)
+    rows.extend((row.handle, "interaction") for row in bundle.interactions)
+    rows.extend((row.handle, "fact") for row in bundle.facts)
+    rows.extend((row.handle, "unresolved") for row in bundle.unresolved)
+    return tuple(rows)
+
+
+def _repeated_handles(bundle: SourceFactBundle) -> frozenset[str]:
+    """Every handle more than one row of the bundle claims.
+
+    One namespace across all four tables, so a fact naming ``m1`` can never
+    reach a mention and an interaction both. A repeated handle rejects **every**
+    row carrying it rather than letting the first win: which row the writer
+    meant is not knowable here.
+    """
+    seen: set[str] = set()
+    repeated: set[str] = set()
+    for handle, _ in _handles(bundle):
+        if handle in seen:
+            repeated.add(handle)
+        seen.add(handle)
+    return frozenset(repeated)
+
+
+def _repeated_rows(
+    bundle: SourceFactBundle, repeated: Collection[str]
+) -> tuple[tuple[str, RowKind], ...]:
+    """Each row carrying a repeated handle, with the table it came from."""
+    return tuple(row for row in _handles(bundle) if row[0] in repeated)
+
+
+def _prepared(sources: Mapping[str, str]) -> Mapping[str, SpanSource]:
+    """Every source folded once, keyed by label, for every quote taken from it.
+
+    A source whose two folds disagree is absent here rather than wrong, exactly
+    as it is for the assertion resolver: its quotes then find no span, which is
+    the same outcome as a quote that is not in it.
+    """
+    built = {}
+    for label, text in sources.items():
+        folded = span_source(label, text)
+        if folded is not None:
+            built[label] = folded
+    return built
+
+
+@dataclass(frozen=True)
+class _Cited:
+    """One row's first usable quote: the words, and the source that holds them."""
+
+    quote: str
+    label: str
+
+
+def _cite(
+    quotes: Sequence[QuoteProposal], prepared: Mapping[str, SpanSource]
+) -> tuple[_Cited | None, str, str]:
+    """The first quote that locates in the source it names, or why none did.
+
+    Four refusals, each a shape a quote can take rather than a judgement about
+    it: the row proposes none, the label names no source this job carried, the
+    words are not in that source, or the source holds them in more than one
+    place. The last is
+    :func:`~analysis_service.assertions.ambiguous_quote`, the one reader of that
+    rule, so an element's citation and an assertion's span refuse the same
+    repeated line.
+    """
+    if not quotes:
+        return (
+            None,
+            "uncited",
+            "the row proposes no quote, so nothing ties it to a source",
+        )
+    code = ""
+    message = ""
+    for proposed in quotes:
+        folded = prepared.get(proposed.source_label)
+        if folded is None:
+            code = "dangling-source"
+            message = f"no source is labelled {proposed.source_label!r}"
+            continue
+        if not spans_for(proposed.quote, folded):
+            code = "unlocatable-quote"
+            message = f"source {folded.label!r} does not hold {proposed.quote!r}"
+            continue
+        if ambiguous_quote(proposed.quote, folded.indexed.haystack):
+            code = "ambiguous-quote"
+            message = (
+                f"source {folded.label!r} holds {proposed.quote!r} in more than"
+                " one place, so it names no one of them"
+            )
+            continue
+        return _Cited(proposed.quote, folded.label), "", ""
+    return None, code, message
+
+
+def _stated_placements(
+    bundle: SourceFactBundle, repeated: Collection[str]
+) -> tuple[Mapping[str, str], frozenset[str]]:
+    """Which zone handle each mention's facts place it in, and which disagree.
+
+    Read from the fact rows, because :data:`PLACEMENT_PREDICATES` is the one
+    reader of placement. Two rows placing one component in two zones settle
+    nothing — the predicate's multiplicity is ``one`` and the catalog would
+    call them a conflict — so the component is returned as competing rather
+    than placed by whichever row came first.
+    """
+    stated: dict[str, str] = {}
+    competing: set[str] = set()
+    for fact in bundle.facts:
+        if fact.handle in repeated or fact.predicate not in PLACEMENT_PREDICATES:
+            continue
+        if fact.subject_kind != "mention":
+            continue
+        held = stated.get(fact.subject)
+        if held is not None and held != fact.value:
+            competing.add(fact.subject)
+        stated[fact.subject] = fact.value
+    return stated, frozenset(competing)
+
+
+def _mentions(
+    bundle: SourceFactBundle,
+    prepared: Mapping[str, SpanSource],
+    repeated: Collection[str],
+    stated: Mapping[str, str],
+    competing: Collection[str],
+    rows: list[DispositionRow],
+) -> tuple[dict[str, TrustBoundary], dict[str, ZonedElement], list[Assumption]]:
+    """Turn every mention into a zone or a placed element, or say why not.
+
+    Two passes, because placement reads the zones: the first builds every
+    element the roles decide, and the second places the zoned ones. A component
+    no fact places takes the sole zone where there is exactly one, with an
+    :class:`~analysis_service.system_model.Assumption` naming why; with none or
+    several it is ``unsupported``, because choosing between zones to obtain a
+    binding is the failure #1003 names.
+    """
+    zones: dict[str, TrustBoundary] = {}
+    unplaced: dict[str, tuple[MentionProposal, ZonedElement]] = {}
+    taken: set[str] = set()
+
+    for mention in bundle.mentions:
+        if mention.handle in repeated:
+            continue
+        built = _build_mention(mention, prepared, taken, rows)
+        if built is None:
+            continue
+        if isinstance(built, TrustBoundary):
+            zones[mention.handle] = built
+            rows.append(
+                DispositionRow(
+                    handle=mention.handle,
+                    kind="mention",
+                    disposition="consumed",
+                    target=built.id,
+                )
+            )
+        else:
+            unplaced[mention.handle] = (mention, built)
+
+    zoned: dict[str, ZonedElement] = {}
+    assumptions: list[Assumption] = []
+    sole = next(iter(zones.values())).id if len(zones) == 1 else ""
+    for handle, (mention, element) in unplaced.items():
+        placed, assumption, code, message = _place(
+            mention,
+            element,
+            zones,
+            stated.get(handle, ""),
+            handle in competing,
+            sole,
+        )
+        if placed is None:
+            rows.append(
+                DispositionRow(
+                    handle=handle,
+                    kind="mention",
+                    disposition="unsupported",
+                    code=code,
+                    message=message,
+                )
+            )
+            continue
+        zoned[handle] = placed
+        if assumption is not None:
+            assumptions.append(assumption)
+        rows.append(
+            DispositionRow(
+                handle=handle,
+                kind="mention",
+                disposition="consumed",
+                target=placed.id,
+            )
+        )
+    return zones, zoned, assumptions
+
+
+def _build_mention(
+    mention: MentionProposal,
+    prepared: Mapping[str, SpanSource],
+    taken: set[str],
+    rows: list[DispositionRow],
+) -> TrustBoundary | ZonedElement | None:
+    """One mention's element, or a disposition row saying what stopped it.
+
+    A mention with no role names something the vocabulary cannot type; one with
+    several names something the stage read two ways. Both stay ``unresolved``,
+    because each is a question rather than a defect, and #1003 measures how
+    many of them a route leaves open.
+    """
+
+    def refuse(disposition: DispositionCode, code: str, message: str) -> None:
+        rows.append(
+            DispositionRow(
+                handle=mention.handle,
+                kind="mention",
+                disposition=disposition,
+                code=code,
+                message=message,
+            )
+        )
+
+    if len(mention.roles) != 1:
+        named = ", ".join(mention.roles) or "nothing"
+        refuse(
+            "unresolved",
+            "no-role" if not mention.roles else "competing-roles",
+            f"mention {mention.text!r} reads as {named}; the bundle settles"
+            " which, and code does not settle it by position",
+        )
+        return None
+
+    cited, code, message = _cite(mention.quotes, prepared)
+    if cited is None:
+        refuse("rejected", code, message)
+        return None
+
+    rule = ROLES[mention.roles[0]]
+    try:
+        element_id = make_element_id(rule.element.id_prefix, mention.text)
+    except ValueError:
+        refuse(
+            "rejected",
+            "unnameable",
+            f"mention {mention.text!r} normalizes to an empty slug, so it can"
+            " carry no element ID",
+        )
+        return None
+    if element_id in taken:
+        refuse(
+            "rejected",
+            "duplicate-element",
+            f"element ID {element_id!r} is already taken by another mention;"
+            " two things named the same are one element or two names",
+        )
+        return None
+    taken.add(element_id)
+    # ``model_validate`` rather than the constructor: ``rule.element`` is any
+    # of the five classes, and the fields a role settles differ per class, so
+    # the keyword form would have to be written out once per class — which is
+    # the branch :data:`ROLES` exists to replace.
+    return rule.element.model_validate(
+        {
+            "id": element_id,
+            "name": mention.text,
+            "source_excerpt": cited.quote,
+            "source_label": cited.label,
+            **rule.fixed,
+            **unstated_fields(rule.element, rule.fixed),
+        }
+    )
+
+
+def _place(
+    mention: MentionProposal,
+    element: ZonedElement,
+    zones: Mapping[str, TrustBoundary],
+    placement: str,
+    competing: bool,
+    sole: str,
+) -> tuple[ZonedElement | None, Assumption | None, str, str]:
+    """Put one component in its zone, or say why the graph cannot hold it."""
+    if competing:
+        return (
+            None,
+            None,
+            "competing-placement",
+            (
+                f"more than one fact places {mention.text!r}, in different"
+                " zones; the graph holds one trust_zone and the bundle settles"
+                " which, not code"
+            ),
+        )
+    if placement:
+        boundary = zones.get(placement)
+        if boundary is None:
+            return (
+                None,
+                None,
+                "dangling-zone",
+                f"zone handle {placement!r} names no zone mention of this bundle",
+            )
+        return element.model_copy(update={"trust_zone": boundary.id}), None, "", ""
+    if not sole:
+        return (
+            None,
+            None,
+            "unplaced",
+            (
+                f"no source places {mention.text!r}, and the bundle names"
+                f" {len(zones)} zones, so the graph's required trust_zone would"
+                " be a choice nobody stated"
+            ),
+        )
+    assumption = Assumption(
+        assumption=f"{mention.text} sits in the one zone the sources describe",
+        element_id=element.id,
+        attribute="trust_zone",
+        basis="no source places this component, and the bundle names one zone",
+    )
+    return element.model_copy(update={"trust_zone": sole}), assumption, "", ""
+
+
+def _interactions(
+    bundle: SourceFactBundle,
+    prepared: Mapping[str, SpanSource],
+    repeated: Collection[str],
+    zoned: Mapping[str, ZonedElement],
+    rows: list[DispositionRow],
+) -> dict[str, DataFlow]:
+    """Turn every interaction into a Data Flow between two placed elements."""
+    flows: dict[str, DataFlow] = {}
+    taken: set[str] = set()
+    for interaction in bundle.interactions:
+        if interaction.handle in repeated:
+            continue
+        built, code, message = _build_interaction(interaction, prepared, zoned, taken)
+        if built is None:
+            rows.append(
+                DispositionRow(
+                    handle=interaction.handle,
+                    kind="interaction",
+                    disposition="rejected",
+                    code=code,
+                    message=message,
+                )
+            )
+            continue
+        taken.add(built.id)
+        flows[interaction.handle] = built
+        rows.append(
+            DispositionRow(
+                handle=interaction.handle,
+                kind="interaction",
+                disposition="consumed",
+                target=built.id,
+            )
+        )
+    return flows
+
+
+def _build_interaction(
+    interaction: InteractionProposal,
+    prepared: Mapping[str, SpanSource],
+    zoned: Mapping[str, ZonedElement],
+    taken: Collection[str],
+) -> tuple[DataFlow | None, str, str]:
+    """One interaction's flow, or the code and message that stopped it.
+
+    Both endpoints must be components this resolver placed. A zone handle is
+    refused here rather than coerced: a flow to a **Trust Boundary** is not a
+    flow, and the graph says so by giving ``source`` and ``destination`` the
+    zoned element types alone.
+    """
+    for field, handle in (
+        ("initiator", interaction.initiator),
+        ("receiver", interaction.receiver),
+    ):
+        if handle not in zoned:
+            return (
+                None,
+                "dangling-endpoint",
+                f"{field} {handle!r} names no placed component of this bundle",
+            )
+    cited, code, message = _cite(interaction.quotes, prepared)
+    if cited is None:
+        return None, code, message
+    source = zoned[interaction.initiator]
+    destination = zoned[interaction.receiver]
+    try:
+        flow_id = make_flow_id(source.id, destination.id, interaction.action)
+    except ValueError:
+        return (
+            None,
+            "unnameable",
+            (
+                f"action {interaction.action!r} normalizes to an empty slug, so"
+                " the flow can carry no ID"
+            ),
+        )
+    if flow_id in taken:
+        return (
+            None,
+            "duplicate-flow",
+            (
+                f"flow ID {flow_id!r} is already taken; two interactions between"
+                " one pair of endpoints need the verbs the sources used"
+            ),
+        )
+    return (
+        DataFlow.model_validate(
+            {
+                "id": flow_id,
+                "name": interaction.action,
+                "source": source.id,
+                "destination": destination.id,
+                "protocol": interaction.protocol,
+                "source_excerpt": cited.quote,
+                "source_label": cited.label,
+                **unstated_fields(DataFlow, ("protocol",)),
+            }
+        ),
+        "",
+        "",
+    )
+
+
+#: Which subject type each bundle subject kind resolves to. The three graph
+#: kinds are decided by what the handle turned into, and the other three are
+#: the assertion layer's own, named by the words the source used.
+_SUBJECT_TYPES: Mapping[str, SubjectType] = MappingProxyType(
+    {
+        "principal": "principal",
+        "credential": "credential",
+        "artifact": "artifact",
+    }
+)
+
+
+def _bound(
+    handle: str,
+    zones: Mapping[str, TrustBoundary],
+    zoned: Mapping[str, ZonedElement],
+    flows: Mapping[str, DataFlow],
+) -> tuple[str, SubjectType] | None:
+    """What one handle became, with the subject type that ID carries.
+
+    **The one reader of "did this handle reach the graph".** A subject and a
+    reference value ask the same question of the same three tables, and asking
+    it twice is how the two would come to disagree about an ID that resolves.
+    """
+    boundary = zones.get(handle)
+    if boundary is not None:
+        return boundary.id, "zone"
+    element = zoned.get(handle)
+    if element is not None:
+        return element.id, "component"
+    flow = flows.get(handle)
+    if flow is not None:
+        return flow.id, "interaction"
+    return None
+
+
+def _subject(
+    fact: FactProposal,
+    zones: Mapping[str, TrustBoundary],
+    zoned: Mapping[str, ZonedElement],
+    flows: Mapping[str, DataFlow],
+) -> tuple[str | None, SubjectType, str, str]:
+    """What one fact is about, resolved from its handle or read as a name."""
+    if fact.subject_kind not in ("mention", "interaction"):
+        return fact.subject, _SUBJECT_TYPES[fact.subject_kind], "", ""
+    found = _bound(fact.subject, zones, zoned, flows)
+    wanted = "interaction" if fact.subject_kind == "interaction" else "mention"
+    if found is None:
+        return (
+            None,
+            "component",
+            "dangling-subject",
+            f"subject {fact.subject!r} names no {wanted} this bundle built",
+        )
+    identity, subject_type = found
+    if (subject_type == "interaction") != (fact.subject_kind == "interaction"):
+        return (
+            None,
+            subject_type,
+            "wrong-handle-kind",
+            (
+                f"subject {fact.subject!r} is a {subject_type}, and the row"
+                f" calls it a {fact.subject_kind}"
+            ),
+        )
+    return identity, subject_type, "", ""
+
+
+def _referent(
+    fact: FactProposal,
+    zones: Mapping[str, TrustBoundary],
+    zoned: Mapping[str, ZonedElement],
+    flows: Mapping[str, DataFlow],
+) -> tuple[str | None, str, str]:
+    """One fact's value, with a graph handle rewritten to the ID it became.
+
+    A value naming a principal, a credential or an artifact is left as written:
+    those subjects are named rather than built, and the catalog slugs the name.
+    Everything else passes through, including the value of a predicate no
+    registry entry holds — that row is refused by
+    :func:`~analysis_service.assertions.resolve_catalog`, which is the reader
+    of what a predicate admits.
+    """
+    if fact.predicate not in GRAPH_REFERENTS:
+        return fact.value, "", ""
+    wanted = next(iter(REGISTRY[fact.predicate].refers_to))
+    found = _bound(fact.value, zones, zoned, flows)
+    if found is None:
+        return (
+            None,
+            "dangling-value",
+            (
+                f"{fact.predicate} names {fact.value!r}, which is no handle"
+                " this bundle built"
+            ),
+        )
+    identity, subject_type = found
+    if subject_type != wanted:
+        return (
+            None,
+            "wrong-referent-type",
+            (
+                f"{fact.predicate} refers to a {wanted}, and {fact.value!r} is"
+                f" a {subject_type}"
+            ),
+        )
+    return identity, "", ""
+
+
+def _facts(
+    bundle: SourceFactBundle,
+    sources: Mapping[str, str],
+    model: SystemModel,
+    zones: Mapping[str, TrustBoundary],
+    zoned: Mapping[str, ZonedElement],
+    flows: Mapping[str, DataFlow],
+    repeated: Collection[str],
+    rows: list[DispositionRow],
+) -> AssertionCatalog:
+    """Turn every fact into an assertion, through the existing resolver.
+
+    A fact whose subject or reference handle reached no output is ``rejected``
+    here, before the catalog sees it: what it is about does not exist, so the
+    row has nothing to say. Everything else goes to
+    :func:`~analysis_service.assertions.resolve_catalog`, and what that refuses
+    comes back by row index — ``unsupported`` where the registry holds no such
+    predicate, ``rejected`` for every other reason.
+
+    A row the catalog kept is ``consumed`` where its predicate projects into a
+    graph field and ``preserved`` where it does not, which is the split
+    :data:`~analysis_service.assertions.UNPROJECTED` already rules.
+    """
+    proposals: list[AssertionProposal] = []
+    handles: list[str] = []
+    for fact in bundle.facts:
+        if fact.handle in repeated:
+            continue
+        subject, subject_type, code, message = _subject(fact, zones, zoned, flows)
+        value, value_code, value_message = _referent(fact, zones, zoned, flows)
+        if subject is None or value is None:
+            rows.append(
+                DispositionRow(
+                    handle=fact.handle,
+                    kind="fact",
+                    disposition="rejected",
+                    code=code or value_code,
+                    message=message or value_message,
+                )
+            )
+            continue
+        proposals.append(
+            AssertionProposal(
+                subject_type=subject_type,
+                subject=subject,
+                predicate=fact.predicate,
+                value=value,
+                reason=fact.reason,
+                scope=fact.scope,
+                basis=fact.basis,
+                quotes=fact.quotes,
+                explanation=fact.explanation,
+                exclusive=fact.exclusive,
+            )
+        )
+        handles.append(fact.handle)
+
+    catalog, issues = resolve_catalog(
+        CatalogProposal(assertions=proposals), model, sources
+    )
+    refused: dict[int, tuple[DispositionCode, str, str]] = {}
+    for issue in issues:
+        if issue.row is None or issue.row in refused:
+            continue
+        refused[issue.row] = (
+            REFUSAL_DISPOSITIONS[issue.code],
+            issue.code,
+            issue.message,
+        )
+    for index, (handle, proposal) in enumerate(zip(handles, proposals, strict=True)):
+        stopped = refused.get(index)
+        if stopped is not None:
+            disposition, code, message = stopped
+            rows.append(
+                DispositionRow(
+                    handle=handle,
+                    kind="fact",
+                    disposition=disposition,
+                    code=code,
+                    message=message,
+                )
+            )
+            continue
+        rows.append(
+            DispositionRow(
+                handle=handle,
+                kind="fact",
+                disposition=(
+                    "preserved" if proposal.predicate in UNPROJECTED else "consumed"
+                ),
+                target=proposal.subject,
+            )
+        )
+    return catalog
