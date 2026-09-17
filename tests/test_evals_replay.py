@@ -21,7 +21,11 @@ from analysis_service.assertions import (
     assertion_id,
     identity_parts,
 )
-from analysis_service.system_model import SystemModel, normalize_element_ids
+from analysis_service.system_model import (
+    SystemModel,
+    make_flow_id,
+    normalize_element_ids,
+)
 from analysis_service.validation import parse_and_validate
 from evals.harness import replay
 from evals.harness.alignment import align, placeholder_zones
@@ -234,6 +238,79 @@ class TestEveryBlessedElementTakesOneFate:
 
         assert [c.key for c in graded.wrong_facts] == ["process.exposure"]
         assert graded.counts["found"] == len(list(golden.model.elements()))
+
+
+def fact(
+    subject: str = "store:queue",
+    predicate: str = "storage-encryption",
+    value: str = ABSENT,
+    **overrides,
+) -> Assertion:
+    """One stated row, with only what a matcher test reads."""
+    return Assertion(
+        subject=subject, predicate=predicate, value=value, basis="stated", **overrides
+    )
+
+
+def graded_rows(
+    references: list[Assertion], produced: list[Assertion]
+) -> replay.AssertionReplay:
+    """Two hand-built catalogs, graded against each other."""
+    reference = replay.SignedReference(catalog=AssertionCatalog(entries=references))
+    result = AssertionResult(
+        "probe", {"assertions": []}, AssertionCatalog(entries=produced), ()
+    )
+    case = load_corpus(CORPUS)[0]
+    return replay.replay_assertions(case, reference, result)
+
+
+class TestOneProducedRowAnswersOneReferenceRow:
+    """The matcher assigns, and an assignment is one-to-one and order-free."""
+
+    def scoped(self, value: str) -> list:
+        from analysis_service.assertions import Qualifier
+
+        return [Qualifier(kind="resource", value=value)]
+
+    def test_a_row_exactly_answered_keeps_its_answer(self) -> None:
+        """Two rows differ only in scope, and the run answers the second.
+
+        Reading the reference array once and taking each row's best available
+        candidate spends the exact answer on the first row as a ``rescoped``
+        one, so the score turns on the order the reference lists its rows.
+        """
+        one, two = fact(scope=self.scoped("one")), fact(scope=self.scoped("two"))
+        produced = [fact(scope=self.scoped("two"))]
+
+        forwards = graded_rows([one, two], produced)
+        backwards = graded_rows([two, one], produced)
+
+        assert forwards.counts["found"] == 1
+        assert forwards.counts["found"] == backwards.counts["found"]
+        assert forwards.counts["omitted"] == backwards.counts["omitted"] == 1
+
+    def test_one_flow_does_not_credit_two_interactions(self) -> None:
+        """Two interactions between one pair of endpoints are two facts.
+
+        Dropping the flow label to compare a rename makes their keys equal, so
+        a single generic row would answer both. It answers one.
+        """
+        ordinary = make_flow_id("process:client", "process:api", "ordinary requests")
+        socket = make_flow_id("process:client", "process:api", "websocket")
+        sent = make_flow_id("process:client", "process:api", "send traffic")
+        references = [
+            fact(ordinary, "transport-encryption", "TLS"),
+            fact(socket, "transport-encryption", "TLS"),
+        ]
+        reference = replay.SignedReference(catalog=AssertionCatalog(entries=references))
+        result = AssertionResult(
+            "probe",
+            {"assertions": []},
+            AssertionCatalog(entries=[fact(sent, "transport-encryption", "TLS")]),
+            (),
+        )
+
+        assert len(replay.aligned_rows(reference, result)) == 1
 
 
 class TestEveryReferenceRowTakesOneFate:
