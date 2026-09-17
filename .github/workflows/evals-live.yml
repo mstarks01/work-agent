@@ -99,6 +99,7 @@ on:
       - "!src/analysis_service/conformance.py"
       - "!src/analysis_service/engine.py"
       - "!src/analysis_service/factbundle.py"
+      - "!src/analysis_service/patch.py"
       - "!src/analysis_service/smoke.py"
       - "!src/analysis_service/token_caps.py"
       - "!src/analysis_service/verify_report.py"
