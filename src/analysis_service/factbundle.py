@@ -1,17 +1,17 @@
 """The **Source Fact Bundle**: what the sources state, before any graph ID exists.
 
-The prototype half of #1003's arm B. Today's extraction reads the sources and
-emits a **System Model** in one step, so every fact it keeps has to fit a node
-the same pass invented, and the assertion pass then reads that graph and cannot
-introduce a component the graph left out. This module is the other order: a
-stage names what the sources say in **local handles**, and code resolves those
-handles into canonical IDs afterwards.
+The resolver half of #1003's arm B. The one-step extraction reads the sources
+and emits a **System Model**, so every fact it keeps has to fit a node the same
+pass invented, and the assertion pass then reads that graph and cannot introduce
+a component the graph left out. This module is the other order: a stage names
+what the sources say in **local handles**, and code resolves those handles into
+canonical IDs afterwards.
 
-Nothing here runs in production. ``build_pipeline`` has no route to it and
-there is no prompt for it yet: this is the schema and the resolver a route will
-call, so #1003's offline acceptance tests run before any paid model does. The
-names are experimental interfaces, and :data:`BUNDLE_VERSION` says which
-spelling an artifact was written under.
+``build_pipeline`` routes here only where a deployment asks for the facts-first
+head, which no production install sets. ``prompts/extract-facts.md`` and the
+two prompts of the split route write what this reads. The names are
+experimental interfaces, and :data:`BUNDLE_VERSION` says which spelling an
+artifact was written under.
 
 **The resolver constructs, and every input row gets a
 :class:`DispositionRow`.** That is the contract the experiment measures
