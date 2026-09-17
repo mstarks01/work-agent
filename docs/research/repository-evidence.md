@@ -13,7 +13,7 @@ below, and each proposal is argued against them.
 
 **Method.** Three kinds of evidence, kept apart.
 
-1. **The repository, at `8085c43`.** `src/analysis_service/sources.py`, `evidence.py`,
+1. **The repository, at `a7553a1`.** `src/analysis_service/sources.py`, `evidence.py`,
    `grounding.py`, `report.py`, `frameworks/asvs/record.py`, `frameworks/asvs/rules.py`, and
    the ADRs named above.
 2. **The ASVS corpus, 96 reference records over 11 cases.** Counted with

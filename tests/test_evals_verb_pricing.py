@@ -25,7 +25,7 @@ BASELINE_DIR = (
     Path(__file__).resolve().parents[1]
     / "evals"
     / "baselines"
-    / "352b72d-gpt-5.6-terra-2f7e336d"
+    / "d4edd64-gpt-5.6-terra-fd1c49af"
 )
 
 

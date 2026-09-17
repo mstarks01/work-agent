@@ -1,6 +1,6 @@
 # An OpenRouter route has no unit price, and an exact reported one (#822)
 
-Probed 2026-09-11 against `litellm==1.97.0`, repo `242ceb0`, and OpenRouter's
+Probed 2026-09-11 against `litellm==1.97.0`, repo `d7cfe17`, and OpenRouter's
 live catalogue. Produced by `probe_openrouter_pricing.py` in this directory.
 Every call is an unbilled `GET`, so the whole measurement cost nothing.
 

@@ -22,39 +22,11 @@ many findings a person has judged — the coverage column says how many. Read
 this small rewards overfitting to it. The submitter is named because the
 manifest records it.
 
-## Commit `352b72d46f4f`, corpus `09772afde754`
+## Commit `219887050681`, corpus `b09805c6726d`
 
 1 baseline(s). Numbers in this section compare with each other and with nothing above or below it.
 
-### `352b72d-gpt-5.6-terra-2f7e336d`
-
-`strong`: `openai/gpt-5.6-terra` · frameworks stride · 1 sweep(s) · $5.68 recorded · submitted by mstarks01
-
-Vote coverage: 0 of 16 unmatched finding(s) judged by a person.
-
-Nobody has voted on this Baseline's findings, so every vote-dependent number below reads `no votes yet`.
-
-**Series `maintainer`** — reads maintainer votes.
-
-`stride`
-
-| reference coverage | must-find coverage | rejected rate | writing objections |
-| --- | --- | --- | --- |
-| 0.467 | 0.479 | no votes yet | no votes yet |
-
-**Series `all`** — reads maintainer, contributor votes.
-
-`stride`
-
-| reference coverage | must-find coverage | rejected rate | writing objections |
-| --- | --- | --- | --- |
-| 0.467 | 0.479 | no votes yet | no votes yet |
-
-## Commit `503f2d8a34f8`, corpus `b09805c6726d`
-
-1 baseline(s). Numbers in this section compare with each other and with nothing above or below it.
-
-### `503f2d8-gpt-5.6-terra-2f8a87a0`
+### `2198870-gpt-5.6-terra-6cd39a95`
 
 `strong`: `openrouter/openai/gpt-5.6-terra` via `OpenAI` · frameworks stride · 1 sweep(s) · $2.41 reported by the provider · submitted by mstarks01
 
@@ -78,11 +50,11 @@ Nobody has voted on this Baseline's findings, so every vote-dependent number bel
 | --- | --- | --- | --- |
 | 0.527 | 0.634 | no votes yet | no votes yet |
 
-## Commit `fb9d7925584e`, corpus `b09805c6726d`
+## Commit `d3f1898c8959`, corpus `b09805c6726d`
 
 1 baseline(s). Numbers in this section compare with each other and with nothing above or below it.
 
-### `fb9d792-gpt-5.6-terra-8a940b54`
+### `d3f1898-gpt-5.6-terra-29929443`
 
 `strong`: `openrouter/openai/gpt-5.6-terra` via `OpenAI` · frameworks stride · 1 sweep(s) · $3.10 reported by the provider · submitted by mstarks01
 
@@ -105,3 +77,31 @@ Nobody has voted on this Baseline's findings, so every vote-dependent number bel
 | reference coverage | must-find coverage | rejected rate | writing objections |
 | --- | --- | --- | --- |
 | 0.473 | 0.518 | no votes yet | no votes yet |
+
+## Commit `d4edd642b781`, corpus `09772afde754`
+
+1 baseline(s). Numbers in this section compare with each other and with nothing above or below it.
+
+### `d4edd64-gpt-5.6-terra-fd1c49af`
+
+`strong`: `openai/gpt-5.6-terra` · frameworks stride · 1 sweep(s) · $5.68 recorded · submitted by mstarks01
+
+Vote coverage: 0 of 16 unmatched finding(s) judged by a person.
+
+Nobody has voted on this Baseline's findings, so every vote-dependent number below reads `no votes yet`.
+
+**Series `maintainer`** — reads maintainer votes.
+
+`stride`
+
+| reference coverage | must-find coverage | rejected rate | writing objections |
+| --- | --- | --- | --- |
+| 0.467 | 0.479 | no votes yet | no votes yet |
+
+**Series `all`** — reads maintainer, contributor votes.
+
+`stride`
+
+| reference coverage | must-find coverage | rejected rate | writing objections |
+| --- | --- | --- | --- |
+| 0.467 | 0.479 | no votes yet | no votes yet |
