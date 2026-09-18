@@ -45,6 +45,27 @@ the same counts.
 3. **The finding rests on structure alone.** Case 11 is the whole of this shape
    — both endpoints unstated and every control unknown on every flow.
 
+## The ruling of 2026-09-18
+
+`undecidable-crossings-rulings.csv` beside this holds the maintainer's reading
+of the 26 findings on the flows cases 10 to 13 carry, in their own words.
+`retain` means the observation or attack scenario survives without the zone;
+`conditional` means an attack prerequisite has to be made explicit; `revise`
+means the present wording overclaims.
+
+**Eight retain, fourteen conditional, four revise.** The ruling's own summary:
+
+> None of these remaining candidates needs an invented network zone to justify
+> investigation. Several need stronger premises to justify their current attack
+> wording. That is the distinction the lead generator and critic should
+> preserve.
+
+Two corrections it makes to this file's earlier reading, both accepted: case 11
+does **not** carry an unstated endpoint on every flow — the payroll file share's
+destination membership is stated — and its findings do **not** rest on structure
+alone, because actor roles, privileged operations and payroll data each give a
+reason to investigate.
+
 ## Provenance
 
 Computed at `2e08836` from `evals/corpus/*/model.json`, `facts.json` and

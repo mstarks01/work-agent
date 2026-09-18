@@ -1,0 +1,27 @@
+case,flow,finding,ruling,reason
+10,page-requests,Session cookie attributes,revise,Sign-in does not establish cookie-based sessions. Ask how sessions are represented and which protections apply.
+10,page-requests,Session representation and generation,retain,This information gap is independent of zone placement.
+10,asset-fetch,HTTP and transport security headers,revise,Retain the stated HTTP transport. Do not infer header configuration or browser upgrade behavior from it.
+10,asset-fetch,On-path asset modification,retain,Plain HTTP supports this scenario with an on-path attacker; zone names are unnecessary.
+10,asset-fetch,Malicious CDN script execution,conditional,Requires control of a delivered script and browser execution of it. Public delivery does not establish bucket write access or execution in every reader's browser.
+10,asset-publish,Impersonated asset publisher,conditional,Investigate publisher authentication. Unknown authentication does not establish that an attacker can publish.
+10,direct-administration,Stolen admin credentials used from anywhere,revise,Retain credential-compromise risk subject to reachability and other controls. No jump host does not prove unrestricted internet access.
+10,direct-administration,On-path SQL modification,retain,The stated lack of TLS supports a scenario involving an attacker able to intercept and modify this connection.
+10,direct-administration,Changes lack attribution,conditional,Bypassing the CMS does not establish absence of database auditing or other attribution. Investigate coverage of direct changes.
+10,direct-administration,Cleartext database records,retain,No TLS supports disclosure of records carried on the connection to an attacker able to observe its unprotected traffic.
+10,direct-administration,Interception grants database authority,conditional,Reading traffic alone does not establish session takeover. Specify active interception or reusable credential capture and limit authority to the database account's permissions.
+11,view-shifts,Undocumented transport protection,retain,The stated documentation gap survives without network placement.
+11,view-shifts,Colleague impersonation,conditional,Ask whether authentication prevents impersonation. Its unknown status is not evidence of bypass.
+11,view-shifts,Colleague performs manager operations,conditional,"Different actor roles and operations justify checking authorization. An exploit requires missing or bypassable enforcement, not a network crossing."
+11,build-rota,Manager impersonation,conditional,The privileged manager operation provides the target. Authentication failure remains an unverified prerequisite.
+11,build-rota,Rota-change repudiation,conditional,Missing model evidence warrants an auditability question; it does not establish that the application lacks attribution.
+11,collect-payroll-export,Payroll collector impersonation,conditional,"Sensitive export collection justifies checking collector identity and authorization, independent of zones."
+11,collect-payroll-export,Stored payroll export modification,conditional,Requires an attacker write path and insufficient integrity checking. The collection flow alone does not establish either.
+12,upload-documents,Missing file-type validation information,retain,An upload operation supports this validation question without knowing the supplier's zone.
+12,upload-documents,Undocumented transport protection,retain,The transport documentation gap is independent of zone placement.
+12,upload-documents,Stolen supplier password,conditional,"The stated password mechanism supports the scenario, but additional factors or access controls may prevent password-only impersonation."
+12,upload-documents,Cross-supplier document access,conditional,Supplier-specific documents justify checking tenant authorization. Undocumented separation does not establish cross-tenant access.
+12,push-nightly-extract,Vendor writer impersonation,conditional,Investigate writer authentication and authorization. Unknown controls do not establish attacker write access.
+12,push-nightly-extract,Transit tampering from contradictory encryption claims,revise,Plain CSV does not contradict encrypted transport. Retain only a conditional integrity investigation with protection unresolved.
+13,pull-schedule-feed,XML external-entity configuration,retain,SOAP/XML parsing supports the configuration question. Exploitation additionally depends on parser behavior and attacker-controlled input.
+13,pull-schedule-feed,Forged XML creates work orders,conditional,Requires a way to supply accepted malicious content and downstream processing that creates the orders. HTTPS does not establish that attacker capability.

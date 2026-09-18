@@ -1,6 +1,10 @@
 # 39. A crossing a model cannot decide is still a lead
 
-- **Status**: proposed, priced on the corpus below
+- **Status**: proposed. Rules 1 to 3 carry the maintainer's ruling of
+  2026-09-18 on the 26 findings in
+  [the reading](../research/undecidable-crossings.md); rule 4 is that
+  ruling's own wording. Acceptance waits on the execution comparison
+  named below
 - **Date**: 2026-09-18
 - **Effort**: [#1052](https://github.com/mstarks01/work-agent/issues/1052),
   which reopened [ADR 0038](0038-a-component-reaches-the-graph-only-in-a-zone.md)
@@ -60,10 +64,22 @@ raises a lead and rules nothing out. The facts already carry
 crossing adds `crossing_decided: false`, so a lane agent weighs a lead it would
 otherwise never see.
 
-**4. A severity or a verdict may not rest on an undecidable crossing alone.**
-A lead is not a finding. Where the crossing is the only structure behind a
-claim, the claim is a question for the submitter rather than a ruling — which is
-what the `needs-info` disposition already exists for.
+**4. An undecidable crossing establishes nothing.** It confers *eligibility for
+analysis* and no more. It does not establish that a crossing occurred, that a
+control is missing, or that an attack succeeds. A claim whose only support is an
+undecidable crossing is a question for the submitter rather than a ruling, which
+is what `needs-info` already exists for, and a critic that lets one stand as a
+premise has accepted a fact nobody stated.
+
+Rule 4 is the maintainer's wording rather than a paraphrase of it, because the
+distinction it draws is the whole of what the reading in
+`docs/research/undecidable-crossings.md` established. Of the 26 findings read
+there, **eight survive the loss of the zone as they are written, fourteen need
+an attack prerequisite made explicit, and four overclaim in their present
+wording**. None of them needed an invented network zone to justify
+investigating. Several needed stronger premises to justify their current attack
+sentence, and that distinction is what the lead generator and the critic have to
+preserve.
 
 ## What it costs
 
@@ -83,6 +99,15 @@ lead says the crossing is undecided.
 The implementation cost is the one ADR 0038 priced: `trust_zone` is read by 32
 sites across nine modules, and every rule that reasons about a crossing gains a
 case. Rule 3 is what makes that spend worth making rather than merely honest.
+
+## What this decision does not settle
+
+**Benefit and cost need an execution comparison.** The reading establishes that
+these flows deserve to stay eligible for analysis. It does not measure what a
+lane agent does with an undecidable lead, how many claims a critic then has to
+reject for resting on one, or what the change costs in tokens and latency across
+32 sites. Those need a run, and the corpus that would ground it exists only
+since the sitting of 2026-09-18.
 
 ## What would falsify this
 
