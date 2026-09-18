@@ -539,6 +539,54 @@ class TestTheLossInstrumentReadsTheAlignment:
         assert rows[0].to_json()["missing_elements"] == []
 
 
+class TestAnAliasReadsANameAndNotAnId:
+    """The alias rule compares words to words, so a slug rule may move (#1041).
+
+    An ID follows its name on every model the gate passed, so the two agree
+    there. They part on an **archived** model, whose ID was derived under
+    whatever ``normalize_name`` said on the day — and this rule re-derives the
+    alias's slug today. Keying on the ID made those two readings of one rule.
+    """
+
+    def produced(self, element_id: str, name: str) -> SystemModel:
+        """Case 03's model with one process renamed, and its ID left behind."""
+        raw = case("03").model.model_dump()
+        for process in raw["processes"]:
+            if process["id"] == "process:ingest-scheduler":
+                process["id"] = element_id
+                process["name"] = name
+        for flow in raw["data_flows"]:
+            for end in ("source", "destination"):
+                if flow[end] == "process:ingest-scheduler":
+                    flow[end] = element_id
+        return SystemModel.model_validate(raw)
+
+    def test_an_id_a_newer_slug_rule_would_not_write_still_pairs(self):
+        """The archived spelling of a possessive, under today's rule."""
+        golden = case("03")
+        alias = next(
+            one
+            for one in golden.meta.aliases
+            if one.element == "process:ingest-scheduler"
+        )
+        model = self.produced("process:airflow-s-scheduler", alias.name)
+
+        aligned = align(golden, model)
+
+        assert (alias.element, "process:airflow-s-scheduler") in [
+            (pair.reference, pair.produced) for pair in aligned.by_evidence("alias")
+        ]
+
+    def test_a_name_no_alias_rules_still_pairs_with_nothing(self):
+        """The negative control: the name decides, so a wrong name pairs nothing."""
+        golden = case("03")
+        model = self.produced("process:airflow-s-scheduler", "something else entirely")
+
+        aligned = align(golden, model)
+
+        assert aligned.by_evidence("alias") == ()
+
+
 class TestTwoRulingsForOneElement:
     """A blessed element with two aliases, both produced: listed, never paired twice."""
 
@@ -557,17 +605,13 @@ class TestTwoRulingsForOneElement:
             update={"aliases": [*golden.meta.aliases, second]}
         )
         golden = replace_case(golden, meta=meta)
-        raw = golden.model.model_dump()
-        for process in raw["processes"]:
-            if process["id"] == "process:ingest-scheduler":
-                process["id"] = "process:airflow-scheduler"
+        # Renamed rather than re-identified: an ID follows its name on every
+        # model the gate passed, and the alias rule reads the name.
+        model = renamed(golden.model, "process:ingest-scheduler", "Airflow scheduler")
+        raw = model.model_dump()
         raw["processes"].append(
             dict(raw["processes"][0], id="process:scheduler-job", name="scheduler job")
         )
-        for flow in raw["data_flows"]:
-            for end in ("source", "destination"):
-                if flow[end] == "process:ingest-scheduler":
-                    flow[end] = "process:airflow-scheduler"
         aligned = align(golden, SystemModel.model_validate(raw))
 
         assert aligned.by_evidence("alias") == ()

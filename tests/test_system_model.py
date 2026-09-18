@@ -39,6 +39,28 @@ class TestIdentity:
         with pytest.raises(ValueError):
             normalize_name("!!!")
 
+    def test_an_apostrophe_is_elided_rather_than_separated_on(self):
+        """It sits inside a word, so reading it as a boundary cuts one in two.
+
+        Live extractions wrote ``entity:calling-team-s-users`` for "the calling
+        team's users", and a signed reference subject carried the same stray
+        segment. A slug carries words, and ``s`` alone is not one.
+        """
+        assert normalize_name("calling team's users") == "calling-teams-users"
+        assert normalize_name("don't touch") == "dont-touch"
+        assert normalize_name("O\u2019Brien") == "obrien"
+
+    def test_a_singular_and_a_plural_possessive_are_one_name(self):
+        """The shape that made two runs name one entity two ways (#1041)."""
+        assert normalize_name("other team's backend") == normalize_name(
+            "other teams' backend"
+        )
+
+    def test_nothing_but_an_apostrophe_is_elided(self):
+        """A separator that ran two words together still separates them."""
+        assert normalize_name("a`b") == "a-b"
+        assert normalize_name("a\u2032b") == "a-b"
+
     def test_make_element_id_is_deterministic_from_type_and_name(self):
         assert make_element_id("process", "Auth Service") == "process:auth-service"
 
