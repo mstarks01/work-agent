@@ -364,3 +364,59 @@ class TestACrossingSaysWhichZoneWasAssumed:
         model = valid_model()
 
         assert crossing_flow_ids(model) == frozenset(crossings_by_flow(model))
+
+
+class TestACrossingHasThreeOutcomes:
+    """ADR 0039 rule 2: both zones known and different, known and equal, or unknown.
+
+    The third is the one this decision adds, and it is what lets a model
+    holding an unplaced component be analysed at all: an endpoint the sources
+    never placed answers ``undecidable`` rather than stopping the derivation.
+    """
+
+    def unplaced(self, model, element_id: str):
+        for element in model.zoned_elements():
+            if element.id == element_id:
+                element.trust_zone = UNKNOWN
+        return model
+
+    def test_an_unplaced_endpoint_derives_an_undecidable_crossing(self) -> None:
+        model = self.unplaced(valid_model(), "process:web-app")
+
+        crossings = crossings_by_flow(model)
+        undecided = [one for one in crossings.values() if not one.decided]
+
+        assert undecided, "a flow touching an unplaced component raises a crossing"
+        assert all(
+            UNKNOWN in (one.source_zone, one.destination_zone) for one in undecided
+        )
+
+    def test_an_undecidable_crossing_says_so_to_every_rule(self) -> None:
+        """The flag rides in the facts, so no rule re-derives it from the zones."""
+        model = self.unplaced(valid_model(), "process:web-app")
+        crossings = crossings_by_flow(model)
+        flows = {flow.id: flow for flow in model.data_flows}
+
+        decided = {
+            crossing_facts(crossing, flows[flow_id])["crossing_decided"]
+            for flow_id, crossing in crossings.items()
+        }
+
+        assert False in decided
+
+    def test_two_equal_known_zones_are_still_not_a_crossing(self) -> None:
+        """The outcome the third reading must not swallow."""
+        model = valid_model()
+        zone = model.processes[0].trust_zone
+        for element in model.zoned_elements():
+            element.trust_zone = zone
+
+        assert crossings_by_flow(model) == {}
+
+    def test_a_dangling_endpoint_still_fails_closed(self) -> None:
+        """An invalid model is refused; an unplaced one is answered."""
+        model = valid_model()
+        model.data_flows[0].destination = "store:nowhere"
+
+        with pytest.raises(ValueError, match="cannot derive crossings"):
+            model.boundary_crossings()
