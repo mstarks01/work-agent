@@ -428,8 +428,17 @@ class TestPlacement:
         assert resolution.model.get("process:worker") is not None
         assert row_for(resolution, "i1").disposition == "consumed"
 
-    def test_a_component_no_zone_can_hold_leaves_its_facts_as_questions(self) -> None:
-        """The graph cannot place it; the sources still state what they state."""
+    def test_a_component_no_zone_places_enters_unplaced_and_keeps_its_facts(
+        self,
+    ) -> None:
+        """The sources name it and place it nowhere, so the graph holds it nowhere.
+
+        Several zones and no fact choosing between them is the case where the
+        resolver has nothing to infer from. It declines to choose rather than
+        dropping the component, so the fact about it resolves instead of
+        becoming a question about a component the graph no longer holds
+        (ADR 0039 rule 1).
+        """
         text = f"{NOTE} The admin network is elsewhere."
         bundle = SourceFactBundle(
             mentions=[
@@ -452,9 +461,16 @@ class TestPlacement:
 
         resolution = resolved(bundle, {LABEL: text})
 
-        row = row_for(resolution, "p1")
-        assert (row.disposition, row.code) == ("unresolved", "unplaced-subject")
-        assert row in resolution.gaps
+        worker = resolution.model.get("process:worker")
+        assert worker is not None
+        assert worker.trust_zone == UNKNOWN
+        # The resolver declined to choose, so nothing records a choice.
+        assert [
+            assumption.attribute
+            for assumption in resolution.model.assumptions
+            if assumption.element_id == "process:worker"
+        ] == []
+        assert row_for(resolution, "p1").disposition == "consumed"
 
     def test_an_unknown_zone_is_a_value_the_catalog_keeps(self) -> None:
         """ "The sources do not say which zone" is a fact a reference records.
@@ -477,7 +493,8 @@ class TestPlacement:
             for entry in resolution.record.catalog.entries
         )
 
-    def test_two_zones_and_no_fact_leaves_a_component_unsupported(self) -> None:
+    def test_two_zones_and_no_fact_still_reaches_the_graph_unplaced(self) -> None:
+        """Two zones and nothing choosing between them is not a lost component."""
         text = "A worker. The core network and the admin network."
         bundle = SourceFactBundle(
             mentions=[
@@ -486,9 +503,11 @@ class TestPlacement:
                 mention("m1", "worker", "process", quotes=quote("A worker")),
             ],
         )
-        row = row_for(resolved(bundle, {LABEL: text}), "m1")
-        assert (row.disposition, row.code) == ("unsupported", "unplaced")
-        assert row in resolved(bundle, {LABEL: text}).gaps
+        resolution = resolved(bundle, {LABEL: text})
+
+        assert row_for(resolution, "m1").disposition == "consumed"
+        worker = resolution.model.get("process:worker")
+        assert worker is not None and worker.trust_zone == UNKNOWN
 
     def test_two_placements_of_one_component_settle_nothing(self) -> None:
         text = f"{NOTE} The admin network is elsewhere."

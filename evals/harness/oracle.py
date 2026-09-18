@@ -38,16 +38,10 @@ A run where all three are zero says the path keeps a perfect reading whole.
 
 ## What the oracle cannot author
 
-Two shapes, and each one is a finding rather than a nuisance.
+One shape, and it is a finding rather than a nuisance.
 
-A **component whose zone no source states** cannot be placed. The graph
-requires ``trust_zone``, so the oracle asserts the placement the blessed model
-holds and marks it ``inferred``. The reference records the same component's zone
-as ``unknown``, so the matcher charges the assertion as a wrong claim — which is
-right, and is the cost the schema imposes on every route.
-
-A **row the oracle cannot name a subject for** is the only shape left that it
-cannot write: a reference subject no mention of the bundle built, which
+A **row the oracle cannot name a subject for**: a reference subject no mention
+of the bundle built, which
 :attr:`CaseCharge.inexpressible` counts. A row whose value is the unknown
 sentinel on a graph-bound predicate is written like any other — the sentinel is
 an epistemic value and the resolver reads it as one.
@@ -79,8 +73,6 @@ from types import MappingProxyType
 from typing import Any, Literal, get_args
 
 from analysis_service.assertions import (
-    ABSENT,
-    UNKNOWN,
     Assertion,
     ambiguous_quote,
     assertion_id,
@@ -175,9 +167,6 @@ class CaseCharge:
     uncited: tuple[str, ...] = ()
     #: Signed rows the bundle schema cannot carry.
     inexpressible: tuple[str, ...] = ()
-    #: Placements the oracle asserted because the graph requires a zone and the
-    #: sources state none.
-    scaffolding: int = 0
     #: Blessed elements and flows the resolved graph holds, over the blessed
     #: model's own totals.
     elements: tuple[int, int] = (0, 0)
@@ -199,7 +188,6 @@ class CaseCharge:
             "stages": {stage: self.counts[stage] for stage in STAGES},
             "uncited": list(self.uncited),
             "inexpressible": list(self.inexpressible),
-            "scaffolding": self.scaffolding,
             "elements": list(self.elements),
             "flows": list(self.flows),
         }
@@ -315,7 +303,6 @@ class _Authored:
     bundle: SourceFactBundle
     uncited: list[str] = field(default_factory=list)
     inexpressible: list[str] = field(default_factory=list)
-    scaffolding: int = 0
 
 
 def author(case: GoldenCase, reference: SignedReference) -> _Authored:
@@ -392,14 +379,12 @@ def author(case: GoldenCase, reference: SignedReference) -> _Authored:
             continue
         facts.append(_proposal(f"f{index}", kind, entry, handles))
 
-    scaffolding = _placements(case, handles, reference, len(facts))
     return _Authored(
         bundle=SourceFactBundle(
-            mentions=mentions, interactions=interactions, facts=[*facts, *scaffolding]
+            mentions=mentions, interactions=interactions, facts=facts
         ),
         uncited=uncited,
         inexpressible=inexpressible,
-        scaffolding=len(scaffolding),
     )
 
 
@@ -425,51 +410,6 @@ def _proposal(
             ],
         }
     )
-
-
-def _placements(
-    case: GoldenCase,
-    handles: Mapping[str, str],
-    reference: SignedReference,
-    start: int,
-) -> list[FactProposal]:
-    """A membership row per component the reference places nowhere.
-
-    **The cost the schema imposes, made visible.** ``trust_zone`` is required,
-    so a component the sources place nowhere reaches the graph only if something
-    asserts a zone for it. The oracle asserts the one the blessed model holds and
-    marks it ``inferred``; the matcher then charges it against the reference's
-    own ``unknown``, which is the right answer and the point.
-    """
-    placed = {
-        entry.subject
-        for entry in reference.entries
-        if entry.predicate == "network-membership"
-        and entry.value not in (UNKNOWN, ABSENT)
-    }
-    rows: list[FactProposal] = []
-    for element in case.model.zoned_elements():
-        if element.id in placed or element.id not in handles:
-            continue
-        if element.trust_zone not in handles:
-            continue
-        rows.append(
-            FactProposal.model_validate(
-                {
-                    "handle": f"s{start + len(rows)}",
-                    "subject_kind": "mention",
-                    "subject": handles[element.id],
-                    "predicate": "network-membership",
-                    "value": handles[element.trust_zone],
-                    "basis": "inferred",
-                    "explanation": (
-                        "the graph requires a zone and no source states one for"
-                        " this component"
-                    ),
-                }
-            )
-        )
-    return rows
 
 
 def charge(case: GoldenCase, reference: SignedReference) -> CaseCharge:
@@ -514,7 +454,6 @@ def charge(case: GoldenCase, reference: SignedReference) -> CaseCharge:
         rows=tuple(charged),
         uncited=tuple(written.uncited),
         inexpressible=tuple(written.inexpressible),
-        scaffolding=written.scaffolding,
         elements=(len(built & blessed), len(blessed)),
         flows=(len(built_flows & blessed_flows), len(blessed_flows)),
     )
@@ -587,9 +526,8 @@ def render(found: Sequence[CaseCharge]) -> str:
         "",
         (
             f"{sum(len(case.inexpressible) for case in found)} signed row(s) the"
-            " bundle cannot carry, and"
-            f" {sum(case.scaffolding for case in found)} placement(s) the oracle"
-            " asserted because the graph requires a zone the sources never state."
+            " bundle cannot carry. A component the sources place nowhere is"
+            " placed nowhere, so the reading asserts no zone of its own."
         ),
         "",
     ]

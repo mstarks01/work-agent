@@ -4,8 +4,8 @@ Three groups. The first holds the instrument out of the experiment — it reads
 the answers, so a route that ran it would be graded on a reading it was given.
 The second is the measurement itself: a perfect reading survives the
 deterministic path whole, and a stage that starts losing rows fails here. The
-third drives the two authoring rules that decide whether a row can be written
-at all.
+third drives the authoring rules that decide whether a row can be written at
+all, and that a perfect reading invents no placement of its own.
 """
 
 from __future__ import annotations
@@ -55,20 +55,15 @@ class TestItIsNotAnArm:
 class TestTheCeiling:
     """What the deterministic path does to a reading that is already right."""
 
-    #: The only required row a perfect reading loses, and the rule that loses
-    #: it. Case 12 names a supplier the sources never place, so the interaction
-    #: to the portal has an unplaced endpoint and the authentication fact on it
-    #: is unresolved — which is
-    #: [ADR 0038](../docs/adr/0038-a-component-reaches-the-graph-only-in-a-zone.md)
-    #: rule 2 costing a required fact for the first time. Listed rather than
-    #: tolerated: a second entry here means the contract is costing more than
-    #: the ADR priced it at, and its own revisit condition is met.
-    PRICED_LOSSES: ClassVar[dict[tuple[str, str], str]] = {
-        (
-            "flow:entity:supplier>process:supplier-portal>upload-documents",
-            "authentication-mechanism",
-        ): "unplaced-subject",
-    }
+    #: Every required row a perfect reading loses, and the rule that loses it.
+    #: Empty: a component the sources never place enters the graph unplaced
+    #: under
+    #: [ADR 0039](../docs/adr/0039-a-crossing-a-model-cannot-decide-is-still-a-lead.md)
+    #: rule 1, so the interaction to it resolves and the fact on that
+    #: interaction survives. Listed rather than tolerated — an entry here is the
+    #: deterministic path costing a required fact, and the repair belongs in the
+    #: code rather than in a prompt.
+    PRICED_LOSSES: ClassVar[dict[tuple[str, str], str]] = {}
 
     def test_the_path_loses_only_the_rows_the_contract_prices(self, charged) -> None:
         """What the code between the model and the catalog drops from a perfect reading.
@@ -106,7 +101,7 @@ class TestTheCeiling:
 
 
 class TestWhatTheOracleCannotWrite:
-    """The two shapes a bundle cannot carry, each one a finding."""
+    """What a bundle cannot carry, and what a perfect reading declines to invent."""
 
     def test_every_signed_row_can_be_written(self, charged) -> None:
         """Nothing a reviewer signed is outside what a bundle can carry.
@@ -117,9 +112,35 @@ class TestWhatTheOracleCannotWrite:
         """
         assert not [row for case in charged for row in case.inexpressible]
 
-    def test_a_component_no_source_places_needs_an_asserted_zone(self, charged) -> None:
-        """The graph requires a zone, so something has to assert one."""
-        assert sum(case.scaffolding for case in charged)
+    def test_a_perfect_reading_asserts_no_placement_of_its_own(self, charged) -> None:
+        """ADR 0039 rule 1, at the ceiling: nothing has to invent a zone.
+
+        The oracle writes the reference's own rows and no others, so every
+        ``network-membership`` it proposes is one a source states. A component
+        the sources place nowhere reaches the graph unplaced.
+        """
+        references = {
+            case.id: signed_reference(CORPUS, case) for case in load_corpus(CORPUS)
+        }
+        assert all(references.values()), "every corpus case carries a signed reference"
+
+        placements = 0
+        signed_rows = 0
+        for case in load_corpus(CORPUS):
+            reference = references[case.id]
+            assert reference is not None
+            placements += sum(
+                1
+                for fact in oracle.author(case, reference).bundle.facts
+                if fact.predicate == "network-membership"
+            )
+            signed_rows += sum(
+                1
+                for entry in reference.entries
+                if entry.predicate == "network-membership"
+            )
+
+        assert placements == signed_rows
 
     def test_every_blessed_element_class_has_a_role(self) -> None:
         """A class or a kind added to the model raises rather than being skipped."""

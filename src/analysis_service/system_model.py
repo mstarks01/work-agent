@@ -614,13 +614,30 @@ class Assumption(BaseModel):
 
 
 class BoundaryCrossing(BaseModel):
-    """Derived fact: a Data Flow whose endpoints sit in different trust zones.
+    """Derived fact: a Data Flow whose endpoints the model cannot place together.
+
+    ``decided`` says which of the two readings this is. A decided crossing has
+    two zones the model holds and they differ. An **undecidable** crossing has
+    at least one endpoint the sources never placed, so ``source_zone`` or
+    ``destination_zone`` is :data:`UNKNOWN` and nothing here says a boundary was
+    crossed — only that no comparison could rule it out
+    ([ADR 0039](../../docs/adr/0039-a-crossing-a-model-cannot-decide-is-still-a-lead.md)).
+    Two equal known zones are not a crossing at all and appear here in neither
+    form.
+
+    **An undecidable crossing establishes nothing.** It confers eligibility for
+    analysis and no more: not that a crossing occurred, not that a control is
+    missing, not that an attack succeeds. A rule whose premise is the crossing
+    itself fires on one and says so; a rule whose premise is what the zones
+    *are* cannot, and skips it.
 
     ``assumed_endpoints`` names the endpoints whose zone the service *inferred*
     rather than read, in source-then-destination order, and is empty for a
     crossing both of whose zones the input stated. It is derived from the same
     model as the crossing — an :class:`Assumption` on ``trust_zone`` — so the
-    two cannot disagree.
+    two cannot disagree. It keeps its meaning for the placements a model still
+    infers: an inferred zone is a value the model chose, and an unknown one is a
+    value it declined to choose.
 
     **The field is here because this is where the inference lands.** An
     Assumption sits on the model's top-level list, and a lane agent reading a
@@ -638,6 +655,9 @@ class BoundaryCrossing(BaseModel):
     flow_id: str
     source_zone: str
     destination_zone: str
+    #: False when either zone is :data:`UNKNOWN`. Read it rather than comparing
+    #: the zones again, so the three outcomes have one reader.
+    decided: bool = True
     assumed_endpoints: list[str] = Field(default_factory=list)
 
 
@@ -701,9 +721,15 @@ class SystemModel(BaseModel):
     def boundary_crossings(self) -> list[BoundaryCrossing]:
         """Derive boundary crossings mechanically. Requires a valid model.
 
-        Raises ValueError on a dangling flow endpoint or an endpoint without a
-        trust zone — derivation on an invalid model would produce misleading
-        STRIDE input, so it fails closed instead of skipping.
+        Raises ValueError on a dangling flow endpoint — derivation on an
+        invalid model would produce misleading framework input, so it fails
+        closed instead of skipping.
+
+        **Three outcomes, not two.** Both zones known and different is a
+        crossing; both known and equal is not; either unknown is an
+        *undecidable* crossing, which carries ``decided=False`` and the unknown
+        zone as it stands. An endpoint the sources never placed is a value here
+        rather than a refusal, so an unplaced component still reaches a reader.
 
         Each crossing also names the endpoints whose zone was inferred, read
         from :meth:`assumed_zone_elements`. A crossing that both zones state
@@ -723,19 +749,22 @@ class SystemModel(BaseModel):
                     )
             source_zone = zone_by_id[flow.source]
             destination_zone = zone_by_id[flow.destination]
-            if source_zone != destination_zone:
-                crossings.append(
-                    BoundaryCrossing(
-                        flow_id=flow.id,
-                        source_zone=source_zone,
-                        destination_zone=destination_zone,
-                        assumed_endpoints=[
-                            endpoint
-                            for endpoint in (flow.source, flow.destination)
-                            if endpoint in assumed
-                        ],
-                    )
+            decided = UNKNOWN not in (source_zone, destination_zone)
+            if decided and source_zone == destination_zone:
+                continue
+            crossings.append(
+                BoundaryCrossing(
+                    flow_id=flow.id,
+                    source_zone=source_zone,
+                    destination_zone=destination_zone,
+                    decided=decided,
+                    assumed_endpoints=[
+                        endpoint
+                        for endpoint in (flow.source, flow.destination)
+                        if endpoint in assumed
+                    ],
                 )
+            )
         return crossings
 
     def shared_names(self) -> dict[str, list[str]]:

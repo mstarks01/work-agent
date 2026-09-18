@@ -58,7 +58,10 @@ ARMS = REPO_ROOT / "evals" / "emissions" / "20260917T-arms-luna-pro"
 #: ``cause`` is which of the three readings the loss belongs to, and ``met``
 #: says whether every wanted fact reached a graph attribute a rule reads.
 OBSERVED: dict[str, tuple[str, bool]] = {
-    "unknown-placement": ("adapter", False),
+    # The adapter kept this shape once ADR 0039 rule 1 let a component enter
+    # the graph unplaced: nothing has to choose a zone, so the licence server
+    # and every fact about it survive an unstated placement.
+    "unknown-placement": ("none", True),
     "conflicting-placement": ("adapter", False),
     "store-and-process": ("adapter", False),
     "distinct-subjects": ("consumer", False),
@@ -129,14 +132,21 @@ class TestTheShapesTheSchemaCannotHold:
 
 
 class TestTheShapesTheAdapterLoses:
-    """The three the schema holds and the facts-first resolver does not."""
+    """The two the schema holds and the facts-first resolver does not."""
 
-    def test_an_unplaced_endpoint_leaves_a_question_and_not_a_defect(self) -> None:
-        """ADR 0038 rule 2 reaches the interaction and the fact beside it."""
+    def test_an_unstated_placement_costs_the_interaction_and_the_fact_nothing(
+        self,
+    ) -> None:
+        """ADR 0039 rule 1: nothing has to choose a zone, so nothing is dropped.
+
+        This shape cost three rows at once — the component, the interaction
+        whose endpoint it was, and the fact on that interaction — because the
+        graph required a zone the sources never stated. The component now enters
+        unplaced and all three survive.
+        """
         found = diagnose(fixture_of("unknown-placement"))
-        codes = {code for _, _, code in found.lost_rows}
 
-        assert codes == {"unplaced", "unplaced-endpoint", "unplaced-subject"}
+        assert {code for _, _, code in found.lost_rows} == set()
         assert found.direct_holds
 
     def test_two_sources_placing_one_thing_twice_settle_nothing(self) -> None:
