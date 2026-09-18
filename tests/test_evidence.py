@@ -120,6 +120,53 @@ class TestEvidenceCatalog:
         assert crossing_evidence_ref(flow_id) not in catalog
         assert unknown_evidence_ref("store:orders-db", "trust_zone") in catalog
 
+    @pytest.mark.parametrize(
+        "unplaced",
+        [
+            ["process:web-app"],
+            ["store:orders-db"],
+            ["process:web-app", "store:orders-db"],
+        ],
+    )
+    def test_an_undecidable_crossing_offers_its_unplaced_endpoint_instead(
+        self, unplaced
+    ):
+        """The row ``prompts/analyze.md`` sends a lane agent to, tested here.
+
+        The prompt tells an agent that an undecidable crossing cannot be cited
+        and that the unplaced endpoint's ``trust_zone`` can. That is a claim
+        about this catalog, so the two readers are tested against each other
+        rather than each against its own expectation: for every undecidable
+        crossing, every endpoint the sources left unplaced publishes its own
+        ``unknown`` row.
+        """
+        model = valid_model()
+        by_id = {element.id: element for element in model.zoned_elements()}
+        for element_id in unplaced:
+            by_id[element_id].trust_zone = UNKNOWN
+        flows = {flow.id: flow for flow in model.data_flows}
+
+        catalog = evidence_catalog(model)
+
+        undecided = [
+            crossing for crossing in model.boundary_crossings() if not crossing.decided
+        ]
+        assert undecided
+        for crossing in undecided:
+            flow = flows[crossing.flow_id]
+            endpoints = [
+                endpoint
+                for endpoint, zone in (
+                    (flow.source, crossing.source_zone),
+                    (flow.destination, crossing.destination_zone),
+                )
+                if zone == UNKNOWN
+            ]
+            assert endpoints
+            assert crossing_evidence_ref(crossing.flow_id) not in catalog
+            for endpoint in endpoints:
+                assert unknown_evidence_ref(endpoint, "trust_zone") in catalog
+
     def test_a_claim_cannot_ground_on_an_undecidable_crossing(self):
         """The other half: naming it is refused rather than silently accepted."""
         model = valid_model()

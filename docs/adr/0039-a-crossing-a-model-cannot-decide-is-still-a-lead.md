@@ -1,11 +1,12 @@
 # 39. A crossing a model cannot decide is still a lead
 
-- **Status**: accepted for rules 1 to 3, which ship; rule 4 binds the lane and
-  critic prompts and is not yet built. Rules 1 to 3 carry the maintainer's
-  ruling of 2026-09-18 on the 26 findings in
-  [the reading](../research/undecidable-crossings.md); rule 4 is that ruling's
-  own wording. What a lane agent does with an undecidable lead still needs the
-  execution comparison named below
+- **Status**: accepted. All four rules ship. Rules 1 to 3 are in the code and
+  measured offline; rule 4 binds the lane and the critic, and it is written
+  into `prompts/analyze.md` and `prompts/critic.md`. Every rule carries the
+  maintainer's ruling of 2026-09-18 on the 26 findings in
+  [the reading](../research/undecidable-crossings.md), and rule 4 is that
+  ruling's own wording. What a lane agent *does* with an undecidable lead
+  still needs the execution comparison named below
 - **Date**: 2026-09-18
 - **Effort**: [#1052](https://github.com/mstarks01/work-agent/issues/1052),
   which reopened [ADR 0038](0038-a-component-reaches-the-graph-only-in-a-zone.md)
@@ -128,6 +129,40 @@ The fifth, STRIDE's privilege-zone transition, does not: its premise is what the
 two zones *are*, and an unplaced endpoint has no kind to read, so firing there
 would assert the authority change rule 4 says an undecidable crossing cannot
 establish. The rule skips it and says why.
+
+## Where rule 4 is written down
+
+Rule 4 has three readers and one rule. The code carries two of them:
+`evidence_catalog` omits an undecidable crossing, so no agent can cite one and
+no critic can let one stand; `crossing_facts` carries `crossing_decided`, so a
+lead says which kind it is. The third reader is the instruction, and until now
+it said nothing: both prompts are handed a crossings block carrying `decided`
+and neither told its reader what the field means.
+
+- **`prompts/analyze.md`, step 2.** An undecidable crossing is a reason to look
+  at the flow and never a premise in the claim. The claim rests on what the
+  model states — a control on the flow, the data it carries, the authority at
+  an end — or it names the placement as the thing to answer first. The
+  crossing cannot be cited; the unplaced endpoint's `trust_zone` can, as an
+  unknown, which is what makes the claim conditional through the machinery that
+  already exists.
+- **`prompts/critic.md`, step 1.** A draft on such a flow is a fifth case. One
+  whose argument rests on a stated fact passes on that ground; one that needs
+  the boundary to have been crossed is **needs-info** where it names the
+  placement as the open question, and **rejected** for `reasoning` where it
+  asserts the crossing as a fact.
+
+That split is the reading's own: of its 26 findings, none needed an invented
+zone to justify investigating, and several needed a stronger premise to justify
+their attack sentence. A critic that rejected every draft on an undecidable
+crossing would lose the first group, which is the failure rule 3 exists to
+prevent.
+
+`tests/test_evidence.py` holds the offer the lane prompt points at — every
+unplaced endpoint of an undecidable crossing publishes its own `unknown` row —
+and `tests/test_graph.py` holds that the block both prompts read still carries
+`decided`. Neither test can read the prose; what they pin is that the prose
+points at something real.
 
 ## What this decision does not settle
 
