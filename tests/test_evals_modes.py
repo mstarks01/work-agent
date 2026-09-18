@@ -58,6 +58,7 @@ from analysis_service.report import Report
 from analysis_service.sampling import load_sampling
 from analysis_service.system_model import (
     FLOW_DELIMITER,
+    UNKNOWN,
     ZONE_ATTRIBUTE,
     ModelIndex,
     SystemModel,
@@ -66,7 +67,12 @@ from analysis_service.system_model import (
     normalize_element_ids,
 )
 from analysis_service.validation import validate
-from tests.factories import DEFAULT_FRAMEWORKS, EVAL_MODEL, ScriptedLlm
+from tests.factories import (
+    DEFAULT_FRAMEWORKS,
+    EVAL_MODEL,
+    ScriptedLlm,
+    valid_model,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CASE_DIR = REPO_ROOT / "evals" / "corpus" / "01-payments-checkout"
@@ -1314,6 +1320,43 @@ class TestTheNameFreeReadingOfCrossings:
         """``None`` comes from the raise, not from a guess about the input."""
         assert modes.crossing_keys(None) is None
 
+    def test_an_unplaced_endpoint_is_reported_apart_from_the_two_figures(self):
+        """ADR 0039 rule 2, at the instrument that reads the partition.
+
+        A flow whose endpoint the model placed nowhere derives a crossing with
+        ``decided=False``. Counting it here would credit the extraction with
+        separating the pair, so recall rises on a model that placed nothing.
+        The flow is reported on its own key instead.
+        """
+        model = valid_model()
+        model.data_stores[0].trust_zone = UNKNOWN
+        undecided = f"flow:process:web-app{FLOW_DELIMITER}store:orders-db"
+
+        decided = modes.crossing_keys(model)
+        open_pairs = modes.undecidable_crossing_keys(model)
+
+        assert undecided not in (decided or ())
+        assert open_pairs == (undecided,)
+        # Neither set holds a flow the other does, over one derivation.
+        assert not frozenset(decided or ()) & frozenset(open_pairs or ())
+
+    def test_the_undecidable_flows_reach_the_record(self):
+        """A reader of the artifact sees why a crossing figure went quiet."""
+        record = modes.ExtractionScore(
+            case_id="x",
+            matched=(),
+            missing=(),
+            extra=(),
+            crossings_match=False,
+            attributes=(),
+            blessed_crossings=("flow:a-to-b",),
+            extracted_crossings=(),
+            extracted_undecidable_crossings=("flow:a-to-b",),
+        ).to_json()
+
+        assert record["crossings_recall"] == 0.0
+        assert record["crossings_undecidable"] == ["flow:a-to-b"]
+
     def test_both_readings_are_serialised(self):
         """The strict one is not replaced — a report reader sees zone names."""
         record = self.score(
@@ -2282,6 +2325,38 @@ class TestThePartitionFigureIsReadThreeWays:
         assert score.zone_pair_coverage < 0.5
         assert score.zone_pairs is not None
         assert score.zone_pairs.reference_total > score.zone_pairs.compared
+
+    def test_placing_nothing_reads_as_lost_coverage_and_never_as_agreement(self):
+        """An unplaced element is asked nothing, and the coverage says so.
+
+        ADR 0039 admits a value two elements can share while saying nothing.
+        The unknown sentinel compares equal to itself, so a figure that read
+        the raw field would score an extraction placing every component
+        nowhere as putting all of them *together* — a perfect
+        ``same_zone_recall`` over a model that made no placement at all.
+        """
+        case = self.case_01()
+        model = case.model.model_copy(deep=True)
+        for element in model.zoned_elements():
+            element.trust_zone = UNKNOWN
+
+        score = self.score(case, model)
+
+        assert score.same_zone_recall == 0.0
+        assert score.zone_pair_coverage == 0.0
+        assert score.zone_pairs is not None
+        assert score.zone_pairs.compared == 0
+
+    def test_one_unplaced_element_costs_its_own_pairs_and_no_others(self):
+        """The rule an unpaired element already follows, applied to a placement."""
+        case = self.case_01()
+        model = case.model.model_copy(deep=True)
+        model.zoned_elements()[0].trust_zone = UNKNOWN
+
+        score = self.score(case, model)
+
+        assert score.zone_partition_agreement == 1.0
+        assert 0.0 < score.zone_pair_coverage < 1.0
 
     def test_an_aliased_element_is_still_asked(self):
         """The alignment reaches the partition too: case 09's ruled name."""

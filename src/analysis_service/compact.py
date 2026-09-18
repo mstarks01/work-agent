@@ -103,6 +103,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from analysis_service.system_model import (
     CORE_ASSET_TAGS,
     ELEMENT_GROUPS,
+    UNKNOWN,
     DataFlow,
     DataStore,
     Element,
@@ -192,6 +193,26 @@ REF_TAGS: Mapping[str, str] = MappingProxyType(
 #: exactly backwards.
 REF = rf"^[{''.join(sorted(REF_TAGS.values()))}]:[a-z0-9]+(?:-[a-z0-9]+)*$"
 
+#: A placement field: a zone ref, or the unknown sentinel for a component the
+#: sources place nowhere.
+#:
+#: **The sentinel is a value here and not a ref**, which is why it needs its own
+#: pattern rather than a looser :data:`REF`.
+#: [ADR 0039](../../docs/adr/0039-a-crossing-a-model-cannot-decide-is-still-a-lead.md)
+#: rule 1 lets a component enter the graph unplaced and ``prompts/extract.md``
+#: asks for exactly this word. A ``trust_zone`` bounded by :data:`REF` alone
+#: refuses the whole emission rather than the field: :func:`expand` returns no
+#: model, and ``validate`` routes an unconvertible payload to the rejection
+#: rather than to ``repair``, so one unplaced component would end the job.
+#:
+#: Still an allow list, and still anchored, so it admits one more word and no
+#: new shape. Every reason :data:`REF` gives for bounding a ref holds here: an
+#: unresolved value survives expansion verbatim, and the sentinel carries no
+#: newline and no backtick.
+ZONE_REF = (
+    rf"^(?:{UNKNOWN}|[{''.join(sorted(REF_TAGS.values()))}]:[a-z0-9]+(?:-[a-z0-9]+)*)$"
+)
+
 #: The prefix every provisional element ID carries, ahead of the element class's
 #: own ``id_prefix``. No element type declares a prefix holding ``_``, so a
 #: provisional ID is disjoint from every derived one by construction — which is
@@ -208,12 +229,16 @@ PROVISIONAL_PREFIX = "ref_"
 NAMEABLE = r"[A-Za-z0-9]"
 
 
-def _ref_field() -> Any:
+def _ref_field(pattern: str = REF) -> Any:
     """One field holding a ref: the length bound and the pattern together.
 
     Spelled once so no reference field can be declared with one and not the
     other. A field bounded by length alone would admit a newline, which is the
     half that matters.
+
+    ``pattern`` is :data:`ZONE_REF` for a placement, which is the one field that
+    also holds a value. The bound stays here for every field either way, so a
+    second allow list cannot arrive without one.
 
     Forty characters is a blast-radius guard rather than a measured limit, on
     the reading :data:`~analysis_service.validation.MAX_ELEMENTS` is: a ref is a
@@ -221,7 +246,7 @@ def _ref_field() -> Any:
     and a model that writes a long one has written a legal ref rather than a
     wrong one. Nothing downstream reads a ref at all.
     """
-    return Field(max_length=40, pattern=REF)
+    return Field(max_length=40, pattern=pattern)
 
 
 class _CompactElement(BaseModel):
@@ -250,14 +275,14 @@ class CompactExternalEntity(_CompactElement):
     """An :class:`~analysis_service.system_model.ExternalEntity` on the wire."""
 
     kind: Literal["human", "external-system"]
-    trust_zone: str = _ref_field()
+    trust_zone: str = _ref_field(ZONE_REF)
 
 
 class CompactProcess(_CompactElement):
     """A :class:`~analysis_service.system_model.Process` on the wire."""
 
     technology: str = Field(max_length=200)
-    trust_zone: str = _ref_field()
+    trust_zone: str = _ref_field(ZONE_REF)
     exposure: Literal["internet-facing", "internal", "unknown"]
     interface_kind: Literal["web", "non-web", "unknown"]
 
@@ -266,7 +291,7 @@ class CompactDataStore(_CompactElement):
     """A :class:`~analysis_service.system_model.DataStore` on the wire."""
 
     technology: str = Field(max_length=200)
-    trust_zone: str = _ref_field()
+    trust_zone: str = _ref_field(ZONE_REF)
     data_classification: str = Field(max_length=200)
     encryption_at_rest: str = Field(max_length=200)
 

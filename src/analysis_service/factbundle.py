@@ -33,7 +33,12 @@ exactly one zone**, and that placement is recorded as an
 convention ``prompts/extract.md`` rule 6 already uses for a required field the
 sources do not state, and the one
 :class:`~analysis_service.system_model.BoundaryCrossing` reads to mark an
-inferred endpoint. Every other unplaced component is ``unsupported``.
+inferred endpoint. Every other component no fact places enters the graph at
+:data:`~analysis_service.system_model.UNKNOWN` and carries no Assumption: ADR
+0039 rule 1 lets a component be placed nowhere, and an assumption records a
+placement this service chose rather than one it declined to choose. A row is
+``unsupported`` for what a target schema cannot express, never for a placement
+the sources do not make.
 
 **The resolver invents no Trust Boundary.** Where the bundle names no zone at
 all, the model holds none and
@@ -220,8 +225,13 @@ DispositionCode = Literal[
     "unsupported",
 ]
 
-#: The dispositions that reached an output. Derived nowhere else, because
-#: :attr:`Resolution.gaps` is its complement.
+#: The dispositions that reached an output. **The one reader of "did this row
+#: land"**: :attr:`Resolution.gaps` is its complement, and both the patch
+#: applicator and the oracle ask the same question of a row this resolver
+#: returned. Each spelled the pair again until ``tests/test_reader_lints.py``
+#: held them to it — a sixth disposition that lands would have reached one
+#: caller and not the other two, and each caller's own test would have agreed
+#: with it.
 LANDED: frozenset[str] = frozenset({"consumed", "preserved"})
 
 #: Which table a disposition row is about. ``bundle`` is the whole submission,
@@ -897,8 +907,11 @@ def _mentions(
     element the roles decide, and the second places the zoned ones. A component
     no fact places takes the sole zone where there is exactly one, with an
     :class:`~analysis_service.system_model.Assumption` naming why; with none or
-    several it is ``unsupported``, because choosing between zones to obtain a
-    binding is the failure #1003 names.
+    several it enters unplaced, at
+    :data:`~analysis_service.system_model.UNKNOWN` and with no Assumption
+    beside it. Only a component whose placement the bundle *contradicts* —
+    competing rows, or a zone handle naming nothing — stays out of the graph,
+    because choosing between two stated zones is the failure #1003 names.
     """
     # Keyed by handle for what this bundle builds and by **Element ID** for
     # what ``base`` already held. The two shapes are disjoint —
