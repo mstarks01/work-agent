@@ -1,6 +1,8 @@
 # 38. A component reaches the graph only in a zone
 
-- **Status**: accepted
+- **Status**: accepted; reopened by
+  [#1052](https://github.com/mstarks01/work-agent/issues/1052), which records two of
+  the three conditions below as met
 - **Date**: 2026-09-17
 - **Effort**: the placement finding of
   [#1003's execution audit](https://github.com/mstarks01/work-agent/issues/1003),
