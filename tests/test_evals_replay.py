@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import shutil
 from pathlib import Path
+from typing import get_args
 
 import pytest
 
@@ -318,6 +319,18 @@ class TestOneProducedRowAnswersOneReferenceRow:
         )
 
         assert len(replay.aligned_rows(reference, result)) == 1
+
+
+def test_the_preference_order_answers_for_every_answered_fate():
+    """The table against its registry, which nothing compared.
+
+    ``_assigned`` walks ``_PREFERRED`` to pick the best answer available for a
+    reference row. A fate the tuple leaves out is never picked, so the row
+    falls through to a worse one and no check fires: the table is short and
+    the run still finishes.
+    """
+    assert frozenset(replay._PREFERRED) == frozenset(get_args(replay.AnsweredFate))
+    assert len(replay._PREFERRED) == len(set(replay._PREFERRED))
 
 
 class TestEveryReferenceRowTakesOneFate:

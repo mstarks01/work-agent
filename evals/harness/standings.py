@@ -41,6 +41,13 @@ from evals.harness.roster import Roster, Standing
 #: sweep starts computing it. The first key is the primary one.
 SERIES: dict[str, tuple[Standing, ...]] = {
     "maintainer": ("maintainer",),
+    # Written out rather than derived from :data:`~evals.harness.roster.STANDINGS`,
+    # because this order is published: the artifact's series block carries it
+    # and ``evals/baselines/README.md`` is generated from it, so sorting the
+    # roster's set here would rewrite a committed table. The coverage is held
+    # instead — ``tests/test_evals_standings.py`` compares this table's union
+    # against the roster's set, so a third standing that never joins a series
+    # fails there rather than going unpublished.
     "all": ("maintainer", "contributor"),
 }
 

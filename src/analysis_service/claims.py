@@ -125,6 +125,16 @@ CONDITIONAL_GROUNDS: frozenset[str] = frozenset(
     {"unknown-attribute", "unknown-assertion"}
 )
 
+#: The two ground kinds whose reference is an element and an attribute of it.
+#: They differ in what they say about that attribute — never stated against
+#: stated absent — and in nothing a reader of the *pair* does: both carry
+#: ``element_id`` and ``attribute``, and both resolve against the same model.
+#:
+#: **Here rather than in either reader.** ``fan_in`` snaps the field and
+#: ``coverage`` counts the pairs, and each listed the two kinds for itself, so
+#: a third attribute kind would have reached one of them.
+ATTRIBUTE_GROUNDS: frozenset[str] = frozenset({"unknown-attribute", "absent-attribute"})
+
 # How long a claim ID may be. **Not a grammar**: #163 ruled that ``id`` has no
 # shared one, because each package composes its own from its own ``id_format``
 # and per-lane prefix. STRIDE's ``S-01`` and an ASVS requirement ID are both

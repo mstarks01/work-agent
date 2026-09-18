@@ -40,6 +40,8 @@ from typing import Any, Protocol
 import jwt
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
+from analysis_service.sources import FORMATTING_CATEGORIES
+
 logger = logging.getLogger(__name__)
 
 _OIDC_ENV_SUFFIXES = {
@@ -113,8 +115,10 @@ JWKS_REFRESH_COOLDOWN_SECONDS = 60.0
 
 # Unicode general categories refused in a token subject: ``Cc`` the C0/C1
 # control characters (a newline here forges a log record), ``Cf`` the invisible
-# formatting ones. Matches the rule the source label already applies.
-_SUBJECT_REJECTED_CATEGORIES = frozenset({"Cc", "Cf"})
+# formatting ones. **The source label's own set, called rather than restated**:
+# the two spelled it apart, and a category added to one would have left the
+# other admitting what its neighbour refuses.
+_SUBJECT_REJECTED_CATEGORIES = FORMATTING_CATEGORIES
 
 
 class AuthConfigError(ValueError):

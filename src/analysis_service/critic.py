@@ -42,7 +42,7 @@ from collections import Counter
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, get_args
 
 from analysis_service.claims import (
     Claim,
@@ -67,7 +67,11 @@ from analysis_service.system_model import (
 # The service holds the order because it holds
 # :data:`~analysis_service.claims.SeverityLevel`; whether a framework grades at all
 # is its record's business, and one that does not is ordered by ID alone.
-SEVERITY_ORDER: tuple[SeverityLevel, ...] = ("critical", "high", "medium", "low")
+#
+# Read off that type rather than listed again, so a band added there is ordered
+# the day it lands. The reversal is the whole difference: the type is declared
+# least severe first and a claims array reads most severe first.
+SEVERITY_ORDER: tuple[SeverityLevel, ...] = tuple(reversed(get_args(SeverityLevel)))
 
 
 class CriticOutputError(ValueError):

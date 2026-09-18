@@ -148,7 +148,12 @@ def test_a_login_or_alias_that_is_not_a_login_shape_is_refused(tmp_path):
 
 
 def test_the_standings_set_matches_the_context_glossary():
-    """CONTEXT.md's Standing entry and the code carry the same closed set."""
+    """CONTEXT.md's Standing entry and the code carry the same closed set.
+
+    The literal is the point: it transcribes the glossary, so this is the two
+    readers tested against each other rather than the code against itself.
+    Deriving it from ``Standing`` here would assert nothing.
+    """
     assert STANDINGS == {"maintainer", "contributor"}
 
 

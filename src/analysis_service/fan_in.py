@@ -46,6 +46,7 @@ from typing import NamedTuple
 from analysis_service.assertions import AssertionCatalog
 from analysis_service.candidates import generate_candidates
 from analysis_service.claims import (
+    ATTRIBUTE_GROUNDS,
     BEYOND_GROUNDS,
     ELEMENT_REF_MAX_CHARS,
     MAX_CLAIMS_PER_BATCH,
@@ -322,13 +323,6 @@ def _unresolved_mentions(
     ]
 
 
-# The two branches whose reference is an element and an attribute of it. They
-# differ in what they say about that attribute — never stated against stated
-# absent — and in nothing this module does: both snap the same field and both
-# resolve against the same model, so every check here reads the pair.
-_ATTRIBUTE_KINDS = frozenset({"unknown-attribute", "absent-attribute"})
-
-
 def _snapped_ground(
     ground: Ground, element_ids: Collection[str], labels: Collection[str]
 ) -> Ground:
@@ -341,7 +335,7 @@ def _snapped_ground(
         return ground.model_copy(
             update={"source_label": snap(ground.source_label, labels)}
         )
-    if ground.kind in _ATTRIBUTE_KINDS:
+    if ground.kind in ATTRIBUTE_GROUNDS:
         return ground.model_copy(
             update={"element_id": snap(ground.element_id, element_ids)}
         )

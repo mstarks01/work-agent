@@ -90,7 +90,7 @@ LINE_BREAKS = ("\n", "\r", "\u2028", "\u2029")
 #
 # Categories rather than an enumerated list of code points: a list is a thing
 # that rots as Unicode grows, and the property is what actually matters.
-_FORMATTING_CATEGORIES = frozenset({"Cc", "Cf"})
+FORMATTING_CATEGORIES = frozenset({"Cc", "Cf"})
 
 
 def _carries_line_break(value: str) -> bool:
@@ -100,7 +100,7 @@ def _carries_line_break(value: str) -> bool:
 
 def _carries_formatting(value: str) -> bool:
     """Whether ``value`` holds a control, bidi or zero-width character."""
-    return any(unicodedata.category(char) in _FORMATTING_CATEGORIES for char in value)
+    return any(unicodedata.category(char) in FORMATTING_CATEGORIES for char in value)
 
 
 # All that ``kind`` still selects: one phrase telling the model what register

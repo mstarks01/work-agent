@@ -401,9 +401,6 @@ OMITTABLE_FIELDS: tuple[str, ...] = tuple(
     if not field.is_required()
 )
 
-#: The name an assumption holds its subject's ref under.
-ASSUMPTION_SUBJECT = "element"
-
 #: Every field that holds a ref.
 #:
 #: **There is no scope table any more, and that is the point of version 3.** A
