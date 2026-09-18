@@ -165,7 +165,14 @@ __all__ = [
 #: fact the sources state and a framework rule reads, and no predicate
 #: carried it — so a route that builds its own graph left the attribute at
 #: ``unknown`` and ASVS's classified-store rule had nothing to fire on.
-REGISTRY_VERSION = 4
+#:
+#: Version 5 adds ``origin-verification``. A maintainer sitting read a drafted
+#: row as recording a fact no predicate could carry — a receiver that does not
+#: check who supplied what it took — and the row was deleted rather than forced
+#: into ``destination-verification``, which asks the opposite question, or into
+#: ``signature-verification``, which names a signature the source never
+#: mentions (#1053).
+REGISTRY_VERSION = 5
 
 #: The projection's version: which graph attribute each predicate is
 #: authoritative for, and what :func:`project` does when the rows do not fit one
@@ -445,6 +452,20 @@ REGISTRY: Mapping[str, Predicate] = MappingProxyType(
         "signature-verification": Predicate(
             meaning="whether the receiver checks who signed the artifact it took",
             subjects=frozenset({"artifact", "interaction"}),
+            value="term",
+            terms=frozenset({"verified"}),
+        ),
+        # The mirror of ``destination-verification``, and not a synonym for
+        # ``signature-verification``. A signature is one way to establish an
+        # origin and the only one that predicate names; this one asks whether
+        # the receiver establishes who supplied the thing at all, by any means
+        # — a folder that should match a partner, an account, a source address.
+        # Case 03's scheduler "does not check that a file came from the partner
+        # whose folder it landed in", which names no signature and is the fact
+        # neither other predicate could carry (#1053).
+        "origin-verification": Predicate(
+            meaning="whether the receiver checks who supplied what it took",
+            subjects=frozenset({"interaction"}),
             value="term",
             terms=frozenset({"verified"}),
         ),
