@@ -19,6 +19,7 @@ from analysis_service.assertions import (
     UNKNOWN,
     Assertion,
     AssertionCatalog,
+    Subject,
     assertion_id,
     identity_parts,
 )
@@ -31,13 +32,14 @@ from analysis_service.system_model import (
     parse_flow_id,
 )
 from analysis_service.validation import parse_and_validate
-from evals.harness import replay
+from evals.harness import bundle, replay
 from evals.harness.alignment import align, placeholder_zones
 from evals.harness.archive import kind_of
 from evals.harness.artifact import load_artifact
 from evals.harness.bundle import (
     assertions_from_reports,
     extractions_from_reports,
+    heads_from_reports,
     reports_dir,
     write_assertions,
     write_extractions,
@@ -53,6 +55,7 @@ from tests.test_evals_stability import score, write_run
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CORPUS = REPO_ROOT / "evals" / "corpus"
 EMISSIONS = REPO_ROOT / "evals" / "emissions"
+ARMS = EMISSIONS / "20260917T-arms-luna-pro"
 
 
 def fates(golden, model: SystemModel | None) -> dict[str, replay.ElementFate]:
@@ -855,6 +858,106 @@ class TestAnUnsignedReferenceGradesNothing:
 
         assert replay.unsigned_rows(tmp_path, golden) == 1
         assert replay.signed_reference(tmp_path, golden) is None
+
+
+class TestAnArchivedCatalogIsRedrawnFromItsLabels:
+    """#1044: a slug rule that moves re-keys the reference and not the archive.
+
+    A principal, a credential and an artifact carry an ID that is a pure
+    function of the words a source used, and the archive carries those words.
+    So the archive can be brought forward; a graph-bound subject cannot, because
+    its ID is an **Element ID** the run's own model decided.
+    """
+
+    def catalog(self, *subjects, entries=()):
+        return AssertionCatalog(
+            subjects=[
+                Subject(id=one, type=kind, label=label) for one, kind, label in subjects
+            ],
+            entries=list(entries),
+        )
+
+    def row(self, subject, predicate, value):
+        return Assertion(
+            subject=subject, predicate=predicate, value=value, basis="stated"
+        )
+
+    def test_a_layer_own_subject_is_redrawn_from_its_label(self):
+        """The archived spelling of a possessive, under today's rule."""
+        held = self.catalog(
+            (
+                "principal:order-service-s-own-account",
+                "principal",
+                "order service's own account",
+            ),
+            entries=[
+                self.row(
+                    "principal:order-service-s-own-account", "mfa-requirement", "absent"
+                )
+            ],
+        )
+
+        moved = bundle.redrawn(held)
+
+        assert [one.id for one in moved.subjects] == [
+            "principal:order-services-own-account"
+        ]
+        assert moved.entries[0].subject == "principal:order-services-own-account"
+
+    def test_a_graph_bound_subject_is_left_exactly_as_archived(self):
+        """No rule here can re-derive an Element ID the run's own model decided."""
+        held = self.catalog(
+            ("process:order-service-s-worker", "component", "order service's worker"),
+        )
+
+        assert bundle.redrawn(held).subjects[0].id == "process:order-service-s-worker"
+
+    def test_a_reference_value_follows_the_subject_it_names(self):
+        """A credential a row points at moves with the credential."""
+        held = self.catalog(
+            ("credential:team-s-token", "credential", "team's token"),
+            ("principal:worker", "principal", "worker"),
+            entries=[
+                self.row(
+                    "principal:worker",
+                    "credential-presented",
+                    "credential:team-s-token",
+                )
+            ],
+        )
+
+        moved = bundle.redrawn(held)
+
+        assert moved.entries[0].value == "credential:teams-token"
+
+    def test_a_move_onto_a_taken_id_is_refused(self):
+        """Two labels that slugged apart may slug together; merging them would
+        make two subjects the run kept apart into one."""
+        held = self.catalog(
+            ("principal:team-s-account", "principal", "team's account"),
+            ("principal:teams-account", "principal", "teams account"),
+        )
+
+        moved = bundle.redrawn(held)
+
+        assert [one.id for one in moved.subjects] == [
+            "principal:team-s-account",
+            "principal:teams-account",
+        ]
+
+    def test_a_catalog_needing_no_move_is_returned_as_it_is(self):
+        held = self.catalog(("principal:worker", "principal", "worker"))
+
+        assert bundle.redrawn(held) is held
+
+    def test_the_archive_reads_back_under_todays_rule(self):
+        """The one live row, over the sweep this repository archived."""
+        golden = case("01")
+        result = heads_from_reports(ARMS / "arm-A.json", [golden])[golden.id]
+        subjects = {one.id for one in result.catalog.subjects}
+
+        assert "principal:order-services-own-service-account" in subjects
+        assert "principal:order-service-s-own-service-account" not in subjects
 
 
 class TestTheBundleReadsBackWhatItWrote:
