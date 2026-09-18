@@ -27,11 +27,14 @@ from pathlib import Path
 from typing import Any
 
 from analysis_service.assertions import (
+    GRAPH_BOUND,
+    REGISTRY,
     AssertionCatalog,
     AssertionRecord,
     CatalogIssue,
     CatalogProposal,
     project,
+    subject_id,
 )
 from analysis_service.claims import FrameworkAnalysis, FrameworkName
 from analysis_service.compact import FULL_FORMAT, parse_extraction
@@ -441,6 +444,77 @@ def assertions_from_reports(
     return results
 
 
+def redrawn(catalog: AssertionCatalog) -> AssertionCatalog:
+    """One archived catalog with each layer-own subject ID re-derived from its label.
+
+    **A slug rule that moves re-keys the reference and not the archive (#1044).**
+    A principal, a credential and an artifact carry an ID that is a pure
+    function of the words a source used, through
+    :func:`~analysis_service.assertions.subject_id`. The signed reference
+    derives it today; an archived catalog holds the ID the run wrote on the day.
+    So a change to :func:`~analysis_service.system_model.normalize_name` moved
+    one side and not the other, and an archived row lost the reference row that
+    took it.
+
+    The label is what the archive carries, and it is what the rule reads, so
+    re-deriving from it is the same repair the alignment makes for an element:
+    a name is authoritative and an ID follows. :func:`subject_id` is called
+    rather than respelled, so this moves with the rule instead of becoming a
+    second reading of it.
+
+    **A graph-bound subject is left exactly as archived.** Its ID is an
+    **Element ID** the run's own extracted model decided, and no rule here can
+    re-derive one — which is why :func:`heads_from_reports` reads the catalog
+    the run gated rather than re-resolving it.
+
+    **A move onto an ID something else already holds is refused.** Two labels
+    that slugged apart under the older rule can slug together under the newer
+    one, and rewriting both would merge two subjects the run kept apart. Those
+    stay as archived, which is the same answer the resolver gives a duplicate.
+    """
+    moved: dict[str, str] = {}
+    taken = {subject.id for subject in catalog.subjects}
+    for subject in catalog.subjects:
+        if subject.type in GRAPH_BOUND:
+            continue
+        try:
+            derived = subject_id(subject.type, subject.label)
+        except ValueError:
+            continue
+        if derived == subject.id or derived in taken:
+            continue
+        moved[subject.id] = derived
+        taken.add(derived)
+    if not moved:
+        return catalog
+    return AssertionCatalog(
+        registry_version=catalog.registry_version,
+        subjects=[
+            subject.model_copy(update={"id": moved[subject.id]})
+            if subject.id in moved
+            else subject
+            for subject in catalog.subjects
+        ],
+        entries=[_redrawn_entry(entry, moved) for entry in catalog.entries],
+    )
+
+
+def _redrawn_entry(entry, moved: Mapping[str, str]):
+    """One row under the moved subject IDs, in its subject and in its value.
+
+    A ``reference`` value names a subject, so a row pointing at a moved one
+    follows it. Every other value is prose or a term and is left alone.
+    """
+    update: dict[str, str] = {}
+    if entry.subject in moved:
+        update["subject"] = moved[entry.subject]
+    predicate = REGISTRY.get(entry.predicate)
+    names_a_subject = predicate is not None and predicate.value == "reference"
+    if names_a_subject and entry.value in moved:
+        update["value"] = moved[entry.value]
+    return entry.model_copy(update=update) if update else entry
+
+
 def heads_from_reports(
     artifact: Path, cases: Sequence[GoldenCase]
 ) -> dict[str, modes.AssertionResult]:
@@ -457,13 +531,19 @@ def heads_from_reports(
     and the rows are compared to the reference through the signed subject
     aliases, which is where a reviewer has already ruled whether two names are
     one subject.
+
+    :func:`redrawn` runs over it first, and only over the subjects no graph
+    decides. :func:`assertions_from_reports` needs no such step because it
+    re-resolves the whole proposal, which re-derives every layer-own ID on the
+    way; this reader cannot, and those subjects are exactly the ones it can
+    still bring forward.
     """
     results = {}
     for case, written in _case_files(artifact, cases, ".assertions.json"):
         results[case.id] = modes.AssertionResult(
             case_id=case.id,
             proposal=written.get("proposal", {}),
-            catalog=AssertionCatalog.model_validate(written["catalog"]),
+            catalog=redrawn(AssertionCatalog.model_validate(written["catalog"])),
             issues=tuple(
                 CatalogIssue.model_validate(issue)
                 for issue in written.get("issues", ())
