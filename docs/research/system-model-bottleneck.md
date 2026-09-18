@@ -5,6 +5,14 @@ type, placement and interaction structure. #1033 asks whether those commitments
 lose facts the sources state. Where they do, it asks how much of the measured
 loss they account for.
 
+> **Superseded in part.** The corpus this rests on carried five signed cases
+> and 45 required rows. A maintainer sitting on 2026-09-18 signed the other
+> eight, taking it to **13 cases and 119 rows**, and every figure below
+> recomputes differently on it. The recomputed stage table and what it
+> changes are on
+> [#1033](https://github.com/mstarks01/work-agent/issues/1033). Read this file
+> as the record of what was measured at `756b065`.
+
 **This file records facts and a recommendation. It rules nothing.** The ruling
 belongs to #1033 and to whatever issues it opens. No production default,
 framework behaviour or public schema changed for this investigation.

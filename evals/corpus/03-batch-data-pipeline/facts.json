@@ -21,15 +21,15 @@
         "exclusive": false
       },
       "rationale": "Stated for the partner push and only that path.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
         "subject_type": "principal",
         "subject": "principal:insurance-partners",
         "predicate": "credential-presented",
-        "value": "credential:partner-static-key",
-        "reason": null,
+        "value": "unknown",
+        "reason": "silent",
         "scope": [],
         "basis": "stated",
         "quotes": [
@@ -41,8 +41,8 @@
         "explanation": "",
         "exclusive": false
       },
-      "rationale": "Each partner presents its own key. Recorded on the principal that presents it rather than as a second predicate on the interaction, so the flow's authentication projects a value instead of a degraded unknown.",
-      "reviewed_by": null
+      "rationale": "Issuing each partner a key establishes assignment. It does not state that the key is presented on this flow, so the source settles no mechanism here.",
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -63,7 +63,7 @@
         "exclusive": false
       },
       "rationale": "A stated absence of rotation rather than an unknown.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -84,28 +84,7 @@
         "exclusive": false
       },
       "rationale": "SFTP is stated as the transport for this flow.",
-      "reviewed_by": null
-    },
-    {
-      "assertion": {
-        "subject_type": "interaction",
-        "subject": "flow:process:ingest-scheduler>store:landing-bucket>list-and-read-files",
-        "predicate": "destination-verification",
-        "value": "absent",
-        "reason": null,
-        "scope": [],
-        "basis": "stated",
-        "quotes": [
-          {
-            "source_label": "System description",
-            "quote": "It does not check that a file came from the partner whose folder it landed in."
-          }
-        ],
-        "explanation": "",
-        "exclusive": false
-      },
-      "rationale": "An explicit absence: the check is named and said not to happen.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -126,7 +105,7 @@
         "exclusive": false
       },
       "rationale": "Stated directly.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -147,7 +126,7 @@
         "exclusive": false
       },
       "rationale": "Stated directly.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -168,7 +147,7 @@
         "exclusive": false
       },
       "rationale": "Where the credential is kept, stated.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -189,7 +168,7 @@
         "exclusive": false
       },
       "rationale": "The analyst's own position, stated in the same sentence as the mechanism.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -210,7 +189,7 @@
         "exclusive": false
       },
       "rationale": "Stated for the analyst path.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -233,14 +212,14 @@
         "quotes": [
           {
             "source_label": "System description",
-            "quote": "the grant is dataset-wide — we have not split member-identifying columns out"
+            "quote": "the grant is dataset-wide \u2014 we have not split member-identifying columns out"
           }
         ],
         "explanation": "",
         "exclusive": false
       },
       "rationale": "A grant stated with its breadth, and the speaker names what was not separated.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -261,7 +240,7 @@
         "exclusive": false
       },
       "rationale": "The speaker raised the landing bucket and could not answer. 'Both are on defaults as far as I know' is a hedge, not a statement.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -282,7 +261,7 @@
         "exclusive": false
       },
       "rationale": "The speaker raised the Airflow metadata database and could not answer. 'Both are on defaults as far as I know' is a hedge, not a statement.",
-      "reviewed_by": null
+      "reviewed_by": "mstarks01"
     },
     {
       "assertion": {
@@ -356,8 +335,8 @@
       "proposed": "record as an inference",
       "kind": "defensible-inference",
       "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-      "ruling": null,
-      "reviewed_by": null
+      "ruling": "change",
+      "reviewed_by": "mstarks01"
     },
     {
       "element_id": "process:ingest-scheduler",
@@ -366,8 +345,8 @@
       "proposed": "record as an inference",
       "kind": "defensible-inference",
       "basis": "No sentence states its reachability. Sitting in an internal network implies it, which is an inference rather than a statement.",
-      "ruling": null,
-      "reviewed_by": null
+      "ruling": "change",
+      "reviewed_by": "mstarks01"
     },
     {
       "element_id": "process:spark-transform-job",
@@ -376,8 +355,8 @@
       "proposed": "record as an inference",
       "kind": "defensible-inference",
       "basis": "No sentence states its reachability. Sitting in an internal network implies it, which is an inference rather than a statement.",
-      "ruling": null,
-      "reviewed_by": null
+      "ruling": "change",
+      "reviewed_by": "mstarks01"
     },
     {
       "element_id": "store:landing-bucket",
@@ -386,8 +365,8 @@
       "proposed": "record as an inference",
       "kind": "defensible-inference",
       "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-      "ruling": null,
-      "reviewed_by": null
+      "ruling": "change",
+      "reviewed_by": "mstarks01"
     },
     {
       "element_id": "store:airflow-metadata-database",
@@ -396,8 +375,8 @@
       "proposed": "record as an inference",
       "kind": "defensible-inference",
       "basis": "Airflow keeping its own metadata database implies the scheduler's network. No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-      "ruling": null,
-      "reviewed_by": null
+      "ruling": "change",
+      "reviewed_by": "mstarks01"
     },
     {
       "element_id": "store:claims-warehouse",
@@ -406,8 +385,8 @@
       "proposed": "record as an inference",
       "kind": "defensible-inference",
       "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-      "ruling": null,
-      "reviewed_by": null
+      "ruling": "change",
+      "reviewed_by": "mstarks01"
     }
   ],
   "aliases": {

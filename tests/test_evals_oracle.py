@@ -11,6 +11,7 @@ at all.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 
@@ -54,18 +55,36 @@ class TestItIsNotAnArm:
 class TestTheCeiling:
     """What the deterministic path does to a reading that is already right."""
 
-    def test_the_path_loses_no_required_row(self, charged) -> None:
-        """The result #1003's step 4 asks for, held as a regression test.
+    #: The only required row a perfect reading loses, and the rule that loses
+    #: it. Case 12 names a supplier the sources never place, so the interaction
+    #: to the portal has an unplaced endpoint and the authentication fact on it
+    #: is unresolved — which is
+    #: [ADR 0038](../docs/adr/0038-a-component-reaches-the-graph-only-in-a-zone.md)
+    #: rule 2 costing a required fact for the first time. Listed rather than
+    #: tolerated: a second entry here means the contract is costing more than
+    #: the ADR priced it at, and its own revisit condition is met.
+    PRICED_LOSSES: ClassVar[dict[tuple[str, str], str]] = {
+        (
+            "flow:entity:supplier>process:supplier-portal>upload-documents",
+            "authentication-mechanism",
+        ): "unplaced-subject",
+    }
 
-        A row charged to ``resolution``, ``gate`` or ``scored`` is one the code
-        between the model and the catalog dropped from a perfect reading. None
-        of those stages may carry a row: if one does, a prompt change cannot
-        recover it and the repair belongs in the code.
+    def test_the_path_loses_only_the_rows_the_contract_prices(self, charged) -> None:
+        """What the code between the model and the catalog drops from a perfect reading.
+
+        A row charged to ``resolution``, ``gate`` or ``scored`` is one no prompt
+        change can recover, so the repair would belong in the code. The one
+        exception is a loss the placement contract states and prices, which
+        :data:`PRICED_LOSSES` names in full.
         """
-        lost = [row for case in charged for row in case.lost]
-        assert not lost, [
-            f"{row.subject} {row.predicate}: {row.stage} ({row.why})" for row in lost
-        ]
+        lost = {
+            (row.subject, row.predicate): row.why
+            for case in charged
+            for row in case.lost
+        }
+
+        assert lost == self.PRICED_LOSSES
 
     def test_every_required_row_is_charged_exactly_once(self, charged) -> None:
         for case in charged:

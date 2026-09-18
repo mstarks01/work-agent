@@ -79,7 +79,7 @@ Not part of the question, but the records cite these names, so you need them.
 
 | id | exposure | interface | zone | technology |
 |---|---|---|---|---|
-| process:identity-broker | internet-facing | web | boundary:corporate-network | unknown |
+| process:identity-broker | unknown | web | boundary:corporate-network | unknown |
 | process:store-admin-console | unknown | web | boundary:corporate-network | unknown |
 
 **Data stores**
@@ -118,9 +118,12 @@ Not part of the question, but the records cite these names, so you need them.
 
 **Assumptions**
 
-- `process:identity-broker` — The identity broker is reachable from outside the corporate network. (basis: Colleagues are stated to sign in to it from wherever they are, including their own devices at home, while it is stated to run on the corporate network.)
 - `entity:franchise-identity-provider` — The franchise identity provider is a separate trust party from everywhere else outside the corporate network. (basis: The source introduces the franchise stores as a distinct group let in on distinct terms; it does not say where the provider runs, so the zone is drawn on the party rather than on a network.)
 - `entity:hr-system` — The HR system sits outside the corporate network. (basis: The source names it as the system of record the broker pulls from and never places it; grouped with the other unplaced parties rather than assumed internal.)
+- `store:directory` — directory's trust_zone is boundary:corporate-network, which the schema requires and no source states. (basis: The broker is placed; its directory is not. No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.)
+- `store:key-store` — key store's trust_zone is boundary:corporate-network, which the schema requires and no source states. (basis: No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.)
+- `store:audit-log` — audit log's trust_zone is boundary:corporate-network, which the schema requires and no source states. (basis: No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.)
+- `entity:colleague` — colleague's trust_zone is boundary:outside-corporate-network, which the schema requires and no source states. (basis: Home use establishes a physical location, not network membership: a VPN remains possible. The model's zone is a reading of the architecture, not something the source says.)
 
 **Reviewed aliases** — other names a reader ruled identify the same element, each with the words in the source that support it. An extraction using one is named differently, not wrong.
 
@@ -516,7 +519,7 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "36115502847aa04640666b0dd9f458881e6f7f8968e4d499b58983b3403dc721",
-      "model.json": "772629991b2d031e5972fbfdb5abdb7b87aabdbfc942ea4c6033356a9db21b81",
+      "model.json": "ac76097637bbdeb06785b665adff0fd0ccd280382fa40813611514f88b0c398f",
       "claims/asvs.json": "80d8f95844658dbd83985ff1c9ecd70a675f6dc5861fafe499164b82287a5e9a",
       "claims/stride.json": "e7d9ea199f055777363e62b00eaf13504355343e6ce84bb5230556fb1ab77cfa"
       }

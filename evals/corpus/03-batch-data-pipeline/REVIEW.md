@@ -101,6 +101,12 @@ Not part of the question, but the records cite these names, so you need them.
 
 - `flow:entity:insurance-partner>store:landing-bucket>push-daily-extract` — SFTP traffic from partners is protected by the SSH transport it runs over. (basis: The text names SFTP, whose transport encryption is intrinsic to the protocol; no other transport claim is made.)
 - `store:claims-warehouse` — The claims data is health-related personal data. (basis: Described as insurance claim records carrying member names and dates of birth.)
+- `entity:insurance-partner` — insurance partner's trust_zone is boundary:partner-network, which the schema requires and no source states. (basis: No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.)
+- `process:ingest-scheduler` — ingest scheduler's exposure is internal, which the schema requires and no source states. (basis: No sentence states its reachability. Sitting in an internal network implies it, which is an inference rather than a statement.)
+- `process:spark-transform-job` — Spark transform job's exposure is internal, which the schema requires and no source states. (basis: No sentence states its reachability. Sitting in an internal network implies it, which is an inference rather than a statement.)
+- `store:landing-bucket` — landing bucket's trust_zone is boundary:landing-network, which the schema requires and no source states. (basis: No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.)
+- `store:airflow-metadata-database` — Airflow metadata database's trust_zone is boundary:landing-network, which the schema requires and no source states. (basis: Airflow keeping its own metadata database implies the scheduler's network. No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.)
+- `store:claims-warehouse` — claims warehouse's trust_zone is boundary:warehouse-network, which the schema requires and no source states. (basis: No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.)
 
 **Reviewed aliases** — other names a reader ruled identify the same element, each with the words in the source that support it. An extraction using one is named differently, not wrong.
 
@@ -336,7 +342,7 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "df7757178c394258cbcf1643e81fca5b01f324058a0841824f008e74346da2d0",
-      "model.json": "4cc4e9095e0003827944cc231b4ef8827b184421b138551069e40d4974d5603e",
+      "model.json": "d2f9f347fa2829121859e4d651347522b066a74c4276a026b1b71b31af2f715c",
       "claims/stride.json": "47ff8bbda7f4ddda4ac89fa54e207db321fccfa05d93dbe04ada85f6a7597857"
       }
     }
