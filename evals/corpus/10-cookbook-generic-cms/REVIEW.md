@@ -218,7 +218,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**2.** An attacker publishes assets into the CDN bucket as if they came from the web server, because how that push is authenticated is unverified.
+**2.** An attacker publishes assets into the CDN bucket as if they came from the web server, if the push accepts a writer it does not authenticate, which the source leaves unverified.
 
 - `flow:process:web-server>store:cdn-bucket>asset-publish`, `store:cdn-bucket`
 - severity: medium/high · verb: `impersonate`
@@ -345,11 +345,11 @@ on either of them. That is the finding this sitting exists for.
 
 ### elevation-of-privilege
 
-**16.** An attacker who intercepts the admin's unencrypted session obtains database authority that bypasses every control the CMS applies.
+**16.** An attacker who actively intercepts the admin's unencrypted session, or captures a reusable credential from it, obtains the authority of the admin's database account and bypasses the controls the CMS applies.
 
 - `flow:entity:admin>store:mysql-database>direct-administration`, `store:mysql-database`
 - severity: medium/high · verb: `escalate`
-- The escalation the case is built to grade: authority is not gained inside the application but around it, and the CMS never sees the actor.
+- The escalation the case is built to grade: authority is not gained inside the application but around it, and the CMS never sees the actor. The authority reaches as far as the admin's database account permits and no further.
 
 > mark:
 
@@ -408,7 +408,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "11d2a58f0e1d5773054f0a72d222b3cc96f889cdd0206dd3656495a3d5fe8313",
       "model.json": "c89911777cd70655676903a6c7b7dc10c70282233eb31533b2b58d4fd5662227",
       "claims/asvs.json": "38c218796733dcb8a7704c88a23fb0896007a20be9f562109349be94034a33ad",
-      "claims/stride.json": "b914aa99215333ed4a49748b1c03ab422d37a5cb741ec9fb63a81e82f11db06f"
+      "claims/stride.json": "d1c3bff31f9f7673f961233b604b137b9fb5b49c7a8b8f1812f46683f38f738d"
       }
     }
   }
