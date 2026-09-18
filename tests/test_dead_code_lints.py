@@ -97,6 +97,21 @@ TEST_ONLY: dict[str, str] = {
         "the reader the archive encoding lint classifies every sealed file"
         " with, so a committed file whose producer nobody declared fails there"
     ),
+    "KIND_NAMES": "the whole-name half of what kind_of reads",
+    "KIND_SUFFIXES": "the suffix half of what kind_of reads",
+    "PLACEHOLDERS": (
+        "what the critic replay fills, held against the prompt file by a test"
+        " rather than trusted: an unfilled placeholder reaches a model as a"
+        " literal brace and the critic rules on a model it cannot see"
+    ),
+    "UNREVIEWED_FILE": (
+        "where the UNREVIEWED table lives, so the test that reads the table"
+        " and the sitting that names it cannot point at two different files"
+    ),
+    "DIRTY_MARKER": (
+        "the marker a dirty checkout appends to a configuration label, named"
+        " so the test pins the spelling the rule table produces"
+    ),
     # evals/harness/exemplar_verbs.py, whole: the verbs the exemplars demonstrate
     # against the verbs the corpus grades, which both move often.
     **dict.fromkeys(
@@ -111,12 +126,33 @@ TEST_ONLY: dict[str, str] = {
             "lane_verbs",
             "undemonstrated",
             "verb_keyed_frameworks",
+            "_JSON_BLOCK",
         ),
         _PINNED,
     ),
 }
 
 _DEFINITIONS = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+
+#: The assignment shapes a module-level constant takes, judged beside the
+#: definitions above. A constant is a fact like any other and needs a reader
+#: like any other -- and a lint that looked only at ``def`` and ``class`` left
+#: the whole shape unchecked. Five sat in that gap: a prefix nothing composed,
+#: a field name the code read as a literal, a tuple beside the ``Literal`` that
+#: already declared it, a rank map built from a tuple nobody indexed, and a
+#: version nothing stamped.
+_ASSIGNMENTS = (ast.Assign, ast.AnnAssign)
+
+
+def _assigned_names(node: ast.stmt) -> list[str]:
+    """The module-level names one assignment binds, ignoring every other target."""
+    if isinstance(node, ast.Assign):
+        return [t.id for t in node.targets if isinstance(t, ast.Name)]
+    if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+        # An annotation with no value declares a type and binds nothing, so it
+        # is not a fact anybody could read.
+        return [node.target.id] if node.value is not None else []
+    return []
 
 
 def _definitions() -> dict[str, str]:
@@ -129,14 +165,19 @@ def _definitions() -> dict[str, str]:
     for scope, public_is_api in SCOPES:
         for path in source_files(scope):
             for node in parse(path).body:
-                if not isinstance(node, _DEFINITIONS):
+                if isinstance(node, _DEFINITIONS):
+                    names = [node.name]
+                elif isinstance(node, _ASSIGNMENTS):
+                    names = _assigned_names(node)
+                else:
                     continue
-                private = node.name.startswith("_")
-                if node.name.startswith("__"):
-                    continue
-                if public_is_api and not private:
-                    continue
-                found[node.name] = f"{path.relative_to(REPO_ROOT)}:{node.lineno}"
+                for name in names:
+                    private = name.startswith("_")
+                    if name.startswith("__"):
+                        continue
+                    if public_is_api and not private:
+                        continue
+                    found[name] = f"{path.relative_to(REPO_ROOT)}:{node.lineno}"
     return found
 
 
@@ -149,6 +190,12 @@ def _used_names(
     plain string rather than an ``ast.Name``, so a helper that only defines
     itself never appears here. That is the whole trick.
 
+    **A binding is not a use, which is what makes the trick hold for a
+    constant.** An assignment target *is* an ``ast.Name``, so counting every
+    ``Name`` would let ``X = 1`` reach itself and no constant could ever read
+    as dead. Store context is excluded for that reason, and an augmented
+    assignment is put back by hand: ``X += 1`` binds and reads at one target.
+
     ``ignoring`` names definitions already proved dead. Their bodies are skipped
     entirely, so a name only they reach stops looking reached -- which is what
     finds a helper kept alive by its one dead caller.
@@ -160,7 +207,12 @@ def _used_names(
             if isinstance(child, _DEFINITIONS) and child.name in ignoring:
                 continue
             if isinstance(child, ast.Name):
-                used.add(child.id)
+                if not isinstance(child.ctx, ast.Store):
+                    used.add(child.id)
+            elif isinstance(child, ast.AugAssign) and isinstance(
+                child.target, ast.Name
+            ):
+                used.add(child.target.id)
             elif isinstance(child, ast.Attribute):
                 used.add(child.attr)
             elif isinstance(child, ast.ImportFrom):

@@ -24,7 +24,7 @@ from __future__ import annotations
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, cast
+from typing import Literal, cast, get_args
 
 from evals.harness import ledger
 
@@ -38,10 +38,11 @@ VERSION = 1
 
 Standing = Literal["maintainer", "contributor"]
 
-#: The closed set of standings. Every published number states which of these
-#: its series includes; there is no third class and no per-voter weight —
-#: standing selects which votes a series reads, never how much a vote counts.
-STANDINGS: frozenset[str] = frozenset({"maintainer", "contributor"})
+#: The closed set of standings, off the type that declares it rather than
+#: listed again. Every published number states which of these its series
+#: includes; there is no third class and no per-voter weight — standing selects
+#: which votes a series reads, never how much a vote counts.
+STANDINGS: frozenset[str] = frozenset(get_args(Standing))
 
 #: The login shape the ledger enforces on ``voter``, **called** rather than
 #: spelled again: the roster refuses a key that could never name a vote file,

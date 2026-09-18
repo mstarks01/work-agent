@@ -58,7 +58,14 @@ from analysis_service.system_model import (
 )
 from analysis_service.validation import parse_and_validate
 from evals.harness.calibration import SCORED_LABELS, Label, LabelAnnotation
-from evals.harness.reference import MUST_FIND, AsvsDisposition, CorpusError, Tier
+from evals.harness.reference import (
+    MUST_FIND,
+    AsvsDisposition,
+    CorpusError,
+    ExemplarProximity,
+    Tier,
+    missing_case_files,
+)
 from evals.harness.verbs import unknown_verbs
 from evals.reference_facts import (
     FACTS_FILE,
@@ -144,12 +151,17 @@ UNASSIGNABLE: dict[tuple[str, str], str] = {
     ): "the model holds no audit log to name",
 }
 
-RATINGS = frozenset(("low", "medium", "high"))
+#: The rating vocabulary, off the type that declares it rather than listed
+#: again -- the same rule the tier set below follows, for the same reason.
+RATINGS = frozenset(get_args(Rating))
 #: The tier vocabulary, off the type that declares it rather than listed again.
 #: A second list is how the corpus lint comes to admit a tier the scorer cannot
 #: read, or refuse one it can.
 TIERS = frozenset(get_args(Tier))
-EXEMPLAR_PROXIMITY = frozenset(("near", "far"))
+#: Which proximities a reference set may declare, off the type the reference
+#: record declares them with. A second list here is how the corpus lint comes
+#: to refuse a proximity the scorer reads.
+EXEMPLAR_PROXIMITY = frozenset(get_args(ExemplarProximity))
 CASE_FIELDS = frozenset(
     (
         "id",
@@ -896,10 +908,7 @@ def lane_coverage_issues(must_find_lanes: Mapping[str, set[object]]) -> Iterator
 
 def check_case(case_dir: Path) -> list[str]:
     """Every mechanical failure in one case, empty if the case is sound."""
-    problems: list[str] = []
-    for name in ("source.md", "model.json", "case.json"):
-        if not (case_dir / name).exists():
-            problems.append(f"missing {name}")
+    problems: list[str] = [f"missing {name}" for name in missing_case_files(case_dir)]
     if problems:
         return problems
 

@@ -20,9 +20,8 @@ from analysis_service.system_model import (
     make_flow_id,
     normalize_element_ids,
 )
-from evals.harness import alignment, modes
+from evals.harness import modes
 from evals.harness.alignment import (
-    EVIDENCE,
     FLOW_DISCRIMINATORS,
     Alignment,
     Pair,
@@ -467,11 +466,6 @@ class TestTheAlignmentIsTheOneReader:
     def test_every_discriminator_is_a_scored_attribute(self):
         """A fact that tells two flows apart is a fact the scorer compares."""
         assert set(FLOW_DISCRIMINATORS) <= set(modes._SCORED_ATTRIBUTES)
-
-    def test_the_evidence_literal_and_its_tuple_agree(self):
-        from typing import get_args
-
-        assert set(EVIDENCE) == set(get_args(alignment.Evidence))
 
     def test_the_artifact_carries_the_pairs_and_the_leftovers(self):
         golden = case("09")

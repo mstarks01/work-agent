@@ -69,6 +69,7 @@ from typing import Any, Literal
 
 from analysis_service.analysis import states_a_protocol
 from analysis_service.system_model import (
+    UNKNOWN,
     DataFlow,
     SystemModel,
     flow_label,
@@ -79,14 +80,6 @@ from evals.harness.reference import GoldenCase
 
 #: What a pair rests on, in the order the rules run.
 Evidence = Literal["exact", "alias", "membership", "label", "discriminated", "sole"]
-EVIDENCE: tuple[Evidence, ...] = (
-    "exact",
-    "alias",
-    "membership",
-    "label",
-    "discriminated",
-    "sole",
-)
 
 
 def protocol_state(value: Any) -> str:
@@ -125,7 +118,7 @@ def placeholder_zones(model: SystemModel) -> frozenset[str]:
     assumed = model.assumed_zone_elements()
     members: dict[str, list[str]] = defaultdict(list)
     for element in model.zoned_elements():
-        if element.trust_zone:
+        if element.trust_zone != UNKNOWN:
             members[element.trust_zone].append(element.id)
     return frozenset(
         zone.id
@@ -357,7 +350,7 @@ def _align_zones(
     zone_of = {
         element.id: element.trust_zone
         for element in produced.zoned_elements()
-        if element.trust_zone
+        if element.trust_zone != UNKNOWN
     }
     held = {zone.id for zone in produced.trust_boundaries} - taken
     claims: dict[str, str] = {}

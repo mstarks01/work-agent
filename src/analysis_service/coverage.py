@@ -58,6 +58,7 @@ from types import MappingProxyType
 from analysis_service.analysis import unknown_controls
 from analysis_service.candidates import CandidateSet
 from analysis_service.claims import (
+    ATTRIBUTE_GROUNDS,
     Claim,
     LaneCoverage,
 )
@@ -226,7 +227,7 @@ def _row(
         (ground.element_id, ground.attribute)
         for draft in drafts
         for ground in draft.grounds
-        if ground.kind in ("unknown-attribute", "absent-attribute")
+        if ground.kind in ATTRIBUTE_GROUNDS
     }
     offered = candidate_set.candidates if candidate_set else ()
     return LaneCoverage(

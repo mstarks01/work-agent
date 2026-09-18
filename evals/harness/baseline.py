@@ -373,8 +373,9 @@ BASELINE_RULES: tuple[_BaselineRule, ...] = (
     _BaselineRule(marker="-multiprovider", unmet=_unmet_one_provider),
 )
 
-#: Kept as a name because it reads in a message and in a test. The table above
-#: is what appends it.
+#: The table above is what appends it, off its own rule's ``marker``. Named
+#: here so a test can pin the spelling a dirty checkout produces without
+#: reaching into the table by index.
 DIRTY_MARKER = BASELINE_RULES[0].marker
 
 

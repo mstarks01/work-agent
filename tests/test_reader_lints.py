@@ -32,8 +32,11 @@ from pathlib import Path
 
 import pytest
 
+from analysis_service.claims import ATTRIBUTE_GROUNDS
 from analysis_service.factbundle import LANDED
-from evals.harness.reference import MUST_FIND
+from analysis_service.sources import FORMATTING_CATEGORIES
+from evals.harness.reference import CASE_FILES, MUST_FIND
+from evals.harness.roster import STANDINGS
 from tests.source_tree import REPO_ROOT, parse, source_files
 from webapp import main, offline_sitting, review, sitting
 from webapp.page import client_script
@@ -464,6 +467,24 @@ def test_the_constant_interpolation_scan_finds_one_when_there_is_one(tmp_path):
 #: itself the second spelling it exists to forbid.
 OWNED_VOCABULARIES: dict[str, frozenset[str]] = {
     "src/analysis_service/factbundle.py": LANDED,
+    "src/analysis_service/claims.py": ATTRIBUTE_GROUNDS,
+    "src/analysis_service/sources.py": FORMATTING_CATEGORIES,
+    "evals/harness/roster.py": STANDINGS,
+    "evals/harness/reference.py": frozenset(CASE_FILES),
+}
+
+
+#: The one site allowed to write a vocabulary out again, with the reason. A
+#: declaration that stops being needed fails with everything else, because the
+#: lint reports a site it cannot find.
+DECLARED_RESPELLINGS: dict[str, str] = {
+    "evals/harness/standings.py": (
+        "SERIES writes the standings out in a published order: the artifact's"
+        " series block carries it and evals/baselines/README.md is generated"
+        " from it, so deriving it from an unordered set would rewrite a"
+        " committed table. tests/test_evals_standings.py holds the table's"
+        " union against the roster's set instead"
+    ),
 }
 
 
@@ -491,16 +512,36 @@ def test_no_second_site_respells_an_owned_vocabulary(owner):
     members out again is a reader the owner cannot move.
     """
     members = OWNED_VOCABULARIES[owner]
+    # Production roots only. A test naming both members is data — a vote
+    # fixture needs a standing to put in it — while a second *reader* in the
+    # shipped tree is the thing that comes to disagree.
     found = [
         f"{path.relative_to(REPO_ROOT)}:{line}"
-        for path in source_files(*SEARCHED)
-        if path.relative_to(REPO_ROOT).as_posix() != owner
+        for path in source_files("src", "evals", "webapp")
+        if path.relative_to(REPO_ROOT).as_posix() not in (owner, *DECLARED_RESPELLINGS)
         for line in _respelled(parse(path), members)
     ]
 
     assert not found, (
         f"these sites spell out {sorted(members)}, which {owner} owns:"
         f" {found}. Import the name rather than repeating its members."
+    )
+
+
+def test_every_declared_respelling_is_still_one():
+    """A declaration that stops being needed fails, as the field table's does."""
+    stale = [
+        path
+        for path in DECLARED_RESPELLINGS
+        if not any(
+            _respelled(parse(REPO_ROOT / path), members)
+            for members in OWNED_VOCABULARIES.values()
+        )
+    ]
+
+    assert not stale, (
+        f"these files no longer write an owned vocabulary out: {stale}."
+        " Drop the declaration."
     )
 
 

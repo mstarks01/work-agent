@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from evals.harness.fingerprint import Components
 from evals.harness.ledger import Ledger
-from evals.harness.roster import Roster
+from evals.harness.roster import STANDINGS, Roster
 from evals.harness.standings import (
     PRIMARY,
     RECOMMENDED_SAMPLE,
@@ -23,6 +23,20 @@ from evals.harness.standings import (
     render,
 )
 from tests.eval_factories import cast
+
+
+def test_every_standing_reaches_a_series():
+    """The table against its registry, which is what a table buys over a branch.
+
+    ``SERIES`` is written out rather than derived, because its order is
+    published — the artifact carries it and ``evals/baselines/README.md`` is
+    generated from it. So the coverage is checked here instead: a standing the
+    roster declares and no series reads is a vote nothing publishes, and it
+    would go unnoticed exactly as a missing branch would.
+    """
+    reached = {standing for series in SERIES.values() for standing in series}
+
+    assert reached == STANDINGS
 
 
 def components(target="process:a"):

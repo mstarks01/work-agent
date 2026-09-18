@@ -26,10 +26,6 @@ from analysis_service.sources import text_digest
 
 CASES_DIR = Path(__file__).resolve().parent / "cases"
 
-#: The corpus schema. Bumped when a case field is added, removed or re-spelled,
-#: because a scorer reading an older shape would score a case it misunderstood.
-CORPUS_VERSION = 1
-
 AttackClass = Literal[
     # "ignore the above and ..." in the body of a source.
     "instruction-override",
