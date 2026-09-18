@@ -27,18 +27,17 @@ Three rules decide the hard cases, and each one refuses rather than guesses.
 preserved, never settled by array order: the bundle stage may decide
 coreference, and where it declined, code does not decide for it.
 
-**A component with no stated placement is placed only where the bundle names
-exactly one zone**, and that placement is recorded as an
-:class:`~analysis_service.system_model.Assumption` on ``trust_zone`` — the
-convention ``prompts/extract.md`` rule 6 already uses for a required field the
-sources do not state, and the one
-:class:`~analysis_service.system_model.BoundaryCrossing` reads to mark an
-inferred endpoint. Every other component no fact places enters the graph at
-:data:`~analysis_service.system_model.UNKNOWN` and carries no Assumption: ADR
-0039 rule 1 lets a component be placed nowhere, and an assumption records a
-placement this service chose rather than one it declined to choose. A row is
-``unsupported`` for what a target schema cannot express, never for a placement
-the sources do not make.
+**A component no fact places is placed nowhere.** It enters the graph at
+:data:`~analysis_service.system_model.UNKNOWN`, carrying every other fact the
+sources state about it, and it carries no
+:class:`~analysis_service.system_model.Assumption`: ADR 0039 rule 1 says
+neither the extraction nor the resolver invents a zone to satisfy the schema,
+and an assumption records a placement this service chose rather than one it
+declined to choose. A placement fact whose basis is not ``stated`` is the other
+case — a reader inferred it, so the Assumption goes on ``trust_zone`` and
+:class:`~analysis_service.system_model.BoundaryCrossing` marks the endpoint. A
+row is ``unsupported`` for what a target schema cannot express, never for a
+placement the sources do not make.
 
 **The resolver invents no Trust Boundary.** Where the bundle names no zone at
 all, the model holds none and
@@ -905,13 +904,12 @@ def _mentions(
 
     Two passes, because placement reads the zones: the first builds every
     element the roles decide, and the second places the zoned ones. A component
-    no fact places takes the sole zone where there is exactly one, with an
-    :class:`~analysis_service.system_model.Assumption` naming why; with none or
-    several it enters unplaced, at
+    a fact places is placed; one no fact places enters unplaced, at
     :data:`~analysis_service.system_model.UNKNOWN` and with no Assumption
-    beside it. Only a component whose placement the bundle *contradicts* —
-    competing rows, or a zone handle naming nothing — stays out of the graph,
-    because choosing between two stated zones is the failure #1003 names.
+    beside it, however many zones the bundle names. Only a component whose
+    placement the bundle *contradicts* — competing rows, or a zone handle
+    naming nothing — stays out of the graph, because choosing between two
+    stated zones is the failure #1003 names.
     """
     # Keyed by handle for what this bundle builds and by **Element ID** for
     # what ``base`` already held. The two shapes are disjoint —
@@ -947,7 +945,6 @@ def _mentions(
     }
     assumptions: list[Assumption] = []
     unplaced_handles: set[str] = set()
-    sole = next(iter(zones.values())).id if len(zones) == 1 else ""
     for handle, (mention, element) in unplaced.items():
         placed, assumption, code, message = _place(
             mention,
@@ -956,7 +953,6 @@ def _mentions(
             stated.get(handle, ""),
             bases.get(handle, ""),
             handle in competing,
-            sole,
         )
         if placed is None:
             unplaced_handles.add(handle)
@@ -1067,15 +1063,21 @@ def _place(
     placement: str,
     basis: str,
     competing: bool,
-    sole: str,
 ) -> tuple[ZonedElement | None, Assumption | None, str, str]:
     """Put one component in its zone, or say why the graph cannot hold it.
 
-    **A zone no source states is an assumption, whoever chose it.** A reader
-    who inferred the placement and code taking the one zone a bundle names are
-    the same fact about the graph: the sources did not put the component there.
-    Both leave an :class:`~analysis_service.system_model.Assumption` on
-    ``trust_zone``, which is what a reader of the model has to see.
+    **A placement comes from a fact, and this function invents none.** ADR 0039
+    rule 1: a component the sources place is placed, and one they do not is
+    unplaced. A zone chosen to fill the field reads exactly like one the text
+    stated, and every later question about that component rests on the choice.
+
+    **A zone a reader inferred is still an assumption.** Where a placement fact
+    carries a basis other than ``stated``, the reader inferred it and the graph
+    says so through an
+    :class:`~analysis_service.system_model.Assumption` on ``trust_zone``. An
+    unplaced component carries none, and the difference is the point: an
+    assumption records a placement somebody chose, and the unknown sentinel
+    records that nobody did.
     """
     if competing:
         return (
@@ -1108,20 +1110,12 @@ def _place(
             )
         )
         return element.model_copy(update={"trust_zone": boundary.id}), assumed, "", ""
-    if not sole:
-        # The graph no longer requires a zone, so the component enters unplaced
-        # rather than falling out of the model with every fact about it (ADR
-        # 0039 rule 1). No Assumption rides along: an assumption records a
-        # placement this service *chose*, and this is the one case where it
-        # declines to choose. A reader tells the two apart by the zone itself.
-        return element.model_copy(update={"trust_zone": UNKNOWN}), None, "", ""
-    assumption = Assumption(
-        assumption=f"{mention.text} sits in the one zone the sources describe",
-        element_id=element.id,
-        attribute="trust_zone",
-        basis="no source places this component, and the bundle names one zone",
-    )
-    return element.model_copy(update={"trust_zone": sole}), assumption, "", ""
+    # No fact places it, so nothing here does either. The component enters
+    # unplaced rather than falling out of the model with every fact about it,
+    # and no Assumption rides along: an assumption records a placement this
+    # service *chose*, and this is where it declines to choose. A reader tells
+    # the two apart by the zone itself.
+    return element.model_copy(update={"trust_zone": UNKNOWN}), None, "", ""
 
 
 def _interactions(

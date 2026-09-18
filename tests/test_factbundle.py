@@ -362,7 +362,7 @@ class TestRoles:
 
 
 class TestPlacement:
-    """Where a component sits: stated, assumed on the sole zone, or unsupported."""
+    """Where a component sits: stated, inferred by a reader, or nowhere."""
 
     def test_a_stated_zone_is_the_zone(self) -> None:
         resolution = resolved(worker_bundle())
@@ -371,20 +371,29 @@ class TestPlacement:
         assert found.trust_zone == "boundary:core-network"
         assert resolution.model.assumptions == []
 
-    def test_the_sole_zone_is_taken_on_the_record(self) -> None:
+    def test_a_component_no_fact_places_is_placed_nowhere(self) -> None:
+        """ADR 0039 rule 1: the resolver invents no zone to satisfy the schema.
+
+        One zone in the bundle is the tempting case, and taking it would read
+        exactly like a placement the sources made. The component keeps every
+        other fact about it, the model still passes the gate, and no
+        Assumption is recorded — this service declined to choose rather than
+        chose.
+        """
         bundle = worker_bundle()
         bundle.facts = [placed("m2", "z1")]
+
         resolution = resolved(bundle)
+
         found = resolution.model.get("process:worker")
         assert found is not None
-        assert found.trust_zone == "boundary:core-network"
-        assumed = [
+        assert found.trust_zone == UNKNOWN
+        assert [
             assumption
             for assumption in resolution.model.assumptions
             if assumption.element_id == "process:worker"
-        ]
-        assert len(assumed) == 1
-        assert assumed[0].attribute == "trust_zone"
+        ] == []
+        assert row_for(resolution, "m2").disposition == "consumed"
         assert validate(resolution.model, sources={LABEL: NOTE}) == []
 
     def test_a_placement_the_catalog_refuses_places_nothing(self) -> None:
@@ -403,12 +412,12 @@ class TestPlacement:
 
         found = resolution.model.get("process:worker")
         assert found is not None
-        assert found.trust_zone == "boundary:core-network"
+        assert found.trust_zone == UNKNOWN
         assert [
             assumption.attribute
             for assumption in resolution.model.assumptions
             if assumption.element_id == "process:worker"
-        ] == ["trust_zone"]
+        ] == []
 
     def test_an_unknown_placement_is_a_value_and_not_a_zone_handle(self) -> None:
         """ "We do not know where it sits" keeps the component the source names.
