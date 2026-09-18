@@ -126,13 +126,35 @@ table is the table (first assignment vs last); which version keys a ledger row
 (two copies of one line); when an element ID is checked (the rule and the
 deriver disagreed about the empty-slug case).
 
-Two corollaries, both from the same audits:
+Three corollaries, the first two from the same audits:
 
 - **A self-sized fence is safe only while its neighbours are fenced too.** Ask
   what sits beside the value, not only what wraps it.
 - **A bound that predicts a cost from its inputs is wrong whenever the cost
   turns on which inputs survive a filter.** Spend a budget where the work
   happens.
+- **A rule that re-derives a value must compare it against the material it
+  derives from, never against a value something else derived earlier.** The two
+  are readers of one rule separated by *time* rather than by place, so they
+  agree until the rule moves and there is no site to read side by side. Three
+  instances in #1041's sweep, all in the alignment and the archive: an element
+  alias re-slugged today against an **Element ID** slugged when the run wrote
+  it; a flow alias against a label baked into a flow ID; a signed reference's
+  subject ID against an archived catalog's. Each broke a ruling that was still
+  right about the words.
+
+  The repair is one of three, in this order. Derive both sides from the
+  authoritative material now — a **name** is authoritative and an ID follows,
+  which is what `normalize_element_ids` already states. Where one side is
+  frozen, store the components beside the derived key, as a `Vote` stores
+  `components` beside `fingerprint`, so a rule change re-keys by recomputation.
+  Where neither is possible, version the rule and keep every version's decoder,
+  as `FLOW_ID_RULES` does.
+
+  **Before changing any slug, identity or digest rule, replay the archive
+  first.** `run.py replay` over `evals/emissions/` costs nothing, and the diff
+  is the only thing that says whether a rule change moved a figure. A fixture
+  that sets an ID without its name hides this whole class, and three did.
 
 ### Name the shapes before you read the value
 
