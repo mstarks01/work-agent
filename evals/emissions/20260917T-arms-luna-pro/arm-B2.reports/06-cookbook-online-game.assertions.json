@@ -1,0 +1,1273 @@
+{
+  "proposal": {
+    "assertions": [
+      {
+        "subject_type": "component",
+        "subject": "process:lobby",
+        "predicate": "network-membership",
+        "value": "boundary:our-production-network",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The client connects out to two things in our production network. It talks to the lobby"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "process:game-servers",
+        "predicate": "network-membership",
+        "value": "boundary:our-production-network",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The client connects out to two things in our production network. It talks to the lobby on TCP 1234 for matchmaking, and once a match starts it talks directly to the game servers on TCP 1235."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "process:lobby",
+        "predicate": "internet-exposure",
+        "value": "internet-facing",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Both of those have to be reachable from wherever a player is, so they are exposed."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "process:game-servers",
+        "predicate": "internet-exposure",
+        "value": "internet-facing",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Both of those have to be reachable from wherever a player is, so they are exposed."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:process:lobby>process:game-servers>hands-the-match-over",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "The source does not record what authentication is on these links.",
+        "exclusive": false
+      },
+      {
+        "subject_type": "principal",
+        "subject": "players",
+        "predicate": "tenant-ownership",
+        "value": "machines",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Players run our game client on their own machines. We do not control those machines."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "principal",
+        "subject": "customer support staff",
+        "predicate": "authorization-grant",
+        "value": "look at and act on player accounts",
+        "reason": null,
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "player accounts"
+          },
+          {
+            "kind": "operation",
+            "value": "look at and act on"
+          }
+        ],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "our customer support staff work from the corporate network and use a moderation website to look at and act on player accounts."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      }
+    ]
+  },
+  "catalog": {
+    "registry_version": 3,
+    "subjects": [
+      {
+        "id": "boundary:our-production-network",
+        "type": "zone",
+        "label": "our production network"
+      },
+      {
+        "id": "flow:process:lobby>process:game-servers>hands-the-match-over",
+        "type": "interaction",
+        "label": "hands the match over"
+      },
+      {
+        "id": "principal:customer-support-staff",
+        "type": "principal",
+        "label": "customer support staff"
+      },
+      {
+        "id": "process:game-servers",
+        "type": "component",
+        "label": "game servers"
+      },
+      {
+        "id": "process:lobby",
+        "type": "component",
+        "label": "lobby"
+      }
+    ],
+    "entries": [
+      {
+        "subject": "process:lobby",
+        "predicate": "network-membership",
+        "value": "boundary:our-production-network",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "17e797d0315fdd53d5acf05962ca0ae8a23e08f84779f8528ade6422c34577a3",
+            "start": 189,
+            "end": 275,
+            "quote": "The client connects out to two things in our production network. It talks to the lobby"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "process:game-servers",
+        "predicate": "network-membership",
+        "value": "boundary:our-production-network",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "17e797d0315fdd53d5acf05962ca0ae8a23e08f84779f8528ade6422c34577a3",
+            "start": 189,
+            "end": 379,
+            "quote": "The client connects out to two things in our production network. It talks to the lobby on TCP 1234 for matchmaking, and once a match starts it talks directly to the game servers on TCP 1235."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "process:lobby",
+        "predicate": "internet-exposure",
+        "value": "internet-facing",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "17e797d0315fdd53d5acf05962ca0ae8a23e08f84779f8528ade6422c34577a3",
+            "start": 380,
+            "end": 462,
+            "quote": "Both of those have to be reachable from wherever a player is, so they are exposed."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "process:game-servers",
+        "predicate": "internet-exposure",
+        "value": "internet-facing",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "17e797d0315fdd53d5acf05962ca0ae8a23e08f84779f8528ade6422c34577a3",
+            "start": 380,
+            "end": 462,
+            "quote": "Both of those have to be reachable from wherever a player is, so they are exposed."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:process:lobby>process:game-servers>hands-the-match-over",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "silent",
+        "support": [],
+        "premises": [],
+        "explanation": "The source does not record what authentication is on these links.",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "principal:customer-support-staff",
+        "predicate": "authorization-grant",
+        "value": "look at and act on player accounts",
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "player accounts"
+          },
+          {
+            "kind": "operation",
+            "value": "look at and act on"
+          }
+        ],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "17e797d0315fdd53d5acf05962ca0ae8a23e08f84779f8528ade6422c34577a3",
+            "start": 704,
+            "end": 830,
+            "quote": "our customer support staff work from the corporate network and use a moderation website to look at and act on player accounts."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      }
+    ]
+  },
+  "issues": [
+    {
+      "code": "wrong-subject-type",
+      "message": "'tenant-ownership' accepts component, zone, not 'principal'",
+      "subject": "players",
+      "assertion": null,
+      "row": 5
+    }
+  ],
+  "projection": [
+    {
+      "element_id": "flow:process:lobby>process:game-servers>hands-the-match-over",
+      "attribute": "authentication",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:authentication-mechanism~flow:process:lobby>process:game-servers>hands-the-match-over~any~unknown"
+      ]
+    },
+    {
+      "element_id": "process:game-servers",
+      "attribute": "exposure",
+      "value": "internet-facing",
+      "reason": "stated",
+      "rows": [
+        "assertion:internet-exposure~process:game-servers~any~internet-facing"
+      ]
+    },
+    {
+      "element_id": "process:game-servers",
+      "attribute": "trust_zone",
+      "value": "boundary:our-production-network",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~process:game-servers~any~boundary:our-production-network"
+      ]
+    },
+    {
+      "element_id": "process:lobby",
+      "attribute": "exposure",
+      "value": "internet-facing",
+      "reason": "stated",
+      "rows": [
+        "assertion:internet-exposure~process:lobby~any~internet-facing"
+      ]
+    },
+    {
+      "element_id": "process:lobby",
+      "attribute": "trust_zone",
+      "value": "boundary:our-production-network",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~process:lobby~any~boundary:our-production-network"
+      ]
+    }
+  ],
+  "stages": {
+    "source_facts": {
+      "mentions": [
+        {
+          "handle": "machines",
+          "text": "their own machines",
+          "roles": [
+            "external-system",
+            "tenant-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Players run our game client on their own machines. We do not control those machines."
+            }
+          ]
+        },
+        {
+          "handle": "client",
+          "text": "game client",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Players run our game client on their own machines."
+            }
+          ]
+        },
+        {
+          "handle": "production_network",
+          "text": "our production network",
+          "roles": [
+            "network-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The client connects out to two things in our production network."
+            }
+          ]
+        },
+        {
+          "handle": "lobby",
+          "text": "lobby",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "It talks to the lobby on TCP 1234 for matchmaking"
+            }
+          ]
+        },
+        {
+          "handle": "game_servers",
+          "text": "game servers",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "it talks directly to the game servers on TCP 1235"
+            }
+          ]
+        },
+        {
+          "handle": "player_database",
+          "text": "player database",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The lobby reads the player database to set up a match"
+            }
+          ]
+        },
+        {
+          "handle": "stats_database",
+          "text": "stats database",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The game servers read and write the stats database during and after a match"
+            }
+          ]
+        },
+        {
+          "handle": "corporate_network",
+          "text": "corporate network",
+          "roles": [
+            "network-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "our customer support staff work from the corporate network"
+            }
+          ]
+        },
+        {
+          "handle": "moderation_website",
+          "text": "moderation website",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "use a moderation website to look at and act on player accounts"
+            }
+          ]
+        }
+      ],
+      "interactions": [
+        {
+          "handle": "client_lobby",
+          "initiator": "client",
+          "receiver": "lobby",
+          "action": "talks to",
+          "protocol": "TCP 1234",
+          "operations": "unknown",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "It talks to the lobby on TCP 1234 for matchmaking"
+            }
+          ]
+        },
+        {
+          "handle": "client_servers",
+          "initiator": "client",
+          "receiver": "game_servers",
+          "action": "talks directly to",
+          "protocol": "TCP 1235",
+          "operations": "unknown",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "once a match starts it talks directly to the game servers on TCP 1235"
+            }
+          ]
+        },
+        {
+          "handle": "lobby_playerdb",
+          "initiator": "lobby",
+          "receiver": "player_database",
+          "action": "reads",
+          "protocol": "",
+          "operations": "read",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The lobby reads the player database to set up a match"
+            }
+          ]
+        },
+        {
+          "handle": "lobby_servers",
+          "initiator": "lobby",
+          "receiver": "game_servers",
+          "action": "hands the match over",
+          "protocol": "",
+          "operations": "unknown",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "and hands the match over to the game servers"
+            }
+          ]
+        },
+        {
+          "handle": "servers_statsdb",
+          "initiator": "game_servers",
+          "receiver": "stats_database",
+          "action": "read and write",
+          "protocol": "",
+          "operations": "read-write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The game servers read and write the stats database during and after a match"
+            }
+          ]
+        },
+        {
+          "handle": "servers_playerdb",
+          "initiator": "game_servers",
+          "receiver": "player_database",
+          "action": "write back",
+          "protocol": "",
+          "operations": "write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "they also write back to the player database"
+            }
+          ]
+        },
+        {
+          "handle": "website_playerdb",
+          "initiator": "moderation_website",
+          "receiver": "player_database",
+          "action": "reads and writes",
+          "protocol": "",
+          "operations": "read-write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "That website reads and writes the player database directly."
+            }
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "handle": "f1",
+          "subject_kind": "mention",
+          "subject": "client",
+          "predicate": "network-membership",
+          "value": "machines",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Players run our game client on their own machines."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f2",
+          "subject_kind": "mention",
+          "subject": "lobby",
+          "predicate": "network-membership",
+          "value": "production_network",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The client connects out to two things in our production network. It talks to the lobby"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f3",
+          "subject_kind": "mention",
+          "subject": "game_servers",
+          "predicate": "network-membership",
+          "value": "production_network",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The client connects out to two things in our production network. It talks to the lobby on TCP 1234 for matchmaking, and once a match starts it talks directly to the game servers on TCP 1235."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f4",
+          "subject_kind": "mention",
+          "subject": "lobby",
+          "predicate": "internet-exposure",
+          "value": "internet-facing",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Both of those have to be reachable from wherever a player is, so they are exposed."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f5",
+          "subject_kind": "mention",
+          "subject": "game_servers",
+          "predicate": "internet-exposure",
+          "value": "internet-facing",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Both of those have to be reachable from wherever a player is, so they are exposed."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f6",
+          "subject_kind": "mention",
+          "subject": "player_database",
+          "predicate": "storage-encryption",
+          "value": "unknown",
+          "reason": "silent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "The source says it does not record how any of the stores are protected.",
+          "exclusive": false
+        },
+        {
+          "handle": "f7",
+          "subject_kind": "mention",
+          "subject": "stats_database",
+          "predicate": "storage-encryption",
+          "value": "unknown",
+          "reason": "silent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "The source says it does not record how any of the stores are protected.",
+          "exclusive": false
+        },
+        {
+          "handle": "f8",
+          "subject_kind": "interaction",
+          "subject": "client_lobby",
+          "predicate": "authentication-mechanism",
+          "value": "unknown",
+          "reason": "silent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "The source does not record what authentication is on the links.",
+          "exclusive": false
+        },
+        {
+          "handle": "f9",
+          "subject_kind": "interaction",
+          "subject": "client_servers",
+          "predicate": "authentication-mechanism",
+          "value": "unknown",
+          "reason": "silent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "The source does not record what authentication is on the links.",
+          "exclusive": false
+        },
+        {
+          "handle": "f10",
+          "subject_kind": "interaction",
+          "subject": "lobby_playerdb",
+          "predicate": "authentication-mechanism",
+          "value": "unknown",
+          "reason": "silent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "The source does not record what authentication is on these links.",
+          "exclusive": false
+        },
+        {
+          "handle": "f11",
+          "subject_kind": "interaction",
+          "subject": "lobby_servers",
+          "predicate": "authentication-mechanism",
+          "value": "unknown",
+          "reason": "silent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "The source does not record what authentication is on these links.",
+          "exclusive": false
+        },
+        {
+          "handle": "f12",
+          "subject_kind": "interaction",
+          "subject": "servers_statsdb",
+          "predicate": "authentication-mechanism",
+          "value": "unknown",
+          "reason": "silent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "The source does not record what authentication is on these links.",
+          "exclusive": false
+        },
+        {
+          "handle": "f13",
+          "subject_kind": "interaction",
+          "subject": "servers_playerdb",
+          "predicate": "authentication-mechanism",
+          "value": "unknown",
+          "reason": "silent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "The source does not record what authentication is on these links.",
+          "exclusive": false
+        },
+        {
+          "handle": "f14",
+          "subject_kind": "interaction",
+          "subject": "website_playerdb",
+          "predicate": "authentication-mechanism",
+          "value": "unknown",
+          "reason": "silent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "The source does not record what authentication is on these links.",
+          "exclusive": false
+        },
+        {
+          "handle": "f15",
+          "subject_kind": "principal",
+          "subject": "players",
+          "predicate": "tenant-ownership",
+          "value": "machines",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Players run our game client on their own machines. We do not control those machines."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f16",
+          "subject_kind": "principal",
+          "subject": "customer support staff",
+          "predicate": "authorization-grant",
+          "value": "look at and act on player accounts",
+          "scope": [
+            {
+              "kind": "resource",
+              "value": "player accounts"
+            },
+            {
+              "kind": "operation",
+              "value": "look at and act on"
+            }
+          ],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "our customer support staff work from the corporate network and use a moderation website to look at and act on player accounts."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        }
+      ],
+      "unresolved": [
+        {
+          "handle": "u1",
+          "question": "What authentication is used on the links?",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The diagram doesn't record what authentication is on any of these links"
+            }
+          ]
+        },
+        {
+          "handle": "u2",
+          "question": "How are the stores protected?",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "or how any of the stores are protected"
+            }
+          ]
+        }
+      ]
+    },
+    "bundle_dispositions": [
+      {
+        "handle": "machines",
+        "kind": "mention",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "competing-roles",
+        "message": "mention 'their own machines' reads as external-system, tenant-zone; the bundle settles which, and code does not settle it by position"
+      },
+      {
+        "handle": "production_network",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "boundary:our-production-network",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "corporate_network",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "boundary:corporate-network",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "client",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "dangling-zone",
+        "message": "zone handle 'machines' names no zone mention of this bundle"
+      },
+      {
+        "handle": "lobby",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "process:lobby",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "game_servers",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "process:game-servers",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "player_database",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "unplaced",
+        "message": "no source places 'player database', and the bundle names 2 zones, so the graph's required trust_zone would be a choice nobody stated"
+      },
+      {
+        "handle": "stats_database",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "unplaced",
+        "message": "no source places 'stats database', and the bundle names 2 zones, so the graph's required trust_zone would be a choice nobody stated"
+      },
+      {
+        "handle": "moderation_website",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "unplaced",
+        "message": "no source places 'moderation website', and the bundle names 2 zones, so the graph's required trust_zone would be a choice nobody stated"
+      },
+      {
+        "handle": "client_lobby",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "initiator 'client' names no placed component of this bundle"
+      },
+      {
+        "handle": "client_servers",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "initiator 'client' names no placed component of this bundle"
+      },
+      {
+        "handle": "lobby_playerdb",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "receiver 'player_database' names no placed component of this bundle"
+      },
+      {
+        "handle": "lobby_servers",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:process:lobby>process:game-servers>hands-the-match-over",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "servers_statsdb",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "receiver 'stats_database' names no placed component of this bundle"
+      },
+      {
+        "handle": "servers_playerdb",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "receiver 'player_database' names no placed component of this bundle"
+      },
+      {
+        "handle": "website_playerdb",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "initiator 'moderation_website' names no placed component of this bundle"
+      },
+      {
+        "handle": "f1",
+        "kind": "fact",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "unplaced-subject",
+        "message": "the sources state this about 'client', and the graph holds no zone to place that component in"
+      },
+      {
+        "handle": "f6",
+        "kind": "fact",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "unplaced-subject",
+        "message": "the sources state this about 'player_database', and the graph holds no zone to place that component in"
+      },
+      {
+        "handle": "f7",
+        "kind": "fact",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "unplaced-subject",
+        "message": "the sources state this about 'stats_database', and the graph holds no zone to place that component in"
+      },
+      {
+        "handle": "f8",
+        "kind": "fact",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-subject",
+        "message": "subject 'client_lobby' names no interaction this bundle built"
+      },
+      {
+        "handle": "f9",
+        "kind": "fact",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-subject",
+        "message": "subject 'client_servers' names no interaction this bundle built"
+      },
+      {
+        "handle": "f10",
+        "kind": "fact",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-subject",
+        "message": "subject 'lobby_playerdb' names no interaction this bundle built"
+      },
+      {
+        "handle": "f12",
+        "kind": "fact",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-subject",
+        "message": "subject 'servers_statsdb' names no interaction this bundle built"
+      },
+      {
+        "handle": "f13",
+        "kind": "fact",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-subject",
+        "message": "subject 'servers_playerdb' names no interaction this bundle built"
+      },
+      {
+        "handle": "f14",
+        "kind": "fact",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-subject",
+        "message": "subject 'website_playerdb' names no interaction this bundle built"
+      },
+      {
+        "handle": "f2",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "process:lobby",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f3",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "process:game-servers",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f4",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "process:lobby",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f5",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "process:game-servers",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f11",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "flow:process:lobby>process:game-servers>hands-the-match-over",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f15",
+        "kind": "fact",
+        "disposition": "rejected",
+        "target": "",
+        "code": "wrong-subject-type",
+        "message": "'tenant-ownership' accepts component, zone, not 'principal'"
+      },
+      {
+        "handle": "f16",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "customer support staff",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "u1",
+        "kind": "unresolved",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "open-question",
+        "message": "What authentication is used on the links?"
+      },
+      {
+        "handle": "u2",
+        "kind": "unresolved",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "open-question",
+        "message": "How are the stores protected?"
+      }
+    ],
+    "extracted_model": {
+      "external_entities": [],
+      "processes": [
+        {
+          "id": "process:lobby",
+          "name": "lobby",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "It talks to the lobby on TCP 1234 for matchmaking",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:our-production-network",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:game-servers",
+          "name": "game servers",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "it talks directly to the game servers on TCP 1235",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:our-production-network",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        }
+      ],
+      "data_stores": [],
+      "data_flows": [
+        {
+          "id": "flow:process:lobby>process:game-servers>hands-the-match-over",
+          "name": "hands the match over",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "and hands the match over to the game servers",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:lobby",
+          "destination": "process:game-servers",
+          "protocol": "",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "unknown"
+        }
+      ],
+      "trust_boundaries": [
+        {
+          "id": "boundary:our-production-network",
+          "name": "our production network",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The client connects out to two things in our production network.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        },
+        {
+          "id": "boundary:corporate-network",
+          "name": "corporate network",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "our customer support staff work from the corporate network",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        }
+      ],
+      "assumptions": []
+    },
+    "valid_model": {
+      "external_entities": [],
+      "processes": [
+        {
+          "id": "process:lobby",
+          "name": "lobby",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "It talks to the lobby on TCP 1234 for matchmaking",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:our-production-network",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:game-servers",
+          "name": "game servers",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "it talks directly to the game servers on TCP 1235",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:our-production-network",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        }
+      ],
+      "data_stores": [],
+      "data_flows": [
+        {
+          "id": "flow:process:lobby>process:game-servers>hands-the-match-over",
+          "name": "hands the match over",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "and hands the match over to the game servers",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:lobby",
+          "destination": "process:game-servers",
+          "protocol": "",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "unknown"
+        }
+      ],
+      "trust_boundaries": [
+        {
+          "id": "boundary:our-production-network",
+          "name": "our production network",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The client connects out to two things in our production network.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        },
+        {
+          "id": "boundary:corporate-network",
+          "name": "corporate network",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "our customer support staff work from the corporate network",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        }
+      ],
+      "assumptions": []
+    }
+  }
+}

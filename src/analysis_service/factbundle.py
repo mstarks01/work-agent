@@ -610,7 +610,9 @@ def resolve_bundle(
     zones, zoned, assumptions, unplaced = _mentions(
         bundle, prepared, repeated, stated, competing, bases, held, rows
     )
-    flows = _interactions(bundle, prepared, repeated, zoned, held, rows)
+    flows, open_flows = _interactions(
+        bundle, prepared, repeated, zoned, unplaced, held, rows
+    )
     model = SystemModel(
         external_entities=[
             element for element in zoned.values() if isinstance(element, ExternalEntity)
@@ -626,7 +628,16 @@ def resolve_bundle(
         assumptions=[*held.assumptions, *assumptions],
     )
     proposal, record = _facts(
-        bundle, sources, model, zones, zoned, flows, repeated, unplaced, rows
+        bundle,
+        sources,
+        model,
+        zones,
+        zoned,
+        flows,
+        repeated,
+        unplaced,
+        open_flows,
+        rows,
     )
     rows.extend(
         DispositionRow(
@@ -1109,24 +1120,48 @@ def _interactions(
     prepared: Mapping[str, SpanSource],
     repeated: Collection[str],
     zoned: Mapping[str, ZonedElement],
+    unplaced: Collection[str],
     held: SystemModel,
     rows: list[DispositionRow],
-) -> dict[str, DataFlow]:
-    """Turn every interaction into a Data Flow between two placed elements."""
+) -> tuple[dict[str, DataFlow], frozenset[str]]:
+    """Turn every interaction into a Data Flow between two placed elements.
+
+    **An endpoint the graph could not place is a question, not a broken
+    reference.** The two arrive at :func:`_build_interaction` as one refusal,
+    because neither handle is in ``zoned``, and they mean opposite things: a
+    handle naming nothing is a bundle that contradicts itself, while a handle
+    naming a component no zone could hold is
+    [ADR 0038](../../docs/adr/0038-a-component-reaches-the-graph-only-in-a-zone.md)
+    rule 2 reaching a second row. That rule says the loss is named and
+    answerable, so the interaction is ``unresolved`` under
+    ``unplaced-endpoint`` and the second return carries it to :func:`_facts`,
+    which charges every fact about it the same way.
+    """
     flows: dict[str, DataFlow] = {flow.id: flow for flow in held.data_flows}
     taken: set[str] = set(flows)
+    open_flows: set[str] = set()
     for interaction in bundle.interactions:
         if interaction.handle in repeated:
             continue
         built, code, message = _build_interaction(interaction, prepared, zoned, taken)
         if built is None:
+            stranded = code == "dangling-endpoint" and (
+                interaction.initiator in unplaced or interaction.receiver in unplaced
+            )
+            if stranded:
+                open_flows.add(interaction.handle)
             rows.append(
                 DispositionRow(
                     handle=interaction.handle,
                     kind="interaction",
-                    disposition="rejected",
-                    code=code,
-                    message=message,
+                    disposition="unresolved" if stranded else "rejected",
+                    code="unplaced-endpoint" if stranded else code,
+                    message=(
+                        "the sources state this interaction, and one endpoint"
+                        " is a component the graph holds no zone to place"
+                        if stranded
+                        else message
+                    ),
                 )
             )
             continue
@@ -1140,7 +1175,7 @@ def _interactions(
                 target=built.id,
             )
         )
-    return flows
+    return flows, frozenset(open_flows)
 
 
 def _build_interaction(
@@ -1334,6 +1369,7 @@ def _facts(
     flows: Mapping[str, DataFlow],
     repeated: Collection[str],
     unplaced: Collection[str],
+    open_flows: Collection[str],
     rows: list[DispositionRow],
 ) -> tuple[CatalogProposal, AssertionRecord]:
     """Turn every fact into an assertion, through the existing resolver.
@@ -1347,7 +1383,9 @@ def _facts(
     it; what failed is the graph's required ``trust_zone``. Those rows are
     ``unresolved`` under ``unplaced-subject``, so a reader counting what a route
     lost can tell "nobody read this" from "the model cannot hold it", and the
-    sidecar carries the fact rather than dropping it. Everything else goes to
+    sidecar carries the fact rather than dropping it. A fact about an
+    *interaction* one of whose endpoints went unplaced is the same question one
+    row further on, which is what ``open_flows`` carries here. Everything else goes to
     :meth:`~analysis_service.assertions.AssertionRecord.of`, the one reader of
     what a proposal came to — the production ``prepare`` node, the assertion
     eval mode and the offline replay all ask it, so a resolver change moves
@@ -1367,7 +1405,9 @@ def _facts(
         subject, subject_type, code, message = _subject(fact, zones, zoned, flows)
         value, value_code, value_message = _referent(fact, zones, zoned, flows)
         if subject is None or value is None:
-            open_question = fact.subject in unplaced and fact.subject_kind == "mention"
+            open_question = (
+                fact.subject in unplaced and fact.subject_kind == "mention"
+            ) or (fact.subject in open_flows and fact.subject_kind == "interaction")
             rows.append(
                 DispositionRow(
                     handle=fact.handle,

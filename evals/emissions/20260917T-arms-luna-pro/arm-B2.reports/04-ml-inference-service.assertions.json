@@ -1,0 +1,2271 @@
+{
+  "proposal": {
+    "assertions": [
+      {
+        "subject_type": "component",
+        "subject": "process:inference-gateway",
+        "predicate": "internet-exposure",
+        "value": "internet-facing",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "a FastAPI service on GKE that we expose on the internet"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "process:model-server",
+        "predicate": "network-membership",
+        "value": "boundary:model-network",
+        "reason": null,
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "the model server, which runs the actual model on GPU nodes in our model network"
+          }
+        ],
+        "explanation": "The model server runs the model on nodes stated to be in the model network.",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "process:gpu-nodes",
+        "predicate": "network-membership",
+        "value": "boundary:model-network",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "GPU nodes in our model network"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:redis-feature-store",
+        "predicate": "network-membership",
+        "value": "boundary:model-network",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "a Redis feature store on the same network"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:entity:other-teams-backends>process:inference-gateway>call-inference-gateway",
+        "predicate": "authentication-mechanism",
+        "value": "API key in a header",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Callers pass an API key in a header"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:entity:other-teams-backends>process:inference-gateway>call-inference-gateway",
+        "predicate": "credential-presented",
+        "value": "API key",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Callers pass an API key in a header"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "principal",
+        "subject": "calling teams",
+        "predicate": "credential-presented",
+        "value": "API key",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Keys are issued per calling team"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "credential",
+        "subject": "API key",
+        "predicate": "credential-sharing",
+        "value": "per-principal",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Keys are issued per calling team"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "credential",
+        "subject": "API key",
+        "predicate": "credential-expiry",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "we have never expired one"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:process:inference-gateway>process:model-server>forward-request",
+        "predicate": "authentication-mechanism",
+        "value": "absent",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "There is no auth between the gateway and the model server"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:process:model-server>store:model-registry-bucket>load-model-artifacts",
+        "predicate": "authentication-mechanism",
+        "value": "service account",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "It uses its own service account for that"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:process:model-server>store:model-registry-bucket>load-model-artifacts",
+        "predicate": "credential-presented",
+        "value": "service account",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "It uses its own service account for that"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "artifact",
+        "subject": "model artifacts",
+        "predicate": "signature-verification",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "I don't believe anything verifies the artifact hasn't been swapped"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:redis-feature-store",
+        "predicate": "authentication-mechanism",
+        "value": "absent",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Redis has no password on it"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:process:inference-gateway>store:inference-log>write-requests-and-responses",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:inference-log",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "principal",
+        "subject": "ML engineers",
+        "predicate": "authorization-grant",
+        "value": "publish model artifacts",
+        "reason": null,
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "model registry bucket"
+          },
+          {
+            "kind": "operation",
+            "value": "publish"
+          }
+        ],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "ML engineers publish new model artifacts to the registry bucket"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      }
+    ]
+  },
+  "catalog": {
+    "registry_version": 3,
+    "subjects": [
+      {
+        "id": "artifact:model-artifacts",
+        "type": "artifact",
+        "label": "model artifacts"
+      },
+      {
+        "id": "boundary:model-network",
+        "type": "zone",
+        "label": "model network"
+      },
+      {
+        "id": "credential:api-key",
+        "type": "credential",
+        "label": "API key"
+      },
+      {
+        "id": "credential:service-account",
+        "type": "credential",
+        "label": "service account"
+      },
+      {
+        "id": "flow:entity:other-teams-backends>process:inference-gateway>call-inference-gateway",
+        "type": "interaction",
+        "label": "call inference gateway"
+      },
+      {
+        "id": "flow:process:inference-gateway>process:model-server>forward-request",
+        "type": "interaction",
+        "label": "forward request"
+      },
+      {
+        "id": "flow:process:model-server>store:model-registry-bucket>load-model-artifacts",
+        "type": "interaction",
+        "label": "load model artifacts"
+      },
+      {
+        "id": "principal:calling-teams",
+        "type": "principal",
+        "label": "calling teams"
+      },
+      {
+        "id": "principal:ml-engineers",
+        "type": "principal",
+        "label": "ML engineers"
+      },
+      {
+        "id": "process:gpu-nodes",
+        "type": "component",
+        "label": "GPU nodes"
+      },
+      {
+        "id": "process:inference-gateway",
+        "type": "component",
+        "label": "inference gateway"
+      },
+      {
+        "id": "process:model-server",
+        "type": "component",
+        "label": "model server"
+      },
+      {
+        "id": "store:redis-feature-store",
+        "type": "component",
+        "label": "Redis feature store"
+      }
+    ],
+    "entries": [
+      {
+        "subject": "process:inference-gateway",
+        "predicate": "internet-exposure",
+        "value": "internet-facing",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
+            "start": 97,
+            "end": 152,
+            "quote": "a FastAPI service on GKE that we expose on the internet"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "process:model-server",
+        "predicate": "network-membership",
+        "value": "boundary:model-network",
+        "scope": [],
+        "basis": "inferred",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
+            "start": 353,
+            "end": 433,
+            "quote": "the model server, which runs the actual model on GPU nodes in our model network"
+          }
+        ],
+        "premises": [],
+        "explanation": "The model server runs the model on nodes stated to be in the model network.",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "process:gpu-nodes",
+        "predicate": "network-membership",
+        "value": "boundary:model-network",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
+            "start": 402,
+            "end": 433,
+            "quote": "GPU nodes in our model network"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:redis-feature-store",
+        "predicate": "network-membership",
+        "value": "boundary:model-network",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
+            "start": 851,
+            "end": 893,
+            "quote": "a Redis feature store on the same network"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:entity:other-teams-backends>process:inference-gateway>call-inference-gateway",
+        "predicate": "authentication-mechanism",
+        "value": "API key in a header",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
+            "start": 215,
+            "end": 251,
+            "quote": "Callers pass an API key in a header"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:entity:other-teams-backends>process:inference-gateway>call-inference-gateway",
+        "predicate": "credential-presented",
+        "value": "credential:api-key",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
+            "start": 215,
+            "end": 251,
+            "quote": "Callers pass an API key in a header"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "principal:calling-teams",
+        "predicate": "credential-presented",
+        "value": "credential:api-key",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
+            "start": 252,
+            "end": 284,
+            "quote": "Keys are issued per calling team"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "credential:api-key",
+        "predicate": "credential-sharing",
+        "value": "per-principal",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
+            "start": 252,
+            "end": 284,
+            "quote": "Keys are issued per calling team"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "credential:api-key",
+        "predicate": "credential-expiry",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
+            "start": 289,
+            "end": 315,
+            "quote": "we have never expired one"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:process:inference-gateway>process:model-server>forward-request",
+        "predicate": "authentication-mechanism",
+        "value": "absent",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
+            "start": 434,
+            "end": 492,
+            "quote": "There is no auth between the gateway and the model server"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:process:model-server>store:model-registry-bucket>load-model-artifacts",
+        "predicate": "authentication-mechanism",
+        "value": "service account",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
+            "start": 640,
+            "end": 681,
+            "quote": "It uses its own service account for that"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:process:model-server>store:model-registry-bucket>load-model-artifacts",
+        "predicate": "credential-presented",
+        "value": "credential:service-account",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
+            "start": 640,
+            "end": 681,
+            "quote": "It uses its own service account for that"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "artifact:model-artifacts",
+        "predicate": "signature-verification",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
+            "start": 682,
+            "end": 748,
+            "quote": "I don't believe anything verifies the artifact hasn't been swapped"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:redis-feature-store",
+        "predicate": "authentication-mechanism",
+        "value": "absent",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
+            "start": 894,
+            "end": 922,
+            "quote": "Redis has no password on it"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "principal:ml-engineers",
+        "predicate": "authorization-grant",
+        "value": "publish model artifacts",
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "model registry bucket"
+          },
+          {
+            "kind": "operation",
+            "value": "publish"
+          }
+        ],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
+            "start": 1218,
+            "end": 1282,
+            "quote": "ML engineers publish new model artifacts to the registry bucket"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      }
+    ]
+  },
+  "issues": [
+    {
+      "code": "wrong-subject-type",
+      "message": "'storage-encryption' accepts component, not 'interaction'",
+      "subject": "flow:process:inference-gateway>store:inference-log>write-requests-and-responses",
+      "assertion": null,
+      "row": 14
+    },
+    {
+      "code": "missing-premise",
+      "message": "an inferred or derived value says what it rests on",
+      "subject": "flow:process:inference-gateway>store:inference-log>write-requests-and-responses",
+      "assertion": null,
+      "row": 14
+    },
+    {
+      "code": "missing-premise",
+      "message": "an inferred or derived value says what it rests on",
+      "subject": "store:inference-log",
+      "assertion": null,
+      "row": 15
+    }
+  ],
+  "projection": [
+    {
+      "element_id": "flow:entity:other-teams-backends>process:inference-gateway>call-inference-gateway",
+      "attribute": "authentication",
+      "value": "unknown",
+      "reason": "several-predicates",
+      "rows": [
+        "assertion:authentication-mechanism~flow:entity:other-teams-backends>process:inference-gateway>call-inference-gateway~any~v.fd60f8c677e3",
+        "assertion:credential-presented~flow:entity:other-teams-backends>process:inference-gateway>call-inference-gateway~any~credential:api-key"
+      ]
+    },
+    {
+      "element_id": "flow:process:inference-gateway>process:model-server>forward-request",
+      "attribute": "authentication",
+      "value": "none",
+      "reason": "absent",
+      "rows": [
+        "assertion:authentication-mechanism~flow:process:inference-gateway>process:model-server>forward-request~any~absent"
+      ]
+    },
+    {
+      "element_id": "flow:process:model-server>store:model-registry-bucket>load-model-artifacts",
+      "attribute": "authentication",
+      "value": "unknown",
+      "reason": "several-predicates",
+      "rows": [
+        "assertion:authentication-mechanism~flow:process:model-server>store:model-registry-bucket>load-model-artifacts~any~v.d7da08389824",
+        "assertion:credential-presented~flow:process:model-server>store:model-registry-bucket>load-model-artifacts~any~credential:service-account"
+      ]
+    },
+    {
+      "element_id": "process:gpu-nodes",
+      "attribute": "trust_zone",
+      "value": "boundary:model-network",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~process:gpu-nodes~any~boundary:model-network"
+      ]
+    },
+    {
+      "element_id": "process:inference-gateway",
+      "attribute": "exposure",
+      "value": "internet-facing",
+      "reason": "stated",
+      "rows": [
+        "assertion:internet-exposure~process:inference-gateway~any~internet-facing"
+      ]
+    },
+    {
+      "element_id": "process:model-server",
+      "attribute": "trust_zone",
+      "value": "boundary:model-network",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~process:model-server~any~boundary:model-network"
+      ]
+    },
+    {
+      "element_id": "store:redis-feature-store",
+      "attribute": "trust_zone",
+      "value": "boundary:model-network",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~store:redis-feature-store~any~boundary:model-network"
+      ]
+    }
+  ],
+  "stages": {
+    "source_facts": {
+      "mentions": [
+        {
+          "handle": "m1",
+          "text": "other teams' backends",
+          "roles": [
+            "external-system"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Other teams' backends call our inference gateway"
+            }
+          ]
+        },
+        {
+          "handle": "m2",
+          "text": "inference gateway",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "our inference gateway, a FastAPI service on GKE"
+            }
+          ]
+        },
+        {
+          "handle": "m3",
+          "text": "calling services",
+          "roles": [
+            "external-system"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "two of the calling services are in a different cloud"
+            }
+          ]
+        },
+        {
+          "handle": "m4",
+          "text": "model server",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "the model server, which runs the actual model"
+            }
+          ]
+        },
+        {
+          "handle": "m5",
+          "text": "GPU nodes",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "on GPU nodes in our model network"
+            }
+          ]
+        },
+        {
+          "handle": "m6",
+          "text": "model network",
+          "roles": [
+            "network-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "our model network"
+            }
+          ]
+        },
+        {
+          "handle": "m7",
+          "text": "model registry bucket",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "a model registry bucket at startup"
+            }
+          ]
+        },
+        {
+          "handle": "m8",
+          "text": "Redis feature store",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "a Redis feature store on the same network"
+            }
+          ]
+        },
+        {
+          "handle": "m9",
+          "text": "inference log",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "an inference log in BigQuery"
+            }
+          ]
+        },
+        {
+          "handle": "m10",
+          "text": "BigQuery",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "in an inference log in BigQuery"
+            }
+          ]
+        },
+        {
+          "handle": "m11",
+          "text": "ML engineers",
+          "roles": [
+            "person"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "ML engineers publish new model artifacts"
+            }
+          ]
+        },
+        {
+          "handle": "m12",
+          "text": "calling team's users",
+          "roles": [
+            "person"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "whatever the calling team's users typed"
+            }
+          ]
+        }
+      ],
+      "interactions": [
+        {
+          "handle": "i1",
+          "initiator": "m1",
+          "receiver": "m2",
+          "action": "call inference gateway",
+          "protocol": "API",
+          "operations": "read-write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Other teams' backends call our inference gateway"
+            }
+          ]
+        },
+        {
+          "handle": "i2",
+          "initiator": "m2",
+          "receiver": "m4",
+          "action": "forward request",
+          "protocol": "unknown",
+          "operations": "read-write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The gateway forwards the request to the model server"
+            }
+          ]
+        },
+        {
+          "handle": "i3",
+          "initiator": "m4",
+          "receiver": "m7",
+          "action": "load model artifacts",
+          "protocol": "unknown",
+          "operations": "read",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The model server loads model artifacts from a model registry bucket"
+            }
+          ]
+        },
+        {
+          "handle": "i4",
+          "initiator": "m4",
+          "receiver": "m8",
+          "action": "read customer features",
+          "protocol": "unknown",
+          "operations": "read",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "the model server reads from a Redis feature store"
+            }
+          ]
+        },
+        {
+          "handle": "i5",
+          "initiator": "m2",
+          "receiver": "m9",
+          "action": "write requests and responses",
+          "protocol": "unknown",
+          "operations": "write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The gateway writes every request and response into an inference log"
+            }
+          ]
+        },
+        {
+          "handle": "i6",
+          "initiator": "m11",
+          "receiver": "m7",
+          "action": "publish model artifacts",
+          "protocol": "unknown",
+          "operations": "write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "ML engineers publish new model artifacts to the registry bucket"
+            }
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "handle": "f1",
+          "subject_kind": "mention",
+          "subject": "m2",
+          "predicate": "internet-exposure",
+          "value": "internet-facing",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "a FastAPI service on GKE that we expose on the internet"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f2",
+          "subject_kind": "mention",
+          "subject": "m4",
+          "predicate": "network-membership",
+          "value": "m6",
+          "scope": [],
+          "basis": "inferred",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "the model server, which runs the actual model on GPU nodes in our model network"
+            }
+          ],
+          "explanation": "The model server runs the model on nodes stated to be in the model network.",
+          "exclusive": false
+        },
+        {
+          "handle": "f3",
+          "subject_kind": "mention",
+          "subject": "m5",
+          "predicate": "network-membership",
+          "value": "m6",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "GPU nodes in our model network"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f4",
+          "subject_kind": "mention",
+          "subject": "m8",
+          "predicate": "network-membership",
+          "value": "m6",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "a Redis feature store on the same network"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f5",
+          "subject_kind": "interaction",
+          "subject": "i1",
+          "predicate": "authentication-mechanism",
+          "value": "API key in a header",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Callers pass an API key in a header"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f6",
+          "subject_kind": "interaction",
+          "subject": "i1",
+          "predicate": "credential-presented",
+          "value": "API key",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Callers pass an API key in a header"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f7",
+          "subject_kind": "principal",
+          "subject": "calling teams",
+          "predicate": "credential-presented",
+          "value": "API key",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Keys are issued per calling team"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f8",
+          "subject_kind": "credential",
+          "subject": "API key",
+          "predicate": "credential-sharing",
+          "value": "per-principal",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Keys are issued per calling team"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f9",
+          "subject_kind": "credential",
+          "subject": "API key",
+          "predicate": "credential-expiry",
+          "value": "unknown",
+          "reason": "hedged",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "we have never expired one"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f10",
+          "subject_kind": "interaction",
+          "subject": "i2",
+          "predicate": "authentication-mechanism",
+          "value": "absent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "There is no auth between the gateway and the model server"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f11",
+          "subject_kind": "interaction",
+          "subject": "i3",
+          "predicate": "authentication-mechanism",
+          "value": "service account",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "It uses its own service account for that"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f12",
+          "subject_kind": "interaction",
+          "subject": "i3",
+          "predicate": "credential-presented",
+          "value": "service account",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "It uses its own service account for that"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f13",
+          "subject_kind": "artifact",
+          "subject": "model artifacts",
+          "predicate": "signature-verification",
+          "value": "unknown",
+          "reason": "hedged",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "I don't believe anything verifies the artifact hasn't been swapped"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f14",
+          "subject_kind": "mention",
+          "subject": "m8",
+          "predicate": "authentication-mechanism",
+          "value": "absent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Redis has no password on it"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f15",
+          "subject_kind": "interaction",
+          "subject": "i5",
+          "predicate": "storage-encryption",
+          "value": "unknown",
+          "reason": "silent",
+          "scope": [],
+          "basis": "inferred",
+          "quotes": [],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f16",
+          "subject_kind": "mention",
+          "subject": "m9",
+          "predicate": "storage-encryption",
+          "value": "unknown",
+          "reason": "silent",
+          "scope": [],
+          "basis": "inferred",
+          "quotes": [],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f17",
+          "subject_kind": "principal",
+          "subject": "ML engineers",
+          "predicate": "authorization-grant",
+          "value": "publish model artifacts",
+          "scope": [
+            {
+              "kind": "resource",
+              "value": "model registry bucket"
+            },
+            {
+              "kind": "operation",
+              "value": "publish"
+            }
+          ],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "ML engineers publish new model artifacts to the registry bucket"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        }
+      ],
+      "unresolved": [
+        {
+          "handle": "u1",
+          "question": "What governs who can push model artifacts to the registry bucket? The source is unsure whether it is a shared group account.",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "I'm not sure what governs who can push \u2014 I think it is a shared group account"
+            }
+          ]
+        },
+        {
+          "handle": "u2",
+          "question": "Whether the model artifacts are verified against a signature before use is not settled.",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "I don't believe anything verifies the artifact hasn't been swapped"
+            }
+          ]
+        }
+      ]
+    },
+    "bundle_dispositions": [
+      {
+        "handle": "m6",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "boundary:model-network",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m10",
+        "kind": "mention",
+        "disposition": "rejected",
+        "target": "",
+        "code": "unlocatable-quote",
+        "message": "source 'System description' does not hold 'in an inference log in BigQuery'"
+      },
+      {
+        "handle": "m1",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "entity:other-teams-backends",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m2",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "process:inference-gateway",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m3",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "entity:calling-services",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m4",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "process:model-server",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m5",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "process:gpu-nodes",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m7",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "store:model-registry-bucket",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m8",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "store:redis-feature-store",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m9",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "store:inference-log",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m11",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "entity:ml-engineers",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m12",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "entity:calling-team-s-users",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "i1",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:entity:other-teams-backends>process:inference-gateway>call-inference-gateway",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "i2",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:process:inference-gateway>process:model-server>forward-request",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "i3",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:process:model-server>store:model-registry-bucket>load-model-artifacts",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "i4",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:process:model-server>store:redis-feature-store>read-customer-features",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "i5",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:process:inference-gateway>store:inference-log>write-requests-and-responses",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "i6",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:entity:ml-engineers>store:model-registry-bucket>publish-model-artifacts",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f1",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "process:inference-gateway",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f2",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "process:model-server",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f3",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "process:gpu-nodes",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f4",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "store:redis-feature-store",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f5",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "flow:entity:other-teams-backends>process:inference-gateway>call-inference-gateway",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f6",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "flow:entity:other-teams-backends>process:inference-gateway>call-inference-gateway",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f7",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "calling teams",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f8",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "API key",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f9",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "API key",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f10",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "flow:process:inference-gateway>process:model-server>forward-request",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f11",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "flow:process:model-server>store:model-registry-bucket>load-model-artifacts",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f12",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "flow:process:model-server>store:model-registry-bucket>load-model-artifacts",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f13",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "model artifacts",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f14",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "store:redis-feature-store",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f15",
+        "kind": "fact",
+        "disposition": "rejected",
+        "target": "",
+        "code": "wrong-subject-type",
+        "message": "'storage-encryption' accepts component, not 'interaction'"
+      },
+      {
+        "handle": "f16",
+        "kind": "fact",
+        "disposition": "rejected",
+        "target": "",
+        "code": "missing-premise",
+        "message": "an inferred or derived value says what it rests on"
+      },
+      {
+        "handle": "f17",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "ML engineers",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "u1",
+        "kind": "unresolved",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "open-question",
+        "message": "What governs who can push model artifacts to the registry bucket? The source is unsure whether it is a shared group account."
+      },
+      {
+        "handle": "u2",
+        "kind": "unresolved",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "open-question",
+        "message": "Whether the model artifacts are verified against a signature before use is not settled."
+      }
+    ],
+    "extracted_model": {
+      "external_entities": [
+        {
+          "id": "entity:other-teams-backends",
+          "name": "other teams' backends",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Other teams' backends call our inference gateway",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "external-system",
+          "trust_zone": "boundary:model-network"
+        },
+        {
+          "id": "entity:calling-services",
+          "name": "calling services",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "two of the calling services are in a different cloud",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "external-system",
+          "trust_zone": "boundary:model-network"
+        },
+        {
+          "id": "entity:ml-engineers",
+          "name": "ML engineers",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "ML engineers publish new model artifacts",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "human",
+          "trust_zone": "boundary:model-network"
+        },
+        {
+          "id": "entity:calling-team-s-users",
+          "name": "calling team's users",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "whatever the calling team's users typed",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "human",
+          "trust_zone": "boundary:model-network"
+        }
+      ],
+      "processes": [
+        {
+          "id": "process:inference-gateway",
+          "name": "inference gateway",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "our inference gateway, a FastAPI service on GKE",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:model-network",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:model-server",
+          "name": "model server",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "the model server, which runs the actual model",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:model-network",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:gpu-nodes",
+          "name": "GPU nodes",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "on GPU nodes in our model network",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:model-network",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        }
+      ],
+      "data_stores": [
+        {
+          "id": "store:model-registry-bucket",
+          "name": "model registry bucket",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "a model registry bucket at startup",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:model-network",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        },
+        {
+          "id": "store:redis-feature-store",
+          "name": "Redis feature store",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "a Redis feature store on the same network",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:model-network",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        },
+        {
+          "id": "store:inference-log",
+          "name": "inference log",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "an inference log in BigQuery",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:model-network",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        }
+      ],
+      "data_flows": [
+        {
+          "id": "flow:entity:other-teams-backends>process:inference-gateway>call-inference-gateway",
+          "name": "call inference gateway",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Other teams' backends call our inference gateway",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "entity:other-teams-backends",
+          "destination": "process:inference-gateway",
+          "protocol": "API",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "read-write"
+        },
+        {
+          "id": "flow:process:inference-gateway>process:model-server>forward-request",
+          "name": "forward request",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The gateway forwards the request to the model server",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:inference-gateway",
+          "destination": "process:model-server",
+          "protocol": "unknown",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "read-write"
+        },
+        {
+          "id": "flow:process:model-server>store:model-registry-bucket>load-model-artifacts",
+          "name": "load model artifacts",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The model server loads model artifacts from a model registry bucket",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:model-server",
+          "destination": "store:model-registry-bucket",
+          "protocol": "unknown",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "read"
+        },
+        {
+          "id": "flow:process:model-server>store:redis-feature-store>read-customer-features",
+          "name": "read customer features",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "the model server reads from a Redis feature store",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:model-server",
+          "destination": "store:redis-feature-store",
+          "protocol": "unknown",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "read"
+        },
+        {
+          "id": "flow:process:inference-gateway>store:inference-log>write-requests-and-responses",
+          "name": "write requests and responses",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The gateway writes every request and response into an inference log",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:inference-gateway",
+          "destination": "store:inference-log",
+          "protocol": "unknown",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        },
+        {
+          "id": "flow:entity:ml-engineers>store:model-registry-bucket>publish-model-artifacts",
+          "name": "publish model artifacts",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "ML engineers publish new model artifacts to the registry bucket",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "entity:ml-engineers",
+          "destination": "store:model-registry-bucket",
+          "protocol": "unknown",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        }
+      ],
+      "trust_boundaries": [
+        {
+          "id": "boundary:model-network",
+          "name": "model network",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "our model network",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        }
+      ],
+      "assumptions": [
+        {
+          "assumption": "other teams' backends sits in the one zone the sources describe",
+          "element_id": "entity:other-teams-backends",
+          "attribute": "trust_zone",
+          "basis": "no source places this component, and the bundle names one zone"
+        },
+        {
+          "assumption": "inference gateway sits in the one zone the sources describe",
+          "element_id": "process:inference-gateway",
+          "attribute": "trust_zone",
+          "basis": "no source places this component, and the bundle names one zone"
+        },
+        {
+          "assumption": "calling services sits in the one zone the sources describe",
+          "element_id": "entity:calling-services",
+          "attribute": "trust_zone",
+          "basis": "no source places this component, and the bundle names one zone"
+        },
+        {
+          "assumption": "model server sits in model network",
+          "element_id": "process:model-server",
+          "attribute": "trust_zone",
+          "basis": "no source places this component; the placement is inferred"
+        },
+        {
+          "assumption": "model registry bucket sits in the one zone the sources describe",
+          "element_id": "store:model-registry-bucket",
+          "attribute": "trust_zone",
+          "basis": "no source places this component, and the bundle names one zone"
+        },
+        {
+          "assumption": "inference log sits in the one zone the sources describe",
+          "element_id": "store:inference-log",
+          "attribute": "trust_zone",
+          "basis": "no source places this component, and the bundle names one zone"
+        },
+        {
+          "assumption": "ML engineers sits in the one zone the sources describe",
+          "element_id": "entity:ml-engineers",
+          "attribute": "trust_zone",
+          "basis": "no source places this component, and the bundle names one zone"
+        },
+        {
+          "assumption": "calling team's users sits in the one zone the sources describe",
+          "element_id": "entity:calling-team-s-users",
+          "attribute": "trust_zone",
+          "basis": "no source places this component, and the bundle names one zone"
+        }
+      ]
+    },
+    "valid_model": {
+      "external_entities": [
+        {
+          "id": "entity:other-teams-backends",
+          "name": "other teams' backends",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Other teams' backends call our inference gateway",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "external-system",
+          "trust_zone": "boundary:model-network"
+        },
+        {
+          "id": "entity:calling-services",
+          "name": "calling services",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "two of the calling services are in a different cloud",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "external-system",
+          "trust_zone": "boundary:model-network"
+        },
+        {
+          "id": "entity:ml-engineers",
+          "name": "ML engineers",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "ML engineers publish new model artifacts",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "human",
+          "trust_zone": "boundary:model-network"
+        },
+        {
+          "id": "entity:calling-team-s-users",
+          "name": "calling team's users",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "whatever the calling team's users typed",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "human",
+          "trust_zone": "boundary:model-network"
+        }
+      ],
+      "processes": [
+        {
+          "id": "process:inference-gateway",
+          "name": "inference gateway",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "our inference gateway, a FastAPI service on GKE",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:model-network",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:model-server",
+          "name": "model server",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "the model server, which runs the actual model",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:model-network",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:gpu-nodes",
+          "name": "GPU nodes",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "on GPU nodes in our model network",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:model-network",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        }
+      ],
+      "data_stores": [
+        {
+          "id": "store:model-registry-bucket",
+          "name": "model registry bucket",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "a model registry bucket at startup",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:model-network",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        },
+        {
+          "id": "store:redis-feature-store",
+          "name": "Redis feature store",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "a Redis feature store on the same network",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:model-network",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        },
+        {
+          "id": "store:inference-log",
+          "name": "inference log",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "an inference log in BigQuery",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:model-network",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        }
+      ],
+      "data_flows": [
+        {
+          "id": "flow:entity:other-teams-backends>process:inference-gateway>call-inference-gateway",
+          "name": "call inference gateway",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Other teams' backends call our inference gateway",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "entity:other-teams-backends",
+          "destination": "process:inference-gateway",
+          "protocol": "API",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "read-write"
+        },
+        {
+          "id": "flow:process:inference-gateway>process:model-server>forward-request",
+          "name": "forward request",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The gateway forwards the request to the model server",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:inference-gateway",
+          "destination": "process:model-server",
+          "protocol": "unknown",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "read-write"
+        },
+        {
+          "id": "flow:process:model-server>store:model-registry-bucket>load-model-artifacts",
+          "name": "load model artifacts",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The model server loads model artifacts from a model registry bucket",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:model-server",
+          "destination": "store:model-registry-bucket",
+          "protocol": "unknown",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "read"
+        },
+        {
+          "id": "flow:process:model-server>store:redis-feature-store>read-customer-features",
+          "name": "read customer features",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "the model server reads from a Redis feature store",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:model-server",
+          "destination": "store:redis-feature-store",
+          "protocol": "unknown",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "read"
+        },
+        {
+          "id": "flow:process:inference-gateway>store:inference-log>write-requests-and-responses",
+          "name": "write requests and responses",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The gateway writes every request and response into an inference log",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:inference-gateway",
+          "destination": "store:inference-log",
+          "protocol": "unknown",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        },
+        {
+          "id": "flow:entity:ml-engineers>store:model-registry-bucket>publish-model-artifacts",
+          "name": "publish model artifacts",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "ML engineers publish new model artifacts to the registry bucket",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "entity:ml-engineers",
+          "destination": "store:model-registry-bucket",
+          "protocol": "unknown",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        }
+      ],
+      "trust_boundaries": [
+        {
+          "id": "boundary:model-network",
+          "name": "model network",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "our model network",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        }
+      ],
+      "assumptions": [
+        {
+          "assumption": "other teams' backends sits in the one zone the sources describe",
+          "element_id": "entity:other-teams-backends",
+          "attribute": "trust_zone",
+          "basis": "no source places this component, and the bundle names one zone"
+        },
+        {
+          "assumption": "inference gateway sits in the one zone the sources describe",
+          "element_id": "process:inference-gateway",
+          "attribute": "trust_zone",
+          "basis": "no source places this component, and the bundle names one zone"
+        },
+        {
+          "assumption": "calling services sits in the one zone the sources describe",
+          "element_id": "entity:calling-services",
+          "attribute": "trust_zone",
+          "basis": "no source places this component, and the bundle names one zone"
+        },
+        {
+          "assumption": "model server sits in model network",
+          "element_id": "process:model-server",
+          "attribute": "trust_zone",
+          "basis": "no source places this component; the placement is inferred"
+        },
+        {
+          "assumption": "model registry bucket sits in the one zone the sources describe",
+          "element_id": "store:model-registry-bucket",
+          "attribute": "trust_zone",
+          "basis": "no source places this component, and the bundle names one zone"
+        },
+        {
+          "assumption": "inference log sits in the one zone the sources describe",
+          "element_id": "store:inference-log",
+          "attribute": "trust_zone",
+          "basis": "no source places this component, and the bundle names one zone"
+        },
+        {
+          "assumption": "ML engineers sits in the one zone the sources describe",
+          "element_id": "entity:ml-engineers",
+          "attribute": "trust_zone",
+          "basis": "no source places this component, and the bundle names one zone"
+        },
+        {
+          "assumption": "calling team's users sits in the one zone the sources describe",
+          "element_id": "entity:calling-team-s-users",
+          "attribute": "trust_zone",
+          "basis": "no source places this component, and the bundle names one zone"
+        }
+      ]
+    }
+  }
+}
