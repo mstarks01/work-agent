@@ -80,9 +80,9 @@ Not part of the question, but the records cite these names, so you need them.
 
 | id | exposure | interface | zone | technology |
 |---|---|---|---|---|
-| process:build-runner | internal | unknown | boundary:build-environment | unknown |
-| process:deploy-controller | internal | unknown | boundary:corporate-network | unknown |
-| process:store-server | internal | unknown | boundary:store-estate | container runtime running the till software |
+| process:build-runner | unknown | unknown | boundary:build-environment | unknown |
+| process:deploy-controller | unknown | unknown | boundary:corporate-network | unknown |
+| process:store-server | unknown | unknown | boundary:store-estate | container runtime running the till software |
 
 **Data stores**
 
@@ -122,9 +122,7 @@ Not part of the question, but the records cite these names, so you need them.
 **Assumptions**
 
 - `entity:developer` — Developers sit on the corporate network. (basis: The git server they push to is stated to sit on the corporate network; the source places developers nowhere else.)
-- `process:build-runner` — The build runner is not reachable from the internet. (basis: Stated to live in its own build environment; the only internet interaction stated is outbound dependency resolution.)
-- `process:deploy-controller` — The deploy controller is not reachable from the internet. (basis: Stated to run on the corporate network and to be reached by store servers over the retail WAN.)
-- `process:store-server` — The store servers are not reachable from the internet. (basis: Back-office servers reached over the retail WAN; the source states they do not get pushed to at all.)
+- `entity:developer` — developer's trust_zone is boundary:corporate-network, which the schema requires and no source states. (basis: The description locates the git server, not developers. Access to a corporate service does not establish the caller's network membership.)
 
 **Reviewed aliases** — other names a reader ruled identify the same element, each with the words in the source that support it. An extraction using one is named differently, not wrong.
 
@@ -414,7 +412,7 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "1bfb96ef3374b697ef78e76661daa3d2b227792a3b20d2d1ee1d526cde02652c",
-      "model.json": "d1b86827c28af02381ec53351fde0294f760ea296e051611e93aef2384d4c92c",
+      "model.json": "1d3dab79b052dbc4cdef97a94781723e2981b5ba3fb188a7bddaf685183cd395",
       "claims/stride.json": "418d496873e962611c9b2187a1c7193dbca22348b556136d3c721e84bf0c43d8"
       }
     }

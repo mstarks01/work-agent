@@ -358,39 +358,54 @@
       },
       "rationale": "The source states the bucket is readable by anyone, which is the classification the model records.",
       "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:pub-sub",
+        "predicate": "network-membership",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "exclusive": false
+      },
+      "rationale": "The source places the normalizer \"in our analytics network\" and places the broker nowhere. It associates the broker with the gateway's onward hop \u2014 \"Readings the gateway accepts are forwarded onto Pub/Sub\" \u2014 so it takes the gateway's zone. Either placement leaves exactly one crossing on this path.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "entity:field-technician",
+        "predicate": "network-membership",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "exclusive": false
+      },
+      "rationale": "A local service session supports proximity to the node. It does not establish membership in a common network across customer sites.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:device-registry",
+        "predicate": "network-membership",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "exclusive": false
+      },
+      "rationale": "Device-registry function and confidential classification do not establish ingest-edge membership. No placement evidence is supplied.",
+      "reviewed_by": "mstarks01"
     }
   ],
   "disputed": [
-    {
-      "element_id": "entity:field-technician",
-      "attribute": "trust_zone",
-      "blessed": "boundary:field-network",
-      "proposed": "record as an inference",
-      "kind": "defensible-inference",
-      "basis": "Servicing nodes over a local console implies being where the nodes are. No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-      "ruling": null,
-      "reviewed_by": null
-    },
-    {
-      "element_id": "process:telemetry-normalizer",
-      "attribute": "exposure",
-      "blessed": "internal",
-      "proposed": "record as an inference",
-      "kind": "defensible-inference",
-      "basis": "No sentence states its reachability. Sitting in an internal network implies it, which is an inference rather than a statement.",
-      "ruling": null,
-      "reviewed_by": null
-    },
-    {
-      "element_id": "store:device-registry",
-      "attribute": "trust_zone",
-      "blessed": "boundary:ingest-edge",
-      "proposed": "record as an inference",
-      "kind": "defensible-inference",
-      "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-      "ruling": null,
-      "reviewed_by": null
-    },
     {
       "element_id": "store:telemetry-lake",
       "attribute": "trust_zone",
@@ -408,36 +423,6 @@
       "proposed": "record as an inference",
       "kind": "defensible-inference",
       "basis": "Public read makes its placement arguable as well as unstated. No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-      "ruling": null,
-      "reviewed_by": null
-    },
-    {
-      "element_id": "store:pub-sub",
-      "attribute": "trust_zone",
-      "blessed": "boundary:ingest-edge",
-      "proposed": "keep; model.json already records it as an assumption",
-      "kind": "defensible-inference",
-      "basis": "The model itself carries an assumption on this attribute, so it is not held as stated.",
-      "ruling": null,
-      "reviewed_by": null
-    },
-    {
-      "element_id": "entity:sensor-node",
-      "attribute": "trust_zone",
-      "blessed": "boundary:field-network",
-      "proposed": "record as an inference",
-      "kind": "defensible-inference",
-      "basis": "Installation at customer sites is explicit; a single field network is not. The model's zone is a reasonable grouping of those sites, not something the source says.",
-      "ruling": null,
-      "reviewed_by": null
-    },
-    {
-      "element_id": "process:device-gateway",
-      "attribute": "trust_zone",
-      "blessed": "boundary:ingest-edge",
-      "proposed": "record as an inference",
-      "kind": "defensible-inference",
-      "basis": "The quote names GKE and internet exposure, not an ingest-edge network or membership in it. The zone is the model's own grouping of the ingest path.",
       "ruling": null,
       "reviewed_by": null
     }

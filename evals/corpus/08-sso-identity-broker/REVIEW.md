@@ -120,6 +120,11 @@ Not part of the question, but the records cite these names, so you need them.
 
 - `entity:franchise-identity-provider` — The franchise identity provider is a separate trust party from everywhere else outside the corporate network. (basis: The source introduces the franchise stores as a distinct group let in on distinct terms; it does not say where the provider runs, so the zone is drawn on the party rather than on a network.)
 - `entity:hr-system` — The HR system sits outside the corporate network. (basis: The source names it as the system of record the broker pulls from and never places it; grouped with the other unplaced parties rather than assumed internal.)
+- `entity:franchise-identity-provider` — franchise identity provider's trust_zone is boundary:franchise-partner, which the schema requires and no source states. (basis: Their own identity provider establishes a distinct authority relationship. It does not establish the provider's physical network or hosting location.)
+- `store:directory` — directory's trust_zone is boundary:corporate-network, which the schema requires and no source states. (basis: Its own directory establishes the broker's directory relationship, not the directory's network location.)
+- `store:key-store` — key store's trust_zone is boundary:corporate-network, which the schema requires and no source states. (basis: The broker keeping its key in a key store does not locate that store. A remote key-management service is compatible with the description.)
+- `store:audit-log` — audit log's trust_zone is boundary:corporate-network, which the schema requires and no source states. (basis: Writing to an audit log does not place its storage on the writer's network. Centralized or externally hosted logging remains possible.)
+- `entity:colleague` — colleague's trust_zone is boundary:outside-corporate-network, which the schema requires and no source states. (basis: Home sign-ins support an external-origin scenario. They do not place all colleagues outside the corporate network or exclude VPN connectivity.)
 
 **Reviewed aliases** — other names a reader ruled identify the same element, each with the words in the source that support it. An extraction using one is named differently, not wrong.
 
@@ -515,7 +520,7 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "36115502847aa04640666b0dd9f458881e6f7f8968e4d499b58983b3403dc721",
-      "model.json": "32b2b3e1998f13d406092d0edc6e451f3f595857fd30909383f86bd4d397c535",
+      "model.json": "71ed0fb603b40e3b80de2efaae88e285d6748a94145e576f028d01a46d667599",
       "claims/asvs.json": "80d8f95844658dbd83985ff1c9ecd70a675f6dc5861fafe499164b82287a5e9a",
       "claims/stride.json": "e7d9ea199f055777363e62b00eaf13504355343e6ce84bb5230556fb1ab77cfa"
       }

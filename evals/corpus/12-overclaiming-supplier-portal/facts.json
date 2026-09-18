@@ -190,39 +190,39 @@
       },
       "rationale": "Supplier use of a portal does not establish internet exposure: private connectivity or restricted access remains possible. External organizational users are not proof of public network reachability.",
       "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "entity:supplier",
+        "predicate": "network-membership",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "exclusive": false
+      },
+      "rationale": "Supplier access to a SaaS product does not establish the suppliers' network location. The value is a placement the schema requires, not a source-backed fact.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "entity:portal-vendor",
+        "predicate": "network-membership",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "exclusive": false
+      },
+      "rationale": "The vendor operates the platform, supporting an ownership grouping. That does not locate the vendor's extract-sending infrastructure on a particular network.",
+      "reviewed_by": "mstarks01"
     }
   ],
   "disputed": [
-    {
-      "element_id": "entity:supplier",
-      "attribute": "trust_zone",
-      "blessed": "boundary:public-internet",
-      "proposed": "record as an inference",
-      "kind": "defensible-inference",
-      "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-      "ruling": null,
-      "reviewed_by": null
-    },
-    {
-      "element_id": "entity:portal-vendor",
-      "attribute": "trust_zone",
-      "blessed": "boundary:vendor-platform",
-      "proposed": "record as an inference",
-      "kind": "defensible-inference",
-      "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-      "ruling": null,
-      "reviewed_by": null
-    },
-    {
-      "element_id": "process:supplier-master-service",
-      "attribute": "exposure",
-      "blessed": "internal",
-      "proposed": "record as an inference",
-      "kind": "defensible-inference",
-      "basis": "No sentence states its reachability. Sitting in an internal network implies it, which is an inference rather than a statement.",
-      "ruling": null,
-      "reviewed_by": null
-    },
     {
       "element_id": "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract",
       "attribute": "encryption_in_transit",
@@ -230,8 +230,8 @@
       "proposed": "none",
       "kind": "explicit-fact",
       "basis": "The runbook states what arrives: 'the file arrives as a plain CSV and is picked up as-is'. The model holds unknown, which reads the hearsay claim 'we were told the nightly extract is encrypted end to end' as leaving the question open. A record of the artifact beats a claim about it with no teller.",
-      "ruling": null,
-      "reviewed_by": null
+      "ruling": "keep",
+      "reviewed_by": "mstarks01"
     }
   ],
   "aliases": {

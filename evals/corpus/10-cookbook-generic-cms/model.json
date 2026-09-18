@@ -225,6 +225,24 @@
       "element_id": "entity:cdn",
       "attribute": "trust_zone",
       "basis": "Assets 'do not come off the web server'; the web server 'pushes them up to the CDN's bucket', implying a distinct, separately operated location."
+    },
+    {
+      "assumption": "CDN's trust_zone is boundary:cdn, which the schema requires and no source states.",
+      "element_id": "entity:cdn",
+      "attribute": "trust_zone",
+      "basis": "A CDN entity can reasonably belong to a CDN-provider grouping. This does not establish a particular network perimeter or shared connectivity."
+    },
+    {
+      "assumption": "CDN bucket's trust_zone is boundary:cdn, which the schema requires and no source states.",
+      "element_id": "store:cdn-bucket",
+      "attribute": "trust_zone",
+      "basis": "The stated ownership supports the grouping. It does not establish network co-location with CDN serving infrastructure."
+    },
+    {
+      "assumption": "Reader's trust_zone is boundary:public-internet, which the schema requires and no source states.",
+      "element_id": "entity:reader",
+      "attribute": "trust_zone",
+      "basis": "A public audience supports this abstraction. It does not locate every reader on a specific network."
     }
   ]
 }
