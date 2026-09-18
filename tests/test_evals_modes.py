@@ -1688,7 +1688,10 @@ class TestAnExtraElementIsACandidateOrUnreviewedAndNeverARename:
         raw = case.model.model_dump()
         for process in raw["processes"]:
             if process["id"] == "process:ingest-scheduler":
+                # The name moves with the ID, because the alias rule reads the
+                # name and a gate-passing model derives one from the other.
                 process["id"] = "process:airflow-scheduler"
+                process["name"] = "Airflow scheduler"
         for flow in raw["data_flows"]:
             for end in ("source", "destination"):
                 if flow[end] == "process:ingest-scheduler":
@@ -1853,8 +1856,19 @@ class TestASupportedNameIsNamedDifferentlyRatherThanMissed:
 
     CASE = "03-batch-data-pipeline"
 
+    def renamed(self, element: dict, element_id: str) -> None:
+        """Give one element the ID asked for, **and the name it derives from**.
+
+        A model the gate passed carries an ID its own name derives, and the
+        alias rule reads the name. Moving the ID alone would build a model no
+        extraction can emit, and would ask the alias rule a question about a
+        spelling nothing wrote.
+        """
+        element["id"] = element_id
+        element["name"] = element_id.partition(":")[2].replace("-", " ")
+
     def scored(self, renames):
-        """The blessed model with elements re-identified, as a model naming them
+        """The blessed model with elements re-named, as a model naming them
         its own way would emit."""
         from evals.harness.reference import load_case
 
@@ -1865,7 +1879,7 @@ class TestASupportedNameIsNamedDifferentlyRatherThanMissed:
         for collection in ("external_entities", "processes", "data_stores"):
             for element in raw.get(collection, []):
                 if element["id"] in renames:
-                    element["id"] = renames[element["id"]]
+                    self.renamed(element, renames[element["id"]])
         for flow in raw.get("data_flows", []):
             for end in ("source", "destination"):
                 flow[end] = renames.get(flow[end], flow[end])
@@ -1885,7 +1899,8 @@ class TestASupportedNameIsNamedDifferentlyRatherThanMissed:
         )
         raw = case.model.model_dump()
         for boundary in raw.get("trust_boundaries", []):
-            boundary["id"] = renames.get(boundary["id"], boundary["id"])
+            if boundary["id"] in renames:
+                self.renamed(boundary, renames[boundary["id"]])
         for collection in ("external_entities", "processes", "data_stores"):
             for element in raw.get(collection, []):
                 zone = element.get(ZONE_ATTRIBUTE)

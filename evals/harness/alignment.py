@@ -264,7 +264,7 @@ def align(case: GoldenCase, produced: SystemModel | None) -> Alignment:
     produced_ids = [element.id for element in produced.elements()]
     pairs: list[Pair] = []
     ambiguous: list[Ambiguity] = []
-    _align_nodes(case, reference_ids, produced_ids, pairs, ambiguous)
+    _align_nodes(case, reference_ids, produced, pairs, ambiguous)
     _align_zones(case.model, produced, pairs, ambiguous)
     _align_flows(case, produced, pairs, ambiguous)
     aligned = {pair.reference for pair in pairs}
@@ -280,15 +280,35 @@ def align(case: GoldenCase, produced: SystemModel | None) -> Alignment:
 def _align_nodes(
     case: GoldenCase,
     reference_ids: Iterable[str],
-    produced_ids: Iterable[str],
+    produced: SystemModel,
     pairs: list[Pair],
     ambiguous: list[Ambiguity],
 ) -> None:
-    """Rules 1 and 2 over everything that is not a flow."""
+    """Rules 1 and 2 over everything that is not a flow.
+
+    **An alias is matched against a produced element's name, not its ID.** The
+    two agree on any model the gate passed, because ``id-mismatch`` holds an ID
+    to the slug its name derives. They part on an *archived* model, whose ID
+    was derived under whatever :func:`~analysis_service.system_model.normalize_name`
+    said on the day — and this rule re-derives the alias's slug today. Keying
+    on the ID made those two readings of one rule, and a normalization change
+    then broke a reader's ruling that is still correct about the words.
+    ``normalize_element_ids`` states the precedence this follows: names are
+    authoritative and IDs follow.
+    """
     nodes = frozenset(_nodes(reference_ids))
+    produced_ids = [element.id for element in produced.elements()]
     held = frozenset(_nodes(produced_ids))
     pairs.extend(Pair(one, one, "exact") for one in sorted(nodes & held))
-    by_key = {slug_key(element_id): element_id for element_id in held - nodes}
+    by_key: dict[str, str] = {}
+    for element in produced.elements():
+        if element.id in nodes or element_type(element.id) == DataFlow.id_prefix:
+            continue
+        try:
+            named = make_element_id(element_type(element.id), element.name)
+        except ValueError:
+            named = element.id
+        by_key.setdefault(slug_key(named), element.id)
     claims: dict[tuple[str, str], str] = {}
     for alias in case.meta.aliases:
         if alias.element in held or alias.element not in nodes:

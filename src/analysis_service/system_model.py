@@ -51,6 +51,22 @@ CORE_ASSET_TAGS = frozenset(
 
 _NON_SLUG_CHARS_RE = re.compile(r"[^a-z0-9]+")
 
+#: The apostrophes a writer types, elided rather than separated on.
+#:
+#: **An apostrophe sits inside a word, so it is not a word boundary.** Every
+#: other non-slug character runs words together — a slash, a comma, a space —
+#: and becomes one separator. An apostrophe does the opposite: treating it as a
+#: separator cuts one word in two and leaves a segment that is not a word, so
+#: "the calling team's users" slugged to ``calling-team-s-users`` with a stray
+#: ``s``. Live extractions wrote that shape, and one signed reference subject
+#: carried it.
+#:
+#: Both spellings, because a person types either and a model emits either: the
+#: typewriter apostrophe and the typographic one. Nothing else is elided — a
+#: backtick and a prime are not apostrophes in a name, and reading them as one
+#: would run two words together instead.
+_APOSTROPHES_RE = re.compile("['\u2019]")
+
 
 #: An element ID's two halves, named so the ID pattern, the flow encoding and
 #: the flow decoder read one spelling of each. A prefix is an element class's
@@ -93,8 +109,15 @@ _FLOW_ID_V1 = rf"flow:{_ID_SLUG}:{_ID_SLUG}"
 
 
 def normalize_name(name: str) -> str:
-    """Normalize a human-readable name into the slug used inside element IDs."""
-    slug = _NON_SLUG_CHARS_RE.sub("-", name.lower()).strip("-")
+    """Normalize a human-readable name into the slug used inside element IDs.
+
+    Two passes, and the order is the rule: an apostrophe is **elided** and
+    every other non-slug character **separates**. So "the team's account"
+    becomes ``the-teams-account`` rather than ``the-team-s-account``, and a
+    slug carries no segment that is not a word.
+    """
+    lowered = _APOSTROPHES_RE.sub("", name.lower())
+    slug = _NON_SLUG_CHARS_RE.sub("-", lowered).strip("-")
     if not slug:
         raise ValueError(f"name {name!r} normalizes to an empty slug")
     return slug
