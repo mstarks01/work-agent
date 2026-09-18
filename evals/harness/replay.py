@@ -436,7 +436,16 @@ class ReferenceRowFate:
 
 @dataclass(frozen=True)
 class AssertionReplay:
-    """One archived proposal, re-resolved and graded against a signed reference."""
+    """One archived proposal, re-resolved and graded against a signed reference.
+
+    **Two readings of one run, always both.** ``rows`` is the strict matcher's,
+    where a **Data Flow**'s label is part of its subject; ``aligned`` is the
+    rows this run stated on the same fact under another label, which the strict
+    matcher therefore scored as missed. #1015 settles that the two are reported
+    as a pair and that the gap between them is the naming measurement — so the
+    aligned reading is computed here, where the strict one is, rather than by
+    whichever caller remembers to ask for it.
+    """
 
     case_id: str
     rows: tuple[ReferenceRowFate, ...]
@@ -444,6 +453,10 @@ class AssertionReplay:
     produced: Mapping[str, ProducedFate]
     rejected: int
     issues: tuple[str, ...] = ()
+    #: Reference rows answered under another flow label, by identity. It
+    #: overlaps ``rows`` by construction — a row the strict matcher found is
+    #: stated on that fact too — so :attr:`credited` is what a reader counts.
+    aligned: frozenset[str] = frozenset()
 
     @property
     def counts(self) -> Counter[str]:
@@ -452,6 +465,16 @@ class AssertionReplay:
     @property
     def produced_counts(self) -> Counter[str]:
         return Counter(self.produced.values())
+
+    @property
+    def credited(self) -> frozenset[str]:
+        """The rows only the looser key answered, which is the gap itself.
+
+        Derived rather than stored beside ``aligned``, so nothing can report a
+        gap the two readings do not hold.
+        """
+        found = {row.reference for row in self.rows if row.fate == "found"}
+        return self.aligned - found
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -465,6 +488,7 @@ class AssertionReplay:
             "issues": list(self.issues),
             "rows": [row.to_json() for row in self.rows],
             "produced": dict(self.produced),
+            "relabelled": sorted(self.credited),
         }
 
 
@@ -764,6 +788,11 @@ def replay_assertions(
     reviewer ruled they should be. The fates are then the plain matcher's,
     assigned by :func:`_assigned` so that no reference row's exact answer is
     spent on another row that had only a worse use for it.
+
+    **The looser reading rides along.** :func:`aligned_rows` reads the same
+    reference and the same result under a key that sets a flow's label aside,
+    and the result carries both — so a caller cannot report the strict figure
+    without the pair beside it. The strict fates are untouched by it.
     """
     available: dict[tuple[str, str], list[Assertion]] = defaultdict(list)
     for entry in result.catalog.entries:
@@ -817,6 +846,7 @@ def replay_assertions(
         produced=produced,
         rejected=len({issue.row for issue in result.issues if issue.row is not None}),
         issues=tuple(f"{issue.code}: {issue.message}" for issue in result.issues),
+        aligned=aligned_rows(reference, result),
     )
 
 
@@ -1239,6 +1269,7 @@ def pooled_assertions(sweeps: Sequence[SweepReplay]) -> dict[str, Any]:
     overstated = 0
     rejected = 0
     emissions = 0
+    relabelled = 0
     for sweep in sweeps:
         for replay in sweep.assertions:
             emissions += 1
@@ -1246,6 +1277,7 @@ def pooled_assertions(sweeps: Sequence[SweepReplay]) -> dict[str, Any]:
             counts.update(replay.counts)
             produced.update(replay.produced_counts)
             overstated += sum(row.basis_overstated for row in replay.rows)
+            relabelled += len(replay.credited)
             for row in replay.rows:
                 if row.fate in ROW_LOSSES:
                     per_row[f"{replay.case_id}/{row.reference}"][row.fate] += 1
@@ -1253,6 +1285,11 @@ def pooled_assertions(sweeps: Sequence[SweepReplay]) -> dict[str, Any]:
         "sweeps": len(sweeps),
         "emissions": emissions,
         "fates": {fate: counts[fate] for fate in ROW_FATES},
+        # The pair #1015 settles: ``found`` is the strict reading, and this is
+        # what the same runs stated on the same fact under another flow label.
+        # Reported beside the fates and never folded into them.
+        "found": counts["found"],
+        "relabelled": relabelled,
         "basis_overstated": overstated,
         "produced": {fate: produced[fate] for fate in PRODUCED_FATES},
         "rejected": rejected,
@@ -1449,6 +1486,13 @@ def _render_assertions(pool: dict[str, Any], targets: int) -> None:
     for fate in ROW_FATES:
         print(f"  {fate:<20} {pool['fates'][fate]:>5}")
     print(f"  basis overstated     {pool['basis_overstated']:>5}")
+    # The strict reading and the aligned one, with the gap named between them
+    # (#1015). A relabelled row is one the run stated on the same fact under
+    # another flow label, which the fates above score as missed.
+    print(
+        f"  found {pool['found']} strictly, +{pool['relabelled']} stated under"
+        " another flow label"
+    )
     produced = ", ".join(f"{fate} {pool['produced'][fate]}" for fate in PRODUCED_FATES)
     print(f"  produced rows: {produced}")
     if pool["targets"]:

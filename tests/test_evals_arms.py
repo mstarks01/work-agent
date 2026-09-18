@@ -11,6 +11,7 @@ last group drives the file the comparison is re-run from, which fails closed on
 a vocabulary it does not know.
 """
 
+import inspect
 import json
 from pathlib import Path
 from typing import get_args
@@ -26,7 +27,14 @@ from analysis_service.assertions import (
 )
 from analysis_service.deployment import Deployment
 from analysis_service.markdown_loader import MarkdownLoader
-from analysis_service.system_model import Element
+from analysis_service.system_model import (
+    UNKNOWN,
+    Element,
+    flow_id_version,
+    make_flow_id,
+    parse_flow_id,
+)
+from evals.harness import replay
 from evals.harness.arms import (
     ARMS,
     ARTIFACT_VERSION,
@@ -59,6 +67,7 @@ from evals.harness.arms import (
     write_runs,
     wrong_rate,
 )
+from evals.harness.modes import AssertionResult
 from evals.harness.replay import PRODUCED_FATES, ROW_FATES, SignedReference
 from tests.factories import PROJECT_ROOT
 from tests.test_deployment import VERTEX_ENV
@@ -517,6 +526,65 @@ class TestTheAlignedReading:
         runs = [self.run_with(found=4, aligned=3)]
         assert macro_recall(runs, "A") == 0.4
         assert macro_recall(runs, "A", aligned=True) == 0.7
+
+
+class TestTheAlignedReadingComesOffTheReplay:
+    """No caller supplies it, so no caller can leave it out (#1015).
+
+    The pair is built where the fates are, in
+    :func:`~evals.harness.replay.replay_assertions`. These drive a relabelled
+    row end to end: the strict recall must not move, and the aligned one must.
+    """
+
+    @pytest.fixture(scope="class")
+    def golden(self):
+        from evals.harness.reference import load_corpus
+
+        return next(
+            one
+            for one in load_corpus(PROJECT_ROOT / "evals" / "corpus")
+            if one.id == "01-payments-checkout"
+        )
+
+    @pytest.fixture(scope="class")
+    def reference(self, golden):
+        held = replay.signed_reference(PROJECT_ROOT / "evals" / "corpus", golden)
+        if held is None:
+            pytest.skip("case 01's facts are unsigned, so nothing grades a proposal")
+        return held
+
+    def test_of_takes_no_aligned_argument(self) -> None:
+        """The keyword is gone, so the pair cannot be half-built by a caller."""
+        assert "aligned" not in inspect.signature(ArmRun.of).parameters
+
+    def test_a_relabelled_row_moves_the_aligned_figure_and_not_the_strict_one(
+        self, golden, reference
+    ) -> None:
+        row = next(
+            entry
+            for entry in reference.entries
+            if entry.subject.startswith("flow:")
+            and entry.basis == "stated"
+            and entry.value != UNKNOWN
+        )
+        parts = parse_flow_id(row.subject, flow_id_version(row.subject))
+        moved = row.model_copy(
+            update={
+                "subject": make_flow_id(
+                    parts.source, parts.destination, "another word entirely"
+                )
+            }
+        )
+        entries = [moved if entry is row else entry for entry in reference.entries]
+        produced = AssertionCatalog(subjects=reference.subjects, entries=list(entries))
+        result = AssertionResult(golden.id, {"assertions": []}, produced, ())
+
+        graded = replay.replay_assertions(golden, reference, result)
+        run = ArmRun.of(graded, reference, arm="A")
+
+        assert assertion_id(row) in run.aligned_rows
+        assert assertion_id(row) not in run.found_rows
+        assert run.aligned_recall > run.recall
 
 
 class TestTheRowTally:
