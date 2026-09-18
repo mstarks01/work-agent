@@ -65,6 +65,7 @@ from analysis_service.report import (
 )
 from evals.harness import (
     arms,
+    bottleneck,
     comparison,
     consent,
     envelope,
@@ -1501,10 +1502,10 @@ def replay_artifact(
 ) -> replay.SweepReplay:
     """One archived sweep, read through the loader and re-scored by its mode."""
     loaded = load_artifact(path)
-    if loaded.mode not in replay.NODE_OF:
+    if loaded.mode not in replay.ROUTES_OF:
         raise modes.EvalRunError(
             f"{path}: a {loaded.mode} sweep keeps no emission this instrument reads;"
-            f" it replays {sorted(replay.NODE_OF)}"
+            f" it replays {sorted(replay.ROUTES_OF)}"
         )
     held = [case for case in cases if case.id in loaded.cases]
     if not held:
@@ -2334,6 +2335,12 @@ COMMANDS: dict[str, Command] = {
         " file (no credentials)",
         run=arms.command_compare_arms,
         arguments=arms.arguments,
+    ),
+    "bottleneck": Command(
+        help="put ten hand-authored shapes through the System Model and charge"
+        " every archived miss to a stage (#1033, no credentials)",
+        run=bottleneck.command_bottleneck,
+        arguments=bottleneck.arguments,
     ),
     "oracle": Command(
         help="put a perfect reading of every signed case through the"

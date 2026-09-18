@@ -1,0 +1,1330 @@
+{
+  "proposal": {
+    "assertions": [
+      {
+        "subject_type": "component",
+        "subject": "process:order-service",
+        "predicate": "internet-exposure",
+        "value": "internal",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "it is not exposed outside."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "process:order-service",
+        "predicate": "network-membership",
+        "value": "boundary:core-network",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "a Python worker in our core network"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "principal",
+        "subject": "shopper accounts",
+        "predicate": "credential-presented",
+        "value": "session cookie",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Shoppers sign in with email and password and get a session cookie"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "principal",
+        "subject": "shopper accounts",
+        "predicate": "mfa-requirement",
+        "value": "absent",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "we have not rolled out MFA for shopper accounts yet."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "principal",
+        "subject": "anything that can reach it",
+        "predicate": "authorization-grant",
+        "value": "call the order service",
+        "reason": null,
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "m_order_service"
+          },
+          {
+            "kind": "operation",
+            "value": "call"
+          }
+        ],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "the order service accepts anything that can reach it"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "principal",
+        "subject": "single application account",
+        "predicate": "authorization-grant",
+        "value": "full read/write",
+        "reason": null,
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "m_orders_db"
+          },
+          {
+            "kind": "operation",
+            "value": "read-write"
+          }
+        ],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Orders, shopper addresses and card-last-four live in a PostgreSQL database (orders-db) that the order service reads and writes with a single application account that has full read/write."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "credential",
+        "subject": "password",
+        "predicate": "credential-custody",
+        "value": "environment variable on the worker",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The password comes from an environment variable on the worker."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      }
+    ]
+  },
+  "catalog": {
+    "registry_version": 3,
+    "subjects": [
+      {
+        "id": "boundary:core-network",
+        "type": "zone",
+        "label": "core network"
+      },
+      {
+        "id": "credential:password",
+        "type": "credential",
+        "label": "password"
+      },
+      {
+        "id": "credential:session-cookie",
+        "type": "credential",
+        "label": "session cookie"
+      },
+      {
+        "id": "principal:anything-that-can-reach-it",
+        "type": "principal",
+        "label": "anything that can reach it"
+      },
+      {
+        "id": "principal:shopper-accounts",
+        "type": "principal",
+        "label": "shopper accounts"
+      },
+      {
+        "id": "principal:single-application-account",
+        "type": "principal",
+        "label": "single application account"
+      },
+      {
+        "id": "process:order-service",
+        "type": "component",
+        "label": "order service"
+      }
+    ],
+    "entries": [
+      {
+        "subject": "process:order-service",
+        "predicate": "internet-exposure",
+        "value": "internal",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08",
+            "start": 479,
+            "end": 505,
+            "quote": "it is not exposed outside."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "process:order-service",
+        "predicate": "network-membership",
+        "value": "boundary:core-network",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08",
+            "start": 442,
+            "end": 478,
+            "quote": "a Python worker in our core network"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "principal:shopper-accounts",
+        "predicate": "credential-presented",
+        "value": "credential:session-cookie",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08",
+            "start": 214,
+            "end": 280,
+            "quote": "Shoppers sign in with email and password and get a session cookie"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "principal:shopper-accounts",
+        "predicate": "mfa-requirement",
+        "value": "absent",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08",
+            "start": 281,
+            "end": 333,
+            "quote": "we have not rolled out MFA for shopper accounts yet."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "principal:anything-that-can-reach-it",
+        "predicate": "authorization-grant",
+        "value": "call the order service",
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "m_order_service"
+          },
+          {
+            "kind": "operation",
+            "value": "call"
+          }
+        ],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08",
+            "start": 543,
+            "end": 596,
+            "quote": "the order service accepts anything that can reach it"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "principal:single-application-account",
+        "predicate": "authorization-grant",
+        "value": "full read/write",
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "m_orders_db"
+          },
+          {
+            "kind": "operation",
+            "value": "read-write"
+          }
+        ],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08",
+            "start": 643,
+            "end": 829,
+            "quote": "Orders, shopper addresses and card-last-four live in a PostgreSQL database (orders-db) that the order service reads and writes with a single application account that has full read/write."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "credential:password",
+        "predicate": "credential-custody",
+        "value": "environment variable on the worker",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08",
+            "start": 830,
+            "end": 892,
+            "quote": "The password comes from an environment variable on the worker."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      }
+    ]
+  },
+  "issues": [],
+  "projection": [
+    {
+      "element_id": "process:order-service",
+      "attribute": "exposure",
+      "value": "internal",
+      "reason": "stated",
+      "rows": [
+        "assertion:internet-exposure~process:order-service~any~internal"
+      ]
+    },
+    {
+      "element_id": "process:order-service",
+      "attribute": "trust_zone",
+      "value": "boundary:core-network",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~process:order-service~any~boundary:core-network"
+      ]
+    }
+  ],
+  "stages": {
+    "source_facts": {
+      "bundle_version": 1,
+      "role_version": 1,
+      "mentions": [],
+      "interactions": [],
+      "facts": [
+        {
+          "handle": "f_api_exposure",
+          "subject_kind": "mention",
+          "subject": "m_api",
+          "predicate": "internet-exposure",
+          "value": "internet-facing",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "It is the only thing we expose to the internet."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f_order_service_exposure",
+          "subject_kind": "mention",
+          "subject": "m_order_service",
+          "predicate": "internet-exposure",
+          "value": "internal",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "it is not exposed outside."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f_order_service_network",
+          "subject_kind": "mention",
+          "subject": "m_order_service",
+          "predicate": "network-membership",
+          "value": "z_core",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "a Python worker in our core network"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f_signin_auth",
+          "subject_kind": "interaction",
+          "subject": "i_sign_in",
+          "predicate": "authentication-mechanism",
+          "value": "email and password",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Shoppers sign in with email and password"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f_signin_credential",
+          "subject_kind": "interaction",
+          "subject": "i_sign_in",
+          "predicate": "credential-presented",
+          "value": "email and password",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Shoppers sign in with email and password"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f_shopper_session_cookie",
+          "subject_kind": "principal",
+          "subject": "shopper accounts",
+          "predicate": "credential-presented",
+          "value": "session cookie",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Shoppers sign in with email and password and get a session cookie"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f_shopper_mfa",
+          "subject_kind": "principal",
+          "subject": "shopper accounts",
+          "predicate": "mfa-requirement",
+          "value": "absent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "we have not rolled out MFA for shopper accounts yet."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f_call_auth",
+          "subject_kind": "interaction",
+          "subject": "i_call_order",
+          "predicate": "authentication-mechanism",
+          "value": "absent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "There is no auth on that gRPC call"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f_call_credential",
+          "subject_kind": "interaction",
+          "subject": "i_call_order",
+          "predicate": "credential-presented",
+          "value": "absent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "There is no auth on that gRPC call"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f_reachable_grant",
+          "subject_kind": "principal",
+          "subject": "anything that can reach it",
+          "predicate": "authorization-grant",
+          "value": "call the order service",
+          "scope": [
+            {
+              "kind": "resource",
+              "value": "m_order_service"
+            },
+            {
+              "kind": "operation",
+              "value": "call"
+            }
+          ],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "the order service accepts anything that can reach it"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f_db_account_grant",
+          "subject_kind": "principal",
+          "subject": "single application account",
+          "predicate": "authorization-grant",
+          "value": "full read/write",
+          "scope": [
+            {
+              "kind": "resource",
+              "value": "m_orders_db"
+            },
+            {
+              "kind": "operation",
+              "value": "read-write"
+            }
+          ],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Orders, shopper addresses and card-last-four live in a PostgreSQL database (orders-db) that the order service reads and writes with a single application account that has full read/write."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f_db_password_custody",
+          "subject_kind": "credential",
+          "subject": "password",
+          "predicate": "credential-custody",
+          "value": "environment variable on the worker",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The password comes from an environment variable on the worker."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f_receipt_transport",
+          "subject_kind": "interaction",
+          "subject": "i_write_receipt",
+          "predicate": "transport-encryption",
+          "value": "TLS",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "That is on TLS with the order service's own service account"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f_receipt_service_account",
+          "subject_kind": "interaction",
+          "subject": "i_write_receipt",
+          "predicate": "authentication-mechanism",
+          "value": "order service's own service account",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "That is on TLS with the order service's own service account"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f_receipt_storage_encryption",
+          "subject_kind": "mention",
+          "subject": "m_receipt_archive",
+          "predicate": "storage-encryption",
+          "value": "customer-managed key",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "the bucket is encrypted with a customer-managed key"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f_webhook_auth_unknown",
+          "subject_kind": "interaction",
+          "subject": "i_webhook",
+          "predicate": "authentication-mechanism",
+          "value": "unknown",
+          "reason": "hedged",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "",
+          "exclusive": false
+        }
+      ],
+      "unresolved": [
+        {
+          "handle": "u_callback_auth",
+          "question": "How is the card processor's callback authenticated?",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "I would have to check how that callback is authenticated."
+            }
+          ]
+        }
+      ]
+    },
+    "source_inventory": {
+      "bundle_version": 1,
+      "role_version": 1,
+      "mentions": [
+        {
+          "handle": "m_shoppers",
+          "text": "Shoppers",
+          "roles": [
+            "person"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Shoppers browse the storefront and place orders through the storefront API"
+            }
+          ]
+        },
+        {
+          "handle": "m_storefront",
+          "text": "storefront",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "browse the storefront"
+            }
+          ]
+        },
+        {
+          "handle": "m_api",
+          "text": "storefront API",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "place orders through the storefront API, a Node service running on Cloud Run."
+            }
+          ]
+        },
+        {
+          "handle": "m_cloud_run",
+          "text": "Cloud Run",
+          "roles": [
+            "external-system"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "a Node service running on Cloud Run."
+            }
+          ]
+        },
+        {
+          "handle": "m_order_service",
+          "text": "order service",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "the storefront API calls the order service over gRPC."
+            }
+          ]
+        },
+        {
+          "handle": "z_internet",
+          "text": "internet",
+          "roles": [
+            "network-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "It is the only thing we expose to the internet."
+            }
+          ]
+        },
+        {
+          "handle": "z_core",
+          "text": "core network",
+          "roles": [
+            "network-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "a Python worker in our core network; it is not exposed outside."
+            }
+          ]
+        },
+        {
+          "handle": "m_orders_db",
+          "text": "orders-db",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "a PostgreSQL database (orders-db)"
+            }
+          ]
+        },
+        {
+          "handle": "m_cloud_storage",
+          "text": "Cloud Storage",
+          "roles": [
+            "external-system"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "a Cloud Storage bucket"
+            }
+          ]
+        },
+        {
+          "handle": "m_receipt_archive",
+          "text": "receipt archive",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "a Cloud Storage bucket we call the receipt archive."
+            }
+          ]
+        },
+        {
+          "handle": "m_card_processor",
+          "text": "card processor",
+          "roles": [
+            "external-system"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Our card processor is a third party."
+            }
+          ]
+        }
+      ],
+      "interactions": [
+        {
+          "handle": "i_browse",
+          "initiator": "m_shoppers",
+          "receiver": "m_storefront",
+          "action": "browse storefront",
+          "protocol": "unknown",
+          "operations": "read",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Shoppers browse the storefront"
+            }
+          ]
+        },
+        {
+          "handle": "i_place_orders",
+          "initiator": "m_shoppers",
+          "receiver": "m_api",
+          "action": "place orders",
+          "protocol": "unknown",
+          "operations": "write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "place orders through the storefront API"
+            }
+          ]
+        },
+        {
+          "handle": "i_sign_in",
+          "initiator": "m_shoppers",
+          "receiver": "m_api",
+          "action": "sign in",
+          "protocol": "unknown",
+          "operations": "read-write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Shoppers sign in with email and password"
+            }
+          ]
+        },
+        {
+          "handle": "i_call_order",
+          "initiator": "m_api",
+          "receiver": "m_order_service",
+          "action": "call",
+          "protocol": "gRPC",
+          "operations": "write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "the storefront API calls the order service over gRPC."
+            }
+          ]
+        },
+        {
+          "handle": "i_db_rw",
+          "initiator": "m_order_service",
+          "receiver": "m_orders_db",
+          "action": "reads and writes",
+          "protocol": "unknown",
+          "operations": "read-write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "a PostgreSQL database (orders-db) that the order service reads and writes"
+            }
+          ]
+        },
+        {
+          "handle": "i_write_receipt",
+          "initiator": "m_order_service",
+          "receiver": "m_receipt_archive",
+          "action": "write receipt",
+          "protocol": "TLS",
+          "operations": "write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Every completed order also gets a receipt written to a Cloud Storage bucket we call the receipt archive."
+            }
+          ]
+        },
+        {
+          "handle": "i_webhook",
+          "initiator": "m_card_processor",
+          "receiver": "m_api",
+          "action": "POST webhook",
+          "protocol": "HTTP",
+          "operations": "unknown",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "they POST a webhook back to the storefront API"
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "unresolved": [
+        {
+          "handle": "u_callback_auth",
+          "question": "How is the card processor's callback authenticated?",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "I would have to check how that callback is authenticated."
+            }
+          ]
+        }
+      ]
+    },
+    "bundle_dispositions": [
+      {
+        "handle": "z_internet",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "boundary:internet",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "z_core",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "boundary:core-network",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m_shoppers",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "unplaced",
+        "message": "no source places 'Shoppers', and the bundle names 2 zones, so the graph's required trust_zone would be a choice nobody stated"
+      },
+      {
+        "handle": "m_storefront",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "unplaced",
+        "message": "no source places 'storefront', and the bundle names 2 zones, so the graph's required trust_zone would be a choice nobody stated"
+      },
+      {
+        "handle": "m_api",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "unplaced",
+        "message": "no source places 'storefront API', and the bundle names 2 zones, so the graph's required trust_zone would be a choice nobody stated"
+      },
+      {
+        "handle": "m_cloud_run",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "unplaced",
+        "message": "no source places 'Cloud Run', and the bundle names 2 zones, so the graph's required trust_zone would be a choice nobody stated"
+      },
+      {
+        "handle": "m_order_service",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "process:order-service",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m_orders_db",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "unplaced",
+        "message": "no source places 'orders-db', and the bundle names 2 zones, so the graph's required trust_zone would be a choice nobody stated"
+      },
+      {
+        "handle": "m_cloud_storage",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "unplaced",
+        "message": "no source places 'Cloud Storage', and the bundle names 2 zones, so the graph's required trust_zone would be a choice nobody stated"
+      },
+      {
+        "handle": "m_receipt_archive",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "unplaced",
+        "message": "no source places 'receipt archive', and the bundle names 2 zones, so the graph's required trust_zone would be a choice nobody stated"
+      },
+      {
+        "handle": "m_card_processor",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "unplaced",
+        "message": "no source places 'card processor', and the bundle names 2 zones, so the graph's required trust_zone would be a choice nobody stated"
+      },
+      {
+        "handle": "i_browse",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "initiator 'm_shoppers' names no placed component of this bundle"
+      },
+      {
+        "handle": "i_place_orders",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "initiator 'm_shoppers' names no placed component of this bundle"
+      },
+      {
+        "handle": "i_sign_in",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "initiator 'm_shoppers' names no placed component of this bundle"
+      },
+      {
+        "handle": "i_call_order",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "initiator 'm_api' names no placed component of this bundle"
+      },
+      {
+        "handle": "i_db_rw",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "receiver 'm_orders_db' names no placed component of this bundle"
+      },
+      {
+        "handle": "i_write_receipt",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "receiver 'm_receipt_archive' names no placed component of this bundle"
+      },
+      {
+        "handle": "i_webhook",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "initiator 'm_card_processor' names no placed component of this bundle"
+      },
+      {
+        "handle": "f_api_exposure",
+        "kind": "fact",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "unplaced-subject",
+        "message": "the sources state this about 'm_api', and the graph holds no zone to place that component in"
+      },
+      {
+        "handle": "f_signin_auth",
+        "kind": "fact",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-subject",
+        "message": "subject 'i_sign_in' names no interaction this bundle built"
+      },
+      {
+        "handle": "f_signin_credential",
+        "kind": "fact",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-subject",
+        "message": "subject 'i_sign_in' names no interaction this bundle built"
+      },
+      {
+        "handle": "f_call_auth",
+        "kind": "fact",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-subject",
+        "message": "subject 'i_call_order' names no interaction this bundle built"
+      },
+      {
+        "handle": "f_call_credential",
+        "kind": "fact",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-subject",
+        "message": "subject 'i_call_order' names no interaction this bundle built"
+      },
+      {
+        "handle": "f_receipt_transport",
+        "kind": "fact",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-subject",
+        "message": "subject 'i_write_receipt' names no interaction this bundle built"
+      },
+      {
+        "handle": "f_receipt_service_account",
+        "kind": "fact",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-subject",
+        "message": "subject 'i_write_receipt' names no interaction this bundle built"
+      },
+      {
+        "handle": "f_receipt_storage_encryption",
+        "kind": "fact",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "unplaced-subject",
+        "message": "the sources state this about 'm_receipt_archive', and the graph holds no zone to place that component in"
+      },
+      {
+        "handle": "f_webhook_auth_unknown",
+        "kind": "fact",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-subject",
+        "message": "subject 'i_webhook' names no interaction this bundle built"
+      },
+      {
+        "handle": "f_order_service_exposure",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "process:order-service",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f_order_service_network",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "process:order-service",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f_shopper_session_cookie",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "shopper accounts",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f_shopper_mfa",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "shopper accounts",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f_reachable_grant",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "anything that can reach it",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f_db_account_grant",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "single application account",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f_db_password_custody",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "password",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "u_callback_auth",
+        "kind": "unresolved",
+        "disposition": "rejected",
+        "target": "",
+        "code": "duplicate-handle",
+        "message": "handle 'u_callback_auth' is claimed by more than one row"
+      },
+      {
+        "handle": "u_callback_auth",
+        "kind": "unresolved",
+        "disposition": "rejected",
+        "target": "",
+        "code": "duplicate-handle",
+        "message": "handle 'u_callback_auth' is claimed by more than one row"
+      }
+    ],
+    "extracted_model": {
+      "external_entities": [],
+      "processes": [
+        {
+          "id": "process:order-service",
+          "name": "order service",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "the storefront API calls the order service over gRPC.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:core-network",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        }
+      ],
+      "data_stores": [],
+      "data_flows": [],
+      "trust_boundaries": [
+        {
+          "id": "boundary:internet",
+          "name": "internet",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "It is the only thing we expose to the internet.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        },
+        {
+          "id": "boundary:core-network",
+          "name": "core network",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "a Python worker in our core network; it is not exposed outside.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        }
+      ],
+      "assumptions": []
+    },
+    "valid_model": {
+      "external_entities": [],
+      "processes": [
+        {
+          "id": "process:order-service",
+          "name": "order service",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "the storefront API calls the order service over gRPC.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:core-network",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        }
+      ],
+      "data_stores": [],
+      "data_flows": [],
+      "trust_boundaries": [
+        {
+          "id": "boundary:internet",
+          "name": "internet",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "It is the only thing we expose to the internet.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        },
+        {
+          "id": "boundary:core-network",
+          "name": "core network",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "a Python worker in our core network; it is not exposed outside.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        }
+      ],
+      "assumptions": []
+    }
+  }
+}

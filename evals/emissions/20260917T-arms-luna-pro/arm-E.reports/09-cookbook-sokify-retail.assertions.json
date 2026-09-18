@@ -1,0 +1,1442 @@
+{
+  "proposal": {
+    "assertions": [
+      {
+        "subject_type": "component",
+        "subject": "entity:marketing-laptop",
+        "predicate": "network-membership",
+        "value": "boundary:office",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The spreadsheet lives on a marketing laptop in the office."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:process:mobile-app>process:web-api>talks-to",
+        "predicate": "transport-encryption",
+        "value": "absent",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The app talks to the web API over HTTP \u2014 not HTTPS, it's on the list."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "process:web-api",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:user-database",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:flat-file",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      }
+    ]
+  },
+  "catalog": {
+    "registry_version": 3,
+    "subjects": [
+      {
+        "id": "boundary:office",
+        "type": "zone",
+        "label": "office"
+      },
+      {
+        "id": "entity:marketing-laptop",
+        "type": "component",
+        "label": "marketing laptop"
+      },
+      {
+        "id": "flow:process:mobile-app>process:web-api>talks-to",
+        "type": "interaction",
+        "label": "talks to"
+      },
+      {
+        "id": "process:web-api",
+        "type": "component",
+        "label": "web API"
+      },
+      {
+        "id": "store:flat-file",
+        "type": "component",
+        "label": "flat file"
+      },
+      {
+        "id": "store:user-database",
+        "type": "component",
+        "label": "user database"
+      }
+    ],
+    "entries": [
+      {
+        "subject": "entity:marketing-laptop",
+        "predicate": "network-membership",
+        "value": "boundary:office",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "603873a0d569ba3f0ac4a91a363086b54bae022cf432862d17be9eec9465e4ea",
+            "start": 1052,
+            "end": 1110,
+            "quote": "The spreadsheet lives on a marketing laptop in the office."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:process:mobile-app>process:web-api>talks-to",
+        "predicate": "transport-encryption",
+        "value": "absent",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "603873a0d569ba3f0ac4a91a363086b54bae022cf432862d17be9eec9465e4ea",
+            "start": 162,
+            "end": 231,
+            "quote": "The app talks to the web API over HTTP \u2014 not HTTPS, it's on the list."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "process:web-api",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:user-database",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:flat-file",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      }
+    ]
+  },
+  "issues": [],
+  "projection": [
+    {
+      "element_id": "entity:marketing-laptop",
+      "attribute": "trust_zone",
+      "value": "boundary:office",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~entity:marketing-laptop~any~boundary:office"
+      ]
+    },
+    {
+      "element_id": "flow:process:mobile-app>process:web-api>talks-to",
+      "attribute": "encryption_in_transit",
+      "value": "none",
+      "reason": "absent",
+      "rows": [
+        "assertion:transport-encryption~flow:process:mobile-app>process:web-api>talks-to~any~absent"
+      ]
+    },
+    {
+      "element_id": "store:flat-file",
+      "attribute": "encryption_at_rest",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:storage-encryption~store:flat-file~any~unknown"
+      ]
+    },
+    {
+      "element_id": "store:user-database",
+      "attribute": "encryption_at_rest",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:storage-encryption~store:user-database~any~unknown"
+      ]
+    }
+  ],
+  "stages": {
+    "source_facts": {
+      "bundle_version": 1,
+      "role_version": 1,
+      "mentions": [],
+      "interactions": [],
+      "facts": [
+        {
+          "handle": "fact_marketing_laptop_office",
+          "subject_kind": "mention",
+          "subject": "marketing_laptop",
+          "predicate": "network-membership",
+          "value": "office",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The spreadsheet lives on a marketing laptop in the office."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "fact_app_api_transport",
+          "subject_kind": "interaction",
+          "subject": "app_talks_api",
+          "predicate": "transport-encryption",
+          "value": "absent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The app talks to the web API over HTTP \u2014 not HTTPS, it's on the list."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "fact_gateway_destination_ver5",
+          "subject_kind": "interaction",
+          "subject": "gateway_dials_number",
+          "predicate": "destination-verification",
+          "value": "absent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The gateway dials the number stored against the order and nobody checks it arrived at the right place."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "fact_api_authentication_unknown",
+          "subject_kind": "mention",
+          "subject": "web_api",
+          "predicate": "authentication-mechanism",
+          "value": "unknown",
+          "reason": "hedged",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "fact_user_database_encryption_21",
+          "subject_kind": "mention",
+          "subject": "user_database",
+          "predicate": "storage-encryption",
+          "value": "unknown",
+          "reason": "hedged",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "fact_flat_file_encryption_22",
+          "subject_kind": "mention",
+          "subject": "flat_file",
+          "predicate": "storage-encryption",
+          "value": "unknown",
+          "reason": "hedged",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "",
+          "exclusive": false
+        }
+      ],
+      "unresolved": []
+    },
+    "source_inventory": {
+      "bundle_version": 1,
+      "role_version": 1,
+      "mentions": [
+        {
+          "handle": "customer",
+          "text": "customer",
+          "roles": [
+            "person"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Customers browse and order through our mobile app"
+            }
+          ]
+        },
+        {
+          "handle": "mobile_app",
+          "text": "mobile app",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Customers browse and order through our mobile app"
+            }
+          ]
+        },
+        {
+          "handle": "web_api",
+          "text": "web API",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The app talks to the web API over HTTP \u2014 not HTTPS, it's on the list."
+            }
+          ]
+        },
+        {
+          "handle": "user_database",
+          "text": "user database",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The web API keeps customers in the user database: name, address, and the card they paid with."
+            }
+          ]
+        },
+        {
+          "handle": "sims",
+          "text": "SIMS",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "SIMS, our stock and inventory system"
+            }
+          ]
+        },
+        {
+          "handle": "flat_file",
+          "text": "flat file",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "a flat file kept alongside it"
+            }
+          ]
+        },
+        {
+          "handle": "fax_gateway",
+          "text": "fax gateway",
+          "roles": [
+            "process",
+            "external-system"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "the fax gateway, which faxes the customer a confirmation"
+            }
+          ]
+        },
+        {
+          "handle": "spreadsheet",
+          "text": "spreadsheet",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Marketing keep the catalogue in a spreadsheet."
+            }
+          ]
+        },
+        {
+          "handle": "macros",
+          "text": "macros",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The macros in it send SQL statements straight to the web API"
+            }
+          ]
+        },
+        {
+          "handle": "marketing_laptop",
+          "text": "marketing laptop",
+          "roles": [
+            "external-system"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The spreadsheet lives on a marketing laptop in the office."
+            }
+          ]
+        },
+        {
+          "handle": "office",
+          "text": "office",
+          "roles": [
+            "network-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "in the office"
+            }
+          ]
+        }
+      ],
+      "interactions": [
+        {
+          "handle": "customer_browse_order",
+          "initiator": "customer",
+          "receiver": "mobile_app",
+          "action": "browse and order",
+          "protocol": "",
+          "operations": "read-write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Customers browse and order through our mobile app"
+            }
+          ]
+        },
+        {
+          "handle": "app_talks_api",
+          "initiator": "mobile_app",
+          "receiver": "web_api",
+          "action": "talks to",
+          "protocol": "HTTP",
+          "operations": "unknown",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The app talks to the web API over HTTP \u2014 not HTTPS, it's on the list."
+            }
+          ]
+        },
+        {
+          "handle": "api_keeps_customers",
+          "initiator": "web_api",
+          "receiver": "user_database",
+          "action": "keeps customers",
+          "protocol": "",
+          "operations": "write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The web API keeps customers in the user database: name, address, and the card they paid with."
+            }
+          ]
+        },
+        {
+          "handle": "api_hands_order",
+          "initiator": "web_api",
+          "receiver": "sims",
+          "action": "hands order over",
+          "protocol": "",
+          "operations": "write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "When an order is placed the API hands the order over to SIMS, our stock and inventory system, which has been running since long before the app existed."
+            }
+          ]
+        },
+        {
+          "handle": "sims_writes_address",
+          "initiator": "sims",
+          "receiver": "flat_file",
+          "action": "writes delivery address",
+          "protocol": "",
+          "operations": "write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "It writes the delivery address into a flat file kept alongside it"
+            }
+          ]
+        },
+        {
+          "handle": "sims_sends_note",
+          "initiator": "sims",
+          "receiver": "fax_gateway",
+          "action": "sends dispatch note",
+          "protocol": "",
+          "operations": "write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "it sends a dispatch note to the fax gateway"
+            }
+          ]
+        },
+        {
+          "handle": "gateway_faxes_confirmation",
+          "initiator": "fax_gateway",
+          "receiver": "customer",
+          "action": "faxes confirmation",
+          "protocol": "",
+          "operations": "write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "which faxes the customer a confirmation with their name and address on it."
+            }
+          ]
+        },
+        {
+          "handle": "gateway_dials_number",
+          "initiator": "fax_gateway",
+          "receiver": "customer",
+          "action": "dials number",
+          "protocol": "",
+          "operations": "unknown",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The gateway dials the number stored against the order"
+            }
+          ]
+        },
+        {
+          "handle": "macros_send_sql",
+          "initiator": "macros",
+          "receiver": "web_api",
+          "action": "send SQL statements",
+          "protocol": "",
+          "operations": "write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The macros in it send SQL statements straight to the web API to change prices and product copy"
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "unresolved": [
+        {
+          "handle": "unknown_security_details",
+          "question": "What does the API do about authentication, and whether the user database and the flat file are encrypted?",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Nobody here can tell me what the API does about authentication, or whether the user database and the flat file are encrypted."
+            }
+          ]
+        }
+      ]
+    },
+    "bundle_dispositions": [
+      {
+        "handle": "fax_gateway",
+        "kind": "mention",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "competing-roles",
+        "message": "mention 'fax gateway' reads as process, external-system; the bundle settles which, and code does not settle it by position"
+      },
+      {
+        "handle": "office",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "boundary:office",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "customer",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "entity:customer",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "mobile_app",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "process:mobile-app",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "web_api",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "process:web-api",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "user_database",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "store:user-database",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "sims",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "process:sims",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "flat_file",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "store:flat-file",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "spreadsheet",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "store:spreadsheet",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "macros",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "process:macros",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "marketing_laptop",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "entity:marketing-laptop",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "customer_browse_order",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:entity:customer>process:mobile-app>browse-and-order",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "app_talks_api",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:process:mobile-app>process:web-api>talks-to",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "api_keeps_customers",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:process:web-api>store:user-database>keeps-customers",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "api_hands_order",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:process:web-api>process:sims>hands-order-over",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "sims_writes_address",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:process:sims>store:flat-file>writes-delivery-address",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "sims_sends_note",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "receiver 'fax_gateway' names no placed component of this bundle"
+      },
+      {
+        "handle": "gateway_faxes_confirmation",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "initiator 'fax_gateway' names no placed component of this bundle"
+      },
+      {
+        "handle": "gateway_dials_number",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "initiator 'fax_gateway' names no placed component of this bundle"
+      },
+      {
+        "handle": "macros_send_sql",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:process:macros>process:web-api>send-sql-statements",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "fact_gateway_destination_ver5",
+        "kind": "fact",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-subject",
+        "message": "subject 'gateway_dials_number' names no interaction this bundle built"
+      },
+      {
+        "handle": "fact_marketing_laptop_office",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "entity:marketing-laptop",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "fact_app_api_transport",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "flow:process:mobile-app>process:web-api>talks-to",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "fact_api_authentication_unknown",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "process:web-api",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "fact_user_database_encryption_21",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "store:user-database",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "fact_flat_file_encryption_22",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "store:flat-file",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "unknown_security_details",
+        "kind": "unresolved",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "open-question",
+        "message": "What does the API do about authentication, and whether the user database and the flat file are encrypted?"
+      }
+    ],
+    "extracted_model": {
+      "external_entities": [
+        {
+          "id": "entity:customer",
+          "name": "customer",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Customers browse and order through our mobile app",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "human",
+          "trust_zone": "boundary:office"
+        },
+        {
+          "id": "entity:marketing-laptop",
+          "name": "marketing laptop",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The spreadsheet lives on a marketing laptop in the office.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "external-system",
+          "trust_zone": "boundary:office"
+        }
+      ],
+      "processes": [
+        {
+          "id": "process:mobile-app",
+          "name": "mobile app",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Customers browse and order through our mobile app",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:office",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:web-api",
+          "name": "web API",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The app talks to the web API over HTTP \u2014 not HTTPS, it's on the list.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:office",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:sims",
+          "name": "SIMS",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "SIMS, our stock and inventory system",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:office",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:macros",
+          "name": "macros",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The macros in it send SQL statements straight to the web API",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:office",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        }
+      ],
+      "data_stores": [
+        {
+          "id": "store:user-database",
+          "name": "user database",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The web API keeps customers in the user database: name, address, and the card they paid with.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:office",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        },
+        {
+          "id": "store:flat-file",
+          "name": "flat file",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "a flat file kept alongside it",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:office",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        },
+        {
+          "id": "store:spreadsheet",
+          "name": "spreadsheet",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Marketing keep the catalogue in a spreadsheet.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:office",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        }
+      ],
+      "data_flows": [
+        {
+          "id": "flow:entity:customer>process:mobile-app>browse-and-order",
+          "name": "browse and order",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Customers browse and order through our mobile app",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "entity:customer",
+          "destination": "process:mobile-app",
+          "protocol": "",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "read-write"
+        },
+        {
+          "id": "flow:process:mobile-app>process:web-api>talks-to",
+          "name": "talks to",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The app talks to the web API over HTTP \u2014 not HTTPS, it's on the list.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:mobile-app",
+          "destination": "process:web-api",
+          "protocol": "HTTP",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "unknown"
+        },
+        {
+          "id": "flow:process:web-api>store:user-database>keeps-customers",
+          "name": "keeps customers",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The web API keeps customers in the user database: name, address, and the card they paid with.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:web-api",
+          "destination": "store:user-database",
+          "protocol": "",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        },
+        {
+          "id": "flow:process:web-api>process:sims>hands-order-over",
+          "name": "hands order over",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "When an order is placed the API hands the order over to SIMS, our stock and inventory system, which has been running since long before the app existed.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:web-api",
+          "destination": "process:sims",
+          "protocol": "",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        },
+        {
+          "id": "flow:process:sims>store:flat-file>writes-delivery-address",
+          "name": "writes delivery address",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "It writes the delivery address into a flat file kept alongside it",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:sims",
+          "destination": "store:flat-file",
+          "protocol": "",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        },
+        {
+          "id": "flow:process:macros>process:web-api>send-sql-statements",
+          "name": "send SQL statements",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The macros in it send SQL statements straight to the web API to change prices and product copy",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:macros",
+          "destination": "process:web-api",
+          "protocol": "",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        }
+      ],
+      "trust_boundaries": [
+        {
+          "id": "boundary:office",
+          "name": "office",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "in the office",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        }
+      ],
+      "assumptions": [
+        {
+          "assumption": "customer sits in the one zone the sources describe",
+          "element_id": "entity:customer",
+          "attribute": "trust_zone",
+          "basis": "no source places this component, and the bundle names one zone"
+        },
+        {
+          "assumption": "mobile app sits in the one zone the sources describe",
+          "element_id": "process:mobile-app",
+          "attribute": "trust_zone",
+          "basis": "no source places this component, and the bundle names one zone"
+        },
+        {
+          "assumption": "web API sits in the one zone the sources describe",
+          "element_id": "process:web-api",
+          "attribute": "trust_zone",
+          "basis": "no source places this component, and the bundle names one zone"
+        },
+        {
+          "assumption": "user database sits in the one zone the sources describe",
+          "element_id": "store:user-database",
+          "attribute": "trust_zone",
+          "basis": "no source places this component, and the bundle names one zone"
+        },
+        {
+          "assumption": "SIMS sits in the one zone the sources describe",
+          "element_id": "process:sims",
+          "attribute": "trust_zone",
+          "basis": "no source places this component, and the bundle names one zone"
+        },
+        {
+          "assumption": "flat file sits in the one zone the sources describe",
+          "element_id": "store:flat-file",
+          "attribute": "trust_zone",
+          "basis": "no source places this component, and the bundle names one zone"
+        },
+        {
+          "assumption": "spreadsheet sits in the one zone the sources describe",
+          "element_id": "store:spreadsheet",
+          "attribute": "trust_zone",
+          "basis": "no source places this component, and the bundle names one zone"
+        },
+        {
+          "assumption": "macros sits in the one zone the sources describe",
+          "element_id": "process:macros",
+          "attribute": "trust_zone",
+          "basis": "no source places this component, and the bundle names one zone"
+        }
+      ]
+    },
+    "valid_model": {
+      "external_entities": [
+        {
+          "id": "entity:customer",
+          "name": "customer",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Customers browse and order through our mobile app",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "human",
+          "trust_zone": "boundary:office"
+        },
+        {
+          "id": "entity:marketing-laptop",
+          "name": "marketing laptop",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The spreadsheet lives on a marketing laptop in the office.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "external-system",
+          "trust_zone": "boundary:office"
+        }
+      ],
+      "processes": [
+        {
+          "id": "process:mobile-app",
+          "name": "mobile app",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Customers browse and order through our mobile app",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:office",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:web-api",
+          "name": "web API",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The app talks to the web API over HTTP \u2014 not HTTPS, it's on the list.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:office",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:sims",
+          "name": "SIMS",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "SIMS, our stock and inventory system",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:office",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:macros",
+          "name": "macros",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The macros in it send SQL statements straight to the web API",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:office",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        }
+      ],
+      "data_stores": [
+        {
+          "id": "store:user-database",
+          "name": "user database",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The web API keeps customers in the user database: name, address, and the card they paid with.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:office",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        },
+        {
+          "id": "store:flat-file",
+          "name": "flat file",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "a flat file kept alongside it",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:office",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        },
+        {
+          "id": "store:spreadsheet",
+          "name": "spreadsheet",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Marketing keep the catalogue in a spreadsheet.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:office",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        }
+      ],
+      "data_flows": [
+        {
+          "id": "flow:entity:customer>process:mobile-app>browse-and-order",
+          "name": "browse and order",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Customers browse and order through our mobile app",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "entity:customer",
+          "destination": "process:mobile-app",
+          "protocol": "",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "read-write"
+        },
+        {
+          "id": "flow:process:mobile-app>process:web-api>talks-to",
+          "name": "talks to",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The app talks to the web API over HTTP \u2014 not HTTPS, it's on the list.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:mobile-app",
+          "destination": "process:web-api",
+          "protocol": "HTTP",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "unknown"
+        },
+        {
+          "id": "flow:process:web-api>store:user-database>keeps-customers",
+          "name": "keeps customers",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The web API keeps customers in the user database: name, address, and the card they paid with.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:web-api",
+          "destination": "store:user-database",
+          "protocol": "",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        },
+        {
+          "id": "flow:process:web-api>process:sims>hands-order-over",
+          "name": "hands order over",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "When an order is placed the API hands the order over to SIMS, our stock and inventory system, which has been running since long before the app existed.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:web-api",
+          "destination": "process:sims",
+          "protocol": "",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        },
+        {
+          "id": "flow:process:sims>store:flat-file>writes-delivery-address",
+          "name": "writes delivery address",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "It writes the delivery address into a flat file kept alongside it",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:sims",
+          "destination": "store:flat-file",
+          "protocol": "",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        },
+        {
+          "id": "flow:process:macros>process:web-api>send-sql-statements",
+          "name": "send SQL statements",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The macros in it send SQL statements straight to the web API to change prices and product copy",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:macros",
+          "destination": "process:web-api",
+          "protocol": "",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        }
+      ],
+      "trust_boundaries": [
+        {
+          "id": "boundary:office",
+          "name": "office",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "in the office",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        }
+      ],
+      "assumptions": [
+        {
+          "assumption": "customer sits in the one zone the sources describe",
+          "element_id": "entity:customer",
+          "attribute": "trust_zone",
+          "basis": "no source places this component, and the bundle names one zone"
+        },
+        {
+          "assumption": "mobile app sits in the one zone the sources describe",
+          "element_id": "process:mobile-app",
+          "attribute": "trust_zone",
+          "basis": "no source places this component, and the bundle names one zone"
+        },
+        {
+          "assumption": "web API sits in the one zone the sources describe",
+          "element_id": "process:web-api",
+          "attribute": "trust_zone",
+          "basis": "no source places this component, and the bundle names one zone"
+        },
+        {
+          "assumption": "user database sits in the one zone the sources describe",
+          "element_id": "store:user-database",
+          "attribute": "trust_zone",
+          "basis": "no source places this component, and the bundle names one zone"
+        },
+        {
+          "assumption": "SIMS sits in the one zone the sources describe",
+          "element_id": "process:sims",
+          "attribute": "trust_zone",
+          "basis": "no source places this component, and the bundle names one zone"
+        },
+        {
+          "assumption": "flat file sits in the one zone the sources describe",
+          "element_id": "store:flat-file",
+          "attribute": "trust_zone",
+          "basis": "no source places this component, and the bundle names one zone"
+        },
+        {
+          "assumption": "spreadsheet sits in the one zone the sources describe",
+          "element_id": "store:spreadsheet",
+          "attribute": "trust_zone",
+          "basis": "no source places this component, and the bundle names one zone"
+        },
+        {
+          "assumption": "macros sits in the one zone the sources describe",
+          "element_id": "process:macros",
+          "attribute": "trust_zone",
+          "basis": "no source places this component, and the bundle names one zone"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,1716 @@
+{
+  "proposal": {
+    "assertions": [
+      {
+        "subject_type": "component",
+        "subject": "entity:category-managers",
+        "predicate": "network-membership",
+        "value": "boundary:corporate-network",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Our category managers, who work from the corporate network, review what has been uploaded and approve or reject it."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "entity:portal",
+        "predicate": "network-membership",
+        "value": "boundary:vendor-hosting",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The portal is a SaaS product. The vendor hosts it and we do not run any part of it."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:landing-bucket",
+        "predicate": "network-membership",
+        "value": "boundary:our-cloud-account",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Every night the vendor pushes a supplier data extract to a landing bucket in our cloud account."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "process:supplier-master-service",
+        "predicate": "network-membership",
+        "value": "boundary:our-cloud-account",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The bucket, the service and the database are all in our cloud account."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:supplier-database",
+        "predicate": "network-membership",
+        "value": "boundary:our-cloud-account",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The bucket, the service and the database are all in our cloud account."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "principal",
+        "subject": "suppliers",
+        "predicate": "credential-presented",
+        "value": "username and password",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Suppliers sign in with a username and password that the vendor issues to them."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "principal",
+        "subject": "category managers",
+        "predicate": "authorization-grant",
+        "value": "review and approve or reject uploaded paperwork",
+        "reason": null,
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "portal"
+          },
+          {
+            "kind": "operation",
+            "value": "review, approve or reject"
+          }
+        ],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Our category managers, who work from the corporate network, review what has been uploaded and approve or reject it."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:landing-bucket",
+        "predicate": "tenant-ownership",
+        "value": "we",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Every night the vendor pushes a supplier data extract to a landing bucket in our cloud account."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "process:supplier-master-service",
+        "predicate": "tenant-ownership",
+        "value": "we",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The bucket, the service and the database are all in our cloud account."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:supplier-database",
+        "predicate": "tenant-ownership",
+        "value": "we",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The bucket, the service and the database are all in our cloud account."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      }
+    ]
+  },
+  "catalog": {
+    "registry_version": 3,
+    "subjects": [
+      {
+        "id": "boundary:corporate-network",
+        "type": "zone",
+        "label": "corporate network"
+      },
+      {
+        "id": "boundary:our-cloud-account",
+        "type": "zone",
+        "label": "our cloud account"
+      },
+      {
+        "id": "boundary:vendor-hosting",
+        "type": "zone",
+        "label": "vendor hosting"
+      },
+      {
+        "id": "credential:username-and-password",
+        "type": "credential",
+        "label": "username and password"
+      },
+      {
+        "id": "entity:category-managers",
+        "type": "component",
+        "label": "category managers"
+      },
+      {
+        "id": "entity:portal",
+        "type": "component",
+        "label": "portal"
+      },
+      {
+        "id": "principal:category-managers",
+        "type": "principal",
+        "label": "category managers"
+      },
+      {
+        "id": "principal:suppliers",
+        "type": "principal",
+        "label": "suppliers"
+      },
+      {
+        "id": "principal:we",
+        "type": "principal",
+        "label": "we"
+      },
+      {
+        "id": "process:supplier-master-service",
+        "type": "component",
+        "label": "supplier master service"
+      },
+      {
+        "id": "store:landing-bucket",
+        "type": "component",
+        "label": "landing bucket"
+      },
+      {
+        "id": "store:supplier-database",
+        "type": "component",
+        "label": "supplier database"
+      }
+    ],
+    "entries": [
+      {
+        "subject": "entity:category-managers",
+        "predicate": "network-membership",
+        "value": "boundary:corporate-network",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
+            "start": 231,
+            "end": 346,
+            "quote": "Our category managers, who work from the corporate network, review what has been uploaded and approve or reject it."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "entity:portal",
+        "predicate": "network-membership",
+        "value": "boundary:vendor-hosting",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
+            "start": 348,
+            "end": 431,
+            "quote": "The portal is a SaaS product. The vendor hosts it and we do not run any part of it."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:landing-bucket",
+        "predicate": "network-membership",
+        "value": "boundary:our-cloud-account",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
+            "start": 721,
+            "end": 816,
+            "quote": "Every night the vendor pushes a supplier data extract to a landing bucket in our cloud account."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "process:supplier-master-service",
+        "predicate": "network-membership",
+        "value": "boundary:our-cloud-account",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
+            "start": 912,
+            "end": 982,
+            "quote": "The bucket, the service and the database are all in our cloud account."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:supplier-database",
+        "predicate": "network-membership",
+        "value": "boundary:our-cloud-account",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
+            "start": 912,
+            "end": 982,
+            "quote": "The bucket, the service and the database are all in our cloud account."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "principal:suppliers",
+        "predicate": "credential-presented",
+        "value": "credential:username-and-password",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
+            "start": 641,
+            "end": 719,
+            "quote": "Suppliers sign in with a username and password that the vendor issues to them."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "principal:category-managers",
+        "predicate": "authorization-grant",
+        "value": "review and approve or reject uploaded paperwork",
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "portal"
+          },
+          {
+            "kind": "operation",
+            "value": "review, approve or reject"
+          }
+        ],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
+            "start": 231,
+            "end": 346,
+            "quote": "Our category managers, who work from the corporate network, review what has been uploaded and approve or reject it."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:landing-bucket",
+        "predicate": "tenant-ownership",
+        "value": "principal:we",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
+            "start": 721,
+            "end": 816,
+            "quote": "Every night the vendor pushes a supplier data extract to a landing bucket in our cloud account."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "process:supplier-master-service",
+        "predicate": "tenant-ownership",
+        "value": "principal:we",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
+            "start": 912,
+            "end": 982,
+            "quote": "The bucket, the service and the database are all in our cloud account."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:supplier-database",
+        "predicate": "tenant-ownership",
+        "value": "principal:we",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
+            "start": 912,
+            "end": 982,
+            "quote": "The bucket, the service and the database are all in our cloud account."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      }
+    ]
+  },
+  "issues": [],
+  "projection": [
+    {
+      "element_id": "entity:category-managers",
+      "attribute": "trust_zone",
+      "value": "boundary:corporate-network",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~entity:category-managers~any~boundary:corporate-network"
+      ]
+    },
+    {
+      "element_id": "entity:portal",
+      "attribute": "trust_zone",
+      "value": "boundary:vendor-hosting",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~entity:portal~any~boundary:vendor-hosting"
+      ]
+    },
+    {
+      "element_id": "process:supplier-master-service",
+      "attribute": "trust_zone",
+      "value": "boundary:our-cloud-account",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~process:supplier-master-service~any~boundary:our-cloud-account"
+      ]
+    },
+    {
+      "element_id": "store:landing-bucket",
+      "attribute": "trust_zone",
+      "value": "boundary:our-cloud-account",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~store:landing-bucket~any~boundary:our-cloud-account"
+      ]
+    },
+    {
+      "element_id": "store:supplier-database",
+      "attribute": "trust_zone",
+      "value": "boundary:our-cloud-account",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~store:supplier-database~any~boundary:our-cloud-account"
+      ]
+    }
+  ],
+  "stages": {
+    "source_facts": {
+      "bundle_version": 1,
+      "role_version": 1,
+      "mentions": [],
+      "interactions": [],
+      "facts": [
+        {
+          "handle": "fact_network_category_managers",
+          "subject_kind": "mention",
+          "subject": "category_managers",
+          "predicate": "network-membership",
+          "value": "corporate_network",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Our category managers, who work from the corporate network, review what has been uploaded and approve or reject it."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "fact_network_portal",
+          "subject_kind": "mention",
+          "subject": "portal",
+          "predicate": "network-membership",
+          "value": "vendor_hosting",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The portal is a SaaS product. The vendor hosts it and we do not run any part of it."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "fact_network_vendor_platform",
+          "subject_kind": "mention",
+          "subject": "vendor_platform",
+          "predicate": "network-membership",
+          "value": "vendor_hosting",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The documents themselves stay in the vendor's platform. The vendor hosts it and we do not run any part of it."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "fact_network_landing_bucket",
+          "subject_kind": "mention",
+          "subject": "landing_bucket",
+          "predicate": "network-membership",
+          "value": "our_cloud_account",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Every night the vendor pushes a supplier data extract to a landing bucket in our cloud account."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "fact_network_supplier_master",
+          "subject_kind": "mention",
+          "subject": "supplier_master_service",
+          "predicate": "network-membership",
+          "value": "our_cloud_account",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The bucket, the service and the database are all in our cloud account."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "fact_network_supplier_database",
+          "subject_kind": "mention",
+          "subject": "supplier_database",
+          "predicate": "network-membership",
+          "value": "our_cloud_account",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The bucket, the service and the database are all in our cloud account."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "fact_sign_in_authentication",
+          "subject_kind": "interaction",
+          "subject": "sign_in",
+          "predicate": "authentication-mechanism",
+          "value": "username and password",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Suppliers sign in with a username and password that the vendor issues to them."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "fact_supplier_credential_present",
+          "subject_kind": "principal",
+          "subject": "suppliers",
+          "predicate": "credential-presented",
+          "value": "username and password",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Suppliers sign in with a username and password that the vendor issues to them."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "fact_category_manager_authority",
+          "subject_kind": "principal",
+          "subject": "category managers",
+          "predicate": "authorization-grant",
+          "value": "review and approve or reject uploaded paperwork",
+          "scope": [
+            {
+              "kind": "resource",
+              "value": "portal"
+            },
+            {
+              "kind": "operation",
+              "value": "review, approve or reject"
+            }
+          ],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Our category managers, who work from the corporate network, review what has been uploaded and approve or reject it."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "fact_bucket_ownership",
+          "subject_kind": "mention",
+          "subject": "landing_bucket",
+          "predicate": "tenant-ownership",
+          "value": "we",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Every night the vendor pushes a supplier data extract to a landing bucket in our cloud account."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "fact_service_ownership",
+          "subject_kind": "mention",
+          "subject": "supplier_master_service",
+          "predicate": "tenant-ownership",
+          "value": "we",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The bucket, the service and the database are all in our cloud account."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "fact_database_ownership",
+          "subject_kind": "mention",
+          "subject": "supplier_database",
+          "predicate": "tenant-ownership",
+          "value": "we",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The bucket, the service and the database are all in our cloud account."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "fact_extract_encryption_claim",
+          "subject_kind": "interaction",
+          "subject": "push_extract",
+          "predicate": "transport-encryption",
+          "value": "encrypted end to end",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "We were told the nightly extract is encrypted end to end."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "fact_extract_plain_csv",
+          "subject_kind": "interaction",
+          "subject": "push_extract",
+          "predicate": "transport-encryption",
+          "value": "plain CSV",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The runbook for the landing bucket says the file arrives as a plain CSV and is picked up as-is."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        }
+      ],
+      "unresolved": [
+        {
+          "handle": "unresolved_extract_encryption",
+          "question": "Is the nightly supplier data extract encrypted end to end, or does it arrive as a plain CSV?",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "We were told the nightly extract is encrypted end to end. The runbook for the landing bucket says the file arrives as a plain CSV and is picked up as-is."
+            }
+          ]
+        }
+      ]
+    },
+    "source_inventory": {
+      "bundle_version": 1,
+      "role_version": 1,
+      "mentions": [
+        {
+          "handle": "supplier",
+          "text": "supplier",
+          "roles": [
+            "person"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Suppliers upload their compliance paperwork through a portal"
+            }
+          ]
+        },
+        {
+          "handle": "portal",
+          "text": "portal",
+          "roles": [
+            "external-system"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Supplier document portal."
+            }
+          ]
+        },
+        {
+          "handle": "category_managers",
+          "text": "category managers",
+          "roles": [
+            "person"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Our category managers, who work from the corporate network, review what has been uploaded and approve or reject it."
+            }
+          ]
+        },
+        {
+          "handle": "vendor",
+          "text": "vendor",
+          "roles": [
+            "external-system"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The vendor hosts it and we do not run any part of it."
+            }
+          ]
+        },
+        {
+          "handle": "vendor_platform",
+          "text": "vendor's platform",
+          "roles": [
+            "external-system"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The documents themselves stay in the vendor's platform."
+            }
+          ]
+        },
+        {
+          "handle": "landing_bucket",
+          "text": "landing bucket",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Every night the vendor pushes a supplier data extract to a landing bucket in our cloud account."
+            }
+          ]
+        },
+        {
+          "handle": "supplier_master_service",
+          "text": "supplier master service",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Our supplier master service loads that file and writes the records into the supplier database."
+            }
+          ]
+        },
+        {
+          "handle": "supplier_database",
+          "text": "supplier database",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Our supplier master service loads that file and writes the records into the supplier database."
+            }
+          ]
+        },
+        {
+          "handle": "corporate_network",
+          "text": "corporate network",
+          "roles": [
+            "network-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Our category managers, who work from the corporate network, review what has been uploaded and approve or reject it."
+            }
+          ]
+        },
+        {
+          "handle": "our_cloud_account",
+          "text": "our cloud account",
+          "roles": [
+            "privilege-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The bucket, the service and the database are all in our cloud account."
+            }
+          ]
+        },
+        {
+          "handle": "vendor_hosting",
+          "text": "vendor hosting",
+          "roles": [
+            "tenant-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The vendor hosts it and we do not run any part of it."
+            }
+          ]
+        }
+      ],
+      "interactions": [
+        {
+          "handle": "upload_paperwork",
+          "initiator": "supplier",
+          "receiver": "portal",
+          "action": "upload paperwork",
+          "protocol": "unknown",
+          "operations": "write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Suppliers upload their compliance paperwork through a portal"
+            }
+          ]
+        },
+        {
+          "handle": "review_uploads",
+          "initiator": "category_managers",
+          "receiver": "portal",
+          "action": "review uploads",
+          "protocol": "unknown",
+          "operations": "read",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "review what has been uploaded"
+            }
+          ]
+        },
+        {
+          "handle": "approve_or_reject",
+          "initiator": "category_managers",
+          "receiver": "portal",
+          "action": "approve or reject",
+          "protocol": "unknown",
+          "operations": "write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "approve or reject it"
+            }
+          ]
+        },
+        {
+          "handle": "sign_in",
+          "initiator": "supplier",
+          "receiver": "portal",
+          "action": "sign in",
+          "protocol": "unknown",
+          "operations": "unknown",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Suppliers sign in with a username and password that the vendor issues to them."
+            }
+          ]
+        },
+        {
+          "handle": "issue_credentials",
+          "initiator": "vendor",
+          "receiver": "supplier",
+          "action": "issue credentials",
+          "protocol": "unknown",
+          "operations": "write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "the vendor issues to them"
+            }
+          ]
+        },
+        {
+          "handle": "push_extract",
+          "initiator": "vendor",
+          "receiver": "landing_bucket",
+          "action": "push extract",
+          "protocol": "unknown",
+          "operations": "write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Every night the vendor pushes a supplier data extract to a landing bucket in our cloud account."
+            }
+          ]
+        },
+        {
+          "handle": "load_file",
+          "initiator": "supplier_master_service",
+          "receiver": "landing_bucket",
+          "action": "load file",
+          "protocol": "unknown",
+          "operations": "read",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Our supplier master service loads that file"
+            }
+          ]
+        },
+        {
+          "handle": "write_records",
+          "initiator": "supplier_master_service",
+          "receiver": "supplier_database",
+          "action": "write records",
+          "protocol": "unknown",
+          "operations": "write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "writes the records into the supplier database"
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "unresolved": [
+        {
+          "handle": "platform_portal_same",
+          "question": "Are the vendor's platform and the portal the same thing?",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The documents themselves stay in the vendor's platform. The portal is a SaaS product."
+            }
+          ]
+        }
+      ]
+    },
+    "bundle_dispositions": [
+      {
+        "handle": "corporate_network",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "boundary:corporate-network",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "our_cloud_account",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "boundary:our-cloud-account",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "vendor_hosting",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "boundary:vendor-hosting",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "supplier",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "unplaced",
+        "message": "no source places 'supplier', and the bundle names 3 zones, so the graph's required trust_zone would be a choice nobody stated"
+      },
+      {
+        "handle": "portal",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "entity:portal",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "category_managers",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "entity:category-managers",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "vendor",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "unplaced",
+        "message": "no source places 'vendor', and the bundle names 3 zones, so the graph's required trust_zone would be a choice nobody stated"
+      },
+      {
+        "handle": "vendor_platform",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "unplaced",
+        "message": "no source places \"vendor's platform\", and the bundle names 3 zones, so the graph's required trust_zone would be a choice nobody stated"
+      },
+      {
+        "handle": "landing_bucket",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "store:landing-bucket",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "supplier_master_service",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "process:supplier-master-service",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "supplier_database",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "store:supplier-database",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "upload_paperwork",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "initiator 'supplier' names no placed component of this bundle"
+      },
+      {
+        "handle": "review_uploads",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:entity:category-managers>entity:portal>review-uploads",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "approve_or_reject",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:entity:category-managers>entity:portal>approve-or-reject",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "sign_in",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "initiator 'supplier' names no placed component of this bundle"
+      },
+      {
+        "handle": "issue_credentials",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "initiator 'vendor' names no placed component of this bundle"
+      },
+      {
+        "handle": "push_extract",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "initiator 'vendor' names no placed component of this bundle"
+      },
+      {
+        "handle": "load_file",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:process:supplier-master-service>store:landing-bucket>load-file",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "write_records",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:process:supplier-master-service>store:supplier-database>write-records",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "fact_network_vendor_platform",
+        "kind": "fact",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "unplaced-subject",
+        "message": "the sources state this about 'vendor_platform', and the graph holds no zone to place that component in"
+      },
+      {
+        "handle": "fact_sign_in_authentication",
+        "kind": "fact",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-subject",
+        "message": "subject 'sign_in' names no interaction this bundle built"
+      },
+      {
+        "handle": "fact_extract_encryption_claim",
+        "kind": "fact",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-subject",
+        "message": "subject 'push_extract' names no interaction this bundle built"
+      },
+      {
+        "handle": "fact_extract_plain_csv",
+        "kind": "fact",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-subject",
+        "message": "subject 'push_extract' names no interaction this bundle built"
+      },
+      {
+        "handle": "fact_network_category_managers",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "entity:category-managers",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "fact_network_portal",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "entity:portal",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "fact_network_landing_bucket",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "store:landing-bucket",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "fact_network_supplier_master",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "process:supplier-master-service",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "fact_network_supplier_database",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "store:supplier-database",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "fact_supplier_credential_present",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "suppliers",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "fact_category_manager_authority",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "category managers",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "fact_bucket_ownership",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "store:landing-bucket",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "fact_service_ownership",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "process:supplier-master-service",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "fact_database_ownership",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "store:supplier-database",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "platform_portal_same",
+        "kind": "unresolved",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "open-question",
+        "message": "Are the vendor's platform and the portal the same thing?"
+      },
+      {
+        "handle": "unresolved_extract_encryption",
+        "kind": "unresolved",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "open-question",
+        "message": "Is the nightly supplier data extract encrypted end to end, or does it arrive as a plain CSV?"
+      }
+    ],
+    "extracted_model": {
+      "external_entities": [
+        {
+          "id": "entity:portal",
+          "name": "portal",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Supplier document portal.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "external-system",
+          "trust_zone": "boundary:vendor-hosting"
+        },
+        {
+          "id": "entity:category-managers",
+          "name": "category managers",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Our category managers, who work from the corporate network, review what has been uploaded and approve or reject it.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "human",
+          "trust_zone": "boundary:corporate-network"
+        }
+      ],
+      "processes": [
+        {
+          "id": "process:supplier-master-service",
+          "name": "supplier master service",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Our supplier master service loads that file and writes the records into the supplier database.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:our-cloud-account",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        }
+      ],
+      "data_stores": [
+        {
+          "id": "store:landing-bucket",
+          "name": "landing bucket",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Every night the vendor pushes a supplier data extract to a landing bucket in our cloud account.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:our-cloud-account",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        },
+        {
+          "id": "store:supplier-database",
+          "name": "supplier database",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Our supplier master service loads that file and writes the records into the supplier database.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:our-cloud-account",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        }
+      ],
+      "data_flows": [
+        {
+          "id": "flow:entity:category-managers>entity:portal>review-uploads",
+          "name": "review uploads",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "review what has been uploaded",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "entity:category-managers",
+          "destination": "entity:portal",
+          "protocol": "unknown",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "read"
+        },
+        {
+          "id": "flow:entity:category-managers>entity:portal>approve-or-reject",
+          "name": "approve or reject",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "approve or reject it",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "entity:category-managers",
+          "destination": "entity:portal",
+          "protocol": "unknown",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        },
+        {
+          "id": "flow:process:supplier-master-service>store:landing-bucket>load-file",
+          "name": "load file",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Our supplier master service loads that file",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:supplier-master-service",
+          "destination": "store:landing-bucket",
+          "protocol": "unknown",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "read"
+        },
+        {
+          "id": "flow:process:supplier-master-service>store:supplier-database>write-records",
+          "name": "write records",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "writes the records into the supplier database",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:supplier-master-service",
+          "destination": "store:supplier-database",
+          "protocol": "unknown",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        }
+      ],
+      "trust_boundaries": [
+        {
+          "id": "boundary:corporate-network",
+          "name": "corporate network",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Our category managers, who work from the corporate network, review what has been uploaded and approve or reject it.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        },
+        {
+          "id": "boundary:our-cloud-account",
+          "name": "our cloud account",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The bucket, the service and the database are all in our cloud account.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "privilege"
+        },
+        {
+          "id": "boundary:vendor-hosting",
+          "name": "vendor hosting",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The vendor hosts it and we do not run any part of it.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "tenant"
+        }
+      ],
+      "assumptions": []
+    },
+    "valid_model": {
+      "external_entities": [
+        {
+          "id": "entity:portal",
+          "name": "portal",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Supplier document portal.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "external-system",
+          "trust_zone": "boundary:vendor-hosting"
+        },
+        {
+          "id": "entity:category-managers",
+          "name": "category managers",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Our category managers, who work from the corporate network, review what has been uploaded and approve or reject it.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "human",
+          "trust_zone": "boundary:corporate-network"
+        }
+      ],
+      "processes": [
+        {
+          "id": "process:supplier-master-service",
+          "name": "supplier master service",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Our supplier master service loads that file and writes the records into the supplier database.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:our-cloud-account",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        }
+      ],
+      "data_stores": [
+        {
+          "id": "store:landing-bucket",
+          "name": "landing bucket",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Every night the vendor pushes a supplier data extract to a landing bucket in our cloud account.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:our-cloud-account",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        },
+        {
+          "id": "store:supplier-database",
+          "name": "supplier database",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Our supplier master service loads that file and writes the records into the supplier database.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:our-cloud-account",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        }
+      ],
+      "data_flows": [
+        {
+          "id": "flow:entity:category-managers>entity:portal>review-uploads",
+          "name": "review uploads",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "review what has been uploaded",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "entity:category-managers",
+          "destination": "entity:portal",
+          "protocol": "unknown",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "read"
+        },
+        {
+          "id": "flow:entity:category-managers>entity:portal>approve-or-reject",
+          "name": "approve or reject",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "approve or reject it",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "entity:category-managers",
+          "destination": "entity:portal",
+          "protocol": "unknown",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        },
+        {
+          "id": "flow:process:supplier-master-service>store:landing-bucket>load-file",
+          "name": "load file",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Our supplier master service loads that file",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:supplier-master-service",
+          "destination": "store:landing-bucket",
+          "protocol": "unknown",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "read"
+        },
+        {
+          "id": "flow:process:supplier-master-service>store:supplier-database>write-records",
+          "name": "write records",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "writes the records into the supplier database",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:supplier-master-service",
+          "destination": "store:supplier-database",
+          "protocol": "unknown",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        }
+      ],
+      "trust_boundaries": [
+        {
+          "id": "boundary:corporate-network",
+          "name": "corporate network",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Our category managers, who work from the corporate network, review what has been uploaded and approve or reject it.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        },
+        {
+          "id": "boundary:our-cloud-account",
+          "name": "our cloud account",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The bucket, the service and the database are all in our cloud account.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "privilege"
+        },
+        {
+          "id": "boundary:vendor-hosting",
+          "name": "vendor hosting",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The vendor hosts it and we do not run any part of it.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "tenant"
+        }
+      ],
+      "assumptions": []
+    }
+  }
+}

@@ -2,8 +2,9 @@
 
 Two tables answer two questions that gave one answer while a mode's reading
 node and its kept emission moved together. #1003's head-only mode reads through
-`extract` or through `facts` — which of them is the very thing separating its
-arms — and keeps a catalog either way. These hold each table to its own
+`extract`, through `facts`, or through the split `inventory`/`rows` route —
+which of them is the very thing separating its arms — and keeps a catalog every
+way. These hold each table to its own
 question, and drive the reader that grades such a sweep off the catalog its own
 run gated rather than off the blessed model it was never shown.
 """
@@ -15,6 +16,7 @@ from pathlib import Path
 
 import pytest
 
+from analysis_service import graph
 from analysis_service.assertions import (
     Assertion,
     AssertionCatalog,
@@ -59,24 +61,39 @@ def sweep(tmp_path: Path, corpus_case) -> Path:
 
 
 class TestTheTwoTables:
-    """Which node places an arm, and which emission a replay grades."""
+    """Which route places an arm, and which emission a replay grades."""
 
-    def test_the_head_only_mode_reads_through_either_node(self) -> None:
-        assert replay.NODE_OF["heads"] == ("extract", "facts")
+    def test_the_head_only_mode_reads_through_three_routes(self) -> None:
+        assert replay.ROUTES_OF["heads"] == (
+            ("extract",),
+            ("facts",),
+            ("inventory", "rows"),
+        )
 
     def test_every_replayable_mode_says_what_it_keeps(self) -> None:
         """A mode in one table and not the other is a replay that reads nothing."""
-        assert set(replay.KEEPS) == set(replay.NODE_OF)
+        assert set(replay.KEEPS) == set(replay.ROUTES_OF)
 
     def test_what_a_mode_keeps_is_one_of_two_emissions(self) -> None:
         assert set(replay.KEEPS.values()) == {"extraction", "catalog"}
 
     def test_every_replayable_mode_is_a_mode(self) -> None:
-        assert set(replay.NODE_OF) <= set(modes.MODE_ENTRIES)
+        assert set(replay.ROUTES_OF) <= set(modes.MODE_ENTRIES)
+
+    def test_every_route_names_a_node_the_graph_builds(self) -> None:
+        """A route node nothing runs would refuse every sweep that ran it."""
+        named = {node for route in replay.ROUTES_OF["heads"] for node in route}
+
+        assert named == {
+            graph.EXTRACT_NODE,
+            graph.FACTS_NODE,
+            graph.INVENTORY_NODE,
+            graph.ROWS_NODE,
+        }
 
 
 class TestPlacingAHeadOnlySweep:
-    """An arm is the reading node the sweep actually carried."""
+    """An arm is the reading route the sweep actually carried."""
 
     def artifact(self, *nodes: str):
         class Fake:
@@ -99,11 +116,18 @@ class TestPlacingAHeadOnlySweep:
     @pytest.mark.parametrize("node", ("extract", "facts"))
     def test_it_is_placed_by_the_node_it_carried(self, node: str) -> None:
         arm = replay.arm_of(self.artifact(node, "repair"))
-        assert arm.node == node
-        assert arm.instruction == f"{node}-digest"
+        assert arm.nodes == (node,)
+        assert arm.instructions == (f"{node}-digest",)
+
+    def test_a_split_reading_is_one_arm_over_two_prompts(self) -> None:
+        """#1003's arm E reads through two calls, and each carries its own prompt."""
+        arm = replay.arm_of(self.artifact("inventory", "rows", "resolve"))
+
+        assert arm.nodes == ("inventory", "rows")
+        assert arm.instructions == ("inventory-digest", "rows-digest")
 
     def test_a_sweep_carrying_both_is_refused(self) -> None:
-        """Two reading nodes is two arms, and a sweep is one."""
+        """Two reading routes is two arms, and a sweep is one."""
         with pytest.raises(ValueError, match="cannot be placed on"):
             replay.arm_of(self.artifact("extract", "facts"))
 

@@ -1,0 +1,1836 @@
+{
+  "proposal": {
+    "assertions": [
+      {
+        "subject_type": "component",
+        "subject": "process:supplier-document-portal",
+        "predicate": "network-membership",
+        "value": "vendor platform",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The portal is a SaaS product. The vendor hosts it and we do not run any part of it."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:vendor-platform",
+        "predicate": "network-membership",
+        "value": "vendor platform",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The documents themselves stay in the vendor's platform."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "process:supplier-master-service",
+        "predicate": "network-membership",
+        "value": "our cloud account",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The bucket, the service and the database are all in our cloud account."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:landing-bucket",
+        "predicate": "network-membership",
+        "value": "our cloud account",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The bucket, the service and the database are all in our cloud account."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:supplier-database",
+        "predicate": "network-membership",
+        "value": "our cloud account",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The bucket, the service and the database are all in our cloud account."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "entity:suppliers",
+        "predicate": "network-membership",
+        "value": "suppliers",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Suppliers upload their compliance paperwork through a portal"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "entity:category-managers",
+        "predicate": "network-membership",
+        "value": "corporate network",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Our category managers, who work from the corporate network"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "entity:vendor",
+        "predicate": "network-membership",
+        "value": "vendor platform",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The vendor hosts it"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "process:supplier-document-portal",
+        "predicate": "tenant-ownership",
+        "value": "vendor",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The portal is a SaaS product. The vendor hosts it"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:vendor-platform",
+        "predicate": "tenant-ownership",
+        "value": "vendor",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The documents themselves stay in the vendor's platform."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:vendor-platform",
+        "predicate": "storage-encryption",
+        "value": "enterprise-grade encryption",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "it uses enterprise-grade encryption throughout"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "process:supplier-document-portal",
+        "predicate": "authentication-mechanism",
+        "value": "fully authenticated",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "all access is fully authenticated and audited"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:entity:suppliers>process:supplier-document-portal>sign-in",
+        "predicate": "authentication-mechanism",
+        "value": "username and password",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Suppliers sign in with a username and password that the vendor issues to them."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:entity:category-managers>process:supplier-document-portal>review-submissions",
+        "predicate": "authentication-mechanism",
+        "value": "fully authenticated",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "all access is fully authenticated and audited"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:entity:suppliers>process:supplier-document-portal>upload-paperwork",
+        "predicate": "transport-encryption",
+        "value": "enterprise-grade encryption",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "it uses enterprise-grade encryption throughout"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:entity:suppliers>process:supplier-document-portal>sign-in",
+        "predicate": "transport-encryption",
+        "value": "enterprise-grade encryption",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "it uses enterprise-grade encryption throughout"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:entity:category-managers>process:supplier-document-portal>review-submissions",
+        "predicate": "transport-encryption",
+        "value": "enterprise-grade encryption",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "it uses enterprise-grade encryption throughout"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "principal",
+        "subject": "suppliers",
+        "predicate": "credential-presented",
+        "value": "username and password",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Suppliers sign in with a username and password that the vendor issues to them."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:entity:suppliers>process:supplier-document-portal>sign-in",
+        "predicate": "credential-presented",
+        "value": "username and password",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Suppliers sign in with a username and password that the vendor issues to them."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "principal",
+        "subject": "suppliers",
+        "predicate": "authorization-grant",
+        "value": "upload compliance paperwork",
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "supplier document portal"
+          },
+          {
+            "kind": "operation",
+            "value": "upload"
+          }
+        ],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Suppliers upload their compliance paperwork through a portal"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "principal",
+        "subject": "category managers",
+        "predicate": "authorization-grant",
+        "value": "review uploaded paperwork and approve or reject it",
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "supplier document portal"
+          },
+          {
+            "kind": "operation",
+            "value": "review, approve or reject"
+          }
+        ],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Our category managers, who work from the corporate network, review what has been uploaded and approve or reject it."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "principal",
+        "subject": "vendor",
+        "predicate": "authorization-grant",
+        "value": "push supplier data extract",
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "landing bucket"
+          },
+          {
+            "kind": "operation",
+            "value": "push extract"
+          }
+        ],
+        "basis": "inferred",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Every night the vendor pushes a supplier data extract to a landing bucket in our cloud account."
+          }
+        ],
+        "explanation": "The described push shows the vendor exercising permission to write the extract to the landing bucket; the source does not explicitly say that this permission was granted.",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:entity:vendor>store:landing-bucket>push-extract",
+        "predicate": "transport-encryption",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "We were told the nightly extract is encrypted end to end."
+          },
+          {
+            "source_label": "System description",
+            "quote": "The runbook for the landing bucket says the file arrives as a plain CSV and is picked up as-is."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      }
+    ]
+  },
+  "catalog": {
+    "registry_version": 3,
+    "subjects": [
+      {
+        "id": "boundary:corporate-network",
+        "type": "zone",
+        "label": "corporate network"
+      },
+      {
+        "id": "boundary:our-cloud-account",
+        "type": "zone",
+        "label": "our cloud account"
+      },
+      {
+        "id": "boundary:suppliers",
+        "type": "zone",
+        "label": "suppliers"
+      },
+      {
+        "id": "boundary:vendor-platform",
+        "type": "zone",
+        "label": "vendor platform"
+      },
+      {
+        "id": "credential:username-and-password",
+        "type": "credential",
+        "label": "username and password"
+      },
+      {
+        "id": "entity:category-managers",
+        "type": "component",
+        "label": "category managers"
+      },
+      {
+        "id": "entity:suppliers",
+        "type": "component",
+        "label": "suppliers"
+      },
+      {
+        "id": "entity:vendor",
+        "type": "component",
+        "label": "vendor"
+      },
+      {
+        "id": "flow:entity:category-managers>process:supplier-document-portal>review-submissions",
+        "type": "interaction",
+        "label": "review submissions"
+      },
+      {
+        "id": "flow:entity:suppliers>process:supplier-document-portal>sign-in",
+        "type": "interaction",
+        "label": "sign in"
+      },
+      {
+        "id": "flow:entity:suppliers>process:supplier-document-portal>upload-paperwork",
+        "type": "interaction",
+        "label": "upload paperwork"
+      },
+      {
+        "id": "flow:entity:vendor>store:landing-bucket>push-extract",
+        "type": "interaction",
+        "label": "push extract"
+      },
+      {
+        "id": "principal:category-managers",
+        "type": "principal",
+        "label": "category managers"
+      },
+      {
+        "id": "principal:suppliers",
+        "type": "principal",
+        "label": "suppliers"
+      },
+      {
+        "id": "principal:vendor",
+        "type": "principal",
+        "label": "vendor"
+      },
+      {
+        "id": "process:supplier-document-portal",
+        "type": "component",
+        "label": "supplier document portal"
+      },
+      {
+        "id": "process:supplier-master-service",
+        "type": "component",
+        "label": "supplier master service"
+      },
+      {
+        "id": "store:landing-bucket",
+        "type": "component",
+        "label": "landing bucket"
+      },
+      {
+        "id": "store:supplier-database",
+        "type": "component",
+        "label": "supplier database"
+      },
+      {
+        "id": "store:vendor-platform",
+        "type": "component",
+        "label": "vendor platform"
+      }
+    ],
+    "entries": [
+      {
+        "subject": "process:supplier-document-portal",
+        "predicate": "network-membership",
+        "value": "boundary:vendor-platform",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
+            "start": 348,
+            "end": 431,
+            "quote": "The portal is a SaaS product. The vendor hosts it and we do not run any part of it."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:vendor-platform",
+        "predicate": "network-membership",
+        "value": "boundary:vendor-platform",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
+            "start": 175,
+            "end": 230,
+            "quote": "The documents themselves stay in the vendor's platform."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "process:supplier-master-service",
+        "predicate": "network-membership",
+        "value": "boundary:our-cloud-account",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
+            "start": 912,
+            "end": 982,
+            "quote": "The bucket, the service and the database are all in our cloud account."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:landing-bucket",
+        "predicate": "network-membership",
+        "value": "boundary:our-cloud-account",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
+            "start": 912,
+            "end": 982,
+            "quote": "The bucket, the service and the database are all in our cloud account."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:supplier-database",
+        "predicate": "network-membership",
+        "value": "boundary:our-cloud-account",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
+            "start": 912,
+            "end": 982,
+            "quote": "The bucket, the service and the database are all in our cloud account."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "entity:suppliers",
+        "predicate": "network-membership",
+        "value": "boundary:suppliers",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
+            "start": 27,
+            "end": 87,
+            "quote": "Suppliers upload their compliance paperwork through a portal"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "entity:category-managers",
+        "predicate": "network-membership",
+        "value": "boundary:corporate-network",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
+            "start": 231,
+            "end": 290,
+            "quote": "Our category managers, who work from the corporate network"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "entity:vendor",
+        "predicate": "network-membership",
+        "value": "boundary:vendor-platform",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
+            "start": 378,
+            "end": 397,
+            "quote": "The vendor hosts it"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "process:supplier-document-portal",
+        "predicate": "tenant-ownership",
+        "value": "principal:vendor",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
+            "start": 348,
+            "end": 397,
+            "quote": "The portal is a SaaS product. The vendor hosts it"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:vendor-platform",
+        "predicate": "tenant-ownership",
+        "value": "principal:vendor",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
+            "start": 175,
+            "end": 230,
+            "quote": "The documents themselves stay in the vendor's platform."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:vendor-platform",
+        "predicate": "storage-encryption",
+        "value": "enterprise-grade encryption",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
+            "start": 499,
+            "end": 546,
+            "quote": "it uses enterprise-grade encryption throughout"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "process:supplier-document-portal",
+        "predicate": "authentication-mechanism",
+        "value": "fully authenticated",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
+            "start": 552,
+            "end": 598,
+            "quote": "all access is fully authenticated and audited"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:entity:suppliers>process:supplier-document-portal>sign-in",
+        "predicate": "authentication-mechanism",
+        "value": "username and password",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
+            "start": 641,
+            "end": 719,
+            "quote": "Suppliers sign in with a username and password that the vendor issues to them."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:entity:category-managers>process:supplier-document-portal>review-submissions",
+        "predicate": "authentication-mechanism",
+        "value": "fully authenticated",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
+            "start": 552,
+            "end": 598,
+            "quote": "all access is fully authenticated and audited"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:entity:suppliers>process:supplier-document-portal>upload-paperwork",
+        "predicate": "transport-encryption",
+        "value": "enterprise-grade encryption",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
+            "start": 499,
+            "end": 546,
+            "quote": "it uses enterprise-grade encryption throughout"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:entity:suppliers>process:supplier-document-portal>sign-in",
+        "predicate": "transport-encryption",
+        "value": "enterprise-grade encryption",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
+            "start": 499,
+            "end": 546,
+            "quote": "it uses enterprise-grade encryption throughout"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:entity:category-managers>process:supplier-document-portal>review-submissions",
+        "predicate": "transport-encryption",
+        "value": "enterprise-grade encryption",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
+            "start": 499,
+            "end": 546,
+            "quote": "it uses enterprise-grade encryption throughout"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "principal:suppliers",
+        "predicate": "credential-presented",
+        "value": "credential:username-and-password",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
+            "start": 641,
+            "end": 719,
+            "quote": "Suppliers sign in with a username and password that the vendor issues to them."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:entity:suppliers>process:supplier-document-portal>sign-in",
+        "predicate": "credential-presented",
+        "value": "credential:username-and-password",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
+            "start": 641,
+            "end": 719,
+            "quote": "Suppliers sign in with a username and password that the vendor issues to them."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "principal:suppliers",
+        "predicate": "authorization-grant",
+        "value": "upload compliance paperwork",
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "supplier document portal"
+          },
+          {
+            "kind": "operation",
+            "value": "upload"
+          }
+        ],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
+            "start": 27,
+            "end": 87,
+            "quote": "Suppliers upload their compliance paperwork through a portal"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "principal:category-managers",
+        "predicate": "authorization-grant",
+        "value": "review uploaded paperwork and approve or reject it",
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "supplier document portal"
+          },
+          {
+            "kind": "operation",
+            "value": "review, approve or reject"
+          }
+        ],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
+            "start": 231,
+            "end": 346,
+            "quote": "Our category managers, who work from the corporate network, review what has been uploaded and approve or reject it."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "principal:vendor",
+        "predicate": "authorization-grant",
+        "value": "push supplier data extract",
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "landing bucket"
+          },
+          {
+            "kind": "operation",
+            "value": "push extract"
+          }
+        ],
+        "basis": "inferred",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
+            "start": 721,
+            "end": 816,
+            "quote": "Every night the vendor pushes a supplier data extract to a landing bucket in our cloud account."
+          }
+        ],
+        "premises": [],
+        "explanation": "The described push shows the vendor exercising permission to write the extract to the landing bucket; the source does not explicitly say that this permission was granted.",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:entity:vendor>store:landing-bucket>push-extract",
+        "predicate": "transport-encryption",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
+            "start": 984,
+            "end": 1041,
+            "quote": "We were told the nightly extract is encrypted end to end."
+          },
+          {
+            "source_label": "System description",
+            "digest": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
+            "start": 1042,
+            "end": 1137,
+            "quote": "The runbook for the landing bucket says the file arrives as a plain CSV and is picked up as-is."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      }
+    ]
+  },
+  "issues": [],
+  "projection": [
+    {
+      "element_id": "entity:category-managers",
+      "attribute": "trust_zone",
+      "value": "boundary:corporate-network",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~entity:category-managers~any~boundary:corporate-network"
+      ]
+    },
+    {
+      "element_id": "entity:suppliers",
+      "attribute": "trust_zone",
+      "value": "boundary:suppliers",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~entity:suppliers~any~boundary:suppliers"
+      ]
+    },
+    {
+      "element_id": "entity:vendor",
+      "attribute": "trust_zone",
+      "value": "boundary:vendor-platform",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~entity:vendor~any~boundary:vendor-platform"
+      ]
+    },
+    {
+      "element_id": "flow:entity:category-managers>process:supplier-document-portal>review-submissions",
+      "attribute": "authentication",
+      "value": "fully authenticated",
+      "reason": "stated",
+      "rows": [
+        "assertion:authentication-mechanism~flow:entity:category-managers>process:supplier-document-portal>review-submissions~any~v.d3d75cadd185"
+      ]
+    },
+    {
+      "element_id": "flow:entity:category-managers>process:supplier-document-portal>review-submissions",
+      "attribute": "encryption_in_transit",
+      "value": "enterprise-grade encryption",
+      "reason": "stated",
+      "rows": [
+        "assertion:transport-encryption~flow:entity:category-managers>process:supplier-document-portal>review-submissions~any~v.85e2fb0c6509"
+      ]
+    },
+    {
+      "element_id": "flow:entity:suppliers>process:supplier-document-portal>sign-in",
+      "attribute": "authentication",
+      "value": "unknown",
+      "reason": "several-predicates",
+      "rows": [
+        "assertion:authentication-mechanism~flow:entity:suppliers>process:supplier-document-portal>sign-in~any~v.96391275b446",
+        "assertion:credential-presented~flow:entity:suppliers>process:supplier-document-portal>sign-in~any~credential:username-and-password"
+      ]
+    },
+    {
+      "element_id": "flow:entity:suppliers>process:supplier-document-portal>sign-in",
+      "attribute": "encryption_in_transit",
+      "value": "enterprise-grade encryption",
+      "reason": "stated",
+      "rows": [
+        "assertion:transport-encryption~flow:entity:suppliers>process:supplier-document-portal>sign-in~any~v.85e2fb0c6509"
+      ]
+    },
+    {
+      "element_id": "flow:entity:suppliers>process:supplier-document-portal>upload-paperwork",
+      "attribute": "encryption_in_transit",
+      "value": "enterprise-grade encryption",
+      "reason": "stated",
+      "rows": [
+        "assertion:transport-encryption~flow:entity:suppliers>process:supplier-document-portal>upload-paperwork~any~v.85e2fb0c6509"
+      ]
+    },
+    {
+      "element_id": "flow:entity:vendor>store:landing-bucket>push-extract",
+      "attribute": "encryption_in_transit",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:transport-encryption~flow:entity:vendor>store:landing-bucket>push-extract~any~unknown"
+      ]
+    },
+    {
+      "element_id": "process:supplier-document-portal",
+      "attribute": "trust_zone",
+      "value": "boundary:vendor-platform",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~process:supplier-document-portal~any~boundary:vendor-platform"
+      ]
+    },
+    {
+      "element_id": "process:supplier-master-service",
+      "attribute": "trust_zone",
+      "value": "boundary:our-cloud-account",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~process:supplier-master-service~any~boundary:our-cloud-account"
+      ]
+    },
+    {
+      "element_id": "store:landing-bucket",
+      "attribute": "trust_zone",
+      "value": "boundary:our-cloud-account",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~store:landing-bucket~any~boundary:our-cloud-account"
+      ]
+    },
+    {
+      "element_id": "store:supplier-database",
+      "attribute": "trust_zone",
+      "value": "boundary:our-cloud-account",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~store:supplier-database~any~boundary:our-cloud-account"
+      ]
+    },
+    {
+      "element_id": "store:vendor-platform",
+      "attribute": "encryption_at_rest",
+      "value": "enterprise-grade encryption",
+      "reason": "stated",
+      "rows": [
+        "assertion:storage-encryption~store:vendor-platform~any~v.85e2fb0c6509"
+      ]
+    },
+    {
+      "element_id": "store:vendor-platform",
+      "attribute": "trust_zone",
+      "value": "boundary:vendor-platform",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~store:vendor-platform~any~boundary:vendor-platform"
+      ]
+    }
+  ],
+  "stages": {
+    "extracted_model": {
+      "external_entities": [
+        {
+          "id": "entity:suppliers",
+          "name": "suppliers",
+          "description": "Suppliers who upload compliance paperwork and sign in to the portal.",
+          "assets": [],
+          "source_excerpt": "Suppliers upload their compliance paperwork through a portal",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "human",
+          "trust_zone": "boundary:suppliers"
+        },
+        {
+          "id": "entity:category-managers",
+          "name": "category managers",
+          "description": "Category managers who review uploaded paperwork and approve or reject it.",
+          "assets": [],
+          "source_excerpt": "Our category managers, who work from the corporate network, review what has been uploaded and approve or reject it.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "human",
+          "trust_zone": "boundary:corporate-network"
+        },
+        {
+          "id": "entity:vendor",
+          "name": "vendor",
+          "description": "The SaaS vendor that hosts the portal and pushes the nightly supplier data extract.",
+          "assets": [],
+          "source_excerpt": "The portal is a SaaS product. The vendor hosts it",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "external-system",
+          "trust_zone": "boundary:vendor-platform"
+        }
+      ],
+      "processes": [
+        {
+          "id": "process:supplier-document-portal",
+          "name": "supplier document portal",
+          "description": "A vendor-hosted SaaS portal through which suppliers upload compliance paperwork and category managers review and approve or reject it.",
+          "assets": [
+            "pii",
+            "business-critical-data"
+          ],
+          "source_excerpt": "Supplier document portal.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "SaaS",
+          "trust_zone": "boundary:vendor-platform",
+          "exposure": "unknown",
+          "interface_kind": "web"
+        },
+        {
+          "id": "process:supplier-master-service",
+          "name": "supplier master service",
+          "description": "A service that loads the nightly supplier data extract and writes the records into the supplier database.",
+          "assets": [
+            "pii",
+            "business-critical-data"
+          ],
+          "source_excerpt": "Our supplier master service loads that file and writes the records into the supplier database.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:our-cloud-account",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        }
+      ],
+      "data_stores": [
+        {
+          "id": "store:vendor-platform",
+          "name": "vendor platform",
+          "description": "The vendor's platform where the uploaded compliance documents remain.",
+          "assets": [
+            "pii",
+            "business-critical-data"
+          ],
+          "source_excerpt": "The documents themselves stay in the vendor's platform.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "SaaS",
+          "trust_zone": "boundary:vendor-platform",
+          "data_classification": "confidential",
+          "encryption_at_rest": "enterprise-grade encryption"
+        },
+        {
+          "id": "store:landing-bucket",
+          "name": "landing bucket",
+          "description": "A bucket in our cloud account receiving the nightly supplier data extract.",
+          "assets": [
+            "pii",
+            "business-critical-data"
+          ],
+          "source_excerpt": "Every night the vendor pushes a supplier data extract to a landing bucket in our cloud account.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "The source says, \"We were told the nightly extract is encrypted end to end.\" The runbook says, \"the file arrives as a plain CSV and is picked up as-is.\" These claims do not establish a single value for encryption at rest.",
+          "technology": "unknown",
+          "trust_zone": "boundary:our-cloud-account",
+          "data_classification": "confidential",
+          "encryption_at_rest": "unknown"
+        },
+        {
+          "id": "store:supplier-database",
+          "name": "supplier database",
+          "description": "A database in our cloud account containing records loaded from the supplier data extract.",
+          "assets": [
+            "pii",
+            "business-critical-data"
+          ],
+          "source_excerpt": "The bucket, the service and the database are all in our cloud account.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:our-cloud-account",
+          "data_classification": "confidential",
+          "encryption_at_rest": "unknown"
+        }
+      ],
+      "data_flows": [
+        {
+          "id": "flow:entity-suppliers-to-process-supplier-document-portal:upload-paperwork",
+          "name": "upload paperwork",
+          "description": "Suppliers upload compliance paperwork to the supplier document portal.",
+          "assets": [
+            "pii",
+            "business-critical-data"
+          ],
+          "source_excerpt": "Suppliers upload their compliance paperwork through a portal \u2014 insurance certificates, food safety audits, and contact details for their own staff.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "entity:suppliers",
+          "destination": "process:supplier-document-portal",
+          "protocol": "unknown",
+          "authentication": "username and password",
+          "data_description": "Insurance certificates, food safety audits, and contact details for suppliers' own staff.",
+          "encryption_in_transit": "enterprise-grade encryption",
+          "operations": "write"
+        },
+        {
+          "id": "flow:entity-suppliers-to-process-supplier-document-portal:sign-in",
+          "name": "sign in",
+          "description": "Suppliers sign in to the supplier document portal using vendor-issued credentials.",
+          "assets": [
+            "credentials"
+          ],
+          "source_excerpt": "Suppliers sign in with a username and password that the vendor issues to them.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "entity:suppliers",
+          "destination": "process:supplier-document-portal",
+          "protocol": "unknown",
+          "authentication": "username and password",
+          "data_description": "Vendor-issued supplier username and password credentials.",
+          "encryption_in_transit": "enterprise-grade encryption",
+          "operations": "unknown"
+        },
+        {
+          "id": "flow:entity-category-managers-to-process-supplier-document-portal:review-submissions",
+          "name": "review submissions",
+          "description": "Category managers review uploaded paperwork and approve or reject it in the supplier document portal.",
+          "assets": [
+            "business-critical-data"
+          ],
+          "source_excerpt": "Our category managers, who work from the corporate network, review what has been uploaded and approve or reject it.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "entity:category-managers",
+          "destination": "process:supplier-document-portal",
+          "protocol": "unknown",
+          "authentication": "fully authenticated",
+          "data_description": "Uploaded compliance paperwork and approval or rejection decisions.",
+          "encryption_in_transit": "enterprise-grade encryption",
+          "operations": "read-write"
+        },
+        {
+          "id": "flow:entity-vendor-to-store-landing-bucket:push-extract",
+          "name": "push extract",
+          "description": "The vendor pushes a nightly supplier data extract to the landing bucket.",
+          "assets": [
+            "pii",
+            "business-critical-data"
+          ],
+          "source_excerpt": "Every night the vendor pushes a supplier data extract to a landing bucket in our cloud account.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "The source says, \"We were told the nightly extract is encrypted end to end.\" The runbook says, \"the file arrives as a plain CSV and is picked up as-is.\" These claims do not establish a single value for encryption in transit.",
+          "source": "entity:vendor",
+          "destination": "store:landing-bucket",
+          "protocol": "unknown",
+          "authentication": "unknown",
+          "data_description": "Nightly supplier data extract.",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        },
+        {
+          "id": "flow:process-supplier-master-service-to-store-landing-bucket:load-file",
+          "name": "load file",
+          "description": "The supplier master service loads the supplier data extract from the landing bucket.",
+          "assets": [
+            "pii",
+            "business-critical-data"
+          ],
+          "source_excerpt": "Our supplier master service loads that file",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:supplier-master-service",
+          "destination": "store:landing-bucket",
+          "protocol": "unknown",
+          "authentication": "unknown",
+          "data_description": "Supplier data extract file.",
+          "encryption_in_transit": "unknown",
+          "operations": "read"
+        },
+        {
+          "id": "flow:process-supplier-master-service-to-store-supplier-database:write-records",
+          "name": "write records",
+          "description": "The supplier master service writes supplier data extract records into the supplier database.",
+          "assets": [
+            "pii",
+            "business-critical-data"
+          ],
+          "source_excerpt": "writes the records into the supplier database",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:supplier-master-service",
+          "destination": "store:supplier-database",
+          "protocol": "unknown",
+          "authentication": "unknown",
+          "data_description": "Supplier records from the nightly extract.",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        }
+      ],
+      "trust_boundaries": [
+        {
+          "id": "boundary:vendor-platform",
+          "name": "vendor platform",
+          "description": "The vendor-controlled hosting zone containing the SaaS portal and the uploaded documents.",
+          "assets": [],
+          "source_excerpt": "The documents themselves stay in the vendor's platform.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "tenant"
+        },
+        {
+          "id": "boundary:corporate-network",
+          "name": "corporate network",
+          "description": "The corporate network from which category managers work.",
+          "assets": [],
+          "source_excerpt": "Our category managers, who work from the corporate network",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        },
+        {
+          "id": "boundary:our-cloud-account",
+          "name": "our cloud account",
+          "description": "Our cloud account containing the landing bucket, supplier master service, and supplier database.",
+          "assets": [],
+          "source_excerpt": "The bucket, the service and the database are all in our cloud account.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        },
+        {
+          "id": "boundary:suppliers",
+          "name": "suppliers",
+          "description": "The supplier-controlled zone from which suppliers access the portal.",
+          "assets": [],
+          "source_excerpt": "Suppliers upload their compliance paperwork through a portal",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "tenant"
+        }
+      ],
+      "assumptions": [
+        {
+          "assumption": "The suppliers are in a separate supplier-controlled trust zone from the vendor platform.",
+          "element_id": "entity:suppliers",
+          "attribute": "trust_zone",
+          "basis": "Suppliers are described as external actors uploading their own compliance paperwork to a vendor-hosted platform."
+        },
+        {
+          "assumption": "The vendor platform's uploaded documents are confidential because they include staff contact details and compliance paperwork.",
+          "element_id": "store:vendor-platform",
+          "attribute": "data_classification",
+          "basis": "The platform stores insurance certificates, food safety audits, and contact details for suppliers' own staff."
+        },
+        {
+          "assumption": "The landing bucket's supplier data extract is confidential because it contains supplier data.",
+          "element_id": "store:landing-bucket",
+          "attribute": "data_classification",
+          "basis": "The landing bucket receives a supplier data extract."
+        },
+        {
+          "assumption": "The supplier database's records are confidential because they originate from the supplier data extract.",
+          "element_id": "store:supplier-database",
+          "attribute": "data_classification",
+          "basis": "The supplier database receives records from the supplier data extract."
+        }
+      ]
+    },
+    "valid_model": {
+      "external_entities": [
+        {
+          "id": "entity:suppliers",
+          "name": "suppliers",
+          "description": "Suppliers who upload compliance paperwork and sign in to the portal.",
+          "assets": [],
+          "source_excerpt": "Suppliers upload their compliance paperwork through a portal",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "human",
+          "trust_zone": "boundary:suppliers"
+        },
+        {
+          "id": "entity:category-managers",
+          "name": "category managers",
+          "description": "Category managers who review uploaded paperwork and approve or reject it.",
+          "assets": [],
+          "source_excerpt": "Our category managers, who work from the corporate network, review what has been uploaded and approve or reject it.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "human",
+          "trust_zone": "boundary:corporate-network"
+        },
+        {
+          "id": "entity:vendor",
+          "name": "vendor",
+          "description": "The SaaS vendor that hosts the portal and pushes the nightly supplier data extract.",
+          "assets": [],
+          "source_excerpt": "The portal is a SaaS product. The vendor hosts it",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "external-system",
+          "trust_zone": "boundary:vendor-platform"
+        }
+      ],
+      "processes": [
+        {
+          "id": "process:supplier-document-portal",
+          "name": "supplier document portal",
+          "description": "A vendor-hosted SaaS portal through which suppliers upload compliance paperwork and category managers review and approve or reject it.",
+          "assets": [
+            "pii",
+            "business-critical-data"
+          ],
+          "source_excerpt": "Supplier document portal.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "SaaS",
+          "trust_zone": "boundary:vendor-platform",
+          "exposure": "unknown",
+          "interface_kind": "web"
+        },
+        {
+          "id": "process:supplier-master-service",
+          "name": "supplier master service",
+          "description": "A service that loads the nightly supplier data extract and writes the records into the supplier database.",
+          "assets": [
+            "pii",
+            "business-critical-data"
+          ],
+          "source_excerpt": "Our supplier master service loads that file and writes the records into the supplier database.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:our-cloud-account",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        }
+      ],
+      "data_stores": [
+        {
+          "id": "store:vendor-platform",
+          "name": "vendor platform",
+          "description": "The vendor's platform where the uploaded compliance documents remain.",
+          "assets": [
+            "pii",
+            "business-critical-data"
+          ],
+          "source_excerpt": "The documents themselves stay in the vendor's platform.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "SaaS",
+          "trust_zone": "boundary:vendor-platform",
+          "data_classification": "confidential",
+          "encryption_at_rest": "enterprise-grade encryption"
+        },
+        {
+          "id": "store:landing-bucket",
+          "name": "landing bucket",
+          "description": "A bucket in our cloud account receiving the nightly supplier data extract.",
+          "assets": [
+            "pii",
+            "business-critical-data"
+          ],
+          "source_excerpt": "Every night the vendor pushes a supplier data extract to a landing bucket in our cloud account.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "The source says, \"We were told the nightly extract is encrypted end to end.\" The runbook says, \"the file arrives as a plain CSV and is picked up as-is.\" These claims do not establish a single value for encryption at rest.",
+          "technology": "unknown",
+          "trust_zone": "boundary:our-cloud-account",
+          "data_classification": "confidential",
+          "encryption_at_rest": "unknown"
+        },
+        {
+          "id": "store:supplier-database",
+          "name": "supplier database",
+          "description": "A database in our cloud account containing records loaded from the supplier data extract.",
+          "assets": [
+            "pii",
+            "business-critical-data"
+          ],
+          "source_excerpt": "The bucket, the service and the database are all in our cloud account.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:our-cloud-account",
+          "data_classification": "confidential",
+          "encryption_at_rest": "unknown"
+        }
+      ],
+      "data_flows": [
+        {
+          "id": "flow:entity:suppliers>process:supplier-document-portal>upload-paperwork",
+          "name": "upload paperwork",
+          "description": "Suppliers upload compliance paperwork to the supplier document portal.",
+          "assets": [
+            "pii",
+            "business-critical-data"
+          ],
+          "source_excerpt": "Suppliers upload their compliance paperwork through a portal \u2014 insurance certificates, food safety audits, and contact details for their own staff.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "entity:suppliers",
+          "destination": "process:supplier-document-portal",
+          "protocol": "unknown",
+          "authentication": "username and password",
+          "data_description": "Insurance certificates, food safety audits, and contact details for suppliers' own staff.",
+          "encryption_in_transit": "enterprise-grade encryption",
+          "operations": "write"
+        },
+        {
+          "id": "flow:entity:suppliers>process:supplier-document-portal>sign-in",
+          "name": "sign in",
+          "description": "Suppliers sign in to the supplier document portal using vendor-issued credentials.",
+          "assets": [
+            "credentials"
+          ],
+          "source_excerpt": "Suppliers sign in with a username and password that the vendor issues to them.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "entity:suppliers",
+          "destination": "process:supplier-document-portal",
+          "protocol": "unknown",
+          "authentication": "username and password",
+          "data_description": "Vendor-issued supplier username and password credentials.",
+          "encryption_in_transit": "enterprise-grade encryption",
+          "operations": "unknown"
+        },
+        {
+          "id": "flow:entity:category-managers>process:supplier-document-portal>review-submissions",
+          "name": "review submissions",
+          "description": "Category managers review uploaded paperwork and approve or reject it in the supplier document portal.",
+          "assets": [
+            "business-critical-data"
+          ],
+          "source_excerpt": "Our category managers, who work from the corporate network, review what has been uploaded and approve or reject it.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "entity:category-managers",
+          "destination": "process:supplier-document-portal",
+          "protocol": "unknown",
+          "authentication": "fully authenticated",
+          "data_description": "Uploaded compliance paperwork and approval or rejection decisions.",
+          "encryption_in_transit": "enterprise-grade encryption",
+          "operations": "read-write"
+        },
+        {
+          "id": "flow:entity:vendor>store:landing-bucket>push-extract",
+          "name": "push extract",
+          "description": "The vendor pushes a nightly supplier data extract to the landing bucket.",
+          "assets": [
+            "pii",
+            "business-critical-data"
+          ],
+          "source_excerpt": "Every night the vendor pushes a supplier data extract to a landing bucket in our cloud account.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "The source says, \"We were told the nightly extract is encrypted end to end.\" The runbook says, \"the file arrives as a plain CSV and is picked up as-is.\" These claims do not establish a single value for encryption in transit.",
+          "source": "entity:vendor",
+          "destination": "store:landing-bucket",
+          "protocol": "unknown",
+          "authentication": "unknown",
+          "data_description": "Nightly supplier data extract.",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        },
+        {
+          "id": "flow:process:supplier-master-service>store:landing-bucket>load-file",
+          "name": "load file",
+          "description": "The supplier master service loads the supplier data extract from the landing bucket.",
+          "assets": [
+            "pii",
+            "business-critical-data"
+          ],
+          "source_excerpt": "Our supplier master service loads that file",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:supplier-master-service",
+          "destination": "store:landing-bucket",
+          "protocol": "unknown",
+          "authentication": "unknown",
+          "data_description": "Supplier data extract file.",
+          "encryption_in_transit": "unknown",
+          "operations": "read"
+        },
+        {
+          "id": "flow:process:supplier-master-service>store:supplier-database>write-records",
+          "name": "write records",
+          "description": "The supplier master service writes supplier data extract records into the supplier database.",
+          "assets": [
+            "pii",
+            "business-critical-data"
+          ],
+          "source_excerpt": "writes the records into the supplier database",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:supplier-master-service",
+          "destination": "store:supplier-database",
+          "protocol": "unknown",
+          "authentication": "unknown",
+          "data_description": "Supplier records from the nightly extract.",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        }
+      ],
+      "trust_boundaries": [
+        {
+          "id": "boundary:vendor-platform",
+          "name": "vendor platform",
+          "description": "The vendor-controlled hosting zone containing the SaaS portal and the uploaded documents.",
+          "assets": [],
+          "source_excerpt": "The documents themselves stay in the vendor's platform.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "tenant"
+        },
+        {
+          "id": "boundary:corporate-network",
+          "name": "corporate network",
+          "description": "The corporate network from which category managers work.",
+          "assets": [],
+          "source_excerpt": "Our category managers, who work from the corporate network",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        },
+        {
+          "id": "boundary:our-cloud-account",
+          "name": "our cloud account",
+          "description": "Our cloud account containing the landing bucket, supplier master service, and supplier database.",
+          "assets": [],
+          "source_excerpt": "The bucket, the service and the database are all in our cloud account.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        },
+        {
+          "id": "boundary:suppliers",
+          "name": "suppliers",
+          "description": "The supplier-controlled zone from which suppliers access the portal.",
+          "assets": [],
+          "source_excerpt": "Suppliers upload their compliance paperwork through a portal",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "tenant"
+        }
+      ],
+      "assumptions": [
+        {
+          "assumption": "The suppliers are in a separate supplier-controlled trust zone from the vendor platform.",
+          "element_id": "entity:suppliers",
+          "attribute": "trust_zone",
+          "basis": "Suppliers are described as external actors uploading their own compliance paperwork to a vendor-hosted platform."
+        },
+        {
+          "assumption": "The vendor platform's uploaded documents are confidential because they include staff contact details and compliance paperwork.",
+          "element_id": "store:vendor-platform",
+          "attribute": "data_classification",
+          "basis": "The platform stores insurance certificates, food safety audits, and contact details for suppliers' own staff."
+        },
+        {
+          "assumption": "The landing bucket's supplier data extract is confidential because it contains supplier data.",
+          "element_id": "store:landing-bucket",
+          "attribute": "data_classification",
+          "basis": "The landing bucket receives a supplier data extract."
+        },
+        {
+          "assumption": "The supplier database's records are confidential because they originate from the supplier data extract.",
+          "element_id": "store:supplier-database",
+          "attribute": "data_classification",
+          "basis": "The supplier database receives records from the supplier data extract."
+        }
+      ]
+    }
+  }
+}

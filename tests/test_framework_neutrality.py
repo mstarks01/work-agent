@@ -132,6 +132,14 @@ DECLARED: dict[str, str] = {
         " carries that as `needs_candidate_pairs`. A package matching by catalog"
         " identifier contributes no pair, so there is nothing here to key."
     ),
+    "evals/harness/bottleneck.py": (
+        "Each fixture's ``Want`` cites the deterministic consumer that reads"
+        " the attribute, by the rule's own name, and both packages are cited"
+        " because the point of the table is that a typed attribute reaches a"
+        " reader whatever kind of claim set the package has. Nothing branches"
+        " on a name: the fixtures read the System Model, which is the"
+        " service's."
+    ),
     "evals/harness/reference.py": (
         "REFERENCE_TYPES is a table keyed by framework. `stride_claims()` is a"
         " named accessor for the scorer that grades STRIDE's open claim set;"

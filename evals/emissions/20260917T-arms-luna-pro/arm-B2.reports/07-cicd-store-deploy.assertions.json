@@ -1,0 +1,2151 @@
+{
+  "proposal": {
+    "assertions": [
+      {
+        "subject_type": "component",
+        "subject": "process:build-runner",
+        "predicate": "network-membership",
+        "value": "boundary:build-environment",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The runner lives in its own build environment"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:image-registry",
+        "predicate": "network-membership",
+        "value": "boundary:build-environment",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "our image registry, which is also in the build environment"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "process:deploy-controller",
+        "predicate": "network-membership",
+        "value": "boundary:corporate-network",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The deploy controller runs on the corporate network"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "process:store-server",
+        "predicate": "network-membership",
+        "value": "boundary:back-office",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "a small server in the back office"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "credential",
+        "subject": "shared build token",
+        "predicate": "credential-sharing",
+        "value": "shared",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "a shared build token that is the same for every pipeline"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "credential",
+        "subject": "shared build token",
+        "predicate": "credential-rotation",
+        "value": "not-rotated",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "has not been rotated since the pipeline was set up"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:process:build-runner>process:deploy-controller>calls-the-deploy-controller",
+        "predicate": "credential-presented",
+        "value": "shared build token",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The token the runner uses to call the controller is a shared build token"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:process:build-runner>process:deploy-controller>calls-the-deploy-controller",
+        "predicate": "authentication-mechanism",
+        "value": "shared build token",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The token the runner uses to call the controller"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:image-registry",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Nobody has documented ... whether the image registry does"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:process:store-server>store:image-registry>pulls-that-image",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "nobody has written down what a store server presents to it"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:process:store-server>process:deploy-controller>asks-the-deploy-controller",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "or what it presents to the controller"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "principal",
+        "subject": "developers",
+        "predicate": "authorization-grant",
+        "value": "kick off a rebuild of `main`",
+        "reason": null,
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "`main`"
+          },
+          {
+            "kind": "operation",
+            "value": "kick off a rebuild"
+          }
+        ],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "any developer can log in to the build runner and kick off a rebuild of `main` by hand"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:image-registry",
+        "predicate": "internet-exposure",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [],
+        "explanation": "The source states that the registry is reachable from the store estate over the WAN, but does not state that it is reachable from the internet.",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:process:store-server>store:image-registry>pulls-that-image",
+        "predicate": "transport-encryption",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [],
+        "explanation": "The source identifies the WAN path but does not state whether the interaction is encrypted.",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:process:store-server>process:deploy-controller>asks-the-deploy-controller",
+        "predicate": "transport-encryption",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [],
+        "explanation": "The source identifies the retail WAN context but does not state whether this interaction is encrypted.",
+        "exclusive": false
+      }
+    ]
+  },
+  "catalog": {
+    "registry_version": 3,
+    "subjects": [
+      {
+        "id": "boundary:back-office",
+        "type": "zone",
+        "label": "back office"
+      },
+      {
+        "id": "boundary:build-environment",
+        "type": "zone",
+        "label": "build environment"
+      },
+      {
+        "id": "boundary:corporate-network",
+        "type": "zone",
+        "label": "corporate network"
+      },
+      {
+        "id": "credential:shared-build-token",
+        "type": "credential",
+        "label": "shared build token"
+      },
+      {
+        "id": "flow:process:build-runner>process:deploy-controller>calls-the-deploy-controller",
+        "type": "interaction",
+        "label": "calls the deploy controller"
+      },
+      {
+        "id": "flow:process:store-server>process:deploy-controller>asks-the-deploy-controller",
+        "type": "interaction",
+        "label": "asks the deploy controller"
+      },
+      {
+        "id": "flow:process:store-server>store:image-registry>pulls-that-image",
+        "type": "interaction",
+        "label": "pulls that image"
+      },
+      {
+        "id": "principal:developers",
+        "type": "principal",
+        "label": "developers"
+      },
+      {
+        "id": "process:build-runner",
+        "type": "component",
+        "label": "build runner"
+      },
+      {
+        "id": "process:deploy-controller",
+        "type": "component",
+        "label": "deploy controller"
+      },
+      {
+        "id": "process:store-server",
+        "type": "component",
+        "label": "store server"
+      },
+      {
+        "id": "store:image-registry",
+        "type": "component",
+        "label": "image registry"
+      }
+    ],
+    "entries": [
+      {
+        "subject": "process:build-runner",
+        "predicate": "network-membership",
+        "value": "boundary:build-environment",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "1bfb96ef3374b697ef78e76661daa3d2b227792a3b20d2d1ee1d526cde02652c",
+            "start": 501,
+            "end": 547,
+            "quote": "The runner lives in its own build environment"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:image-registry",
+        "predicate": "network-membership",
+        "value": "boundary:build-environment",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "1bfb96ef3374b697ef78e76661daa3d2b227792a3b20d2d1ee1d526cde02652c",
+            "start": 617,
+            "end": 676,
+            "quote": "our image registry, which is also in the build environment"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "process:deploy-controller",
+        "predicate": "network-membership",
+        "value": "boundary:corporate-network",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "1bfb96ef3374b697ef78e76661daa3d2b227792a3b20d2d1ee1d526cde02652c",
+            "start": 833,
+            "end": 884,
+            "quote": "The deploy controller runs on the corporate network"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "process:store-server",
+        "predicate": "network-membership",
+        "value": "boundary:back-office",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "1bfb96ef3374b697ef78e76661daa3d2b227792a3b20d2d1ee1d526cde02652c",
+            "start": 94,
+            "end": 127,
+            "quote": "a small server in the back office"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "credential:shared-build-token",
+        "predicate": "credential-sharing",
+        "value": "shared",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "1bfb96ef3374b697ef78e76661daa3d2b227792a3b20d2d1ee1d526cde02652c",
+            "start": 1000,
+            "end": 1056,
+            "quote": "a shared build token that is the same for every pipeline"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "credential:shared-build-token",
+        "predicate": "credential-rotation",
+        "value": "not-rotated",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "1bfb96ef3374b697ef78e76661daa3d2b227792a3b20d2d1ee1d526cde02652c",
+            "start": 1061,
+            "end": 1112,
+            "quote": "has not been rotated since the pipeline was set up"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:process:build-runner>process:deploy-controller>calls-the-deploy-controller",
+        "predicate": "credential-presented",
+        "value": "credential:shared-build-token",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "1bfb96ef3374b697ef78e76661daa3d2b227792a3b20d2d1ee1d526cde02652c",
+            "start": 948,
+            "end": 1020,
+            "quote": "The token the runner uses to call the controller is a shared build token"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:process:build-runner>process:deploy-controller>calls-the-deploy-controller",
+        "predicate": "authentication-mechanism",
+        "value": "shared build token",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "1bfb96ef3374b697ef78e76661daa3d2b227792a3b20d2d1ee1d526cde02652c",
+            "start": 948,
+            "end": 996,
+            "quote": "The token the runner uses to call the controller"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:image-registry",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "1bfb96ef3374b697ef78e76661daa3d2b227792a3b20d2d1ee1d526cde02652c",
+            "start": 2011,
+            "end": 2032,
+            "quote": "Nobody has documented"
+          },
+          {
+            "source_label": "System description",
+            "digest": "1bfb96ef3374b697ef78e76661daa3d2b227792a3b20d2d1ee1d526cde02652c",
+            "start": 2084,
+            "end": 2116,
+            "quote": "whether the image registry does"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:process:store-server>store:image-registry>pulls-that-image",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "1bfb96ef3374b697ef78e76661daa3d2b227792a3b20d2d1ee1d526cde02652c",
+            "start": 1381,
+            "end": 1440,
+            "quote": "nobody has written down what a store server presents to it"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:process:store-server>process:deploy-controller>asks-the-deploy-controller",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "1bfb96ef3374b697ef78e76661daa3d2b227792a3b20d2d1ee1d526cde02652c",
+            "start": 1441,
+            "end": 1479,
+            "quote": "or what it presents to the controller"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "principal:developers",
+        "predicate": "authorization-grant",
+        "value": "kick off a rebuild of `main`",
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "`main`"
+          },
+          {
+            "kind": "operation",
+            "value": "kick off a rebuild"
+          }
+        ],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "1bfb96ef3374b697ef78e76661daa3d2b227792a3b20d2d1ee1d526cde02652c",
+            "start": 1867,
+            "end": 1953,
+            "quote": "any developer can log in to the build runner and kick off a rebuild of `main` by hand"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:image-registry",
+        "predicate": "internet-exposure",
+        "value": "unknown",
+        "scope": [],
+        "basis": "inferred",
+        "reason": "silent",
+        "support": [],
+        "premises": [],
+        "explanation": "The source states that the registry is reachable from the store estate over the WAN, but does not state that it is reachable from the internet.",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:process:store-server>store:image-registry>pulls-that-image",
+        "predicate": "transport-encryption",
+        "value": "unknown",
+        "scope": [],
+        "basis": "inferred",
+        "reason": "silent",
+        "support": [],
+        "premises": [],
+        "explanation": "The source identifies the WAN path but does not state whether the interaction is encrypted.",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:process:store-server>process:deploy-controller>asks-the-deploy-controller",
+        "predicate": "transport-encryption",
+        "value": "unknown",
+        "scope": [],
+        "basis": "inferred",
+        "reason": "silent",
+        "support": [],
+        "premises": [],
+        "explanation": "The source identifies the retail WAN context but does not state whether this interaction is encrypted.",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      }
+    ]
+  },
+  "issues": [],
+  "projection": [
+    {
+      "element_id": "flow:process:build-runner>process:deploy-controller>calls-the-deploy-controller",
+      "attribute": "authentication",
+      "value": "unknown",
+      "reason": "several-predicates",
+      "rows": [
+        "assertion:authentication-mechanism~flow:process:build-runner>process:deploy-controller>calls-the-deploy-controller~any~v.b091d8123780",
+        "assertion:credential-presented~flow:process:build-runner>process:deploy-controller>calls-the-deploy-controller~any~credential:shared-build-token"
+      ]
+    },
+    {
+      "element_id": "flow:process:store-server>process:deploy-controller>asks-the-deploy-controller",
+      "attribute": "authentication",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:authentication-mechanism~flow:process:store-server>process:deploy-controller>asks-the-deploy-controller~any~unknown"
+      ]
+    },
+    {
+      "element_id": "flow:process:store-server>process:deploy-controller>asks-the-deploy-controller",
+      "attribute": "encryption_in_transit",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:transport-encryption~flow:process:store-server>process:deploy-controller>asks-the-deploy-controller~any~unknown"
+      ]
+    },
+    {
+      "element_id": "flow:process:store-server>store:image-registry>pulls-that-image",
+      "attribute": "authentication",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:authentication-mechanism~flow:process:store-server>store:image-registry>pulls-that-image~any~unknown"
+      ]
+    },
+    {
+      "element_id": "flow:process:store-server>store:image-registry>pulls-that-image",
+      "attribute": "encryption_in_transit",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:transport-encryption~flow:process:store-server>store:image-registry>pulls-that-image~any~unknown"
+      ]
+    },
+    {
+      "element_id": "process:build-runner",
+      "attribute": "trust_zone",
+      "value": "boundary:build-environment",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~process:build-runner~any~boundary:build-environment"
+      ]
+    },
+    {
+      "element_id": "process:deploy-controller",
+      "attribute": "trust_zone",
+      "value": "boundary:corporate-network",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~process:deploy-controller~any~boundary:corporate-network"
+      ]
+    },
+    {
+      "element_id": "process:store-server",
+      "attribute": "trust_zone",
+      "value": "boundary:back-office",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~process:store-server~any~boundary:back-office"
+      ]
+    },
+    {
+      "element_id": "store:image-registry",
+      "attribute": "encryption_at_rest",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:storage-encryption~store:image-registry~any~unknown"
+      ]
+    },
+    {
+      "element_id": "store:image-registry",
+      "attribute": "trust_zone",
+      "value": "boundary:build-environment",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~store:image-registry~any~boundary:build-environment"
+      ]
+    }
+  ],
+  "stages": {
+    "source_facts": {
+      "mentions": [
+        {
+          "handle": "store_server",
+          "text": "store server",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Each store has a small server in the back office"
+            }
+          ]
+        },
+        {
+          "handle": "till_software",
+          "text": "till software",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "running the till software as a container"
+            }
+          ]
+        },
+        {
+          "handle": "git_server",
+          "text": "self-hosted git server",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "their self-hosted git server"
+            }
+          ]
+        },
+        {
+          "handle": "corporate_network",
+          "text": "corporate network",
+          "roles": [
+            "network-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "which sits on the corporate network"
+            }
+          ]
+        },
+        {
+          "handle": "build_runner",
+          "text": "build runner",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The build runner picks the merge up"
+            }
+          ]
+        },
+        {
+          "handle": "build_environment",
+          "text": "build environment",
+          "roles": [
+            "network-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "its own build environment"
+            }
+          ]
+        },
+        {
+          "handle": "container_image",
+          "text": "container image",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "produces a container image"
+            }
+          ]
+        },
+        {
+          "handle": "image_registry",
+          "text": "image registry",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "to our image registry"
+            }
+          ]
+        },
+        {
+          "handle": "deploy_controller",
+          "text": "deploy controller",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "the runner calls the deploy controller"
+            }
+          ]
+        },
+        {
+          "handle": "store_estate",
+          "text": "store estate",
+          "roles": [
+            "network-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "from the store estate over the WAN"
+            }
+          ]
+        },
+        {
+          "handle": "retail_wan",
+          "text": "retail WAN",
+          "roles": [
+            "network-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "over the retail WAN"
+            }
+          ]
+        },
+        {
+          "handle": "public_package_registry",
+          "text": "public package registry",
+          "roles": [
+            "external-system"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "the public package registry on the internet"
+            }
+          ]
+        },
+        {
+          "handle": "internet",
+          "text": "internet",
+          "roles": [
+            "network-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "on the internet"
+            }
+          ]
+        },
+        {
+          "handle": "back_office",
+          "text": "back office",
+          "roles": [
+            "network-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "in the back office"
+            }
+          ]
+        },
+        {
+          "handle": "dependency_lockfile",
+          "text": "dependency lockfile",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "resolves the dependency lockfile"
+            }
+          ]
+        }
+      ],
+      "interactions": [
+        {
+          "handle": "runner_fetches_source",
+          "initiator": "build_runner",
+          "receiver": "git_server",
+          "action": "fetches the source",
+          "protocol": "unspecified",
+          "operations": "read",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "fetches the source"
+            }
+          ]
+        },
+        {
+          "handle": "runner_pushes_image",
+          "initiator": "build_runner",
+          "receiver": "image_registry",
+          "action": "pushes the finished image",
+          "protocol": "unspecified",
+          "operations": "write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "It pushes the finished image to our image registry"
+            }
+          ]
+        },
+        {
+          "handle": "runner_calls_controller",
+          "initiator": "build_runner",
+          "receiver": "deploy_controller",
+          "action": "calls the deploy controller",
+          "protocol": "unspecified",
+          "operations": "read-write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "the runner calls the deploy controller"
+            }
+          ]
+        },
+        {
+          "handle": "server_asks_controller",
+          "initiator": "store_server",
+          "receiver": "deploy_controller",
+          "action": "asks the deploy controller",
+          "protocol": "unspecified",
+          "operations": "read",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Every store server asks the deploy controller once a minute what the current release is"
+            }
+          ]
+        },
+        {
+          "handle": "server_pulls_image",
+          "initiator": "store_server",
+          "receiver": "image_registry",
+          "action": "pulls that image",
+          "protocol": "unspecified",
+          "operations": "read",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "it pulls that image from the registry"
+            }
+          ]
+        },
+        {
+          "handle": "runner_reaches_registry",
+          "initiator": "build_runner",
+          "receiver": "public_package_registry",
+          "action": "reaches out",
+          "protocol": "internet",
+          "operations": "read",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Dependency resolution reaches out to the public package registry on the internet"
+            }
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "handle": "f1",
+          "subject_kind": "mention",
+          "subject": "git_server",
+          "predicate": "network-membership",
+          "value": "corporate_network",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "their self-hosted git server, which sits on the corporate network"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f2",
+          "subject_kind": "mention",
+          "subject": "build_runner",
+          "predicate": "network-membership",
+          "value": "build_environment",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The runner lives in its own build environment"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f3",
+          "subject_kind": "mention",
+          "subject": "image_registry",
+          "predicate": "network-membership",
+          "value": "build_environment",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "our image registry, which is also in the build environment"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f4",
+          "subject_kind": "mention",
+          "subject": "deploy_controller",
+          "predicate": "network-membership",
+          "value": "corporate_network",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The deploy controller runs on the corporate network"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f5",
+          "subject_kind": "mention",
+          "subject": "store_server",
+          "predicate": "network-membership",
+          "value": "back_office",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "a small server in the back office"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f6",
+          "subject_kind": "mention",
+          "subject": "public_package_registry",
+          "predicate": "internet-exposure",
+          "value": "internet-facing",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "the public package registry on the internet"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f7",
+          "subject_kind": "credential",
+          "subject": "shared build token",
+          "predicate": "credential-sharing",
+          "value": "shared",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "a shared build token that is the same for every pipeline"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f8",
+          "subject_kind": "credential",
+          "subject": "shared build token",
+          "predicate": "credential-rotation",
+          "value": "not-rotated",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "has not been rotated since the pipeline was set up"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f9",
+          "subject_kind": "interaction",
+          "subject": "runner_calls_controller",
+          "predicate": "credential-presented",
+          "value": "shared build token",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The token the runner uses to call the controller is a shared build token"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f10",
+          "subject_kind": "interaction",
+          "subject": "runner_calls_controller",
+          "predicate": "authentication-mechanism",
+          "value": "shared build token",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The token the runner uses to call the controller"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f11",
+          "subject_kind": "mention",
+          "subject": "image_registry",
+          "predicate": "storage-encryption",
+          "value": "unknown",
+          "reason": "hedged",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Nobody has documented ... whether the image registry does"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f12",
+          "subject_kind": "mention",
+          "subject": "git_server",
+          "predicate": "storage-encryption",
+          "value": "unknown",
+          "reason": "hedged",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Nobody has documented whether the git server encrypts what it stores"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f13",
+          "subject_kind": "interaction",
+          "subject": "runner_reaches_registry",
+          "predicate": "signature-verification",
+          "value": "absent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "the runner does not verify signatures on what it downloads"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f14",
+          "subject_kind": "interaction",
+          "subject": "server_pulls_image",
+          "predicate": "authentication-mechanism",
+          "value": "unknown",
+          "reason": "hedged",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "nobody has written down what a store server presents to it"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f15",
+          "subject_kind": "interaction",
+          "subject": "server_asks_controller",
+          "predicate": "authentication-mechanism",
+          "value": "unknown",
+          "reason": "hedged",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "or what it presents to the controller"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f16",
+          "subject_kind": "principal",
+          "subject": "developers",
+          "predicate": "authorization-grant",
+          "value": "kick off a rebuild of `main`",
+          "scope": [
+            {
+              "kind": "resource",
+              "value": "`main`"
+            },
+            {
+              "kind": "operation",
+              "value": "kick off a rebuild"
+            }
+          ],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "any developer can log in to the build runner and kick off a rebuild of `main` by hand"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f17",
+          "subject_kind": "mention",
+          "subject": "image_registry",
+          "predicate": "internet-exposure",
+          "value": "unknown",
+          "reason": "silent",
+          "scope": [],
+          "basis": "inferred",
+          "quotes": [],
+          "explanation": "The source states that the registry is reachable from the store estate over the WAN, but does not state that it is reachable from the internet.",
+          "exclusive": false
+        },
+        {
+          "handle": "f18",
+          "subject_kind": "interaction",
+          "subject": "server_pulls_image",
+          "predicate": "transport-encryption",
+          "value": "unknown",
+          "reason": "silent",
+          "scope": [],
+          "basis": "inferred",
+          "quotes": [],
+          "explanation": "The source identifies the WAN path but does not state whether the interaction is encrypted.",
+          "exclusive": false
+        },
+        {
+          "handle": "f19",
+          "subject_kind": "interaction",
+          "subject": "server_asks_controller",
+          "predicate": "transport-encryption",
+          "value": "unknown",
+          "reason": "silent",
+          "scope": [],
+          "basis": "inferred",
+          "quotes": [],
+          "explanation": "The source identifies the retail WAN context but does not state whether this interaction is encrypted.",
+          "exclusive": false
+        }
+      ],
+      "unresolved": [
+        {
+          "handle": "u1",
+          "question": "What does a store server present to the image registry when it pulls an image?",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "nobody has written down what a store server presents to it"
+            }
+          ]
+        },
+        {
+          "handle": "u2",
+          "question": "What does a store server present to the deploy controller when it asks for the current release?",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "or what it presents to the controller"
+            }
+          ]
+        },
+        {
+          "handle": "u3",
+          "question": "Does the git server encrypt what it stores?",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Nobody has documented whether the git server encrypts what it stores"
+            }
+          ]
+        },
+        {
+          "handle": "u4",
+          "question": "Does the image registry encrypt what it stores?",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "or whether the image registry does"
+            }
+          ]
+        }
+      ]
+    },
+    "bundle_dispositions": [
+      {
+        "handle": "git_server",
+        "kind": "mention",
+        "disposition": "rejected",
+        "target": "",
+        "code": "unlocatable-quote",
+        "message": "source 'System description' does not hold 'their self-hosted git server'"
+      },
+      {
+        "handle": "corporate_network",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "boundary:corporate-network",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "build_environment",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "boundary:build-environment",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "store_estate",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "boundary:store-estate",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "retail_wan",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "boundary:retail-wan",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "internet",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "boundary:internet",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "back_office",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "boundary:back-office",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "store_server",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "process:store-server",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "till_software",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "unplaced",
+        "message": "no source places 'till software', and the bundle names 6 zones, so the graph's required trust_zone would be a choice nobody stated"
+      },
+      {
+        "handle": "build_runner",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "process:build-runner",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "container_image",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "unplaced",
+        "message": "no source places 'container image', and the bundle names 6 zones, so the graph's required trust_zone would be a choice nobody stated"
+      },
+      {
+        "handle": "image_registry",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "store:image-registry",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "deploy_controller",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "process:deploy-controller",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "public_package_registry",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "unplaced",
+        "message": "no source places 'public package registry', and the bundle names 6 zones, so the graph's required trust_zone would be a choice nobody stated"
+      },
+      {
+        "handle": "dependency_lockfile",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "unplaced",
+        "message": "no source places 'dependency lockfile', and the bundle names 6 zones, so the graph's required trust_zone would be a choice nobody stated"
+      },
+      {
+        "handle": "runner_fetches_source",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "receiver 'git_server' names no placed component of this bundle"
+      },
+      {
+        "handle": "runner_pushes_image",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:process:build-runner>store:image-registry>pushes-the-finished-image",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "runner_calls_controller",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:process:build-runner>process:deploy-controller>calls-the-deploy-controller",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "server_asks_controller",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:process:store-server>process:deploy-controller>asks-the-deploy-controller",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "server_pulls_image",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:process:store-server>store:image-registry>pulls-that-image",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "runner_reaches_registry",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "receiver 'public_package_registry' names no placed component of this bundle"
+      },
+      {
+        "handle": "f1",
+        "kind": "fact",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-subject",
+        "message": "subject 'git_server' names no mention this bundle built"
+      },
+      {
+        "handle": "f6",
+        "kind": "fact",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "unplaced-subject",
+        "message": "the sources state this about 'public_package_registry', and the graph holds no zone to place that component in"
+      },
+      {
+        "handle": "f12",
+        "kind": "fact",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-subject",
+        "message": "subject 'git_server' names no mention this bundle built"
+      },
+      {
+        "handle": "f13",
+        "kind": "fact",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-subject",
+        "message": "subject 'runner_reaches_registry' names no interaction this bundle built"
+      },
+      {
+        "handle": "f2",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "process:build-runner",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f3",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "store:image-registry",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f4",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "process:deploy-controller",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f5",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "process:store-server",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f7",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "shared build token",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f8",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "shared build token",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f9",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "flow:process:build-runner>process:deploy-controller>calls-the-deploy-controller",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f10",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "flow:process:build-runner>process:deploy-controller>calls-the-deploy-controller",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f11",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "store:image-registry",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f14",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "flow:process:store-server>store:image-registry>pulls-that-image",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f15",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "flow:process:store-server>process:deploy-controller>asks-the-deploy-controller",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f16",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "developers",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f17",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "store:image-registry",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f18",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "flow:process:store-server>store:image-registry>pulls-that-image",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f19",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "flow:process:store-server>process:deploy-controller>asks-the-deploy-controller",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "u1",
+        "kind": "unresolved",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "open-question",
+        "message": "What does a store server present to the image registry when it pulls an image?"
+      },
+      {
+        "handle": "u2",
+        "kind": "unresolved",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "open-question",
+        "message": "What does a store server present to the deploy controller when it asks for the current release?"
+      },
+      {
+        "handle": "u3",
+        "kind": "unresolved",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "open-question",
+        "message": "Does the git server encrypt what it stores?"
+      },
+      {
+        "handle": "u4",
+        "kind": "unresolved",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "open-question",
+        "message": "Does the image registry encrypt what it stores?"
+      }
+    ],
+    "extracted_model": {
+      "external_entities": [],
+      "processes": [
+        {
+          "id": "process:store-server",
+          "name": "store server",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Each store has a small server in the back office",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:back-office",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:build-runner",
+          "name": "build runner",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The build runner picks the merge up",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:build-environment",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:deploy-controller",
+          "name": "deploy controller",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "the runner calls the deploy controller",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:corporate-network",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        }
+      ],
+      "data_stores": [
+        {
+          "id": "store:image-registry",
+          "name": "image registry",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "to our image registry",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:build-environment",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        }
+      ],
+      "data_flows": [
+        {
+          "id": "flow:process:build-runner>store:image-registry>pushes-the-finished-image",
+          "name": "pushes the finished image",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "It pushes the finished image to our image registry",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:build-runner",
+          "destination": "store:image-registry",
+          "protocol": "unspecified",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        },
+        {
+          "id": "flow:process:build-runner>process:deploy-controller>calls-the-deploy-controller",
+          "name": "calls the deploy controller",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "the runner calls the deploy controller",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:build-runner",
+          "destination": "process:deploy-controller",
+          "protocol": "unspecified",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "read-write"
+        },
+        {
+          "id": "flow:process:store-server>process:deploy-controller>asks-the-deploy-controller",
+          "name": "asks the deploy controller",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Every store server asks the deploy controller once a minute what the current release is",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:store-server",
+          "destination": "process:deploy-controller",
+          "protocol": "unspecified",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "read"
+        },
+        {
+          "id": "flow:process:store-server>store:image-registry>pulls-that-image",
+          "name": "pulls that image",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "it pulls that image from the registry",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:store-server",
+          "destination": "store:image-registry",
+          "protocol": "unspecified",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "read"
+        }
+      ],
+      "trust_boundaries": [
+        {
+          "id": "boundary:corporate-network",
+          "name": "corporate network",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "which sits on the corporate network",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        },
+        {
+          "id": "boundary:build-environment",
+          "name": "build environment",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "its own build environment",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        },
+        {
+          "id": "boundary:store-estate",
+          "name": "store estate",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "from the store estate over the WAN",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        },
+        {
+          "id": "boundary:retail-wan",
+          "name": "retail WAN",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "over the retail WAN",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        },
+        {
+          "id": "boundary:internet",
+          "name": "internet",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "on the internet",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        },
+        {
+          "id": "boundary:back-office",
+          "name": "back office",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "in the back office",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        }
+      ],
+      "assumptions": []
+    },
+    "valid_model": {
+      "external_entities": [],
+      "processes": [
+        {
+          "id": "process:store-server",
+          "name": "store server",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Each store has a small server in the back office",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:back-office",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:build-runner",
+          "name": "build runner",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The build runner picks the merge up",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:build-environment",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:deploy-controller",
+          "name": "deploy controller",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "the runner calls the deploy controller",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:corporate-network",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        }
+      ],
+      "data_stores": [
+        {
+          "id": "store:image-registry",
+          "name": "image registry",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "to our image registry",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:build-environment",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        }
+      ],
+      "data_flows": [
+        {
+          "id": "flow:process:build-runner>store:image-registry>pushes-the-finished-image",
+          "name": "pushes the finished image",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "It pushes the finished image to our image registry",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:build-runner",
+          "destination": "store:image-registry",
+          "protocol": "unspecified",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        },
+        {
+          "id": "flow:process:build-runner>process:deploy-controller>calls-the-deploy-controller",
+          "name": "calls the deploy controller",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "the runner calls the deploy controller",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:build-runner",
+          "destination": "process:deploy-controller",
+          "protocol": "unspecified",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "read-write"
+        },
+        {
+          "id": "flow:process:store-server>process:deploy-controller>asks-the-deploy-controller",
+          "name": "asks the deploy controller",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Every store server asks the deploy controller once a minute what the current release is",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:store-server",
+          "destination": "process:deploy-controller",
+          "protocol": "unspecified",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "read"
+        },
+        {
+          "id": "flow:process:store-server>store:image-registry>pulls-that-image",
+          "name": "pulls that image",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "it pulls that image from the registry",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:store-server",
+          "destination": "store:image-registry",
+          "protocol": "unspecified",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "read"
+        }
+      ],
+      "trust_boundaries": [
+        {
+          "id": "boundary:corporate-network",
+          "name": "corporate network",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "which sits on the corporate network",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        },
+        {
+          "id": "boundary:build-environment",
+          "name": "build environment",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "its own build environment",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        },
+        {
+          "id": "boundary:store-estate",
+          "name": "store estate",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "from the store estate over the WAN",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        },
+        {
+          "id": "boundary:retail-wan",
+          "name": "retail WAN",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "over the retail WAN",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        },
+        {
+          "id": "boundary:internet",
+          "name": "internet",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "on the internet",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        },
+        {
+          "id": "boundary:back-office",
+          "name": "back office",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "in the back office",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        }
+      ],
+      "assumptions": []
+    }
+  }
+}

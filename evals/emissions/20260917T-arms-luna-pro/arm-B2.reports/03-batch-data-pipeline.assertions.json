@@ -1,0 +1,1191 @@
+{
+  "proposal": {
+    "assertions": [
+      {
+        "subject_type": "component",
+        "subject": "process:airflow-scheduler",
+        "predicate": "network-membership",
+        "value": "boundary:landing-network",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "An Airflow scheduler running in the landing network"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "process:spark-transform-job",
+        "predicate": "network-membership",
+        "value": "boundary:warehouse-network",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "a Spark transform job in the warehouse network"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "principal",
+        "subject": "insurance partners",
+        "predicate": "credential-presented",
+        "value": "partner keys",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Each partner has a static key we issued when they onboarded"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "credential",
+        "subject": "partner keys",
+        "predicate": "credential-sharing",
+        "value": "per-principal",
+        "reason": null,
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Each partner has a static key"
+          }
+        ],
+        "explanation": "The source says each partner has a key, indicating the keys are held per partner rather than shared across the partners.",
+        "exclusive": false
+      },
+      {
+        "subject_type": "credential",
+        "subject": "partner keys",
+        "predicate": "credential-rotation",
+        "value": "not-rotated",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "the keys have not changed since"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "credential",
+        "subject": "partner keys",
+        "predicate": "credential-custody",
+        "value": "m8",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Airflow keeps its connection strings and the partner keys in its own metadata database"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "principal",
+        "subject": "Analysts",
+        "predicate": "authorization-grant",
+        "value": "dataset-wide",
+        "reason": null,
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "dataset"
+          },
+          {
+            "kind": "operation",
+            "value": "query"
+          }
+        ],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "the grant is dataset-wide"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      }
+    ]
+  },
+  "catalog": {
+    "registry_version": 3,
+    "subjects": [
+      {
+        "id": "boundary:landing-network",
+        "type": "zone",
+        "label": "landing network"
+      },
+      {
+        "id": "boundary:warehouse-network",
+        "type": "zone",
+        "label": "warehouse network"
+      },
+      {
+        "id": "credential:partner-keys",
+        "type": "credential",
+        "label": "partner keys"
+      },
+      {
+        "id": "principal:analysts",
+        "type": "principal",
+        "label": "Analysts"
+      },
+      {
+        "id": "principal:insurance-partners",
+        "type": "principal",
+        "label": "insurance partners"
+      },
+      {
+        "id": "process:airflow-scheduler",
+        "type": "component",
+        "label": "Airflow scheduler"
+      },
+      {
+        "id": "process:spark-transform-job",
+        "type": "component",
+        "label": "Spark transform job"
+      }
+    ],
+    "entries": [
+      {
+        "subject": "process:airflow-scheduler",
+        "predicate": "network-membership",
+        "value": "boundary:landing-network",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "df7757178c394258cbcf1643e81fca5b01f324058a0841824f008e74346da2d0",
+            "start": 303,
+            "end": 354,
+            "quote": "An Airflow scheduler running in the landing network"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "process:spark-transform-job",
+        "predicate": "network-membership",
+        "value": "boundary:warehouse-network",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "df7757178c394258cbcf1643e81fca5b01f324058a0841824f008e74346da2d0",
+            "start": 626,
+            "end": 673,
+            "quote": "a Spark transform job in the warehouse network"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "principal:insurance-partners",
+        "predicate": "credential-presented",
+        "value": "credential:partner-keys",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "df7757178c394258cbcf1643e81fca5b01f324058a0841824f008e74346da2d0",
+            "start": 135,
+            "end": 195,
+            "quote": "Each partner has a static key we issued when they onboarded"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "credential:partner-keys",
+        "predicate": "credential-sharing",
+        "value": "per-principal",
+        "scope": [],
+        "basis": "inferred",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "df7757178c394258cbcf1643e81fca5b01f324058a0841824f008e74346da2d0",
+            "start": 135,
+            "end": 164,
+            "quote": "Each partner has a static key"
+          }
+        ],
+        "premises": [],
+        "explanation": "The source says each partner has a key, indicating the keys are held per partner rather than shared across the partners.",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "credential:partner-keys",
+        "predicate": "credential-rotation",
+        "value": "not-rotated",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "df7757178c394258cbcf1643e81fca5b01f324058a0841824f008e74346da2d0",
+            "start": 196,
+            "end": 228,
+            "quote": "the keys have not changed since"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "credential:partner-keys",
+        "predicate": "credential-custody",
+        "value": "m8",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "df7757178c394258cbcf1643e81fca5b01f324058a0841824f008e74346da2d0",
+            "start": 500,
+            "end": 587,
+            "quote": "Airflow keeps its connection strings and the partner keys in its own metadata database"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "principal:analysts",
+        "predicate": "authorization-grant",
+        "value": "dataset-wide",
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "dataset"
+          },
+          {
+            "kind": "operation",
+            "value": "query"
+          }
+        ],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "df7757178c394258cbcf1643e81fca5b01f324058a0841824f008e74346da2d0",
+            "start": 900,
+            "end": 925,
+            "quote": "the grant is dataset-wide"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      }
+    ]
+  },
+  "issues": [],
+  "projection": [
+    {
+      "element_id": "process:airflow-scheduler",
+      "attribute": "trust_zone",
+      "value": "boundary:landing-network",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~process:airflow-scheduler~any~boundary:landing-network"
+      ]
+    },
+    {
+      "element_id": "process:spark-transform-job",
+      "attribute": "trust_zone",
+      "value": "boundary:warehouse-network",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~process:spark-transform-job~any~boundary:warehouse-network"
+      ]
+    }
+  ],
+  "stages": {
+    "source_facts": {
+      "mentions": [
+        {
+          "handle": "m1",
+          "text": "insurance partners",
+          "roles": [
+            "external-system"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Three insurance partners"
+            }
+          ]
+        },
+        {
+          "handle": "m2",
+          "text": "landing bucket",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "a landing bucket"
+            }
+          ]
+        },
+        {
+          "handle": "m3",
+          "text": "Airflow scheduler",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "An Airflow scheduler"
+            }
+          ]
+        },
+        {
+          "handle": "m4",
+          "text": "landing network",
+          "roles": [
+            "network-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "running in the landing network"
+            }
+          ]
+        },
+        {
+          "handle": "m5",
+          "text": "Spark transform job",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "a Spark transform job in the warehouse network"
+            }
+          ]
+        },
+        {
+          "handle": "m6",
+          "text": "warehouse network",
+          "roles": [
+            "network-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "in the warehouse network"
+            }
+          ]
+        },
+        {
+          "handle": "m7",
+          "text": "BigQuery",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "loads them into BigQuery"
+            }
+          ]
+        },
+        {
+          "handle": "m8",
+          "text": "Airflow metadata database",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Airflow keeps its connection strings and the partner keys in its own metadata database"
+            }
+          ]
+        },
+        {
+          "handle": "m9",
+          "text": "warehouse",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Analysts query the warehouse directly"
+            }
+          ]
+        },
+        {
+          "handle": "m10",
+          "text": "Analysts",
+          "roles": [
+            "person"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Analysts query"
+            }
+          ]
+        }
+      ],
+      "interactions": [
+        {
+          "handle": "i1",
+          "initiator": "m1",
+          "receiver": "m2",
+          "action": "push files",
+          "protocol": "SFTP",
+          "operations": "write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "They push files into a\nlanding bucket over SFTP"
+            }
+          ]
+        },
+        {
+          "handle": "i2",
+          "initiator": "m3",
+          "receiver": "m2",
+          "action": "list bucket",
+          "protocol": "",
+          "operations": "read",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "lists the bucket"
+            }
+          ]
+        },
+        {
+          "handle": "i3",
+          "initiator": "m3",
+          "receiver": "m2",
+          "action": "read files",
+          "protocol": "",
+          "operations": "read",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "reads whatever is there"
+            }
+          ]
+        },
+        {
+          "handle": "i4",
+          "initiator": "m3",
+          "receiver": "m5",
+          "action": "triggers transform job",
+          "protocol": "",
+          "operations": "unknown",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "the scheduler triggers a Spark transform job"
+            }
+          ]
+        },
+        {
+          "handle": "i5",
+          "initiator": "m5",
+          "receiver": "m7",
+          "action": "loads records",
+          "protocol": "",
+          "operations": "write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "loads them into BigQuery"
+            }
+          ]
+        },
+        {
+          "handle": "i6",
+          "initiator": "m10",
+          "receiver": "m9",
+          "action": "query warehouse",
+          "protocol": "",
+          "operations": "read",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Analysts query the warehouse directly"
+            }
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "handle": "f1",
+          "subject_kind": "mention",
+          "subject": "m3",
+          "predicate": "network-membership",
+          "value": "m4",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "An Airflow scheduler running in the landing network"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f2",
+          "subject_kind": "mention",
+          "subject": "m5",
+          "predicate": "network-membership",
+          "value": "m6",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "a Spark transform job in the warehouse network"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f3",
+          "subject_kind": "interaction",
+          "subject": "i1",
+          "predicate": "authentication-mechanism",
+          "value": "static key",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Each partner has a static key we issued when they onboarded"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f4",
+          "subject_kind": "interaction",
+          "subject": "i1",
+          "predicate": "credential-presented",
+          "value": "partner keys",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Each partner has a static key we issued when they onboarded"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f5",
+          "subject_kind": "principal",
+          "subject": "insurance partners",
+          "predicate": "credential-presented",
+          "value": "partner keys",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Each partner has a static key we issued when they onboarded"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f6",
+          "subject_kind": "credential",
+          "subject": "partner keys",
+          "predicate": "credential-sharing",
+          "value": "per-principal",
+          "scope": [],
+          "basis": "inferred",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Each partner has a static key"
+            }
+          ],
+          "explanation": "The source says each partner has a key, indicating the keys are held per partner rather than shared across the partners.",
+          "exclusive": false
+        },
+        {
+          "handle": "f7",
+          "subject_kind": "credential",
+          "subject": "partner keys",
+          "predicate": "credential-rotation",
+          "value": "not-rotated",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "the keys have not changed since"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f8",
+          "subject_kind": "credential",
+          "subject": "partner keys",
+          "predicate": "credential-custody",
+          "value": "m8",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Airflow keeps its connection strings and the partner keys in its own metadata database"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f9",
+          "subject_kind": "interaction",
+          "subject": "i6",
+          "predicate": "authentication-mechanism",
+          "value": "SSO",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "They are on the warehouse network and authenticate with SSO"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f10",
+          "subject_kind": "principal",
+          "subject": "Analysts",
+          "predicate": "authorization-grant",
+          "value": "dataset-wide",
+          "scope": [
+            {
+              "kind": "resource",
+              "value": "dataset"
+            },
+            {
+              "kind": "operation",
+              "value": "query"
+            }
+          ],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "the grant is dataset-wide"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f11",
+          "subject_kind": "mention",
+          "subject": "m2",
+          "predicate": "storage-encryption",
+          "value": "unknown",
+          "reason": "hedged",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f12",
+          "subject_kind": "mention",
+          "subject": "m8",
+          "predicate": "storage-encryption",
+          "value": "unknown",
+          "reason": "hedged",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "",
+          "exclusive": false
+        }
+      ],
+      "unresolved": [
+        {
+          "handle": "u1",
+          "question": "Are BigQuery and the warehouse the same data store?",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "loads them into BigQuery. Nothing validates the row contents beyond the schema.\n\nAnalysts query the warehouse directly"
+            }
+          ]
+        }
+      ]
+    },
+    "bundle_dispositions": [
+      {
+        "handle": "m4",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "boundary:landing-network",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m6",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "boundary:warehouse-network",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m1",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "unplaced",
+        "message": "no source places 'insurance partners', and the bundle names 2 zones, so the graph's required trust_zone would be a choice nobody stated"
+      },
+      {
+        "handle": "m2",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "unplaced",
+        "message": "no source places 'landing bucket', and the bundle names 2 zones, so the graph's required trust_zone would be a choice nobody stated"
+      },
+      {
+        "handle": "m3",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "process:airflow-scheduler",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m5",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "process:spark-transform-job",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m7",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "unplaced",
+        "message": "no source places 'BigQuery', and the bundle names 2 zones, so the graph's required trust_zone would be a choice nobody stated"
+      },
+      {
+        "handle": "m8",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "unplaced",
+        "message": "no source places 'Airflow metadata database', and the bundle names 2 zones, so the graph's required trust_zone would be a choice nobody stated"
+      },
+      {
+        "handle": "m9",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "unplaced",
+        "message": "no source places 'warehouse', and the bundle names 2 zones, so the graph's required trust_zone would be a choice nobody stated"
+      },
+      {
+        "handle": "m10",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "unplaced",
+        "message": "no source places 'Analysts', and the bundle names 2 zones, so the graph's required trust_zone would be a choice nobody stated"
+      },
+      {
+        "handle": "i1",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "initiator 'm1' names no placed component of this bundle"
+      },
+      {
+        "handle": "i2",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "receiver 'm2' names no placed component of this bundle"
+      },
+      {
+        "handle": "i3",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "receiver 'm2' names no placed component of this bundle"
+      },
+      {
+        "handle": "i4",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:process:airflow-scheduler>process:spark-transform-job>triggers-transform-job",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "i5",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "receiver 'm7' names no placed component of this bundle"
+      },
+      {
+        "handle": "i6",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "initiator 'm10' names no placed component of this bundle"
+      },
+      {
+        "handle": "f3",
+        "kind": "fact",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-subject",
+        "message": "subject 'i1' names no interaction this bundle built"
+      },
+      {
+        "handle": "f4",
+        "kind": "fact",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-subject",
+        "message": "subject 'i1' names no interaction this bundle built"
+      },
+      {
+        "handle": "f9",
+        "kind": "fact",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-subject",
+        "message": "subject 'i6' names no interaction this bundle built"
+      },
+      {
+        "handle": "f11",
+        "kind": "fact",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "unplaced-subject",
+        "message": "the sources state this about 'm2', and the graph holds no zone to place that component in"
+      },
+      {
+        "handle": "f12",
+        "kind": "fact",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "unplaced-subject",
+        "message": "the sources state this about 'm8', and the graph holds no zone to place that component in"
+      },
+      {
+        "handle": "f1",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "process:airflow-scheduler",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f2",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "process:spark-transform-job",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f5",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "insurance partners",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f6",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "partner keys",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f7",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "partner keys",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f8",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "partner keys",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f10",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "Analysts",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "u1",
+        "kind": "unresolved",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "open-question",
+        "message": "Are BigQuery and the warehouse the same data store?"
+      }
+    ],
+    "extracted_model": {
+      "external_entities": [],
+      "processes": [
+        {
+          "id": "process:airflow-scheduler",
+          "name": "Airflow scheduler",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "An Airflow scheduler",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:landing-network",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:spark-transform-job",
+          "name": "Spark transform job",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "a Spark transform job in the warehouse network",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:warehouse-network",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        }
+      ],
+      "data_stores": [],
+      "data_flows": [
+        {
+          "id": "flow:process:airflow-scheduler>process:spark-transform-job>triggers-transform-job",
+          "name": "triggers transform job",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "the scheduler triggers a Spark transform job",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:airflow-scheduler",
+          "destination": "process:spark-transform-job",
+          "protocol": "",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "unknown"
+        }
+      ],
+      "trust_boundaries": [
+        {
+          "id": "boundary:landing-network",
+          "name": "landing network",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "running in the landing network",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        },
+        {
+          "id": "boundary:warehouse-network",
+          "name": "warehouse network",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "in the warehouse network",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        }
+      ],
+      "assumptions": []
+    },
+    "valid_model": {
+      "external_entities": [],
+      "processes": [
+        {
+          "id": "process:airflow-scheduler",
+          "name": "Airflow scheduler",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "An Airflow scheduler",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:landing-network",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:spark-transform-job",
+          "name": "Spark transform job",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "a Spark transform job in the warehouse network",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:warehouse-network",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        }
+      ],
+      "data_stores": [],
+      "data_flows": [
+        {
+          "id": "flow:process:airflow-scheduler>process:spark-transform-job>triggers-transform-job",
+          "name": "triggers transform job",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "the scheduler triggers a Spark transform job",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:airflow-scheduler",
+          "destination": "process:spark-transform-job",
+          "protocol": "",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "unknown"
+        }
+      ],
+      "trust_boundaries": [
+        {
+          "id": "boundary:landing-network",
+          "name": "landing network",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "running in the landing network",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        },
+        {
+          "id": "boundary:warehouse-network",
+          "name": "warehouse network",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "in the warehouse network",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        }
+      ],
+      "assumptions": []
+    }
+  }
+}

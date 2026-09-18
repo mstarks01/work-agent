@@ -1,0 +1,1447 @@
+{
+  "proposal": {
+    "assertions": [
+      {
+        "subject_type": "component",
+        "subject": "process:dispatch-api",
+        "predicate": "network-membership",
+        "value": "boundary:production-control-plane",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The dispatch API runs in the production control plane."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "process:schedule-importer",
+        "predicate": "network-membership",
+        "value": "boundary:corporate-network",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Our schedule importer runs on the corporate network."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "process:dispatch-api",
+        "predicate": "internet-exposure",
+        "value": "internal",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The control plane is not reachable from the internet."
+          }
+        ],
+        "explanation": "The dispatch API is stated to run in the control plane, which is not reachable from the internet.",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:process:schedule-importer>process:dispatch-api>posts-work-orders",
+        "predicate": "credential-presented",
+        "value": "API token",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "It presents an API token."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "credential",
+        "subject": "API token",
+        "predicate": "credential-rotation",
+        "value": "not-rotated",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "That token was issued when the importer was built and nobody has rotated it since."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "principal",
+        "subject": "an account there",
+        "predicate": "authorization-grant",
+        "value": "move a crew",
+        "reason": null,
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "a crew"
+          },
+          {
+            "kind": "operation",
+            "value": "move"
+          }
+        ],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "an account there can move a crew"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "principal",
+        "subject": "an account there",
+        "predicate": "authorization-grant",
+        "value": "change depot work",
+        "reason": null,
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "the work a depot does that day"
+          },
+          {
+            "kind": "operation",
+            "value": "change"
+          }
+        ],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "it can change the work a depot does that day"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      }
+    ]
+  },
+  "catalog": {
+    "registry_version": 3,
+    "subjects": [
+      {
+        "id": "boundary:corporate-network",
+        "type": "zone",
+        "label": "corporate network"
+      },
+      {
+        "id": "boundary:production-control-plane",
+        "type": "zone",
+        "label": "production control plane"
+      },
+      {
+        "id": "credential:api-token",
+        "type": "credential",
+        "label": "API token"
+      },
+      {
+        "id": "flow:process:schedule-importer>process:dispatch-api>posts-work-orders",
+        "type": "interaction",
+        "label": "posts work orders"
+      },
+      {
+        "id": "principal:an-account-there",
+        "type": "principal",
+        "label": "an account there"
+      },
+      {
+        "id": "process:dispatch-api",
+        "type": "component",
+        "label": "dispatch API"
+      },
+      {
+        "id": "process:schedule-importer",
+        "type": "component",
+        "label": "schedule importer"
+      }
+    ],
+    "entries": [
+      {
+        "subject": "process:dispatch-api",
+        "predicate": "network-membership",
+        "value": "boundary:production-control-plane",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
+            "start": 409,
+            "end": 463,
+            "quote": "The dispatch API runs in the production control plane."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "process:schedule-importer",
+        "predicate": "network-membership",
+        "value": "boundary:corporate-network",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
+            "start": 1628,
+            "end": 1680,
+            "quote": "Our schedule importer runs on the corporate network."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "process:dispatch-api",
+        "predicate": "internet-exposure",
+        "value": "internal",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
+            "start": 700,
+            "end": 753,
+            "quote": "The control plane is not reachable from the internet."
+          }
+        ],
+        "premises": [],
+        "explanation": "The dispatch API is stated to run in the control plane, which is not reachable from the internet.",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:process:schedule-importer>process:dispatch-api>posts-work-orders",
+        "predicate": "credential-presented",
+        "value": "credential:api-token",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
+            "start": 2088,
+            "end": 2113,
+            "quote": "It presents an API token."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "credential:api-token",
+        "predicate": "credential-rotation",
+        "value": "not-rotated",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
+            "start": 2114,
+            "end": 2196,
+            "quote": "That token was issued when the importer was built and nobody has rotated it since."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "principal:an-account-there",
+        "predicate": "authorization-grant",
+        "value": "move a crew",
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "a crew"
+          },
+          {
+            "kind": "operation",
+            "value": "move"
+          }
+        ],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
+            "start": 569,
+            "end": 602,
+            "quote": "an account there can move a crew"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "principal:an-account-there",
+        "predicate": "authorization-grant",
+        "value": "change depot work",
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "the work a depot does that day"
+          },
+          {
+            "kind": "operation",
+            "value": "change"
+          }
+        ],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
+            "start": 607,
+            "end": 652,
+            "quote": "it can change the work a depot does that day"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      }
+    ]
+  },
+  "issues": [],
+  "projection": [
+    {
+      "element_id": "flow:process:schedule-importer>process:dispatch-api>posts-work-orders",
+      "attribute": "authentication",
+      "value": "API token",
+      "reason": "stated",
+      "rows": [
+        "assertion:credential-presented~flow:process:schedule-importer>process:dispatch-api>posts-work-orders~any~credential:api-token"
+      ]
+    },
+    {
+      "element_id": "process:dispatch-api",
+      "attribute": "exposure",
+      "value": "internal",
+      "reason": "stated",
+      "rows": [
+        "assertion:internet-exposure~process:dispatch-api~any~internal"
+      ]
+    },
+    {
+      "element_id": "process:dispatch-api",
+      "attribute": "trust_zone",
+      "value": "boundary:production-control-plane",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~process:dispatch-api~any~boundary:production-control-plane"
+      ]
+    },
+    {
+      "element_id": "process:schedule-importer",
+      "attribute": "trust_zone",
+      "value": "boundary:corporate-network",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~process:schedule-importer~any~boundary:corporate-network"
+      ]
+    }
+  ],
+  "stages": {
+    "source_facts": {
+      "mentions": [
+        {
+          "handle": "m1",
+          "text": "dispatch console",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "They open the dispatch console in their browser."
+            }
+          ]
+        },
+        {
+          "handle": "m2",
+          "text": "corporate web host",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "our corporate web host serves it"
+            }
+          ]
+        },
+        {
+          "handle": "m3",
+          "text": "dispatch API",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The console calls the dispatch API."
+            }
+          ]
+        },
+        {
+          "handle": "m4",
+          "text": "production control plane",
+          "roles": [
+            "privilege-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The dispatch API runs in the production control plane."
+            }
+          ]
+        },
+        {
+          "handle": "m5",
+          "text": "corporate laptop",
+          "roles": [
+            "other-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "A corporate laptop holds none of those rights."
+            }
+          ]
+        },
+        {
+          "handle": "m6",
+          "text": "dispatch database",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The dispatch API reads and writes the dispatch database."
+            }
+          ]
+        },
+        {
+          "handle": "m7",
+          "text": "corporate network",
+          "roles": [
+            "network-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Duty engineers sit on the corporate network."
+            }
+          ]
+        },
+        {
+          "handle": "m8",
+          "text": "schedule importer",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Our schedule importer runs on the corporate network."
+            }
+          ]
+        },
+        {
+          "handle": "m9",
+          "text": "schedule archive",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "the schedule archive, a folder on the corporate file store"
+            }
+          ]
+        },
+        {
+          "handle": "m10",
+          "text": "corporate file store",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "a folder on the corporate file store"
+            }
+          ]
+        },
+        {
+          "handle": "m11",
+          "text": "scheduling partner",
+          "roles": [
+            "external-system",
+            "tenant-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "A scheduling partner, which is another company"
+            }
+          ]
+        }
+      ],
+      "interactions": [
+        {
+          "handle": "i1",
+          "initiator": "m1",
+          "receiver": "m3",
+          "action": "calls API",
+          "protocol": "HTTP",
+          "operations": "unknown",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The console calls the dispatch API."
+            }
+          ]
+        },
+        {
+          "handle": "i2",
+          "initiator": "m1",
+          "receiver": "m3",
+          "action": "opens WebSocket",
+          "protocol": "WebSocket",
+          "operations": "read",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The console also opens a WebSocket to the dispatch API and holds it open for live job status."
+            }
+          ]
+        },
+        {
+          "handle": "i3",
+          "initiator": "m3",
+          "receiver": "m6",
+          "action": "reads and writes",
+          "protocol": "unknown",
+          "operations": "read-write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The dispatch API reads and writes the dispatch database."
+            }
+          ]
+        },
+        {
+          "handle": "i4",
+          "initiator": "m11",
+          "receiver": "m8",
+          "action": "publishes planned work",
+          "protocol": "SOAP",
+          "operations": "write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "A scheduling partner, which is another company, publishes tomorrow's planned work."
+            }
+          ]
+        },
+        {
+          "handle": "i5",
+          "initiator": "m8",
+          "receiver": "m11",
+          "action": "pulls SOAP feed",
+          "protocol": "HTTPS",
+          "operations": "read",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Every hour it pulls the partner's SOAP feed over HTTPS"
+            }
+          ]
+        },
+        {
+          "handle": "i6",
+          "initiator": "m8",
+          "receiver": "m9",
+          "action": "writes document",
+          "protocol": "unknown",
+          "operations": "write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "It writes each document it downloads into the schedule archive"
+            }
+          ]
+        },
+        {
+          "handle": "i7",
+          "initiator": "m8",
+          "receiver": "m3",
+          "action": "posts work orders",
+          "protocol": "API",
+          "operations": "write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The importer then posts the parsed work orders to the same dispatch API the console calls."
+            }
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "handle": "f1",
+          "subject_kind": "mention",
+          "subject": "m3",
+          "predicate": "network-membership",
+          "value": "m4",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The dispatch API runs in the production control plane."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f2",
+          "subject_kind": "mention",
+          "subject": "m8",
+          "predicate": "network-membership",
+          "value": "m7",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Our schedule importer runs on the corporate network."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f3",
+          "subject_kind": "mention",
+          "subject": "m3",
+          "predicate": "internet-exposure",
+          "value": "internal",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The control plane is not reachable from the internet."
+            }
+          ],
+          "explanation": "The dispatch API is stated to run in the control plane, which is not reachable from the internet.",
+          "exclusive": false
+        },
+        {
+          "handle": "f4",
+          "subject_kind": "mention",
+          "subject": "m6",
+          "predicate": "storage-encryption",
+          "value": "unknown",
+          "reason": "silent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "The source does not state how the database is protected at rest.",
+          "exclusive": false
+        },
+        {
+          "handle": "f5",
+          "subject_kind": "interaction",
+          "subject": "i1",
+          "predicate": "authentication-mechanism",
+          "value": "unknown",
+          "reason": "silent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "The source does not state how the console authenticates to the API.",
+          "exclusive": false
+        },
+        {
+          "handle": "f6",
+          "subject_kind": "interaction",
+          "subject": "i2",
+          "predicate": "transport-encryption",
+          "value": "unknown",
+          "reason": "hedged",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "The source explicitly leaves open whether the WebSocket runs over TLS.",
+          "exclusive": false
+        },
+        {
+          "handle": "f7",
+          "subject_kind": "interaction",
+          "subject": "i2",
+          "predicate": "authentication-mechanism",
+          "value": "unknown",
+          "reason": "hedged",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "The source explicitly leaves open whether the WebSocket handshake is authenticated.",
+          "exclusive": false
+        },
+        {
+          "handle": "f8",
+          "subject_kind": "interaction",
+          "subject": "i2",
+          "predicate": "credential-presented",
+          "value": "unknown",
+          "reason": "hedged",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "The source does not say whether the engineer's session is checked again after the socket opens.",
+          "exclusive": false
+        },
+        {
+          "handle": "f9",
+          "subject_kind": "interaction",
+          "subject": "i4",
+          "predicate": "authentication-mechanism",
+          "value": "unknown",
+          "reason": "hedged",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "The source says nothing was written down about how the partner identifies the importer.",
+          "exclusive": false
+        },
+        {
+          "handle": "f10",
+          "subject_kind": "interaction",
+          "subject": "i5",
+          "predicate": "authentication-mechanism",
+          "value": "unknown",
+          "reason": "hedged",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "The source says nothing was written down about how the importer identifies the partner.",
+          "exclusive": false
+        },
+        {
+          "handle": "f11",
+          "subject_kind": "interaction",
+          "subject": "i5",
+          "predicate": "transport-encryption",
+          "value": "HTTPS",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "it pulls the partner's SOAP feed over HTTPS"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f12",
+          "subject_kind": "interaction",
+          "subject": "i7",
+          "predicate": "credential-presented",
+          "value": "API token",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "It presents an API token."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f13",
+          "subject_kind": "credential",
+          "subject": "API token",
+          "predicate": "credential-rotation",
+          "value": "not-rotated",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "That token was issued when the importer was built and nobody has rotated it since."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f14",
+          "subject_kind": "principal",
+          "subject": "an account there",
+          "predicate": "authorization-grant",
+          "value": "move a crew",
+          "scope": [
+            {
+              "kind": "resource",
+              "value": "a crew"
+            },
+            {
+              "kind": "operation",
+              "value": "move"
+            }
+          ],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "an account there can move a crew"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f15",
+          "subject_kind": "principal",
+          "subject": "an account there",
+          "predicate": "authorization-grant",
+          "value": "change depot work",
+          "scope": [
+            {
+              "kind": "resource",
+              "value": "the work a depot does that day"
+            },
+            {
+              "kind": "operation",
+              "value": "change"
+            }
+          ],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "it can change the work a depot does that day"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        }
+      ],
+      "unresolved": [
+        {
+          "handle": "u1",
+          "question": "How does an engineer sign in to the dispatch console?",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Nobody wrote down how an engineer signs in to it."
+            }
+          ]
+        },
+        {
+          "handle": "u2",
+          "question": "Which origins does the dispatch API allow through CORS, and does it allow credentials?",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Whoever configured CORS did not record which origins the API allows, or whether it allows credentials."
+            }
+          ]
+        },
+        {
+          "handle": "u3",
+          "question": "Does the WebSocket run over TLS, authenticate its handshake, or check the engineer's session again after opening?",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Nobody wrote down whether that socket runs over TLS, whether its handshake is authenticated, or whether it checks the engineer's session again after it is open."
+            }
+          ]
+        },
+        {
+          "handle": "u4",
+          "question": "How is the dispatch database protected at rest?",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "How the database is protected at rest is not written down anywhere."
+            }
+          ]
+        },
+        {
+          "handle": "u5",
+          "question": "How does the scheduling partner identify the importer, and how does the importer identify the partner?",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Nothing was written down about how the partner identifies our importer, or how our importer identifies the partner."
+            }
+          ]
+        },
+        {
+          "handle": "u6",
+          "question": "Does each job order carry a token or a session, and what person is behind it?",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Every job order in it carries the token or the session that created it, and nothing about the person behind that token."
+            }
+          ]
+        }
+      ]
+    },
+    "bundle_dispositions": [
+      {
+        "handle": "m4",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "boundary:production-control-plane",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m5",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "boundary:corporate-laptop",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m7",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "boundary:corporate-network",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m11",
+        "kind": "mention",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "competing-roles",
+        "message": "mention 'scheduling partner' reads as external-system, tenant-zone; the bundle settles which, and code does not settle it by position"
+      },
+      {
+        "handle": "m1",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "unplaced",
+        "message": "no source places 'dispatch console', and the bundle names 3 zones, so the graph's required trust_zone would be a choice nobody stated"
+      },
+      {
+        "handle": "m2",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "unplaced",
+        "message": "no source places 'corporate web host', and the bundle names 3 zones, so the graph's required trust_zone would be a choice nobody stated"
+      },
+      {
+        "handle": "m3",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "process:dispatch-api",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m6",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "unplaced",
+        "message": "no source places 'dispatch database', and the bundle names 3 zones, so the graph's required trust_zone would be a choice nobody stated"
+      },
+      {
+        "handle": "m8",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "process:schedule-importer",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m9",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "unplaced",
+        "message": "no source places 'schedule archive', and the bundle names 3 zones, so the graph's required trust_zone would be a choice nobody stated"
+      },
+      {
+        "handle": "m10",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "unplaced",
+        "message": "no source places 'corporate file store', and the bundle names 3 zones, so the graph's required trust_zone would be a choice nobody stated"
+      },
+      {
+        "handle": "i1",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "initiator 'm1' names no placed component of this bundle"
+      },
+      {
+        "handle": "i2",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "initiator 'm1' names no placed component of this bundle"
+      },
+      {
+        "handle": "i3",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "receiver 'm6' names no placed component of this bundle"
+      },
+      {
+        "handle": "i4",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "initiator 'm11' names no placed component of this bundle"
+      },
+      {
+        "handle": "i5",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "receiver 'm11' names no placed component of this bundle"
+      },
+      {
+        "handle": "i6",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "receiver 'm9' names no placed component of this bundle"
+      },
+      {
+        "handle": "i7",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:process:schedule-importer>process:dispatch-api>posts-work-orders",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f4",
+        "kind": "fact",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "unplaced-subject",
+        "message": "the sources state this about 'm6', and the graph holds no zone to place that component in"
+      },
+      {
+        "handle": "f5",
+        "kind": "fact",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-subject",
+        "message": "subject 'i1' names no interaction this bundle built"
+      },
+      {
+        "handle": "f6",
+        "kind": "fact",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-subject",
+        "message": "subject 'i2' names no interaction this bundle built"
+      },
+      {
+        "handle": "f7",
+        "kind": "fact",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-subject",
+        "message": "subject 'i2' names no interaction this bundle built"
+      },
+      {
+        "handle": "f8",
+        "kind": "fact",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-subject",
+        "message": "subject 'i2' names no interaction this bundle built"
+      },
+      {
+        "handle": "f9",
+        "kind": "fact",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-subject",
+        "message": "subject 'i4' names no interaction this bundle built"
+      },
+      {
+        "handle": "f10",
+        "kind": "fact",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-subject",
+        "message": "subject 'i5' names no interaction this bundle built"
+      },
+      {
+        "handle": "f11",
+        "kind": "fact",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-subject",
+        "message": "subject 'i5' names no interaction this bundle built"
+      },
+      {
+        "handle": "f1",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "process:dispatch-api",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f2",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "process:schedule-importer",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f3",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "process:dispatch-api",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f12",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "flow:process:schedule-importer>process:dispatch-api>posts-work-orders",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f13",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "API token",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f14",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "an account there",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f15",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "an account there",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "u1",
+        "kind": "unresolved",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "open-question",
+        "message": "How does an engineer sign in to the dispatch console?"
+      },
+      {
+        "handle": "u2",
+        "kind": "unresolved",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "open-question",
+        "message": "Which origins does the dispatch API allow through CORS, and does it allow credentials?"
+      },
+      {
+        "handle": "u3",
+        "kind": "unresolved",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "open-question",
+        "message": "Does the WebSocket run over TLS, authenticate its handshake, or check the engineer's session again after opening?"
+      },
+      {
+        "handle": "u4",
+        "kind": "unresolved",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "open-question",
+        "message": "How is the dispatch database protected at rest?"
+      },
+      {
+        "handle": "u5",
+        "kind": "unresolved",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "open-question",
+        "message": "How does the scheduling partner identify the importer, and how does the importer identify the partner?"
+      },
+      {
+        "handle": "u6",
+        "kind": "unresolved",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "open-question",
+        "message": "Does each job order carry a token or a session, and what person is behind it?"
+      }
+    ],
+    "extracted_model": {
+      "external_entities": [],
+      "processes": [
+        {
+          "id": "process:dispatch-api",
+          "name": "dispatch API",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The console calls the dispatch API.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:production-control-plane",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:schedule-importer",
+          "name": "schedule importer",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Our schedule importer runs on the corporate network.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:corporate-network",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        }
+      ],
+      "data_stores": [],
+      "data_flows": [
+        {
+          "id": "flow:process:schedule-importer>process:dispatch-api>posts-work-orders",
+          "name": "posts work orders",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The importer then posts the parsed work orders to the same dispatch API the console calls.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:schedule-importer",
+          "destination": "process:dispatch-api",
+          "protocol": "API",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        }
+      ],
+      "trust_boundaries": [
+        {
+          "id": "boundary:production-control-plane",
+          "name": "production control plane",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The dispatch API runs in the production control plane.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "privilege"
+        },
+        {
+          "id": "boundary:corporate-laptop",
+          "name": "corporate laptop",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "A corporate laptop holds none of those rights.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "other"
+        },
+        {
+          "id": "boundary:corporate-network",
+          "name": "corporate network",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Duty engineers sit on the corporate network.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        }
+      ],
+      "assumptions": []
+    },
+    "valid_model": {
+      "external_entities": [],
+      "processes": [
+        {
+          "id": "process:dispatch-api",
+          "name": "dispatch API",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The console calls the dispatch API.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:production-control-plane",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:schedule-importer",
+          "name": "schedule importer",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Our schedule importer runs on the corporate network.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:corporate-network",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        }
+      ],
+      "data_stores": [],
+      "data_flows": [
+        {
+          "id": "flow:process:schedule-importer>process:dispatch-api>posts-work-orders",
+          "name": "posts work orders",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The importer then posts the parsed work orders to the same dispatch API the console calls.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:schedule-importer",
+          "destination": "process:dispatch-api",
+          "protocol": "API",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        }
+      ],
+      "trust_boundaries": [
+        {
+          "id": "boundary:production-control-plane",
+          "name": "production control plane",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The dispatch API runs in the production control plane.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "privilege"
+        },
+        {
+          "id": "boundary:corporate-laptop",
+          "name": "corporate laptop",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "A corporate laptop holds none of those rights.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "other"
+        },
+        {
+          "id": "boundary:corporate-network",
+          "name": "corporate network",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Duty engineers sit on the corporate network.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        }
+      ],
+      "assumptions": []
+    }
+  }
+}

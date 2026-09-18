@@ -27,3 +27,17 @@ arm, and to a replay that runs.
 To add a sweep, copy its artifact and its `.reports/` directory from
 `evals/runs/` unchanged. Do not rewrite a file: the bytes are what the sweep
 wrote, and `evals/harness/archive.py` names the spelling each kind carries.
+
+## What each sweep here is
+
+| Sweep | Mode | What it measures |
+| --- | --- | --- |
+| `20260914T2200Z-extract-*`, `20260914T2205Z-extract-sweep` | extraction | the `extract.md` edit of #925, five runs each side |
+| `20260914T201030Z-assert-model-benchmark` | assertions | three models on the `assert` node, #926 |
+| `20260917T-arms-luna-pro` | heads | #1003's arms A, B and E over 13 cases, one repeat each |
+
+The arms sweep carries three reading routes: `arm-A` reads through `extract`,
+`arm-B2` through `facts`, and `arm-E` through the split `inventory` and `rows`
+calls. `evals/harness/replay.py`'s `ROUTES_OF` places each on its own arm, and
+`run.py bottleneck misses` charges every missed reference row of the three to
+the earliest stage that did not carry it.
