@@ -939,7 +939,7 @@ class TestTheArchivedEmissionsReplay:
 
         assert luna.models == ("openrouter/openai/gpt-5.6-luna",)
         assert terra.models == ("openrouter/openai/gpt-5.6-terra",)
-        assert terra.instruction == luna.instruction
+        assert terra.instructions == luna.instructions
         assert terra != luna
 
     def test_the_spread_is_read_over_the_sweeps_that_ran_every_case(self, corpus):
@@ -953,7 +953,7 @@ class TestTheArchivedEmissionsReplay:
         before = next(
             arm
             for arm in by_arm
-            if arm.instruction.startswith("88f0740b")
+            if any(digest.startswith("88f0740b") for digest in arm.instructions)
             and any("luna" in model for model in arm.models)
         )
 

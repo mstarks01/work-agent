@@ -1,0 +1,1542 @@
+{
+  "artifact_version": 7,
+  "mode": "heads",
+  "cases": [
+    "01-payments-checkout",
+    "02-iot-fleet-telemetry",
+    "03-batch-data-pipeline",
+    "04-ml-inference-service",
+    "05-cookbook-queue-webapp",
+    "06-cookbook-online-game",
+    "07-cicd-store-deploy",
+    "08-sso-identity-broker",
+    "09-cookbook-sokify-retail",
+    "10-cookbook-generic-cms",
+    "11-sparse-shift-scheduling",
+    "12-overclaiming-supplier-portal",
+    "13-dispatch-control-plane"
+  ],
+  "models": {
+    "tiers_config_version": 9,
+    "tiers": {
+      "base": {
+        "vendor": "openrouter",
+        "model": "openai/gpt-5.6-luna-pro",
+        "upstreams": []
+      },
+      "strong": {
+        "vendor": "openrouter",
+        "model": "openai/gpt-5.6-luna-pro",
+        "upstreams": []
+      }
+    }
+  },
+  "gating": "tier-1-structural-only",
+  "certification": {
+    "certified": false,
+    "uncertified_nodes": [
+      {
+        "node": "inventory",
+        "fingerprint": "cbf09f6e8f7a04f00fdbb41559b376103e473e77ea76597c1561fb8df26ef39f"
+      },
+      {
+        "node": "rows",
+        "fingerprint": "cbf09f6e8f7a04f00fdbb41559b376103e473e77ea76597c1561fb8df26ef39f"
+      }
+    ],
+    "unexercised_tiers": []
+  },
+  "provenance": {
+    "identity_version": 2,
+    "build": {
+      "analysis-service": "0.1.0",
+      "google-adk": "2.5.0",
+      "google-genai": "2.11.0",
+      "litellm": "1.97.0"
+    },
+    "sampling_config_version": 5,
+    "tiers_config_version": 9,
+    "sampling": {
+      "base": {
+        "temperature": null,
+        "top_p": null,
+        "seed": null,
+        "max_output_tokens": 16384,
+        "candidate_count": 1,
+        "presence_penalty": null,
+        "frequency_penalty": null,
+        "thinking": null,
+        "constrain_output": true
+      },
+      "strong": {
+        "temperature": null,
+        "top_p": null,
+        "seed": null,
+        "max_output_tokens": 64000,
+        "candidate_count": 1,
+        "presence_penalty": null,
+        "frequency_penalty": null,
+        "thinking": null,
+        "constrain_output": true
+      },
+      "review": {
+        "temperature": null,
+        "top_p": null,
+        "seed": null,
+        "max_output_tokens": 64000,
+        "candidate_count": 1,
+        "presence_penalty": null,
+        "frequency_penalty": null,
+        "thinking": null,
+        "constrain_output": true
+      }
+    },
+    "node_runs": {
+      "inventory": [
+        {
+          "node": "inventory",
+          "tier": "base",
+          "requested_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "served_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "instruction_sha256": "f8168df6ac6c0efa80647a41de8161b46092dd3cc61ca7dff4ab683b7b62bc90",
+          "generation_fingerprint": "cbf09f6e8f7a04f00fdbb41559b376103e473e77ea76597c1561fb8df26ef39f",
+          "served_upstream": "OpenAI"
+        },
+        {
+          "node": "inventory",
+          "tier": "base",
+          "requested_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "served_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "instruction_sha256": "f8168df6ac6c0efa80647a41de8161b46092dd3cc61ca7dff4ab683b7b62bc90",
+          "generation_fingerprint": "cbf09f6e8f7a04f00fdbb41559b376103e473e77ea76597c1561fb8df26ef39f",
+          "served_upstream": "OpenAI"
+        },
+        {
+          "node": "inventory",
+          "tier": "base",
+          "requested_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "served_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "instruction_sha256": "f8168df6ac6c0efa80647a41de8161b46092dd3cc61ca7dff4ab683b7b62bc90",
+          "generation_fingerprint": "cbf09f6e8f7a04f00fdbb41559b376103e473e77ea76597c1561fb8df26ef39f",
+          "served_upstream": "OpenAI"
+        },
+        {
+          "node": "inventory",
+          "tier": "base",
+          "requested_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "served_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "instruction_sha256": "f8168df6ac6c0efa80647a41de8161b46092dd3cc61ca7dff4ab683b7b62bc90",
+          "generation_fingerprint": "cbf09f6e8f7a04f00fdbb41559b376103e473e77ea76597c1561fb8df26ef39f",
+          "served_upstream": "OpenAI"
+        },
+        {
+          "node": "inventory",
+          "tier": "base",
+          "requested_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "served_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "instruction_sha256": "f8168df6ac6c0efa80647a41de8161b46092dd3cc61ca7dff4ab683b7b62bc90",
+          "generation_fingerprint": "cbf09f6e8f7a04f00fdbb41559b376103e473e77ea76597c1561fb8df26ef39f",
+          "served_upstream": "OpenAI"
+        },
+        {
+          "node": "inventory",
+          "tier": "base",
+          "requested_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "served_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "instruction_sha256": "f8168df6ac6c0efa80647a41de8161b46092dd3cc61ca7dff4ab683b7b62bc90",
+          "generation_fingerprint": "cbf09f6e8f7a04f00fdbb41559b376103e473e77ea76597c1561fb8df26ef39f",
+          "served_upstream": "OpenAI"
+        },
+        {
+          "node": "inventory",
+          "tier": "base",
+          "requested_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "served_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "instruction_sha256": "f8168df6ac6c0efa80647a41de8161b46092dd3cc61ca7dff4ab683b7b62bc90",
+          "generation_fingerprint": "cbf09f6e8f7a04f00fdbb41559b376103e473e77ea76597c1561fb8df26ef39f",
+          "served_upstream": "OpenAI"
+        },
+        {
+          "node": "inventory",
+          "tier": "base",
+          "requested_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "served_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "instruction_sha256": "f8168df6ac6c0efa80647a41de8161b46092dd3cc61ca7dff4ab683b7b62bc90",
+          "generation_fingerprint": "cbf09f6e8f7a04f00fdbb41559b376103e473e77ea76597c1561fb8df26ef39f",
+          "served_upstream": "OpenAI"
+        },
+        {
+          "node": "inventory",
+          "tier": "base",
+          "requested_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "served_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "instruction_sha256": "f8168df6ac6c0efa80647a41de8161b46092dd3cc61ca7dff4ab683b7b62bc90",
+          "generation_fingerprint": "cbf09f6e8f7a04f00fdbb41559b376103e473e77ea76597c1561fb8df26ef39f",
+          "served_upstream": "OpenAI"
+        },
+        {
+          "node": "inventory",
+          "tier": "base",
+          "requested_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "served_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "instruction_sha256": "f8168df6ac6c0efa80647a41de8161b46092dd3cc61ca7dff4ab683b7b62bc90",
+          "generation_fingerprint": "cbf09f6e8f7a04f00fdbb41559b376103e473e77ea76597c1561fb8df26ef39f",
+          "served_upstream": "OpenAI"
+        },
+        {
+          "node": "inventory",
+          "tier": "base",
+          "requested_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "served_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "instruction_sha256": "f8168df6ac6c0efa80647a41de8161b46092dd3cc61ca7dff4ab683b7b62bc90",
+          "generation_fingerprint": "cbf09f6e8f7a04f00fdbb41559b376103e473e77ea76597c1561fb8df26ef39f",
+          "served_upstream": "OpenAI"
+        },
+        {
+          "node": "inventory",
+          "tier": "base",
+          "requested_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "served_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "instruction_sha256": "f8168df6ac6c0efa80647a41de8161b46092dd3cc61ca7dff4ab683b7b62bc90",
+          "generation_fingerprint": "cbf09f6e8f7a04f00fdbb41559b376103e473e77ea76597c1561fb8df26ef39f",
+          "served_upstream": "OpenAI"
+        },
+        {
+          "node": "inventory",
+          "tier": "base",
+          "requested_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "served_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "instruction_sha256": "f8168df6ac6c0efa80647a41de8161b46092dd3cc61ca7dff4ab683b7b62bc90",
+          "generation_fingerprint": "cbf09f6e8f7a04f00fdbb41559b376103e473e77ea76597c1561fb8df26ef39f",
+          "served_upstream": "OpenAI"
+        }
+      ],
+      "rows": [
+        {
+          "node": "rows",
+          "tier": "base",
+          "requested_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "served_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "instruction_sha256": "f8168df6ac6c0efa80647a41de8161b46092dd3cc61ca7dff4ab683b7b62bc90",
+          "generation_fingerprint": "cbf09f6e8f7a04f00fdbb41559b376103e473e77ea76597c1561fb8df26ef39f",
+          "served_upstream": "OpenAI"
+        },
+        {
+          "node": "rows",
+          "tier": "base",
+          "requested_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "served_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "instruction_sha256": "f8168df6ac6c0efa80647a41de8161b46092dd3cc61ca7dff4ab683b7b62bc90",
+          "generation_fingerprint": "cbf09f6e8f7a04f00fdbb41559b376103e473e77ea76597c1561fb8df26ef39f",
+          "served_upstream": "OpenAI"
+        },
+        {
+          "node": "rows",
+          "tier": "base",
+          "requested_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "served_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "instruction_sha256": "f8168df6ac6c0efa80647a41de8161b46092dd3cc61ca7dff4ab683b7b62bc90",
+          "generation_fingerprint": "cbf09f6e8f7a04f00fdbb41559b376103e473e77ea76597c1561fb8df26ef39f",
+          "served_upstream": "OpenAI"
+        },
+        {
+          "node": "rows",
+          "tier": "base",
+          "requested_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "served_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "instruction_sha256": "f8168df6ac6c0efa80647a41de8161b46092dd3cc61ca7dff4ab683b7b62bc90",
+          "generation_fingerprint": "cbf09f6e8f7a04f00fdbb41559b376103e473e77ea76597c1561fb8df26ef39f",
+          "served_upstream": "OpenAI"
+        },
+        {
+          "node": "rows",
+          "tier": "base",
+          "requested_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "served_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "instruction_sha256": "f8168df6ac6c0efa80647a41de8161b46092dd3cc61ca7dff4ab683b7b62bc90",
+          "generation_fingerprint": "cbf09f6e8f7a04f00fdbb41559b376103e473e77ea76597c1561fb8df26ef39f",
+          "served_upstream": "OpenAI"
+        },
+        {
+          "node": "rows",
+          "tier": "base",
+          "requested_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "served_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "instruction_sha256": "f8168df6ac6c0efa80647a41de8161b46092dd3cc61ca7dff4ab683b7b62bc90",
+          "generation_fingerprint": "cbf09f6e8f7a04f00fdbb41559b376103e473e77ea76597c1561fb8df26ef39f",
+          "served_upstream": "OpenAI"
+        },
+        {
+          "node": "rows",
+          "tier": "base",
+          "requested_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "served_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "instruction_sha256": "f8168df6ac6c0efa80647a41de8161b46092dd3cc61ca7dff4ab683b7b62bc90",
+          "generation_fingerprint": "cbf09f6e8f7a04f00fdbb41559b376103e473e77ea76597c1561fb8df26ef39f",
+          "served_upstream": "OpenAI"
+        },
+        {
+          "node": "rows",
+          "tier": "base",
+          "requested_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "served_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "instruction_sha256": "f8168df6ac6c0efa80647a41de8161b46092dd3cc61ca7dff4ab683b7b62bc90",
+          "generation_fingerprint": "cbf09f6e8f7a04f00fdbb41559b376103e473e77ea76597c1561fb8df26ef39f",
+          "served_upstream": "OpenAI"
+        },
+        {
+          "node": "rows",
+          "tier": "base",
+          "requested_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "served_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "instruction_sha256": "f8168df6ac6c0efa80647a41de8161b46092dd3cc61ca7dff4ab683b7b62bc90",
+          "generation_fingerprint": "cbf09f6e8f7a04f00fdbb41559b376103e473e77ea76597c1561fb8df26ef39f",
+          "served_upstream": "OpenAI"
+        },
+        {
+          "node": "rows",
+          "tier": "base",
+          "requested_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "served_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "instruction_sha256": "f8168df6ac6c0efa80647a41de8161b46092dd3cc61ca7dff4ab683b7b62bc90",
+          "generation_fingerprint": "cbf09f6e8f7a04f00fdbb41559b376103e473e77ea76597c1561fb8df26ef39f",
+          "served_upstream": "OpenAI"
+        },
+        {
+          "node": "rows",
+          "tier": "base",
+          "requested_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "served_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "instruction_sha256": "f8168df6ac6c0efa80647a41de8161b46092dd3cc61ca7dff4ab683b7b62bc90",
+          "generation_fingerprint": "cbf09f6e8f7a04f00fdbb41559b376103e473e77ea76597c1561fb8df26ef39f",
+          "served_upstream": "OpenAI"
+        },
+        {
+          "node": "rows",
+          "tier": "base",
+          "requested_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "served_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "instruction_sha256": "f8168df6ac6c0efa80647a41de8161b46092dd3cc61ca7dff4ab683b7b62bc90",
+          "generation_fingerprint": "cbf09f6e8f7a04f00fdbb41559b376103e473e77ea76597c1561fb8df26ef39f",
+          "served_upstream": "OpenAI"
+        },
+        {
+          "node": "rows",
+          "tier": "base",
+          "requested_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "served_model": "openrouter/openai/gpt-5.6-luna-pro",
+          "instruction_sha256": "f8168df6ac6c0efa80647a41de8161b46092dd3cc61ca7dff4ab683b7b62bc90",
+          "generation_fingerprint": "cbf09f6e8f7a04f00fdbb41559b376103e473e77ea76597c1561fb8df26ef39f",
+          "served_upstream": "OpenAI"
+        }
+      ]
+    },
+    "generation_identities": {
+      "base": {
+        "requested_models": [
+          "openrouter/openai/gpt-5.6-luna-pro"
+        ],
+        "served_models": [
+          "openrouter/openai/gpt-5.6-luna-pro"
+        ],
+        "instruction_digests": [
+          "f8168df6ac6c0efa80647a41de8161b46092dd3cc61ca7dff4ab683b7b62bc90"
+        ],
+        "fingerprints": [
+          "cbf09f6e8f7a04f00fdbb41559b376103e473e77ea76597c1561fb8df26ef39f"
+        ],
+        "nodes": [
+          "inventory",
+          "rows"
+        ]
+      }
+    }
+  },
+  "node_usage": {
+    "inventory": {
+      "prompt_tokens": 322051,
+      "cached_prompt_tokens": 98964,
+      "completion_tokens": 144731,
+      "reasoning_tokens": 101149,
+      "total_tokens": 466782
+    },
+    "rows": {
+      "prompt_tokens": 426504,
+      "cached_prompt_tokens": 155002,
+      "completion_tokens": 135975,
+      "reasoning_tokens": 91634,
+      "total_tokens": 562479
+    }
+  },
+  "node_charges": {
+    "inventory": 0.22103837999999998,
+    "rows": 0.22176139
+  },
+  "node_latency": {
+    "inventory": {
+      "executions": 13,
+      "total_ms": 596173,
+      "slowest_ms": 61341,
+      "mean_ms": 45859
+    },
+    "reading_inventory": {
+      "executions": 13,
+      "total_ms": 24,
+      "slowest_ms": 9,
+      "mean_ms": 2
+    },
+    "rows": {
+      "executions": 13,
+      "total_ms": 553998,
+      "slowest_ms": 58322,
+      "mean_ms": 42615
+    },
+    "resolve": {
+      "executions": 13,
+      "total_ms": 72,
+      "slowest_ms": 8,
+      "mean_ms": 6
+    },
+    "validate": {
+      "executions": 13,
+      "total_ms": 13,
+      "slowest_ms": 1,
+      "mean_ms": 1
+    },
+    "catalog": {
+      "executions": 13,
+      "total_ms": 32,
+      "slowest_ms": 4,
+      "mean_ms": 2
+    }
+  },
+  "structural_failures": [],
+  "mode_output": [
+    {
+      "case": "01-payments-checkout",
+      "proposed": 7,
+      "kept": 7,
+      "rejected": 0,
+      "refused": {},
+      "subjects": 7,
+      "bound_subjects": 1,
+      "predicates": [
+        "authorization-grant",
+        "credential-custody",
+        "credential-presented",
+        "internet-exposure",
+        "mfa-requirement",
+        "network-membership"
+      ],
+      "span_backed": 7,
+      "assessed": {
+        "unchecked": 7,
+        "supported": 0,
+        "unsupported": 0,
+        "unresolved": 0
+      },
+      "spans": 7,
+      "absences": 1,
+      "unknowns": 0,
+      "inferred": 0,
+      "conflicts": 0,
+      "subjects_reached": 0.071,
+      "reachable": 13,
+      "reached": 2,
+      "reachable_absent": 1,
+      "reached_absent": 0,
+      "projected": 2,
+      "projection_degraded": 0,
+      "agrees_stated": 1,
+      "agrees_absent": 0,
+      "agrees_unstated": 0
+    },
+    {
+      "case": "02-iot-fleet-telemetry",
+      "proposed": 7,
+      "kept": 7,
+      "rejected": 0,
+      "refused": {},
+      "subjects": 9,
+      "bound_subjects": 4,
+      "predicates": [
+        "credential-rotation",
+        "credential-sharing",
+        "network-membership",
+        "signature-verification",
+        "tenant-ownership"
+      ],
+      "span_backed": 6,
+      "assessed": {
+        "unchecked": 7,
+        "supported": 0,
+        "unsupported": 0,
+        "unresolved": 0
+      },
+      "spans": 6,
+      "absences": 0,
+      "unknowns": 1,
+      "inferred": 0,
+      "conflicts": 0,
+      "subjects_reached": 0.143,
+      "reachable": 13,
+      "reached": 3,
+      "reachable_absent": 1,
+      "reached_absent": 0,
+      "projected": 3,
+      "projection_degraded": 0,
+      "agrees_stated": 1,
+      "agrees_absent": 0,
+      "agrees_unstated": 0
+    },
+    {
+      "case": "03-batch-data-pipeline",
+      "proposed": 8,
+      "kept": 8,
+      "rejected": 0,
+      "refused": {},
+      "subjects": 8,
+      "bound_subjects": 3,
+      "predicates": [
+        "authorization-grant",
+        "credential-custody",
+        "credential-presented",
+        "credential-rotation",
+        "credential-sharing",
+        "network-membership"
+      ],
+      "span_backed": 8,
+      "assessed": {
+        "unchecked": 8,
+        "supported": 0,
+        "unsupported": 0,
+        "unresolved": 0
+      },
+      "spans": 9,
+      "absences": 0,
+      "unknowns": 0,
+      "inferred": 1,
+      "conflicts": 0,
+      "subjects_reached": 0.062,
+      "reachable": 12,
+      "reached": 1,
+      "reachable_absent": 0,
+      "reached_absent": 0,
+      "projected": 3,
+      "projection_degraded": 0,
+      "agrees_stated": 1,
+      "agrees_absent": 0,
+      "agrees_unstated": 0
+    },
+    {
+      "case": "04-ml-inference-service",
+      "proposed": 11,
+      "kept": 11,
+      "rejected": 0,
+      "refused": {},
+      "subjects": 12,
+      "bound_subjects": 4,
+      "predicates": [
+        "authentication-mechanism",
+        "credential-presented",
+        "credential-sharing",
+        "internet-exposure",
+        "network-membership"
+      ],
+      "span_backed": 10,
+      "assessed": {
+        "unchecked": 11,
+        "supported": 0,
+        "unsupported": 0,
+        "unresolved": 0
+      },
+      "spans": 10,
+      "absences": 2,
+      "unknowns": 1,
+      "inferred": 0,
+      "conflicts": 1,
+      "subjects_reached": 0.188,
+      "reachable": 10,
+      "reached": 4,
+      "reachable_absent": 1,
+      "reached_absent": 0,
+      "projected": 6,
+      "projection_degraded": 1,
+      "agrees_stated": 3,
+      "agrees_absent": 0,
+      "agrees_unstated": 0
+    },
+    {
+      "case": "05-cookbook-queue-webapp",
+      "proposed": 8,
+      "kept": 8,
+      "rejected": 0,
+      "refused": {},
+      "subjects": 11,
+      "bound_subjects": 8,
+      "predicates": [
+        "credential-custody",
+        "network-membership",
+        "transport-encryption"
+      ],
+      "span_backed": 8,
+      "assessed": {
+        "unchecked": 8,
+        "supported": 0,
+        "unsupported": 0,
+        "unresolved": 0
+      },
+      "spans": 8,
+      "absences": 0,
+      "unknowns": 0,
+      "inferred": 0,
+      "conflicts": 0,
+      "subjects_reached": 0.312,
+      "reachable": 10,
+      "reached": 5,
+      "reachable_absent": 0,
+      "reached_absent": 0,
+      "projected": 6,
+      "projection_degraded": 0,
+      "agrees_stated": 5,
+      "agrees_absent": 0,
+      "agrees_unstated": 0
+    },
+    {
+      "case": "06-cookbook-online-game",
+      "proposed": 11,
+      "kept": 11,
+      "rejected": 0,
+      "refused": {},
+      "subjects": 9,
+      "bound_subjects": 4,
+      "predicates": [
+        "authentication-mechanism",
+        "authorization-grant",
+        "internet-exposure",
+        "network-membership",
+        "transport-encryption"
+      ],
+      "span_backed": 6,
+      "assessed": {
+        "unchecked": 11,
+        "supported": 0,
+        "unsupported": 0,
+        "unresolved": 0
+      },
+      "spans": 6,
+      "absences": 0,
+      "unknowns": 5,
+      "inferred": 0,
+      "conflicts": 0,
+      "subjects_reached": 0.15,
+      "reachable": 10,
+      "reached": 5,
+      "reachable_absent": 0,
+      "reached_absent": 0,
+      "projected": 10,
+      "projection_degraded": 0,
+      "agrees_stated": 4,
+      "agrees_absent": 0,
+      "agrees_unstated": 0
+    },
+    {
+      "case": "07-cicd-store-deploy",
+      "proposed": 14,
+      "kept": 14,
+      "rejected": 0,
+      "refused": {},
+      "subjects": 13,
+      "bound_subjects": 6,
+      "predicates": [
+        "authentication-mechanism",
+        "authorization-grant",
+        "credential-presented",
+        "credential-rotation",
+        "credential-sharing",
+        "network-membership",
+        "storage-encryption"
+      ],
+      "span_backed": 10,
+      "assessed": {
+        "unchecked": 14,
+        "supported": 0,
+        "unsupported": 0,
+        "unresolved": 0
+      },
+      "spans": 10,
+      "absences": 0,
+      "unknowns": 4,
+      "inferred": 0,
+      "conflicts": 0,
+      "subjects_reached": 0.211,
+      "reachable": 11,
+      "reached": 4,
+      "reachable_absent": 0,
+      "reached_absent": 0,
+      "projected": 10,
+      "projection_degraded": 1,
+      "agrees_stated": 3,
+      "agrees_absent": 0,
+      "agrees_unstated": 1
+    },
+    {
+      "case": "08-sso-identity-broker",
+      "proposed": 11,
+      "kept": 11,
+      "rejected": 0,
+      "refused": {},
+      "subjects": 9,
+      "bound_subjects": 3,
+      "predicates": [
+        "authorization-grant",
+        "credential-custody",
+        "credential-expiry",
+        "credential-presented",
+        "credential-sharing",
+        "mfa-requirement",
+        "network-membership",
+        "signature-verification"
+      ],
+      "span_backed": 10,
+      "assessed": {
+        "unchecked": 11,
+        "supported": 0,
+        "unsupported": 0,
+        "unresolved": 0
+      },
+      "spans": 10,
+      "absences": 0,
+      "unknowns": 1,
+      "inferred": 0,
+      "conflicts": 0,
+      "subjects_reached": 0.105,
+      "reachable": 11,
+      "reached": 2,
+      "reachable_absent": 0,
+      "reached_absent": 0,
+      "projected": 3,
+      "projection_degraded": 0,
+      "agrees_stated": 2,
+      "agrees_absent": 0,
+      "agrees_unstated": 0
+    },
+    {
+      "case": "09-cookbook-sokify-retail",
+      "proposed": 5,
+      "kept": 5,
+      "rejected": 0,
+      "refused": {},
+      "subjects": 6,
+      "bound_subjects": 2,
+      "predicates": [
+        "authentication-mechanism",
+        "network-membership",
+        "storage-encryption",
+        "transport-encryption"
+      ],
+      "span_backed": 2,
+      "assessed": {
+        "unchecked": 5,
+        "supported": 0,
+        "unsupported": 0,
+        "unresolved": 0
+      },
+      "spans": 2,
+      "absences": 1,
+      "unknowns": 3,
+      "inferred": 0,
+      "conflicts": 0,
+      "subjects_reached": 0.105,
+      "reachable": 9,
+      "reached": 0,
+      "reachable_absent": 1,
+      "reached_absent": 0,
+      "projected": 4,
+      "projection_degraded": 0,
+      "agrees_stated": 0,
+      "agrees_absent": 0,
+      "agrees_unstated": 1
+    },
+    {
+      "case": "10-cookbook-generic-cms",
+      "proposed": 7,
+      "kept": 7,
+      "rejected": 0,
+      "refused": {},
+      "subjects": 7,
+      "bound_subjects": 3,
+      "predicates": [
+        "administrative-authority",
+        "internet-exposure",
+        "network-membership",
+        "storage-encryption",
+        "transport-encryption"
+      ],
+      "span_backed": 6,
+      "assessed": {
+        "unchecked": 7,
+        "supported": 0,
+        "unsupported": 0,
+        "unresolved": 0
+      },
+      "spans": 6,
+      "absences": 2,
+      "unknowns": 1,
+      "inferred": 0,
+      "conflicts": 0,
+      "subjects_reached": 0.143,
+      "reachable": 9,
+      "reached": 2,
+      "reachable_absent": 2,
+      "reached_absent": 0,
+      "projected": 6,
+      "projection_degraded": 0,
+      "agrees_stated": 2,
+      "agrees_absent": 0,
+      "agrees_unstated": 1
+    },
+    {
+      "case": "11-sparse-shift-scheduling",
+      "proposed": 6,
+      "kept": 6,
+      "rejected": 0,
+      "refused": {},
+      "subjects": 8,
+      "bound_subjects": 5,
+      "predicates": [
+        "administrative-authority",
+        "authorization-grant",
+        "network-membership"
+      ],
+      "span_backed": 6,
+      "assessed": {
+        "unchecked": 6,
+        "supported": 0,
+        "unsupported": 0,
+        "unresolved": 0
+      },
+      "spans": 6,
+      "absences": 0,
+      "unknowns": 0,
+      "inferred": 0,
+      "conflicts": 0,
+      "subjects_reached": 0.188,
+      "reachable": 7,
+      "reached": 3,
+      "reachable_absent": 0,
+      "reached_absent": 0,
+      "projected": 3,
+      "projection_degraded": 0,
+      "agrees_stated": 3,
+      "agrees_absent": 0,
+      "agrees_unstated": 0
+    },
+    {
+      "case": "12-overclaiming-supplier-portal",
+      "proposed": 10,
+      "kept": 10,
+      "rejected": 0,
+      "refused": {},
+      "subjects": 12,
+      "bound_subjects": 4,
+      "predicates": [
+        "authorization-grant",
+        "credential-presented",
+        "network-membership",
+        "tenant-ownership"
+      ],
+      "span_backed": 10,
+      "assessed": {
+        "unchecked": 10,
+        "supported": 0,
+        "unsupported": 0,
+        "unresolved": 0
+      },
+      "spans": 10,
+      "absences": 0,
+      "unknowns": 0,
+      "inferred": 0,
+      "conflicts": 0,
+      "subjects_reached": 0.167,
+      "reachable": 11,
+      "reached": 3,
+      "reachable_absent": 0,
+      "reached_absent": 0,
+      "projected": 5,
+      "projection_degraded": 0,
+      "agrees_stated": 0,
+      "agrees_absent": 0,
+      "agrees_unstated": 0
+    },
+    {
+      "case": "13-dispatch-control-plane",
+      "proposed": 13,
+      "kept": 12,
+      "rejected": 1,
+      "refused": {
+        "wrong-subject-type": 1
+      },
+      "subjects": 11,
+      "bound_subjects": 5,
+      "predicates": [
+        "authentication-mechanism",
+        "authorization-grant",
+        "credential-presented",
+        "credential-rotation",
+        "network-membership",
+        "tenant-ownership"
+      ],
+      "span_backed": 12,
+      "assessed": {
+        "unchecked": 12,
+        "supported": 0,
+        "unsupported": 0,
+        "unresolved": 0
+      },
+      "spans": 12,
+      "absences": 1,
+      "unknowns": 0,
+      "inferred": 0,
+      "conflicts": 0,
+      "subjects_reached": 0.158,
+      "reachable": 11,
+      "reached": 3,
+      "reachable_absent": 0,
+      "reached_absent": 0,
+      "projected": 4,
+      "projection_degraded": 1,
+      "agrees_stated": 3,
+      "agrees_absent": 0,
+      "agrees_unstated": 0
+    }
+  ],
+  "trusted": false,
+  "repo_commit": {
+    "commit": "b7d253d8c68081feacdf6eafd5d2a8e7d50bc041",
+    "clean": true
+  },
+  "corpus_digest": "56b28ec7fe555046e0b18700748ea605c7fdc499a24ff116f6b2bc2eb56dfa8f",
+  "flow_identity_version": 2,
+  "frameworks": [
+    "asvs",
+    "stride"
+  ],
+  "stopped": [],
+  "series": {},
+  "completion": {
+    "attempted": 13,
+    "scored": 0,
+    "failed": 0,
+    "stopped_before": 0
+  },
+  "attribute_aggregate": null,
+  "grounds": [],
+  "grounds_failures": [],
+  "grounds_aggregate": null,
+  "coverage": [
+    {
+      "framework": "asvs",
+      "lane": "encoding-and-sanitization",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "validation-and-business-logic",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "web-frontend-security",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "api-and-web-service",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "file-handling",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "authentication",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "session-management",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "authorization",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "self-contained-tokens",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "oauth-and-oidc",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "cryptography",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "secure-communication",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "configuration",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "data-protection",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "secure-coding-and-architecture",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "security-logging-and-error-handling",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "asvs",
+      "lane": "webrtc",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "stride",
+      "lane": "spoofing",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "stride",
+      "lane": "tampering",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "stride",
+      "lane": "repudiation",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "stride",
+      "lane": "information-disclosure",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "stride",
+      "lane": "denial-of-service",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    },
+    {
+      "framework": "stride",
+      "lane": "elevation-of-privilege",
+      "cases": 0,
+      "drafts": 0,
+      "rules": 0,
+      "rules_fired": 0,
+      "rules_fired_rate": 0.0,
+      "candidates": 0,
+      "candidates_cited": 0,
+      "elements": 0,
+      "elements_cited": 0,
+      "boundary_crossings": 0,
+      "boundary_crossings_cited": 0,
+      "unknown_controls": 0,
+      "unknown_controls_cited": 0,
+      "cited_rates": {
+        "candidates_cited": 0.0,
+        "elements_cited": 0.0,
+        "boundary_crossings_cited": 0.0,
+        "unknown_controls_cited": 0.0
+      }
+    }
+  ],
+  "coverage_totals": {
+    "cases": 0,
+    "drafts": 0,
+    "rules_fired": 0,
+    "rules": 0,
+    "candidates": 0,
+    "candidates_cited": 0,
+    "elements": 0,
+    "elements_cited": 0,
+    "boundary_crossings": 0,
+    "boundary_crossings_cited": 0,
+    "unknown_controls": 0,
+    "unknown_controls_cited": 0,
+    "cited_rates": {
+      "candidates_cited": 0.0,
+      "elements_cited": 0.0,
+      "boundary_crossings_cited": 0.0,
+      "unknown_controls_cited": 0.0
+    }
+  },
+  "filler": {},
+  "instruction": [
+    {
+      "framework": "(shared)",
+      "node": "inventory",
+      "tokens": 1675,
+      "sha256": "74a22486d9afaa5561c7bcdfb3af75b9e2ea24ddc0a3704cb001c3191a7df7b1"
+    },
+    {
+      "framework": "(shared)",
+      "node": "repair",
+      "tokens": 791,
+      "sha256": "f74a50df7d8161adf3148788e142c005572c3d3cd458a796a7a32e49b66bff21"
+    },
+    {
+      "framework": "(shared)",
+      "node": "rows",
+      "tokens": 2308,
+      "sha256": "5dea22147855a9e37e72f46cb85b2fa3c68a8b2a6584a2430cf0df33d9be8b34"
+    }
+  ],
+  "instruction_totals": {
+    "(shared)": {
+      "nodes": 3,
+      "tokens": 4774,
+      "largest": 2308
+    }
+  },
+  "applicability": [],
+  "applicability_aggregate": null,
+  "applicability_exemplar_delta": null,
+  "over_applied_for_promotion": [],
+  "disposition": [],
+  "disposition_aggregate": null,
+  "applicability_yield": [],
+  "applicability_yield_aggregate": null,
+  "attribution": [],
+  "attribution_aggregate": null,
+  "scores": [],
+  "exemplar_delta": null,
+  "unlisted_for_promotion": [],
+  "critic_yield": [],
+  "critic_yield_aggregate": null,
+  "losses": [],
+  "losses_aggregate": null,
+  "writing": [],
+  "writing_aggregate": {
+    "answered": 0,
+    "objections": 0,
+    "carried": 0,
+    "objection_rate": 0.0,
+    "by_framework": {},
+    "by_reason": {}
+  }
+}

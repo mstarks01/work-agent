@@ -1,0 +1,1143 @@
+{
+  "proposal": {
+    "assertions": [
+      {
+        "subject_type": "component",
+        "subject": "entity:sensor-node",
+        "predicate": "network-membership",
+        "value": "boundary:customer-site",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "sensor nodes installed on customer sites"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "process:telemetry-normalizer",
+        "predicate": "network-membership",
+        "value": "boundary:analytics-network",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "the telemetry normalizer, a Python consumer in our analytics network"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "credential",
+        "subject": "pre-shared key",
+        "predicate": "credential-sharing",
+        "value": "shared",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The key is per fleet, not per device"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "credential",
+        "subject": "pre-shared key",
+        "predicate": "credential-rotation",
+        "value": "not-rotated",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Nobody has rotated it since deployment"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      }
+    ]
+  },
+  "catalog": {
+    "registry_version": 3,
+    "subjects": [
+      {
+        "id": "boundary:analytics-network",
+        "type": "zone",
+        "label": "analytics network"
+      },
+      {
+        "id": "boundary:customer-site",
+        "type": "zone",
+        "label": "customer site"
+      },
+      {
+        "id": "credential:pre-shared-key",
+        "type": "credential",
+        "label": "pre-shared key"
+      },
+      {
+        "id": "entity:sensor-node",
+        "type": "component",
+        "label": "sensor node"
+      },
+      {
+        "id": "process:telemetry-normalizer",
+        "type": "component",
+        "label": "telemetry normalizer"
+      }
+    ],
+    "entries": [
+      {
+        "subject": "entity:sensor-node",
+        "predicate": "network-membership",
+        "value": "boundary:customer-site",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "fc745e273aff8be740a814f0a9b4a45d6f3c6fe39dc7c8efa2b879d4f270ac74",
+            "start": 74,
+            "end": 115,
+            "quote": "sensor nodes installed on customer sites"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "process:telemetry-normalizer",
+        "predicate": "network-membership",
+        "value": "boundary:analytics-network",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "fc745e273aff8be740a814f0a9b4a45d6f3c6fe39dc7c8efa2b879d4f270ac74",
+            "start": 722,
+            "end": 791,
+            "quote": "the telemetry normalizer, a Python consumer in our analytics network"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "credential:pre-shared-key",
+        "predicate": "credential-sharing",
+        "value": "shared",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "fc745e273aff8be740a814f0a9b4a45d6f3c6fe39dc7c8efa2b879d4f270ac74",
+            "start": 436,
+            "end": 473,
+            "quote": "The key is per fleet, not per device"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "credential:pre-shared-key",
+        "predicate": "credential-rotation",
+        "value": "not-rotated",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "fc745e273aff8be740a814f0a9b4a45d6f3c6fe39dc7c8efa2b879d4f270ac74",
+            "start": 474,
+            "end": 513,
+            "quote": "Nobody has rotated it since deployment"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      }
+    ]
+  },
+  "issues": [],
+  "projection": [
+    {
+      "element_id": "entity:sensor-node",
+      "attribute": "trust_zone",
+      "value": "boundary:customer-site",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~entity:sensor-node~any~boundary:customer-site"
+      ]
+    },
+    {
+      "element_id": "process:telemetry-normalizer",
+      "attribute": "trust_zone",
+      "value": "boundary:analytics-network",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~process:telemetry-normalizer~any~boundary:analytics-network"
+      ]
+    }
+  ],
+  "stages": {
+    "source_facts": {
+      "mentions": [
+        {
+          "handle": "m1",
+          "text": "sensor node",
+          "roles": [
+            "external-system"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "sensor nodes installed on customer sites"
+            }
+          ]
+        },
+        {
+          "handle": "m2",
+          "text": "customer site",
+          "roles": [
+            "tenant-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "installed on customer sites"
+            }
+          ]
+        },
+        {
+          "handle": "m3",
+          "text": "device gateway",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "the device gateway, which is an MQTT broker we run on GKE"
+            }
+          ]
+        },
+        {
+          "handle": "m4",
+          "text": "internet",
+          "roles": [
+            "network-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "expose to the internet because the nodes dial in from anywhere"
+            }
+          ]
+        },
+        {
+          "handle": "m5",
+          "text": "device registry",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "a device registry (Firestore)"
+            }
+          ]
+        },
+        {
+          "handle": "m6",
+          "text": "Pub/Sub",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "forwarded onto Pub/Sub"
+            }
+          ]
+        },
+        {
+          "handle": "m7",
+          "text": "telemetry normalizer",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "the telemetry normalizer, a Python consumer"
+            }
+          ]
+        },
+        {
+          "handle": "m8",
+          "text": "analytics network",
+          "roles": [
+            "network-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "in our analytics network"
+            }
+          ]
+        },
+        {
+          "handle": "m9",
+          "text": "telemetry lake",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "the telemetry lake in BigQuery"
+            }
+          ]
+        },
+        {
+          "handle": "m10",
+          "text": "Cloud Storage bucket",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "a Cloud Storage bucket"
+            }
+          ]
+        },
+        {
+          "handle": "m11",
+          "text": "firmware image",
+          "roles": [
+            "other-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "for a new image"
+            }
+          ]
+        },
+        {
+          "handle": "m12",
+          "text": "BigQuery",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "dashboards over BigQuery"
+            }
+          ]
+        },
+        {
+          "handle": "m13",
+          "text": "corporate network",
+          "roles": [
+            "network-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "from the corporate network"
+            }
+          ]
+        }
+      ],
+      "interactions": [
+        {
+          "handle": "i1",
+          "initiator": "m1",
+          "receiver": "m3",
+          "action": "publishes readings",
+          "protocol": "MQTT",
+          "operations": "write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Each node publishes readings over MQTT to the device gateway"
+            }
+          ]
+        },
+        {
+          "handle": "i2",
+          "initiator": "m3",
+          "receiver": "m5",
+          "action": "looks up device",
+          "protocol": "",
+          "operations": "read",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The gateway looks up the device in a device registry (Firestore)"
+            }
+          ]
+        },
+        {
+          "handle": "i3",
+          "initiator": "m3",
+          "receiver": "m6",
+          "action": "forwards readings",
+          "protocol": "Pub/Sub",
+          "operations": "write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Readings the gateway accepts are forwarded onto Pub/Sub"
+            }
+          ]
+        },
+        {
+          "handle": "i4",
+          "initiator": "m7",
+          "receiver": "m6",
+          "action": "picks up readings",
+          "protocol": "Pub/Sub",
+          "operations": "read",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "picked up by the telemetry normalizer"
+            }
+          ]
+        },
+        {
+          "handle": "i5",
+          "initiator": "m7",
+          "receiver": "m9",
+          "action": "writes them",
+          "protocol": "",
+          "operations": "write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "which writes them into the telemetry lake in BigQuery"
+            }
+          ]
+        },
+        {
+          "handle": "i6",
+          "initiator": "m1",
+          "receiver": "m10",
+          "action": "polls for image",
+          "protocol": "",
+          "operations": "read",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "nodes poll a Cloud Storage bucket for a new image"
+            }
+          ]
+        },
+        {
+          "handle": "i7",
+          "initiator": "m12",
+          "receiver": "m9",
+          "action": "looks at dashboards",
+          "protocol": "BigQuery",
+          "operations": "read",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "look at dashboards over BigQuery"
+            }
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "handle": "f1",
+          "subject_kind": "mention",
+          "subject": "m1",
+          "predicate": "network-membership",
+          "value": "m2",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "sensor nodes installed on customer sites"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f2",
+          "subject_kind": "mention",
+          "subject": "m7",
+          "predicate": "network-membership",
+          "value": "m8",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "the telemetry normalizer, a Python consumer in our analytics network"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f3",
+          "subject_kind": "mention",
+          "subject": "m3",
+          "predicate": "internet-exposure",
+          "value": "internet-facing",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "the device gateway, which is an MQTT broker we run on GKE and expose to the internet"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f4",
+          "subject_kind": "mention",
+          "subject": "m10",
+          "predicate": "internet-exposure",
+          "value": "internet-facing",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The bucket is public read"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f5",
+          "subject_kind": "interaction",
+          "subject": "i1",
+          "predicate": "authentication-mechanism",
+          "value": "pre-shared key",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Nodes authenticate to the broker with a pre-shared key"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f6",
+          "subject_kind": "interaction",
+          "subject": "i1",
+          "predicate": "credential-presented",
+          "value": "pre-shared key",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Nodes authenticate to the broker with a pre-shared key"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f7",
+          "subject_kind": "credential",
+          "subject": "pre-shared key",
+          "predicate": "credential-sharing",
+          "value": "shared",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The key is per fleet, not per device"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f8",
+          "subject_kind": "credential",
+          "subject": "pre-shared key",
+          "predicate": "credential-rotation",
+          "value": "not-rotated",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Nobody has rotated it since deployment"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f9",
+          "subject_kind": "interaction",
+          "subject": "i6",
+          "predicate": "signature-verification",
+          "value": "unknown",
+          "reason": "hedged",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f10",
+          "subject_kind": "interaction",
+          "subject": "i7",
+          "predicate": "authentication-mechanism",
+          "value": "company SSO",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "signed in with company SSO"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f11",
+          "subject_kind": "interaction",
+          "subject": "i7",
+          "predicate": "transport-encryption",
+          "value": "unknown",
+          "reason": "silent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "",
+          "exclusive": false
+        }
+      ],
+      "unresolved": [
+        {
+          "handle": "u1",
+          "question": "Do the sensor nodes check a signature on the firmware image before installing it?",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "I do not know whether the nodes check a signature on the image before installing it"
+            }
+          ]
+        },
+        {
+          "handle": "u2",
+          "question": "What authentication, if any, does the local serial console have?",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "I don't know what authentication that console has, if any"
+            }
+          ]
+        }
+      ]
+    },
+    "bundle_dispositions": [
+      {
+        "handle": "m2",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "boundary:customer-site",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m4",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "boundary:internet",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m8",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "boundary:analytics-network",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m11",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "boundary:firmware-image",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m13",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "boundary:corporate-network",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m1",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "entity:sensor-node",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m3",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "unplaced",
+        "message": "no source places 'device gateway', and the bundle names 5 zones, so the graph's required trust_zone would be a choice nobody stated"
+      },
+      {
+        "handle": "m5",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "unplaced",
+        "message": "no source places 'device registry', and the bundle names 5 zones, so the graph's required trust_zone would be a choice nobody stated"
+      },
+      {
+        "handle": "m6",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "unplaced",
+        "message": "no source places 'Pub/Sub', and the bundle names 5 zones, so the graph's required trust_zone would be a choice nobody stated"
+      },
+      {
+        "handle": "m7",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "process:telemetry-normalizer",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m9",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "unplaced",
+        "message": "no source places 'telemetry lake', and the bundle names 5 zones, so the graph's required trust_zone would be a choice nobody stated"
+      },
+      {
+        "handle": "m10",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "unplaced",
+        "message": "no source places 'Cloud Storage bucket', and the bundle names 5 zones, so the graph's required trust_zone would be a choice nobody stated"
+      },
+      {
+        "handle": "m12",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "unplaced",
+        "message": "no source places 'BigQuery', and the bundle names 5 zones, so the graph's required trust_zone would be a choice nobody stated"
+      },
+      {
+        "handle": "i1",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "receiver 'm3' names no placed component of this bundle"
+      },
+      {
+        "handle": "i2",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "initiator 'm3' names no placed component of this bundle"
+      },
+      {
+        "handle": "i3",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "initiator 'm3' names no placed component of this bundle"
+      },
+      {
+        "handle": "i4",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "receiver 'm6' names no placed component of this bundle"
+      },
+      {
+        "handle": "i5",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "receiver 'm9' names no placed component of this bundle"
+      },
+      {
+        "handle": "i6",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "receiver 'm10' names no placed component of this bundle"
+      },
+      {
+        "handle": "i7",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "initiator 'm12' names no placed component of this bundle"
+      },
+      {
+        "handle": "f3",
+        "kind": "fact",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "unplaced-subject",
+        "message": "the sources state this about 'm3', and the graph holds no zone to place that component in"
+      },
+      {
+        "handle": "f4",
+        "kind": "fact",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "unplaced-subject",
+        "message": "the sources state this about 'm10', and the graph holds no zone to place that component in"
+      },
+      {
+        "handle": "f5",
+        "kind": "fact",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-subject",
+        "message": "subject 'i1' names no interaction this bundle built"
+      },
+      {
+        "handle": "f6",
+        "kind": "fact",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-subject",
+        "message": "subject 'i1' names no interaction this bundle built"
+      },
+      {
+        "handle": "f9",
+        "kind": "fact",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-subject",
+        "message": "subject 'i6' names no interaction this bundle built"
+      },
+      {
+        "handle": "f10",
+        "kind": "fact",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-subject",
+        "message": "subject 'i7' names no interaction this bundle built"
+      },
+      {
+        "handle": "f11",
+        "kind": "fact",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-subject",
+        "message": "subject 'i7' names no interaction this bundle built"
+      },
+      {
+        "handle": "f1",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "entity:sensor-node",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f2",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "process:telemetry-normalizer",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f7",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "pre-shared key",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f8",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "pre-shared key",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "u1",
+        "kind": "unresolved",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "open-question",
+        "message": "Do the sensor nodes check a signature on the firmware image before installing it?"
+      },
+      {
+        "handle": "u2",
+        "kind": "unresolved",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "open-question",
+        "message": "What authentication, if any, does the local serial console have?"
+      }
+    ],
+    "extracted_model": {
+      "external_entities": [
+        {
+          "id": "entity:sensor-node",
+          "name": "sensor node",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "sensor nodes installed on customer sites",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "external-system",
+          "trust_zone": "boundary:customer-site"
+        }
+      ],
+      "processes": [
+        {
+          "id": "process:telemetry-normalizer",
+          "name": "telemetry normalizer",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "the telemetry normalizer, a Python consumer",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:analytics-network",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        }
+      ],
+      "data_stores": [],
+      "data_flows": [],
+      "trust_boundaries": [
+        {
+          "id": "boundary:customer-site",
+          "name": "customer site",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "installed on customer sites",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "tenant"
+        },
+        {
+          "id": "boundary:internet",
+          "name": "internet",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "expose to the internet because the nodes dial in from anywhere",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        },
+        {
+          "id": "boundary:analytics-network",
+          "name": "analytics network",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "in our analytics network",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        },
+        {
+          "id": "boundary:firmware-image",
+          "name": "firmware image",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "for a new image",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "other"
+        },
+        {
+          "id": "boundary:corporate-network",
+          "name": "corporate network",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "from the corporate network",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        }
+      ],
+      "assumptions": []
+    },
+    "valid_model": {
+      "external_entities": [
+        {
+          "id": "entity:sensor-node",
+          "name": "sensor node",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "sensor nodes installed on customer sites",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "external-system",
+          "trust_zone": "boundary:customer-site"
+        }
+      ],
+      "processes": [
+        {
+          "id": "process:telemetry-normalizer",
+          "name": "telemetry normalizer",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "the telemetry normalizer, a Python consumer",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:analytics-network",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        }
+      ],
+      "data_stores": [],
+      "data_flows": [],
+      "trust_boundaries": [
+        {
+          "id": "boundary:customer-site",
+          "name": "customer site",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "installed on customer sites",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "tenant"
+        },
+        {
+          "id": "boundary:internet",
+          "name": "internet",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "expose to the internet because the nodes dial in from anywhere",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        },
+        {
+          "id": "boundary:analytics-network",
+          "name": "analytics network",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "in our analytics network",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        },
+        {
+          "id": "boundary:firmware-image",
+          "name": "firmware image",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "for a new image",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "other"
+        },
+        {
+          "id": "boundary:corporate-network",
+          "name": "corporate network",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "from the corporate network",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        }
+      ],
+      "assumptions": []
+    }
+  }
+}

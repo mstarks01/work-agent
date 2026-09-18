@@ -1,0 +1,1501 @@
+{
+  "proposal": {
+    "assertions": [
+      {
+        "subject_type": "component",
+        "subject": "process:identity-broker",
+        "predicate": "network-membership",
+        "value": "boundary:corporate-network",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The broker runs on the corporate network."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "process:store-admin-console",
+        "predicate": "network-membership",
+        "value": "boundary:corporate-network",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "It also runs on the corporate network."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "principal",
+        "subject": "colleagues",
+        "predicate": "credential-presented",
+        "value": "token",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Once the broker has signed a colleague in it issues them a token."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "credential",
+        "subject": "token",
+        "predicate": "credential-expiry",
+        "value": "expires",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Tokens are good for twelve hours"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "artifact",
+        "subject": "token",
+        "predicate": "signature-verification",
+        "value": "verified",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Applications fetch the public half from the broker to check the signature."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "credential",
+        "subject": "signing key",
+        "predicate": "credential-custody",
+        "value": "key store",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The broker signs tokens with a signing key it keeps in a key store."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "credential",
+        "subject": "signing key",
+        "predicate": "credential-sharing",
+        "value": "shared",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The same key signs the tokens for every application."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "principal",
+        "subject": "holder",
+        "predicate": "authorization-grant",
+        "value": "change prices and void transactions",
+        "reason": null,
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "store admin console"
+          },
+          {
+            "kind": "operation",
+            "value": "change prices and void transactions"
+          },
+          {
+            "kind": "condition",
+            "value": "token has the store-manager group"
+          }
+        ],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "If the token has the store-manager group in it, the console lets the holder change prices and void transactions."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "principal",
+        "subject": "colleagues",
+        "predicate": "mfa-requirement",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      }
+    ]
+  },
+  "catalog": {
+    "registry_version": 3,
+    "subjects": [
+      {
+        "id": "artifact:token",
+        "type": "artifact",
+        "label": "token"
+      },
+      {
+        "id": "boundary:corporate-network",
+        "type": "zone",
+        "label": "corporate network"
+      },
+      {
+        "id": "credential:signing-key",
+        "type": "credential",
+        "label": "signing key"
+      },
+      {
+        "id": "credential:token",
+        "type": "credential",
+        "label": "token"
+      },
+      {
+        "id": "principal:colleagues",
+        "type": "principal",
+        "label": "colleagues"
+      },
+      {
+        "id": "principal:holder",
+        "type": "principal",
+        "label": "holder"
+      },
+      {
+        "id": "process:identity-broker",
+        "type": "component",
+        "label": "identity broker"
+      },
+      {
+        "id": "process:store-admin-console",
+        "type": "component",
+        "label": "store admin console"
+      }
+    ],
+    "entries": [
+      {
+        "subject": "process:identity-broker",
+        "predicate": "network-membership",
+        "value": "boundary:corporate-network",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "36115502847aa04640666b0dd9f458881e6f7f8968e4d499b58983b3403dc721",
+            "start": 113,
+            "end": 154,
+            "quote": "The broker runs on the corporate network."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "process:store-admin-console",
+        "predicate": "network-membership",
+        "value": "boundary:corporate-network",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "36115502847aa04640666b0dd9f458881e6f7f8968e4d499b58983b3403dc721",
+            "start": 621,
+            "end": 659,
+            "quote": "It also runs on the corporate network."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "principal:colleagues",
+        "predicate": "credential-presented",
+        "value": "credential:token",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "36115502847aa04640666b0dd9f458881e6f7f8968e4d499b58983b3403dc721",
+            "start": 242,
+            "end": 307,
+            "quote": "Once the broker has signed a colleague in it issues them a token."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "credential:token",
+        "predicate": "credential-expiry",
+        "value": "expires",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "36115502847aa04640666b0dd9f458881e6f7f8968e4d499b58983b3403dc721",
+            "start": 1351,
+            "end": 1383,
+            "quote": "Tokens are good for twelve hours"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "artifact:token",
+        "predicate": "signature-verification",
+        "value": "verified",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "36115502847aa04640666b0dd9f458881e6f7f8968e4d499b58983b3403dc721",
+            "start": 1012,
+            "end": 1086,
+            "quote": "Applications fetch the public half from the broker to check the signature."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "credential:signing-key",
+        "predicate": "credential-custody",
+        "value": "key store",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "36115502847aa04640666b0dd9f458881e6f7f8968e4d499b58983b3403dc721",
+            "start": 891,
+            "end": 958,
+            "quote": "The broker signs tokens with a signing key it keeps in a key store."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "credential:signing-key",
+        "predicate": "credential-sharing",
+        "value": "shared",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "36115502847aa04640666b0dd9f458881e6f7f8968e4d499b58983b3403dc721",
+            "start": 959,
+            "end": 1011,
+            "quote": "The same key signs the tokens for every application."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "principal:holder",
+        "predicate": "authorization-grant",
+        "value": "change prices and void transactions",
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "store admin console"
+          },
+          {
+            "kind": "operation",
+            "value": "change prices and void transactions"
+          },
+          {
+            "kind": "condition",
+            "value": "token has the store-manager group"
+          }
+        ],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "36115502847aa04640666b0dd9f458881e6f7f8968e4d499b58983b3403dc721",
+            "start": 660,
+            "end": 772,
+            "quote": "If the token has the store-manager group in it, the console lets the holder change prices and void transactions."
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "principal:colleagues",
+        "predicate": "mfa-requirement",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "silent",
+        "support": [],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      }
+    ]
+  },
+  "issues": [],
+  "projection": [
+    {
+      "element_id": "process:identity-broker",
+      "attribute": "trust_zone",
+      "value": "boundary:corporate-network",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~process:identity-broker~any~boundary:corporate-network"
+      ]
+    },
+    {
+      "element_id": "process:store-admin-console",
+      "attribute": "trust_zone",
+      "value": "boundary:corporate-network",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~process:store-admin-console~any~boundary:corporate-network"
+      ]
+    }
+  ],
+  "stages": {
+    "source_facts": {
+      "mentions": [
+        {
+          "handle": "colleagues",
+          "text": "colleague",
+          "roles": [
+            "person"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Colleagues sign in to it from wherever they are, including their own devices at home."
+            }
+          ]
+        },
+        {
+          "handle": "franchise_colleagues",
+          "text": "franchise colleague",
+          "roles": [
+            "person"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Franchise colleagues do not have staff accounts with us; their own identity provider vouches for them and the broker takes that as a sign-in."
+            }
+          ]
+        },
+        {
+          "handle": "identity_broker",
+          "text": "identity broker",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Everything colleagues use signs them in through one identity broker."
+            }
+          ]
+        },
+        {
+          "handle": "corporate_network",
+          "text": "corporate network",
+          "roles": [
+            "network-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The broker runs on the corporate network."
+            }
+          ]
+        },
+        {
+          "handle": "home",
+          "text": "home",
+          "roles": [
+            "tenant-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "including their own devices at home"
+            }
+          ]
+        },
+        {
+          "handle": "applications",
+          "text": "application",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Every application takes that token and decides what the colleague may do from the groups in it."
+            }
+          ]
+        },
+        {
+          "handle": "store_admin_console",
+          "text": "store admin console",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The store admin console is one of those applications."
+            }
+          ]
+        },
+        {
+          "handle": "stores",
+          "text": "store",
+          "roles": [
+            "other-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "so a store-manager token works against every store."
+            }
+          ]
+        },
+        {
+          "handle": "franchise_stores",
+          "text": "franchise store",
+          "roles": [
+            "tenant-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "We also let the franchise stores in."
+            }
+          ]
+        },
+        {
+          "handle": "hr_system",
+          "text": "HR system",
+          "roles": [
+            "external-system"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "it comes from the HR system overnight."
+            }
+          ]
+        },
+        {
+          "handle": "key_store",
+          "text": "key store",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "it keeps in a key store."
+            }
+          ]
+        },
+        {
+          "handle": "directory",
+          "text": "directory",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The broker keeps the colleagues and the groups they are in its own directory."
+            }
+          ]
+        },
+        {
+          "handle": "audit_log",
+          "text": "audit log",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The broker writes sign-ins to an audit log."
+            }
+          ]
+        },
+        {
+          "handle": "identity_provider",
+          "text": "identity provider",
+          "roles": [
+            "external-system"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "their own identity provider vouches for them"
+            }
+          ]
+        },
+        {
+          "handle": "holder",
+          "text": "holder",
+          "roles": [
+            "person"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "the console lets the holder change prices and void transactions."
+            }
+          ]
+        }
+      ],
+      "interactions": [
+        {
+          "handle": "colleague_signs_in",
+          "initiator": "colleagues",
+          "receiver": "identity_broker",
+          "action": "sign in",
+          "protocol": "identity broker",
+          "operations": "unknown",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Colleagues sign in to it from wherever they are"
+            }
+          ]
+        },
+        {
+          "handle": "broker_issues_token",
+          "initiator": "identity_broker",
+          "receiver": "colleagues",
+          "action": "issue token",
+          "protocol": "identity broker",
+          "operations": "write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Once the broker has signed a colleague in it issues them a token."
+            }
+          ]
+        },
+        {
+          "handle": "applications_fetch_key",
+          "initiator": "applications",
+          "receiver": "identity_broker",
+          "action": "fetch public half",
+          "protocol": "identity broker",
+          "operations": "read",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Applications fetch the public half from the broker to check the signature."
+            }
+          ]
+        },
+        {
+          "handle": "broker_pulls_changes",
+          "initiator": "identity_broker",
+          "receiver": "hr_system",
+          "action": "pull changes",
+          "protocol": "overnight directory update",
+          "operations": "read",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The broker pulls the changes once a night"
+            }
+          ]
+        },
+        {
+          "handle": "broker_writes_log",
+          "initiator": "identity_broker",
+          "receiver": "audit_log",
+          "action": "write sign-ins",
+          "protocol": "audit logging",
+          "operations": "write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The broker writes sign-ins to an audit log."
+            }
+          ]
+        },
+        {
+          "handle": "provider_vouches",
+          "initiator": "identity_provider",
+          "receiver": "identity_broker",
+          "action": "vouch for colleagues",
+          "protocol": "identity provider",
+          "operations": "write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "their own identity provider vouches for them and the broker takes that as a sign-in."
+            }
+          ]
+        },
+        {
+          "handle": "holder_changes_prices",
+          "initiator": "holder",
+          "receiver": "store_admin_console",
+          "action": "change prices",
+          "protocol": "application authorization",
+          "operations": "write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "the console lets the holder change prices"
+            }
+          ]
+        },
+        {
+          "handle": "holder_voids_transactions",
+          "initiator": "holder",
+          "receiver": "store_admin_console",
+          "action": "void transactions",
+          "protocol": "application authorization",
+          "operations": "write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "and void transactions."
+            }
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "handle": "f1",
+          "subject_kind": "mention",
+          "subject": "identity_broker",
+          "predicate": "network-membership",
+          "value": "corporate_network",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The broker runs on the corporate network."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f2",
+          "subject_kind": "mention",
+          "subject": "store_admin_console",
+          "predicate": "network-membership",
+          "value": "corporate_network",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "It also runs on the corporate network."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f3",
+          "subject_kind": "interaction",
+          "subject": "colleague_signs_in",
+          "predicate": "authentication-mechanism",
+          "value": "identity broker",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Everything colleagues use signs them in through one identity broker."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f4",
+          "subject_kind": "principal",
+          "subject": "colleagues",
+          "predicate": "credential-presented",
+          "value": "token",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Once the broker has signed a colleague in it issues them a token."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f5",
+          "subject_kind": "credential",
+          "subject": "token",
+          "predicate": "credential-expiry",
+          "value": "expires",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Tokens are good for twelve hours"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f6",
+          "subject_kind": "artifact",
+          "subject": "token",
+          "predicate": "signature-verification",
+          "value": "verified",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Applications fetch the public half from the broker to check the signature."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f7",
+          "subject_kind": "credential",
+          "subject": "signing key",
+          "predicate": "credential-custody",
+          "value": "key store",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The broker signs tokens with a signing key it keeps in a key store."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f8",
+          "subject_kind": "credential",
+          "subject": "signing key",
+          "predicate": "credential-sharing",
+          "value": "shared",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The same key signs the tokens for every application."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f9",
+          "subject_kind": "principal",
+          "subject": "holder",
+          "predicate": "authorization-grant",
+          "value": "change prices and void transactions",
+          "scope": [
+            {
+              "kind": "resource",
+              "value": "store admin console"
+            },
+            {
+              "kind": "operation",
+              "value": "change prices and void transactions"
+            },
+            {
+              "kind": "condition",
+              "value": "token has the store-manager group"
+            }
+          ],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "If the token has the store-manager group in it, the console lets the holder change prices and void transactions."
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f10",
+          "subject_kind": "interaction",
+          "subject": "colleague_signs_in",
+          "predicate": "mfa-requirement",
+          "value": "unknown",
+          "reason": "silent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f11",
+          "subject_kind": "principal",
+          "subject": "colleagues",
+          "predicate": "mfa-requirement",
+          "value": "unknown",
+          "reason": "silent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f12",
+          "subject_kind": "mention",
+          "subject": "directory",
+          "predicate": "storage-encryption",
+          "value": "unknown",
+          "reason": "silent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f13",
+          "subject_kind": "mention",
+          "subject": "audit_log",
+          "predicate": "storage-encryption",
+          "value": "unknown",
+          "reason": "silent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "",
+          "exclusive": false
+        }
+      ],
+      "unresolved": [
+        {
+          "handle": "u1",
+          "question": "Which colleagues is the franchise identity provider allowed to vouch for?",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "We have not written down which colleagues that provider is allowed to vouch for."
+            }
+          ]
+        },
+        {
+          "handle": "u2",
+          "question": "What does the audit log record, and does it cover the franchise sign-in route?",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Nobody has written down what that log records, whether it covers the franchise route"
+            }
+          ]
+        },
+        {
+          "handle": "u3",
+          "question": "Are the directory and audit log encrypted where they sit?",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "or whether the directory or the log are encrypted where they sit."
+            }
+          ]
+        },
+        {
+          "handle": "u4",
+          "question": "Are colleagues required to use a second factor?",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Nor has anyone written down whether colleagues are asked for a second factor."
+            }
+          ]
+        }
+      ]
+    },
+    "bundle_dispositions": [
+      {
+        "handle": "corporate_network",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "boundary:corporate-network",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "home",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "boundary:home",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "stores",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "boundary:store",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "franchise_stores",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "boundary:franchise-store",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "colleagues",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "unplaced",
+        "message": "no source places 'colleague', and the bundle names 4 zones, so the graph's required trust_zone would be a choice nobody stated"
+      },
+      {
+        "handle": "franchise_colleagues",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "unplaced",
+        "message": "no source places 'franchise colleague', and the bundle names 4 zones, so the graph's required trust_zone would be a choice nobody stated"
+      },
+      {
+        "handle": "identity_broker",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "process:identity-broker",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "applications",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "unplaced",
+        "message": "no source places 'application', and the bundle names 4 zones, so the graph's required trust_zone would be a choice nobody stated"
+      },
+      {
+        "handle": "store_admin_console",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "process:store-admin-console",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "hr_system",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "unplaced",
+        "message": "no source places 'HR system', and the bundle names 4 zones, so the graph's required trust_zone would be a choice nobody stated"
+      },
+      {
+        "handle": "key_store",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "unplaced",
+        "message": "no source places 'key store', and the bundle names 4 zones, so the graph's required trust_zone would be a choice nobody stated"
+      },
+      {
+        "handle": "directory",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "unplaced",
+        "message": "no source places 'directory', and the bundle names 4 zones, so the graph's required trust_zone would be a choice nobody stated"
+      },
+      {
+        "handle": "audit_log",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "unplaced",
+        "message": "no source places 'audit log', and the bundle names 4 zones, so the graph's required trust_zone would be a choice nobody stated"
+      },
+      {
+        "handle": "identity_provider",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "unplaced",
+        "message": "no source places 'identity provider', and the bundle names 4 zones, so the graph's required trust_zone would be a choice nobody stated"
+      },
+      {
+        "handle": "holder",
+        "kind": "mention",
+        "disposition": "unsupported",
+        "target": "",
+        "code": "unplaced",
+        "message": "no source places 'holder', and the bundle names 4 zones, so the graph's required trust_zone would be a choice nobody stated"
+      },
+      {
+        "handle": "colleague_signs_in",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "initiator 'colleagues' names no placed component of this bundle"
+      },
+      {
+        "handle": "broker_issues_token",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "receiver 'colleagues' names no placed component of this bundle"
+      },
+      {
+        "handle": "applications_fetch_key",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "initiator 'applications' names no placed component of this bundle"
+      },
+      {
+        "handle": "broker_pulls_changes",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "receiver 'hr_system' names no placed component of this bundle"
+      },
+      {
+        "handle": "broker_writes_log",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "receiver 'audit_log' names no placed component of this bundle"
+      },
+      {
+        "handle": "provider_vouches",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "initiator 'identity_provider' names no placed component of this bundle"
+      },
+      {
+        "handle": "holder_changes_prices",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "initiator 'holder' names no placed component of this bundle"
+      },
+      {
+        "handle": "holder_voids_transactions",
+        "kind": "interaction",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-endpoint",
+        "message": "initiator 'holder' names no placed component of this bundle"
+      },
+      {
+        "handle": "f3",
+        "kind": "fact",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-subject",
+        "message": "subject 'colleague_signs_in' names no interaction this bundle built"
+      },
+      {
+        "handle": "f10",
+        "kind": "fact",
+        "disposition": "rejected",
+        "target": "",
+        "code": "dangling-subject",
+        "message": "subject 'colleague_signs_in' names no interaction this bundle built"
+      },
+      {
+        "handle": "f12",
+        "kind": "fact",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "unplaced-subject",
+        "message": "the sources state this about 'directory', and the graph holds no zone to place that component in"
+      },
+      {
+        "handle": "f13",
+        "kind": "fact",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "unplaced-subject",
+        "message": "the sources state this about 'audit_log', and the graph holds no zone to place that component in"
+      },
+      {
+        "handle": "f1",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "process:identity-broker",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f2",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "process:store-admin-console",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f4",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "colleagues",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f5",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "token",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f6",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "token",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f7",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "signing key",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f8",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "signing key",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f9",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "holder",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f11",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "colleagues",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "u1",
+        "kind": "unresolved",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "open-question",
+        "message": "Which colleagues is the franchise identity provider allowed to vouch for?"
+      },
+      {
+        "handle": "u2",
+        "kind": "unresolved",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "open-question",
+        "message": "What does the audit log record, and does it cover the franchise sign-in route?"
+      },
+      {
+        "handle": "u3",
+        "kind": "unresolved",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "open-question",
+        "message": "Are the directory and audit log encrypted where they sit?"
+      },
+      {
+        "handle": "u4",
+        "kind": "unresolved",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "open-question",
+        "message": "Are colleagues required to use a second factor?"
+      }
+    ],
+    "extracted_model": {
+      "external_entities": [],
+      "processes": [
+        {
+          "id": "process:identity-broker",
+          "name": "identity broker",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Everything colleagues use signs them in through one identity broker.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:corporate-network",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:store-admin-console",
+          "name": "store admin console",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The store admin console is one of those applications.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:corporate-network",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        }
+      ],
+      "data_stores": [],
+      "data_flows": [],
+      "trust_boundaries": [
+        {
+          "id": "boundary:corporate-network",
+          "name": "corporate network",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The broker runs on the corporate network.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        },
+        {
+          "id": "boundary:home",
+          "name": "home",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "including their own devices at home",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "tenant"
+        },
+        {
+          "id": "boundary:store",
+          "name": "store",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "so a store-manager token works against every store.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "other"
+        },
+        {
+          "id": "boundary:franchise-store",
+          "name": "franchise store",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "We also let the franchise stores in.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "tenant"
+        }
+      ],
+      "assumptions": []
+    },
+    "valid_model": {
+      "external_entities": [],
+      "processes": [
+        {
+          "id": "process:identity-broker",
+          "name": "identity broker",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Everything colleagues use signs them in through one identity broker.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:corporate-network",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:store-admin-console",
+          "name": "store admin console",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The store admin console is one of those applications.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:corporate-network",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        }
+      ],
+      "data_stores": [],
+      "data_flows": [],
+      "trust_boundaries": [
+        {
+          "id": "boundary:corporate-network",
+          "name": "corporate network",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The broker runs on the corporate network.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        },
+        {
+          "id": "boundary:home",
+          "name": "home",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "including their own devices at home",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "tenant"
+        },
+        {
+          "id": "boundary:store",
+          "name": "store",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "so a store-manager token works against every store.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "other"
+        },
+        {
+          "id": "boundary:franchise-store",
+          "name": "franchise store",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "We also let the franchise stores in.",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "tenant"
+        }
+      ],
+      "assumptions": []
+    }
+  }
+}

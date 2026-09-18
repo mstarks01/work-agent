@@ -468,6 +468,12 @@ def heads_from_reports(
                 CatalogIssue.model_validate(issue)
                 for issue in written.get("issues", ())
             ),
+            # What every earlier node wrote, which for a facts-first head is
+            # the bundle and its dispositions. A charge that has to say whether
+            # a row was read and dropped or never read reads them, and reading
+            # the file a second time beside this one would be a second reader
+            # of one archive.
+            stages=written.get("stages", {}),
         )
     return results
 

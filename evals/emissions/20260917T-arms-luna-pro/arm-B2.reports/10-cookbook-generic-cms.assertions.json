@@ -1,0 +1,1042 @@
+{
+  "proposal": {
+    "assertions": [
+      {
+        "subject_type": "component",
+        "subject": "process:web-server",
+        "predicate": "network-membership",
+        "value": "boundary:hosted-network",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The web server runs the CMS and keeps pages, accounts and comments in a MySQL\ndatabase on the same hosted network"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "process:cms",
+        "predicate": "network-membership",
+        "value": "boundary:hosted-network",
+        "reason": null,
+        "scope": [],
+        "basis": "inferred",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The web server runs the CMS"
+          }
+        ],
+        "explanation": "The CMS runs on the web server, which the source places on the hosted network.",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:mysql-database",
+        "predicate": "network-membership",
+        "value": "boundary:hosted-network",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "a MySQL\ndatabase on the same hosted network"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "interaction",
+        "subject": "flow:process:web-server>entity:cdn>pushes-them-up",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "component",
+        "subject": "store:mysql-database",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "reason": "hedged",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "principal",
+        "subject": "admin",
+        "predicate": "administrative-authority",
+        "value": "store:mysql-database",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "There is an admin who maintains the database directly"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      {
+        "subject_type": "principal",
+        "subject": "admin",
+        "predicate": "authorization-grant",
+        "value": "maintain the database",
+        "reason": null,
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "m3"
+          },
+          {
+            "kind": "operation",
+            "value": "maintain"
+          }
+        ],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "There is an admin who maintains the database directly"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      }
+    ]
+  },
+  "catalog": {
+    "registry_version": 3,
+    "subjects": [
+      {
+        "id": "boundary:hosted-network",
+        "type": "zone",
+        "label": "hosted network"
+      },
+      {
+        "id": "flow:process:web-server>entity:cdn>pushes-them-up",
+        "type": "interaction",
+        "label": "pushes them up"
+      },
+      {
+        "id": "principal:admin",
+        "type": "principal",
+        "label": "admin"
+      },
+      {
+        "id": "process:cms",
+        "type": "component",
+        "label": "CMS"
+      },
+      {
+        "id": "process:web-server",
+        "type": "component",
+        "label": "web server"
+      },
+      {
+        "id": "store:mysql-database",
+        "type": "component",
+        "label": "MySQL database"
+      }
+    ],
+    "entries": [
+      {
+        "subject": "process:web-server",
+        "predicate": "network-membership",
+        "value": "boundary:hosted-network",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "11d2a58f0e1d5773054f0a72d222b3cc96f889cdd0206dd3656495a3d5fe8313",
+            "start": 116,
+            "end": 230,
+            "quote": "The web server runs the CMS and keeps pages, accounts and comments in a MySQL\ndatabase on the same hosted network"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "process:cms",
+        "predicate": "network-membership",
+        "value": "boundary:hosted-network",
+        "scope": [],
+        "basis": "inferred",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "11d2a58f0e1d5773054f0a72d222b3cc96f889cdd0206dd3656495a3d5fe8313",
+            "start": 116,
+            "end": 143,
+            "quote": "The web server runs the CMS"
+          }
+        ],
+        "premises": [],
+        "explanation": "The CMS runs on the web server, which the source places on the hosted network.",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:mysql-database",
+        "predicate": "network-membership",
+        "value": "boundary:hosted-network",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "11d2a58f0e1d5773054f0a72d222b3cc96f889cdd0206dd3656495a3d5fe8313",
+            "start": 186,
+            "end": 230,
+            "quote": "a MySQL\ndatabase on the same hosted network"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "flow:process:web-server>entity:cdn>pushes-them-up",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "silent",
+        "support": [],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "store:mysql-database",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "scope": [],
+        "basis": "stated",
+        "reason": "hedged",
+        "support": [],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "principal:admin",
+        "predicate": "administrative-authority",
+        "value": "store:mysql-database",
+        "scope": [],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "11d2a58f0e1d5773054f0a72d222b3cc96f889cdd0206dd3656495a3d5fe8313",
+            "start": 424,
+            "end": 477,
+            "quote": "There is an admin who maintains the database directly"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      },
+      {
+        "subject": "principal:admin",
+        "predicate": "authorization-grant",
+        "value": "maintain the database",
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "m3"
+          },
+          {
+            "kind": "operation",
+            "value": "maintain"
+          }
+        ],
+        "basis": "stated",
+        "reason": null,
+        "support": [
+          {
+            "source_label": "System description",
+            "digest": "11d2a58f0e1d5773054f0a72d222b3cc96f889cdd0206dd3656495a3d5fe8313",
+            "start": 424,
+            "end": 477,
+            "quote": "There is an admin who maintains the database directly"
+          }
+        ],
+        "premises": [],
+        "explanation": "",
+        "exclusive": false,
+        "assessment": "unchecked",
+        "assessor": ""
+      }
+    ]
+  },
+  "issues": [],
+  "projection": [
+    {
+      "element_id": "flow:process:web-server>entity:cdn>pushes-them-up",
+      "attribute": "authentication",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:authentication-mechanism~flow:process:web-server>entity:cdn>pushes-them-up~any~unknown"
+      ]
+    },
+    {
+      "element_id": "process:cms",
+      "attribute": "trust_zone",
+      "value": "boundary:hosted-network",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~process:cms~any~boundary:hosted-network"
+      ]
+    },
+    {
+      "element_id": "process:web-server",
+      "attribute": "trust_zone",
+      "value": "boundary:hosted-network",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~process:web-server~any~boundary:hosted-network"
+      ]
+    },
+    {
+      "element_id": "store:mysql-database",
+      "attribute": "encryption_at_rest",
+      "value": "unknown",
+      "reason": "unknown",
+      "rows": [
+        "assertion:storage-encryption~store:mysql-database~any~unknown"
+      ]
+    },
+    {
+      "element_id": "store:mysql-database",
+      "attribute": "trust_zone",
+      "value": "boundary:hosted-network",
+      "reason": "stated",
+      "rows": [
+        "assertion:network-membership~store:mysql-database~any~boundary:hosted-network"
+      ]
+    }
+  ],
+  "stages": {
+    "source_facts": {
+      "mentions": [
+        {
+          "handle": "m1",
+          "text": "web server",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The web server runs the CMS"
+            }
+          ]
+        },
+        {
+          "handle": "m2",
+          "text": "CMS",
+          "roles": [
+            "process"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "runs the CMS"
+            }
+          ]
+        },
+        {
+          "handle": "m3",
+          "text": "MySQL database",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "a MySQL\ndatabase on the same hosted network"
+            }
+          ]
+        },
+        {
+          "handle": "m4",
+          "text": "hosted network",
+          "roles": [
+            "network-zone"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "same hosted network"
+            }
+          ]
+        },
+        {
+          "handle": "m5",
+          "text": "CDN",
+          "roles": [
+            "external-system"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Readers fetch those from the CDN over HTTP"
+            }
+          ]
+        },
+        {
+          "handle": "m6",
+          "text": "CDN's bucket",
+          "roles": [
+            "store"
+          ],
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "the CDN's bucket"
+            }
+          ]
+        }
+      ],
+      "interactions": [
+        {
+          "handle": "i1",
+          "initiator": "m1",
+          "receiver": "m3",
+          "action": "keeps pages",
+          "protocol": "MySQL",
+          "operations": "write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The web server runs the CMS and keeps pages, accounts and comments in a MySQL\ndatabase"
+            }
+          ]
+        },
+        {
+          "handle": "i2",
+          "initiator": "m1",
+          "receiver": "m5",
+          "action": "pushes them up",
+          "protocol": "unspecified",
+          "operations": "write",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "When new assets are published the web server pushes them up to the CDN's bucket"
+            }
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "handle": "f1",
+          "subject_kind": "mention",
+          "subject": "m1",
+          "predicate": "network-membership",
+          "value": "m4",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The web server runs the CMS and keeps pages, accounts and comments in a MySQL\ndatabase on the same hosted network"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f2",
+          "subject_kind": "mention",
+          "subject": "m2",
+          "predicate": "network-membership",
+          "value": "m4",
+          "scope": [],
+          "basis": "inferred",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "The web server runs the CMS"
+            }
+          ],
+          "explanation": "The CMS runs on the web server, which the source places on the hosted network.",
+          "exclusive": false
+        },
+        {
+          "handle": "f3",
+          "subject_kind": "mention",
+          "subject": "m3",
+          "predicate": "network-membership",
+          "value": "m4",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "a MySQL\ndatabase on the same hosted network"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f4",
+          "subject_kind": "interaction",
+          "subject": "i2",
+          "predicate": "authentication-mechanism",
+          "value": "unknown",
+          "reason": "silent",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f5",
+          "subject_kind": "mention",
+          "subject": "m3",
+          "predicate": "storage-encryption",
+          "value": "unknown",
+          "reason": "hedged",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f6",
+          "subject_kind": "principal",
+          "subject": "admin",
+          "predicate": "administrative-authority",
+          "value": "m3",
+          "scope": [],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "There is an admin who maintains the database directly"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        },
+        {
+          "handle": "f7",
+          "subject_kind": "principal",
+          "subject": "admin",
+          "predicate": "authorization-grant",
+          "value": "maintain the database",
+          "scope": [
+            {
+              "kind": "resource",
+              "value": "m3"
+            },
+            {
+              "kind": "operation",
+              "value": "maintain"
+            }
+          ],
+          "basis": "stated",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "There is an admin who maintains the database directly"
+            }
+          ],
+          "explanation": "",
+          "exclusive": false
+        }
+      ],
+      "unresolved": [
+        {
+          "handle": "u1",
+          "question": "How is the push to the CDN authenticated?",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "Nothing here tells you how the push to the CDN is authenticated"
+            }
+          ]
+        },
+        {
+          "handle": "u2",
+          "question": "Is the database encrypted on disk?",
+          "quotes": [
+            {
+              "source_label": "System description",
+              "quote": "I could not tell you whether the database is encrypted on disk"
+            }
+          ]
+        }
+      ]
+    },
+    "bundle_dispositions": [
+      {
+        "handle": "m4",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "boundary:hosted-network",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m1",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "process:web-server",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m2",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "process:cms",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m3",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "store:mysql-database",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m5",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "entity:cdn",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "m6",
+        "kind": "mention",
+        "disposition": "consumed",
+        "target": "store:cdn-s-bucket",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "i1",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:process:web-server>store:mysql-database>keeps-pages",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "i2",
+        "kind": "interaction",
+        "disposition": "consumed",
+        "target": "flow:process:web-server>entity:cdn>pushes-them-up",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f1",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "process:web-server",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f2",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "process:cms",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f3",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "store:mysql-database",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f4",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "flow:process:web-server>entity:cdn>pushes-them-up",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f5",
+        "kind": "fact",
+        "disposition": "consumed",
+        "target": "store:mysql-database",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f6",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "admin",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "f7",
+        "kind": "fact",
+        "disposition": "preserved",
+        "target": "admin",
+        "code": "",
+        "message": ""
+      },
+      {
+        "handle": "u1",
+        "kind": "unresolved",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "open-question",
+        "message": "How is the push to the CDN authenticated?"
+      },
+      {
+        "handle": "u2",
+        "kind": "unresolved",
+        "disposition": "unresolved",
+        "target": "",
+        "code": "open-question",
+        "message": "Is the database encrypted on disk?"
+      }
+    ],
+    "extracted_model": {
+      "external_entities": [
+        {
+          "id": "entity:cdn",
+          "name": "CDN",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Readers fetch those from the CDN over HTTP",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "external-system",
+          "trust_zone": "boundary:hosted-network"
+        }
+      ],
+      "processes": [
+        {
+          "id": "process:web-server",
+          "name": "web server",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The web server runs the CMS",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:hosted-network",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:cms",
+          "name": "CMS",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "runs the CMS",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:hosted-network",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        }
+      ],
+      "data_stores": [
+        {
+          "id": "store:mysql-database",
+          "name": "MySQL database",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "a MySQL\ndatabase on the same hosted network",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:hosted-network",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        },
+        {
+          "id": "store:cdn-s-bucket",
+          "name": "CDN's bucket",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "the CDN's bucket",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:hosted-network",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        }
+      ],
+      "data_flows": [
+        {
+          "id": "flow:process:web-server>store:mysql-database>keeps-pages",
+          "name": "keeps pages",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The web server runs the CMS and keeps pages, accounts and comments in a MySQL\ndatabase",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:web-server",
+          "destination": "store:mysql-database",
+          "protocol": "MySQL",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        },
+        {
+          "id": "flow:process:web-server>entity:cdn>pushes-them-up",
+          "name": "pushes them up",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "When new assets are published the web server pushes them up to the CDN's bucket",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:web-server",
+          "destination": "entity:cdn",
+          "protocol": "unspecified",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        }
+      ],
+      "trust_boundaries": [
+        {
+          "id": "boundary:hosted-network",
+          "name": "hosted network",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "same hosted network",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        }
+      ],
+      "assumptions": [
+        {
+          "assumption": "CMS sits in hosted network",
+          "element_id": "process:cms",
+          "attribute": "trust_zone",
+          "basis": "no source places this component; the placement is inferred"
+        },
+        {
+          "assumption": "CDN sits in the one zone the sources describe",
+          "element_id": "entity:cdn",
+          "attribute": "trust_zone",
+          "basis": "no source places this component, and the bundle names one zone"
+        },
+        {
+          "assumption": "CDN's bucket sits in the one zone the sources describe",
+          "element_id": "store:cdn-s-bucket",
+          "attribute": "trust_zone",
+          "basis": "no source places this component, and the bundle names one zone"
+        }
+      ]
+    },
+    "valid_model": {
+      "external_entities": [
+        {
+          "id": "entity:cdn",
+          "name": "CDN",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "Readers fetch those from the CDN over HTTP",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "external-system",
+          "trust_zone": "boundary:hosted-network"
+        }
+      ],
+      "processes": [
+        {
+          "id": "process:web-server",
+          "name": "web server",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The web server runs the CMS",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:hosted-network",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        },
+        {
+          "id": "process:cms",
+          "name": "CMS",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "runs the CMS",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:hosted-network",
+          "exposure": "unknown",
+          "interface_kind": "unknown"
+        }
+      ],
+      "data_stores": [
+        {
+          "id": "store:mysql-database",
+          "name": "MySQL database",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "a MySQL\ndatabase on the same hosted network",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:hosted-network",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        },
+        {
+          "id": "store:cdn-s-bucket",
+          "name": "CDN's bucket",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "the CDN's bucket",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "technology": "unknown",
+          "trust_zone": "boundary:hosted-network",
+          "data_classification": "unknown",
+          "encryption_at_rest": "unknown"
+        }
+      ],
+      "data_flows": [
+        {
+          "id": "flow:process:web-server>store:mysql-database>keeps-pages",
+          "name": "keeps pages",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "The web server runs the CMS and keeps pages, accounts and comments in a MySQL\ndatabase",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:web-server",
+          "destination": "store:mysql-database",
+          "protocol": "MySQL",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        },
+        {
+          "id": "flow:process:web-server>entity:cdn>pushes-them-up",
+          "name": "pushes them up",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "When new assets are published the web server pushes them up to the CDN's bucket",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "source": "process:web-server",
+          "destination": "entity:cdn",
+          "protocol": "unspecified",
+          "authentication": "unknown",
+          "data_description": "unknown",
+          "encryption_in_transit": "unknown",
+          "operations": "write"
+        }
+      ],
+      "trust_boundaries": [
+        {
+          "id": "boundary:hosted-network",
+          "name": "hosted network",
+          "description": "",
+          "assets": [],
+          "source_excerpt": "same hosted network",
+          "source_label": "System description",
+          "source_speaker": "",
+          "notes": "",
+          "kind": "network"
+        }
+      ],
+      "assumptions": [
+        {
+          "assumption": "CMS sits in hosted network",
+          "element_id": "process:cms",
+          "attribute": "trust_zone",
+          "basis": "no source places this component; the placement is inferred"
+        },
+        {
+          "assumption": "CDN sits in the one zone the sources describe",
+          "element_id": "entity:cdn",
+          "attribute": "trust_zone",
+          "basis": "no source places this component, and the bundle names one zone"
+        },
+        {
+          "assumption": "CDN's bucket sits in the one zone the sources describe",
+          "element_id": "store:cdn-s-bucket",
+          "attribute": "trust_zone",
+          "basis": "no source places this component, and the bundle names one zone"
+        }
+      ]
+    }
+  }
+}

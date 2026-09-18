@@ -1004,52 +1004,65 @@ def bind_assertions(
 
 @dataclass(frozen=True)
 class Arm:
-    """What one archived sweep was: the node's instruction and the models that answered it.
+    """What one archived sweep was: the reading route, and the models that answered it.
 
-    ``models`` is what answered the archived node, read off the sweep's own
+    ``models`` is what answered the archived route, read off the sweep's own
     execution record, never the tier table. Two sweeps with one tier table
-    and one prompt are two arms when the node ran on different tiers, which
+    and one prompt are two arms when the route ran on different tiers, which
     is exactly the per-phase model comparison #961 step 6 asks for.
+
+    ``nodes`` and ``instructions`` are tuples because a reading route can be
+    more than one call: #1003's arm E splits the reading into ``inventory``
+    and ``rows``, and each call carries its own prompt. A single-call route
+    holds one of each, which is every archived sweep before that arm.
     """
 
-    node: str
-    instruction: str
+    nodes: tuple[str, ...]
+    instructions: tuple[str, ...]
     models: tuple[str, ...]
 
     @property
     def label(self) -> str:
-        return f"{self.node}@{self.instruction[:12]} on {', '.join(self.models)}"
+        route = "+".join(self.nodes)
+        digests = ",".join(digest[:12] for digest in self.instructions)
+        return f"{route}@{digests} on {', '.join(self.models)}"
 
     def to_json(self) -> dict[str, Any]:
         return {
-            "node": self.node,
-            "instruction": self.instruction,
+            "nodes": list(self.nodes),
+            "instructions": list(self.instructions),
             "models": list(self.models),
         }
 
 
-#: The node whose emission each mode archives. An end-to-end sweep keeps the
-#: first pass of the same node the extraction mode does, so it replays under
-#: the same fates; its repair's emission is archived and not graded here.
-#: Which node's instruction places a sweep on an arm, by mode. A tuple because
-#: one mode's graph can be built two ways: #1003's head-only mode reads its
-#: sources through ``extract`` or through ``facts``, and which of them a sweep
-#: ran is the very thing that separates its arms — so the reader takes whichever
-#: the sweep actually carries and refuses a sweep carrying both.
-NODE_OF: Mapping[str, tuple[str, ...]] = {
-    "extraction": ("extract",),
-    "end-to-end": ("extract",),
-    "assertions": ("assert",),
-    "heads": ("extract", "facts"),
+#: Which reading routes each mode admits, and so which nodes' instructions
+#: place a sweep on an arm. An end-to-end sweep keeps the first pass of the
+#: same node the extraction mode does, so it replays under the same fates; its
+#: repair's emission is archived and not graded here.
+#:
+#: **A route rather than a node**, because a reading can be more than one call.
+#: #1003's head-only mode builds its graph three ways: ``extract`` reads the
+#: sources into a graph, ``facts`` reads them into a bundle, and the split
+#: route reads them into a bundle over two calls. Which route a sweep ran is
+#: the very thing that separates its arms, so the reader takes the one route
+#: whose every node the sweep carries and refuses a sweep carrying two.
+#:
+#: A table keyed by mode, listing routes: a fourth route added to a mode is one
+#: entry here, and a sweep that ran it is placed rather than refused.
+ROUTES_OF: Mapping[str, tuple[tuple[str, ...], ...]] = {
+    "extraction": (("extract",),),
+    "end-to-end": (("extract",),),
+    "assertions": (("assert",),),
+    "heads": (("extract",), ("facts",), ("inventory", "rows")),
 }
 
 
 #: What each replayable mode keeps beside its artifact, and so which emission a
-#: replay grades. **Apart from** :data:`NODE_OF`, which answers a different
-#: question — which node's instruction places the sweep on an arm. The two gave
+#: replay grades. **Apart from** :data:`ROUTES_OF`, which answers a different
+#: question — which nodes' instructions place the sweep on an arm. The two gave
 #: one answer only while a mode's reading node and its kept emission moved
-#: together; #1003's head-only mode reads through ``extract`` or ``facts`` and
-#: keeps a catalog either way.
+#: together; #1003's head-only mode reads through ``extract``, through ``facts``
+#: or through the split route, and keeps a catalog every way.
 KEEPS: Mapping[str, str] = {
     "extraction": "extraction",
     "end-to-end": "extraction",
@@ -1059,34 +1072,40 @@ KEEPS: Mapping[str, str] = {
 
 
 def arm_of(artifact: EvalArtifact) -> Arm:
-    """Which prompt and which models an archived sweep ran, off its own record."""
+    """Which prompts and which models an archived sweep ran, off its own record.
+
+    One route of :data:`ROUTES_OF`, and one prompt per node of it. A sweep
+    carrying the nodes of two routes is two arms and is refused, and so is one
+    that carries the nodes of none.
+    """
     rows = artifact.block("instruction")
-    named = [
-        node
-        for node in NODE_OF[artifact.mode]
-        if any(row["node"] == node for row in rows)
-    ]
-    if len(named) != 1:
+    carried = {row["node"] for row in rows}
+    routes = [route for route in ROUTES_OF[artifact.mode] if set(route) <= carried]
+    if len(routes) != 1:
+        spelled = ["+".join(route) for route in ROUTES_OF[artifact.mode]]
         raise ValueError(
-            f"{artifact.path}: the instruction block names {len(named)} of"
-            f" {list(NODE_OF[artifact.mode])}, so the sweep cannot be placed on"
-            " one arm"
+            f"{artifact.path}: the instruction block names {len(routes)} of"
+            f" {spelled}, so the sweep cannot be placed on one arm"
         )
-    node = named[0]
-    digests = {row["sha256"] for row in rows if row["node"] == node}
-    if len(digests) != 1:
-        raise ValueError(
-            f"{artifact.path}: the instruction block names {len(digests)} digests"
-            f" for {node}, so the sweep cannot be placed on one arm"
-        )
-    executions = artifact.block("provenance")["node_runs"].get(node, [])
-    if not executions:
-        raise ValueError(
-            f"{artifact.path}: the provenance block records no execution of {node},"
-            " so the sweep cannot be placed on an arm"
-        )
-    models = tuple(sorted({execution["requested_model"] for execution in executions}))
-    return Arm(node, next(iter(digests)), models)
+    route = routes[0]
+    instructions = []
+    models: set[str] = set()
+    for node in route:
+        digests = {row["sha256"] for row in rows if row["node"] == node}
+        if len(digests) != 1:
+            raise ValueError(
+                f"{artifact.path}: the instruction block names {len(digests)}"
+                f" digests for {node}, so the sweep cannot be placed on one arm"
+            )
+        instructions.append(next(iter(digests)))
+        executions = artifact.block("provenance")["node_runs"].get(node, [])
+        if not executions:
+            raise ValueError(
+                f"{artifact.path}: the provenance block records no execution of"
+                f" {node}, so the sweep cannot be placed on an arm"
+            )
+        models.update(execution["requested_model"] for execution in executions)
+    return Arm(tuple(route), tuple(instructions), tuple(sorted(models)))
 
 
 @dataclass(frozen=True)
