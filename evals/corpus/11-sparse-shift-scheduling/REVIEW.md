@@ -222,7 +222,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### spoofing
 
-**1.** An attacker signs in to the scheduling web app as a colleague and reads that colleague's shifts and details, because how colleagues are authenticated is unverified.
+**1.** An attacker signs in to the scheduling web app as a colleague and reads that colleague's shifts and details, if colleague authentication does not stop them, which is unverified.
 
 - `flow:entity:colleague>process:scheduling-web-app>view-shifts`, `entity:colleague`
 - severity: medium/medium · verb: `impersonate`
@@ -230,7 +230,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**2.** An attacker signs in as a store manager and builds that store's rota, because how managers are authenticated is unverified.
+**2.** An attacker signs in as a store manager and builds that store's rota, if manager authentication does not stop them, which is unverified.
 
 - `flow:entity:store-manager>process:scheduling-web-app>build-rota`, `entity:store-manager`
 - severity: medium/high · verb: `impersonate`
@@ -238,11 +238,11 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**3.** An attacker presents itself to the file share as the payroll system and collects the weekly payroll export, since how the share identifies a collector is unverified.
+**3.** An attacker presents itself to the file share as the payroll system and collects the weekly payroll export, if the share does not identify and authorize a collector, which is unverified.
 
 - `flow:entity:payroll-system>store:file-share>collect-payroll-export`, `store:file-share`
 - severity: medium/high · verb: `impersonate`
-- This is the boundary crossing the source draws most clearly and says least about. The payroll team environment is a zone we are told nothing else about.
+- The export is sensitive, so who collects it is a question the source does not answer. The check is on the collector's identity and authorization, not on which zone either side sits in.
 
 > mark:
 
@@ -349,7 +349,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### elevation-of-privilege
 
-**15.** A colleague uses the shared app to build or change a rota as though they were a store manager, because the separation between the two roles is unverified.
+**15.** A colleague uses the shared app to build or change a rota as though they were a store manager, if the app does not enforce the separation between the two roles, which is unverified.
 
 - `process:scheduling-web-app`, `flow:entity:colleague>process:scheduling-web-app>view-shifts`
 - severity: medium/high · verb: `abuse-grant`
@@ -412,7 +412,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "2507fd3081003c1c94427ef81dcea36f6ca92f5358c965789b49ec4af89b6a60",
       "model.json": "252800813f3b60ff0937689d594ee0d29879b84595259d16ef4cd8f64e1e72f1",
       "claims/asvs.json": "47f787e3c526f8ddc7da2eac4d1739f3685c9b9e926a2bd66c72c26b9d997700",
-      "claims/stride.json": "e9148f9977acf9da7ca98d98abbf9271b2749904a6ec04edcc5ff39a627e0e7b"
+      "claims/stride.json": "7cda8c5d56a81c2eb10a168738932a1e4cf4655391e1c972e03917608800d789"
       }
     }
   }

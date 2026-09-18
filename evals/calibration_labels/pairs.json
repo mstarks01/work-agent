@@ -4111,7 +4111,7 @@
   {
     "case": "10-cookbook-generic-cms",
     "category": "spoofing",
-    "reference_claim": "An attacker publishes assets into the CDN bucket as if they came from the web server, because how that push is authenticated is unverified.",
+    "reference_claim": "An attacker publishes assets into the CDN bucket as if they came from the web server, if the push accepts a writer it does not authenticate, which the source leaves unverified.",
     "reference_element_ids": [
       "flow:process:web-server>store:cdn-bucket>asset-publish",
       "store:cdn-bucket"
@@ -4129,7 +4129,7 @@
   {
     "case": "10-cookbook-generic-cms",
     "category": "spoofing",
-    "reference_claim": "An attacker publishes assets into the CDN bucket as if they came from the web server, because how that push is authenticated is unverified.",
+    "reference_claim": "An attacker publishes assets into the CDN bucket as if they came from the web server, if the push accepts a writer it does not authenticate, which the source leaves unverified.",
     "reference_element_ids": [
       "flow:process:web-server>store:cdn-bucket>asset-publish",
       "store:cdn-bucket"
@@ -4537,7 +4537,7 @@
   {
     "case": "10-cookbook-generic-cms",
     "category": "elevation-of-privilege",
-    "reference_claim": "An attacker who intercepts the admin's unencrypted session obtains database authority that bypasses every control the CMS applies.",
+    "reference_claim": "An attacker who actively intercepts the admin's unencrypted session, or captures a reusable credential from it, obtains the authority of the admin's database account and bypasses the controls the CMS applies.",
     "reference_element_ids": [
       "flow:entity:admin>store:mysql-database>direct-administration",
       "store:mysql-database"
@@ -4555,7 +4555,7 @@
   {
     "case": "10-cookbook-generic-cms",
     "category": "elevation-of-privilege",
-    "reference_claim": "An attacker who intercepts the admin's unencrypted session obtains database authority that bypasses every control the CMS applies.",
+    "reference_claim": "An attacker who actively intercepts the admin's unencrypted session, or captures a reusable credential from it, obtains the authority of the admin's database account and bypasses the controls the CMS applies.",
     "reference_element_ids": [
       "flow:entity:admin>store:mysql-database>direct-administration",
       "store:mysql-database"
@@ -4626,7 +4626,7 @@
   {
     "case": "11-sparse-shift-scheduling",
     "category": "spoofing",
-    "reference_claim": "An attacker signs in to the scheduling web app as a colleague and reads that colleague's shifts and details, because how colleagues are authenticated is unverified.",
+    "reference_claim": "An attacker signs in to the scheduling web app as a colleague and reads that colleague's shifts and details, if colleague authentication does not stop them, which is unverified.",
     "reference_element_ids": [
       "entity:colleague",
       "flow:entity:colleague>process:scheduling-web-app>view-shifts"
@@ -4644,7 +4644,7 @@
   {
     "case": "11-sparse-shift-scheduling",
     "category": "spoofing",
-    "reference_claim": "An attacker signs in to the scheduling web app as a colleague and reads that colleague's shifts and details, because how colleagues are authenticated is unverified.",
+    "reference_claim": "An attacker signs in to the scheduling web app as a colleague and reads that colleague's shifts and details, if colleague authentication does not stop them, which is unverified.",
     "reference_element_ids": [
       "entity:colleague",
       "flow:entity:colleague>process:scheduling-web-app>view-shifts"
@@ -4662,7 +4662,7 @@
   {
     "case": "11-sparse-shift-scheduling",
     "category": "spoofing",
-    "reference_claim": "An attacker signs in as a store manager and builds that store's rota, because how managers are authenticated is unverified.",
+    "reference_claim": "An attacker signs in as a store manager and builds that store's rota, if manager authentication does not stop them, which is unverified.",
     "reference_element_ids": [
       "entity:store-manager",
       "flow:entity:store-manager>process:scheduling-web-app>build-rota"
@@ -4680,7 +4680,7 @@
   {
     "case": "11-sparse-shift-scheduling",
     "category": "spoofing",
-    "reference_claim": "An attacker signs in as a store manager and builds that store's rota, because how managers are authenticated is unverified.",
+    "reference_claim": "An attacker signs in as a store manager and builds that store's rota, if manager authentication does not stop them, which is unverified.",
     "reference_element_ids": [
       "entity:store-manager",
       "flow:entity:store-manager>process:scheduling-web-app>build-rota"
@@ -4698,7 +4698,7 @@
   {
     "case": "11-sparse-shift-scheduling",
     "category": "spoofing",
-    "reference_claim": "An attacker presents itself to the file share as the payroll system and collects the weekly payroll export, since how the share identifies a collector is unverified.",
+    "reference_claim": "An attacker presents itself to the file share as the payroll system and collects the weekly payroll export, if the share does not identify and authorize a collector, which is unverified.",
     "reference_element_ids": [
       "flow:entity:payroll-system>store:file-share>collect-payroll-export",
       "store:file-share"
@@ -4716,7 +4716,7 @@
   {
     "case": "11-sparse-shift-scheduling",
     "category": "spoofing",
-    "reference_claim": "An attacker presents itself to the file share as the payroll system and collects the weekly payroll export, since how the share identifies a collector is unverified.",
+    "reference_claim": "An attacker presents itself to the file share as the payroll system and collects the weekly payroll export, if the share does not identify and authorize a collector, which is unverified.",
     "reference_element_ids": [
       "flow:entity:payroll-system>store:file-share>collect-payroll-export",
       "store:file-share"
@@ -4970,7 +4970,7 @@
   {
     "case": "11-sparse-shift-scheduling",
     "category": "elevation-of-privilege",
-    "reference_claim": "A colleague uses the shared app to build or change a rota as though they were a store manager, because the separation between the two roles is unverified.",
+    "reference_claim": "A colleague uses the shared app to build or change a rota as though they were a store manager, if the app does not enforce the separation between the two roles, which is unverified.",
     "reference_element_ids": [
       "flow:entity:colleague>process:scheduling-web-app>view-shifts",
       "process:scheduling-web-app"
@@ -4988,7 +4988,7 @@
   {
     "case": "11-sparse-shift-scheduling",
     "category": "elevation-of-privilege",
-    "reference_claim": "A colleague uses the shared app to build or change a rota as though they were a store manager, because the separation between the two roles is unverified.",
+    "reference_claim": "A colleague uses the shared app to build or change a rota as though they were a store manager, if the app does not enforce the separation between the two roles, which is unverified.",
     "reference_element_ids": [
       "flow:entity:colleague>process:scheduling-web-app>view-shifts",
       "process:scheduling-web-app"
