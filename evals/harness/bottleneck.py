@@ -94,7 +94,7 @@ from evals.harness.arms import required_rows
 from evals.harness.artifact import load_artifact
 from evals.harness.bundle import heads_from_reports
 from evals.harness.modes import AssertionResult
-from evals.harness.reference import GoldenCase, load_corpus
+from evals.harness.reference import MUST_FIND, GoldenCase, load_corpus
 from evals.harness.replay import (
     ADJUDICATED_WRONG,
     AliasTarget,
@@ -1743,6 +1743,9 @@ def command_bottleneck(args: argparse.Namespace) -> int:
             for issue in one.direct_issues:
                 print(f"   the gate refuses the hand-written model: {issue}")
 
+    print("\nWhat the corpus's own findings rest on (#1052).")
+    print(render_reliance(placement_reliance(args.corpus)))
+
     charges: tuple[MissCharge, ...] = ()
     relaxations: tuple[Relaxation, ...] = ()
     arms: list[str] = []
@@ -1905,4 +1908,91 @@ def render_relaxations(found: Sequence[Relaxation]) -> str:
             f"| {one.arm} | {one.required} | {one.found} | {one.relaxed_found} |"
             f" +{one.recovered} | {one.wrong} | {one.relaxed_wrong} |"
         )
+    return "\n".join(lines)
+
+
+# --- What the findings rest on ----------------------------------------------
+
+
+@dataclass(frozen=True)
+class PlacementReliance:
+    """How far one case's reference findings rest on a placement nobody stated.
+
+    The fixtures say what the representation can lose and the charges say what a
+    reading lost. Neither says what the *findings* stand on, and #1052 turns on
+    exactly that: a **Boundary Crossing** derived from two zones this service
+    inferred is the structural reason a rule fires, and until the reader is told
+    so it reads like a fact about the system.
+
+    ``assumed`` counts must-find findings citing a crossing with at least one
+    inferred endpoint, and ``wholly`` those citing one where both endpoints were
+    inferred.
+
+    **It measures reliance and never error.** The reference findings were
+    authored against the blessed model, inferred zones and all, so a finding
+    resting on one is not thereby wrong — what the count shows is how much of
+    the corpus's own answer would have to be re-argued if the placement went
+    away.
+    """
+
+    case_id: str
+    must_finds: int
+    assumed: int
+    wholly: int
+
+    def to_json(self) -> dict[str, Any]:
+        return {
+            "case": self.case_id,
+            "must_finds": self.must_finds,
+            "assumed": self.assumed,
+            "wholly": self.wholly,
+        }
+
+
+def placement_reliance(corpus_dir: Path) -> tuple[PlacementReliance, ...]:
+    """Every case's must-find findings, against the crossings they rest on."""
+    found = []
+    for model_path in sorted(corpus_dir.glob("*/model.json")):
+        case_dir = model_path.parent
+        model = SystemModel.model_validate(json.loads(model_path.read_text()))
+        assumed = {
+            crossing.flow_id
+            for crossing in model.boundary_crossings()
+            if crossing.assumed_endpoints
+        }
+        wholly = {
+            crossing.flow_id
+            for crossing in model.boundary_crossings()
+            if len(crossing.assumed_endpoints) == 2
+        }
+        counts = [0, 0, 0]
+        for claims_path in sorted((case_dir / "claims").glob("*.json")):
+            for claim in json.loads(claims_path.read_text()):
+                if claim.get("tier") != MUST_FIND:
+                    continue
+                cited = set(claim.get("affected_element_ids", ()))
+                counts[0] += 1
+                counts[1] += bool(cited & assumed)
+                counts[2] += bool(cited & wholly)
+        found.append(PlacementReliance(case_dir.name, *counts))
+    return tuple(found)
+
+
+def render_reliance(found: Sequence[PlacementReliance]) -> str:
+    """The reliance table, over whatever cases carry claims."""
+    lines = [
+        "| case | must-finds | on an assumed crossing | on two inferred zones |",
+        "| --- | ---: | ---: | ---: |",
+    ]
+    for one in found:
+        if not one.must_finds:
+            continue
+        lines.append(
+            f"| {one.case_id} | {one.must_finds} | {one.assumed} | {one.wholly} |"
+        )
+    lines.append(
+        f"| **all** | **{sum(one.must_finds for one in found)}** |"
+        f" **{sum(one.assumed for one in found)}** |"
+        f" **{sum(one.wholly for one in found)}** |"
+    )
     return "\n".join(lines)
