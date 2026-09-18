@@ -35,3 +35,10 @@ The maintainer's sitting on the drafted reference facts. A `change` ruling is ap
 | `process:spark-transform-job` | `exposure` | `internal` to `unknown` | Warehouse-network membership does not establish lack of internet exposure. |
 | `store:landing-bucket` | `trust_zone` | keep `boundary:landing-network`, recorded as an inference | The landing role and name do not locate the bucket on the scheduler's network. Storage-encryption status provides no placement evidence. |
 | `store:airflow-metadata-database` | `trust_zone` | keep `boundary:landing-network`, recorded as an inference | Airflow owning or using a metadata database does not imply that the database shares its network. It could be remotely hosted. |
+
+### The remaining values, ruled 2026-09-18
+
+| Element | Attribute | Ruling | Why |
+|---|---|---|---|
+| `store:claims-warehouse` | `trust_zone` | retain `boundary:warehouse-network` as an explicit assumption | The supplied evidence does not establish this membership. The zone is retained because the schema requires one, not because the source places it. |
+
