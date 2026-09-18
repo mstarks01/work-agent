@@ -1,0 +1,568 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:store-manager",
+        "name": "store manager",
+        "description": "A manager who uses the scheduling web app to build the weekly rota for their store.",
+        "assets": [],
+        "source_excerpt": "Store managers use a scheduling web app to build the weekly rota for their store.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:colleague",
+        "name": "colleague",
+        "description": "A colleague who uses the scheduling web app to look at assigned shifts.",
+        "assets": [],
+        "source_excerpt": "Colleagues use the same app to look at the shifts they have been given.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "How colleagues sign in is not documented.",
+        "kind": "human",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:phone",
+        "name": "phone",
+        "description": "A phone used by colleagues to reach the scheduling web app.",
+        "assets": [],
+        "source_excerpt": "Colleagues reach the app from their own phones.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:payroll-system",
+        "name": "payroll system",
+        "description": "A payroll system that collects the export from the file share.",
+        "assets": [],
+        "source_excerpt": "The payroll system, which is run by another team, collects the export from the file share.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "How the payroll system is identified when it collects the export is not documented.",
+        "kind": "external-system",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:another-team",
+        "name": "another team",
+        "description": "The team that runs the payroll system.",
+        "assets": [],
+        "source_excerpt": "The payroll system, which is run by another team",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "unknown"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:scheduling-web-app",
+        "name": "scheduling web app",
+        "description": "A web application used by store managers to build weekly rotas and by colleagues to view assigned shifts.",
+        "assets": [],
+        "source_excerpt": "Store managers use a scheduling web app to build the weekly rota for their store.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "How the web app and the scheduling service identify each other is not documented.",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:scheduling-service",
+        "name": "scheduling service",
+        "description": "A service that reads and writes rotas and writes a weekly payroll export.",
+        "assets": [],
+        "source_excerpt": "The scheduling service is what actually reads and writes the rotas",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "How the web app and the scheduling service identify each other is not documented.",
+        "technology": "unknown",
+        "trust_zone": "boundary:internal-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:rota-database",
+        "name": "rota database",
+        "description": "A database containing rotas, colleague names, contact details and stated availability.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "Colleague names, contact details and stated availability are held in that database.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "Whether the database is encrypted is not documented.",
+        "technology": "unknown",
+        "trust_zone": "boundary:internal-network",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:file-share",
+        "name": "file share",
+        "description": "A file share where the scheduling service writes a weekly payroll export.",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "Once a week the scheduling service writes a payroll export onto a file share.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "Whether the file share is encrypted is not documented.",
+        "technology": "unknown",
+        "trust_zone": "boundary:internal-network",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:store-manager-to-scheduling-web-app:build-weekly-rota",
+        "name": "build weekly rota",
+        "description": "",
+        "assets": [],
+        "source_excerpt": "Store managers use a scheduling web app to build the weekly rota for their store.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "How store managers sign in is not documented. Whether the interaction is encrypted is not documented.",
+        "source": "entity:store-manager",
+        "destination": "process:scheduling-web-app",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "weekly rota",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:colleague-to-scheduling-web-app:look-at-shifts",
+        "name": "look at shifts",
+        "description": "",
+        "assets": [],
+        "source_excerpt": "Colleagues use the same app to look at the shifts they have been given.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "How colleagues sign in is not documented. Whether the interaction is encrypted is not documented.",
+        "source": "entity:colleague",
+        "destination": "process:scheduling-web-app",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "assigned shifts",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:phone-to-scheduling-web-app:reach-app",
+        "name": "reach app",
+        "description": "",
+        "assets": [],
+        "source_excerpt": "Colleagues reach the app from their own phones.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "Whether the interaction is encrypted is not documented.",
+        "source": "entity:phone",
+        "destination": "process:scheduling-web-app",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:scheduling-web-app-to-scheduling-service:talks-to",
+        "name": "talks to",
+        "description": "",
+        "assets": [],
+        "source_excerpt": "The web app talks to a scheduling service.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "How the web app and the scheduling service identify each other is not documented. Whether the interaction is encrypted is not documented.",
+        "source": "process:scheduling-web-app",
+        "destination": "process:scheduling-service",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:scheduling-service-to-rota-database:read-and-write-rotas",
+        "name": "read and write rotas",
+        "description": "",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "The scheduling service is what actually reads and writes the rotas",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "Whether the interaction is encrypted is not documented.",
+        "source": "process:scheduling-service",
+        "destination": "store:rota-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "rotas",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:scheduling-service-to-file-share:write-payroll-export",
+        "name": "write payroll export",
+        "description": "",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "Once a week the scheduling service writes a payroll export onto a file share.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "Whether the interaction is encrypted is not documented.",
+        "source": "process:scheduling-service",
+        "destination": "store:file-share",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "payroll export",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:payroll-system-to-file-share:collect-export",
+        "name": "collect export",
+        "description": "",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "The payroll system, which is run by another team, collects the export from the file share.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "How the payroll system is identified when it collects the export is not documented. Whether the interaction is encrypted is not documented.",
+        "source": "entity:payroll-system",
+        "destination": "store:file-share",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "payroll export",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:internal-network",
+        "name": "internal network",
+        "description": "The internal network containing the scheduling service, rota database and file share.",
+        "assets": [],
+        "source_excerpt": "The scheduling service, the rota database and the file share are on the internal network.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The rota database's contents are confidential because it contains colleague names, contact details and stated availability.",
+        "element_id": "store:rota-database",
+        "attribute": "data_classification",
+        "basis": "The source states that the database holds colleague names, contact details and stated availability."
+      },
+      {
+        "assumption": "The file share's payroll export is confidential because payroll data is business-sensitive.",
+        "element_id": "store:file-share",
+        "attribute": "data_classification",
+        "basis": "The source states that the file share contains a payroll export."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:store-manager",
+        "name": "store manager",
+        "description": "A manager who uses the scheduling web app to build the weekly rota for their store.",
+        "assets": [],
+        "source_excerpt": "Store managers use a scheduling web app to build the weekly rota for their store.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:colleague",
+        "name": "colleague",
+        "description": "A colleague who uses the scheduling web app to look at assigned shifts.",
+        "assets": [],
+        "source_excerpt": "Colleagues use the same app to look at the shifts they have been given.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "How colleagues sign in is not documented.",
+        "kind": "human",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:phone",
+        "name": "phone",
+        "description": "A phone used by colleagues to reach the scheduling web app.",
+        "assets": [],
+        "source_excerpt": "Colleagues reach the app from their own phones.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:payroll-system",
+        "name": "payroll system",
+        "description": "A payroll system that collects the export from the file share.",
+        "assets": [],
+        "source_excerpt": "The payroll system, which is run by another team, collects the export from the file share.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "How the payroll system is identified when it collects the export is not documented.",
+        "kind": "external-system",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:another-team",
+        "name": "another team",
+        "description": "The team that runs the payroll system.",
+        "assets": [],
+        "source_excerpt": "The payroll system, which is run by another team",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "unknown"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:scheduling-web-app",
+        "name": "scheduling web app",
+        "description": "A web application used by store managers to build weekly rotas and by colleagues to view assigned shifts.",
+        "assets": [],
+        "source_excerpt": "Store managers use a scheduling web app to build the weekly rota for their store.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "How the web app and the scheduling service identify each other is not documented.",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:scheduling-service",
+        "name": "scheduling service",
+        "description": "A service that reads and writes rotas and writes a weekly payroll export.",
+        "assets": [],
+        "source_excerpt": "The scheduling service is what actually reads and writes the rotas",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "How the web app and the scheduling service identify each other is not documented.",
+        "technology": "unknown",
+        "trust_zone": "boundary:internal-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:rota-database",
+        "name": "rota database",
+        "description": "A database containing rotas, colleague names, contact details and stated availability.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "Colleague names, contact details and stated availability are held in that database.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "Whether the database is encrypted is not documented.",
+        "technology": "unknown",
+        "trust_zone": "boundary:internal-network",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:file-share",
+        "name": "file share",
+        "description": "A file share where the scheduling service writes a weekly payroll export.",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "Once a week the scheduling service writes a payroll export onto a file share.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "Whether the file share is encrypted is not documented.",
+        "technology": "unknown",
+        "trust_zone": "boundary:internal-network",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:store-manager>process:scheduling-web-app>build-weekly-rota",
+        "name": "build weekly rota",
+        "description": "",
+        "assets": [],
+        "source_excerpt": "Store managers use a scheduling web app to build the weekly rota for their store.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "How store managers sign in is not documented. Whether the interaction is encrypted is not documented.",
+        "source": "entity:store-manager",
+        "destination": "process:scheduling-web-app",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "weekly rota",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:colleague>process:scheduling-web-app>look-at-shifts",
+        "name": "look at shifts",
+        "description": "",
+        "assets": [],
+        "source_excerpt": "Colleagues use the same app to look at the shifts they have been given.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "How colleagues sign in is not documented. Whether the interaction is encrypted is not documented.",
+        "source": "entity:colleague",
+        "destination": "process:scheduling-web-app",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "assigned shifts",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:entity:phone>process:scheduling-web-app>reach-app",
+        "name": "reach app",
+        "description": "",
+        "assets": [],
+        "source_excerpt": "Colleagues reach the app from their own phones.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "Whether the interaction is encrypted is not documented.",
+        "source": "entity:phone",
+        "destination": "process:scheduling-web-app",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:scheduling-web-app>process:scheduling-service>talks-to",
+        "name": "talks to",
+        "description": "",
+        "assets": [],
+        "source_excerpt": "The web app talks to a scheduling service.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "How the web app and the scheduling service identify each other is not documented. Whether the interaction is encrypted is not documented.",
+        "source": "process:scheduling-web-app",
+        "destination": "process:scheduling-service",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:scheduling-service>store:rota-database>read-and-write-rotas",
+        "name": "read and write rotas",
+        "description": "",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "The scheduling service is what actually reads and writes the rotas",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "Whether the interaction is encrypted is not documented.",
+        "source": "process:scheduling-service",
+        "destination": "store:rota-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "rotas",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:process:scheduling-service>store:file-share>write-payroll-export",
+        "name": "write payroll export",
+        "description": "",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "Once a week the scheduling service writes a payroll export onto a file share.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "Whether the interaction is encrypted is not documented.",
+        "source": "process:scheduling-service",
+        "destination": "store:file-share",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "payroll export",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:payroll-system>store:file-share>collect-export",
+        "name": "collect export",
+        "description": "",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "The payroll system, which is run by another team, collects the export from the file share.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "How the payroll system is identified when it collects the export is not documented. Whether the interaction is encrypted is not documented.",
+        "source": "entity:payroll-system",
+        "destination": "store:file-share",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "payroll export",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:internal-network",
+        "name": "internal network",
+        "description": "The internal network containing the scheduling service, rota database and file share.",
+        "assets": [],
+        "source_excerpt": "The scheduling service, the rota database and the file share are on the internal network.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The rota database's contents are confidential because it contains colleague names, contact details and stated availability.",
+        "element_id": "store:rota-database",
+        "attribute": "data_classification",
+        "basis": "The source states that the database holds colleague names, contact details and stated availability."
+      },
+      {
+        "assumption": "The file share's payroll export is confidential because payroll data is business-sensitive.",
+        "element_id": "store:file-share",
+        "attribute": "data_classification",
+        "basis": "The source states that the file share contains a payroll export."
+      }
+    ]
+  },
+  "issues": [],
+  "repair": null
+}

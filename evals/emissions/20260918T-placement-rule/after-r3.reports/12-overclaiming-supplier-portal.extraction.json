@@ -1,0 +1,616 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:supplier",
+        "name": "Supplier",
+        "description": "A supplier that uploads compliance paperwork and signs in to the supplier document portal.",
+        "assets": [],
+        "source_excerpt": "Suppliers upload their compliance paperwork through a portal",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:category-manager",
+        "name": "Category manager",
+        "description": "A category manager who reviews uploaded compliance paperwork and approves or rejects it.",
+        "assets": [],
+        "source_excerpt": "Our category managers, who work from the corporate network, review what has been uploaded and approve or reject it.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:corporate-network"
+      },
+      {
+        "id": "entity:vendor",
+        "name": "Vendor",
+        "description": "The vendor that hosts the SaaS portal, issues supplier credentials, and pushes the nightly supplier data extract.",
+        "assets": [],
+        "source_excerpt": "The portal is a SaaS product. The vendor hosts it",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "unknown"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:supplier-document-portal",
+        "name": "Supplier document portal",
+        "description": "A vendor-hosted SaaS portal through which suppliers upload compliance paperwork and category managers review and approve or reject it.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "Supplier document portal.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "SaaS",
+        "trust_zone": "boundary:vendor-hosting",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:supplier-master-service",
+        "name": "Supplier master service",
+        "description": "A service that loads the nightly supplier data extract and writes the records into the supplier database.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "Our supplier master service loads that file and writes the records into the supplier database.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:our-cloud-account",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:vendor-platform",
+        "name": "Vendor platform",
+        "description": "The vendor's platform where uploaded compliance documents remain.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "The documents themselves stay in the vendor's platform.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:vendor-hosting",
+        "data_classification": "confidential",
+        "encryption_at_rest": "enterprise-grade encryption"
+      },
+      {
+        "id": "store:landing-bucket",
+        "name": "Landing bucket",
+        "description": "A bucket in the organisation's cloud account receiving the nightly supplier data extract.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "Every night the vendor pushes a supplier data extract to a landing bucket in our cloud account.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The runbook says the file arrives as a plain CSV and is picked up as-is.",
+        "technology": "Cloud storage bucket",
+        "trust_zone": "boundary:our-cloud-account",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:supplier-database",
+        "name": "Supplier database",
+        "description": "A database in the organisation's cloud account holding records loaded from the supplier data extract.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "Our supplier master service loads that file and writes the records into the supplier database.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "Database",
+        "trust_zone": "boundary:our-cloud-account",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:supplier-to-process-supplier-document-portal-upload-paperwork",
+        "name": "upload paperwork",
+        "description": "A supplier uploads insurance certificates, food safety audits, and contact details for its staff to the supplier document portal.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "Suppliers upload their compliance paperwork through a portal \u2014 insurance certificates, food safety audits, and contact details for their own staff.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:supplier",
+        "destination": "process:supplier-document-portal",
+        "protocol": "unknown",
+        "authentication": "username and password",
+        "data_description": "Insurance certificates, food safety audits, and contact details for supplier staff",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process-supplier-document-portal-to-store-vendor-platform-store-documents",
+        "name": "store documents",
+        "description": "The supplier document portal stores uploaded compliance documents in the vendor platform.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "The documents themselves stay in the vendor's platform.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:supplier-document-portal",
+        "destination": "store:vendor-platform",
+        "protocol": "unknown",
+        "authentication": "fully authenticated",
+        "data_description": "Uploaded compliance documents",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process-supplier-document-portal-to-entity:category-manager-review-paperwork",
+        "name": "review paperwork",
+        "description": "The supplier document portal presents uploaded paperwork to category managers for review and approval or rejection.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "Our category managers, who work from the corporate network, review what has been uploaded and approve or reject it.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:supplier-document-portal",
+        "destination": "entity:category-manager",
+        "protocol": "unknown",
+        "authentication": "fully authenticated",
+        "data_description": "Uploaded compliance paperwork and approval or rejection decision",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:entity:vendor-to-store-landing-bucket-push-extract",
+        "name": "push extract",
+        "description": "The vendor pushes a nightly supplier data extract to the landing bucket.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "Every night the vendor pushes a supplier data extract to a landing bucket in our cloud account.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The source says, \"We were told the nightly extract is encrypted end to end.\" The runbook says, \"the file arrives as a plain CSV and is picked up as-is.\" These are conflicting positive claims about encryption in transit.",
+        "source": "entity:vendor",
+        "destination": "store:landing-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Nightly supplier data extract",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process-supplier-master-service-to-store-landing-bucket-load-file",
+        "name": "load file",
+        "description": "The supplier master service loads the nightly file from the landing bucket.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "Our supplier master service loads that file",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:supplier-master-service",
+        "destination": "store:landing-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Nightly supplier data extract",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process-supplier-master-service-to-store-supplier-database-write-records",
+        "name": "write records",
+        "description": "The supplier master service writes supplier records into the supplier database.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "writes the records into the supplier database",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:supplier-master-service",
+        "destination": "store:supplier-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Supplier records from the nightly extract",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:vendor-hosting",
+        "name": "Vendor hosting",
+        "description": "The vendor-hosted environment containing the supplier document portal and vendor platform.",
+        "assets": [],
+        "source_excerpt": "The portal is a SaaS product. The vendor hosts it",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:corporate-network",
+        "name": "Corporate network",
+        "description": "The corporate network from which category managers work.",
+        "assets": [],
+        "source_excerpt": "Our category managers, who work from the corporate network",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:our-cloud-account",
+        "name": "Our cloud account",
+        "description": "The organisation's cloud account containing the landing bucket, supplier master service, and supplier database.",
+        "assets": [],
+        "source_excerpt": "The bucket, the service and the database are all in our cloud account.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The compliance documents and supplier records are confidential because they include contact details for supplier staff and commercially sensitive compliance paperwork.",
+        "element_id": "store:vendor-platform",
+        "attribute": "data_classification",
+        "basis": "The vendor platform stores insurance certificates, food safety audits, and contact details for supplier staff."
+      },
+      {
+        "assumption": "The supplier data extract is confidential because it contains supplier data, including contact details for supplier staff.",
+        "element_id": "store:landing-bucket",
+        "attribute": "data_classification",
+        "basis": "The landing bucket receives the nightly supplier data extract."
+      },
+      {
+        "assumption": "The supplier database records are confidential because they originate from the supplier data extract, which includes supplier data and contact details for supplier staff.",
+        "element_id": "store:supplier-database",
+        "attribute": "data_classification",
+        "basis": "The supplier master service writes records from the supplier data extract into the supplier database."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:supplier",
+        "name": "Supplier",
+        "description": "A supplier that uploads compliance paperwork and signs in to the supplier document portal.",
+        "assets": [],
+        "source_excerpt": "Suppliers upload their compliance paperwork through a portal",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:category-manager",
+        "name": "Category manager",
+        "description": "A category manager who reviews uploaded compliance paperwork and approves or rejects it.",
+        "assets": [],
+        "source_excerpt": "Our category managers, who work from the corporate network, review what has been uploaded and approve or reject it.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:corporate-network"
+      },
+      {
+        "id": "entity:vendor",
+        "name": "Vendor",
+        "description": "The vendor that hosts the SaaS portal, issues supplier credentials, and pushes the nightly supplier data extract.",
+        "assets": [],
+        "source_excerpt": "The portal is a SaaS product. The vendor hosts it",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "unknown"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:supplier-document-portal",
+        "name": "Supplier document portal",
+        "description": "A vendor-hosted SaaS portal through which suppliers upload compliance paperwork and category managers review and approve or reject it.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "Supplier document portal.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "SaaS",
+        "trust_zone": "boundary:vendor-hosting",
+        "exposure": "unknown",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:supplier-master-service",
+        "name": "Supplier master service",
+        "description": "A service that loads the nightly supplier data extract and writes the records into the supplier database.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "Our supplier master service loads that file and writes the records into the supplier database.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:our-cloud-account",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:vendor-platform",
+        "name": "Vendor platform",
+        "description": "The vendor's platform where uploaded compliance documents remain.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "The documents themselves stay in the vendor's platform.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:vendor-hosting",
+        "data_classification": "confidential",
+        "encryption_at_rest": "enterprise-grade encryption"
+      },
+      {
+        "id": "store:landing-bucket",
+        "name": "Landing bucket",
+        "description": "A bucket in the organisation's cloud account receiving the nightly supplier data extract.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "Every night the vendor pushes a supplier data extract to a landing bucket in our cloud account.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The runbook says the file arrives as a plain CSV and is picked up as-is.",
+        "technology": "Cloud storage bucket",
+        "trust_zone": "boundary:our-cloud-account",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:supplier-database",
+        "name": "Supplier database",
+        "description": "A database in the organisation's cloud account holding records loaded from the supplier data extract.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "Our supplier master service loads that file and writes the records into the supplier database.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "Database",
+        "trust_zone": "boundary:our-cloud-account",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:supplier>process:supplier-document-portal>upload-paperwork",
+        "name": "upload paperwork",
+        "description": "A supplier uploads insurance certificates, food safety audits, and contact details for its staff to the supplier document portal.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "Suppliers upload their compliance paperwork through a portal \u2014 insurance certificates, food safety audits, and contact details for their own staff.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:supplier",
+        "destination": "process:supplier-document-portal",
+        "protocol": "unknown",
+        "authentication": "username and password",
+        "data_description": "Insurance certificates, food safety audits, and contact details for supplier staff",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:supplier-document-portal>store:vendor-platform>store-documents",
+        "name": "store documents",
+        "description": "The supplier document portal stores uploaded compliance documents in the vendor platform.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "The documents themselves stay in the vendor's platform.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:supplier-document-portal",
+        "destination": "store:vendor-platform",
+        "protocol": "unknown",
+        "authentication": "fully authenticated",
+        "data_description": "Uploaded compliance documents",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:supplier-document-portal>entity:category-manager>review-paperwork",
+        "name": "review paperwork",
+        "description": "The supplier document portal presents uploaded paperwork to category managers for review and approval or rejection.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "Our category managers, who work from the corporate network, review what has been uploaded and approve or reject it.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:supplier-document-portal",
+        "destination": "entity:category-manager",
+        "protocol": "unknown",
+        "authentication": "fully authenticated",
+        "data_description": "Uploaded compliance paperwork and approval or rejection decision",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:entity:vendor>store:landing-bucket>push-extract",
+        "name": "push extract",
+        "description": "The vendor pushes a nightly supplier data extract to the landing bucket.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "Every night the vendor pushes a supplier data extract to a landing bucket in our cloud account.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The source says, \"We were told the nightly extract is encrypted end to end.\" The runbook says, \"the file arrives as a plain CSV and is picked up as-is.\" These are conflicting positive claims about encryption in transit.",
+        "source": "entity:vendor",
+        "destination": "store:landing-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Nightly supplier data extract",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:supplier-master-service>store:landing-bucket>load-file",
+        "name": "load file",
+        "description": "The supplier master service loads the nightly file from the landing bucket.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "Our supplier master service loads that file",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:supplier-master-service",
+        "destination": "store:landing-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Nightly supplier data extract",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:supplier-master-service>store:supplier-database>write-records",
+        "name": "write records",
+        "description": "The supplier master service writes supplier records into the supplier database.",
+        "assets": [
+          "pii",
+          "business-critical-data"
+        ],
+        "source_excerpt": "writes the records into the supplier database",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:supplier-master-service",
+        "destination": "store:supplier-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Supplier records from the nightly extract",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:vendor-hosting",
+        "name": "Vendor hosting",
+        "description": "The vendor-hosted environment containing the supplier document portal and vendor platform.",
+        "assets": [],
+        "source_excerpt": "The portal is a SaaS product. The vendor hosts it",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:corporate-network",
+        "name": "Corporate network",
+        "description": "The corporate network from which category managers work.",
+        "assets": [],
+        "source_excerpt": "Our category managers, who work from the corporate network",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:our-cloud-account",
+        "name": "Our cloud account",
+        "description": "The organisation's cloud account containing the landing bucket, supplier master service, and supplier database.",
+        "assets": [],
+        "source_excerpt": "The bucket, the service and the database are all in our cloud account.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The compliance documents and supplier records are confidential because they include contact details for supplier staff and commercially sensitive compliance paperwork.",
+        "element_id": "store:vendor-platform",
+        "attribute": "data_classification",
+        "basis": "The vendor platform stores insurance certificates, food safety audits, and contact details for supplier staff."
+      },
+      {
+        "assumption": "The supplier data extract is confidential because it contains supplier data, including contact details for supplier staff.",
+        "element_id": "store:landing-bucket",
+        "attribute": "data_classification",
+        "basis": "The landing bucket receives the nightly supplier data extract."
+      },
+      {
+        "assumption": "The supplier database records are confidential because they originate from the supplier data extract, which includes supplier data and contact details for supplier staff.",
+        "element_id": "store:supplier-database",
+        "attribute": "data_classification",
+        "basis": "The supplier master service writes records from the supplier data extract into the supplier database."
+      }
+    ]
+  },
+  "issues": [],
+  "repair": null
+}

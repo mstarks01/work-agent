@@ -1,0 +1,633 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:user-s-browser",
+        "name": "user's browser",
+        "description": "A user's browser outside the system's network.",
+        "assets": [],
+        "source_excerpt": "A user's browser talks to the web application over HTTP/S across the public internet.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:public-internet"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:web-application",
+        "name": "web application",
+        "description": "The web application in the web tier that receives browser traffic and puts jobs onto a message queue.",
+        "assets": [],
+        "source_excerpt": "The web application does not do the heavy work itself. It puts jobs onto a message queue",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:web-tier",
+        "exposure": "internet-facing",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:background-worker-process",
+        "name": "background worker process",
+        "description": "A background worker process that picks jobs up from the message queue and does the work.",
+        "assets": [],
+        "source_excerpt": "a background worker process picks them up and does the work",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:backend-tier",
+        "exposure": "unknown",
+        "interface_kind": "non-web"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:message-queue",
+        "name": "message queue",
+        "description": "A message queue receiving jobs from the web application for the background worker process.",
+        "assets": [],
+        "source_excerpt": "It puts jobs onto a message queue, and a background worker process picks them up",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:backend-tier",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:database",
+        "name": "database",
+        "description": "The database read and written by the background worker process and used to keep the application's log records.",
+        "assets": [],
+        "source_excerpt": "The background worker reads and writes the database. The database is also where we keep the application's log records.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The description does not say whether anything is encrypted at rest.",
+        "technology": "unknown",
+        "trust_zone": "boundary:backend-tier",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:web-application-config",
+        "name": "web application config",
+        "description": "A config store from which the web application reads its settings, including its queue credentials.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "the web application has a web application config",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:backend-tier",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:worker-config",
+        "name": "worker config",
+        "description": "A config store from which the worker reads its settings, including its database credentials.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "the worker has a worker config",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:backend-tier",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:user-s-browser-to-process-web-application-access-application",
+        "name": "access application",
+        "description": "The user's browser talks to the web application.",
+        "assets": [],
+        "source_excerpt": "A user's browser talks to the web application over HTTP/S across the public internet.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:user-s-browser",
+        "destination": "process:web-application",
+        "protocol": "HTTP/S",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "encrypted",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:web-application-to-store-message-queue-enqueue-jobs",
+        "name": "enqueue jobs",
+        "description": "The web application puts jobs onto the message queue.",
+        "assets": [
+          "availability-critical"
+        ],
+        "source_excerpt": "It puts jobs onto a message queue",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The description does not say how the web application authenticates to the queue.",
+        "source": "process:web-application",
+        "destination": "store:message-queue",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "jobs",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:background-worker-process-to-store-message-queue-pick-up-jobs",
+        "name": "pick up jobs",
+        "description": "The background worker process picks jobs up from the message queue.",
+        "assets": [
+          "availability-critical"
+        ],
+        "source_excerpt": "a background worker process picks them up",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:background-worker-process",
+        "destination": "store:message-queue",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "jobs",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:background-worker-process-to-store-database-database-access",
+        "name": "database access",
+        "description": "The background worker reads and writes the database.",
+        "assets": [],
+        "source_excerpt": "The background worker reads and writes the database.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The description does not say how the worker authenticates to the database.",
+        "source": "process:background-worker-process",
+        "destination": "store:database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "database records and application log records",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:process:web-application-to-store-web-application-config-read-settings",
+        "name": "read settings",
+        "description": "The web application reads its settings from the web application config.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "Both processes read their settings from a config store: the web application has a web application config",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:web-application",
+        "destination": "store:web-application-config",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "settings and queue credentials",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:background-worker-process-to-store-worker-config-read-settings",
+        "name": "read settings",
+        "description": "The background worker process reads its settings from the worker config.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "the worker has a worker config. Both of those config stores hold the credentials the process needs",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:background-worker-process",
+        "destination": "store:worker-config",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "settings and database credentials",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:public-internet",
+        "name": "public internet",
+        "description": "The public internet outside the system's network.",
+        "assets": [],
+        "source_excerpt": "over HTTP/S across the public internet",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:web-tier",
+        "name": "web tier",
+        "description": "The web tier where the web application runs.",
+        "assets": [],
+        "source_excerpt": "the web application runs in our web tier",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:backend-tier",
+        "name": "backend tier",
+        "description": "The backend tier containing the queue, worker, database and config stores behind the web tier.",
+        "assets": [],
+        "source_excerpt": "The queue, the worker and the database are all in the backend tier, behind the web tier.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The web application is internet-facing because a user's browser reaches it across the public internet.",
+        "element_id": "process:web-application",
+        "attribute": "exposure",
+        "basis": "The source states that a user's browser talks to the web application across the public internet."
+      },
+      {
+        "assumption": "The background worker process presents a non-web interface because it is a background worker that picks up jobs and does work rather than a web application.",
+        "element_id": "process:background-worker-process",
+        "attribute": "interface_kind",
+        "basis": "The source describes it as a background worker process."
+      },
+      {
+        "assumption": "The message queue and its job traffic are availability-critical because the web application depends on the queue to decouple and dispatch work.",
+        "element_id": "store:message-queue",
+        "attribute": "assets",
+        "basis": "The source states that the web application puts jobs onto the message queue and the background worker picks them up."
+      },
+      {
+        "assumption": "The enqueue-jobs flow is availability-critical because it carries jobs required for the background work.",
+        "element_id": "flow:process:web-application-to-store-message-queue-enqueue-jobs",
+        "attribute": "assets",
+        "basis": "The source states that the web application puts jobs onto a message queue for processing."
+      },
+      {
+        "assumption": "The pick-up-jobs flow is availability-critical because it carries jobs required for the background work.",
+        "element_id": "flow:process:background-worker-process-to-store-message-queue-pick-up-jobs",
+        "attribute": "assets",
+        "basis": "The source states that the background worker process picks jobs up from the message queue."
+      },
+      {
+        "assumption": "The web application config is confidential because it holds the web application's queue credentials.",
+        "element_id": "store:web-application-config",
+        "attribute": "data_classification",
+        "basis": "The source states that the web application config holds the credentials the process needs, specifically the web application's queue credentials."
+      },
+      {
+        "assumption": "The worker config is confidential because it holds the worker's database credentials.",
+        "element_id": "store:worker-config",
+        "attribute": "data_classification",
+        "basis": "The source states that the worker config holds the credentials the process needs, specifically the worker's database credentials."
+      },
+      {
+        "assumption": "The web application settings flow carries credentials because the web application config holds queue credentials.",
+        "element_id": "flow:process:web-application-to-store-web-application-config-read-settings",
+        "attribute": "assets",
+        "basis": "The source states that the web application reads settings from a config store holding its queue credentials."
+      },
+      {
+        "assumption": "The worker settings flow carries credentials because the worker config holds database credentials.",
+        "element_id": "flow:process:background-worker-process-to-store-worker-config-read-settings",
+        "attribute": "assets",
+        "basis": "The source states that the worker reads settings from a config store holding its database credentials."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:users-browser",
+        "name": "user's browser",
+        "description": "A user's browser outside the system's network.",
+        "assets": [],
+        "source_excerpt": "A user's browser talks to the web application over HTTP/S across the public internet.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:public-internet"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:web-application",
+        "name": "web application",
+        "description": "The web application in the web tier that receives browser traffic and puts jobs onto a message queue.",
+        "assets": [],
+        "source_excerpt": "The web application does not do the heavy work itself. It puts jobs onto a message queue",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:web-tier",
+        "exposure": "internet-facing",
+        "interface_kind": "web"
+      },
+      {
+        "id": "process:background-worker-process",
+        "name": "background worker process",
+        "description": "A background worker process that picks jobs up from the message queue and does the work.",
+        "assets": [],
+        "source_excerpt": "a background worker process picks them up and does the work",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:backend-tier",
+        "exposure": "unknown",
+        "interface_kind": "non-web"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:message-queue",
+        "name": "message queue",
+        "description": "A message queue receiving jobs from the web application for the background worker process.",
+        "assets": [],
+        "source_excerpt": "It puts jobs onto a message queue, and a background worker process picks them up",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:backend-tier",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:database",
+        "name": "database",
+        "description": "The database read and written by the background worker process and used to keep the application's log records.",
+        "assets": [],
+        "source_excerpt": "The background worker reads and writes the database. The database is also where we keep the application's log records.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The description does not say whether anything is encrypted at rest.",
+        "technology": "unknown",
+        "trust_zone": "boundary:backend-tier",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:web-application-config",
+        "name": "web application config",
+        "description": "A config store from which the web application reads its settings, including its queue credentials.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "the web application has a web application config",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:backend-tier",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:worker-config",
+        "name": "worker config",
+        "description": "A config store from which the worker reads its settings, including its database credentials.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "the worker has a worker config",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:backend-tier",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:users-browser>process:web-application>access-application",
+        "name": "access application",
+        "description": "The user's browser talks to the web application.",
+        "assets": [],
+        "source_excerpt": "A user's browser talks to the web application over HTTP/S across the public internet.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:users-browser",
+        "destination": "process:web-application",
+        "protocol": "HTTP/S",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "encrypted",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:web-application>store:message-queue>enqueue-jobs",
+        "name": "enqueue jobs",
+        "description": "The web application puts jobs onto the message queue.",
+        "assets": [
+          "availability-critical"
+        ],
+        "source_excerpt": "It puts jobs onto a message queue",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The description does not say how the web application authenticates to the queue.",
+        "source": "process:web-application",
+        "destination": "store:message-queue",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "jobs",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:background-worker-process>store:message-queue>pick-up-jobs",
+        "name": "pick up jobs",
+        "description": "The background worker process picks jobs up from the message queue.",
+        "assets": [
+          "availability-critical"
+        ],
+        "source_excerpt": "a background worker process picks them up",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:background-worker-process",
+        "destination": "store:message-queue",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "jobs",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:background-worker-process>store:database>database-access",
+        "name": "database access",
+        "description": "The background worker reads and writes the database.",
+        "assets": [],
+        "source_excerpt": "The background worker reads and writes the database.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The description does not say how the worker authenticates to the database.",
+        "source": "process:background-worker-process",
+        "destination": "store:database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "database records and application log records",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:process:web-application>store:web-application-config>read-settings",
+        "name": "read settings",
+        "description": "The web application reads its settings from the web application config.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "Both processes read their settings from a config store: the web application has a web application config",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:web-application",
+        "destination": "store:web-application-config",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "settings and queue credentials",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:background-worker-process>store:worker-config>read-settings",
+        "name": "read settings",
+        "description": "The background worker process reads its settings from the worker config.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "the worker has a worker config. Both of those config stores hold the credentials the process needs",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:background-worker-process",
+        "destination": "store:worker-config",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "settings and database credentials",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:public-internet",
+        "name": "public internet",
+        "description": "The public internet outside the system's network.",
+        "assets": [],
+        "source_excerpt": "over HTTP/S across the public internet",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:web-tier",
+        "name": "web tier",
+        "description": "The web tier where the web application runs.",
+        "assets": [],
+        "source_excerpt": "the web application runs in our web tier",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:backend-tier",
+        "name": "backend tier",
+        "description": "The backend tier containing the queue, worker, database and config stores behind the web tier.",
+        "assets": [],
+        "source_excerpt": "The queue, the worker and the database are all in the backend tier, behind the web tier.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The web application is internet-facing because a user's browser reaches it across the public internet.",
+        "element_id": "process:web-application",
+        "attribute": "exposure",
+        "basis": "The source states that a user's browser talks to the web application across the public internet."
+      },
+      {
+        "assumption": "The background worker process presents a non-web interface because it is a background worker that picks up jobs and does work rather than a web application.",
+        "element_id": "process:background-worker-process",
+        "attribute": "interface_kind",
+        "basis": "The source describes it as a background worker process."
+      },
+      {
+        "assumption": "The message queue and its job traffic are availability-critical because the web application depends on the queue to decouple and dispatch work.",
+        "element_id": "store:message-queue",
+        "attribute": "assets",
+        "basis": "The source states that the web application puts jobs onto the message queue and the background worker picks them up."
+      },
+      {
+        "assumption": "The enqueue-jobs flow is availability-critical because it carries jobs required for the background work.",
+        "element_id": "flow:process:web-application>store:message-queue>enqueue-jobs",
+        "attribute": "assets",
+        "basis": "The source states that the web application puts jobs onto a message queue for processing."
+      },
+      {
+        "assumption": "The pick-up-jobs flow is availability-critical because it carries jobs required for the background work.",
+        "element_id": "flow:process:background-worker-process>store:message-queue>pick-up-jobs",
+        "attribute": "assets",
+        "basis": "The source states that the background worker process picks jobs up from the message queue."
+      },
+      {
+        "assumption": "The web application config is confidential because it holds the web application's queue credentials.",
+        "element_id": "store:web-application-config",
+        "attribute": "data_classification",
+        "basis": "The source states that the web application config holds the credentials the process needs, specifically the web application's queue credentials."
+      },
+      {
+        "assumption": "The worker config is confidential because it holds the worker's database credentials.",
+        "element_id": "store:worker-config",
+        "attribute": "data_classification",
+        "basis": "The source states that the worker config holds the credentials the process needs, specifically the worker's database credentials."
+      },
+      {
+        "assumption": "The web application settings flow carries credentials because the web application config holds queue credentials.",
+        "element_id": "flow:process:web-application>store:web-application-config>read-settings",
+        "attribute": "assets",
+        "basis": "The source states that the web application reads settings from a config store holding its queue credentials."
+      },
+      {
+        "assumption": "The worker settings flow carries credentials because the worker config holds database credentials.",
+        "element_id": "flow:process:background-worker-process>store:worker-config>read-settings",
+        "attribute": "assets",
+        "basis": "The source states that the worker reads settings from a config store holding its database credentials."
+      }
+    ]
+  },
+  "issues": [
+    {
+      "code": "assumption-on-unknown",
+      "message": "assumption records an inference for 'assets' on 'store:message-queue', but that attribute is still unknown; an unknown value is not an inference and needs no assumption",
+      "element_id": "store:message-queue",
+      "field": "assumptions"
+    }
+  ],
+  "repair": null
+}

@@ -1,0 +1,416 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:reader",
+        "name": "reader",
+        "description": "A person who accesses the public site and fetches assets from the CDN.",
+        "assets": [],
+        "source_excerpt": "Public site: readers hit the web server over HTTPS",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:admin",
+        "name": "admin",
+        "description": "An administrator who maintains the database directly.",
+        "assets": [],
+        "source_excerpt": "There is an admin who maintains the database directly rather than through the CMS.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:cdn",
+        "name": "CDN",
+        "description": "The CDN from which readers fetch images, stylesheets and downloads.",
+        "assets": [],
+        "source_excerpt": "Readers fetch those from the CDN over HTTP.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "unknown"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:web-server",
+        "name": "web server",
+        "description": "The public site web server that runs the CMS and publishes assets to the CDN.",
+        "assets": [],
+        "source_excerpt": "The web server runs the CMS",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "CMS",
+        "trust_zone": "boundary:hosted-network",
+        "exposure": "internet-facing",
+        "interface_kind": "web"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:mysql-database",
+        "name": "MySQL database",
+        "description": "A database containing pages, accounts and comments.",
+        "assets": [],
+        "source_excerpt": "keeps pages, accounts and comments in a MySQL database on the same hosted network",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The source states: \"I could not tell you whether the database is encrypted on disk.\"",
+        "technology": "MySQL",
+        "trust_zone": "boundary:hosted-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:cdn-bucket",
+        "name": "CDN bucket",
+        "description": "The CDN bucket to which the web server pushes newly published assets.",
+        "assets": [],
+        "source_excerpt": "the web server pushes them up to the CDN's bucket",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "public",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:reader-to-process-web-server-access-site",
+        "name": "access site",
+        "description": "Readers access the public site.",
+        "assets": [],
+        "source_excerpt": "readers hit the web server over HTTPS",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:reader",
+        "destination": "process:web-server",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:reader-to-entity-cdn-fetch-assets",
+        "name": "fetch assets",
+        "description": "Readers fetch images, stylesheets and downloads from the CDN.",
+        "assets": [],
+        "source_excerpt": "Readers fetch those from the CDN over HTTP.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:reader",
+        "destination": "entity:cdn",
+        "protocol": "HTTP",
+        "authentication": "unknown",
+        "data_description": "images, stylesheets and downloads",
+        "encryption_in_transit": "none",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:web-server-to-store-mysql-database-keep-content",
+        "name": "keep content",
+        "description": "The web server keeps pages, accounts and comments in the MySQL database.",
+        "assets": [],
+        "source_excerpt": "The web server runs the CMS and keeps pages, accounts and comments in a MySQL database",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:web-server",
+        "destination": "store:mysql-database",
+        "protocol": "MySQL",
+        "authentication": "unknown",
+        "data_description": "pages, accounts and comments",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:process:web-server-to-store-cdn-bucket-publish-assets",
+        "name": "publish assets",
+        "description": "The web server pushes newly published assets to the CDN bucket.",
+        "assets": [],
+        "source_excerpt": "When new assets are published the web server pushes them up to the CDN's bucket.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The source states: \"Nothing here tells you how the push to the CDN is authenticated\".",
+        "source": "process:web-server",
+        "destination": "store:cdn-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "new assets",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:admin-to-store-mysql-database-maintain-database",
+        "name": "maintain database",
+        "description": "The admin directly maintains the MySQL database.",
+        "assets": [],
+        "source_excerpt": "There is an admin who maintains the database directly rather than through the CMS.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:admin",
+        "destination": "store:mysql-database",
+        "protocol": "MySQL",
+        "authentication": "unknown",
+        "data_description": "pages, accounts and comments",
+        "encryption_in_transit": "none",
+        "operations": "read-write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:hosted-network",
+        "name": "hosted network",
+        "description": "The hosted network containing the web server and MySQL database.",
+        "assets": [],
+        "source_excerpt": "The web server runs the CMS and keeps pages, accounts and comments in a MySQL database on the same hosted network.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The web server is internet-facing because it serves the public site that readers access.",
+        "element_id": "process:web-server",
+        "attribute": "exposure",
+        "basis": "The source describes it as the web server for the \"Public site\" that readers hit."
+      },
+      {
+        "assumption": "The web server presents a web interface.",
+        "element_id": "process:web-server",
+        "attribute": "interface_kind",
+        "basis": "The source describes it as serving the public site, and a site is a web interface."
+      },
+      {
+        "assumption": "The CDN bucket contains public data.",
+        "element_id": "store:cdn-bucket",
+        "attribute": "data_classification",
+        "basis": "The bucket holds assets that are published and fetched by readers from the CDN."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:reader",
+        "name": "reader",
+        "description": "A person who accesses the public site and fetches assets from the CDN.",
+        "assets": [],
+        "source_excerpt": "Public site: readers hit the web server over HTTPS",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:admin",
+        "name": "admin",
+        "description": "An administrator who maintains the database directly.",
+        "assets": [],
+        "source_excerpt": "There is an admin who maintains the database directly rather than through the CMS.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:cdn",
+        "name": "CDN",
+        "description": "The CDN from which readers fetch images, stylesheets and downloads.",
+        "assets": [],
+        "source_excerpt": "Readers fetch those from the CDN over HTTP.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "unknown"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:web-server",
+        "name": "web server",
+        "description": "The public site web server that runs the CMS and publishes assets to the CDN.",
+        "assets": [],
+        "source_excerpt": "The web server runs the CMS",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "CMS",
+        "trust_zone": "boundary:hosted-network",
+        "exposure": "internet-facing",
+        "interface_kind": "web"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:mysql-database",
+        "name": "MySQL database",
+        "description": "A database containing pages, accounts and comments.",
+        "assets": [],
+        "source_excerpt": "keeps pages, accounts and comments in a MySQL database on the same hosted network",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The source states: \"I could not tell you whether the database is encrypted on disk.\"",
+        "technology": "MySQL",
+        "trust_zone": "boundary:hosted-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:cdn-bucket",
+        "name": "CDN bucket",
+        "description": "The CDN bucket to which the web server pushes newly published assets.",
+        "assets": [],
+        "source_excerpt": "the web server pushes them up to the CDN's bucket",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "public",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:reader>process:web-server>access-site",
+        "name": "access site",
+        "description": "Readers access the public site.",
+        "assets": [],
+        "source_excerpt": "readers hit the web server over HTTPS",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:reader",
+        "destination": "process:web-server",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "unknown",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:entity:reader>entity:cdn>fetch-assets",
+        "name": "fetch assets",
+        "description": "Readers fetch images, stylesheets and downloads from the CDN.",
+        "assets": [],
+        "source_excerpt": "Readers fetch those from the CDN over HTTP.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:reader",
+        "destination": "entity:cdn",
+        "protocol": "HTTP",
+        "authentication": "unknown",
+        "data_description": "images, stylesheets and downloads",
+        "encryption_in_transit": "none",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:web-server>store:mysql-database>keep-content",
+        "name": "keep content",
+        "description": "The web server keeps pages, accounts and comments in the MySQL database.",
+        "assets": [],
+        "source_excerpt": "The web server runs the CMS and keeps pages, accounts and comments in a MySQL database",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:web-server",
+        "destination": "store:mysql-database",
+        "protocol": "MySQL",
+        "authentication": "unknown",
+        "data_description": "pages, accounts and comments",
+        "encryption_in_transit": "unknown",
+        "operations": "read-write"
+      },
+      {
+        "id": "flow:process:web-server>store:cdn-bucket>publish-assets",
+        "name": "publish assets",
+        "description": "The web server pushes newly published assets to the CDN bucket.",
+        "assets": [],
+        "source_excerpt": "When new assets are published the web server pushes them up to the CDN's bucket.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The source states: \"Nothing here tells you how the push to the CDN is authenticated\".",
+        "source": "process:web-server",
+        "destination": "store:cdn-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "new assets",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:admin>store:mysql-database>maintain-database",
+        "name": "maintain database",
+        "description": "The admin directly maintains the MySQL database.",
+        "assets": [],
+        "source_excerpt": "There is an admin who maintains the database directly rather than through the CMS.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:admin",
+        "destination": "store:mysql-database",
+        "protocol": "MySQL",
+        "authentication": "unknown",
+        "data_description": "pages, accounts and comments",
+        "encryption_in_transit": "none",
+        "operations": "read-write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:hosted-network",
+        "name": "hosted network",
+        "description": "The hosted network containing the web server and MySQL database.",
+        "assets": [],
+        "source_excerpt": "The web server runs the CMS and keeps pages, accounts and comments in a MySQL database on the same hosted network.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The web server is internet-facing because it serves the public site that readers access.",
+        "element_id": "process:web-server",
+        "attribute": "exposure",
+        "basis": "The source describes it as the web server for the \"Public site\" that readers hit."
+      },
+      {
+        "assumption": "The web server presents a web interface.",
+        "element_id": "process:web-server",
+        "attribute": "interface_kind",
+        "basis": "The source describes it as serving the public site, and a site is a web interface."
+      },
+      {
+        "assumption": "The CDN bucket contains public data.",
+        "element_id": "store:cdn-bucket",
+        "attribute": "data_classification",
+        "basis": "The bucket holds assets that are published and fetched by readers from the CDN."
+      }
+    ]
+  },
+  "issues": [],
+  "repair": null
+}
