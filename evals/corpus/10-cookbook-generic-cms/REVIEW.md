@@ -128,17 +128,17 @@ The narrower question, per record: **does this requirement apply to this system,
 
 ### web-frontend-security
 
-**A1.** `V3.3.1` — Sign-in exists for some readers and no cookie attribute is stated for the session it creates.
+**A1.** `V3.3.1` — Sign-in exists for some readers and how the session is represented and protected is not stated.
 
 - `entity:reader`, `process:web-server`, `flow:entity:reader>process:web-server>page-requests`
-- The submitter says the mechanism and session handling are not stated, which is the requirement. The attribute is set by whatever emits Set-Cookie, which is the application or the layer in front of it, so either route settles it.
+- Sign-in does not establish cookie-based sessions. The requirement is the question of how sessions are represented and which protections apply, and the source states neither. Reworded by the maintainer ruling of 2026-09-18 on docs/research/undecidable-crossings-rulings.csv, which read the previous wording as overclaiming.
 
 > mark:
 
-**A2.** `V3.4.1` — Assets are fetched over plain HTTP, so no transport security header protects them.
+**A2.** `V3.4.1` — Assets are fetched over plain HTTP, and what protects that channel is not stated.
 
 - `process:web-server`, `entity:cdn`, `flow:entity:reader>entity:cdn>asset-fetch`
-- encryption_in_transit is stated absent on the CDN fetch.
+- The stated HTTP transport is the fact. Header configuration and browser upgrade behaviour are not inferable from it, so the requirement is the protection of that channel rather than a named header. Reworded by the maintainer ruling of 2026-09-18 on docs/research/undecidable-crossings-rulings.csv, which read the previous wording as overclaiming.
 
 > mark:
 
@@ -407,7 +407,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "11d2a58f0e1d5773054f0a72d222b3cc96f889cdd0206dd3656495a3d5fe8313",
       "model.json": "c89911777cd70655676903a6c7b7dc10c70282233eb31533b2b58d4fd5662227",
-      "claims/asvs.json": "a9729f279ab4f3c7f855a19131ad3b3504ad4cba5dbd23c6c6ae86053147e1dc",
+      "claims/asvs.json": "38c218796733dcb8a7704c88a23fb0896007a20be9f562109349be94034a33ad",
       "claims/stride.json": "b914aa99215333ed4a49748b1c03ab422d37a5cb741ec9fb63a81e82f11db06f"
       }
     }

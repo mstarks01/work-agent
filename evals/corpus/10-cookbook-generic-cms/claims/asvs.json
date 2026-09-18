@@ -7,10 +7,10 @@
       "process:web-server",
       "flow:entity:reader>process:web-server>page-requests"
     ],
-    "claim": "Sign-in exists for some readers and no cookie attribute is stated for the session it creates.",
+    "claim": "Sign-in exists for some readers and how the session is represented and protected is not stated.",
     "tier": "must-find",
     "disposition": "needs-config",
-    "notes": "The submitter says the mechanism and session handling are not stated, which is the requirement. The attribute is set by whatever emits Set-Cookie, which is the application or the layer in front of it, so either route settles it.",
+    "notes": "Sign-in does not establish cookie-based sessions. The requirement is the question of how sessions are represented and which protections apply, and the source states neither. Reworded by the maintainer ruling of 2026-09-18 on docs/research/undecidable-crossings-rulings.csv, which read the previous wording as overclaiming.",
     "also_acceptable": [
       "needs-code"
     ]
@@ -23,10 +23,10 @@
       "entity:cdn",
       "flow:entity:reader>entity:cdn>asset-fetch"
     ],
-    "claim": "Assets are fetched over plain HTTP, so no transport security header protects them.",
+    "claim": "Assets are fetched over plain HTTP, and what protects that channel is not stated.",
     "tier": "must-find",
     "disposition": "gap-from-prose",
-    "notes": "encryption_in_transit is stated absent on the CDN fetch."
+    "notes": "The stated HTTP transport is the fact. Header configuration and browser upgrade behaviour are not inferable from it, so the requirement is the protection of that channel rather than a named header. Reworded by the maintainer ruling of 2026-09-18 on docs/research/undecidable-crossings-rulings.csv, which read the previous wording as overclaiming."
   },
   {
     "chapter": "session-management",
