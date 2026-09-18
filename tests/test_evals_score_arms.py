@@ -79,11 +79,11 @@ class TestTheSpec:
 class TestScoring:
     """What reaches the runs file, and what is named as skipped instead."""
 
-    def run(self, tmp_path: Path, *specs: str) -> int:
+    def run(self, tmp_path: Path, *specs: str, corpus: Path | None = None) -> int:
         return command_score_arms(
             argparse.Namespace(
                 artifact=list(specs),
-                corpus=Path("evals") / "corpus",
+                corpus=corpus or Path("evals") / "corpus",
                 out=tmp_path / "runs.json",
             )
         )
@@ -150,14 +150,31 @@ class TestScoring:
     def test_a_case_nobody_signed_is_named_rather_than_scored(
         self, tmp_path: Path, capsys
     ) -> None:
-        """A run graded against a draft reference is graded against nothing."""
+        """A run graded against a draft reference is graded against nothing.
+
+        The draft is built here rather than borrowed from the corpus, because
+        every corpus case carries a signed reference. A test that borrowed one
+        would stop driving this rule the moment the last draft was signed, and
+        say nothing about it.
+        """
+        import json
+        import shutil
+
         from evals.harness.reference import load_corpus
 
-        drafted = next(
+        corpus = tmp_path / "corpus"
+        corpus.mkdir()
+        held = next(
             case
             for case in load_corpus(Path("evals") / "corpus")
             if case.id == "02-iot-fleet-telemetry"
         )
-        artifact = sweep(tmp_path, drafted)
-        assert self.run(tmp_path, f"A={artifact}") == 1
+        shutil.copytree(Path("evals") / "corpus" / held.id, corpus / held.id)
+        facts_path = corpus / held.id / "facts.json"
+        facts = json.loads(facts_path.read_text())
+        facts["rows"][0]["reviewed_by"] = None
+        facts_path.write_text(json.dumps(facts, indent=2) + "\n")
+
+        artifact = sweep(tmp_path, held)
+        assert self.run(tmp_path, f"A={artifact}", corpus=corpus) == 1
         assert "no sweep held a case with a signed reference" in capsys.readouterr().err

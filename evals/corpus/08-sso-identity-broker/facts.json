@@ -1,374 +1,392 @@
 {
- "case": "08-sso-identity-broker",
- "drafted_by": "agent-stand-in",
- "rows": [
-  {
-   "assertion": {
-    "subject_type": "component",
-    "subject": "process:identity-broker",
-    "predicate": "network-membership",
-    "value": "boundary:corporate-network",
-    "reason": null,
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "The broker\nruns on the corporate network."
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Stated directly.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "component",
-    "subject": "process:store-admin-console",
-    "predicate": "network-membership",
-    "value": "boundary:corporate-network",
-    "reason": null,
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "It also runs on the corporate network."
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Stated directly.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "component",
-    "subject": "entity:colleague",
-    "predicate": "network-membership",
-    "value": "boundary:outside-corporate-network",
-    "reason": null,
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "Colleagues sign in to it from wherever they are,\nincluding their own devices at home."
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Their position is stated as outside, explicitly including unmanaged devices.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "credential",
-    "subject": "credential:token-signing-key",
-    "predicate": "credential-custody",
-    "value": "a key store the broker keeps it in",
-    "reason": null,
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "The broker signs tokens with a signing key it keeps in a key store."
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Where the credential is kept, stated.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "credential",
-    "subject": "credential:token-signing-key",
-    "predicate": "credential-sharing",
-    "value": "shared",
-    "reason": null,
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "The same\nkey signs the tokens for every application."
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "One key across every application is shared by this vocabulary.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "credential",
-    "subject": "credential:colleague-token",
-    "predicate": "credential-expiry",
-    "value": "expires",
-    "reason": null,
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "Tokens are good for twelve hours and there is no\nway to pull one back before it expires."
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Twelve hours is a lifetime, so the credential expires. The absence of early revocation is a separate fact this registry has no predicate for, and is left unrecorded rather than forced into this one.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "interaction",
-    "subject": "flow:entity:colleague>process:identity-broker>sign-in",
-    "predicate": "mfa-requirement",
-    "value": "unknown",
-    "reason": "silent",
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "Nor has anyone written down whether\ncolleagues are asked for a second factor."
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Named as not written down.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "component",
-    "subject": "store:directory",
-    "predicate": "storage-encryption",
-    "value": "unknown",
-    "reason": "silent",
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "whether the directory or\nthe log are encrypted where they sit"
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Named as not written down.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "component",
-    "subject": "store:audit-log",
-    "predicate": "storage-encryption",
-    "value": "unknown",
-    "reason": "silent",
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "whether the directory or\nthe log are encrypted where they sit"
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Same sentence, the other half.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "interaction",
-    "subject": "flow:entity:franchise-identity-provider>process:identity-broker>vouch-for-colleague",
-    "predicate": "authentication-mechanism",
-    "value": "the franchise provider's own assertion, taken as a sign-in",
-    "reason": null,
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "their own identity provider vouches for them and the broker\ntakes that as a sign-in"
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Stated: the broker accepts another party's assertion.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "principal",
-    "subject": "principal:franchise-identity-provider",
-    "predicate": "authorization-grant",
-    "value": "vouch for colleagues, with no written limit on which ones",
-    "reason": null,
-    "scope": [
-     {
-      "kind": "resource",
-      "value": "identity broker"
-     },
-     {
-      "kind": "operation",
-      "value": "vouch"
-     }
-    ],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "We have not written down which colleagues that provider\nis allowed to vouch for."
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "A grant whose breadth the source says is unwritten.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "principal",
-    "subject": "principal:store-manager-group",
-    "predicate": "authorization-grant",
-    "value": "change prices and void transactions at every store, not only the holder's own",
-    "reason": null,
-    "scope": [
-     {
-      "kind": "resource",
-      "value": "store admin console"
-     },
-     {
-      "kind": "operation",
-      "value": "change prices and void transactions"
-     }
-    ],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "The console does not check\nwhich store the colleague belongs to, so a store-manager token works against\nevery store."
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "A grant stated with the check that does not narrow it.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "component",
-    "subject": "process:identity-broker",
-    "predicate": "internet-exposure",
-    "value": "internet-facing",
-    "reason": null,
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "Colleagues sign in to it from wherever they are,\nincluding their own devices at home."
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Sign-in from anywhere, including unmanaged devices, states reachability from outside.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "interaction",
-    "subject": "flow:entity:colleague>process:store-admin-console>change-prices-and-void",
-    "predicate": "authentication-mechanism",
-    "value": "the token the broker issued, and nothing else",
-    "reason": null,
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "Every\napplication takes that token and decides what the colleague may do from the\ngroups in it. Nothing calls back to the broker to ask whether a colleague is\nstill allowed in."
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "The mechanism is the token alone, and the sentence says what is not done besides.",
-   "reviewed_by": null
+  "case": "08-sso-identity-broker",
+  "drafted_by": "agent-stand-in",
+  "rows": [
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:identity-broker",
+        "predicate": "network-membership",
+        "value": "boundary:corporate-network",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The broker\nruns on the corporate network."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Stated directly.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:store-admin-console",
+        "predicate": "network-membership",
+        "value": "boundary:corporate-network",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "It also runs on the corporate network."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Stated directly.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "entity:colleague",
+        "predicate": "network-membership",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Colleagues sign in to it from wherever they are,\nincluding their own devices at home."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Home use establishes a physical location, not network membership: a VPN remains possible and personally owned devices are not necessarily unmanaged.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "credential",
+        "subject": "credential:token-signing-key",
+        "predicate": "credential-custody",
+        "value": "a key store the broker keeps it in",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The broker signs tokens with a signing key it keeps in a key store."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Where the credential is kept, stated.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "credential",
+        "subject": "credential:token-signing-key",
+        "predicate": "credential-sharing",
+        "value": "shared",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The same\nkey signs the tokens for every application."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "One key across every application is shared by this vocabulary.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "credential",
+        "subject": "credential:colleague-token",
+        "predicate": "credential-expiry",
+        "value": "expires",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Tokens are good for twelve hours and there is no\nway to pull one back before it expires."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Twelve hours is a lifetime, so the credential expires. The absence of early revocation is a separate fact this registry has no predicate for, and is left unrecorded rather than forced into this one.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:entity:colleague>process:identity-broker>sign-in",
+        "predicate": "mfa-requirement",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Nor has anyone written down whether\ncolleagues are asked for a second factor."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Named as not written down.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:directory",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "whether the directory or\nthe log are encrypted where they sit"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Named as not written down.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:audit-log",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "whether the directory or\nthe log are encrypted where they sit"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Same sentence, the other half.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:entity:franchise-identity-provider>process:identity-broker>vouch-for-colleague",
+        "predicate": "authentication-mechanism",
+        "value": "the franchise provider's own assertion, taken as a sign-in",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "their own identity provider vouches for them and the broker\ntakes that as a sign-in"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Stated: the broker accepts another party's assertion.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "principal",
+        "subject": "principal:franchise-identity-provider",
+        "predicate": "authorization-grant",
+        "value": "vouch for colleagues, with no written limit on which ones",
+        "reason": null,
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "identity broker"
+          },
+          {
+            "kind": "operation",
+            "value": "vouch"
+          }
+        ],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "We have not written down which colleagues that provider\nis allowed to vouch for."
+          },
+          {
+            "source_label": "System description",
+            "quote": "their own identity provider vouches for them and the broker\ntakes that as a sign-in"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "A grant whose breadth the source says is unwritten.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "principal",
+        "subject": "principal:store-manager-group",
+        "predicate": "authorization-grant",
+        "value": "change prices and void transactions at every store, not only the holder's own",
+        "reason": null,
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "store admin console"
+          },
+          {
+            "kind": "operation",
+            "value": "change prices and void transactions"
+          }
+        ],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The console does not check\nwhich store the colleague belongs to, so a store-manager token works against\nevery store."
+          },
+          {
+            "source_label": "System description",
+            "quote": "If the token has the store-manager group in it, the console\nlets the holder change prices and void transactions."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "A grant stated with the check that does not narrow it.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:identity-broker",
+        "predicate": "internet-exposure",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Colleagues sign in to it from wherever they are,\nincluding their own devices at home."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Sign-in from home does not establish that the broker itself is internet-facing: VPN access or an intermediary remains possible. Corporate-network placement does not settle exposure either way.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:entity:colleague>process:store-admin-console>change-prices-and-void",
+        "predicate": "authentication-mechanism",
+        "value": "the broker-issued signed token",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Every\napplication takes that token and decides what the colleague may do from the\ngroups in it. Nothing calls back to the broker to ask whether a colleague is\nstill allowed in."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Token use is explicit and applications check its signature. The absence of a callback establishes no live broker recheck, not the absence of every other authentication or access control. Group authorization and the missing store scoping are separate facts.",
+      "reviewed_by": "mstarks01"
+    }
+  ],
+  "disputed": [
+    {
+      "element_id": "entity:franchise-identity-provider",
+      "attribute": "trust_zone",
+      "blessed": "boundary:franchise-partner",
+      "proposed": "record as an inference",
+      "kind": "defensible-inference",
+      "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
+      "ruling": "change",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "element_id": "entity:hr-system",
+      "attribute": "trust_zone",
+      "blessed": "boundary:outside-corporate-network",
+      "proposed": "record as an inference",
+      "kind": "defensible-inference",
+      "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
+      "ruling": "change",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "element_id": "store:directory",
+      "attribute": "trust_zone",
+      "blessed": "boundary:corporate-network",
+      "proposed": "record as an inference",
+      "kind": "defensible-inference",
+      "basis": "The broker is placed; its directory is not. No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
+      "ruling": "change",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "element_id": "store:key-store",
+      "attribute": "trust_zone",
+      "blessed": "boundary:corporate-network",
+      "proposed": "record as an inference",
+      "kind": "defensible-inference",
+      "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
+      "ruling": "change",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "element_id": "store:audit-log",
+      "attribute": "trust_zone",
+      "blessed": "boundary:corporate-network",
+      "proposed": "record as an inference",
+      "kind": "defensible-inference",
+      "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
+      "ruling": "change",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "element_id": "entity:colleague",
+      "attribute": "trust_zone",
+      "blessed": "boundary:outside-corporate-network",
+      "proposed": "record as an inference",
+      "kind": "defensible-inference",
+      "basis": "Home use establishes a physical location, not network membership: a VPN remains possible. The model's zone is a reading of the architecture, not something the source says.",
+      "ruling": "change",
+      "reviewed_by": "mstarks01"
+    }
+  ],
+  "aliases": {
+    "subjects": [],
+    "qualifiers": []
   }
- ],
- "disputed": [
-  {
-   "element_id": "entity:franchise-identity-provider",
-   "attribute": "trust_zone",
-   "blessed": "boundary:franchise-partner",
-   "proposed": "record as an inference",
-   "kind": "defensible-inference",
-   "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-   "ruling": null,
-   "reviewed_by": null
-  },
-  {
-   "element_id": "entity:hr-system",
-   "attribute": "trust_zone",
-   "blessed": "boundary:outside-corporate-network",
-   "proposed": "record as an inference",
-   "kind": "defensible-inference",
-   "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-   "ruling": null,
-   "reviewed_by": null
-  },
-  {
-   "element_id": "store:directory",
-   "attribute": "trust_zone",
-   "blessed": "boundary:corporate-network",
-   "proposed": "record as an inference",
-   "kind": "defensible-inference",
-   "basis": "The broker is placed; its directory is not. No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-   "ruling": null,
-   "reviewed_by": null
-  },
-  {
-   "element_id": "store:key-store",
-   "attribute": "trust_zone",
-   "blessed": "boundary:corporate-network",
-   "proposed": "record as an inference",
-   "kind": "defensible-inference",
-   "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-   "ruling": null,
-   "reviewed_by": null
-  },
-  {
-   "element_id": "store:audit-log",
-   "attribute": "trust_zone",
-   "blessed": "boundary:corporate-network",
-   "proposed": "record as an inference",
-   "kind": "defensible-inference",
-   "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-   "ruling": null,
-   "reviewed_by": null
-  }
- ],
- "aliases": {
-  "subjects": [],
-  "qualifiers": []
- }
 }

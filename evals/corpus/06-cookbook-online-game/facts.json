@@ -1,336 +1,336 @@
 {
- "case": "06-cookbook-online-game",
- "drafted_by": "agent-stand-in",
- "rows": [
-  {
-   "assertion": {
-    "subject_type": "component",
-    "subject": "entity:player",
-    "predicate": "network-membership",
-    "value": "boundary:player-local-machine",
-    "reason": null,
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "Players run our game client on their own machines. We do not control those\nmachines."
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Stated, with the control boundary named.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "component",
-    "subject": "process:lobby",
-    "predicate": "network-membership",
-    "value": "boundary:production-network",
-    "reason": null,
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "The client connects out to two things in our production network."
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Stated for both endpoints of that sentence.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "component",
-    "subject": "process:game-server",
-    "predicate": "network-membership",
-    "value": "boundary:production-network",
-    "reason": null,
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "The client connects out to two things in our production network."
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Same sentence.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "component",
-    "subject": "process:lobby",
-    "predicate": "internet-exposure",
-    "value": "internet-facing",
-    "reason": null,
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "Both of those have to be reachable\nfrom wherever a player is, so they are exposed."
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Stated outright, with the reason.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "component",
-    "subject": "process:game-server",
-    "predicate": "internet-exposure",
-    "value": "internet-facing",
-    "reason": null,
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "Both of those have to be reachable\nfrom wherever a player is, so they are exposed."
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Same sentence, the other half.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "component",
-    "subject": "entity:customer-support-staff",
-    "predicate": "network-membership",
-    "value": "boundary:corporate-network",
-    "reason": null,
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "our customer support staff work from the corporate network"
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Stated directly.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "interaction",
-    "subject": "flow:process:game-client>process:lobby>matchmaking",
-    "predicate": "authentication-mechanism",
-    "value": "unknown",
-    "reason": "silent",
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "The diagram doesn't record what authentication is on any of these links"
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Named as not recorded, for every link.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "interaction",
-    "subject": "flow:process:game-client>process:game-server>gameplay-traffic",
-    "predicate": "authentication-mechanism",
-    "value": "unknown",
-    "reason": "silent",
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "The diagram doesn't record what authentication is on any of these links"
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Same sentence; 'any of these links' covers this one.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "interaction",
-    "subject": "flow:entity:customer-support-staff>process:moderation-website>moderate-accounts",
-    "predicate": "authentication-mechanism",
-    "value": "unknown",
-    "reason": "silent",
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "The diagram doesn't record what authentication is on any of these links"
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Same sentence. A moderation path with no stated authentication is the sharpest of them.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "component",
-    "subject": "store:player-database",
-    "predicate": "storage-encryption",
-    "value": "unknown",
-    "reason": "silent",
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "or how\nany of the stores are protected"
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Named as not recorded.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "component",
-    "subject": "store:stats-database",
-    "predicate": "storage-encryption",
-    "value": "unknown",
-    "reason": "silent",
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "or how\nany of the stores are protected"
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "'Any of the stores' covers both.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "interaction",
-    "subject": "flow:process:game-client>process:lobby>matchmaking",
-    "predicate": "transport-encryption",
-    "value": "unknown",
-    "reason": "silent",
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "The two client links are just port numbers."
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "A port number states no protection: the speaker says that is all there is.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "interaction",
-    "subject": "flow:process:game-client>process:game-server>gameplay-traffic",
-    "predicate": "transport-encryption",
-    "value": "unknown",
-    "reason": "silent",
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "The two client links are just port numbers."
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Same sentence, the other link.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "component",
-    "subject": "process:game-client",
-    "predicate": "network-membership",
-    "value": "boundary:player-local-machine",
-    "reason": null,
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "Players run our game client on their own machines."
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Stated directly.",
-   "reviewed_by": null
+  "case": "06-cookbook-online-game",
+  "drafted_by": "agent-stand-in",
+  "rows": [
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "entity:player",
+        "predicate": "network-membership",
+        "value": "boundary:player-local-machine",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Players run our game client on their own machines. We do not control those\nmachines."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Stated, with the control boundary named.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:lobby",
+        "predicate": "network-membership",
+        "value": "boundary:production-network",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The client connects out to two things in our production network."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Stated for both endpoints of that sentence.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:game-server",
+        "predicate": "network-membership",
+        "value": "boundary:production-network",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The client connects out to two things in our production network."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Same sentence.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:lobby",
+        "predicate": "internet-exposure",
+        "value": "internet-facing",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Both of those have to be reachable\nfrom wherever a player is, so they are exposed."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Stated outright, with the reason.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:game-server",
+        "predicate": "internet-exposure",
+        "value": "internet-facing",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Both of those have to be reachable\nfrom wherever a player is, so they are exposed."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Same sentence, the other half.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "entity:customer-support-staff",
+        "predicate": "network-membership",
+        "value": "boundary:corporate-network",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "our customer support staff work from the corporate network"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Stated directly.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:process:game-client>process:lobby>matchmaking",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The diagram doesn't record what authentication is on any of these links"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Named as not recorded, for every link.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:process:game-client>process:game-server>gameplay-traffic",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The diagram doesn't record what authentication is on any of these links"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Same sentence; 'any of these links' covers this one.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:entity:customer-support-staff>process:moderation-website>moderate-accounts",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The diagram doesn't record what authentication is on any of these links"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Same sentence. A moderation path with no stated authentication is the sharpest of them.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:player-database",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "or how\nany of the stores are protected"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Named as not recorded.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:stats-database",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "or how\nany of the stores are protected"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "'Any of the stores' covers both.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:process:game-client>process:lobby>matchmaking",
+        "predicate": "transport-encryption",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The two client links are just port numbers."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "A port number states no protection: the speaker says that is all there is.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:process:game-client>process:game-server>gameplay-traffic",
+        "predicate": "transport-encryption",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The two client links are just port numbers."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Same sentence, the other link.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:game-client",
+        "predicate": "network-membership",
+        "value": "boundary:player-local-machine",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Players run our game client on their own machines."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Stated directly.",
+      "reviewed_by": "mstarks01"
+    }
+  ],
+  "disputed": [
+    {
+      "element_id": "process:moderation-website",
+      "attribute": "trust_zone",
+      "blessed": "boundary:production-network",
+      "proposed": "record as an inference",
+      "kind": "defensible-inference",
+      "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
+      "ruling": "change",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "element_id": "store:player-database",
+      "attribute": "trust_zone",
+      "blessed": "boundary:production-network",
+      "proposed": "record as an inference",
+      "kind": "defensible-inference",
+      "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
+      "ruling": "change",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "element_id": "store:stats-database",
+      "attribute": "trust_zone",
+      "blessed": "boundary:production-network",
+      "proposed": "record as an inference",
+      "kind": "defensible-inference",
+      "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
+      "ruling": "change",
+      "reviewed_by": "mstarks01"
+    }
+  ],
+  "aliases": {
+    "subjects": [],
+    "qualifiers": []
   }
- ],
- "disputed": [
-  {
-   "element_id": "process:moderation-website",
-   "attribute": "trust_zone",
-   "blessed": "boundary:production-network",
-   "proposed": "record as an inference",
-   "kind": "defensible-inference",
-   "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-   "ruling": null,
-   "reviewed_by": null
-  },
-  {
-   "element_id": "store:player-database",
-   "attribute": "trust_zone",
-   "blessed": "boundary:production-network",
-   "proposed": "record as an inference",
-   "kind": "defensible-inference",
-   "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-   "ruling": null,
-   "reviewed_by": null
-  },
-  {
-   "element_id": "store:stats-database",
-   "attribute": "trust_zone",
-   "blessed": "boundary:production-network",
-   "proposed": "record as an inference",
-   "kind": "defensible-inference",
-   "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-   "ruling": null,
-   "reviewed_by": null
-  }
- ],
- "aliases": {
-  "subjects": [],
-  "qualifiers": []
- }
 }
