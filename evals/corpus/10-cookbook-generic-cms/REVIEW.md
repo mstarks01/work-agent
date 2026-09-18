@@ -272,7 +272,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### repudiation
 
-**8.** Content is changed directly in the database and no CMS record shows who changed it, because that path bypasses the CMS entirely.
+**8.** Content is changed directly in the database and no CMS record shows who changed it, so the change goes unattributed unless the database itself records the actor, which is unverified.
 
 - `flow:entity:admin>store:mysql-database>direct-administration`, `process:web-server`
 - severity: medium/medium · verb: `unattributable`
@@ -353,7 +353,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**17.** An attacker who plants a script in the CDN bucket runs code in every reader's browser in the site's own context.
+**17.** An attacker who can write to the CDN bucket plants a script there, and it runs in the site's own context in the browser of each reader the site delivers it to.
 
 - `store:cdn-bucket`, `flow:entity:reader>entity:cdn>asset-fetch`
 - severity: medium/high · verb: `plant`
@@ -408,7 +408,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "11d2a58f0e1d5773054f0a72d222b3cc96f889cdd0206dd3656495a3d5fe8313",
       "model.json": "c89911777cd70655676903a6c7b7dc10c70282233eb31533b2b58d4fd5662227",
       "claims/asvs.json": "38c218796733dcb8a7704c88a23fb0896007a20be9f562109349be94034a33ad",
-      "claims/stride.json": "d1c3bff31f9f7673f961233b604b137b9fb5b49c7a8b8f1812f46683f38f738d"
+      "claims/stride.json": "5811c028e97a3d75d21a7c16d2c42f50979792c74876c0ea76ee599fc8526d4b"
       }
     }
   }

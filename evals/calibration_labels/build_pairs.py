@@ -10,8 +10,20 @@ are pulled verbatim from each case's
 a fixture from the claim it was labelled against. ``verify_corpus.py`` fails
 when it does.
 
-Editing fixtures means editing ``LABELS`` and re-running this. ``pairs.json`` is
-generated, and should never be hand-edited.
+Editing fixtures means editing ``LABELS`` and re-running this with
+``python -m evals.calibration_labels.build_pairs``. ``pairs.json`` is generated,
+and should never be hand-edited.
+
+A fixture's identity reads its place and never its prose
+--------------------------------------------------------
+
+Each pair carries ``reference_index``, ``candidate_ordinal`` and the
+``fixture_id`` :func:`evals.harness.calibration.fixture_id` derives from them
+and the case. A review record under ``reviews/`` pins a manifest of those IDs,
+so rewording either claim must leave the identity where it is; the components
+sit beside the derived value, so a change to the rule re-keys every fixture by
+recomputation. ``load_pairs`` refuses a stored ID its own components do not
+derive.
 
 The sixth field, the candidate's affected element IDs
 -----------------------------------------------------
@@ -43,6 +55,8 @@ import json
 from collections import Counter
 from pathlib import Path
 from typing import Any, cast
+
+from evals.harness.calibration import fixture_id
 
 HERE = Path(__file__).resolve().parent
 CORPUS = HERE.parent / "corpus"
@@ -421,6 +435,7 @@ def main() -> None:
         if case_dir.is_dir()
     }
     pairs = []
+    ordinals: Counter[tuple[str, int]] = Counter()
     for raw in LABELS:
         if len(raw) not in (7, 8):
             raise ValueError(f"label tuple has {len(raw)} fields, expected 7 or 8")
@@ -433,9 +448,17 @@ def main() -> None:
         verb = cast(str | None, raw[6])
         annotations = cast(tuple[str, ...], raw[7]) if len(raw) == 8 else ()
         reference = threats_by_case[case][index]
+        ordinal = ordinals[(case, index)]
+        ordinals[(case, index)] += 1
         pair: dict[str, Any] = {
             "case": case,
             "category": reference["category"],
+            # The fixture's place, and the identity derived from it. A review
+            # record pins that identity, so it reads where the fixture sits and
+            # never what either claim says.
+            "reference_index": index,
+            "candidate_ordinal": ordinal,
+            "fixture_id": fixture_id(case, index, ordinal),
             "reference_claim": reference["claim"],
             # Free: the corpus already holds it, so no hand pass assigns it
             # and no reworded reference can detach it from its claim.

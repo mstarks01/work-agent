@@ -108,7 +108,7 @@
       "flow:entity:admin>store:mysql-database>direct-administration",
       "process:web-server"
     ],
-    "claim": "Content is changed directly in the database and no CMS record shows who changed it, because that path bypasses the CMS entirely.",
+    "claim": "Content is changed directly in the database and no CMS record shows who changed it, so the change goes unattributed unless the database itself records the actor, which is unverified.",
     "tier": "must-find",
     "severity": {
       "likelihood": "medium",
@@ -239,7 +239,7 @@
       "store:cdn-bucket",
       "flow:entity:reader>entity:cdn>asset-fetch"
     ],
-    "claim": "An attacker who plants a script in the CDN bucket runs code in every reader's browser in the site's own context.",
+    "claim": "An attacker who can write to the CDN bucket plants a script there, and it runs in the site's own context in the browser of each reader the site delivers it to.",
     "tier": "must-find",
     "severity": {
       "likelihood": "medium",

@@ -64,7 +64,7 @@
       "store:file-share",
       "flow:entity:payroll-system>store:file-share>collect-payroll-export"
     ],
-    "claim": "An attacker alters the payroll export while it sits on the file share, so the payroll system collects hours nobody worked.",
+    "claim": "An attacker with a write path to the file share alters the payroll export while it sits there, and the payroll system collects hours nobody worked if it checks the file no further.",
     "tier": "must-find",
     "severity": {
       "likelihood": "medium",
@@ -108,7 +108,7 @@
       "process:scheduling-service",
       "flow:entity:store-manager>process:scheduling-web-app>build-rota"
     ],
-    "claim": "A store manager denies having made a rota change that disadvantaged a colleague, and nothing in the model records who changed what.",
+    "claim": "A store manager denies having made a rota change that disadvantaged a colleague, and the model records nothing that attributes the change, so whether the application keeps such a record is unverified.",
     "tier": "must-find",
     "severity": {
       "likelihood": "medium",

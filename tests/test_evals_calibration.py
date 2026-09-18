@@ -24,6 +24,7 @@ from evals.harness.calibration import (
     IDENTITY_VALIDATION,
     SCORED_LABELS,
     CalibrationError,
+    fixture_id,
     load_pairs,
     measure_agreement,
     measure_merges,
@@ -147,14 +148,7 @@ def test_malformed_fixtures_fail_closed(tmp_path):
 
 def test_unknown_label_fails_closed(tmp_path, pairs):
     path = tmp_path / "pairs.json"
-    entry = {
-        "case": pairs[0].case,
-        "category": pairs[0].category,
-        "reference_claim": pairs[0].reference_claim,
-        "candidate_claim": pairs[0].candidate_claim,
-        "label": "probably",
-        "note": "",
-    }
+    entry = _entry(pairs[0], label="probably")
     path.write_text(json.dumps([entry]))
 
     with pytest.raises(CalibrationError, match="label"):
@@ -230,6 +224,9 @@ def _entry(pair, **overrides):
     entry = {
         "case": pair.case,
         "category": pair.category,
+        "reference_index": pair.reference_index,
+        "candidate_ordinal": pair.candidate_ordinal,
+        "fixture_id": pair.fixture_id,
         "reference_claim": pair.reference_claim,
         "candidate_claim": pair.candidate_claim,
         "reference_element_ids": list(pair.reference_element_ids),
@@ -244,7 +241,13 @@ def _entry(pair, **overrides):
         "note": pair.note,
         "annotations": list(pair.annotations),
     }
-    return entry | overrides
+    entry |= overrides
+    # The identity follows the place, so an override that moves the place
+    # re-derives it rather than carrying the original fixture's value.
+    entry["fixture_id"] = fixture_id(
+        entry["case"], entry["reference_index"], entry["candidate_ordinal"]
+    )
+    return entry
 
 
 def test_an_unclear_label_loads(tmp_path, pairs):
@@ -281,7 +284,14 @@ def test_an_unclear_pair_is_counted_and_never_scored(tmp_path, pairs, labels):
     """
     decided = [pair for pair in pairs if pair.is_scored][:10]
     entries = [_entry(pair) for pair in decided]
-    entries.append(_entry(decided[0], label="unclear", candidate_claim="undecided"))
+    entries.append(
+        _entry(
+            decided[0],
+            label="unclear",
+            candidate_claim="undecided",
+            candidate_ordinal=decided[0].candidate_ordinal + 100,
+        )
+    )
     path = tmp_path / "pairs.json"
     path.write_text(json.dumps(entries))
 
@@ -297,7 +307,12 @@ def test_an_invalid_claim_is_counted_and_never_scored(tmp_path, pairs, labels):
     decided = [pair for pair in pairs if pair.is_scored][:10]
     entries = [_entry(pair) for pair in decided]
     entries.append(
-        _entry(decided[0], label="invalid-claim", candidate_claim="not a threat")
+        _entry(
+            decided[0],
+            label="invalid-claim",
+            candidate_claim="not a threat",
+            candidate_ordinal=decided[0].candidate_ordinal + 100,
+        )
     )
     path = tmp_path / "pairs.json"
     path.write_text(json.dumps(entries))

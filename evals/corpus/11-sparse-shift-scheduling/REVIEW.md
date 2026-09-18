@@ -257,7 +257,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### tampering
 
-**5.** An attacker alters the payroll export while it sits on the file share, so the payroll system collects hours nobody worked.
+**5.** An attacker with a write path to the file share alters the payroll export while it sits there, and the payroll system collects hours nobody worked if it checks the file no further.
 
 - `store:file-share`, `flow:entity:payroll-system>store:file-share>collect-payroll-export`
 - severity: medium/high · verb: `alter`
@@ -284,7 +284,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### repudiation
 
-**8.** A store manager denies having made a rota change that disadvantaged a colleague, and nothing in the model records who changed what.
+**8.** A store manager denies having made a rota change that disadvantaged a colleague, and the model records nothing that attributes the change, so whether the application keeps such a record is unverified.
 
 - `process:scheduling-service`, `flow:entity:store-manager>process:scheduling-web-app>build-rota`
 - severity: medium/medium · verb: `unattributable`
@@ -412,7 +412,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "2507fd3081003c1c94427ef81dcea36f6ca92f5358c965789b49ec4af89b6a60",
       "model.json": "252800813f3b60ff0937689d594ee0d29879b84595259d16ef4cd8f64e1e72f1",
       "claims/asvs.json": "47f787e3c526f8ddc7da2eac4d1739f3685c9b9e926a2bd66c72c26b9d997700",
-      "claims/stride.json": "7cda8c5d56a81c2eb10a168738932a1e4cf4655391e1c972e03917608800d789"
+      "claims/stride.json": "68c933a86331d8f0e25efa504ba54b19ba65dfd6d8fe5cc7e972548ea06d09a8"
       }
     }
   }

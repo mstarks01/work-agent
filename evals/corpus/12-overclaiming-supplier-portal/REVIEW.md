@@ -239,7 +239,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### spoofing
 
-**1.** An attacker who obtains a supplier's vendor-issued password signs in as that supplier and uploads paperwork in their name.
+**1.** An attacker who obtains a supplier's vendor-issued password signs in as that supplier and uploads paperwork in their name, if the password alone admits them; whether a second factor or another access control stands in the way is unverified.
 
 - `flow:entity:supplier>process:supplier-portal>upload-documents`, `entity:supplier`
 - severity: medium/medium · verb: `use-credential`
@@ -255,7 +255,7 @@ on either of them. That is the finding this sitting exists for.
 
 > mark:
 
-**3.** An attacker writes a file into the landing bucket while posing as the vendor's nightly push, since how the bucket identifies the writer is unverified.
+**3.** An attacker writes a file into the landing bucket while posing as the vendor's nightly push, if the bucket does not authenticate and authorize the writer, which is unverified.
 
 - `flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract`, `store:landing-bucket`
 - severity: medium/high · verb: `plant`
@@ -358,7 +358,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### elevation-of-privilege
 
-**14.** A signed-in supplier reaches another supplier's compliance documents through the portal, because no separation between supplier tenants is stated.
+**14.** A signed-in supplier reaches another supplier's compliance documents through the portal, if the portal does not authorize access per tenant, which the source does not state either way.
 
 - `flow:entity:supplier>process:supplier-portal>upload-documents`, `process:supplier-portal`
 - severity: medium/high · verb: `abuse-grant`
@@ -421,7 +421,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
       "model.json": "dcfd28bad38f897c03648d173c9cfd9454673988d6d13e3cd11abed53723c036",
       "claims/asvs.json": "1557978c4d8757e7d5243d8839aa3a0950bec51093b9851e24b470fa4abb6e31",
-      "claims/stride.json": "682ed7f034133a83c6bcef123cba03d91f2cfface683d15eab24d4e6f57a60e5"
+      "claims/stride.json": "559fffbbdd6787424ca09a29fc43ef22e382ac426716e7136b9c1b633b3204dd"
       }
     }
   }

@@ -2,6 +2,9 @@
   {
     "case": "01-payments-checkout",
     "category": "spoofing",
+    "reference_index": 0,
+    "candidate_ordinal": 0,
+    "fixture_id": "1f78e2367f2c",
     "reference_claim": "An attacker who obtains a shopper's session cookie replays it against the storefront API and places orders as that shopper.",
     "reference_element_ids": [
       "entity:shopper",
@@ -20,6 +23,9 @@
   {
     "case": "01-payments-checkout",
     "category": "spoofing",
+    "reference_index": 0,
+    "candidate_ordinal": 1,
+    "fixture_id": "028d56783548",
     "reference_claim": "An attacker who obtains a shopper's session cookie replays it against the storefront API and places orders as that shopper.",
     "reference_element_ids": [
       "entity:shopper",
@@ -37,6 +43,9 @@
   {
     "case": "01-payments-checkout",
     "category": "spoofing",
+    "reference_index": 1,
+    "candidate_ordinal": 0,
+    "fixture_id": "70b8f2ad5b9b",
     "reference_claim": "An attacker POSTs a forged settlement webhook to the storefront API, impersonating the card processor to mark an unpaid order as paid.",
     "reference_element_ids": [
       "flow:entity:card-processor>process:storefront-api>settlement-webhook",
@@ -55,6 +64,9 @@
   {
     "case": "01-payments-checkout",
     "category": "spoofing",
+    "reference_index": 1,
+    "candidate_ordinal": 1,
+    "fixture_id": "d1a0dce4de4d",
     "reference_claim": "An attacker POSTs a forged settlement webhook to the storefront API, impersonating the card processor to mark an unpaid order as paid.",
     "reference_element_ids": [
       "flow:entity:card-processor>process:storefront-api>settlement-webhook",
@@ -72,6 +84,9 @@
   {
     "case": "01-payments-checkout",
     "category": "spoofing",
+    "reference_index": 2,
+    "candidate_ordinal": 0,
+    "fixture_id": "23ee664bb459",
     "reference_claim": "Any workload that can reach the order service impersonates the storefront API on the unauthenticated gRPC channel and submits orders.",
     "reference_element_ids": [
       "flow:process:storefront-api>process:order-service>submit-order",
@@ -89,6 +104,9 @@
   {
     "case": "01-payments-checkout",
     "category": "spoofing",
+    "reference_index": 3,
+    "candidate_ordinal": 0,
+    "fixture_id": "8ddaccffbb0e",
     "reference_claim": "An attacker holding the shared application password connects to orders-db as the order service.",
     "reference_element_ids": [
       "flow:process:order-service>store:orders-db>read-write-orders",
@@ -107,6 +125,9 @@
   {
     "case": "01-payments-checkout",
     "category": "tampering",
+    "reference_index": 4,
+    "candidate_ordinal": 0,
+    "fixture_id": "2afc72c21906",
     "reference_claim": "An attacker positioned in the storefront tier modifies order contents in flight on the gRPC channel, whose transport protection is unverified.",
     "reference_element_ids": [
       "flow:process:storefront-api>process:order-service>submit-order"
@@ -123,6 +144,9 @@
   {
     "case": "01-payments-checkout",
     "category": "tampering",
+    "reference_index": 5,
+    "candidate_ordinal": 0,
+    "fixture_id": "d7ffbe88a00c",
     "reference_claim": "An attacker with the shared full read/write database account alters order rows, changing prices or payment status directly.",
     "reference_element_ids": [
       "flow:process:order-service>store:orders-db>read-write-orders",
@@ -140,6 +164,9 @@
   {
     "case": "01-payments-checkout",
     "category": "tampering",
+    "reference_index": 5,
+    "candidate_ordinal": 1,
+    "fixture_id": "0eb98ccb5691",
     "reference_claim": "An attacker with the shared full read/write database account alters order rows, changing prices or payment status directly.",
     "reference_element_ids": [
       "flow:process:order-service>store:orders-db>read-write-orders",
@@ -157,6 +184,9 @@
   {
     "case": "01-payments-checkout",
     "category": "repudiation",
+    "reference_index": 8,
+    "candidate_ordinal": 0,
+    "fixture_id": "33604bd8aa2d",
     "reference_claim": "A shopper denies having placed an order, and the receipt archive cannot contradict them because receipts record only the order service as the writer.",
     "reference_element_ids": [
       "entity:shopper",
@@ -175,6 +205,9 @@
   {
     "case": "01-payments-checkout",
     "category": "repudiation",
+    "reference_index": 8,
+    "candidate_ordinal": 1,
+    "fixture_id": "43791d7c7408",
     "reference_claim": "A shopper denies having placed an order, and the receipt archive cannot contradict them because receipts record only the order service as the writer.",
     "reference_element_ids": [
       "entity:shopper",
@@ -192,6 +225,9 @@
   {
     "case": "01-payments-checkout",
     "category": "information-disclosure",
+    "reference_index": 11,
+    "candidate_ordinal": 0,
+    "fixture_id": "9f456848fa81",
     "reference_claim": "An attacker who reaches the database storage or its backups reads shopper addresses and card last-four, because protection at rest is unverified.",
     "reference_element_ids": [
       "store:orders-db"
@@ -208,6 +244,9 @@
   {
     "case": "01-payments-checkout",
     "category": "information-disclosure",
+    "reference_index": 12,
+    "candidate_ordinal": 0,
+    "fixture_id": "16077c259ce7",
     "reference_claim": "An attacker with access to the internal network reads order contents and shopper identifiers off the gRPC channel, whose encryption is unverified.",
     "reference_element_ids": [
       "flow:process:storefront-api>process:order-service>submit-order"
@@ -224,6 +263,9 @@
   {
     "case": "01-payments-checkout",
     "category": "information-disclosure",
+    "reference_index": 12,
+    "candidate_ordinal": 1,
+    "fixture_id": "87521b3c263a",
     "reference_claim": "An attacker with access to the internal network reads order contents and shopper identifiers off the gRPC channel, whose encryption is unverified.",
     "reference_element_ids": [
       "flow:process:storefront-api>process:order-service>submit-order"
@@ -240,6 +282,9 @@
   {
     "case": "01-payments-checkout",
     "category": "denial-of-service",
+    "reference_index": 15,
+    "candidate_ordinal": 0,
+    "fixture_id": "6f5809e0dbf5",
     "reference_claim": "An attacker floods the unauthenticated settlement webhook endpoint until the storefront API stops serving shoppers.",
     "reference_element_ids": [
       "flow:entity:card-processor>process:storefront-api>settlement-webhook",
@@ -258,6 +303,9 @@
   {
     "case": "01-payments-checkout",
     "category": "elevation-of-privilege",
+    "reference_index": 18,
+    "candidate_ordinal": 0,
+    "fixture_id": "d9729f6cc058",
     "reference_claim": "An attacker with any foothold in the storefront tier gains order-writing privilege in the core zone, because the order service grants it on network position alone.",
     "reference_element_ids": [
       "flow:process:storefront-api>process:order-service>submit-order",
@@ -276,6 +324,9 @@
   {
     "case": "01-payments-checkout",
     "category": "elevation-of-privilege",
+    "reference_index": 18,
+    "candidate_ordinal": 1,
+    "fixture_id": "d1ac2bdc2435",
     "reference_claim": "An attacker with any foothold in the storefront tier gains order-writing privilege in the core zone, because the order service grants it on network position alone.",
     "reference_element_ids": [
       "flow:process:storefront-api>process:order-service>submit-order",
@@ -293,6 +344,9 @@
   {
     "case": "02-iot-fleet-telemetry",
     "category": "spoofing",
+    "reference_index": 0,
+    "candidate_ordinal": 0,
+    "fixture_id": "0688e348a728",
     "reference_claim": "An attacker who extracts the fleet-wide pre-shared key from any one node publishes readings to the gateway as any other device in the fleet.",
     "reference_element_ids": [
       "entity:sensor-node",
@@ -311,6 +365,9 @@
   {
     "case": "02-iot-fleet-telemetry",
     "category": "spoofing",
+    "reference_index": 0,
+    "candidate_ordinal": 1,
+    "fixture_id": "0643554654b3",
     "reference_claim": "An attacker who extracts the fleet-wide pre-shared key from any one node publishes readings to the gateway as any other device in the fleet.",
     "reference_element_ids": [
       "entity:sensor-node",
@@ -328,6 +385,9 @@
   {
     "case": "02-iot-fleet-telemetry",
     "category": "spoofing",
+    "reference_index": 1,
+    "candidate_ordinal": 0,
+    "fixture_id": "6790a048e7aa",
     "reference_claim": "An attacker with physical access presents themselves as a field technician on the node's serial console, whose authentication is unverified.",
     "reference_element_ids": [
       "entity:sensor-node",
@@ -346,6 +406,9 @@
   {
     "case": "02-iot-fleet-telemetry",
     "category": "tampering",
+    "reference_index": 3,
+    "candidate_ordinal": 0,
+    "fixture_id": "d9b68fdaf9ec",
     "reference_claim": "An attacker who can write to the firmware bucket plants a malicious image that every polling node installs, since image signature verification is unverified.",
     "reference_element_ids": [
       "entity:sensor-node",
@@ -363,6 +426,9 @@
   {
     "case": "02-iot-fleet-telemetry",
     "category": "tampering",
+    "reference_index": 3,
+    "candidate_ordinal": 1,
+    "fixture_id": "b27dfb1d14ad",
     "reference_claim": "An attacker who can write to the firmware bucket plants a malicious image that every polling node installs, since image signature verification is unverified.",
     "reference_element_ids": [
       "entity:sensor-node",
@@ -380,6 +446,9 @@
   {
     "case": "02-iot-fleet-telemetry",
     "category": "tampering",
+    "reference_index": 4,
+    "candidate_ordinal": 0,
+    "fixture_id": "192b73955132",
     "reference_claim": "An attacker holding the fleet key injects fabricated readings that the normalizer loads into the lake as genuine customer data.",
     "reference_element_ids": [
       "flow:entity:sensor-node>process:device-gateway>publish-readings",
@@ -398,6 +467,9 @@
   {
     "case": "02-iot-fleet-telemetry",
     "category": "tampering",
+    "reference_index": 4,
+    "candidate_ordinal": 1,
+    "fixture_id": "3345f127d4ab",
     "reference_claim": "An attacker holding the fleet key injects fabricated readings that the normalizer loads into the lake as genuine customer data.",
     "reference_element_ids": [
       "flow:entity:sensor-node>process:device-gateway>publish-readings",
@@ -416,6 +488,9 @@
   {
     "case": "02-iot-fleet-telemetry",
     "category": "repudiation",
+    "reference_index": 6,
+    "candidate_ordinal": 0,
+    "fixture_id": "f00946fbd3dc",
     "reference_claim": "A customer disputes a reading attributed to their site and no per-device identity exists to establish which node actually sent it.",
     "reference_element_ids": [
       "entity:sensor-node",
@@ -434,6 +509,9 @@
   {
     "case": "02-iot-fleet-telemetry",
     "category": "information-disclosure",
+    "reference_index": 8,
+    "candidate_ordinal": 0,
+    "fixture_id": "b76c3d4346a8",
     "reference_claim": "An attacker who reaches the telemetry lake reads customer site addresses and occupancy patterns, whose protection at rest is unverified.",
     "reference_element_ids": [
       "store:telemetry-lake"
@@ -450,6 +528,9 @@
   {
     "case": "02-iot-fleet-telemetry",
     "category": "information-disclosure",
+    "reference_index": 9,
+    "candidate_ordinal": 0,
+    "fixture_id": "c20add999632",
     "reference_claim": "An attacker on the path between a node and the gateway reads readings and the presented key, because transport encryption on the MQTT session is unverified.",
     "reference_element_ids": [
       "flow:entity:sensor-node>process:device-gateway>publish-readings"
@@ -466,6 +547,9 @@
   {
     "case": "02-iot-fleet-telemetry",
     "category": "information-disclosure",
+    "reference_index": 10,
+    "candidate_ordinal": 0,
+    "fixture_id": "fb07f3962056",
     "reference_claim": "An attacker downloads firmware images from the public bucket and reverse-engineers them to recover embedded fleet credentials or logic.",
     "reference_element_ids": [
       "store:firmware-bucket"
@@ -482,6 +566,9 @@
   {
     "case": "02-iot-fleet-telemetry",
     "category": "information-disclosure",
+    "reference_index": 10,
+    "candidate_ordinal": 1,
+    "fixture_id": "ad9f0ec062ad",
     "reference_claim": "An attacker downloads firmware images from the public bucket and reverse-engineers them to recover embedded fleet credentials or logic.",
     "reference_element_ids": [
       "store:firmware-bucket"
@@ -498,6 +585,9 @@
   {
     "case": "02-iot-fleet-telemetry",
     "category": "denial-of-service",
+    "reference_index": 12,
+    "candidate_ordinal": 0,
+    "fixture_id": "87f777b4ed21",
     "reference_claim": "An attacker floods the internet-exposed MQTT broker with connections until genuine nodes can no longer publish readings.",
     "reference_element_ids": [
       "flow:entity:sensor-node>process:device-gateway>publish-readings",
@@ -515,6 +605,9 @@
   {
     "case": "02-iot-fleet-telemetry",
     "category": "denial-of-service",
+    "reference_index": 13,
+    "candidate_ordinal": 0,
+    "fixture_id": "4b0bf3c2abee",
     "reference_claim": "An attacker publishes a firmware image that bricks every node that installs it, taking the fleet offline with no remote recovery path.",
     "reference_element_ids": [
       "entity:sensor-node",
@@ -533,6 +626,9 @@
   {
     "case": "02-iot-fleet-telemetry",
     "category": "elevation-of-privilege",
+    "reference_index": 15,
+    "candidate_ordinal": 0,
+    "fixture_id": "bf6ab18a873e",
     "reference_claim": "An attacker turns an unsigned firmware update into code execution on every node, escalating from bucket write access to control of the physical fleet.",
     "reference_element_ids": [
       "entity:sensor-node",
@@ -551,6 +647,9 @@
   {
     "case": "02-iot-fleet-telemetry",
     "category": "elevation-of-privilege",
+    "reference_index": 16,
+    "candidate_ordinal": 0,
+    "fixture_id": "6a3bf410673a",
     "reference_claim": "An attacker who compromises one physically accessible node uses its fleet-wide credential to act as the whole fleet against the ingest edge.",
     "reference_element_ids": [
       "entity:sensor-node",
@@ -568,6 +667,9 @@
   {
     "case": "02-iot-fleet-telemetry",
     "category": "elevation-of-privilege",
+    "reference_index": 17,
+    "candidate_ordinal": 0,
+    "fixture_id": "6de076d1c0d2",
     "reference_claim": "An operator signed in for dashboards queries raw customer records beyond what their role needs, because no narrower grant on the lake is described.",
     "reference_element_ids": [
       "entity:fleet-operator",
@@ -586,6 +688,9 @@
   {
     "case": "03-batch-data-pipeline",
     "category": "spoofing",
+    "reference_index": 0,
+    "candidate_ordinal": 0,
+    "fixture_id": "0dfb6a41251a",
     "reference_claim": "An attacker who obtains a partner's never-rotated static SFTP key uploads extracts as that partner.",
     "reference_element_ids": [
       "entity:insurance-partner",
@@ -604,6 +709,9 @@
   {
     "case": "03-batch-data-pipeline",
     "category": "spoofing",
+    "reference_index": 1,
+    "candidate_ordinal": 0,
+    "fixture_id": "be25553eb377",
     "reference_claim": "An attacker deposits a file into another partner's folder and the scheduler processes it as that partner's extract, because it never checks the depositor.",
     "reference_element_ids": [
       "process:ingest-scheduler",
@@ -622,6 +730,9 @@
   {
     "case": "03-batch-data-pipeline",
     "category": "spoofing",
+    "reference_index": 1,
+    "candidate_ordinal": 1,
+    "fixture_id": "f6dadc61b28e",
     "reference_claim": "An attacker deposits a file into another partner's folder and the scheduler processes it as that partner's extract, because it never checks the depositor.",
     "reference_element_ids": [
       "process:ingest-scheduler",
@@ -640,6 +751,9 @@
   {
     "case": "03-batch-data-pipeline",
     "category": "tampering",
+    "reference_index": 3,
+    "candidate_ordinal": 0,
+    "fixture_id": "b76844d9288d",
     "reference_claim": "An attacker who can write to the landing bucket alters claim records before the nightly run, and only the schema is checked before they reach the warehouse.",
     "reference_element_ids": [
       "process:spark-transform-job",
@@ -657,6 +771,9 @@
   {
     "case": "03-batch-data-pipeline",
     "category": "tampering",
+    "reference_index": 3,
+    "candidate_ordinal": 1,
+    "fixture_id": "543fdacd3a3a",
     "reference_claim": "An attacker who can write to the landing bucket alters claim records before the nightly run, and only the schema is checked before they reach the warehouse.",
     "reference_element_ids": [
       "process:spark-transform-job",
@@ -677,6 +794,9 @@
   {
     "case": "03-batch-data-pipeline",
     "category": "tampering",
+    "reference_index": 4,
+    "candidate_ordinal": 0,
+    "fixture_id": "f0062c04dd67",
     "reference_claim": "An attacker who can write to the Airflow metadata database rewrites a connection string to redirect the pipeline to infrastructure they control.",
     "reference_element_ids": [
       "flow:process:ingest-scheduler>store:airflow-metadata-database>read-connections",
@@ -694,6 +814,9 @@
   {
     "case": "03-batch-data-pipeline",
     "category": "repudiation",
+    "reference_index": 6,
+    "candidate_ordinal": 0,
+    "fixture_id": "64b9e0fccca8",
     "reference_claim": "A partner denies having sent an extract and nothing binds a landed file to the key that uploaded it.",
     "reference_element_ids": [
       "entity:insurance-partner",
@@ -712,6 +835,9 @@
   {
     "case": "03-batch-data-pipeline",
     "category": "information-disclosure",
+    "reference_index": 8,
+    "candidate_ordinal": 0,
+    "fixture_id": "15ac3527132b",
     "reference_claim": "An analyst who needs only aggregate figures reads member names and dates of birth, because the grant covers the whole dataset.",
     "reference_element_ids": [
       "flow:entity:data-analyst>store:claims-warehouse>run-queries",
@@ -730,6 +856,9 @@
   {
     "case": "03-batch-data-pipeline",
     "category": "information-disclosure",
+    "reference_index": 8,
+    "candidate_ordinal": 1,
+    "fixture_id": "804e7a6719cf",
     "reference_claim": "An analyst who needs only aggregate figures reads member names and dates of birth, because the grant covers the whole dataset.",
     "reference_element_ids": [
       "flow:entity:data-analyst>store:claims-warehouse>run-queries",
@@ -748,6 +877,9 @@
   {
     "case": "03-batch-data-pipeline",
     "category": "information-disclosure",
+    "reference_index": 9,
+    "candidate_ordinal": 0,
+    "fixture_id": "601b09a4305f",
     "reference_claim": "An attacker who reaches the Airflow metadata database recovers every partner key and connection string it holds, since its protection at rest is unverified.",
     "reference_element_ids": [
       "store:airflow-metadata-database"
@@ -764,6 +896,9 @@
   {
     "case": "03-batch-data-pipeline",
     "category": "information-disclosure",
+    "reference_index": 9,
+    "candidate_ordinal": 1,
+    "fixture_id": "b597da86935e",
     "reference_claim": "An attacker who reaches the Airflow metadata database recovers every partner key and connection string it holds, since its protection at rest is unverified.",
     "reference_element_ids": [
       "store:airflow-metadata-database"
@@ -780,6 +915,9 @@
   {
     "case": "03-batch-data-pipeline",
     "category": "denial-of-service",
+    "reference_index": 12,
+    "candidate_ordinal": 0,
+    "fixture_id": "37d2c91035f1",
     "reference_claim": "An attacker deposits an enormous or malformed file that consumes the nightly window and prevents genuine extracts from being processed.",
     "reference_element_ids": [
       "process:ingest-scheduler",
@@ -798,6 +936,9 @@
   {
     "case": "03-batch-data-pipeline",
     "category": "denial-of-service",
+    "reference_index": 13,
+    "candidate_ordinal": 0,
+    "fixture_id": "bacec870cfb8",
     "reference_claim": "An attacker crafts input that makes the transform job fail repeatedly, leaving the warehouse stale without any request-level error surfacing.",
     "reference_element_ids": [
       "process:spark-transform-job",
@@ -815,6 +956,9 @@
   {
     "case": "03-batch-data-pipeline",
     "category": "elevation-of-privilege",
+    "reference_index": 14,
+    "candidate_ordinal": 0,
+    "fixture_id": "4e75293f733f",
     "reference_claim": "An attacker with a foothold in the landing network reads the metadata database and escalates to every credential the pipeline holds.",
     "reference_element_ids": [
       "process:ingest-scheduler",
@@ -832,6 +976,9 @@
   {
     "case": "03-batch-data-pipeline",
     "category": "elevation-of-privilege",
+    "reference_index": 15,
+    "candidate_ordinal": 0,
+    "fixture_id": "19c2e3e67c3a",
     "reference_claim": "An attacker who can plant a file in the landing bucket gains execution in the warehouse network through the job it triggers.",
     "reference_element_ids": [
       "flow:process:ingest-scheduler>process:spark-transform-job>trigger-transform",
@@ -850,6 +997,9 @@
   {
     "case": "03-batch-data-pipeline",
     "category": "elevation-of-privilege",
+    "reference_index": 16,
+    "candidate_ordinal": 0,
+    "fixture_id": "082a8cc60ab2",
     "reference_claim": "An analyst uses their dataset-wide grant to reach claim data belonging to partners outside their remit.",
     "reference_element_ids": [
       "entity:data-analyst",
@@ -868,6 +1018,9 @@
   {
     "case": "03-batch-data-pipeline",
     "category": "elevation-of-privilege",
+    "reference_index": 16,
+    "candidate_ordinal": 1,
+    "fixture_id": "8abcd4924116",
     "reference_claim": "An analyst uses their dataset-wide grant to reach claim data belonging to partners outside their remit.",
     "reference_element_ids": [
       "entity:data-analyst",
@@ -886,6 +1039,9 @@
   {
     "case": "04-ml-inference-service",
     "category": "spoofing",
+    "reference_index": 0,
+    "candidate_ordinal": 0,
+    "fixture_id": "a62fc3352f6c",
     "reference_claim": "An attacker who obtains a never-expiring API key calls the inference gateway as that team indefinitely.",
     "reference_element_ids": [
       "entity:calling-service",
@@ -904,6 +1060,9 @@
   {
     "case": "04-ml-inference-service",
     "category": "spoofing",
+    "reference_index": 0,
+    "candidate_ordinal": 1,
+    "fixture_id": "8231d30c54d7",
     "reference_claim": "An attacker who obtains a never-expiring API key calls the inference gateway as that team indefinitely.",
     "reference_element_ids": [
       "entity:calling-service",
@@ -921,6 +1080,9 @@
   {
     "case": "04-ml-inference-service",
     "category": "spoofing",
+    "reference_index": 1,
+    "candidate_ordinal": 0,
+    "fixture_id": "ec3457952ad9",
     "reference_claim": "Any workload inside the model network submits inference requests posing as the gateway, which the model server accepts on network position alone.",
     "reference_element_ids": [
       "flow:process:inference-gateway>process:model-server>forward-request",
@@ -938,6 +1100,9 @@
   {
     "case": "04-ml-inference-service",
     "category": "tampering",
+    "reference_index": 3,
+    "candidate_ordinal": 0,
+    "fixture_id": "e4774deab286",
     "reference_claim": "An attacker who can write to the registry swaps the model artifact and the model server loads it without any integrity verification.",
     "reference_element_ids": [
       "flow:process:model-server>store:model-registry-bucket>load-artifact",
@@ -956,6 +1121,9 @@
   {
     "case": "04-ml-inference-service",
     "category": "tampering",
+    "reference_index": 3,
+    "candidate_ordinal": 1,
+    "fixture_id": "58482cfe76a7",
     "reference_claim": "An attacker who can write to the registry swaps the model artifact and the model server loads it without any integrity verification.",
     "reference_element_ids": [
       "flow:process:model-server>store:model-registry-bucket>load-artifact",
@@ -974,6 +1142,9 @@
   {
     "case": "04-ml-inference-service",
     "category": "tampering",
+    "reference_index": 4,
+    "candidate_ordinal": 0,
+    "fixture_id": "025a1c975cb1",
     "reference_claim": "An attacker with model-network access writes to the unauthenticated Redis feature store and changes the features a decision is made on.",
     "reference_element_ids": [
       "flow:process:model-server>store:redis-feature-store>read-features",
@@ -991,6 +1162,9 @@
   {
     "case": "04-ml-inference-service",
     "category": "tampering",
+    "reference_index": 4,
+    "candidate_ordinal": 1,
+    "fixture_id": "834a0a3d3cad",
     "reference_claim": "An attacker with model-network access writes to the unauthenticated Redis feature store and changes the features a decision is made on.",
     "reference_element_ids": [
       "flow:process:model-server>store:redis-feature-store>read-features",
@@ -1008,6 +1182,9 @@
   {
     "case": "04-ml-inference-service",
     "category": "repudiation",
+    "reference_index": 6,
+    "candidate_ordinal": 0,
+    "fixture_id": "46f677b0b11e",
     "reference_claim": "Nobody can establish which engineer published a given model artifact, because publication runs through a shared account.",
     "reference_element_ids": [
       "entity:ml-engineer",
@@ -1026,6 +1203,9 @@
   {
     "case": "04-ml-inference-service",
     "category": "information-disclosure",
+    "reference_index": 8,
+    "candidate_ordinal": 0,
+    "fixture_id": "f42b9235c6dc",
     "reference_claim": "An attacker who reaches the inference log reads raw end-user prompts, whose protection at rest is unverified.",
     "reference_element_ids": [
       "store:inference-log"
@@ -1042,6 +1222,9 @@
   {
     "case": "04-ml-inference-service",
     "category": "information-disclosure",
+    "reference_index": 8,
+    "candidate_ordinal": 1,
+    "fixture_id": "056df7c729e7",
     "reference_claim": "An attacker who reaches the inference log reads raw end-user prompts, whose protection at rest is unverified.",
     "reference_element_ids": [
       "store:inference-log"
@@ -1058,6 +1241,9 @@
   {
     "case": "04-ml-inference-service",
     "category": "information-disclosure",
+    "reference_index": 10,
+    "candidate_ordinal": 0,
+    "fixture_id": "f2c7002ac02d",
     "reference_claim": "A caller crafts a request that makes the model emit customer features belonging to a different tenant.",
     "reference_element_ids": [
       "flow:entity:calling-service>process:inference-gateway>submit-inference-request",
@@ -1075,6 +1261,9 @@
   {
     "case": "04-ml-inference-service",
     "category": "information-disclosure",
+    "reference_index": 10,
+    "candidate_ordinal": 1,
+    "fixture_id": "340c8beb4d7a",
     "reference_claim": "A caller crafts a request that makes the model emit customer features belonging to a different tenant.",
     "reference_element_ids": [
       "flow:entity:calling-service>process:inference-gateway>submit-inference-request",
@@ -1093,6 +1282,9 @@
   {
     "case": "04-ml-inference-service",
     "category": "denial-of-service",
+    "reference_index": 12,
+    "candidate_ordinal": 0,
+    "fixture_id": "bcf4f92337f6",
     "reference_claim": "A caller holding a valid key floods the gateway with inference requests and exhausts the shared GPU capacity behind it.",
     "reference_element_ids": [
       "flow:entity:calling-service>process:inference-gateway>submit-inference-request",
@@ -1110,6 +1302,9 @@
   {
     "case": "04-ml-inference-service",
     "category": "denial-of-service",
+    "reference_index": 13,
+    "candidate_ordinal": 0,
+    "fixture_id": "e9f61ea10d7f",
     "reference_claim": "An attacker with model-network access flushes or fills the unauthenticated Redis store, stalling every request that needs features.",
     "reference_element_ids": [
       "process:model-server",
@@ -1127,6 +1322,9 @@
   {
     "case": "04-ml-inference-service",
     "category": "elevation-of-privilege",
+    "reference_index": 15,
+    "candidate_ordinal": 0,
+    "fixture_id": "11c7c2e2358f",
     "reference_claim": "An attacker who can write to the registry turns an unverified artifact load into code execution on the GPU nodes.",
     "reference_element_ids": [
       "process:model-server",
@@ -1145,6 +1343,9 @@
   {
     "case": "04-ml-inference-service",
     "category": "elevation-of-privilege",
+    "reference_index": 16,
+    "candidate_ordinal": 0,
+    "fixture_id": "f566e319e97e",
     "reference_claim": "An attacker who compromises the internet-facing gateway inherits unauthenticated access to everything in the model network.",
     "reference_element_ids": [
       "process:inference-gateway",
@@ -1163,6 +1364,9 @@
   {
     "case": "04-ml-inference-service",
     "category": "elevation-of-privilege",
+    "reference_index": 17,
+    "candidate_ordinal": 0,
+    "fixture_id": "38b4042f6aef",
     "reference_claim": "A caller uses its key to reach models or capabilities its team was never entitled to, because the key authenticates without scoping what it may invoke.",
     "reference_element_ids": [
       "entity:calling-service",
@@ -1181,6 +1385,9 @@
   {
     "case": "05-cookbook-queue-webapp",
     "category": "spoofing",
+    "reference_index": 1,
+    "candidate_ordinal": 0,
+    "fixture_id": "0798d5a0a7b6",
     "reference_claim": "An attacker who reaches the queue enqueues jobs as if they came from the web application, since queue authentication is unverified.",
     "reference_element_ids": [
       "flow:process:web-application>store:message-queue>enqueue-job",
@@ -1199,6 +1406,9 @@
   {
     "case": "05-cookbook-queue-webapp",
     "category": "tampering",
+    "reference_index": 3,
+    "candidate_ordinal": 0,
+    "fixture_id": "ae120e4ad932",
     "reference_claim": "An attacker places a poisoned message on the queue and the worker processes it as legitimate work.",
     "reference_element_ids": [
       "process:background-worker-process",
@@ -1217,6 +1427,9 @@
   {
     "case": "05-cookbook-queue-webapp",
     "category": "tampering",
+    "reference_index": 3,
+    "candidate_ordinal": 1,
+    "fixture_id": "c6dc238f0042",
     "reference_claim": "An attacker places a poisoned message on the queue and the worker processes it as legitimate work.",
     "reference_element_ids": [
       "process:background-worker-process",
@@ -1235,6 +1448,9 @@
   {
     "case": "05-cookbook-queue-webapp",
     "category": "tampering",
+    "reference_index": 4,
+    "candidate_ordinal": 0,
+    "fixture_id": "ce9e36ae2c4c",
     "reference_claim": "An attacker who can write to the web application config changes the queue endpoint or credentials and redirects the application's work.",
     "reference_element_ids": [
       "process:web-application",
@@ -1252,6 +1468,9 @@
   {
     "case": "05-cookbook-queue-webapp",
     "category": "repudiation",
+    "reference_index": 6,
+    "candidate_ordinal": 0,
+    "fixture_id": "db3d24d6836b",
     "reference_claim": "An attacker who compromises the worker erases or edits the log records that would show what it did, because the logs live in the same database the worker writes.",
     "reference_element_ids": [
       "process:background-worker-process",
@@ -1270,6 +1489,9 @@
   {
     "case": "05-cookbook-queue-webapp",
     "category": "repudiation",
+    "reference_index": 6,
+    "candidate_ordinal": 1,
+    "fixture_id": "864aad2b83a3",
     "reference_claim": "An attacker who compromises the worker erases or edits the log records that would show what it did, because the logs live in the same database the worker writes.",
     "reference_element_ids": [
       "process:background-worker-process",
@@ -1287,6 +1509,9 @@
   {
     "case": "05-cookbook-queue-webapp",
     "category": "information-disclosure",
+    "reference_index": 8,
+    "candidate_ordinal": 0,
+    "fixture_id": "f0daf7c86099",
     "reference_claim": "An attacker who compromises the background worker reads the database credentials from its config store.",
     "reference_element_ids": [
       "store:worker-config"
@@ -1303,6 +1528,9 @@
   {
     "case": "05-cookbook-queue-webapp",
     "category": "information-disclosure",
+    "reference_index": 9,
+    "candidate_ordinal": 0,
+    "fixture_id": "f21da933697a",
     "reference_claim": "An attacker who compromises the internet-facing web application reads the queue credentials from its config store.",
     "reference_element_ids": [
       "store:web-application-config"
@@ -1319,6 +1547,9 @@
   {
     "case": "05-cookbook-queue-webapp",
     "category": "information-disclosure",
+    "reference_index": 9,
+    "candidate_ordinal": 1,
+    "fixture_id": "ae729b5676d6",
     "reference_claim": "An attacker who compromises the internet-facing web application reads the queue credentials from its config store.",
     "reference_element_ids": [
       "store:web-application-config"
@@ -1336,6 +1567,9 @@
   {
     "case": "05-cookbook-queue-webapp",
     "category": "information-disclosure",
+    "reference_index": 10,
+    "candidate_ordinal": 0,
+    "fixture_id": "58cf12f3206c",
     "reference_claim": "An attacker who reaches the database storage reads application and log records, whose protection at rest is unverified.",
     "reference_element_ids": [
       "store:database"
@@ -1352,6 +1586,9 @@
   {
     "case": "05-cookbook-queue-webapp",
     "category": "information-disclosure",
+    "reference_index": 11,
+    "candidate_ordinal": 0,
+    "fixture_id": "fc9a35a3ae1f",
     "reference_claim": "An attacker on the internal network reads job contents in transit, because transport encryption between the tiers is unverified.",
     "reference_element_ids": [
       "flow:process:background-worker-process>store:message-queue>consume-job",
@@ -1370,6 +1607,9 @@
   {
     "case": "05-cookbook-queue-webapp",
     "category": "denial-of-service",
+    "reference_index": 12,
+    "candidate_ordinal": 0,
+    "fixture_id": "98518ec901cc",
     "reference_claim": "An attacker floods the queue with jobs until the worker cannot keep up and queued work stops completing.",
     "reference_element_ids": [
       "process:background-worker-process",
@@ -1388,6 +1628,9 @@
   {
     "case": "05-cookbook-queue-webapp",
     "category": "denial-of-service",
+    "reference_index": 12,
+    "candidate_ordinal": 1,
+    "fixture_id": "3c5b09a572a9",
     "reference_claim": "An attacker floods the queue with jobs until the worker cannot keep up and queued work stops completing.",
     "reference_element_ids": [
       "process:background-worker-process",
@@ -1405,6 +1648,9 @@
   {
     "case": "05-cookbook-queue-webapp",
     "category": "elevation-of-privilege",
+    "reference_index": 15,
+    "candidate_ordinal": 0,
+    "fixture_id": "72ae4fc2d27d",
     "reference_claim": "An attacker who compromises the internet-facing web application uses its queue credentials to reach the backend tier.",
     "reference_element_ids": [
       "process:web-application",
@@ -1423,6 +1669,9 @@
   {
     "case": "05-cookbook-queue-webapp",
     "category": "elevation-of-privilege",
+    "reference_index": 16,
+    "candidate_ordinal": 0,
+    "fixture_id": "0286425f2887",
     "reference_claim": "An attacker who gets code execution in the worker inherits whatever database privilege its credentials carry, which is unverified and may be unrestricted.",
     "reference_element_ids": [
       "process:background-worker-process",
@@ -1441,6 +1690,9 @@
   {
     "case": "05-cookbook-queue-webapp",
     "category": "elevation-of-privilege",
+    "reference_index": 16,
+    "candidate_ordinal": 1,
+    "fixture_id": "8ec61576af12",
     "reference_claim": "An attacker who gets code execution in the worker inherits whatever database privilege its credentials carry, which is unverified and may be unrestricted.",
     "reference_element_ids": [
       "process:background-worker-process",
@@ -1459,6 +1711,9 @@
   {
     "case": "05-cookbook-queue-webapp",
     "category": "spoofing",
+    "reference_index": 0,
+    "candidate_ordinal": 0,
+    "fixture_id": "e4e69670a459",
     "reference_claim": "An attacker interacts with the web application as a legitimate user, because how the application authenticates the browser is unverified.",
     "reference_element_ids": [
       "entity:browser",
@@ -1477,6 +1732,9 @@
   {
     "case": "06-cookbook-online-game",
     "category": "spoofing",
+    "reference_index": 0,
+    "candidate_ordinal": 0,
+    "fixture_id": "f9b0f4cbd1c9",
     "reference_claim": "An attacker connects to the exposed lobby port as another player, because how the lobby authenticates a client is unverified.",
     "reference_element_ids": [
       "flow:process:game-client>process:lobby>matchmaking",
@@ -1495,6 +1753,9 @@
   {
     "case": "06-cookbook-online-game",
     "category": "spoofing",
+    "reference_index": 1,
+    "candidate_ordinal": 0,
+    "fixture_id": "e151872d5e2c",
     "reference_claim": "An attacker connects directly to a game server on its exposed port, bypassing the lobby, as a player who was never assigned to that match.",
     "reference_element_ids": [
       "flow:process:game-client>process:game-server>gameplay-traffic",
@@ -1513,6 +1774,9 @@
   {
     "case": "06-cookbook-online-game",
     "category": "spoofing",
+    "reference_index": 1,
+    "candidate_ordinal": 1,
+    "fixture_id": "36ccbe6918d4",
     "reference_claim": "An attacker connects directly to a game server on its exposed port, bypassing the lobby, as a player who was never assigned to that match.",
     "reference_element_ids": [
       "flow:process:game-client>process:game-server>gameplay-traffic",
@@ -1533,6 +1797,9 @@
   {
     "case": "06-cookbook-online-game",
     "category": "tampering",
+    "reference_index": 3,
+    "candidate_ordinal": 0,
+    "fixture_id": "4c24402d6f10",
     "reference_claim": "A player modifies the game client on their own machine and sends manipulated gameplay actions that the servers accept.",
     "reference_element_ids": [
       "flow:process:game-client>process:game-server>gameplay-traffic",
@@ -1551,6 +1818,9 @@
   {
     "case": "06-cookbook-online-game",
     "category": "tampering",
+    "reference_index": 3,
+    "candidate_ordinal": 1,
+    "fixture_id": "e0e30bb806ab",
     "reference_claim": "A player modifies the game client on their own machine and sends manipulated gameplay actions that the servers accept.",
     "reference_element_ids": [
       "flow:process:game-client>process:game-server>gameplay-traffic",
@@ -1568,6 +1838,9 @@
   {
     "case": "06-cookbook-online-game",
     "category": "tampering",
+    "reference_index": 4,
+    "candidate_ordinal": 0,
+    "fixture_id": "4dac478185f7",
     "reference_claim": "An attacker alters match statistics in the stats database to change rankings or rewards.",
     "reference_element_ids": [
       "flow:process:game-server>store:stats-database>read-write-stats",
@@ -1585,6 +1858,9 @@
   {
     "case": "06-cookbook-online-game",
     "category": "repudiation",
+    "reference_index": 6,
+    "candidate_ordinal": 0,
+    "fixture_id": "a681ba7b4da0",
     "reference_claim": "A support agent's action on a player account cannot be attributed to them, because nothing records who performed a moderation change.",
     "reference_element_ids": [
       "process:moderation-website",
@@ -1603,6 +1879,9 @@
   {
     "case": "06-cookbook-online-game",
     "category": "repudiation",
+    "reference_index": 6,
+    "candidate_ordinal": 1,
+    "fixture_id": "8bd2b46f8d92",
     "reference_claim": "A support agent's action on a player account cannot be attributed to them, because nothing records who performed a moderation change.",
     "reference_element_ids": [
       "process:moderation-website",
@@ -1621,6 +1900,9 @@
   {
     "case": "06-cookbook-online-game",
     "category": "information-disclosure",
+    "reference_index": 8,
+    "candidate_ordinal": 0,
+    "fixture_id": "ac6f59e2fc15",
     "reference_claim": "An attacker who reaches the player database reads player account data, whose protection at rest is unverified.",
     "reference_element_ids": [
       "store:player-database"
@@ -1637,6 +1919,9 @@
   {
     "case": "06-cookbook-online-game",
     "category": "information-disclosure",
+    "reference_index": 9,
+    "candidate_ordinal": 0,
+    "fixture_id": "41ab0e048fec",
     "reference_claim": "An attacker on the network path reads matchmaking and gameplay traffic, including player identifiers, because encryption on both client links is unverified.",
     "reference_element_ids": [
       "flow:process:game-client>process:game-server>gameplay-traffic",
@@ -1655,6 +1940,9 @@
   {
     "case": "06-cookbook-online-game",
     "category": "information-disclosure",
+    "reference_index": 10,
+    "candidate_ordinal": 0,
+    "fixture_id": "256ffe0b66dd",
     "reference_claim": "A player extracts information from their own client that the server sends but should not reveal, such as other players' positions.",
     "reference_element_ids": [
       "process:game-client",
@@ -1673,6 +1961,9 @@
   {
     "case": "06-cookbook-online-game",
     "category": "information-disclosure",
+    "reference_index": 11,
+    "candidate_ordinal": 0,
+    "fixture_id": "624260c4046a",
     "reference_claim": "A support agent reads player account data beyond what a moderation decision requires, because the website's access to the database is unscoped.",
     "reference_element_ids": [
       "process:moderation-website",
@@ -1691,6 +1982,9 @@
   {
     "case": "06-cookbook-online-game",
     "category": "denial-of-service",
+    "reference_index": 12,
+    "candidate_ordinal": 0,
+    "fixture_id": "f3d8c68b8410",
     "reference_claim": "An attacker floods the exposed lobby until players can no longer be matched into games.",
     "reference_element_ids": [
       "flow:process:game-client>process:lobby>matchmaking",
@@ -1708,6 +2002,9 @@
   {
     "case": "06-cookbook-online-game",
     "category": "denial-of-service",
+    "reference_index": 13,
+    "candidate_ordinal": 0,
+    "fixture_id": "2223223397fa",
     "reference_claim": "An attacker floods a game server's exposed port and disrupts a match in progress for every player in it.",
     "reference_element_ids": [
       "flow:process:game-client>process:game-server>gameplay-traffic",
@@ -1725,6 +2022,9 @@
   {
     "case": "06-cookbook-online-game",
     "category": "elevation-of-privilege",
+    "reference_index": 15,
+    "candidate_ordinal": 0,
+    "fixture_id": "ff3159a7ba88",
     "reference_claim": "An attacker who compromises an internet-exposed game server gains write access to player records across the production network.",
     "reference_element_ids": [
       "process:game-server",
@@ -1743,6 +2043,9 @@
   {
     "case": "06-cookbook-online-game",
     "category": "elevation-of-privilege",
+    "reference_index": 15,
+    "candidate_ordinal": 1,
+    "fixture_id": "6a74890acd13",
     "reference_claim": "An attacker who compromises an internet-exposed game server gains write access to player records across the production network.",
     "reference_element_ids": [
       "process:game-server",
@@ -1764,6 +2067,9 @@
   {
     "case": "06-cookbook-online-game",
     "category": "elevation-of-privilege",
+    "reference_index": 16,
+    "candidate_ordinal": 0,
+    "fixture_id": "d010e9ae3815",
     "reference_claim": "An attacker who gets any access to the moderation website acquires privilege over every player account it can reach.",
     "reference_element_ids": [
       "entity:customer-support-staff",
@@ -1782,6 +2088,9 @@
   {
     "case": "06-cookbook-online-game",
     "category": "elevation-of-privilege",
+    "reference_index": 17,
+    "candidate_ordinal": 0,
+    "fixture_id": "ad1a60b9ae87",
     "reference_claim": "A player uses their control over the client to obtain a match assignment or account state they are not entitled to.",
     "reference_element_ids": [
       "process:game-client",
@@ -1799,6 +2108,9 @@
   {
     "case": "01-payments-checkout",
     "category": "spoofing",
+    "reference_index": 0,
+    "candidate_ordinal": 2,
+    "fixture_id": "df1a0b6defa4",
     "reference_claim": "An attacker who obtains a shopper's session cookie replays it against the storefront API and places orders as that shopper.",
     "reference_element_ids": [
       "entity:shopper",
@@ -1817,6 +2129,9 @@
   {
     "case": "01-payments-checkout",
     "category": "spoofing",
+    "reference_index": 2,
+    "candidate_ordinal": 1,
+    "fixture_id": "1a36141fe945",
     "reference_claim": "Any workload that can reach the order service impersonates the storefront API on the unauthenticated gRPC channel and submits orders.",
     "reference_element_ids": [
       "flow:process:storefront-api>process:order-service>submit-order",
@@ -1835,6 +2150,9 @@
   {
     "case": "01-payments-checkout",
     "category": "information-disclosure",
+    "reference_index": 11,
+    "candidate_ordinal": 1,
+    "fixture_id": "6d660148bb1f",
     "reference_claim": "An attacker who reaches the database storage or its backups reads shopper addresses and card last-four, because protection at rest is unverified.",
     "reference_element_ids": [
       "store:orders-db"
@@ -1851,6 +2169,9 @@
   {
     "case": "01-payments-checkout",
     "category": "denial-of-service",
+    "reference_index": 16,
+    "candidate_ordinal": 0,
+    "fixture_id": "6b7f31e7c3b6",
     "reference_claim": "An attacker drives enough order submissions to exhaust the order service's database connections and halt order capture.",
     "reference_element_ids": [
       "process:order-service",
@@ -1868,6 +2189,9 @@
   {
     "case": "01-payments-checkout",
     "category": "elevation-of-privilege",
+    "reference_index": 20,
+    "candidate_ordinal": 0,
+    "fixture_id": "465ba12f7dbf",
     "reference_claim": "An attacker who compromises the internet-facing storefront API pivots from the DMZ into the core zone.",
     "reference_element_ids": [
       "process:order-service",
@@ -1885,6 +2209,9 @@
   {
     "case": "02-iot-fleet-telemetry",
     "category": "spoofing",
+    "reference_index": 2,
+    "candidate_ordinal": 0,
+    "fixture_id": "512b19cfc41d",
     "reference_claim": "An attacker serves a node a firmware image that impersonates an official release, because the node authenticates neither the bucket nor the image's origin.",
     "reference_element_ids": [
       "flow:entity:sensor-node>store:firmware-bucket>poll-firmware",
@@ -1903,6 +2230,9 @@
   {
     "case": "02-iot-fleet-telemetry",
     "category": "tampering",
+    "reference_index": 5,
+    "candidate_ordinal": 0,
+    "fixture_id": "f6f03c045c02",
     "reference_claim": "An attacker who can write to the device registry reassigns a node to a different customer, redirecting or corrupting that customer's data.",
     "reference_element_ids": [
       "flow:process:device-gateway>store:device-registry>look-up-device",
@@ -1920,6 +2250,9 @@
   {
     "case": "02-iot-fleet-telemetry",
     "category": "information-disclosure",
+    "reference_index": 11,
+    "candidate_ordinal": 0,
+    "fixture_id": "6269ef917a91",
     "reference_claim": "An attacker who reaches the device registry reads the key material and customer assignments it holds, whose protection at rest is unverified.",
     "reference_element_ids": [
       "store:device-registry"
@@ -1936,6 +2269,9 @@
   {
     "case": "02-iot-fleet-telemetry",
     "category": "denial-of-service",
+    "reference_index": 14,
+    "candidate_ordinal": 0,
+    "fixture_id": "2d56dabefd02",
     "reference_claim": "An attacker holding the fleet key floods the ingest path with readings until the normalizer falls behind and dashboards stop reflecting the fleet.",
     "reference_element_ids": [
       "process:telemetry-normalizer",
@@ -1953,6 +2289,9 @@
   {
     "case": "03-batch-data-pipeline",
     "category": "spoofing",
+    "reference_index": 2,
+    "candidate_ordinal": 0,
+    "fixture_id": "12b231b4657e",
     "reference_claim": "An attacker submits a transform run impersonating the scheduler, since authentication on the trigger path is unverified.",
     "reference_element_ids": [
       "flow:process:ingest-scheduler>process:spark-transform-job>trigger-transform"
@@ -1969,6 +2308,9 @@
   {
     "case": "03-batch-data-pipeline",
     "category": "tampering",
+    "reference_index": 5,
+    "candidate_ordinal": 0,
+    "fixture_id": "90cfb10b6c0b",
     "reference_claim": "An attacker who compromises the transform job writes fabricated claim rows into the warehouse alongside genuine ones.",
     "reference_element_ids": [
       "flow:process:spark-transform-job>store:claims-warehouse>load-records",
@@ -1986,6 +2328,9 @@
   {
     "case": "03-batch-data-pipeline",
     "category": "repudiation",
+    "reference_index": 7,
+    "candidate_ordinal": 0,
+    "fixture_id": "93073522b884",
     "reference_claim": "A dispute over a warehouse row cannot be traced back to the extract it came from, because no lineage from file to loaded record is described.",
     "reference_element_ids": [
       "process:spark-transform-job",
@@ -2001,6 +2346,9 @@
   {
     "case": "03-batch-data-pipeline",
     "category": "information-disclosure",
+    "reference_index": 10,
+    "candidate_ordinal": 0,
+    "fixture_id": "e91cc0b0a29f",
     "reference_claim": "An attacker who reaches the landing bucket's storage reads raw partner extracts, whose protection at rest is unverified.",
     "reference_element_ids": [
       "store:landing-bucket"
@@ -2017,6 +2365,9 @@
   {
     "case": "04-ml-inference-service",
     "category": "spoofing",
+    "reference_index": 2,
+    "candidate_ordinal": 0,
+    "fixture_id": "726f0d0ee499",
     "reference_claim": "An attacker publishes a model artifact under a shared group account with no individual identity behind it.",
     "reference_element_ids": [
       "entity:ml-engineer",
@@ -2035,6 +2386,9 @@
   {
     "case": "04-ml-inference-service",
     "category": "tampering",
+    "reference_index": 5,
+    "candidate_ordinal": 0,
+    "fixture_id": "0de80dfad480",
     "reference_claim": "An attacker inside the model network alters request payloads in flight on the unauthenticated, unencrypted forward path.",
     "reference_element_ids": [
       "flow:process:inference-gateway>process:model-server>forward-request"
@@ -2051,6 +2405,9 @@
   {
     "case": "04-ml-inference-service",
     "category": "information-disclosure",
+    "reference_index": 9,
+    "candidate_ordinal": 0,
+    "fixture_id": "ec8e55713cd6",
     "reference_claim": "An attacker with model-network access reads per-customer account age and spend bands from the unauthenticated feature store.",
     "reference_element_ids": [
       "store:redis-feature-store"
@@ -2067,6 +2424,9 @@
   {
     "case": "04-ml-inference-service",
     "category": "denial-of-service",
+    "reference_index": 14,
+    "candidate_ordinal": 0,
+    "fixture_id": "f43b69988b2d",
     "reference_claim": "An attacker deletes or corrupts the registry artifact so the model server cannot start after a restart.",
     "reference_element_ids": [
       "process:model-server",
@@ -2085,6 +2445,9 @@
   {
     "case": "04-ml-inference-service",
     "category": "elevation-of-privilege",
+    "reference_index": 17,
+    "candidate_ordinal": 1,
+    "fixture_id": "ef528cd6f142",
     "reference_claim": "A caller uses its key to reach models or capabilities its team was never entitled to, because the key authenticates without scoping what it may invoke.",
     "reference_element_ids": [
       "entity:calling-service",
@@ -2106,6 +2469,9 @@
   {
     "case": "05-cookbook-queue-webapp",
     "category": "spoofing",
+    "reference_index": 2,
+    "candidate_ordinal": 0,
+    "fixture_id": "764f00ff0573",
     "reference_claim": "An attacker holding the worker's database credentials connects to the database as the worker.",
     "reference_element_ids": [
       "flow:process:background-worker-process>store:database>read-write-records"
@@ -2122,6 +2488,9 @@
   {
     "case": "05-cookbook-queue-webapp",
     "category": "tampering",
+    "reference_index": 5,
+    "candidate_ordinal": 0,
+    "fixture_id": "9389b7416914",
     "reference_claim": "An attacker with the worker's database access alters application records or the log records stored alongside them.",
     "reference_element_ids": [
       "flow:process:background-worker-process>store:database>read-write-records",
@@ -2139,6 +2508,9 @@
   {
     "case": "05-cookbook-queue-webapp",
     "category": "denial-of-service",
+    "reference_index": 13,
+    "candidate_ordinal": 0,
+    "fixture_id": "af0651a264a3",
     "reference_claim": "An attacker floods the internet-facing web application until it stops serving browsers.",
     "reference_element_ids": [
       "flow:entity:browser>process:web-application>page-request",
@@ -2156,6 +2528,9 @@
   {
     "case": "05-cookbook-queue-webapp",
     "category": "elevation-of-privilege",
+    "reference_index": 15,
+    "candidate_ordinal": 1,
+    "fixture_id": "63ef586375a1",
     "reference_claim": "An attacker who compromises the internet-facing web application uses its queue credentials to reach the backend tier.",
     "reference_element_ids": [
       "process:web-application",
@@ -2174,6 +2549,9 @@
   {
     "case": "06-cookbook-online-game",
     "category": "spoofing",
+    "reference_index": 0,
+    "candidate_ordinal": 1,
+    "fixture_id": "ac850d835015",
     "reference_claim": "An attacker connects to the exposed lobby port as another player, because how the lobby authenticates a client is unverified.",
     "reference_element_ids": [
       "flow:process:game-client>process:lobby>matchmaking",
@@ -2192,6 +2570,9 @@
   {
     "case": "06-cookbook-online-game",
     "category": "tampering",
+    "reference_index": 5,
+    "candidate_ordinal": 0,
+    "fixture_id": "532a0060fb86",
     "reference_claim": "An attacker who influences a game server writes fabricated progression onto player records.",
     "reference_element_ids": [
       "flow:process:game-server>store:player-database>update-players",
@@ -2210,6 +2591,9 @@
   {
     "case": "06-cookbook-online-game",
     "category": "repudiation",
+    "reference_index": 7,
+    "candidate_ordinal": 0,
+    "fixture_id": "e7990b98e734",
     "reference_claim": "A player disputes a change to their record and no log distinguishes whether the lobby, a game server or the moderation website made it.",
     "reference_element_ids": [
       "process:game-server",
@@ -2228,6 +2612,9 @@
   {
     "case": "06-cookbook-online-game",
     "category": "denial-of-service",
+    "reference_index": 14,
+    "candidate_ordinal": 0,
+    "fixture_id": "5325bbe0c6a9",
     "reference_claim": "An attacker drives enough matchmaking requests to exhaust the player database and stall both matchmaking and moderation.",
     "reference_element_ids": [
       "process:lobby",
@@ -2245,6 +2632,9 @@
   {
     "case": "07-cicd-store-deploy",
     "category": "spoofing",
+    "reference_index": 0,
+    "candidate_ordinal": 0,
+    "fixture_id": "f14db91fba73",
     "reference_claim": "An attacker holding the shared build token calls the deploy controller as if it were the build runner and names an image sha of their own choosing as the current release.",
     "reference_element_ids": [
       "flow:process:build-runner>process:deploy-controller>set-current-release",
@@ -2263,6 +2653,9 @@
   {
     "case": "07-cicd-store-deploy",
     "category": "spoofing",
+    "reference_index": 0,
+    "candidate_ordinal": 1,
+    "fixture_id": "577825930531",
     "reference_claim": "An attacker holding the shared build token calls the deploy controller as if it were the build runner and names an image sha of their own choosing as the current release.",
     "reference_element_ids": [
       "flow:process:build-runner>process:deploy-controller>set-current-release",
@@ -2280,6 +2673,9 @@
   {
     "case": "07-cicd-store-deploy",
     "category": "spoofing",
+    "reference_index": 0,
+    "candidate_ordinal": 2,
+    "fixture_id": "df06459ec959",
     "reference_claim": "An attacker holding the shared build token calls the deploy controller as if it were the build runner and names an image sha of their own choosing as the current release.",
     "reference_element_ids": [
       "flow:process:build-runner>process:deploy-controller>set-current-release",
@@ -2297,6 +2693,9 @@
   {
     "case": "07-cicd-store-deploy",
     "category": "spoofing",
+    "reference_index": 1,
+    "candidate_ordinal": 0,
+    "fixture_id": "b47adfcef3c7",
     "reference_claim": "An attacker on the retail WAN presents itself to the image registry as a store server and pulls the estate's container images.",
     "reference_element_ids": [
       "flow:process:store-server>store:image-registry>pull-image",
@@ -2315,6 +2714,9 @@
   {
     "case": "07-cicd-store-deploy",
     "category": "spoofing",
+    "reference_index": 1,
+    "candidate_ordinal": 1,
+    "fixture_id": "86e6a675f8c6",
     "reference_claim": "An attacker on the retail WAN presents itself to the image registry as a store server and pulls the estate's container images.",
     "reference_element_ids": [
       "flow:process:store-server>store:image-registry>pull-image",
@@ -2333,6 +2735,9 @@
   {
     "case": "07-cicd-store-deploy",
     "category": "spoofing",
+    "reference_index": 2,
+    "candidate_ordinal": 0,
+    "fixture_id": "1a42c2afea48",
     "reference_claim": "An attacker polls the deploy controller while claiming to be a store server, since what a store server presents to the controller is unverified.",
     "reference_element_ids": [
       "flow:process:store-server>process:deploy-controller>poll-current-release",
@@ -2351,6 +2756,9 @@
   {
     "case": "07-cicd-store-deploy",
     "category": "spoofing",
+    "reference_index": 3,
+    "candidate_ordinal": 0,
+    "fixture_id": "2bb1a1befeb1",
     "reference_claim": "An attacker pushes branches to the git server as a developer, because how developers authenticate to it is unverified.",
     "reference_element_ids": [
       "entity:developer",
@@ -2369,6 +2777,9 @@
   {
     "case": "07-cicd-store-deploy",
     "category": "tampering",
+    "reference_index": 5,
+    "candidate_ordinal": 0,
+    "fixture_id": "1bf71546e625",
     "reference_claim": "An attacker alters the deploy controller's current-release record so that every store server pulls and runs an image of the attacker's choosing within a minute.",
     "reference_element_ids": [
       "process:deploy-controller",
@@ -2386,6 +2797,9 @@
   {
     "case": "07-cicd-store-deploy",
     "category": "tampering",
+    "reference_index": 5,
+    "candidate_ordinal": 1,
+    "fixture_id": "a966643d787f",
     "reference_claim": "An attacker alters the deploy controller's current-release record so that every store server pulls and runs an image of the attacker's choosing within a minute.",
     "reference_element_ids": [
       "process:deploy-controller",
@@ -2403,6 +2817,9 @@
   {
     "case": "07-cicd-store-deploy",
     "category": "tampering",
+    "reference_index": 6,
+    "candidate_ordinal": 0,
+    "fixture_id": "36c4b4d2e4d8",
     "reference_claim": "An attacker publishes a package that the lockfile resolves to and the runner bakes it into the image unchecked, because signatures on downloads are not verified.",
     "reference_element_ids": [
       "flow:process:build-runner>entity:public-package-registry>resolve-dependencies",
@@ -2421,6 +2838,9 @@
   {
     "case": "07-cicd-store-deploy",
     "category": "tampering",
+    "reference_index": 6,
+    "candidate_ordinal": 1,
+    "fixture_id": "22797e46840a",
     "reference_claim": "An attacker publishes a package that the lockfile resolves to and the runner bakes it into the image unchecked, because signatures on downloads are not verified.",
     "reference_element_ids": [
       "flow:process:build-runner>entity:public-package-registry>resolve-dependencies",
@@ -2438,6 +2858,9 @@
   {
     "case": "07-cicd-store-deploy",
     "category": "tampering",
+    "reference_index": 7,
+    "candidate_ordinal": 0,
+    "fixture_id": "f0b4b61b2d18",
     "reference_claim": "An attacker replaces the image stored under a commit-sha tag in the registry, so store servers pull attacker content while the recorded release is unchanged.",
     "reference_element_ids": [
       "process:store-server",
@@ -2455,6 +2878,9 @@
   {
     "case": "07-cicd-store-deploy",
     "category": "tampering",
+    "reference_index": 7,
+    "candidate_ordinal": 1,
+    "fixture_id": "487ddf9a2538",
     "reference_claim": "An attacker replaces the image stored under a commit-sha tag in the registry, so store servers pull attacker content while the recorded release is unchanged.",
     "reference_element_ids": [
       "process:store-server",
@@ -2475,6 +2901,9 @@
   {
     "case": "07-cicd-store-deploy",
     "category": "tampering",
+    "reference_index": 9,
+    "candidate_ordinal": 0,
+    "fixture_id": "7d5d94522e57",
     "reference_claim": "An attacker on the retail WAN alters the container image as a store server pulls it, since protection of that traffic is unverified.",
     "reference_element_ids": [
       "flow:process:store-server>store:image-registry>pull-image"
@@ -2491,6 +2920,9 @@
   {
     "case": "07-cicd-store-deploy",
     "category": "tampering",
+    "reference_index": 9,
+    "candidate_ordinal": 1,
+    "fixture_id": "d8a15c1ed5cf",
     "reference_claim": "An attacker on the retail WAN alters the container image as a store server pulls it, since protection of that traffic is unverified.",
     "reference_element_ids": [
       "flow:process:store-server>store:image-registry>pull-image"
@@ -2507,6 +2939,9 @@
   {
     "case": "07-cicd-store-deploy",
     "category": "repudiation",
+    "reference_index": 11,
+    "candidate_ordinal": 0,
+    "fixture_id": "953d2b2e13ec",
     "reference_claim": "A build that reached the estate cannot be attributed to the developer who started it, because any developer can trigger a manual rebuild on an unreviewed path whose authentication is unverified.",
     "reference_element_ids": [
       "flow:entity:developer>process:build-runner>manual-rebuild",
@@ -2525,6 +2960,9 @@
   {
     "case": "07-cicd-store-deploy",
     "category": "repudiation",
+    "reference_index": 12,
+    "candidate_ordinal": 0,
+    "fixture_id": "e04a399ef35e",
     "reference_claim": "The deploy controller cannot tell which pipeline set a release, because every pipeline presents the same shared build token.",
     "reference_element_ids": [
       "flow:process:build-runner>process:deploy-controller>set-current-release",
@@ -2543,6 +2981,9 @@
   {
     "case": "07-cicd-store-deploy",
     "category": "information-disclosure",
+    "reference_index": 13,
+    "candidate_ordinal": 0,
+    "fixture_id": "a313f95ddfd1",
     "reference_claim": "An attacker who reads the build runner's configuration recovers the shared build token and can thereafter set the estate's release.",
     "reference_element_ids": [
       "flow:process:build-runner>process:deploy-controller>set-current-release",
@@ -2560,6 +3001,9 @@
   {
     "case": "07-cicd-store-deploy",
     "category": "information-disclosure",
+    "reference_index": 13,
+    "candidate_ordinal": 1,
+    "fixture_id": "9a40417a67d3",
     "reference_claim": "An attacker who reads the build runner's configuration recovers the shared build token and can thereafter set the estate's release.",
     "reference_element_ids": [
       "flow:process:build-runner>process:deploy-controller>set-current-release",
@@ -2578,6 +3022,9 @@
   {
     "case": "07-cicd-store-deploy",
     "category": "information-disclosure",
+    "reference_index": 14,
+    "candidate_ordinal": 0,
+    "fixture_id": "0cdd8b4c1497",
     "reference_claim": "An attacker who reaches the git server's storage reads the estate's source code, since protection of what it stores is unverified.",
     "reference_element_ids": [
       "store:git-server"
@@ -2594,6 +3041,9 @@
   {
     "case": "07-cicd-store-deploy",
     "category": "information-disclosure",
+    "reference_index": 15,
+    "candidate_ordinal": 0,
+    "fixture_id": "0d583b8b49d8",
     "reference_claim": "An attacker who reaches the image registry's storage reads the built images and whatever is baked into them, since protection at rest is unverified.",
     "reference_element_ids": [
       "store:image-registry"
@@ -2610,6 +3060,9 @@
   {
     "case": "07-cicd-store-deploy",
     "category": "information-disclosure",
+    "reference_index": 16,
+    "candidate_ordinal": 0,
+    "fixture_id": "490df5a5b987",
     "reference_claim": "An attacker on the retail WAN reads the container image as a store server pulls it, since protection of that traffic is unverified.",
     "reference_element_ids": [
       "flow:process:store-server>store:image-registry>pull-image"
@@ -2629,6 +3082,9 @@
   {
     "case": "07-cicd-store-deploy",
     "category": "denial-of-service",
+    "reference_index": 17,
+    "candidate_ordinal": 0,
+    "fixture_id": "8762ee454d77",
     "reference_claim": "An attacker sets the current release to an image that does not start, and every store server restarts into it and stops serving tills.",
     "reference_element_ids": [
       "process:deploy-controller",
@@ -2647,6 +3103,9 @@
   {
     "case": "07-cicd-store-deploy",
     "category": "denial-of-service",
+    "reference_index": 17,
+    "candidate_ordinal": 1,
+    "fixture_id": "008601e41b48",
     "reference_claim": "An attacker sets the current release to an image that does not start, and every store server restarts into it and stops serving tills.",
     "reference_element_ids": [
       "process:deploy-controller",
@@ -2664,6 +3123,9 @@
   {
     "case": "07-cicd-store-deploy",
     "category": "denial-of-service",
+    "reference_index": 18,
+    "candidate_ordinal": 0,
+    "fixture_id": "c6156c2639e7",
     "reference_claim": "An attacker floods the deploy controller until the estate's polls fail and no new release can reach any store.",
     "reference_element_ids": [
       "process:deploy-controller"
@@ -2681,6 +3143,9 @@
   {
     "case": "07-cicd-store-deploy",
     "category": "denial-of-service",
+    "reference_index": 19,
+    "candidate_ordinal": 0,
+    "fixture_id": "ce1268b6f590",
     "reference_claim": "An attacker makes the image registry unreachable over the WAN so store servers cannot complete a pull and the estate is left split across two releases.",
     "reference_element_ids": [
       "flow:process:store-server>store:image-registry>pull-image",
@@ -2699,6 +3164,9 @@
   {
     "case": "07-cicd-store-deploy",
     "category": "elevation-of-privilege",
+    "reference_index": 20,
+    "candidate_ordinal": 0,
+    "fixture_id": "27ed4b6ffaf5",
     "reference_claim": "Any developer turns code of their own choosing into the software running in 1,200 stores by triggering the manual rebuild, a path the source states requires no merge and receives no review.",
     "reference_element_ids": [
       "flow:entity:developer>process:build-runner>manual-rebuild",
@@ -2717,6 +3185,9 @@
   {
     "case": "07-cicd-store-deploy",
     "category": "elevation-of-privilege",
+    "reference_index": 20,
+    "candidate_ordinal": 1,
+    "fixture_id": "222b2ec8ad86",
     "reference_claim": "Any developer turns code of their own choosing into the software running in 1,200 stores by triggering the manual rebuild, a path the source states requires no merge and receives no review.",
     "reference_element_ids": [
       "flow:entity:developer>process:build-runner>manual-rebuild",
@@ -2735,6 +3206,9 @@
   {
     "case": "07-cicd-store-deploy",
     "category": "elevation-of-privilege",
+    "reference_index": 21,
+    "candidate_ordinal": 0,
+    "fixture_id": "e6b0c3399c3a",
     "reference_claim": "An attacker who compromises the build runner controls what every store server runs, because the runner both writes the image and holds the token that names the release.",
     "reference_element_ids": [
       "process:build-runner",
@@ -2753,6 +3227,9 @@
   {
     "case": "07-cicd-store-deploy",
     "category": "elevation-of-privilege",
+    "reference_index": 22,
+    "candidate_ordinal": 0,
+    "fixture_id": "b99ceca9be97",
     "reference_claim": "An attacker who takes one store server uses whatever it presents to reach the deploy controller on the corporate network and the registry in the build environment.",
     "reference_element_ids": [
       "flow:process:store-server>process:deploy-controller>poll-current-release",
@@ -2772,6 +3249,9 @@
   {
     "case": "07-cicd-store-deploy",
     "category": "elevation-of-privilege",
+    "reference_index": 22,
+    "candidate_ordinal": 1,
+    "fixture_id": "d8cf5c699365",
     "reference_claim": "An attacker who takes one store server uses whatever it presents to reach the deploy controller on the corporate network and the registry in the build environment.",
     "reference_element_ids": [
       "flow:process:store-server>process:deploy-controller>poll-current-release",
@@ -2791,6 +3271,9 @@
   {
     "case": "07-cicd-store-deploy",
     "category": "elevation-of-privilege",
+    "reference_index": 23,
+    "candidate_ordinal": 0,
+    "fixture_id": "3482aa39baff",
     "reference_claim": "A malicious dependency executes with the build runner's authority during the build, carrying an attacker from the public internet into the build environment.",
     "reference_element_ids": [
       "flow:process:build-runner>entity:public-package-registry>resolve-dependencies",
@@ -2809,6 +3292,9 @@
   {
     "case": "08-sso-identity-broker",
     "category": "spoofing",
+    "reference_index": 0,
+    "candidate_ordinal": 0,
+    "fixture_id": "23266751f695",
     "reference_claim": "An attacker holding the signing key mints a token for any staff id carrying any groups, and every application accepts it as a genuine sign-in.",
     "reference_element_ids": [
       "process:identity-broker",
@@ -2827,6 +3313,9 @@
   {
     "case": "08-sso-identity-broker",
     "category": "spoofing",
+    "reference_index": 0,
+    "candidate_ordinal": 1,
+    "fixture_id": "0220b35ff549",
     "reference_claim": "An attacker holding the signing key mints a token for any staff id carrying any groups, and every application accepts it as a genuine sign-in.",
     "reference_element_ids": [
       "process:identity-broker",
@@ -2844,6 +3333,9 @@
   {
     "case": "08-sso-identity-broker",
     "category": "spoofing",
+    "reference_index": 1,
+    "candidate_ordinal": 0,
+    "fixture_id": "e46ceea616b7",
     "reference_claim": "The franchise identity provider vouches for someone who is not a franchise colleague and the broker signs them in as that person, since nothing records which colleagues it may vouch for.",
     "reference_element_ids": [
       "entity:franchise-identity-provider",
@@ -2862,6 +3354,9 @@
   {
     "case": "08-sso-identity-broker",
     "category": "spoofing",
+    "reference_index": 1,
+    "candidate_ordinal": 1,
+    "fixture_id": "d62de7cf7e8d",
     "reference_claim": "The franchise identity provider vouches for someone who is not a franchise colleague and the broker signs them in as that person, since nothing records which colleagues it may vouch for.",
     "reference_element_ids": [
       "entity:franchise-identity-provider",
@@ -2879,6 +3374,9 @@
   {
     "case": "08-sso-identity-broker",
     "category": "spoofing",
+    "reference_index": 2,
+    "candidate_ordinal": 0,
+    "fixture_id": "a00965dac88a",
     "reference_claim": "An attacker signs in to the broker as a colleague, because whether colleagues are asked for a second factor is unverified.",
     "reference_element_ids": [
       "entity:colleague",
@@ -2896,6 +3394,9 @@
   {
     "case": "08-sso-identity-broker",
     "category": "spoofing",
+    "reference_index": 3,
+    "candidate_ordinal": 0,
+    "fixture_id": "231218691ac7",
     "reference_claim": "An attacker who obtains a colleague's token acts as that colleague for the rest of its twelve hours, because nothing calls back to the broker and there is no way to pull a token back.",
     "reference_element_ids": [
       "flow:entity:colleague>process:identity-broker>sign-in",
@@ -2914,6 +3415,9 @@
   {
     "case": "08-sso-identity-broker",
     "category": "spoofing",
+    "reference_index": 3,
+    "candidate_ordinal": 1,
+    "fixture_id": "43ebdcbadf2d",
     "reference_claim": "An attacker who obtains a colleague's token acts as that colleague for the rest of its twelve hours, because nothing calls back to the broker and there is no way to pull a token back.",
     "reference_element_ids": [
       "flow:entity:colleague>process:identity-broker>sign-in",
@@ -2932,6 +3436,9 @@
   {
     "case": "08-sso-identity-broker",
     "category": "spoofing",
+    "reference_index": 4,
+    "candidate_ordinal": 0,
+    "fixture_id": "e637d5aa924d",
     "reference_claim": "An attacker serves the console a signing public key of their own so that tokens the attacker signed verify, since how the console fetches and trusts that key is unverified.",
     "reference_element_ids": [
       "flow:process:store-admin-console>process:identity-broker>fetch-public-key",
@@ -2950,6 +3457,9 @@
   {
     "case": "08-sso-identity-broker",
     "category": "tampering",
+    "reference_index": 5,
+    "candidate_ordinal": 0,
+    "fixture_id": "f4125b8d1fd4",
     "reference_claim": "An attacker writes a group into the broker's directory and the next token issued to that colleague carries it into every application.",
     "reference_element_ids": [
       "process:identity-broker",
@@ -2967,6 +3477,9 @@
   {
     "case": "08-sso-identity-broker",
     "category": "tampering",
+    "reference_index": 5,
+    "candidate_ordinal": 1,
+    "fixture_id": "1b69486a8891",
     "reference_claim": "An attacker writes a group into the broker's directory and the next token issued to that colleague carries it into every application.",
     "reference_element_ids": [
       "process:identity-broker",
@@ -2984,6 +3497,9 @@
   {
     "case": "08-sso-identity-broker",
     "category": "tampering",
+    "reference_index": 6,
+    "candidate_ordinal": 0,
+    "fixture_id": "742f6adbd6e7",
     "reference_claim": "An attacker alters what the nightly pull returns so that groups are granted, or so that leavers are never removed.",
     "reference_element_ids": [
       "entity:hr-system",
@@ -3001,6 +3517,9 @@
   {
     "case": "08-sso-identity-broker",
     "category": "tampering",
+    "reference_index": 6,
+    "candidate_ordinal": 1,
+    "fixture_id": "1206273df76e",
     "reference_claim": "An attacker alters what the nightly pull returns so that groups are granted, or so that leavers are never removed.",
     "reference_element_ids": [
       "entity:hr-system",
@@ -3018,6 +3537,9 @@
   {
     "case": "08-sso-identity-broker",
     "category": "tampering",
+    "reference_index": 8,
+    "candidate_ordinal": 0,
+    "fixture_id": "81a496480c57",
     "reference_claim": "An attacker alters or removes sign-in records in the audit log so a sign-in leaves no trace.",
     "reference_element_ids": [
       "flow:process:identity-broker>store:audit-log>write-sign-ins",
@@ -3035,6 +3557,9 @@
   {
     "case": "08-sso-identity-broker",
     "category": "repudiation",
+    "reference_index": 9,
+    "candidate_ordinal": 0,
+    "fixture_id": "23a6aca0a350",
     "reference_claim": "A franchise sign-in cannot be attributed to a person, because the identity was asserted by a provider we do not run and whether the log covers that route at all is unverified.",
     "reference_element_ids": [
       "flow:entity:franchise-identity-provider>process:identity-broker>vouch-for-colleague",
@@ -3053,6 +3578,9 @@
   {
     "case": "08-sso-identity-broker",
     "category": "repudiation",
+    "reference_index": 10,
+    "candidate_ordinal": 0,
+    "fixture_id": "d7d5f0ab29fe",
     "reference_claim": "A price change or a void cannot be tied to the store it belongs to, because the console never establishes which store the token holder is from.",
     "reference_element_ids": [
       "flow:entity:colleague>process:store-admin-console>change-prices-and-void",
@@ -3071,6 +3599,9 @@
   {
     "case": "08-sso-identity-broker",
     "category": "repudiation",
+    "reference_index": 10,
+    "candidate_ordinal": 1,
+    "fixture_id": "21bc560ef0c6",
     "reference_claim": "A price change or a void cannot be tied to the store it belongs to, because the console never establishes which store the token holder is from.",
     "reference_element_ids": [
       "flow:entity:colleague>process:store-admin-console>change-prices-and-void",
@@ -3089,6 +3620,9 @@
   {
     "case": "08-sso-identity-broker",
     "category": "repudiation",
+    "reference_index": 11,
+    "candidate_ordinal": 0,
+    "fixture_id": "2cdeef9578ae",
     "reference_claim": "A disputed sign-in may have no evidence behind it, since what the audit log records is unverified.",
     "reference_element_ids": [
       "store:audit-log"
@@ -3105,6 +3639,9 @@
   {
     "case": "08-sso-identity-broker",
     "category": "information-disclosure",
+    "reference_index": 12,
+    "candidate_ordinal": 0,
+    "fixture_id": "127955dbf454",
     "reference_claim": "An attacker who reaches the key store reads the signing key, since protection of what it holds at rest is unverified.",
     "reference_element_ids": [
       "store:key-store"
@@ -3121,6 +3658,9 @@
   {
     "case": "08-sso-identity-broker",
     "category": "information-disclosure",
+    "reference_index": 13,
+    "candidate_ordinal": 0,
+    "fixture_id": "ce180efe7920",
     "reference_claim": "An attacker who reaches the directory reads colleague records and everyone's group membership, since protection at rest is unverified.",
     "reference_element_ids": [
       "store:directory"
@@ -3137,6 +3677,9 @@
   {
     "case": "08-sso-identity-broker",
     "category": "information-disclosure",
+    "reference_index": 14,
+    "candidate_ordinal": 0,
+    "fixture_id": "b0c7e119ccba",
     "reference_claim": "An attacker who reaches the audit log reads when and from where colleagues signed in, since protection at rest is unverified.",
     "reference_element_ids": [
       "store:audit-log"
@@ -3153,6 +3696,9 @@
   {
     "case": "08-sso-identity-broker",
     "category": "information-disclosure",
+    "reference_index": 15,
+    "candidate_ordinal": 0,
+    "fixture_id": "a21f23b9a3b1",
     "reference_claim": "An attacker on the path between a colleague and the broker reads the sign-in and the token that comes back, since protection of that traffic is unverified.",
     "reference_element_ids": [
       "flow:entity:colleague>process:identity-broker>sign-in"
@@ -3169,6 +3715,9 @@
   {
     "case": "08-sso-identity-broker",
     "category": "information-disclosure",
+    "reference_index": 15,
+    "candidate_ordinal": 1,
+    "fixture_id": "74b4b549b546",
     "reference_claim": "An attacker on the path between a colleague and the broker reads the sign-in and the token that comes back, since protection of that traffic is unverified.",
     "reference_element_ids": [
       "flow:entity:colleague>process:identity-broker>sign-in"
@@ -3185,6 +3734,9 @@
   {
     "case": "08-sso-identity-broker",
     "category": "denial-of-service",
+    "reference_index": 17,
+    "candidate_ordinal": 0,
+    "fixture_id": "d230afd43136",
     "reference_claim": "An attacker makes the broker unavailable and no colleague can sign in to anything, because everything colleagues use signs them in through it.",
     "reference_element_ids": [
       "process:identity-broker"
@@ -3201,6 +3753,9 @@
   {
     "case": "08-sso-identity-broker",
     "category": "denial-of-service",
+    "reference_index": 17,
+    "candidate_ordinal": 1,
+    "fixture_id": "091a14162574",
     "reference_claim": "An attacker makes the broker unavailable and no colleague can sign in to anything, because everything colleagues use signs them in through it.",
     "reference_element_ids": [
       "process:identity-broker"
@@ -3217,6 +3772,9 @@
   {
     "case": "08-sso-identity-broker",
     "category": "denial-of-service",
+    "reference_index": 18,
+    "candidate_ordinal": 0,
+    "fixture_id": "8cdc2dfc7e4f",
     "reference_claim": "An attacker stops the nightly pull and group changes silently stop reaching the directory while everything else keeps working.",
     "reference_element_ids": [
       "flow:process:identity-broker>entity:hr-system>nightly-group-pull",
@@ -3235,6 +3793,9 @@
   {
     "case": "08-sso-identity-broker",
     "category": "denial-of-service",
+    "reference_index": 19,
+    "candidate_ordinal": 0,
+    "fixture_id": "4a6269883895",
     "reference_claim": "An attacker destroys or replaces the signing key so that every application rejects every token at once.",
     "reference_element_ids": [
       "process:identity-broker",
@@ -3252,6 +3813,9 @@
   {
     "case": "08-sso-identity-broker",
     "category": "elevation-of-privilege",
+    "reference_index": 20,
+    "candidate_ordinal": 0,
+    "fixture_id": "4181db8899c0",
     "reference_claim": "A colleague who is a store manager in one store changes prices and voids transactions in every store, because the console decides from the group alone and never checks which store they belong to.",
     "reference_element_ids": [
       "flow:entity:colleague>process:store-admin-console>change-prices-and-void",
@@ -3270,6 +3834,9 @@
   {
     "case": "08-sso-identity-broker",
     "category": "elevation-of-privilege",
+    "reference_index": 20,
+    "candidate_ordinal": 1,
+    "fixture_id": "f74f69b83401",
     "reference_claim": "A colleague who is a store manager in one store changes prices and voids transactions in every store, because the console decides from the group alone and never checks which store they belong to.",
     "reference_element_ids": [
       "flow:entity:colleague>process:store-admin-console>change-prices-and-void",
@@ -3288,6 +3855,9 @@
   {
     "case": "08-sso-identity-broker",
     "category": "elevation-of-privilege",
+    "reference_index": 21,
+    "candidate_ordinal": 0,
+    "fixture_id": "004824b436e3",
     "reference_claim": "A leaver keeps their access until the nightly pull runs, and a token issued before it goes on working for twelve hours after that.",
     "reference_element_ids": [
       "entity:colleague",
@@ -3306,6 +3876,9 @@
   {
     "case": "08-sso-identity-broker",
     "category": "elevation-of-privilege",
+    "reference_index": 21,
+    "candidate_ordinal": 1,
+    "fixture_id": "c571df6de687",
     "reference_claim": "A leaver keeps their access until the nightly pull runs, and a token issued before it goes on working for twelve hours after that.",
     "reference_element_ids": [
       "entity:colleague",
@@ -3324,6 +3897,9 @@
   {
     "case": "08-sso-identity-broker",
     "category": "elevation-of-privilege",
+    "reference_index": 22,
+    "candidate_ordinal": 0,
+    "fixture_id": "d7a953fdc325",
     "reference_claim": "An attacker who controls the franchise provider reaches internal applications on the corporate network, because a sign-in it vouches for is treated like any other.",
     "reference_element_ids": [
       "entity:franchise-identity-provider",
@@ -3342,6 +3918,9 @@
   {
     "case": "08-sso-identity-broker",
     "category": "elevation-of-privilege",
+    "reference_index": 22,
+    "candidate_ordinal": 1,
+    "fixture_id": "3a94126537e8",
     "reference_claim": "An attacker who controls the franchise provider reaches internal applications on the corporate network, because a sign-in it vouches for is treated like any other.",
     "reference_element_ids": [
       "entity:franchise-identity-provider",
@@ -3362,6 +3941,9 @@
   {
     "case": "09-cookbook-sokify-retail",
     "category": "spoofing",
+    "reference_index": 0,
+    "candidate_ordinal": 0,
+    "fixture_id": "71f4d03459de",
     "reference_claim": "An attacker submits orders to the web API as if they came from the mobile app, since how the API authenticates callers is unverified.",
     "reference_element_ids": [
       "flow:process:mobile-app>process:web-api>api-traffic",
@@ -3380,6 +3962,9 @@
   {
     "case": "09-cookbook-sokify-retail",
     "category": "spoofing",
+    "reference_index": 0,
+    "candidate_ordinal": 1,
+    "fixture_id": "21e68fcec9dd",
     "reference_claim": "An attacker submits orders to the web API as if they came from the mobile app, since how the API authenticates callers is unverified.",
     "reference_element_ids": [
       "flow:process:mobile-app>process:web-api>api-traffic",
@@ -3398,6 +3983,9 @@
   {
     "case": "09-cookbook-sokify-retail",
     "category": "spoofing",
+    "reference_index": 0,
+    "candidate_ordinal": 2,
+    "fixture_id": "341c5c0a7f91",
     "reference_claim": "An attacker submits orders to the web API as if they came from the mobile app, since how the API authenticates callers is unverified.",
     "reference_element_ids": [
       "flow:process:mobile-app>process:web-api>api-traffic",
@@ -3416,6 +4004,9 @@
   {
     "case": "09-cookbook-sokify-retail",
     "category": "spoofing",
+    "reference_index": 1,
+    "candidate_ordinal": 0,
+    "fixture_id": "6f4475a4ff5f",
     "reference_claim": "An attacker who obtains a copy of the catalogue spreadsheet sends SQL to the web API as the catalogue tool.",
     "reference_element_ids": [
       "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
@@ -3434,6 +4025,9 @@
   {
     "case": "09-cookbook-sokify-retail",
     "category": "spoofing",
+    "reference_index": 1,
+    "candidate_ordinal": 1,
+    "fixture_id": "c7208d3bdf6b",
     "reference_claim": "An attacker who obtains a copy of the catalogue spreadsheet sends SQL to the web API as the catalogue tool.",
     "reference_element_ids": [
       "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
@@ -3451,6 +4045,9 @@
   {
     "case": "09-cookbook-sokify-retail",
     "category": "spoofing",
+    "reference_index": 2,
+    "candidate_ordinal": 0,
+    "fixture_id": "b9240fc089dd",
     "reference_claim": "An attacker faxes a customer what appears to be a Sokify order confirmation, since nothing on the fax leg identifies the sender.",
     "reference_element_ids": [
       "entity:customer",
@@ -3468,6 +4065,9 @@
   {
     "case": "09-cookbook-sokify-retail",
     "category": "spoofing",
+    "reference_index": 2,
+    "candidate_ordinal": 1,
+    "fixture_id": "96db7698f12d",
     "reference_claim": "An attacker faxes a customer what appears to be a Sokify order confirmation, since nothing on the fax leg identifies the sender.",
     "reference_element_ids": [
       "entity:customer",
@@ -3488,6 +4088,9 @@
   {
     "case": "09-cookbook-sokify-retail",
     "category": "tampering",
+    "reference_index": 3,
+    "candidate_ordinal": 0,
+    "fixture_id": "2d946a3b7262",
     "reference_claim": "An attacker on the network path alters order details in flight between the app and the web API, because that traffic runs over plain HTTP.",
     "reference_element_ids": [
       "flow:process:mobile-app>process:web-api>api-traffic"
@@ -3504,6 +4107,9 @@
   {
     "case": "09-cookbook-sokify-retail",
     "category": "tampering",
+    "reference_index": 3,
+    "candidate_ordinal": 1,
+    "fixture_id": "0bbc82a1b464",
     "reference_claim": "An attacker on the network path alters order details in flight between the app and the web API, because that traffic runs over plain HTTP.",
     "reference_element_ids": [
       "flow:process:mobile-app>process:web-api>api-traffic"
@@ -3520,6 +4126,9 @@
   {
     "case": "09-cookbook-sokify-retail",
     "category": "tampering",
+    "reference_index": 4,
+    "candidate_ordinal": 0,
+    "fixture_id": "b2edb6b61e77",
     "reference_claim": "An attacker drives the spreadsheet's macros to change catalogue prices through the web API.",
     "reference_element_ids": [
       "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
@@ -3538,6 +4147,9 @@
   {
     "case": "09-cookbook-sokify-retail",
     "category": "tampering",
+    "reference_index": 4,
+    "candidate_ordinal": 1,
+    "fixture_id": "728f3f62d766",
     "reference_claim": "An attacker drives the spreadsheet's macros to change catalogue prices through the web API.",
     "reference_element_ids": [
       "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
@@ -3556,6 +4168,9 @@
   {
     "case": "09-cookbook-sokify-retail",
     "category": "tampering",
+    "reference_index": 5,
+    "candidate_ordinal": 0,
+    "fixture_id": "d0733007ea6a",
     "reference_claim": "An attacker appends further SQL to the statements the macros send so the web API executes changes beyond prices and product copy.",
     "reference_element_ids": [
       "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
@@ -3574,6 +4189,9 @@
   {
     "case": "09-cookbook-sokify-retail",
     "category": "tampering",
+    "reference_index": 5,
+    "candidate_ordinal": 1,
+    "fixture_id": "dc11f5ef4baf",
     "reference_claim": "An attacker appends further SQL to the statements the macros send so the web API executes changes beyond prices and product copy.",
     "reference_element_ids": [
       "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
@@ -3592,6 +4210,9 @@
   {
     "case": "09-cookbook-sokify-retail",
     "category": "tampering",
+    "reference_index": 6,
+    "candidate_ordinal": 0,
+    "fixture_id": "402852eb394e",
     "reference_claim": "An attacker who can write to the flat file rewrites a delivery address so goods are dispatched somewhere else.",
     "reference_element_ids": [
       "process:sims",
@@ -3609,6 +4230,9 @@
   {
     "case": "09-cookbook-sokify-retail",
     "category": "tampering",
+    "reference_index": 6,
+    "candidate_ordinal": 1,
+    "fixture_id": "524dc037c4a8",
     "reference_claim": "An attacker who can write to the flat file rewrites a delivery address so goods are dispatched somewhere else.",
     "reference_element_ids": [
       "process:sims",
@@ -3626,6 +4250,9 @@
   {
     "case": "09-cookbook-sokify-retail",
     "category": "tampering",
+    "reference_index": 7,
+    "candidate_ordinal": 0,
+    "fixture_id": "b972940cc432",
     "reference_claim": "An attacker changes the number stored against an order so the confirmation is faxed to a machine they control.",
     "reference_element_ids": [
       "flow:process:web-api>process:sims>order-handover",
@@ -3644,6 +4271,9 @@
   {
     "case": "09-cookbook-sokify-retail",
     "category": "tampering",
+    "reference_index": 7,
+    "candidate_ordinal": 1,
+    "fixture_id": "12d1b2176680",
     "reference_claim": "An attacker changes the number stored against an order so the confirmation is faxed to a machine they control.",
     "reference_element_ids": [
       "flow:process:web-api>process:sims>order-handover",
@@ -3662,6 +4292,9 @@
   {
     "case": "09-cookbook-sokify-retail",
     "category": "repudiation",
+    "reference_index": 8,
+    "candidate_ordinal": 0,
+    "fixture_id": "b1116fccb731",
     "reference_claim": "A customer denies placing an order and Sokify cannot show who submitted it, because how the API authenticates callers is unverified.",
     "reference_element_ids": [
       "flow:process:mobile-app>process:web-api>api-traffic",
@@ -3680,6 +4313,9 @@
   {
     "case": "09-cookbook-sokify-retail",
     "category": "repudiation",
+    "reference_index": 8,
+    "candidate_ordinal": 1,
+    "fixture_id": "fab3bf01f8cc",
     "reference_claim": "A customer denies placing an order and Sokify cannot show who submitted it, because how the API authenticates callers is unverified.",
     "reference_element_ids": [
       "flow:process:mobile-app>process:web-api>api-traffic",
@@ -3697,6 +4333,9 @@
   {
     "case": "09-cookbook-sokify-retail",
     "category": "repudiation",
+    "reference_index": 9,
+    "candidate_ordinal": 0,
+    "fixture_id": "f4c7a735a47e",
     "reference_claim": "Nobody can show who made a price change, because the changes arrive at the web API as SQL from a spreadsheet rather than from an identified user.",
     "reference_element_ids": [
       "flow:process:catalogue-spreadsheet>process:web-api>sql-statements"
@@ -3714,6 +4353,9 @@
   {
     "case": "09-cookbook-sokify-retail",
     "category": "repudiation",
+    "reference_index": 10,
+    "candidate_ordinal": 0,
+    "fixture_id": "3e90e515d5f4",
     "reference_claim": "Sokify cannot show a confirmation ever reached the customer, because nobody checks the fax arrived at the right place.",
     "reference_element_ids": [
       "flow:process:fax-gateway>entity:customer>confirmation-fax"
@@ -3730,6 +4372,9 @@
   {
     "case": "09-cookbook-sokify-retail",
     "category": "repudiation",
+    "reference_index": 10,
+    "candidate_ordinal": 1,
+    "fixture_id": "dd1ce47b153e",
     "reference_claim": "Sokify cannot show a confirmation ever reached the customer, because nobody checks the fax arrived at the right place.",
     "reference_element_ids": [
       "flow:process:fax-gateway>entity:customer>confirmation-fax"
@@ -3750,6 +4395,9 @@
   {
     "case": "09-cookbook-sokify-retail",
     "category": "information-disclosure",
+    "reference_index": 11,
+    "candidate_ordinal": 0,
+    "fixture_id": "b3482297fa4c",
     "reference_claim": "An attacker on the network path reads customer details out of the app's plain-HTTP traffic to the web API.",
     "reference_element_ids": [
       "flow:process:mobile-app>process:web-api>api-traffic"
@@ -3766,6 +4414,9 @@
   {
     "case": "09-cookbook-sokify-retail",
     "category": "information-disclosure",
+    "reference_index": 11,
+    "candidate_ordinal": 1,
+    "fixture_id": "47593d65a942",
     "reference_claim": "An attacker on the network path reads customer details out of the app's plain-HTTP traffic to the web API.",
     "reference_element_ids": [
       "flow:process:mobile-app>process:web-api>api-traffic"
@@ -3782,6 +4433,9 @@
   {
     "case": "09-cookbook-sokify-retail",
     "category": "information-disclosure",
+    "reference_index": 11,
+    "candidate_ordinal": 2,
+    "fixture_id": "ca33eed1488f",
     "reference_claim": "An attacker on the network path reads customer details out of the app's plain-HTTP traffic to the web API.",
     "reference_element_ids": [
       "flow:process:mobile-app>process:web-api>api-traffic"
@@ -3798,6 +4452,9 @@
   {
     "case": "09-cookbook-sokify-retail",
     "category": "information-disclosure",
+    "reference_index": 12,
+    "candidate_ordinal": 0,
+    "fixture_id": "d5cdd7ee855c",
     "reference_claim": "An attacker who reaches the user database reads customers' names, addresses and the cards they paid with, since at-rest protection is unverified.",
     "reference_element_ids": [
       "store:user-database"
@@ -3814,6 +4471,9 @@
   {
     "case": "09-cookbook-sokify-retail",
     "category": "information-disclosure",
+    "reference_index": 12,
+    "candidate_ordinal": 1,
+    "fixture_id": "867eae6ef6b5",
     "reference_claim": "An attacker who reaches the user database reads customers' names, addresses and the cards they paid with, since at-rest protection is unverified.",
     "reference_element_ids": [
       "store:user-database"
@@ -3831,6 +4491,9 @@
   {
     "case": "09-cookbook-sokify-retail",
     "category": "information-disclosure",
+    "reference_index": 13,
+    "candidate_ordinal": 0,
+    "fixture_id": "2bd084b7fdfb",
     "reference_claim": "An attacker who reaches the flat file reads every delivery address written into it.",
     "reference_element_ids": [
       "store:delivery-address-flat-file"
@@ -3847,6 +4510,9 @@
   {
     "case": "09-cookbook-sokify-retail",
     "category": "information-disclosure",
+    "reference_index": 13,
+    "candidate_ordinal": 1,
+    "fixture_id": "34d9951e68bb",
     "reference_claim": "An attacker who reaches the flat file reads every delivery address written into it.",
     "reference_element_ids": [
       "store:delivery-address-flat-file"
@@ -3863,6 +4529,9 @@
   {
     "case": "09-cookbook-sokify-retail",
     "category": "information-disclosure",
+    "reference_index": 14,
+    "candidate_ordinal": 0,
+    "fixture_id": "e66181e4cc4b",
     "reference_claim": "The confirmation fax discloses a customer's name and address to whoever holds the dialled number, because nobody checks it arrived at the right place.",
     "reference_element_ids": [
       "flow:process:fax-gateway>entity:customer>confirmation-fax",
@@ -3880,6 +4549,9 @@
   {
     "case": "09-cookbook-sokify-retail",
     "category": "information-disclosure",
+    "reference_index": 14,
+    "candidate_ordinal": 1,
+    "fixture_id": "26c6d7a59d9c",
     "reference_claim": "The confirmation fax discloses a customer's name and address to whoever holds the dialled number, because nobody checks it arrived at the right place.",
     "reference_element_ids": [
       "flow:process:fax-gateway>entity:customer>confirmation-fax",
@@ -3897,6 +4569,9 @@
   {
     "case": "09-cookbook-sokify-retail",
     "category": "denial-of-service",
+    "reference_index": 15,
+    "candidate_ordinal": 0,
+    "fixture_id": "75a1dbad2e55",
     "reference_claim": "An attacker floods the internet-facing web API until customers cannot place orders.",
     "reference_element_ids": [
       "process:web-api"
@@ -3913,6 +4588,9 @@
   {
     "case": "09-cookbook-sokify-retail",
     "category": "denial-of-service",
+    "reference_index": 16,
+    "candidate_ordinal": 0,
+    "fixture_id": "d8b90f1962c9",
     "reference_claim": "An attacker sends SQL through the macro path that locks catalogue rows so the app cannot serve the catalogue.",
     "reference_element_ids": [
       "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
@@ -3931,6 +4609,9 @@
   {
     "case": "09-cookbook-sokify-retail",
     "category": "denial-of-service",
+    "reference_index": 16,
+    "candidate_ordinal": 1,
+    "fixture_id": "4f105bf5f66c",
     "reference_claim": "An attacker sends SQL through the macro path that locks catalogue rows so the app cannot serve the catalogue.",
     "reference_element_ids": [
       "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
@@ -3948,6 +4629,9 @@
   {
     "case": "09-cookbook-sokify-retail",
     "category": "denial-of-service",
+    "reference_index": 17,
+    "candidate_ordinal": 0,
+    "fixture_id": "0204d1854d80",
     "reference_claim": "An attacker who stops SIMS accepting order handovers halts dispatch for every order placed.",
     "reference_element_ids": [
       "flow:process:web-api>process:sims>order-handover",
@@ -3966,6 +4650,9 @@
   {
     "case": "09-cookbook-sokify-retail",
     "category": "denial-of-service",
+    "reference_index": 17,
+    "candidate_ordinal": 1,
+    "fixture_id": "5ac110e8b7f0",
     "reference_claim": "An attacker who stops SIMS accepting order handovers halts dispatch for every order placed.",
     "reference_element_ids": [
       "flow:process:web-api>process:sims>order-handover",
@@ -3983,6 +4670,9 @@
   {
     "case": "09-cookbook-sokify-retail",
     "category": "elevation-of-privilege",
+    "reference_index": 18,
+    "candidate_ordinal": 0,
+    "fixture_id": "d59a531011de",
     "reference_claim": "An attacker who reaches the marketing laptop gains a write path into the web API from the office zone, because the spreadsheet's macros speak SQL to it.",
     "reference_element_ids": [
       "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
@@ -4002,6 +4692,9 @@
   {
     "case": "09-cookbook-sokify-retail",
     "category": "elevation-of-privilege",
+    "reference_index": 18,
+    "candidate_ordinal": 1,
+    "fixture_id": "61139bce95a8",
     "reference_claim": "An attacker who reaches the marketing laptop gains a write path into the web API from the office zone, because the spreadsheet's macros speak SQL to it.",
     "reference_element_ids": [
       "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
@@ -4021,6 +4714,9 @@
   {
     "case": "09-cookbook-sokify-retail",
     "category": "elevation-of-privilege",
+    "reference_index": 19,
+    "candidate_ordinal": 0,
+    "fixture_id": "720eeec487fd",
     "reference_claim": "An attacker whose SQL reaches the web API through the catalogue path acts against customer records the catalogue tool has no business touching.",
     "reference_element_ids": [
       "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
@@ -4039,6 +4735,9 @@
   {
     "case": "09-cookbook-sokify-retail",
     "category": "elevation-of-privilege",
+    "reference_index": 19,
+    "candidate_ordinal": 1,
+    "fixture_id": "9d2e12c98797",
     "reference_claim": "An attacker whose SQL reaches the web API through the catalogue path acts against customer records the catalogue tool has no business touching.",
     "reference_element_ids": [
       "flow:process:catalogue-spreadsheet>process:web-api>sql-statements",
@@ -4057,6 +4756,9 @@
   {
     "case": "10-cookbook-generic-cms",
     "category": "spoofing",
+    "reference_index": 0,
+    "candidate_ordinal": 0,
+    "fixture_id": "303b4d38e8c0",
     "reference_claim": "An attacker holding the admin's database credentials connects to MySQL as the admin from anywhere on the internet, since there is no jump host in the way.",
     "reference_element_ids": [
       "entity:admin",
@@ -4075,6 +4777,9 @@
   {
     "case": "10-cookbook-generic-cms",
     "category": "spoofing",
+    "reference_index": 0,
+    "candidate_ordinal": 1,
+    "fixture_id": "8b6274865988",
     "reference_claim": "An attacker holding the admin's database credentials connects to MySQL as the admin from anywhere on the internet, since there is no jump host in the way.",
     "reference_element_ids": [
       "entity:admin",
@@ -4093,6 +4798,9 @@
   {
     "case": "10-cookbook-generic-cms",
     "category": "spoofing",
+    "reference_index": 0,
+    "candidate_ordinal": 2,
+    "fixture_id": "b0b5dc637a3f",
     "reference_claim": "An attacker holding the admin's database credentials connects to MySQL as the admin from anywhere on the internet, since there is no jump host in the way.",
     "reference_element_ids": [
       "entity:admin",
@@ -4111,6 +4819,9 @@
   {
     "case": "10-cookbook-generic-cms",
     "category": "spoofing",
+    "reference_index": 1,
+    "candidate_ordinal": 0,
+    "fixture_id": "d32a03940721",
     "reference_claim": "An attacker publishes assets into the CDN bucket as if they came from the web server, if the push accepts a writer it does not authenticate, which the source leaves unverified.",
     "reference_element_ids": [
       "flow:process:web-server>store:cdn-bucket>asset-publish",
@@ -4129,6 +4840,9 @@
   {
     "case": "10-cookbook-generic-cms",
     "category": "spoofing",
+    "reference_index": 1,
+    "candidate_ordinal": 1,
+    "fixture_id": "be33b781800a",
     "reference_claim": "An attacker publishes assets into the CDN bucket as if they came from the web server, if the push accepts a writer it does not authenticate, which the source leaves unverified.",
     "reference_element_ids": [
       "flow:process:web-server>store:cdn-bucket>asset-publish",
@@ -4146,6 +4860,9 @@
   {
     "case": "10-cookbook-generic-cms",
     "category": "spoofing",
+    "reference_index": 2,
+    "candidate_ordinal": 0,
+    "fixture_id": "926181fec5be",
     "reference_claim": "An attacker takes over a signed-in reader's session, since nothing is stated about how those sessions are handled.",
     "reference_element_ids": [
       "entity:reader",
@@ -4164,6 +4881,9 @@
   {
     "case": "10-cookbook-generic-cms",
     "category": "spoofing",
+    "reference_index": 2,
+    "candidate_ordinal": 1,
+    "fixture_id": "9c2fdf3f18c4",
     "reference_claim": "An attacker takes over a signed-in reader's session, since nothing is stated about how those sessions are handled.",
     "reference_element_ids": [
       "entity:reader",
@@ -4182,6 +4902,9 @@
   {
     "case": "10-cookbook-generic-cms",
     "category": "tampering",
+    "reference_index": 3,
+    "candidate_ordinal": 0,
+    "fixture_id": "661c7f6cab50",
     "reference_claim": "An attacker on the network path rewrites a stylesheet or script in flight before it reaches the reader, because assets are fetched over plain HTTP.",
     "reference_element_ids": [
       "flow:entity:reader>entity:cdn>asset-fetch"
@@ -4198,6 +4921,9 @@
   {
     "case": "10-cookbook-generic-cms",
     "category": "tampering",
+    "reference_index": 3,
+    "candidate_ordinal": 1,
+    "fixture_id": "ab55ab7e1fa8",
     "reference_claim": "An attacker on the network path rewrites a stylesheet or script in flight before it reaches the reader, because assets are fetched over plain HTTP.",
     "reference_element_ids": [
       "flow:entity:reader>entity:cdn>asset-fetch"
@@ -4214,6 +4940,9 @@
   {
     "case": "10-cookbook-generic-cms",
     "category": "tampering",
+    "reference_index": 4,
+    "candidate_ordinal": 0,
+    "fixture_id": "be63284588a8",
     "reference_claim": "An attacker who can write to the CDN bucket replaces a published asset and every reader of the site loads it.",
     "reference_element_ids": [
       "entity:cdn",
@@ -4231,6 +4960,9 @@
   {
     "case": "10-cookbook-generic-cms",
     "category": "tampering",
+    "reference_index": 4,
+    "candidate_ordinal": 1,
+    "fixture_id": "ad1326bb15da",
     "reference_claim": "An attacker who can write to the CDN bucket replaces a published asset and every reader of the site loads it.",
     "reference_element_ids": [
       "entity:cdn",
@@ -4248,6 +4980,9 @@
   {
     "case": "10-cookbook-generic-cms",
     "category": "tampering",
+    "reference_index": 5,
+    "candidate_ordinal": 0,
+    "fixture_id": "e99836fb5f71",
     "reference_claim": "An attacker on the network path modifies the admin's statements in flight, because the connection carries no TLS.",
     "reference_element_ids": [
       "flow:entity:admin>store:mysql-database>direct-administration"
@@ -4264,6 +4999,9 @@
   {
     "case": "10-cookbook-generic-cms",
     "category": "tampering",
+    "reference_index": 5,
+    "candidate_ordinal": 1,
+    "fixture_id": "bd0d919c5c60",
     "reference_claim": "An attacker on the network path modifies the admin's statements in flight, because the connection carries no TLS.",
     "reference_element_ids": [
       "flow:entity:admin>store:mysql-database>direct-administration"
@@ -4280,6 +5018,9 @@
   {
     "case": "10-cookbook-generic-cms",
     "category": "tampering",
+    "reference_index": 6,
+    "candidate_ordinal": 0,
+    "fixture_id": "055b7c70432d",
     "reference_claim": "An attacker with database access edits page content directly and the web server serves the altered page.",
     "reference_element_ids": [
       "process:web-server",
@@ -4297,7 +5038,10 @@
   {
     "case": "10-cookbook-generic-cms",
     "category": "repudiation",
-    "reference_claim": "Content is changed directly in the database and no CMS record shows who changed it, because that path bypasses the CMS entirely.",
+    "reference_index": 7,
+    "candidate_ordinal": 0,
+    "fixture_id": "32db5835461f",
+    "reference_claim": "Content is changed directly in the database and no CMS record shows who changed it, so the change goes unattributed unless the database itself records the actor, which is unverified.",
     "reference_element_ids": [
       "flow:entity:admin>store:mysql-database>direct-administration",
       "process:web-server"
@@ -4315,7 +5059,10 @@
   {
     "case": "10-cookbook-generic-cms",
     "category": "repudiation",
-    "reference_claim": "Content is changed directly in the database and no CMS record shows who changed it, because that path bypasses the CMS entirely.",
+    "reference_index": 7,
+    "candidate_ordinal": 1,
+    "fixture_id": "74a9ea2032b1",
+    "reference_claim": "Content is changed directly in the database and no CMS record shows who changed it, so the change goes unattributed unless the database itself records the actor, which is unverified.",
     "reference_element_ids": [
       "flow:entity:admin>store:mysql-database>direct-administration",
       "process:web-server"
@@ -4333,7 +5080,10 @@
   {
     "case": "10-cookbook-generic-cms",
     "category": "repudiation",
-    "reference_claim": "Content is changed directly in the database and no CMS record shows who changed it, because that path bypasses the CMS entirely.",
+    "reference_index": 7,
+    "candidate_ordinal": 2,
+    "fixture_id": "c4bfcd0d8a73",
+    "reference_claim": "Content is changed directly in the database and no CMS record shows who changed it, so the change goes unattributed unless the database itself records the actor, which is unverified.",
     "reference_element_ids": [
       "flow:entity:admin>store:mysql-database>direct-administration",
       "process:web-server"
@@ -4351,6 +5101,9 @@
   {
     "case": "10-cookbook-generic-cms",
     "category": "repudiation",
+    "reference_index": 8,
+    "candidate_ordinal": 0,
+    "fixture_id": "ecdb99f54c83",
     "reference_claim": "A reader disputes a comment recorded against their account and the site cannot show it came from their session, since nothing about how sign-in is handled is stated.",
     "reference_element_ids": [
       "flow:entity:reader>process:web-server>page-requests",
@@ -4369,6 +5122,9 @@
   {
     "case": "10-cookbook-generic-cms",
     "category": "information-disclosure",
+    "reference_index": 9,
+    "candidate_ordinal": 0,
+    "fixture_id": "37cd6b2f3b45",
     "reference_claim": "An attacker sniffing the admin's unsecured MySQL connection reads account and comment records in clear text.",
     "reference_element_ids": [
       "flow:entity:admin>store:mysql-database>direct-administration"
@@ -4385,6 +5141,9 @@
   {
     "case": "10-cookbook-generic-cms",
     "category": "information-disclosure",
+    "reference_index": 9,
+    "candidate_ordinal": 1,
+    "fixture_id": "75cab9b8f340",
     "reference_claim": "An attacker sniffing the admin's unsecured MySQL connection reads account and comment records in clear text.",
     "reference_element_ids": [
       "flow:entity:admin>store:mysql-database>direct-administration"
@@ -4401,6 +5160,9 @@
   {
     "case": "10-cookbook-generic-cms",
     "category": "information-disclosure",
+    "reference_index": 10,
+    "candidate_ordinal": 0,
+    "fixture_id": "e6765095d108",
     "reference_claim": "An attacker who reaches the database reads reader account records, since at-rest protection is unverified.",
     "reference_element_ids": [
       "store:mysql-database"
@@ -4417,6 +5179,9 @@
   {
     "case": "10-cookbook-generic-cms",
     "category": "information-disclosure",
+    "reference_index": 10,
+    "candidate_ordinal": 1,
+    "fixture_id": "2767ba5b2bae",
     "reference_claim": "An attacker who reaches the database reads reader account records, since at-rest protection is unverified.",
     "reference_element_ids": [
       "store:mysql-database"
@@ -4433,6 +5198,9 @@
   {
     "case": "10-cookbook-generic-cms",
     "category": "information-disclosure",
+    "reference_index": 11,
+    "candidate_ordinal": 0,
+    "fixture_id": "12b1707d33b3",
     "reference_claim": "An attacker watching a reader's plain-HTTP asset fetches learns which pages that reader is viewing.",
     "reference_element_ids": [
       "entity:reader",
@@ -4450,6 +5218,9 @@
   {
     "case": "10-cookbook-generic-cms",
     "category": "information-disclosure",
+    "reference_index": 11,
+    "candidate_ordinal": 1,
+    "fixture_id": "c0e20a5867d8",
     "reference_claim": "An attacker watching a reader's plain-HTTP asset fetches learns which pages that reader is viewing.",
     "reference_element_ids": [
       "entity:reader",
@@ -4471,6 +5242,9 @@
   {
     "case": "10-cookbook-generic-cms",
     "category": "denial-of-service",
+    "reference_index": 12,
+    "candidate_ordinal": 0,
+    "fixture_id": "407513d82e33",
     "reference_claim": "An attacker floods the internet-facing web server with page requests until the public site stops responding.",
     "reference_element_ids": [
       "process:web-server"
@@ -4487,6 +5261,9 @@
   {
     "case": "10-cookbook-generic-cms",
     "category": "denial-of-service",
+    "reference_index": 13,
+    "candidate_ordinal": 0,
+    "fixture_id": "43b5f320de4f",
     "reference_claim": "An attacker who can write to the CDN bucket removes the assets the site depends on so pages render broken.",
     "reference_element_ids": [
       "store:cdn-bucket"
@@ -4503,6 +5280,9 @@
   {
     "case": "10-cookbook-generic-cms",
     "category": "denial-of-service",
+    "reference_index": 13,
+    "candidate_ordinal": 1,
+    "fixture_id": "eb55f953373b",
     "reference_claim": "An attacker who can write to the CDN bucket removes the assets the site depends on so pages render broken.",
     "reference_element_ids": [
       "store:cdn-bucket"
@@ -4519,6 +5299,9 @@
   {
     "case": "10-cookbook-generic-cms",
     "category": "denial-of-service",
+    "reference_index": 14,
+    "candidate_ordinal": 0,
+    "fixture_id": "c9f773944d1d",
     "reference_claim": "An attacker on the direct MySQL path runs queries expensive enough that the web server cannot serve pages.",
     "reference_element_ids": [
       "flow:entity:admin>store:mysql-database>direct-administration",
@@ -4537,6 +5320,9 @@
   {
     "case": "10-cookbook-generic-cms",
     "category": "elevation-of-privilege",
+    "reference_index": 15,
+    "candidate_ordinal": 0,
+    "fixture_id": "179699b824f5",
     "reference_claim": "An attacker who actively intercepts the admin's unencrypted session, or captures a reusable credential from it, obtains the authority of the admin's database account and bypasses the controls the CMS applies.",
     "reference_element_ids": [
       "flow:entity:admin>store:mysql-database>direct-administration",
@@ -4555,6 +5341,9 @@
   {
     "case": "10-cookbook-generic-cms",
     "category": "elevation-of-privilege",
+    "reference_index": 15,
+    "candidate_ordinal": 1,
+    "fixture_id": "28dfbb048c69",
     "reference_claim": "An attacker who actively intercepts the admin's unencrypted session, or captures a reusable credential from it, obtains the authority of the admin's database account and bypasses the controls the CMS applies.",
     "reference_element_ids": [
       "flow:entity:admin>store:mysql-database>direct-administration",
@@ -4572,7 +5361,10 @@
   {
     "case": "10-cookbook-generic-cms",
     "category": "elevation-of-privilege",
-    "reference_claim": "An attacker who plants a script in the CDN bucket runs code in every reader's browser in the site's own context.",
+    "reference_index": 16,
+    "candidate_ordinal": 0,
+    "fixture_id": "b7c9909bdee7",
+    "reference_claim": "An attacker who can write to the CDN bucket plants a script there, and it runs in the site's own context in the browser of each reader the site delivers it to.",
     "reference_element_ids": [
       "flow:entity:reader>entity:cdn>asset-fetch",
       "store:cdn-bucket"
@@ -4590,7 +5382,10 @@
   {
     "case": "10-cookbook-generic-cms",
     "category": "elevation-of-privilege",
-    "reference_claim": "An attacker who plants a script in the CDN bucket runs code in every reader's browser in the site's own context.",
+    "reference_index": 16,
+    "candidate_ordinal": 1,
+    "fixture_id": "d59f62a2d745",
+    "reference_claim": "An attacker who can write to the CDN bucket plants a script there, and it runs in the site's own context in the browser of each reader the site delivers it to.",
     "reference_element_ids": [
       "flow:entity:reader>entity:cdn>asset-fetch",
       "store:cdn-bucket"
@@ -4608,7 +5403,10 @@
   {
     "case": "10-cookbook-generic-cms",
     "category": "elevation-of-privilege",
-    "reference_claim": "An attacker who plants a script in the CDN bucket runs code in every reader's browser in the site's own context.",
+    "reference_index": 16,
+    "candidate_ordinal": 2,
+    "fixture_id": "e69e2dfe1e6b",
+    "reference_claim": "An attacker who can write to the CDN bucket plants a script there, and it runs in the site's own context in the browser of each reader the site delivers it to.",
     "reference_element_ids": [
       "flow:entity:reader>entity:cdn>asset-fetch",
       "store:cdn-bucket"
@@ -4626,6 +5424,9 @@
   {
     "case": "11-sparse-shift-scheduling",
     "category": "spoofing",
+    "reference_index": 0,
+    "candidate_ordinal": 0,
+    "fixture_id": "fcf7c5b6599a",
     "reference_claim": "An attacker signs in to the scheduling web app as a colleague and reads that colleague's shifts and details, if colleague authentication does not stop them, which is unverified.",
     "reference_element_ids": [
       "entity:colleague",
@@ -4644,6 +5445,9 @@
   {
     "case": "11-sparse-shift-scheduling",
     "category": "spoofing",
+    "reference_index": 0,
+    "candidate_ordinal": 1,
+    "fixture_id": "0c113635e8f3",
     "reference_claim": "An attacker signs in to the scheduling web app as a colleague and reads that colleague's shifts and details, if colleague authentication does not stop them, which is unverified.",
     "reference_element_ids": [
       "entity:colleague",
@@ -4662,6 +5466,9 @@
   {
     "case": "11-sparse-shift-scheduling",
     "category": "spoofing",
+    "reference_index": 1,
+    "candidate_ordinal": 0,
+    "fixture_id": "df602fa6f8c7",
     "reference_claim": "An attacker signs in as a store manager and builds that store's rota, if manager authentication does not stop them, which is unverified.",
     "reference_element_ids": [
       "entity:store-manager",
@@ -4680,6 +5487,9 @@
   {
     "case": "11-sparse-shift-scheduling",
     "category": "spoofing",
+    "reference_index": 1,
+    "candidate_ordinal": 1,
+    "fixture_id": "a0fc20d12075",
     "reference_claim": "An attacker signs in as a store manager and builds that store's rota, if manager authentication does not stop them, which is unverified.",
     "reference_element_ids": [
       "entity:store-manager",
@@ -4698,6 +5508,9 @@
   {
     "case": "11-sparse-shift-scheduling",
     "category": "spoofing",
+    "reference_index": 2,
+    "candidate_ordinal": 0,
+    "fixture_id": "d98201ee3873",
     "reference_claim": "An attacker presents itself to the file share as the payroll system and collects the weekly payroll export, if the share does not identify and authorize a collector, which is unverified.",
     "reference_element_ids": [
       "flow:entity:payroll-system>store:file-share>collect-payroll-export",
@@ -4716,6 +5529,9 @@
   {
     "case": "11-sparse-shift-scheduling",
     "category": "spoofing",
+    "reference_index": 2,
+    "candidate_ordinal": 1,
+    "fixture_id": "dd764a8de786",
     "reference_claim": "An attacker presents itself to the file share as the payroll system and collects the weekly payroll export, if the share does not identify and authorize a collector, which is unverified.",
     "reference_element_ids": [
       "flow:entity:payroll-system>store:file-share>collect-payroll-export",
@@ -4733,6 +5549,9 @@
   {
     "case": "11-sparse-shift-scheduling",
     "category": "spoofing",
+    "reference_index": 3,
+    "candidate_ordinal": 0,
+    "fixture_id": "fa9d1d45355d",
     "reference_claim": "An attacker on the internal network calls the scheduling service while claiming to be the web app, because how the two identify each other is unverified.",
     "reference_element_ids": [
       "flow:process:scheduling-web-app>process:scheduling-service>rota-requests"
@@ -4750,7 +5569,10 @@
   {
     "case": "11-sparse-shift-scheduling",
     "category": "tampering",
-    "reference_claim": "An attacker alters the payroll export while it sits on the file share, so the payroll system collects hours nobody worked.",
+    "reference_index": 4,
+    "candidate_ordinal": 0,
+    "fixture_id": "024c0d4b425e",
+    "reference_claim": "An attacker with a write path to the file share alters the payroll export while it sits there, and the payroll system collects hours nobody worked if it checks the file no further.",
     "reference_element_ids": [
       "flow:entity:payroll-system>store:file-share>collect-payroll-export",
       "store:file-share"
@@ -4767,7 +5589,10 @@
   {
     "case": "11-sparse-shift-scheduling",
     "category": "tampering",
-    "reference_claim": "An attacker alters the payroll export while it sits on the file share, so the payroll system collects hours nobody worked.",
+    "reference_index": 4,
+    "candidate_ordinal": 1,
+    "fixture_id": "5aed772defa9",
+    "reference_claim": "An attacker with a write path to the file share alters the payroll export while it sits there, and the payroll system collects hours nobody worked if it checks the file no further.",
     "reference_element_ids": [
       "flow:entity:payroll-system>store:file-share>collect-payroll-export",
       "store:file-share"
@@ -4784,6 +5609,9 @@
   {
     "case": "11-sparse-shift-scheduling",
     "category": "tampering",
+    "reference_index": 5,
+    "candidate_ordinal": 0,
+    "fixture_id": "19d895872967",
     "reference_claim": "An attacker who reaches the rota database changes rota entries directly, bypassing whatever the scheduling service enforces.",
     "reference_element_ids": [
       "flow:process:scheduling-service>store:rota-database>read-write-rotas",
@@ -4801,6 +5629,9 @@
   {
     "case": "11-sparse-shift-scheduling",
     "category": "tampering",
+    "reference_index": 6,
+    "candidate_ordinal": 0,
+    "fixture_id": "2503048900ea",
     "reference_claim": "An attacker positioned between a manager's device and the web app modifies rota changes in flight, because whether the traffic is encrypted is unverified.",
     "reference_element_ids": [
       "flow:entity:store-manager>process:scheduling-web-app>build-rota"
@@ -4817,6 +5648,9 @@
   {
     "case": "11-sparse-shift-scheduling",
     "category": "tampering",
+    "reference_index": 6,
+    "candidate_ordinal": 1,
+    "fixture_id": "b77c639fa4a8",
     "reference_claim": "An attacker positioned between a manager's device and the web app modifies rota changes in flight, because whether the traffic is encrypted is unverified.",
     "reference_element_ids": [
       "flow:entity:store-manager>process:scheduling-web-app>build-rota"
@@ -4833,7 +5667,10 @@
   {
     "case": "11-sparse-shift-scheduling",
     "category": "repudiation",
-    "reference_claim": "A store manager denies having made a rota change that disadvantaged a colleague, and nothing in the model records who changed what.",
+    "reference_index": 7,
+    "candidate_ordinal": 0,
+    "fixture_id": "9359af2505a0",
+    "reference_claim": "A store manager denies having made a rota change that disadvantaged a colleague, and the model records nothing that attributes the change, so whether the application keeps such a record is unverified.",
     "reference_element_ids": [
       "flow:entity:store-manager>process:scheduling-web-app>build-rota",
       "process:scheduling-service"
@@ -4851,7 +5688,10 @@
   {
     "case": "11-sparse-shift-scheduling",
     "category": "repudiation",
-    "reference_claim": "A store manager denies having made a rota change that disadvantaged a colleague, and nothing in the model records who changed what.",
+    "reference_index": 7,
+    "candidate_ordinal": 1,
+    "fixture_id": "6a0877cd746a",
+    "reference_claim": "A store manager denies having made a rota change that disadvantaged a colleague, and the model records nothing that attributes the change, so whether the application keeps such a record is unverified.",
     "reference_element_ids": [
       "flow:entity:store-manager>process:scheduling-web-app>build-rota",
       "process:scheduling-service"
@@ -4869,6 +5709,9 @@
   {
     "case": "11-sparse-shift-scheduling",
     "category": "repudiation",
+    "reference_index": 8,
+    "candidate_ordinal": 0,
+    "fixture_id": "007dc80f3f8f",
     "reference_claim": "Nobody can establish who collected a given payroll export from the file share, because no record of collections exists in the model.",
     "reference_element_ids": [
       "flow:entity:payroll-system>store:file-share>collect-payroll-export",
@@ -4887,6 +5730,9 @@
   {
     "case": "11-sparse-shift-scheduling",
     "category": "information-disclosure",
+    "reference_index": 9,
+    "candidate_ordinal": 0,
+    "fixture_id": "5d2f37879d53",
     "reference_claim": "An attacker reads colleague names, contact details and availability from the rota database, because whether it is encrypted at rest is unverified.",
     "reference_element_ids": [
       "store:rota-database"
@@ -4903,6 +5749,9 @@
   {
     "case": "11-sparse-shift-scheduling",
     "category": "information-disclosure",
+    "reference_index": 9,
+    "candidate_ordinal": 1,
+    "fixture_id": "d79444b145d0",
     "reference_claim": "An attacker reads colleague names, contact details and availability from the rota database, because whether it is encrypted at rest is unverified.",
     "reference_element_ids": [
       "store:rota-database"
@@ -4919,6 +5768,9 @@
   {
     "case": "11-sparse-shift-scheduling",
     "category": "information-disclosure",
+    "reference_index": 10,
+    "candidate_ordinal": 0,
+    "fixture_id": "11a1efbf03a2",
     "reference_claim": "An attacker with access to the file share reads a whole store's payroll export in one file.",
     "reference_element_ids": [
       "flow:process:scheduling-service>store:file-share>write-payroll-export",
@@ -4936,6 +5788,9 @@
   {
     "case": "11-sparse-shift-scheduling",
     "category": "denial-of-service",
+    "reference_index": 12,
+    "candidate_ordinal": 0,
+    "fixture_id": "57a497ce2918",
     "reference_claim": "An attacker floods the scheduling web app so managers cannot build rotas and colleagues cannot see their shifts.",
     "reference_element_ids": [
       "process:scheduling-web-app"
@@ -4952,6 +5807,9 @@
   {
     "case": "11-sparse-shift-scheduling",
     "category": "denial-of-service",
+    "reference_index": 13,
+    "candidate_ordinal": 0,
+    "fixture_id": "f8804ef09401",
     "reference_claim": "An attacker prevents the weekly export from reaching the file share, so a pay run happens with no hours for a store.",
     "reference_element_ids": [
       "process:scheduling-service",
@@ -4970,6 +5828,9 @@
   {
     "case": "11-sparse-shift-scheduling",
     "category": "elevation-of-privilege",
+    "reference_index": 14,
+    "candidate_ordinal": 0,
+    "fixture_id": "8f177992751c",
     "reference_claim": "A colleague uses the shared app to build or change a rota as though they were a store manager, if the app does not enforce the separation between the two roles, which is unverified.",
     "reference_element_ids": [
       "flow:entity:colleague>process:scheduling-web-app>view-shifts",
@@ -4988,6 +5849,9 @@
   {
     "case": "11-sparse-shift-scheduling",
     "category": "elevation-of-privilege",
+    "reference_index": 14,
+    "candidate_ordinal": 1,
+    "fixture_id": "97c4f2cfef97",
     "reference_claim": "A colleague uses the shared app to build or change a rota as though they were a store manager, if the app does not enforce the separation between the two roles, which is unverified.",
     "reference_element_ids": [
       "flow:entity:colleague>process:scheduling-web-app>view-shifts",
@@ -5005,6 +5869,9 @@
   {
     "case": "11-sparse-shift-scheduling",
     "category": "elevation-of-privilege",
+    "reference_index": 15,
+    "candidate_ordinal": 0,
+    "fixture_id": "bf2c125f3016",
     "reference_claim": "An attacker on the internal network calls the scheduling service directly and performs rota writes the web app would not have allowed.",
     "reference_element_ids": [
       "flow:process:scheduling-web-app>process:scheduling-service>rota-requests",
@@ -5023,7 +5890,10 @@
   {
     "case": "12-overclaiming-supplier-portal",
     "category": "spoofing",
-    "reference_claim": "An attacker who obtains a supplier's vendor-issued password signs in as that supplier and uploads paperwork in their name.",
+    "reference_index": 0,
+    "candidate_ordinal": 0,
+    "fixture_id": "60392cfe984a",
+    "reference_claim": "An attacker who obtains a supplier's vendor-issued password signs in as that supplier and uploads paperwork in their name, if the password alone admits them; whether a second factor or another access control stands in the way is unverified.",
     "reference_element_ids": [
       "entity:supplier",
       "flow:entity:supplier>process:supplier-portal>upload-documents"
@@ -5041,7 +5911,10 @@
   {
     "case": "12-overclaiming-supplier-portal",
     "category": "spoofing",
-    "reference_claim": "An attacker who obtains a supplier's vendor-issued password signs in as that supplier and uploads paperwork in their name.",
+    "reference_index": 0,
+    "candidate_ordinal": 1,
+    "fixture_id": "57d2506c7b37",
+    "reference_claim": "An attacker who obtains a supplier's vendor-issued password signs in as that supplier and uploads paperwork in their name, if the password alone admits them; whether a second factor or another access control stands in the way is unverified.",
     "reference_element_ids": [
       "entity:supplier",
       "flow:entity:supplier>process:supplier-portal>upload-documents"
@@ -5059,6 +5932,9 @@
   {
     "case": "12-overclaiming-supplier-portal",
     "category": "spoofing",
+    "reference_index": 1,
+    "candidate_ordinal": 0,
+    "fixture_id": "5804cbd9c92b",
     "reference_claim": "An attacker signs in to the portal as a category manager and approves supplier paperwork, because how category managers are authenticated is unverified.",
     "reference_element_ids": [
       "entity:category-manager",
@@ -5077,6 +5953,9 @@
   {
     "case": "12-overclaiming-supplier-portal",
     "category": "spoofing",
+    "reference_index": 1,
+    "candidate_ordinal": 1,
+    "fixture_id": "142bbc2c6bed",
     "reference_claim": "An attacker signs in to the portal as a category manager and approves supplier paperwork, because how category managers are authenticated is unverified.",
     "reference_element_ids": [
       "entity:category-manager",
@@ -5095,7 +5974,10 @@
   {
     "case": "12-overclaiming-supplier-portal",
     "category": "spoofing",
-    "reference_claim": "An attacker writes a file into the landing bucket while posing as the vendor's nightly push, since how the bucket identifies the writer is unverified.",
+    "reference_index": 2,
+    "candidate_ordinal": 0,
+    "fixture_id": "a0997be38ef8",
+    "reference_claim": "An attacker writes a file into the landing bucket while posing as the vendor's nightly push, if the bucket does not authenticate and authorize the writer, which is unverified.",
     "reference_element_ids": [
       "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract",
       "store:landing-bucket"
@@ -5113,7 +5995,10 @@
   {
     "case": "12-overclaiming-supplier-portal",
     "category": "spoofing",
-    "reference_claim": "An attacker writes a file into the landing bucket while posing as the vendor's nightly push, since how the bucket identifies the writer is unverified.",
+    "reference_index": 2,
+    "candidate_ordinal": 1,
+    "fixture_id": "3e9be5caa70e",
+    "reference_claim": "An attacker writes a file into the landing bucket while posing as the vendor's nightly push, if the bucket does not authenticate and authorize the writer, which is unverified.",
     "reference_element_ids": [
       "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract",
       "store:landing-bucket"
@@ -5133,6 +6018,9 @@
   {
     "case": "12-overclaiming-supplier-portal",
     "category": "tampering",
+    "reference_index": 3,
+    "candidate_ordinal": 0,
+    "fixture_id": "bb82f3873e34",
     "reference_claim": "An attacker modifies the extract file in the landing bucket before the supplier master service loads it, and the altered supplier records reach the database.",
     "reference_element_ids": [
       "flow:process:supplier-master-service>store:landing-bucket>load-extract",
@@ -5151,6 +6039,9 @@
   {
     "case": "12-overclaiming-supplier-portal",
     "category": "tampering",
+    "reference_index": 3,
+    "candidate_ordinal": 1,
+    "fixture_id": "91d89439f813",
     "reference_claim": "An attacker modifies the extract file in the landing bucket before the supplier master service loads it, and the altered supplier records reach the database.",
     "reference_element_ids": [
       "flow:process:supplier-master-service>store:landing-bucket>load-extract",
@@ -5168,6 +6059,9 @@
   {
     "case": "12-overclaiming-supplier-portal",
     "category": "tampering",
+    "reference_index": 4,
+    "candidate_ordinal": 0,
+    "fixture_id": "5b3175140ae0",
     "reference_claim": "An attacker on the path of the nightly push alters the extract in transit, because the source contradicts itself over whether that transfer is encrypted.",
     "reference_element_ids": [
       "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract"
@@ -5184,6 +6078,9 @@
   {
     "case": "12-overclaiming-supplier-portal",
     "category": "tampering",
+    "reference_index": 4,
+    "candidate_ordinal": 1,
+    "fixture_id": "02c27734836a",
     "reference_claim": "An attacker on the path of the nightly push alters the extract in transit, because the source contradicts itself over whether that transfer is encrypted.",
     "reference_element_ids": [
       "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract"
@@ -5200,6 +6097,9 @@
   {
     "case": "12-overclaiming-supplier-portal",
     "category": "tampering",
+    "reference_index": 5,
+    "candidate_ordinal": 0,
+    "fixture_id": "504e602c4203",
     "reference_claim": "An attacker with access inside the vendor platform alters a stored compliance document so a supplier appears certified when they are not.",
     "reference_element_ids": [
       "flow:process:supplier-portal>store:document-store>store-documents",
@@ -5217,6 +6117,9 @@
   {
     "case": "12-overclaiming-supplier-portal",
     "category": "tampering",
+    "reference_index": 5,
+    "candidate_ordinal": 1,
+    "fixture_id": "63832a7a6674",
     "reference_claim": "An attacker with access inside the vendor platform alters a stored compliance document so a supplier appears certified when they are not.",
     "reference_element_ids": [
       "flow:process:supplier-portal>store:document-store>store-documents",
@@ -5234,6 +6137,9 @@
   {
     "case": "12-overclaiming-supplier-portal",
     "category": "repudiation",
+    "reference_index": 6,
+    "candidate_ordinal": 0,
+    "fixture_id": "a748063cc659",
     "reference_claim": "A category manager denies having approved a supplier's paperwork, and the model holds no audit record we control or can produce.",
     "reference_element_ids": [
       "flow:entity:category-manager>process:supplier-portal>review-documents",
@@ -5252,6 +6158,9 @@
   {
     "case": "12-overclaiming-supplier-portal",
     "category": "repudiation",
+    "reference_index": 6,
+    "candidate_ordinal": 1,
+    "fixture_id": "8c27d5cfc280",
     "reference_claim": "A category manager denies having approved a supplier's paperwork, and the model holds no audit record we control or can produce.",
     "reference_element_ids": [
       "flow:entity:category-manager>process:supplier-portal>review-documents",
@@ -5270,6 +6179,9 @@
   {
     "case": "12-overclaiming-supplier-portal",
     "category": "repudiation",
+    "reference_index": 7,
+    "candidate_ordinal": 0,
+    "fixture_id": "dc759a8945db",
     "reference_claim": "The vendor disputes what a given nightly extract contained when it left their platform, and nothing on our side records what arrived.",
     "reference_element_ids": [
       "entity:portal-vendor",
@@ -5288,6 +6200,9 @@
   {
     "case": "12-overclaiming-supplier-portal",
     "category": "information-disclosure",
+    "reference_index": 8,
+    "candidate_ordinal": 0,
+    "fixture_id": "c3020306efe0",
     "reference_claim": "An attacker with access to the landing bucket reads the whole supplier extract, because whether the bucket is encrypted at rest is unverified.",
     "reference_element_ids": [
       "store:landing-bucket"
@@ -5304,6 +6219,9 @@
   {
     "case": "12-overclaiming-supplier-portal",
     "category": "information-disclosure",
+    "reference_index": 9,
+    "candidate_ordinal": 0,
+    "fixture_id": "2371a0aabb29",
     "reference_claim": "An attacker inside the vendor platform reads supplier staff contact details out of the stored compliance documents.",
     "reference_element_ids": [
       "entity:portal-vendor",
@@ -5321,6 +6239,9 @@
   {
     "case": "12-overclaiming-supplier-portal",
     "category": "information-disclosure",
+    "reference_index": 10,
+    "candidate_ordinal": 0,
+    "fixture_id": "d235cccb88d4",
     "reference_claim": "An attacker on the network path between a supplier and the portal reads uploaded paperwork in transit, because whether that traffic is encrypted is unverified.",
     "reference_element_ids": [
       "flow:entity:supplier>process:supplier-portal>upload-documents"
@@ -5337,6 +6258,9 @@
   {
     "case": "12-overclaiming-supplier-portal",
     "category": "denial-of-service",
+    "reference_index": 11,
+    "candidate_ordinal": 0,
+    "fixture_id": "756ce7ee45dd",
     "reference_claim": "The vendor platform becomes unavailable and suppliers cannot file compliance paperwork while it is down.",
     "reference_element_ids": [
       "entity:portal-vendor",
@@ -5355,6 +6279,9 @@
   {
     "case": "12-overclaiming-supplier-portal",
     "category": "denial-of-service",
+    "reference_index": 12,
+    "candidate_ordinal": 0,
+    "fixture_id": "de191c33e451",
     "reference_claim": "An attacker stops the nightly extract from being loaded and the supplier database silently keeps serving stale supplier records.",
     "reference_element_ids": [
       "process:supplier-master-service",
@@ -5373,6 +6300,9 @@
   {
     "case": "12-overclaiming-supplier-portal",
     "category": "denial-of-service",
+    "reference_index": 12,
+    "candidate_ordinal": 1,
+    "fixture_id": "372b46717718",
     "reference_claim": "An attacker stops the nightly extract from being loaded and the supplier database silently keeps serving stale supplier records.",
     "reference_element_ids": [
       "process:supplier-master-service",
@@ -5390,7 +6320,10 @@
   {
     "case": "12-overclaiming-supplier-portal",
     "category": "elevation-of-privilege",
-    "reference_claim": "A signed-in supplier reaches another supplier's compliance documents through the portal, because no separation between supplier tenants is stated.",
+    "reference_index": 13,
+    "candidate_ordinal": 0,
+    "fixture_id": "438ebc3f43ee",
+    "reference_claim": "A signed-in supplier reaches another supplier's compliance documents through the portal, if the portal does not authorize access per tenant, which the source does not state either way.",
     "reference_element_ids": [
       "flow:entity:supplier>process:supplier-portal>upload-documents",
       "process:supplier-portal"
@@ -5408,7 +6341,10 @@
   {
     "case": "12-overclaiming-supplier-portal",
     "category": "elevation-of-privilege",
-    "reference_claim": "A signed-in supplier reaches another supplier's compliance documents through the portal, because no separation between supplier tenants is stated.",
+    "reference_index": 13,
+    "candidate_ordinal": 1,
+    "fixture_id": "8ad10ab7ff21",
+    "reference_claim": "A signed-in supplier reaches another supplier's compliance documents through the portal, if the portal does not authorize access per tenant, which the source does not state either way.",
     "reference_element_ids": [
       "flow:entity:supplier>process:supplier-portal>upload-documents",
       "process:supplier-portal"
@@ -5426,6 +6362,9 @@
   {
     "case": "12-overclaiming-supplier-portal",
     "category": "elevation-of-privilege",
+    "reference_index": 14,
+    "candidate_ordinal": 0,
+    "fixture_id": "881c49c22820",
     "reference_claim": "An attacker uses the contents of the extract file to make the supplier master service act beyond what a data load should do, since the file is consumed as-is.",
     "reference_element_ids": [
       "flow:process:supplier-master-service>store:landing-bucket>load-extract",
@@ -5444,6 +6383,9 @@
   {
     "case": "13-dispatch-control-plane",
     "category": "spoofing",
+    "reference_index": 0,
+    "candidate_ordinal": 0,
+    "fixture_id": "37fc473140fb",
     "reference_claim": "An attacker who holds the importer's never-rotated API token posts work orders to the dispatch API as the importer.",
     "reference_element_ids": [
       "flow:process:schedule-importer>process:dispatch-api>post-work-orders",
@@ -5463,6 +6405,9 @@
   {
     "case": "13-dispatch-control-plane",
     "category": "spoofing",
+    "reference_index": 0,
+    "candidate_ordinal": 1,
+    "fixture_id": "5e9a63dfe8ab",
     "reference_claim": "An attacker who holds the importer's never-rotated API token posts work orders to the dispatch API as the importer.",
     "reference_element_ids": [
       "flow:process:schedule-importer>process:dispatch-api>post-work-orders",
@@ -5484,6 +6429,9 @@
   {
     "case": "13-dispatch-control-plane",
     "category": "spoofing",
+    "reference_index": 1,
+    "candidate_ordinal": 0,
+    "fixture_id": "da273241b709",
     "reference_claim": "An attacker opens a WebSocket to the dispatch API in a duty engineer's name, because nothing states what the handshake checks.",
     "reference_element_ids": [
       "flow:process:dispatch-console>process:dispatch-api>live-job-status",
@@ -5502,6 +6450,9 @@
   {
     "case": "13-dispatch-control-plane",
     "category": "spoofing",
+    "reference_index": 1,
+    "candidate_ordinal": 1,
+    "fixture_id": "555d8cb68287",
     "reference_claim": "An attacker opens a WebSocket to the dispatch API in a duty engineer's name, because nothing states what the handshake checks.",
     "reference_element_ids": [
       "flow:process:dispatch-console>process:dispatch-api>live-job-status",
@@ -5520,6 +6471,9 @@
   {
     "case": "13-dispatch-control-plane",
     "category": "spoofing",
+    "reference_index": 2,
+    "candidate_ordinal": 0,
+    "fixture_id": "18654dee80eb",
     "reference_claim": "An attacker answers the hourly pull as the scheduling partner, because nothing states how the importer identifies the partner.",
     "reference_element_ids": [
       "entity:scheduling-partner",
@@ -5539,6 +6493,9 @@
   {
     "case": "13-dispatch-control-plane",
     "category": "spoofing",
+    "reference_index": 3,
+    "candidate_ordinal": 0,
+    "fixture_id": "21671634d9df",
     "reference_claim": "An attacker signs in to the dispatch console as a duty engineer, because nothing states what the sign-in checks.",
     "reference_element_ids": [
       "flow:entity:duty-engineer>process:dispatch-console>open-console",
@@ -5557,7 +6514,10 @@
   {
     "case": "13-dispatch-control-plane",
     "category": "tampering",
-    "reference_claim": "An attacker returns an XML document to the hourly pull that plants work orders the partner never sent.",
+    "reference_index": 4,
+    "candidate_ordinal": 0,
+    "fixture_id": "e1f5bb04d9ab",
+    "reference_claim": "An attacker who can supply the hourly pull with a document it accepts returns XML that plants work orders the partner never sent, if the control plane turns that document into orders unchecked.",
     "reference_element_ids": [
       "flow:process:schedule-importer>entity:scheduling-partner>pull-schedule-feed",
       "process:dispatch-api",
@@ -5576,7 +6536,10 @@
   {
     "case": "13-dispatch-control-plane",
     "category": "tampering",
-    "reference_claim": "An attacker returns an XML document to the hourly pull that plants work orders the partner never sent.",
+    "reference_index": 4,
+    "candidate_ordinal": 1,
+    "fixture_id": "97266707178c",
+    "reference_claim": "An attacker who can supply the hourly pull with a document it accepts returns XML that plants work orders the partner never sent, if the control plane turns that document into orders unchecked.",
     "reference_element_ids": [
       "flow:process:schedule-importer>entity:scheduling-partner>pull-schedule-feed",
       "process:dispatch-api",
@@ -5594,6 +6557,9 @@
   {
     "case": "13-dispatch-control-plane",
     "category": "tampering",
+    "reference_index": 5,
+    "candidate_ordinal": 0,
+    "fixture_id": "0ac6d4d60a49",
     "reference_claim": "An attacker on the corporate network alters a dispatch request on its way into the control plane, because nothing states the call is encrypted.",
     "reference_element_ids": [
       "flow:process:dispatch-console>process:dispatch-api>dispatch-requests",
@@ -5611,6 +6577,9 @@
   {
     "case": "13-dispatch-control-plane",
     "category": "tampering",
+    "reference_index": 5,
+    "candidate_ordinal": 1,
+    "fixture_id": "e5794824afcb",
     "reference_claim": "An attacker on the corporate network alters a dispatch request on its way into the control plane, because nothing states the call is encrypted.",
     "reference_element_ids": [
       "flow:process:dispatch-console>process:dispatch-api>dispatch-requests",
@@ -5628,6 +6597,9 @@
   {
     "case": "13-dispatch-control-plane",
     "category": "tampering",
+    "reference_index": 6,
+    "candidate_ordinal": 0,
+    "fixture_id": "b4d6bebdb25b",
     "reference_claim": "An attacker inside the control plane writes job orders straight into the dispatch database, because nothing states what the connection checks.",
     "reference_element_ids": [
       "flow:process:dispatch-api>store:dispatch-database>read-write-job-orders",
@@ -5645,6 +6617,9 @@
   {
     "case": "13-dispatch-control-plane",
     "category": "tampering",
+    "reference_index": 7,
+    "candidate_ordinal": 0,
+    "fixture_id": "57ff3d1b5787",
     "reference_claim": "An attacker rewrites a document in the schedule archive so the kept copy no longer matches what the partner sent.",
     "reference_element_ids": [
       "flow:process:schedule-importer>store:schedule-archive>store-schedule-documents",
@@ -5662,6 +6637,9 @@
   {
     "case": "13-dispatch-control-plane",
     "category": "repudiation",
+    "reference_index": 8,
+    "candidate_ordinal": 0,
+    "fixture_id": "deba96d5888b",
     "reference_claim": "A duty engineer denies moving a crew, and the job order names only the token or session that wrote it.",
     "reference_element_ids": [
       "process:dispatch-api",
@@ -5680,6 +6658,9 @@
   {
     "case": "13-dispatch-control-plane",
     "category": "repudiation",
+    "reference_index": 8,
+    "candidate_ordinal": 1,
+    "fixture_id": "3d5b799fab17",
     "reference_claim": "A duty engineer denies moving a crew, and the job order names only the token or session that wrote it.",
     "reference_element_ids": [
       "process:dispatch-api",
@@ -5698,6 +6679,9 @@
   {
     "case": "13-dispatch-control-plane",
     "category": "information-disclosure",
+    "reference_index": 10,
+    "candidate_ordinal": 0,
+    "fixture_id": "7b64975cc9bb",
     "reference_claim": "An attacker on the corporate network reads the live job status stream, because nothing states the WebSocket runs over TLS.",
     "reference_element_ids": [
       "flow:process:dispatch-console>process:dispatch-api>live-job-status"
@@ -5714,6 +6698,9 @@
   {
     "case": "13-dispatch-control-plane",
     "category": "information-disclosure",
+    "reference_index": 11,
+    "candidate_ordinal": 0,
+    "fixture_id": "ea9828545e38",
     "reference_claim": "An attacker who obtains a copy of the dispatch database reads the crew names and mobile numbers in it.",
     "reference_element_ids": [
       "store:dispatch-database"
@@ -5730,6 +6717,9 @@
   {
     "case": "13-dispatch-control-plane",
     "category": "information-disclosure",
+    "reference_index": 11,
+    "candidate_ordinal": 1,
+    "fixture_id": "4a12f6b15a72",
     "reference_claim": "An attacker who obtains a copy of the dispatch database reads the crew names and mobile numbers in it.",
     "reference_element_ids": [
       "store:dispatch-database"
@@ -5746,6 +6736,9 @@
   {
     "case": "13-dispatch-control-plane",
     "category": "information-disclosure",
+    "reference_index": 12,
+    "candidate_ordinal": 0,
+    "fixture_id": "6fada6976c11",
     "reference_claim": "An attacker returns an XML document whose external entity makes the importer read a file off the corporate network and hand it back.",
     "reference_element_ids": [
       "flow:process:schedule-importer>entity:scheduling-partner>pull-schedule-feed",
@@ -5764,6 +6757,9 @@
   {
     "case": "13-dispatch-control-plane",
     "category": "information-disclosure",
+    "reference_index": 13,
+    "candidate_ordinal": 0,
+    "fixture_id": "ca110a4f2ee5",
     "reference_claim": "An attacker who reaches the corporate file store reads the partner's schedule documents out of the archive.",
     "reference_element_ids": [
       "flow:process:schedule-importer>store:schedule-archive>store-schedule-documents",
@@ -5781,6 +6777,9 @@
   {
     "case": "13-dispatch-control-plane",
     "category": "denial-of-service",
+    "reference_index": 14,
+    "candidate_ordinal": 0,
+    "fixture_id": "69f45117cb7e",
     "reference_claim": "An attacker holds open enough WebSockets to the dispatch API that duty engineers lose live job status.",
     "reference_element_ids": [
       "flow:process:dispatch-console>process:dispatch-api>live-job-status",
@@ -5799,6 +6798,9 @@
   {
     "case": "13-dispatch-control-plane",
     "category": "denial-of-service",
+    "reference_index": 15,
+    "candidate_ordinal": 0,
+    "fixture_id": "956ae02ff2e3",
     "reference_claim": "An attacker returns an XML document large enough that the hourly import never finishes and tomorrow's work never reaches the control plane.",
     "reference_element_ids": [
       "flow:process:schedule-importer>entity:scheduling-partner>pull-schedule-feed",
@@ -5817,6 +6819,9 @@
   {
     "case": "13-dispatch-control-plane",
     "category": "elevation-of-privilege",
+    "reference_index": 16,
+    "candidate_ordinal": 0,
+    "fixture_id": "50000b0c26fa",
     "reference_claim": "An attacker on the corporate network uses the importer's token to act in the control plane, where a corporate laptop holds no rights at all.",
     "reference_element_ids": [
       "boundary:production-control-plane",
@@ -5836,6 +6841,9 @@
   {
     "case": "13-dispatch-control-plane",
     "category": "elevation-of-privilege",
+    "reference_index": 16,
+    "candidate_ordinal": 1,
+    "fixture_id": "2626b7742674",
     "reference_claim": "An attacker on the corporate network uses the importer's token to act in the control plane, where a corporate laptop holds no rights at all.",
     "reference_element_ids": [
       "boundary:production-control-plane",
@@ -5854,6 +6862,9 @@
   {
     "case": "13-dispatch-control-plane",
     "category": "elevation-of-privilege",
+    "reference_index": 17,
+    "candidate_ordinal": 0,
+    "fixture_id": "2e601acb9103",
     "reference_claim": "An attacker gets a duty engineer's browser to dispatch a crew from a page the attacker controls, because the API's allowed origins and its credential rule are unrecorded.",
     "reference_element_ids": [
       "flow:process:dispatch-console>process:dispatch-api>dispatch-requests",
@@ -5872,6 +6883,9 @@
   {
     "case": "13-dispatch-control-plane",
     "category": "elevation-of-privilege",
+    "reference_index": 17,
+    "candidate_ordinal": 1,
+    "fixture_id": "361dd2eac202",
     "reference_claim": "An attacker gets a duty engineer's browser to dispatch a crew from a page the attacker controls, because the API's allowed origins and its credential rule are unrecorded.",
     "reference_element_ids": [
       "flow:process:dispatch-console>process:dispatch-api>dispatch-requests",
@@ -5890,6 +6904,9 @@
   {
     "case": "13-dispatch-control-plane",
     "category": "elevation-of-privilege",
+    "reference_index": 18,
+    "candidate_ordinal": 0,
+    "fixture_id": "b7439e392115",
     "reference_claim": "An attacker who can publish on the corporate web host serves script from the console's own origin and dispatches crews with it.",
     "reference_element_ids": [
       "flow:process:dispatch-console>process:dispatch-api>dispatch-requests",

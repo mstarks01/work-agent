@@ -77,6 +77,7 @@ labels and no provider call happens at all.
 
 from __future__ import annotations
 
+import hashlib
 import itertools
 import json
 from collections import Counter
@@ -138,12 +139,37 @@ class CalibrationError(ValueError):
     """The calibration fixtures are missing or malformed."""
 
 
+def fixture_id(case: str, reference_index: int, candidate_ordinal: int) -> str:
+    """The stable identity of one fixture: where it sits, never what it says.
+
+    A review record under ``evals/calibration_labels/reviews`` pins a manifest
+    of these, so the identity must survive an edit to the words. It therefore
+    reads the fixture's place — the case, the reference claim's index in that
+    case's ``claims/stride.json``, and the candidate's ordinal among the
+    candidates recorded against that reference — and never the prose of either
+    claim.
+
+    ``pairs.json`` stores all three components beside the derived value, so a
+    later rule change re-keys every fixture by recomputation rather than by an
+    edit nobody can check.
+    """
+    material = f"{case}\0{reference_index}\0{candidate_ordinal}"
+    return hashlib.sha256(material.encode()).hexdigest()[:12]
+
+
 @dataclass(frozen=True)
 class LabelledPair:
     """One recorded pair: the label, and the note that argued for it."""
 
     case: str
     category: StrideCategory
+    #: The reference claim's index in the case's ``claims/stride.json``, and
+    #: this candidate's ordinal among the candidates recorded against it. They
+    #: are the components of :attr:`fixture_id`, stored beside it so the
+    #: identity re-keys by recomputation.
+    reference_index: int
+    candidate_ordinal: int
+    fixture_id: str
     reference_claim: str
     candidate_claim: str
     reference_element_ids: tuple[str, ...]
@@ -288,6 +314,9 @@ def load_pairs(path: Path | str = DEFAULT_PAIRS_PATH) -> tuple[LabelledPair, ...
             pair = LabelledPair(
                 case=entry["case"],
                 category=entry["category"],
+                reference_index=entry["reference_index"],
+                candidate_ordinal=entry["candidate_ordinal"],
+                fixture_id=entry["fixture_id"],
                 reference_claim=entry["reference_claim"],
                 candidate_claim=entry["candidate_claim"],
                 reference_element_ids=tuple(entry["reference_element_ids"]),
@@ -317,7 +346,17 @@ def load_pairs(path: Path | str = DEFAULT_PAIRS_PATH) -> tuple[LabelledPair, ...
             raise CalibrationError(
                 f"{path}: pair {index} has category {pair.category!r}"
             )
+        expected = fixture_id(pair.case, pair.reference_index, pair.candidate_ordinal)
+        if pair.fixture_id != expected:
+            raise CalibrationError(
+                f"{path}: pair {index} stores fixture_id {pair.fixture_id!r}, "
+                f"and its components derive {expected!r}"
+            )
         pairs.append(pair)
+    identities = Counter(pair.fixture_id for pair in pairs)
+    repeated = sorted(value for value, count in identities.items() if count > 1)
+    if repeated:
+        raise CalibrationError(f"{path}: fixture IDs {repeated!r} are not unique")
     return tuple(pairs)
 
 
