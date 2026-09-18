@@ -263,7 +263,7 @@ on either of them. That is the finding this sitting exists for.
 
 ### tampering
 
-**5.** An attacker returns an XML document to the hourly pull that plants work orders the partner never sent.
+**5.** An attacker who can supply the hourly pull with a document it accepts returns XML that plants work orders the partner never sent, if the control plane turns that document into orders unchecked.
 
 - `flow:process:schedule-importer>entity:scheduling-partner>pull-schedule-feed`, `process:schedule-importer`, `process:dispatch-api`
 - severity: medium/high · verb: `forge`
@@ -442,7 +442,7 @@ your missing list, your notes and a digest of each file you read:
       "source.md": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
       "model.json": "b31bc54f80f1e972ebf62c0b2c380109a67034c38cc9c15f655d36992bea9b98",
       "claims/asvs.json": "51c6af9b7ef4046e6b6651ad6aee4290907a72b6916932821aa419b8cba6a75c",
-      "claims/stride.json": "0dda409b877378e8b1742d6054b2509100edcff310bbe5eca3fe4974a30ebf62"
+      "claims/stride.json": "a7800ca4d14d10a99c563c7b7b2cc997115548223bdf3f4faf23a741df19b991"
       }
     }
   }

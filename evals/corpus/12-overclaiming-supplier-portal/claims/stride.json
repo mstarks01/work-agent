@@ -5,7 +5,7 @@
       "flow:entity:supplier>process:supplier-portal>upload-documents",
       "entity:supplier"
     ],
-    "claim": "An attacker who obtains a supplier's vendor-issued password signs in as that supplier and uploads paperwork in their name.",
+    "claim": "An attacker who obtains a supplier's vendor-issued password signs in as that supplier and uploads paperwork in their name, if the password alone admits them; whether a second factor or another access control stands in the way is unverified.",
     "tier": "must-find",
     "severity": {
       "likelihood": "medium",
@@ -35,7 +35,7 @@
       "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract",
       "store:landing-bucket"
     ],
-    "claim": "An attacker writes a file into the landing bucket while posing as the vendor's nightly push, since how the bucket identifies the writer is unverified.",
+    "claim": "An attacker writes a file into the landing bucket while posing as the vendor's nightly push, if the bucket does not authenticate and authorize the writer, which is unverified.",
     "tier": "must-find",
     "severity": {
       "likelihood": "medium",
@@ -197,7 +197,7 @@
       "flow:entity:supplier>process:supplier-portal>upload-documents",
       "process:supplier-portal"
     ],
-    "claim": "A signed-in supplier reaches another supplier's compliance documents through the portal, because no separation between supplier tenants is stated.",
+    "claim": "A signed-in supplier reaches another supplier's compliance documents through the portal, if the portal does not authorize access per tenant, which the source does not state either way.",
     "tier": "must-find",
     "severity": {
       "likelihood": "medium",

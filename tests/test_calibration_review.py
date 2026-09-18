@@ -13,11 +13,9 @@ from evals.harness.calibration import load_pairs
 REVIEW_PATH = Path("evals/calibration_labels/reviews/02.json")
 
 
-def _fixture_id(pair) -> str:
-    material = (
-        f"{pair.case}\0{pair.category}\0{pair.reference_claim}\0{pair.candidate_claim}"
-    )
-    return hashlib.sha256(material.encode()).hexdigest()[:12]
+def _text_digest(pair) -> str:
+    material = f"{pair.reference_claim}\0{pair.candidate_claim}"
+    return hashlib.sha256(material.encode()).hexdigest()
 
 
 def _manifest_digest(ids: list[str]) -> str:
@@ -39,7 +37,7 @@ def _hypergeometric_probability(
 def test_review_02_manifests_resolve_and_random_sample_reproduces():
     review = json.loads(REVIEW_PATH.read_text())
     pairs = load_pairs()
-    ids = [_fixture_id(pair) for pair in pairs]
+    ids = [pair.fixture_id for pair in pairs]
     by_id = dict(zip(ids, pairs, strict=True))
 
     assert len(ids) == len(set(ids)) == review["fixture_snapshot"]["pairs"]
@@ -66,9 +64,47 @@ def test_review_02_manifests_resolve_and_random_sample_reproduces():
     assert _manifest_digest(reproduced) == sample["manifest_sha256"]
 
 
+def test_review_02_reidentification_maps_every_pinned_fixture():
+    review = json.loads(REVIEW_PATH.read_text())
+    reidentification = review["reidentification"]
+    pinned = set(review["boundary_review"]["fixture_ids"]) | set(
+        review["random_review"]["fixture_ids"]
+    )
+
+    mapped = reidentification["previous_to_current_fixture_id"]
+    assert len(set(mapped.values())) == len(mapped) == len(pinned)
+    assert set(mapped.values()) == pinned
+    assert set(reidentification["previous_manifest_sha256"]) == {
+        "boundary_review",
+        "random_review",
+    }
+
+
+def test_a_reworded_reference_claim_is_declared_rather_than_silent():
+    """A reviewed fixture keeps its identity when its words change, and says so.
+
+    The identity reads the fixture's place, so rewording a claim no longer
+    detaches the fixture from the record of the reading. What it must never do
+    is pass unremarked: the review file carries the text digest each reviewed
+    fixture held at the re-identification, and every fixture whose text has
+    moved since is named in ``text_changed_since_reidentification``.
+    """
+    review = json.loads(REVIEW_PATH.read_text())
+    reidentification = review["reidentification"]
+    by_id = {pair.fixture_id: pair for pair in load_pairs()}
+
+    recorded = reidentification["text_digest_at_reidentification"]
+    moved = {
+        fixture_id
+        for fixture_id, digest in recorded.items()
+        if _text_digest(by_id[fixture_id]) != digest
+    }
+    assert moved == set(reidentification["text_changed_since_reidentification"])
+
+
 def test_review_02_changed_random_labels_are_applied():
     review = json.loads(REVIEW_PATH.read_text())
-    pairs = {_fixture_id(pair): pair for pair in load_pairs()}
+    pairs = {pair.fixture_id: pair for pair in load_pairs()}
     outcome = review["random_review"]["outcome"]
 
     assert outcome["agreements_with_original_primary_label"] == 58

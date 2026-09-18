@@ -307,7 +307,7 @@ Offline — no credentials, safe on every change:
 ```sh
 python evals/verify_corpus.py                 # check every case and the match fixtures
 python evals/verify_corpus.py --write-sha     # restamp source digests after editing a source
-python evals/calibration_labels/build_pairs.py # regenerate pairs.json from the labels
+python -m evals.calibration_labels.build_pairs   # regenerate pairs.json from the labels
 pytest tests/test_evals_*.py tests/test_corpus_lints.py
 ```
 
