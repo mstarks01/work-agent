@@ -108,7 +108,6 @@ from evals.harness.score_arms import SPEC, parse_spec
 #: Where one wanted fact ended up. Ordered best to worst, so a table reads
 #: down.
 Survival = Literal["structural", "catalog", "question", "lost"]
-SURVIVALS: tuple[Survival, ...] = ("structural", "catalog", "question", "lost")
 
 #: What a fixture's loss is a property of. ``schema`` is a fact neither target
 #: can express; ``adapter`` is one the schema holds and the resolver drops;

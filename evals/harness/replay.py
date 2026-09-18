@@ -741,9 +741,6 @@ _PREFERRED: tuple[AnsweredFate, ...] = (
     "wrong_value",
     "rescoped",
 )
-_PREFERENCE: Mapping[AnsweredFate, int] = {
-    fate: rank for rank, fate in enumerate(_PREFERRED)
-}
 
 
 def _assigned(

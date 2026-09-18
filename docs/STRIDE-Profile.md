@@ -64,12 +64,24 @@ qualitative ordering and never a probability, and the two ratings behind it are
 kept so a reader can disagree with the arithmetic rather than only with the
 result.
 
-**Flat trust zones.** Every entity, process and store belongs to exactly one
-trust zone, and a boundary crossing is a flow whose two ends carry different
-zone IDs. Network position, organisational ownership and privilege level are
-three things in reality and one field here. A shared service enforcing per-tenant
+**Flat trust zones.** Every entity, process and store names at most one trust
+zone. Network position, organisational ownership and privilege level are three
+things in reality and one field here. A shared service enforcing per-tenant
 authority crosses no drawn zone, so an authorisation threat inside one zone has
 no structural crossing to rest on and must be argued from the text.
+
+**A component the sources do not place is unplaced**, and its `trust_zone`
+holds `unknown`. Nothing invents a zone to fill the field, because a placement
+nobody stated reads exactly like one the text made.
+
+**A crossing has three outcomes.** Two known zones that differ is a crossing;
+two known zones that are equal is not; either end unplaced is an *undecidable*
+crossing, which carries `decided: false`. An undecidable crossing establishes
+nothing — not that a crossing occurred, not that a control is missing. It makes
+the flow eligible for analysis and no more, so a rule keyed on the crossing
+fires on one and says so, while the privilege-zone rule, which turns on what
+the two zones *are*, skips it. It is not in the evidence catalog either: the
+two unplaced zones offer their own `unknown` entries instead.
 
 **Flow direction is who initiates.** A data flow records the initiator, not a
 one-directional movement of bytes. A service reading a store and a service

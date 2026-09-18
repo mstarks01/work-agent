@@ -79,6 +79,11 @@ from evals.harness.verbs import check_verb
 # rather than a tier.
 Tier = Literal["must-find", "expected"]
 
+#: How near a reference set's exemplars sit to the case they grade. Named
+#: rather than written inline on the field, so ``evals/verify_corpus.py`` reads
+#: the vocabulary off the type instead of listing it a second time.
+ExemplarProximity = Literal["near", "far"]
+
 #: The tier that drives the hard recall gate. Named so a reader asking "is this
 #: the tier that counts" spells it once — the corpus writes it, the scorer
 #: counts it, and every instrument that reports a must-find number reads it
@@ -392,7 +397,7 @@ class CaseFramework(BaseModel):
 
     name: FrameworkName
     options: Mapping[str, object] = Field(default_factory=dict)
-    exemplar_proximity: Literal["near", "far"]
+    exemplar_proximity: ExemplarProximity
     #: Whether this reference set was read as **complete** against the model, or
     #: is a sample of what the case expects.
     #:
@@ -737,10 +742,23 @@ def _case_refusal(case_dir: Path, error: ValidationError) -> str:
     return f"{case_dir.name}: case.json: {'; '.join(said)}"
 
 
+def missing_case_files(case_dir: Path) -> list[str]:
+    """Which of :data:`CASE_FILES` this directory does not carry, as files.
+
+    **The one reader of "is this a case directory".** The loader raises on the
+    answer and ``evals/verify_corpus.py`` reports it, and the two asked it
+    apart: one listed the three names and called ``is_file``, the other listed
+    them again and called ``exists``, so a *directory* named ``case.json``
+    passed the corpus lint and failed the load. A fourth required file would
+    have reached one of them.
+    """
+    return [name for name in CASE_FILES if not (case_dir / name).is_file()]
+
+
 def load_case(case_dir: Path | str) -> GoldenCase:
     """Load and check one golden case directory."""
     case_dir = Path(case_dir)
-    missing = [name for name in CASE_FILES if not (case_dir / name).is_file()]
+    missing = missing_case_files(case_dir)
     if missing:
         raise CorpusError(f"{case_dir}: missing {', '.join(missing)}")
 

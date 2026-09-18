@@ -120,10 +120,6 @@ EvidenceCatalog = dict[str, Ground]
 UNKNOWN_PREFIX = "unknown"
 ABSENT_PREFIX = "absent"
 CROSSING_PREFIX = "crossing"
-#: The prefix every assertion identity carries. Not composed here: the
-#: reference **is** :func:`~analysis_service.assertions.assertion_id`, so the
-#: catalog and the row can never spell one fact two ways.
-ASSERTION_PREFIX = "assertion"
 #: Not a catalog prefix: no entry is ever keyed by it, because a catalog
 #: enumerates what a model holds and an absence is not in it. It exists so an
 #: absence a model contradicts is reported in the same spelling as every other
