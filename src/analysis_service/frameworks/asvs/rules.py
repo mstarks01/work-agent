@@ -51,6 +51,7 @@ from dataclasses import dataclass
 from analysis_service.analysis import (
     TEXT_ATTRIBUTES,
     control_state,
+    crossing_facts,
     is_unverified,
     matches_term,
     states_a_protocol,
@@ -682,9 +683,8 @@ def _crossing_from_an_entity(
             (flow.id, entity.id, flow.destination),
             {
                 "source_kind": entity.kind,
-                "source_zone": crossing.source_zone,
-                "destination_zone": crossing.destination_zone,
                 "data_description": clip_fact(flow.data_description),
+                **crossing_facts(crossing, flow),
             },
         )
 

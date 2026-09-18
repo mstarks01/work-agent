@@ -240,3 +240,61 @@ def test_every_unselected_entry_names_a_registered_document():
     """A renamed document must not leave its excuse behind, silently covering nothing."""
     unknown = sorted(set(UNSELECTED) - registered_documents())
     assert not unknown, f"UNSELECTED names documents no package registers: {unknown}"
+
+
+class TestEveryCrossingKeyedRuleNamesItsInference:
+    """#1052, stated as a property so a package written tomorrow answers it.
+
+    A rule that fires *because* two zones differ owes its reader both zones and
+    which of them this service assumed. The rule is a property of a **Boundary
+    Crossing** rather than of a package, so this drives every package's rules
+    over the corpus and asks the same thing of each.
+    """
+
+    def leads(self):
+        """Every candidate any package raises over every blessed model."""
+        for path in sorted((CORPUS).glob("*/model.json")):
+            model = SystemModel.model_validate(json.loads(path.read_text()))
+            for name, package in PACKAGES.items():
+                for rule in package.rules:
+                    for elements, facts in rule.find(model, AssertionCatalog()):
+                        yield path.parent.name, name, rule.rule_id, elements, facts
+
+    def test_a_lead_that_names_a_zone_says_whether_it_was_assumed(self) -> None:
+        short = [
+            (case, package, rule_id)
+            for case, package, rule_id, _, facts in self.leads()
+            if "source_zone" in facts
+            and not {"source_zone_assumed", "destination_zone_assumed"} <= set(facts)
+        ]
+
+        assert not short, short
+
+    def test_a_flag_is_a_scalar_beside_the_zone_it_qualifies(self) -> None:
+        """A fact is a scalar, so each side carries its own flag.
+
+        The flags qualify ``source_zone`` and ``destination_zone`` rather than
+        the match's element tuple: a rule may name the flow and the zone it
+        enters rather than both endpoints, and the pair of flags reads the same
+        either way.
+        """
+        for case, package, rule_id, _, facts in self.leads():
+            if "source_zone_assumed" not in facts:
+                continue
+            where = (case, package, rule_id)
+            assert isinstance(facts["source_zone_assumed"], bool), where
+            assert isinstance(facts["destination_zone_assumed"], bool), where
+            assert {"source_zone", "destination_zone"} <= set(facts), where
+
+    def test_both_packages_raise_such_a_lead(self) -> None:
+        """A property no package may quietly opt out of by raising none."""
+        packages = {
+            package
+            for _, package, _, _, facts in self.leads()
+            if "source_zone_assumed" in facts
+        }
+
+        assert packages == set(PACKAGES)
+
+
+CORPUS = Path(__file__).resolve().parents[1] / "evals" / "corpus"

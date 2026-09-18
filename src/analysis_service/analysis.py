@@ -37,8 +37,9 @@ this is analysis over it.
 from __future__ import annotations
 
 import re
-from collections.abc import Collection, Iterator
+from collections.abc import Collection, Iterator, Mapping
 from functools import cache
+from types import MappingProxyType
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -60,7 +61,9 @@ __all__ = [
     "UnknownControl",
     "control_state",
     "cross_boundary_flows",
+    "crossing_facts",
     "crossing_flow_ids",
+    "crossings_by_flow",
     "inbound_flows",
     "internet_exposed_elements",
     "is_unverified",
@@ -290,9 +293,48 @@ def cross_boundary_flows(model: SystemModel) -> list[BoundaryCrossing]:
     return model.boundary_crossings()
 
 
+def crossings_by_flow(model: SystemModel) -> Mapping[str, BoundaryCrossing]:
+    """Each derived crossing, by the flow it was derived from.
+
+    **The one reader a rule needs to weigh a crossing.** A crossing carries
+    more than the fact that it happened: its two zones, and which of them this
+    service *inferred* rather than read
+    ([ADR 0032](../../docs/adr/0032-a-derived-crossing-names-an-inferred-zone.md)).
+    A rule given only the flow IDs cannot tell a crossing both sources state
+    from one resting on two placements nobody wrote down, and over the thirteen
+    corpus cases 29 of 43 crossings rest on at least one of those.
+    """
+    return MappingProxyType(
+        {crossing.flow_id: crossing for crossing in cross_boundary_flows(model)}
+    )
+
+
 def crossing_flow_ids(model: SystemModel) -> frozenset[str]:
     """The IDs of the flows that cross a trust boundary."""
-    return frozenset(crossing.flow_id for crossing in cross_boundary_flows(model))
+    return frozenset(crossings_by_flow(model))
+
+
+def crossing_facts(crossing: BoundaryCrossing, flow: DataFlow) -> dict[str, str | bool]:
+    """What every rule keyed on a crossing says about it, in one spelling.
+
+    **Stated as a property of a crossing rather than of a package**: a crossing
+    is derived from two zones and either may be an inference, so any rule that
+    fires *because* of one owes its reader both zones and which of them the
+    service assumed. Every package reads the same System Model, so a package
+    written tomorrow gets the same three facts by calling this.
+
+    Scalars, because a :data:`~analysis_service.candidates.Fact` is one. The
+    crossing names its assumed endpoints by **Element ID** and the flow names
+    which is which, so the pair of flags says the same thing in the shape a
+    fact can carry.
+    """
+    assumed = set(crossing.assumed_endpoints)
+    return {
+        "source_zone": crossing.source_zone,
+        "destination_zone": crossing.destination_zone,
+        "source_zone_assumed": flow.source in assumed,
+        "destination_zone_assumed": flow.destination in assumed,
+    }
 
 
 def internet_exposed_elements(model: SystemModel) -> list[Element]:
