@@ -125,7 +125,49 @@
         "explanation": "",
         "exclusive": false
       },
-      "rationale": "Twelve hours is a lifetime, so the credential expires. The absence of early revocation is a separate fact this registry has no predicate for, and is left unrecorded rather than forced into this one.",
+      "rationale": "Twelve hours is a lifetime, so the credential expires. The stated duration and the absence of early revocation are separate facts, and the sitting of 2026-09-18 asked for each to be preserved on its own predicate rather than folded into this categorical value (#1054).",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "credential",
+        "subject": "credential:colleague-token",
+        "predicate": "credential-lifetime",
+        "value": "twelve hours",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Tokens are good for twelve hours and there is no\nway to pull one back before it expires."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The window the source states. credential-expiry carries a closed term and loses the duration, which is the difference between a short compromise and a twelve-hour one.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "credential",
+        "subject": "credential:colleague-token",
+        "predicate": "credential-revocation",
+        "value": "absent",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Tokens are good for twelve hours and there is no\nway to pull one back before it expires."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "An explicit absence: the source says outright that nobody can pull a token back before it expires. Nothing shortens the twelve-hour window, which is the security fact in the sentence.",
       "reviewed_by": "mstarks01"
     },
     {

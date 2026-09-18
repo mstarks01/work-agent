@@ -172,7 +172,15 @@ __all__ = [
 #: into ``destination-verification``, which asks the opposite question, or into
 #: ``signature-verification``, which names a signature the source never
 #: mentions (#1053).
-REGISTRY_VERSION = 5
+#:
+#: Version 6 adds ``credential-revocation`` and ``credential-lifetime``. Case
+#: 08's source says a token is "good for twelve hours and there is no way to
+#: pull one back before it expires". ``credential-expiry`` is a closed term and
+#: recorded only ``expires``, which reads as a control being present while the
+#: two facts that matter — how long the window is, and that nobody can shorten
+#: it — had nowhere to go. A maintainer sitting asked for both to be preserved
+#: separately rather than folded into the categorical value (#1054).
+REGISTRY_VERSION = 6
 
 #: The projection's version: which graph attribute each predicate is
 #: authoritative for, and what :func:`project` does when the rows do not fit one
@@ -425,6 +433,23 @@ REGISTRY: Mapping[str, Predicate] = MappingProxyType(
             subjects=frozenset({"credential"}),
             value="term",
             terms=frozenset({"expires", "does-not-expire"}),
+        ),
+        # The two facts ``credential-expiry`` cannot hold. Its closed terms say
+        # only whether the credential stops working on its own, and a source
+        # that gives a window says more than that: how wide the window is, and
+        # whether anybody can close it early. A twelve-hour token nobody can
+        # withdraw is a twelve-hour compromise, and ``expires`` alone reads as a
+        # control being present (#1054).
+        "credential-lifetime": Predicate(
+            meaning="how long this credential works before it expires",
+            subjects=frozenset({"credential"}),
+            value="text",
+        ),
+        "credential-revocation": Predicate(
+            meaning="whether this credential can be withdrawn before it expires",
+            subjects=frozenset({"credential"}),
+            value="term",
+            terms=frozenset({"revocable"}),
         ),
         "transport-encryption": Predicate(
             meaning="what protects this interaction's data on the wire",

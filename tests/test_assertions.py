@@ -175,11 +175,12 @@ class TestTheRegistryAnswersItsVocabularies:
         The count moves two ways and the ratio is the claim. A predicate for a
         field the graph already holds joins the projecting side, which
         `data-classification` did; one for a fact the graph has no field for
-        joins the other, which `origin-verification` did.
+        joins the other, which `origin-verification`, `credential-lifetime` and `credential-revocation`
+        did.
         """
         unprojected = len(REGISTRY) - len(projection_fields())
 
-        assert (len(REGISTRY), unprojected) == (19, 12)
+        assert (len(REGISTRY), unprojected) == (21, 14)
         assert unprojected > len(projection_fields())
 
     def test_two_predicates_can_project_into_one_field(self):
