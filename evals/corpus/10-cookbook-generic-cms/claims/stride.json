@@ -20,7 +20,7 @@
       "flow:process:web-server>store:cdn-bucket>asset-publish",
       "store:cdn-bucket"
     ],
-    "claim": "An attacker publishes assets into the CDN bucket as if they came from the web server, because how that push is authenticated is unverified.",
+    "claim": "An attacker publishes assets into the CDN bucket as if they came from the web server, if the push accepts a writer it does not authenticate, which the source leaves unverified.",
     "tier": "must-find",
     "severity": {
       "likelihood": "medium",
@@ -224,13 +224,13 @@
       "flow:entity:admin>store:mysql-database>direct-administration",
       "store:mysql-database"
     ],
-    "claim": "An attacker who intercepts the admin's unencrypted session obtains database authority that bypasses every control the CMS applies.",
+    "claim": "An attacker who actively intercepts the admin's unencrypted session, or captures a reusable credential from it, obtains the authority of the admin's database account and bypasses the controls the CMS applies.",
     "tier": "must-find",
     "severity": {
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "The escalation the case is built to grade: authority is not gained inside the application but around it, and the CMS never sees the actor.",
+    "notes": "The escalation the case is built to grade: authority is not gained inside the application but around it, and the CMS never sees the actor. The authority reaches as far as the admin's database account permits and no further.",
     "verb": "escalate"
   },
   {
