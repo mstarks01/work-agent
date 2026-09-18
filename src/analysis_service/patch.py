@@ -59,6 +59,7 @@ from analysis_service.assertions import (
 )
 from analysis_service.factbundle import (
     HANDLE_PATTERN,
+    LANDED,
     MAX_HANDLE_CHARS,
     MAX_REFERENCE_CHARS,
     DispositionRow,
@@ -88,9 +89,6 @@ OperationKind = Literal[
 ]
 
 
-#: Which payload field each kind reads. A table rather than a branch, held
-#: against :data:`OperationKind` by ``tests/test_patch.py``, so a kind added on
-#: one side fails rather than reading as an operation that carries nothing.
 @dataclass(frozen=True)
 class PayloadRule:
     """What one kind carries, and where it goes.
@@ -108,6 +106,9 @@ class PayloadRule:
     names: tuple[str, ...] = ()
 
 
+#: Which payload field each kind reads. A table rather than a branch, held
+#: against :data:`OperationKind` by ``tests/test_patch.py``, so a kind added on
+#: one side fails rather than reading as an operation that carries nothing.
 PAYLOADS: Mapping[str, PayloadRule] = MappingProxyType(
     {
         "add-element": PayloadRule("element", "mentions"),
@@ -293,7 +294,7 @@ def apply_patch(
     landed = {row.handle: row for row in resolution.dispositions}
     for operation in additions:
         row = landed.get(operation.handle)
-        if row is None or row.disposition in ("consumed", "preserved"):
+        if row is None or row.disposition in LANDED:
             continue
         refused[operation.handle] = OperationOutcome(
             handle=operation.handle,

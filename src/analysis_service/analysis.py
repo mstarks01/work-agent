@@ -380,8 +380,12 @@ def zone_kinds(model: SystemModel) -> dict[str, str]:
     """Trust boundary ID -> its ``kind``, for zone-aware triggers.
 
     A zoned element's ``trust_zone`` is a boundary ID by the validity gate's
-    rule, so this is the one lookup that turns "these zones differ" into
-    "this crossing is a *privilege* transition".
+    rule, or the unknown sentinel for a component the sources place nowhere
+    (ADR 0039 rule 1). So this is the one lookup that turns "these zones
+    differ" into "this crossing is a *privilege* transition", and an unplaced
+    endpoint reaches it as a key the map does not hold. A caller reads
+    ``BoundaryCrossing.decided`` before asking, because a missing kind is the
+    answer to a question this rule cannot put.
     """
     return {boundary.id: boundary.kind for boundary in model.trust_boundaries}
 

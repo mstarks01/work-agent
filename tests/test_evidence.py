@@ -98,6 +98,45 @@ class TestEvidenceCatalog:
             kind="derived-fact", flow_id="flow:entity:customer>process:web-app>login"
         )
 
+    def test_an_undecidable_crossing_is_not_catalogued(self):
+        """ADR 0039 rule 4, at the seam a lane agent reads.
+
+        A flow whose endpoint the sources never placed derives a crossing with
+        ``decided=False``. The catalog is what an agent may cite and a critic
+        lets stand, so an entry for it would say a boundary was crossed — the
+        one thing rule 4 says an undecidable crossing does not establish. The
+        unplaced zone still reaches the agent as its own ``unknown`` entry.
+        """
+        model = valid_model()
+        model.data_stores[0].trust_zone = UNKNOWN
+        flow_id = "flow:process:web-app>store:orders-db>store-order"
+
+        (crossing,) = [
+            one for one in model.boundary_crossings() if one.flow_id == flow_id
+        ]
+        catalog = evidence_catalog(model)
+
+        assert crossing.decided is False
+        assert crossing_evidence_ref(flow_id) not in catalog
+        assert unknown_evidence_ref("store:orders-db", "trust_zone") in catalog
+
+    def test_a_claim_cannot_ground_on_an_undecidable_crossing(self):
+        """The other half: naming it is refused rather than silently accepted."""
+        model = valid_model()
+        model.data_stores[0].trust_zone = UNKNOWN
+        claim = sample_draft(
+            grounds=[
+                Ground(
+                    kind="derived-fact",
+                    flow_id="flow:process:web-app>store:orders-db>store-order",
+                )
+            ]
+        )
+
+        issues = ground_issues([claim], model)
+
+        assert issues and "not a decided boundary crossing" in issues[0]
+
     def test_an_attribute_the_model_states_is_not_evidence_of_an_unknown(self):
         """The catalog says a fact is unstated, never that a control is weak.
 

@@ -158,11 +158,22 @@ def evidence_catalog(
 
     Two enumerations, in this order: each element's attributes the input left
     unsettled or stated absent, walked in the model's own element order and each
-    element's own field-declaration order; then the derived boundary crossings,
-    in the order :meth:`~analysis_service.system_model.SystemModel.boundary_crossings`
+    element's own field-declaration order; then the **decided** boundary
+    crossings, in the order
+    :meth:`~analysis_service.system_model.SystemModel.boundary_crossings`
     yields them. Both orders are properties of the model rather than of this
     call, so an identical model produces an identical catalog — which is what
     lets a ref be compared across runs, samples and reports.
+
+    **An undecidable crossing is not catalogued.** A catalogued fact is one a
+    lane agent may cite and a critic may let stand, and
+    [ADR 0039](../../docs/adr/0039-a-crossing-a-model-cannot-decide-is-still-a-lead.md)
+    rule 4 says a crossing the model could not decide establishes nothing — not
+    that a crossing occurred, not that a control is missing. It confers
+    eligibility for analysis, which the crossing block and the candidate rules
+    already carry. The zones behind it are unstated on their own elements, so
+    each publishes its own ``unknown`` entry above and the fact a reader needs
+    is offered there, in the words that say it is a question.
 
     A third enumeration follows where the job carried an assertion pass:
     every settled row of a predicate in
@@ -199,6 +210,7 @@ def evidence_catalog(
                 kind="derived-fact", flow_id=crossing.flow_id
             )
             for crossing in model.boundary_crossings()
+            if crossing.decided
         }
     )
     if assertions is not None:
@@ -328,7 +340,7 @@ def _one_ground_issue(
         if crossing_evidence_ref(ground.flow_id) not in catalog:
             return (
                 f"claim {claim_id!r} grounds a derived fact in flow"
-                f" {ground.flow_id!r}, which is not a derived boundary crossing"
+                f" {ground.flow_id!r}, which is not a decided boundary crossing"
             )
         return ""
     if ground.kind in ("assertion", "unknown-assertion"):
@@ -533,6 +545,11 @@ def _gloss(
     layer's own; the predicate; the value; the basis, so an inference reads
     as one; and the scope, so a fact stated for some principals is never read
     as stated for all.
+
+    ``derived-fact`` reads one sentence because the catalog holds one kind of
+    crossing. :func:`evidence_catalog` admits the decided ones only, so this
+    line never tells an agent that a flow whose endpoint nobody placed crosses
+    anything.
     """
     if ground.kind == "derived-fact":
         return "crosses a trust boundary"

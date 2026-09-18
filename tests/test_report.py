@@ -498,7 +498,7 @@ class TestReportInvariants:
                 )
             ]
         )
-        with pytest.raises(ValidationError, match="not a derived boundary crossing"):
+        with pytest.raises(ValidationError, match="not a decided boundary crossing"):
             sample_report(threats=[threat])
 
     def test_an_assertion_ground_resolves_against_the_embedded_catalog(self):
