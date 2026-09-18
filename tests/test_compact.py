@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import get_args
 
 import pytest
+from pydantic import ValidationError
 
 from analysis_service.compact import (
     COMPACT_ELEMENTS,
@@ -49,6 +50,7 @@ from analysis_service.system_model import (
     ELEMENT_GROUPS,
     UNKNOWN,
     Element,
+    Process,
     SystemModel,
     _Element,
     normalize_element_ids,
@@ -479,6 +481,39 @@ class TestMalformedOutputFailsExplicitly:
 
             refused = model is None and codes(issues) == ["schema"]
             assert refused is (written != "b:corp"), written
+
+    def test_an_anchored_fence_refuses_a_trailing_newline(self):
+        """``$`` is end-of-string here, and that is a library default.
+
+        Every ID and ref fence in this tree is spelled ``^...$``. Pydantic
+        compiles a ``pattern`` with the Rust engine, where ``$`` means end of
+        the haystack; Python's own ``re`` treats it as end-of-string *or* just
+        before a trailing newline. Nothing in this repository pins the engine,
+        so a ``regex_engine`` set on any model would silently let a newline
+        into a value that is spliced into an element ID and rendered into a
+        lane agent's Markdown table -- which is the injection the ref pattern
+        exists to stop.
+
+        Driven rather than asserted about the config, so it answers for
+        whatever engine is in force.
+        """
+        payload = compact_fixture()
+        payload["processes"][0]["trust_zone"] = "b:corp\n"
+
+        model, issues = parse_extraction(payload, COMPACT_FORMAT)
+
+        assert model is None
+        assert codes(issues) == ["schema"]
+
+        with pytest.raises(ValidationError):
+            Process(
+                id="process:api\n",
+                name="api",
+                technology=UNKNOWN,
+                trust_zone=UNKNOWN,
+                exposure=UNKNOWN,
+                interface_kind=UNKNOWN,
+            )
 
     def test_an_unknown_field_is_refused(self):
         """``extra="forbid"``: a field nobody reads is a fact silently dropped."""

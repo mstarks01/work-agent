@@ -41,7 +41,7 @@ from typing import Annotated
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, ValidationError
 
-from analysis_service.sources import LINE_BREAKS
+from analysis_service.sources import carries_line_break
 from evals.harness import sitting as sittings
 from evals.harness.reference import (
     MAX_NAME,
@@ -81,10 +81,18 @@ def _one_line(value: str) -> str:
     untrusted. A break here forges headings in the committed reading document,
     because the sink joins these into Markdown with `- ` in front of each.
 
-    The rule is :data:`~analysis_service.sources.LINE_BREAKS`, which already
-    answers this question for a source label. One tuple, two callers.
+    The rule is :func:`~analysis_service.sources.carries_line_break`, **called
+    rather than half-copied**. A tuple of four terminators lived beside the
+    source label's own check and this line type imported it, which left every
+    ``Cc`` terminator through: ``str.splitlines`` splits on ten characters and
+    the label was fenced against all of them only because a category check sat
+    next to the tuple. A fence sized to itself is safe only while its
+    neighbours are fenced too, and this one had no neighbour.
+
+    A control character that is *not* a terminator is another question and not
+    this one — a reader may tab inside their own list item.
     """
-    if any(char in value for char in LINE_BREAKS):
+    if carries_line_break(value):
         raise ValueError("a line holds no line break")
     return value
 

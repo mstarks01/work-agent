@@ -201,6 +201,39 @@ class TestTheImportRefusesWhatWouldRecordWordsNobodyRead:
         assert OTHER in str(raised.value)
 
 
+class TestALineHoldsNoLineBreak:
+    """The rule a source label already answers, asked of an untrusted file.
+
+    ``str.splitlines`` splits on ten characters. The line-break tuple lists
+    four -- the ones outside the ``Cc`` category -- and the other six are the
+    formatting-category check's to refuse. A reader of the tuple alone let
+    every C1 terminator into a value the reading document joins into Markdown
+    behind ``- ``, which is how a mailed-back envelope forges a heading.
+    """
+
+    @pytest.mark.parametrize(
+        "name,code",
+        [
+            ("newline", 0x0A),
+            ("carriage return", 0x0D),
+            ("vertical tab", 0x0B),
+            ("form feed", 0x0C),
+            ("file separator", 0x1C),
+            ("group separator", 0x1D),
+            ("record separator", 0x1E),
+            ("next line", 0x85),
+            ("line separator", 0x2028),
+            ("paragraph separator", 0x2029),
+        ],
+    )
+    def test_every_character_str_splits_on_is_refused(self, name, code):
+        char = chr(code)
+        assert len(f"a{char}b".splitlines()) == 2, f"{name} does not split"
+
+        with pytest.raises(ValueError):
+            envelopes._one_line(f"a{char}b")
+
+
 class TestTheFileIsBoundedBeforeItIsBelieved:
     def test_a_mark_outside_the_closed_set(self, tree):
         with pytest.raises(ValueError):

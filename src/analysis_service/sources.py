@@ -65,13 +65,6 @@ MAX_LABEL_CHARS = 200
 # reader sees. See :func:`clean_system_name`.
 MAX_SYSTEM_NAME_CHARS = 200
 
-# Rejected in a label. The header inside the fence is positional — first line
-# the label, second the separator — so a label spanning lines would make the
-# text below it unreadable as text. Includes the Unicode line separators, which
-# a caller can paste without seeing.
-
-LINE_BREAKS = ("\n", "\r", "\u2028", "\u2029")
-
 # Also rejected in a label, by Unicode general category. ``Cc`` is the C0 and C1
 # control characters; ``Cf`` the invisible formatting ones — the bidi overrides
 # and isolates, the zero-width space and joiners, the soft hyphen, the BOM.
@@ -93,9 +86,25 @@ LINE_BREAKS = ("\n", "\r", "\u2028", "\u2029")
 FORMATTING_CATEGORIES = frozenset({"Cc", "Cf"})
 
 
-def _carries_line_break(value: str) -> bool:
-    """Whether ``value`` spans lines, by any of the four terminators."""
-    return any(char in value for char in LINE_BREAKS)
+def carries_line_break(value: str) -> bool:
+    """Whether ``value`` spans lines, by any terminator ``str`` splits on.
+
+    **Asked of the producer rather than of a list.** ``str.splitlines`` splits
+    on ten characters — the newline and carriage return, the vertical tab and
+    form feed, the three information separators, U+0085, and the two Unicode
+    line separators a caller can paste without seeing. A tuple of four listed
+    the ones outside the ``Cc`` category and left the other six to the
+    formatting-category check beside it, so a caller that imported the tuple
+    alone got half a rule: the reading document's line type did, and every C1
+    terminator passed into a value it joins into Markdown behind ``- ``.
+
+    Comparing the split against the value itself answers for whatever
+    ``splitlines`` does, and catches a *trailing* break too — ``"a\n"`` splits
+    to one line and is still two. A tab is not a terminator and is not refused
+    here; a value that must also carry no control character asks
+    :func:`plain_name`, which puts both questions together.
+    """
+    return bool(value) and value.splitlines() != [value]
 
 
 def _carries_formatting(value: str) -> bool:
@@ -152,13 +161,10 @@ class Source(BaseModel):
     def _single_line_label(cls, value: str) -> str:
         if not value.strip():
             raise ValueError("label must not be blank")
-        if _carries_line_break(value):
-            raise ValueError("label must be a single line")
-        if _carries_formatting(value):
-            raise ValueError(
-                "label must not contain control, bidi or zero-width characters"
-            )
-        return value
+        # :func:`plain_name` is the rule, called rather than inlined: a label
+        # and a caller-supplied name ask one question, and this validator held
+        # its own copy of both halves.
+        return plain_name(value)
 
     @field_validator("text")
     @classmethod
@@ -313,7 +319,7 @@ def plain_name(value: str) -> str:
     bidirectional override: either changes what they see without changing what
     they are told they are seeing.
     """
-    if _carries_line_break(value):
+    if carries_line_break(value):
         raise ValueError("carries a line break")
     if _carries_formatting(value):
         raise ValueError("carries a control or formatting character")
