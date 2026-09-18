@@ -292,30 +292,6 @@
       "element_id": "entity:hr-system",
       "attribute": "trust_zone",
       "basis": "The source names it as the system of record the broker pulls from and never places it; grouped with the other unplaced parties rather than assumed internal."
-    },
-    {
-      "assumption": "directory's trust_zone is boundary:corporate-network, which the schema requires and no source states.",
-      "element_id": "store:directory",
-      "attribute": "trust_zone",
-      "basis": "The broker is placed; its directory is not. No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says."
-    },
-    {
-      "assumption": "key store's trust_zone is boundary:corporate-network, which the schema requires and no source states.",
-      "element_id": "store:key-store",
-      "attribute": "trust_zone",
-      "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says."
-    },
-    {
-      "assumption": "audit log's trust_zone is boundary:corporate-network, which the schema requires and no source states.",
-      "element_id": "store:audit-log",
-      "attribute": "trust_zone",
-      "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says."
-    },
-    {
-      "assumption": "colleague's trust_zone is boundary:outside-corporate-network, which the schema requires and no source states.",
-      "element_id": "entity:colleague",
-      "attribute": "trust_zone",
-      "basis": "Home use establishes a physical location, not network membership: a VPN remains possible. The model's zone is a reading of the architecture, not something the source says."
     }
   ]
 }

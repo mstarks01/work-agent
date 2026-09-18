@@ -99,9 +99,6 @@ Not part of the question, but the records cite these names, so you need them.
 - `process:web-server` — The web server is reachable from the internet. (basis: Described as the 'Public site' that 'readers hit ... over HTTPS'.)
 - `entity:admin` — The admin connects from outside the hosted network. (basis: "they do it from wherever they happen to be — there is no jump host".)
 - `entity:cdn` — The CDN and its bucket sit in a separate trust zone from the hosted network. (basis: Assets 'do not come off the web server'; the web server 'pushes them up to the CDN's bucket', implying a distinct, separately operated location.)
-- `store:cdn-bucket` — CDN bucket's trust_zone is boundary:cdn, which the schema requires and no source states. (basis: The bucket is named as the CDN's; which zone that is remains the model's reading. No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.)
-- `entity:reader` — Reader's trust_zone is boundary:public-internet, which the schema requires and no source states. (basis: 'Public site' supports a public audience. It does not specify every reader's network location, so the model's zone is a reading rather than a statement.)
-- `flow:entity:reader>process:web-server>page-requests` — Page requests's authentication is sign-in exists for some readers; the mechanism, its strength and how sessions are handled are not stated, which no source states. (basis: 'Some of them signed in' states that a sign-in exists for some readers. It does not identify the mechanism, so the attribute's wording is the model's reading rather than a stated control.)
 
 **Reviewed aliases** — other names a reader ruled identify the same element, each with the words in the source that support it. An extraction using one is named differently, not wrong.
 
@@ -406,7 +403,7 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "11d2a58f0e1d5773054f0a72d222b3cc96f889cdd0206dd3656495a3d5fe8313",
-      "model.json": "b40349e9b3e4c670f2a92d92a04ea91297d306a3f340d7c320e3a5747c26dc71",
+      "model.json": "d5d125e135751bbe5e8f074aac280b0d77167cd0e5e5c2f5a6944cbe4f0c3a9c",
       "claims/asvs.json": "a9729f279ab4f3c7f855a19131ad3b3504ad4cba5dbd23c6c6ae86053147e1dc",
       "claims/stride.json": "b914aa99215333ed4a49748b1c03ab422d37a5cb741ec9fb63a81e82f11db06f"
       }

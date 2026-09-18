@@ -200,8 +200,8 @@
       "proposed": "record as an inference",
       "kind": "defensible-inference",
       "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-      "ruling": "change",
-      "reviewed_by": "mstarks01"
+      "ruling": null,
+      "reviewed_by": null
     },
     {
       "element_id": "entity:portal-vendor",
@@ -210,8 +210,8 @@
       "proposed": "record as an inference",
       "kind": "defensible-inference",
       "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-      "ruling": "change",
-      "reviewed_by": "mstarks01"
+      "ruling": null,
+      "reviewed_by": null
     },
     {
       "element_id": "process:supplier-master-service",
@@ -220,8 +220,8 @@
       "proposed": "record as an inference",
       "kind": "defensible-inference",
       "basis": "No sentence states its reachability. Sitting in an internal network implies it, which is an inference rather than a statement.",
-      "ruling": "change",
-      "reviewed_by": "mstarks01"
+      "ruling": null,
+      "reviewed_by": null
     },
     {
       "element_id": "flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract",
@@ -230,8 +230,8 @@
       "proposed": "none",
       "kind": "explicit-fact",
       "basis": "The runbook states what arrives: 'the file arrives as a plain CSV and is picked up as-is'. The model holds unknown, which reads the hearsay claim 'we were told the nightly extract is encrypted end to end' as leaving the question open. A record of the artifact beats a claim about it with no teller.",
-      "ruling": "keep",
-      "reviewed_by": "mstarks01"
+      "ruling": null,
+      "reviewed_by": null
     }
   ],
   "aliases": {

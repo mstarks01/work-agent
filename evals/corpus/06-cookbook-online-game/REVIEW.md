@@ -99,9 +99,6 @@ Not part of the question, but the records cite these names, so you need them.
 
 - `process:lobby` — The lobby and the game servers accept connections from arbitrary networks. (basis: Stated to be reachable "from wherever a player is, so they are exposed".)
 - `store:player-database` — Player records constitute personal data. (basis: Described as player accounts acted on by customer support moderation.)
-- `process:moderation-website` — moderation website's trust_zone is boundary:production-network, which the schema requires and no source states. (basis: No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.)
-- `store:player-database` — player database's trust_zone is boundary:production-network, which the schema requires and no source states. (basis: No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.)
-- `store:stats-database` — stats database's trust_zone is boundary:production-network, which the schema requires and no source states. (basis: No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.)
 
 ### Your list
 
@@ -400,7 +397,7 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "17e797d0315fdd53d5acf05962ca0ae8a23e08f84779f8528ade6422c34577a3",
-      "model.json": "bbd5d68b98884fb96085e7ded50a3b8a42a0840c6c4aeab58e5b41beb70168b7",
+      "model.json": "9ed1655a543f1dc23509b03f9d254993745597327444251a51e27d7f2adf90d3",
       "claims/asvs.json": "79b1fb614daf429bf079268027870240a41c056ba1d41174eb35007f22006bf8",
       "claims/stride.json": "68cbca75a6fc4d8ae365c1108cd252948cfbad0b50b518e7aa61ef2f360639c6"
       }

@@ -288,8 +288,8 @@
       "proposed": "record as an inference",
       "kind": "defensible-inference",
       "basis": "No sentence states its reachability. Sitting in an internal network implies it, which is an inference rather than a statement.",
-      "ruling": "change",
-      "reviewed_by": "mstarks01"
+      "ruling": null,
+      "reviewed_by": null
     },
     {
       "element_id": "store:web-application-config",
@@ -298,8 +298,8 @@
       "proposed": "record as an inference",
       "kind": "defensible-inference",
       "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-      "ruling": "change",
-      "reviewed_by": "mstarks01"
+      "ruling": null,
+      "reviewed_by": null
     },
     {
       "element_id": "store:worker-config",
@@ -308,8 +308,8 @@
       "proposed": "record as an inference",
       "kind": "defensible-inference",
       "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-      "ruling": "change",
-      "reviewed_by": "mstarks01"
+      "ruling": null,
+      "reviewed_by": null
     }
   ],
   "aliases": {

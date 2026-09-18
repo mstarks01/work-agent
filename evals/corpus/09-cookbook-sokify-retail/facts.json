@@ -14,7 +14,7 @@
         "quotes": [
           {
             "source_label": "System description",
-            "quote": "The app talks to the web API over HTTP — not HTTPS"
+            "quote": "The app talks to the web API over HTTP \u2014 not HTTPS"
           }
         ],
         "explanation": "",

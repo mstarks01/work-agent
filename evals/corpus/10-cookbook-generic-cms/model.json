@@ -225,24 +225,6 @@
       "element_id": "entity:cdn",
       "attribute": "trust_zone",
       "basis": "Assets 'do not come off the web server'; the web server 'pushes them up to the CDN's bucket', implying a distinct, separately operated location."
-    },
-    {
-      "assumption": "CDN bucket's trust_zone is boundary:cdn, which the schema requires and no source states.",
-      "element_id": "store:cdn-bucket",
-      "attribute": "trust_zone",
-      "basis": "The bucket is named as the CDN's; which zone that is remains the model's reading. No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says."
-    },
-    {
-      "assumption": "Reader's trust_zone is boundary:public-internet, which the schema requires and no source states.",
-      "element_id": "entity:reader",
-      "attribute": "trust_zone",
-      "basis": "'Public site' supports a public audience. It does not specify every reader's network location, so the model's zone is a reading rather than a statement."
-    },
-    {
-      "assumption": "Page requests's authentication is sign-in exists for some readers; the mechanism, its strength and how sessions are handled are not stated, which no source states.",
-      "element_id": "flow:entity:reader>process:web-server>page-requests",
-      "attribute": "authentication",
-      "basis": "'Some of them signed in' states that a sign-in exists for some readers. It does not identify the mechanism, so the attribute's wording is the model's reading rather than a stated control."
     }
   ]
 }

@@ -335,8 +335,8 @@
       "proposed": "record as an inference",
       "kind": "defensible-inference",
       "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-      "ruling": "change",
-      "reviewed_by": "mstarks01"
+      "ruling": null,
+      "reviewed_by": null
     },
     {
       "element_id": "process:ingest-scheduler",
@@ -345,8 +345,8 @@
       "proposed": "record as an inference",
       "kind": "defensible-inference",
       "basis": "No sentence states its reachability. Sitting in an internal network implies it, which is an inference rather than a statement.",
-      "ruling": "change",
-      "reviewed_by": "mstarks01"
+      "ruling": null,
+      "reviewed_by": null
     },
     {
       "element_id": "process:spark-transform-job",
@@ -355,8 +355,8 @@
       "proposed": "record as an inference",
       "kind": "defensible-inference",
       "basis": "No sentence states its reachability. Sitting in an internal network implies it, which is an inference rather than a statement.",
-      "ruling": "change",
-      "reviewed_by": "mstarks01"
+      "ruling": null,
+      "reviewed_by": null
     },
     {
       "element_id": "store:landing-bucket",
@@ -365,8 +365,8 @@
       "proposed": "record as an inference",
       "kind": "defensible-inference",
       "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-      "ruling": "change",
-      "reviewed_by": "mstarks01"
+      "ruling": null,
+      "reviewed_by": null
     },
     {
       "element_id": "store:airflow-metadata-database",
@@ -375,8 +375,8 @@
       "proposed": "record as an inference",
       "kind": "defensible-inference",
       "basis": "Airflow keeping its own metadata database implies the scheduler's network. No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-      "ruling": "change",
-      "reviewed_by": "mstarks01"
+      "ruling": null,
+      "reviewed_by": null
     },
     {
       "element_id": "store:claims-warehouse",
@@ -385,8 +385,8 @@
       "proposed": "record as an inference",
       "kind": "defensible-inference",
       "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-      "ruling": "change",
-      "reviewed_by": "mstarks01"
+      "ruling": null,
+      "reviewed_by": null
     }
   ],
   "aliases": {
