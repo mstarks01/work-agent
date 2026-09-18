@@ -249,42 +249,6 @@
       "element_id": "store:claims-warehouse",
       "attribute": "assets",
       "basis": "Described as insurance claim records carrying member names and dates of birth."
-    },
-    {
-      "assumption": "insurance partner's trust_zone is boundary:partner-network, which the schema requires and no source states.",
-      "element_id": "entity:insurance-partner",
-      "attribute": "trust_zone",
-      "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says."
-    },
-    {
-      "assumption": "ingest scheduler's exposure is internal, which the schema requires and no source states.",
-      "element_id": "process:ingest-scheduler",
-      "attribute": "exposure",
-      "basis": "No sentence states its reachability. Sitting in an internal network implies it, which is an inference rather than a statement."
-    },
-    {
-      "assumption": "Spark transform job's exposure is internal, which the schema requires and no source states.",
-      "element_id": "process:spark-transform-job",
-      "attribute": "exposure",
-      "basis": "No sentence states its reachability. Sitting in an internal network implies it, which is an inference rather than a statement."
-    },
-    {
-      "assumption": "landing bucket's trust_zone is boundary:landing-network, which the schema requires and no source states.",
-      "element_id": "store:landing-bucket",
-      "attribute": "trust_zone",
-      "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says."
-    },
-    {
-      "assumption": "Airflow metadata database's trust_zone is boundary:landing-network, which the schema requires and no source states.",
-      "element_id": "store:airflow-metadata-database",
-      "attribute": "trust_zone",
-      "basis": "Airflow keeping its own metadata database implies the scheduler's network. No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says."
-    },
-    {
-      "assumption": "claims warehouse's trust_zone is boundary:warehouse-network, which the schema requires and no source states.",
-      "element_id": "store:claims-warehouse",
-      "attribute": "trust_zone",
-      "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says."
     }
   ]
 }

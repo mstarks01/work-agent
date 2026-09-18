@@ -216,7 +216,7 @@
         "quotes": [
           {
             "source_label": "System description",
-            "quote": "I don't believe anything verifies the artifact hasn't been swapped — we just trust the bucket."
+            "quote": "I don't believe anything verifies the artifact hasn't been swapped \u2014 we just trust the bucket."
           }
         ],
         "exclusive": false
@@ -375,7 +375,7 @@
         "quotes": [
           {
             "source_label": "System description",
-            "quote": "I'm not sure what governs who can push — I think it is a shared group account."
+            "quote": "I'm not sure what governs who can push \u2014 I think it is a shared group account."
           }
         ],
         "explanation": "",

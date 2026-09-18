@@ -377,8 +377,8 @@
       "proposed": "record as an inference",
       "kind": "defensible-inference",
       "basis": "The sentence places the git server on the corporate network, not the developer. No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-      "ruling": "change",
-      "reviewed_by": "mstarks01"
+      "ruling": null,
+      "reviewed_by": null
     },
     {
       "element_id": "process:build-runner",
@@ -387,8 +387,8 @@
       "proposed": "record as an inference",
       "kind": "defensible-inference",
       "basis": "No sentence states its reachability. Sitting in an internal network implies it, which is an inference rather than a statement.",
-      "ruling": "change",
-      "reviewed_by": "mstarks01"
+      "ruling": null,
+      "reviewed_by": null
     },
     {
       "element_id": "process:deploy-controller",
@@ -397,8 +397,8 @@
       "proposed": "record as an inference",
       "kind": "defensible-inference",
       "basis": "No sentence states its reachability. Sitting in an internal network implies it, which is an inference rather than a statement.",
-      "ruling": "change",
-      "reviewed_by": "mstarks01"
+      "ruling": null,
+      "reviewed_by": null
     },
     {
       "element_id": "process:store-server",
@@ -407,8 +407,8 @@
       "proposed": "record as an inference",
       "kind": "defensible-inference",
       "basis": "Store servers poll outward and are never pushed to, which implies but does not state that they are unreachable.",
-      "ruling": "change",
-      "reviewed_by": "mstarks01"
+      "ruling": null,
+      "reviewed_by": null
     }
   ],
   "aliases": {

@@ -368,8 +368,8 @@
       "proposed": "record as an inference",
       "kind": "defensible-inference",
       "basis": "Servicing nodes over a local console implies being where the nodes are. No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-      "ruling": "change",
-      "reviewed_by": "mstarks01"
+      "ruling": null,
+      "reviewed_by": null
     },
     {
       "element_id": "process:telemetry-normalizer",
@@ -378,8 +378,8 @@
       "proposed": "record as an inference",
       "kind": "defensible-inference",
       "basis": "No sentence states its reachability. Sitting in an internal network implies it, which is an inference rather than a statement.",
-      "ruling": "change",
-      "reviewed_by": "mstarks01"
+      "ruling": null,
+      "reviewed_by": null
     },
     {
       "element_id": "store:device-registry",
@@ -388,8 +388,8 @@
       "proposed": "record as an inference",
       "kind": "defensible-inference",
       "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-      "ruling": "change",
-      "reviewed_by": "mstarks01"
+      "ruling": null,
+      "reviewed_by": null
     },
     {
       "element_id": "store:telemetry-lake",
@@ -398,8 +398,8 @@
       "proposed": "record as an inference",
       "kind": "defensible-inference",
       "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-      "ruling": "change",
-      "reviewed_by": "mstarks01"
+      "ruling": null,
+      "reviewed_by": null
     },
     {
       "element_id": "store:firmware-bucket",
@@ -408,8 +408,8 @@
       "proposed": "record as an inference",
       "kind": "defensible-inference",
       "basis": "Public read makes its placement arguable as well as unstated. No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-      "ruling": "change",
-      "reviewed_by": "mstarks01"
+      "ruling": null,
+      "reviewed_by": null
     },
     {
       "element_id": "store:pub-sub",
@@ -418,8 +418,8 @@
       "proposed": "keep; model.json already records it as an assumption",
       "kind": "defensible-inference",
       "basis": "The model itself carries an assumption on this attribute, so it is not held as stated.",
-      "ruling": "change",
-      "reviewed_by": "mstarks01"
+      "ruling": null,
+      "reviewed_by": null
     },
     {
       "element_id": "entity:sensor-node",
@@ -428,8 +428,8 @@
       "proposed": "record as an inference",
       "kind": "defensible-inference",
       "basis": "Installation at customer sites is explicit; a single field network is not. The model's zone is a reasonable grouping of those sites, not something the source says.",
-      "ruling": "change",
-      "reviewed_by": "mstarks01"
+      "ruling": null,
+      "reviewed_by": null
     },
     {
       "element_id": "process:device-gateway",
@@ -438,8 +438,8 @@
       "proposed": "record as an inference",
       "kind": "defensible-inference",
       "basis": "The quote names GKE and internet exposure, not an ingest-edge network or membership in it. The zone is the model's own grouping of the ingest path.",
-      "ruling": "change",
-      "reviewed_by": "mstarks01"
+      "ruling": null,
+      "reviewed_by": null
     }
   ],
   "aliases": {
