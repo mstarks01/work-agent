@@ -1,315 +1,319 @@
 {
- "case": "05-cookbook-queue-webapp",
- "drafted_by": "agent-stand-in",
- "rows": [
-  {
-   "assertion": {
-    "subject_type": "interaction",
-    "subject": "flow:entity:browser>process:web-application>page-request",
-    "predicate": "transport-encryption",
-    "value": "HTTP/S",
-    "reason": null,
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "A user's browser talks to the web application over HTTP/S across the public\ninternet."
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Stated, and named again as the one encrypted link.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "component",
-    "subject": "entity:browser",
-    "predicate": "network-membership",
-    "value": "boundary:public-internet",
-    "reason": null,
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "The browser sits outside our network"
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Stated directly.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "component",
-    "subject": "process:web-application",
-    "predicate": "network-membership",
-    "value": "boundary:web-tier",
-    "reason": null,
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "the web application runs in our web tier"
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Stated directly.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "component",
-    "subject": "store:message-queue",
-    "predicate": "network-membership",
-    "value": "boundary:backend-tier",
-    "reason": null,
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "The queue, the worker and the database are all in the backend tier, behind the\nweb tier."
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "One sentence places three components.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "component",
-    "subject": "process:background-worker-process",
-    "predicate": "network-membership",
-    "value": "boundary:backend-tier",
-    "reason": null,
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "The queue, the worker and the database are all in the backend tier, behind the\nweb tier."
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Same sentence.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "component",
-    "subject": "store:database",
-    "predicate": "network-membership",
-    "value": "boundary:backend-tier",
-    "reason": null,
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "The queue, the worker and the database are all in the backend tier, behind the\nweb tier."
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Same sentence.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "credential",
-    "subject": "credential:queue-credentials",
-    "predicate": "credential-custody",
-    "value": "the web application config store",
-    "reason": null,
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "Both of those config stores hold the credentials the process needs \u2014 the web\napplication's queue credentials, and the worker's database credentials."
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Where the credential is kept, stated.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "credential",
-    "subject": "credential:database-credentials",
-    "predicate": "credential-custody",
-    "value": "the worker config store",
-    "reason": null,
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "Both of those config stores hold the credentials the process needs \u2014 the web\napplication's queue credentials, and the worker's database credentials."
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Same sentence, the other half.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "interaction",
-    "subject": "flow:process:web-application>store:message-queue>enqueue-job",
-    "predicate": "authentication-mechanism",
-    "value": "unknown",
-    "reason": "silent",
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "The diagram does not say anything about how the web application authenticates\nto the queue"
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Named as not recorded. A diagram that does not say is silence, not an absence.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "interaction",
-    "subject": "flow:process:background-worker-process>store:database>read-write-records",
-    "predicate": "authentication-mechanism",
-    "value": "unknown",
-    "reason": "silent",
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "how the worker authenticates to the database"
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Named as not recorded, in the same sentence.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "component",
-    "subject": "store:database",
-    "predicate": "storage-encryption",
-    "value": "unknown",
-    "reason": "silent",
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "or whether anything\nis encrypted at rest"
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Named as not recorded.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "component",
-    "subject": "store:message-queue",
-    "predicate": "storage-encryption",
-    "value": "unknown",
-    "reason": "silent",
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "or whether anything\nis encrypted at rest"
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "'Anything' covers every store the diagram holds.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "component",
-    "subject": "process:web-application",
-    "predicate": "internet-exposure",
-    "value": "internet-facing",
-    "reason": null,
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "A user's browser talks to the web application over HTTP/S across the public\ninternet."
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Traffic arriving across the public internet states that it is reachable from there.",
-   "reviewed_by": null
+  "case": "05-cookbook-queue-webapp",
+  "drafted_by": "agent-stand-in",
+  "rows": [
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:entity:browser>process:web-application>page-request",
+        "predicate": "transport-encryption",
+        "value": "encrypted (marked as the one encrypted link)",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "A user's browser talks to the web application over HTTP/S across the public\ninternet."
+          },
+          {
+            "source_label": "System description",
+            "quote": "The browser-to-application traffic is the one link marked\nas encrypted."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "'HTTP/S' alone is ambiguous between HTTP and HTTPS. The second quote states that this link is the one marked as encrypted, which is the evidence the value rests on.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "entity:browser",
+        "predicate": "network-membership",
+        "value": "boundary:public-internet",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The browser sits outside our network"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Stated directly.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:web-application",
+        "predicate": "network-membership",
+        "value": "boundary:web-tier",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "the web application runs in our web tier"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Stated directly.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:message-queue",
+        "predicate": "network-membership",
+        "value": "boundary:backend-tier",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The queue, the worker and the database are all in the backend tier, behind the\nweb tier."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "One sentence places three components.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:background-worker-process",
+        "predicate": "network-membership",
+        "value": "boundary:backend-tier",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The queue, the worker and the database are all in the backend tier, behind the\nweb tier."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Same sentence.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:database",
+        "predicate": "network-membership",
+        "value": "boundary:backend-tier",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The queue, the worker and the database are all in the backend tier, behind the\nweb tier."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Same sentence.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "credential",
+        "subject": "credential:queue-credentials",
+        "predicate": "credential-custody",
+        "value": "the web application config store",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Both of those config stores hold the credentials the process needs \u2014 the web\napplication's queue credentials, and the worker's database credentials."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Where the credential is kept, stated.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "credential",
+        "subject": "credential:database-credentials",
+        "predicate": "credential-custody",
+        "value": "the worker config store",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Both of those config stores hold the credentials the process needs \u2014 the web\napplication's queue credentials, and the worker's database credentials."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Same sentence, the other half.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:process:web-application>store:message-queue>enqueue-job",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The diagram does not say anything about how the web application authenticates\nto the queue"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Named as not recorded. A diagram that does not say is silence, not an absence.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:process:background-worker-process>store:database>read-write-records",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "how the worker authenticates to the database"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Named as not recorded, in the same sentence.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:database",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "or whether anything\nis encrypted at rest"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Named as not recorded.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:message-queue",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "or whether anything\nis encrypted at rest"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "'Anything' covers every store the diagram holds.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:web-application",
+        "predicate": "internet-exposure",
+        "value": "internet-facing",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "A user's browser talks to the web application over HTTP/S across the public\ninternet."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Traffic arriving across the public internet states that it is reachable from there.",
+      "reviewed_by": "mstarks01"
+    }
+  ],
+  "disputed": [
+    {
+      "element_id": "process:background-worker-process",
+      "attribute": "exposure",
+      "blessed": "internal",
+      "proposed": "record as an inference",
+      "kind": "defensible-inference",
+      "basis": "No sentence states its reachability. Sitting in an internal network implies it, which is an inference rather than a statement.",
+      "ruling": "change",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "element_id": "store:web-application-config",
+      "attribute": "trust_zone",
+      "blessed": "boundary:web-tier",
+      "proposed": "record as an inference",
+      "kind": "defensible-inference",
+      "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
+      "ruling": "change",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "element_id": "store:worker-config",
+      "attribute": "trust_zone",
+      "blessed": "boundary:backend-tier",
+      "proposed": "record as an inference",
+      "kind": "defensible-inference",
+      "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
+      "ruling": "change",
+      "reviewed_by": "mstarks01"
+    }
+  ],
+  "aliases": {
+    "subjects": [],
+    "qualifiers": []
   }
- ],
- "disputed": [
-  {
-   "element_id": "process:background-worker-process",
-   "attribute": "exposure",
-   "blessed": "internal",
-   "proposed": "record as an inference",
-   "kind": "defensible-inference",
-   "basis": "No sentence states its reachability. Sitting in an internal network implies it, which is an inference rather than a statement.",
-   "ruling": null,
-   "reviewed_by": null
-  },
-  {
-   "element_id": "store:web-application-config",
-   "attribute": "trust_zone",
-   "blessed": "boundary:web-tier",
-   "proposed": "record as an inference",
-   "kind": "defensible-inference",
-   "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-   "ruling": null,
-   "reviewed_by": null
-  },
-  {
-   "element_id": "store:worker-config",
-   "attribute": "trust_zone",
-   "blessed": "boundary:backend-tier",
-   "proposed": "record as an inference",
-   "kind": "defensible-inference",
-   "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-   "ruling": null,
-   "reviewed_by": null
-  }
- ],
- "aliases": {
-  "subjects": [],
-  "qualifiers": []
- }
 }

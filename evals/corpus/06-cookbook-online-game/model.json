@@ -297,6 +297,24 @@
       "element_id": "store:player-database",
       "attribute": "assets",
       "basis": "Described as player accounts acted on by customer support moderation."
+    },
+    {
+      "assumption": "moderation website's trust_zone is boundary:production-network, which the schema requires and no source states.",
+      "element_id": "process:moderation-website",
+      "attribute": "trust_zone",
+      "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says."
+    },
+    {
+      "assumption": "player database's trust_zone is boundary:production-network, which the schema requires and no source states.",
+      "element_id": "store:player-database",
+      "attribute": "trust_zone",
+      "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says."
+    },
+    {
+      "assumption": "stats database's trust_zone is boundary:production-network, which the schema requires and no source states.",
+      "element_id": "store:stats-database",
+      "attribute": "trust_zone",
+      "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says."
     }
   ]
 }

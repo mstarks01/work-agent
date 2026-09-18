@@ -235,6 +235,24 @@
       "element_id": "process:web-application",
       "attribute": "exposure",
       "basis": "The browser is stated to reach it across the public internet."
+    },
+    {
+      "assumption": "background worker process's exposure is internal, which the schema requires and no source states.",
+      "element_id": "process:background-worker-process",
+      "attribute": "exposure",
+      "basis": "No sentence states its reachability. Sitting in an internal network implies it, which is an inference rather than a statement."
+    },
+    {
+      "assumption": "web application config's trust_zone is boundary:web-tier, which the schema requires and no source states.",
+      "element_id": "store:web-application-config",
+      "attribute": "trust_zone",
+      "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says."
+    },
+    {
+      "assumption": "worker config's trust_zone is boundary:backend-tier, which the schema requires and no source states.",
+      "element_id": "store:worker-config",
+      "attribute": "trust_zone",
+      "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says."
     }
   ]
 }

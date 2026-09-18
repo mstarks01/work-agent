@@ -1,418 +1,418 @@
 {
- "case": "07-cicd-store-deploy",
- "drafted_by": "agent-stand-in",
- "rows": [
-  {
-   "assertion": {
-    "subject_type": "component",
-    "subject": "store:git-server",
-    "predicate": "network-membership",
-    "value": "boundary:corporate-network",
-    "reason": null,
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "our self-hosted git server, which sits on the\ncorporate network"
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Stated directly.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "component",
-    "subject": "process:build-runner",
-    "predicate": "network-membership",
-    "value": "boundary:build-environment",
-    "reason": null,
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "The runner lives in its own\nbuild environment, separate from the corporate network."
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Stated directly.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "component",
-    "subject": "store:image-registry",
-    "predicate": "network-membership",
-    "value": "boundary:build-environment",
-    "reason": null,
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "our image registry, which is also in the build environment"
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Stated directly.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "component",
-    "subject": "process:deploy-controller",
-    "predicate": "network-membership",
-    "value": "boundary:corporate-network",
-    "reason": null,
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "The deploy controller runs on the corporate network"
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Stated directly.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "principal",
-    "subject": "principal:build-pipeline",
-    "predicate": "credential-presented",
-    "value": "credential:shared-build-token",
-    "reason": null,
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "The token the runner uses to call the controller is a shared build token"
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Every pipeline presents the same token. Recorded on the principal that presents it rather than as a second predicate on the interaction, so the flow's authentication projects a value instead of a degraded unknown.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "credential",
-    "subject": "credential:shared-build-token",
-    "predicate": "credential-sharing",
-    "value": "shared",
-    "reason": null,
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "a shared build token\nthat is the same for every pipeline"
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Said outright: one token for every pipeline.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "credential",
-    "subject": "credential:shared-build-token",
-    "predicate": "credential-rotation",
-    "value": "not-rotated",
-    "reason": null,
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "has not been rotated since the pipeline\nwas set up"
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "A stated absence of rotation.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "interaction",
-    "subject": "flow:process:store-server>store:image-registry>pull-image",
-    "predicate": "authentication-mechanism",
-    "value": "unknown",
-    "reason": "silent",
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "nobody has written down what a store server presents to it, or what it\npresents to the controller."
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Named as not written down: silence, not an absence.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "interaction",
-    "subject": "flow:process:store-server>process:deploy-controller>poll-current-release",
-    "predicate": "authentication-mechanism",
-    "value": "unknown",
-    "reason": "silent",
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "nobody has written down what a store server presents to it, or what it\npresents to the controller."
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Same sentence, the other half.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "component",
-    "subject": "store:image-registry",
-    "predicate": "internet-exposure",
-    "value": "internal",
-    "reason": null,
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "The image registry is reachable from the store estate over the WAN."
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Reachable over the retail WAN, which the source distinguishes from the internet.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "interaction",
-    "subject": "flow:process:build-runner>entity:public-package-registry>resolve-dependencies",
-    "predicate": "signature-verification",
-    "value": "absent",
-    "reason": null,
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "the runner does not verify signatures on what it downloads"
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "An explicit absence, stated as such.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "component",
-    "subject": "store:git-server",
-    "predicate": "storage-encryption",
-    "value": "unknown",
-    "reason": "silent",
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "Nobody has documented whether the git server encrypts what it stores, or\nwhether the image registry does."
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Named as undocumented.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "component",
-    "subject": "store:image-registry",
-    "predicate": "storage-encryption",
-    "value": "unknown",
-    "reason": "silent",
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "Nobody has documented whether the git server encrypts what it stores, or\nwhether the image registry does."
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Same sentence, the other half.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "principal",
-    "subject": "principal:developers",
-    "predicate": "authorization-grant",
-    "value": "start a build of main by hand, without a merge and without review",
-    "reason": null,
-    "scope": [
-     {
-      "kind": "resource",
-      "value": "build runner"
-     },
-     {
-      "kind": "operation",
-      "value": "rebuild"
-     }
-    ],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "any developer can log in to the build runner and kick off a rebuild of\n`main` by hand; that path does not require a merge and is not reviewed"
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "A grant stated with what it bypasses.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "component",
-    "subject": "entity:public-package-registry",
-    "predicate": "network-membership",
-    "value": "boundary:internet",
-    "reason": null,
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "Dependency resolution\nreaches out to the public package registry on the internet"
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "Stated directly.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "component",
-    "subject": "process:store-server",
-    "predicate": "network-membership",
-    "value": "boundary:store-estate",
-    "reason": null,
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "Each store has a small server in the back office\nrunning the till software as a container."
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "The store estate is where the store servers are, stated.",
-   "reviewed_by": null
-  },
-  {
-   "assertion": {
-    "subject_type": "interaction",
-    "subject": "flow:process:build-runner>process:deploy-controller>set-current-release",
-    "predicate": "authentication-mechanism",
-    "value": "a shared build token",
-    "reason": null,
-    "scope": [],
-    "basis": "stated",
-    "quotes": [
-     {
-      "source_label": "System description",
-      "quote": "The token the runner uses to call the controller is a shared build token"
-     }
-    ],
-    "explanation": "",
-    "exclusive": false
-   },
-   "rationale": "The mechanism for this call, stated. The credential it presents and the sharing and rotation facts about that credential sit on the principal and the credential respectively.",
-   "reviewed_by": null
+  "case": "07-cicd-store-deploy",
+  "drafted_by": "agent-stand-in",
+  "rows": [
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:git-server",
+        "predicate": "network-membership",
+        "value": "boundary:corporate-network",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "our self-hosted git server, which sits on the\ncorporate network"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Stated directly.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:build-runner",
+        "predicate": "network-membership",
+        "value": "boundary:build-environment",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The runner lives in its own\nbuild environment, separate from the corporate network."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Stated directly.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:image-registry",
+        "predicate": "network-membership",
+        "value": "boundary:build-environment",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "our image registry, which is also in the build environment"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Stated directly.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:deploy-controller",
+        "predicate": "network-membership",
+        "value": "boundary:corporate-network",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The deploy controller runs on the corporate network"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Stated directly.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "principal",
+        "subject": "principal:build-pipeline",
+        "predicate": "credential-presented",
+        "value": "credential:shared-build-token",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The token the runner uses to call the controller is a shared build token"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Every pipeline presents the same token. Recorded on the principal that presents it rather than as a second predicate on the interaction, so the flow's authentication projects a value instead of a degraded unknown.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "credential",
+        "subject": "credential:shared-build-token",
+        "predicate": "credential-sharing",
+        "value": "shared",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "a shared build token\nthat is the same for every pipeline"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Said outright: one token for every pipeline.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "credential",
+        "subject": "credential:shared-build-token",
+        "predicate": "credential-rotation",
+        "value": "not-rotated",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "has not been rotated since the pipeline\nwas set up"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "A stated absence of rotation.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:process:store-server>store:image-registry>pull-image",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "nobody has written down what a store server presents to it, or what it\npresents to the controller."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Named as not written down: silence, not an absence.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:process:store-server>process:deploy-controller>poll-current-release",
+        "predicate": "authentication-mechanism",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "nobody has written down what a store server presents to it, or what it\npresents to the controller."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Same sentence, the other half.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:image-registry",
+        "predicate": "internet-exposure",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The image registry is reachable from the store estate over the WAN."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Reachability over a WAN does not establish that internet access is excluded. The description names a retail WAN for store-to-corporate traffic and does not prohibit an additional public endpoint on the image registry.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:process:build-runner>entity:public-package-registry>resolve-dependencies",
+        "predicate": "signature-verification",
+        "value": "absent",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "the runner does not verify signatures on what it downloads"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "An explicit absence, stated as such.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:git-server",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Nobody has documented whether the git server encrypts what it stores, or\nwhether the image registry does."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Named as undocumented.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:image-registry",
+        "predicate": "storage-encryption",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Nobody has documented whether the git server encrypts what it stores, or\nwhether the image registry does."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Same sentence, the other half.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "principal",
+        "subject": "principal:developers",
+        "predicate": "authorization-grant",
+        "value": "start a build of main by hand, without a merge and without review",
+        "reason": null,
+        "scope": [
+          {
+            "kind": "resource",
+            "value": "build runner"
+          },
+          {
+            "kind": "operation",
+            "value": "rebuild"
+          }
+        ],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "any developer can log in to the build runner and kick off a rebuild of\n`main` by hand; that path does not require a merge and is not reviewed"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "A grant stated with what it bypasses.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "entity:public-package-registry",
+        "predicate": "network-membership",
+        "value": "boundary:internet",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Dependency resolution\nreaches out to the public package registry on the internet"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "Stated directly.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:store-server",
+        "predicate": "network-membership",
+        "value": "boundary:store-estate",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "Each store has a small server in the back office\nrunning the till software as a container."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The store estate is where the store servers are, stated.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:process:build-runner>process:deploy-controller>set-current-release",
+        "predicate": "authentication-mechanism",
+        "value": "a shared build token",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "The token the runner uses to call the controller is a shared build token"
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "The mechanism for this call, stated. The credential it presents and the sharing and rotation facts about that credential sit on the principal and the credential respectively.",
+      "reviewed_by": "mstarks01"
+    }
+  ],
+  "disputed": [
+    {
+      "element_id": "entity:developer",
+      "attribute": "trust_zone",
+      "blessed": "boundary:corporate-network",
+      "proposed": "record as an inference",
+      "kind": "defensible-inference",
+      "basis": "The sentence places the git server on the corporate network, not the developer. No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
+      "ruling": "change",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "element_id": "process:build-runner",
+      "attribute": "exposure",
+      "blessed": "internal",
+      "proposed": "record as an inference",
+      "kind": "defensible-inference",
+      "basis": "No sentence states its reachability. Sitting in an internal network implies it, which is an inference rather than a statement.",
+      "ruling": "change",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "element_id": "process:deploy-controller",
+      "attribute": "exposure",
+      "blessed": "internal",
+      "proposed": "record as an inference",
+      "kind": "defensible-inference",
+      "basis": "No sentence states its reachability. Sitting in an internal network implies it, which is an inference rather than a statement.",
+      "ruling": "change",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "element_id": "process:store-server",
+      "attribute": "exposure",
+      "blessed": "internal",
+      "proposed": "record as an inference",
+      "kind": "defensible-inference",
+      "basis": "Store servers poll outward and are never pushed to, which implies but does not state that they are unreachable.",
+      "ruling": "change",
+      "reviewed_by": "mstarks01"
+    }
+  ],
+  "aliases": {
+    "subjects": [],
+    "qualifiers": []
   }
- ],
- "disputed": [
-  {
-   "element_id": "entity:developer",
-   "attribute": "trust_zone",
-   "blessed": "boundary:corporate-network",
-   "proposed": "record as an inference",
-   "kind": "defensible-inference",
-   "basis": "The sentence places the git server on the corporate network, not the developer. No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-   "ruling": null,
-   "reviewed_by": null
-  },
-  {
-   "element_id": "process:build-runner",
-   "attribute": "exposure",
-   "blessed": "internal",
-   "proposed": "record as an inference",
-   "kind": "defensible-inference",
-   "basis": "No sentence states its reachability. Sitting in an internal network implies it, which is an inference rather than a statement.",
-   "ruling": null,
-   "reviewed_by": null
-  },
-  {
-   "element_id": "process:deploy-controller",
-   "attribute": "exposure",
-   "blessed": "internal",
-   "proposed": "record as an inference",
-   "kind": "defensible-inference",
-   "basis": "No sentence states its reachability. Sitting in an internal network implies it, which is an inference rather than a statement.",
-   "ruling": null,
-   "reviewed_by": null
-  },
-  {
-   "element_id": "process:store-server",
-   "attribute": "exposure",
-   "blessed": "internal",
-   "proposed": "record as an inference",
-   "kind": "defensible-inference",
-   "basis": "Store servers poll outward and are never pushed to, which implies but does not state that they are unreachable.",
-   "ruling": null,
-   "reviewed_by": null
-  }
- ],
- "aliases": {
-  "subjects": [],
-  "qualifiers": []
- }
 }

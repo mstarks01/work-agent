@@ -97,6 +97,9 @@ Not part of the question, but the records cite these names, so you need them.
 **Assumptions**
 
 - `process:web-application` — The web application is reachable from the public internet. (basis: The browser is stated to reach it across the public internet.)
+- `process:background-worker-process` — background worker process's exposure is internal, which the schema requires and no source states. (basis: No sentence states its reachability. Sitting in an internal network implies it, which is an inference rather than a statement.)
+- `store:web-application-config` — web application config's trust_zone is boundary:web-tier, which the schema requires and no source states. (basis: No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.)
+- `store:worker-config` — worker config's trust_zone is boundary:backend-tier, which the schema requires and no source states. (basis: No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.)
 
 **Reviewed aliases** — other names a reader ruled identify the same element, each with the words in the source that support it. An extraction using one is named differently, not wrong.
 
@@ -402,7 +405,7 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "20b0aa82c922766db2353cade33f7a26b38c60a3c7061244ef4686b7a647778b",
-      "model.json": "828bc9a79a8299013b667bd92c0184814f51cee8f181f5ec8e34f14fc950ca1d",
+      "model.json": "da3c86d662cdecd74be33d571ec132b7676c0ae228c29a35b31de02793d193c2",
       "claims/asvs.json": "9e4ee6be326673ba2101ed60662718b0d50ecaf6aba7218bcec702c785b033c5",
       "claims/stride.json": "eb2f6e6330b22dbf3f6151e8d93290df9b401f89a1171f146c17f0b27bab572e"
       }
