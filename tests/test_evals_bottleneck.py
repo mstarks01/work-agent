@@ -390,3 +390,34 @@ def _empty_result() -> AssertionResult:
         catalog=AssertionCatalog(),
         issues=(),
     )
+
+
+class TestWhatTheFindingsRestOn:
+    """#1052's measurement: how far the corpus's own answer needs a guess.
+
+    Recorded observations rather than rules. A number here moving means a
+    placement ruling or a reference finding changed, and the contract decision
+    rests on these, so it should move loudly.
+    """
+
+    @pytest.fixture(scope="class")
+    def reliance(self):
+        return bottleneck.placement_reliance(CORPUS)
+
+    def test_every_case_is_counted(self, reliance) -> None:
+        assert len(reliance) == 13
+        assert sum(one.must_finds for one in reliance) == 180
+
+    def test_two_in_five_must_finds_rest_on_an_inferred_crossing(
+        self, reliance
+    ) -> None:
+        assert sum(one.assumed for one in reliance) == 73
+
+    def test_one_in_seven_rests_on_a_crossing_of_two_guesses(self, reliance) -> None:
+        assert sum(one.wholly for one in reliance) == 25
+
+    def test_a_wholly_inferred_crossing_is_a_subset_of_an_assumed_one(
+        self, reliance
+    ) -> None:
+        """Both endpoints inferred implies at least one, on every case."""
+        assert all(one.wholly <= one.assumed for one in reliance)
