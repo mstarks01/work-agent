@@ -1,0 +1,618 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:insurance-partner",
+        "name": "insurance partner",
+        "description": "Three insurance partners that provide daily claim-record extracts.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "Three insurance partners drop a daily extract for us.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:insurance-partner"
+      },
+      {
+        "id": "entity:analyst",
+        "name": "analyst",
+        "description": "Analysts who query the warehouse directly.",
+        "assets": [],
+        "source_excerpt": "Analysts query the warehouse directly.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:warehouse-network"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:airflow-scheduler",
+        "name": "Airflow scheduler",
+        "description": "A scheduler that lists the landing bucket, reads files, and triggers a Spark transform job.",
+        "assets": [
+          "credentials",
+          "secrets",
+          "pii"
+        ],
+        "source_excerpt": "An Airflow scheduler running in the landing network wakes up at 02:00, lists the bucket, and reads whatever is there.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "It does not check that a file came from the partner whose folder it landed in.",
+        "technology": "Airflow",
+        "trust_zone": "boundary:landing-network",
+        "exposure": "unknown",
+        "interface_kind": "non-web"
+      },
+      {
+        "id": "process:spark-transform-job",
+        "name": "Spark transform job",
+        "description": "A Spark job that normalizes records and loads them into BigQuery.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "For each file the scheduler triggers a Spark transform job in the warehouse network.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "Nothing validates the row contents beyond the schema.",
+        "technology": "Spark",
+        "trust_zone": "boundary:warehouse-network",
+        "exposure": "unknown",
+        "interface_kind": "non-web"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:landing-bucket",
+        "name": "landing bucket",
+        "description": "A bucket where insurance partners place daily claim-record extracts.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "They push files into a landing bucket over SFTP.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "I don't know how the landing bucket is encrypted. Both are on defaults as far as I know.",
+        "technology": "bucket",
+        "trust_zone": "boundary:landing-network",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:airflow-metadata-database",
+        "name": "Airflow metadata database",
+        "description": "The database where Airflow keeps connection strings and partner keys.",
+        "assets": [
+          "credentials",
+          "secrets"
+        ],
+        "source_excerpt": "Airflow keeps its connection strings and the partner keys in its own metadata database.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "I don't know whether the Airflow metadata database is encrypted at rest. Both are on defaults as far as I know.",
+        "technology": "database",
+        "trust_zone": "unknown",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:bigquery",
+        "name": "BigQuery",
+        "description": "The warehouse containing normalized claim records with member names and dates of birth.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "The transform normalizes the records and loads them into BigQuery.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "BigQuery",
+        "trust_zone": "boundary:warehouse-network",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:insurance-partner-to-landing-bucket:deliver-extract",
+        "name": "deliver extract",
+        "description": "",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "They push files into a landing bucket over SFTP.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:insurance-partner",
+        "destination": "store:landing-bucket",
+        "protocol": "SFTP",
+        "authentication": "static key",
+        "data_description": "Daily extracts containing claim records with member names and dates of birth.",
+        "encryption_in_transit": "SFTP",
+        "operations": "write"
+      },
+      {
+        "id": "flow:airflow-scheduler-to-landing-bucket:read-files",
+        "name": "read files",
+        "description": "",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "lists the bucket, and reads whatever is there",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:airflow-scheduler",
+        "destination": "store:landing-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Claim-record extracts.",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:airflow-scheduler-to-spark-transform-job:trigger-job",
+        "name": "trigger job",
+        "description": "",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "For each file the scheduler triggers a Spark transform job",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:airflow-scheduler",
+        "destination": "process:spark-transform-job",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "A file to be transformed.",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:airflow-scheduler-to-airflow-metadata-database:store-credentials",
+        "name": "store credentials",
+        "description": "",
+        "assets": [
+          "credentials",
+          "secrets"
+        ],
+        "source_excerpt": "Airflow keeps its connection strings and the partner keys in its own metadata database.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:airflow-scheduler",
+        "destination": "store:airflow-metadata-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Connection strings and partner keys.",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:spark-transform-job-to-bigquery:load-records",
+        "name": "load records",
+        "description": "",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "The transform normalizes the records and loads them into BigQuery.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:spark-transform-job",
+        "destination": "store:bigquery",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Normalized claim records with member names and dates of birth.",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:analyst-to-bigquery:query-warehouse",
+        "name": "query warehouse",
+        "description": "",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "Analysts query the warehouse directly.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The grant is dataset-wide; member-identifying columns have not been split out.",
+        "source": "entity:analyst",
+        "destination": "store:bigquery",
+        "protocol": "unknown",
+        "authentication": "SSO",
+        "data_description": "Warehouse claim records.",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:insurance-partner",
+        "name": "insurance partner",
+        "description": "The zone containing the external insurance partners.",
+        "assets": [],
+        "source_excerpt": "Three insurance partners drop a daily extract for us.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:landing-network",
+        "name": "landing network",
+        "description": "The network where the Airflow scheduler and landing bucket operate.",
+        "assets": [],
+        "source_excerpt": "An Airflow scheduler running in the landing network",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:warehouse-network",
+        "name": "warehouse network",
+        "description": "The network containing the Spark transform job, BigQuery warehouse, and analysts.",
+        "assets": [],
+        "source_excerpt": "For each file the scheduler triggers a Spark transform job in the warehouse network.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "Analysts are also on the warehouse network.",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The insurance partners are controlled by parties outside the system and therefore form a tenant boundary.",
+        "element_id": "boundary:insurance-partner",
+        "attribute": "kind",
+        "basis": "The source describes them as insurance partners that provide data to us."
+      },
+      {
+        "assumption": "The Airflow scheduler presents a non-web batch interface.",
+        "element_id": "process:airflow-scheduler",
+        "attribute": "interface_kind",
+        "basis": "It is described as a scheduler that wakes at a fixed time, lists a bucket, reads files, and triggers a job."
+      },
+      {
+        "assumption": "The Spark transform job presents a non-web batch interface.",
+        "element_id": "process:spark-transform-job",
+        "attribute": "interface_kind",
+        "basis": "It is described as a transform job processing files and loading records."
+      },
+      {
+        "assumption": "The landing bucket stores confidential data.",
+        "element_id": "store:landing-bucket",
+        "attribute": "data_classification",
+        "basis": "The extracts contain claim records with member names and dates of birth."
+      },
+      {
+        "assumption": "The Airflow metadata database stores confidential data.",
+        "element_id": "store:airflow-metadata-database",
+        "attribute": "data_classification",
+        "basis": "It stores connection strings and partner keys, which are credentials and secrets."
+      },
+      {
+        "assumption": "BigQuery stores confidential data.",
+        "element_id": "store:bigquery",
+        "attribute": "data_classification",
+        "basis": "It contains normalized claim records with member names and dates of birth."
+      }
+    ]
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:insurance-partner",
+        "name": "insurance partner",
+        "description": "Three insurance partners that provide daily claim-record extracts.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "Three insurance partners drop a daily extract for us.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:insurance-partner"
+      },
+      {
+        "id": "entity:analyst",
+        "name": "analyst",
+        "description": "Analysts who query the warehouse directly.",
+        "assets": [],
+        "source_excerpt": "Analysts query the warehouse directly.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:warehouse-network"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:airflow-scheduler",
+        "name": "Airflow scheduler",
+        "description": "A scheduler that lists the landing bucket, reads files, and triggers a Spark transform job.",
+        "assets": [
+          "credentials",
+          "secrets",
+          "pii"
+        ],
+        "source_excerpt": "An Airflow scheduler running in the landing network wakes up at 02:00, lists the bucket, and reads whatever is there.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "It does not check that a file came from the partner whose folder it landed in.",
+        "technology": "Airflow",
+        "trust_zone": "boundary:landing-network",
+        "exposure": "unknown",
+        "interface_kind": "non-web"
+      },
+      {
+        "id": "process:spark-transform-job",
+        "name": "Spark transform job",
+        "description": "A Spark job that normalizes records and loads them into BigQuery.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "For each file the scheduler triggers a Spark transform job in the warehouse network.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "Nothing validates the row contents beyond the schema.",
+        "technology": "Spark",
+        "trust_zone": "boundary:warehouse-network",
+        "exposure": "unknown",
+        "interface_kind": "non-web"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:landing-bucket",
+        "name": "landing bucket",
+        "description": "A bucket where insurance partners place daily claim-record extracts.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "They push files into a landing bucket over SFTP.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "I don't know how the landing bucket is encrypted. Both are on defaults as far as I know.",
+        "technology": "bucket",
+        "trust_zone": "boundary:landing-network",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:airflow-metadata-database",
+        "name": "Airflow metadata database",
+        "description": "The database where Airflow keeps connection strings and partner keys.",
+        "assets": [
+          "credentials",
+          "secrets"
+        ],
+        "source_excerpt": "Airflow keeps its connection strings and the partner keys in its own metadata database.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "I don't know whether the Airflow metadata database is encrypted at rest. Both are on defaults as far as I know.",
+        "technology": "database",
+        "trust_zone": "unknown",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:bigquery",
+        "name": "BigQuery",
+        "description": "The warehouse containing normalized claim records with member names and dates of birth.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "The transform normalizes the records and loads them into BigQuery.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "BigQuery",
+        "trust_zone": "boundary:warehouse-network",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:insurance-partner>store:landing-bucket>deliver-extract",
+        "name": "deliver extract",
+        "description": "",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "They push files into a landing bucket over SFTP.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:insurance-partner",
+        "destination": "store:landing-bucket",
+        "protocol": "SFTP",
+        "authentication": "static key",
+        "data_description": "Daily extracts containing claim records with member names and dates of birth.",
+        "encryption_in_transit": "SFTP",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:airflow-scheduler>store:landing-bucket>read-files",
+        "name": "read files",
+        "description": "",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "lists the bucket, and reads whatever is there",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:airflow-scheduler",
+        "destination": "store:landing-bucket",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Claim-record extracts.",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:airflow-scheduler>process:spark-transform-job>trigger-job",
+        "name": "trigger job",
+        "description": "",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "For each file the scheduler triggers a Spark transform job",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:airflow-scheduler",
+        "destination": "process:spark-transform-job",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "A file to be transformed.",
+        "encryption_in_transit": "unknown",
+        "operations": "unknown"
+      },
+      {
+        "id": "flow:process:airflow-scheduler>store:airflow-metadata-database>store-credentials",
+        "name": "store credentials",
+        "description": "",
+        "assets": [
+          "credentials",
+          "secrets"
+        ],
+        "source_excerpt": "Airflow keeps its connection strings and the partner keys in its own metadata database.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:airflow-scheduler",
+        "destination": "store:airflow-metadata-database",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Connection strings and partner keys.",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:spark-transform-job>store:bigquery>load-records",
+        "name": "load records",
+        "description": "",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "The transform normalizes the records and loads them into BigQuery.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:spark-transform-job",
+        "destination": "store:bigquery",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "Normalized claim records with member names and dates of birth.",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:entity:analyst>store:bigquery>query-warehouse",
+        "name": "query warehouse",
+        "description": "",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "Analysts query the warehouse directly.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The grant is dataset-wide; member-identifying columns have not been split out.",
+        "source": "entity:analyst",
+        "destination": "store:bigquery",
+        "protocol": "unknown",
+        "authentication": "SSO",
+        "data_description": "Warehouse claim records.",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:insurance-partner",
+        "name": "insurance partner",
+        "description": "The zone containing the external insurance partners.",
+        "assets": [],
+        "source_excerpt": "Three insurance partners drop a daily extract for us.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "tenant"
+      },
+      {
+        "id": "boundary:landing-network",
+        "name": "landing network",
+        "description": "The network where the Airflow scheduler and landing bucket operate.",
+        "assets": [],
+        "source_excerpt": "An Airflow scheduler running in the landing network",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:warehouse-network",
+        "name": "warehouse network",
+        "description": "The network containing the Spark transform job, BigQuery warehouse, and analysts.",
+        "assets": [],
+        "source_excerpt": "For each file the scheduler triggers a Spark transform job in the warehouse network.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "Analysts are also on the warehouse network.",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "The insurance partners are controlled by parties outside the system and therefore form a tenant boundary.",
+        "element_id": "boundary:insurance-partner",
+        "attribute": "kind",
+        "basis": "The source describes them as insurance partners that provide data to us."
+      },
+      {
+        "assumption": "The Airflow scheduler presents a non-web batch interface.",
+        "element_id": "process:airflow-scheduler",
+        "attribute": "interface_kind",
+        "basis": "It is described as a scheduler that wakes at a fixed time, lists a bucket, reads files, and triggers a job."
+      },
+      {
+        "assumption": "The Spark transform job presents a non-web batch interface.",
+        "element_id": "process:spark-transform-job",
+        "attribute": "interface_kind",
+        "basis": "It is described as a transform job processing files and loading records."
+      },
+      {
+        "assumption": "The landing bucket stores confidential data.",
+        "element_id": "store:landing-bucket",
+        "attribute": "data_classification",
+        "basis": "The extracts contain claim records with member names and dates of birth."
+      },
+      {
+        "assumption": "The Airflow metadata database stores confidential data.",
+        "element_id": "store:airflow-metadata-database",
+        "attribute": "data_classification",
+        "basis": "It stores connection strings and partner keys, which are credentials and secrets."
+      },
+      {
+        "assumption": "BigQuery stores confidential data.",
+        "element_id": "store:bigquery",
+        "attribute": "data_classification",
+        "basis": "It contains normalized claim records with member names and dates of birth."
+      }
+    ]
+  },
+  "issues": [],
+  "repair": null
+}

@@ -1,0 +1,772 @@
+{
+  "raw": {
+    "external_entities": [
+      {
+        "id": "entity:developers",
+        "name": "developers",
+        "description": "People who write changes, push branches, and may manually start rebuilds.",
+        "assets": [],
+        "source_excerpt": "Developers push their branches to our self-hosted git server",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:public-package-registry",
+        "name": "public package registry",
+        "description": "Public registry reached during dependency resolution.",
+        "assets": [],
+        "source_excerpt": "Dependency resolution reaches out to the public package registry on the internet",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:internet"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:build-runner",
+        "name": "build runner",
+        "description": "Picks up merges, fetches source, resolves the dependency lockfile, produces container images, pushes images, and calls the deploy controller.",
+        "assets": [
+          "availability-critical"
+        ],
+        "source_excerpt": "The build runner picks the merge up, fetches the source, resolves the dependency lockfile and produces a container image.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "Any developer can log in to the build runner and kick off a rebuild of main by hand; that path does not require a merge and is not reviewed.",
+        "technology": "unknown",
+        "trust_zone": "boundary:build-environment",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:deploy-controller",
+        "name": "deploy controller",
+        "description": "Maintains the current release image SHA for the estate and responds to store server queries.",
+        "assets": [
+          "availability-critical"
+        ],
+        "source_excerpt": "The deploy controller runs on the corporate network and holds one record: which image sha the estate should be on.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "Nobody has written down what a store server presents to it.",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:store-server",
+        "name": "store server",
+        "description": "A small server in each store's back office that runs the till software as a container, checks the current release, pulls changed images, and restarts the container.",
+        "assets": [
+          "availability-critical"
+        ],
+        "source_excerpt": "Each store has a small server in the back office running the till software as a container.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The description covers the store servers collectively across about 1,200 stores. Nobody has written down what a store server presents to the registry or controller.",
+        "technology": "unknown",
+        "trust_zone": "boundary:store-estate",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:till-software",
+        "name": "till software",
+        "description": "Software running as a container on each store server.",
+        "assets": [
+          "availability-critical"
+        ],
+        "source_excerpt": "running the till software as a container",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "container",
+        "trust_zone": "boundary:store-estate",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:git-server",
+        "name": "git server",
+        "description": "Self-hosted Git server containing developer branches and the merged source used for builds.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "Developers push their branches to our self-hosted git server, which sits on the corporate network.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "Nobody has documented whether the git server encrypts what it stores.",
+        "technology": "self-hosted Git server",
+        "trust_zone": "boundary:corporate-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:image-registry",
+        "name": "image registry",
+        "description": "Registry in the build environment that stores finished container images tagged with commit SHAs and serves images to store servers.",
+        "assets": [
+          "availability-critical",
+          "business-critical-data"
+        ],
+        "source_excerpt": "It pushes the finished image to our image registry, which is also in the build environment.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "Nobody has documented whether the image registry encrypts what it stores.",
+        "technology": "container image registry",
+        "trust_zone": "boundary:build-environment",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:current-release-record",
+        "name": "current release record",
+        "description": "The record identifying which image SHA the estate should be running.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "holds one record: which image sha the estate should be on",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:dependency-lockfile",
+        "name": "dependency lockfile",
+        "description": "Dependency lockfile used during dependency resolution.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "resolves the dependency lockfile",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The lockfile is taken as given; the runner does not verify signatures on what it downloads.",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:developers-to-store-git-server-branches",
+        "name": "push branches",
+        "description": "Developers push branches to the self-hosted Git server.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "Developers push their branches to our self-hosted git server",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:developers",
+        "destination": "store:git-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "developer branches",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:store:git-server-to-process-build-runner-start-build",
+        "name": "start build",
+        "description": "A merge to main starts a build that the build runner picks up.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "A merge to `main` is what starts a build.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:git-server",
+        "destination": "process:build-runner",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "merge to main",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:build-runner-to-store-git-server-fetch-source",
+        "name": "fetch source",
+        "description": "The build runner fetches source from the Git server.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "The build runner picks the merge up, fetches the source",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:build-runner",
+        "destination": "store:git-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "source for the merge",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:build-runner-to-store-dependency-lockfile-resolve-dependencies",
+        "name": "resolve dependencies",
+        "description": "The build runner resolves dependencies using the dependency lockfile and public package registry.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "Dependency resolution reaches out to the public package registry on the internet",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:build-runner",
+        "destination": "entity:public-package-registry",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "dependencies downloaded during dependency resolution",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:build-runner-to-store-image-registry-push-image",
+        "name": "push image",
+        "description": "The build runner pushes the finished container image to the image registry.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "It pushes the finished image to our image registry",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "Images are tagged with the commit sha.",
+        "source": "process:build-runner",
+        "destination": "store:image-registry",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "finished container image tagged with the commit SHA",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:build-runner-to-process-deploy-controller-set-release",
+        "name": "set release",
+        "description": "The build runner asks the deploy controller to make an image the current release.",
+        "assets": [
+          "credentials",
+          "business-critical-data"
+        ],
+        "source_excerpt": "When the image is pushed the runner calls the deploy controller and asks it to make that image the current release.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The token is a shared build token that is the same for every pipeline and has not been rotated since the pipeline was set up.",
+        "source": "process:build-runner",
+        "destination": "process:deploy-controller",
+        "protocol": "unknown",
+        "authentication": "shared build token",
+        "data_description": "image SHA and release request",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:store-server-to-process-deploy-controller-check-release",
+        "name": "check release",
+        "description": "Each store server asks the deploy controller for the current release once a minute.",
+        "assets": [
+          "availability-critical"
+        ],
+        "source_excerpt": "Every store server asks the deploy controller once a minute what the current release is",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "Nobody has written down what a store server presents to the controller.",
+        "source": "process:store-server",
+        "destination": "process:deploy-controller",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "current release image SHA",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:store-server-to-store-image-registry-pull-image",
+        "name": "pull image",
+        "description": "A store server pulls the current image from the registry when its running image differs from the current release.",
+        "assets": [
+          "availability-critical",
+          "business-critical-data"
+        ],
+        "source_excerpt": "if it differs from what it is running it pulls that image from the registry and restarts the container",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The registry allows the pull; nobody has written down what a store server presents to it.",
+        "source": "process:store-server",
+        "destination": "store:image-registry",
+        "protocol": "retail WAN",
+        "authentication": "unknown",
+        "data_description": "container image",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:entity:developers-to-process-build-runner-rebuild-main",
+        "name": "rebuild main",
+        "description": "A developer logs in to the build runner and manually kicks off a rebuild of main.",
+        "assets": [
+          "credentials",
+          "availability-critical"
+        ],
+        "source_excerpt": "any developer can log in to the build runner and kick off a rebuild of `main` by hand",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "That path does not require a merge and is not reviewed.",
+        "source": "entity:developers",
+        "destination": "process:build-runner",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "manual rebuild request for main",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:corporate-network",
+        "name": "corporate network",
+        "description": "Corporate network containing the self-hosted Git server and deploy controller.",
+        "assets": [],
+        "source_excerpt": "which sits on the corporate network",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:build-environment",
+        "name": "build environment",
+        "description": "Separate build environment containing the build runner and image registry.",
+        "assets": [],
+        "source_excerpt": "The runner lives in its own build environment, separate from the corporate network.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:store-estate",
+        "name": "store estate",
+        "description": "The estate of approximately 1,200 stores and their back-office servers.",
+        "assets": [],
+        "source_excerpt": "We run about 1,200 stores.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:internet",
+        "name": "internet",
+        "description": "Public internet zone reached for dependency resolution.",
+        "assets": [],
+        "source_excerpt": "the public package registry on the internet",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": []
+  },
+  "normalized": {
+    "external_entities": [
+      {
+        "id": "entity:developers",
+        "name": "developers",
+        "description": "People who write changes, push branches, and may manually start rebuilds.",
+        "assets": [],
+        "source_excerpt": "Developers push their branches to our self-hosted git server",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "unknown"
+      },
+      {
+        "id": "entity:public-package-registry",
+        "name": "public package registry",
+        "description": "Public registry reached during dependency resolution.",
+        "assets": [],
+        "source_excerpt": "Dependency resolution reaches out to the public package registry on the internet",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:internet"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:build-runner",
+        "name": "build runner",
+        "description": "Picks up merges, fetches source, resolves the dependency lockfile, produces container images, pushes images, and calls the deploy controller.",
+        "assets": [
+          "availability-critical"
+        ],
+        "source_excerpt": "The build runner picks the merge up, fetches the source, resolves the dependency lockfile and produces a container image.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "Any developer can log in to the build runner and kick off a rebuild of main by hand; that path does not require a merge and is not reviewed.",
+        "technology": "unknown",
+        "trust_zone": "boundary:build-environment",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:deploy-controller",
+        "name": "deploy controller",
+        "description": "Maintains the current release image SHA for the estate and responds to store server queries.",
+        "assets": [
+          "availability-critical"
+        ],
+        "source_excerpt": "The deploy controller runs on the corporate network and holds one record: which image sha the estate should be on.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "Nobody has written down what a store server presents to it.",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:store-server",
+        "name": "store server",
+        "description": "A small server in each store's back office that runs the till software as a container, checks the current release, pulls changed images, and restarts the container.",
+        "assets": [
+          "availability-critical"
+        ],
+        "source_excerpt": "Each store has a small server in the back office running the till software as a container.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The description covers the store servers collectively across about 1,200 stores. Nobody has written down what a store server presents to the registry or controller.",
+        "technology": "unknown",
+        "trust_zone": "boundary:store-estate",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      },
+      {
+        "id": "process:till-software",
+        "name": "till software",
+        "description": "Software running as a container on each store server.",
+        "assets": [
+          "availability-critical"
+        ],
+        "source_excerpt": "running the till software as a container",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "container",
+        "trust_zone": "boundary:store-estate",
+        "exposure": "unknown",
+        "interface_kind": "unknown"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:git-server",
+        "name": "git server",
+        "description": "Self-hosted Git server containing developer branches and the merged source used for builds.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "Developers push their branches to our self-hosted git server, which sits on the corporate network.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "Nobody has documented whether the git server encrypts what it stores.",
+        "technology": "self-hosted Git server",
+        "trust_zone": "boundary:corporate-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:image-registry",
+        "name": "image registry",
+        "description": "Registry in the build environment that stores finished container images tagged with commit SHAs and serves images to store servers.",
+        "assets": [
+          "availability-critical",
+          "business-critical-data"
+        ],
+        "source_excerpt": "It pushes the finished image to our image registry, which is also in the build environment.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "Nobody has documented whether the image registry encrypts what it stores.",
+        "technology": "container image registry",
+        "trust_zone": "boundary:build-environment",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:current-release-record",
+        "name": "current release record",
+        "description": "The record identifying which image SHA the estate should be running.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "holds one record: which image sha the estate should be on",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "technology": "unknown",
+        "trust_zone": "boundary:corporate-network",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      },
+      {
+        "id": "store:dependency-lockfile",
+        "name": "dependency lockfile",
+        "description": "Dependency lockfile used during dependency resolution.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "resolves the dependency lockfile",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The lockfile is taken as given; the runner does not verify signatures on what it downloads.",
+        "technology": "unknown",
+        "trust_zone": "unknown",
+        "data_classification": "unknown",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:entity:developers>store:git-server>push-branches",
+        "name": "push branches",
+        "description": "Developers push branches to the self-hosted Git server.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "Developers push their branches to our self-hosted git server",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "entity:developers",
+        "destination": "store:git-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "developer branches",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:store:git-server>process:build-runner>start-build",
+        "name": "start build",
+        "description": "A merge to main starts a build that the build runner picks up.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "A merge to `main` is what starts a build.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "store:git-server",
+        "destination": "process:build-runner",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "merge to main",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:build-runner>store:git-server>fetch-source",
+        "name": "fetch source",
+        "description": "The build runner fetches source from the Git server.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "The build runner picks the merge up, fetches the source",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:build-runner",
+        "destination": "store:git-server",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "source for the merge",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:build-runner>entity:public-package-registry>resolve-dependencies",
+        "name": "resolve dependencies",
+        "description": "The build runner resolves dependencies using the dependency lockfile and public package registry.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "Dependency resolution reaches out to the public package registry on the internet",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "source": "process:build-runner",
+        "destination": "entity:public-package-registry",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "dependencies downloaded during dependency resolution",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:build-runner>store:image-registry>push-image",
+        "name": "push image",
+        "description": "The build runner pushes the finished container image to the image registry.",
+        "assets": [
+          "business-critical-data"
+        ],
+        "source_excerpt": "It pushes the finished image to our image registry",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "Images are tagged with the commit sha.",
+        "source": "process:build-runner",
+        "destination": "store:image-registry",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "finished container image tagged with the commit SHA",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:build-runner>process:deploy-controller>set-release",
+        "name": "set release",
+        "description": "The build runner asks the deploy controller to make an image the current release.",
+        "assets": [
+          "credentials",
+          "business-critical-data"
+        ],
+        "source_excerpt": "When the image is pushed the runner calls the deploy controller and asks it to make that image the current release.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The token is a shared build token that is the same for every pipeline and has not been rotated since the pipeline was set up.",
+        "source": "process:build-runner",
+        "destination": "process:deploy-controller",
+        "protocol": "unknown",
+        "authentication": "shared build token",
+        "data_description": "image SHA and release request",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      },
+      {
+        "id": "flow:process:store-server>process:deploy-controller>check-release",
+        "name": "check release",
+        "description": "Each store server asks the deploy controller for the current release once a minute.",
+        "assets": [
+          "availability-critical"
+        ],
+        "source_excerpt": "Every store server asks the deploy controller once a minute what the current release is",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "Nobody has written down what a store server presents to the controller.",
+        "source": "process:store-server",
+        "destination": "process:deploy-controller",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "current release image SHA",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:process:store-server>store:image-registry>pull-image",
+        "name": "pull image",
+        "description": "A store server pulls the current image from the registry when its running image differs from the current release.",
+        "assets": [
+          "availability-critical",
+          "business-critical-data"
+        ],
+        "source_excerpt": "if it differs from what it is running it pulls that image from the registry and restarts the container",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "The registry allows the pull; nobody has written down what a store server presents to it.",
+        "source": "process:store-server",
+        "destination": "store:image-registry",
+        "protocol": "retail WAN",
+        "authentication": "unknown",
+        "data_description": "container image",
+        "encryption_in_transit": "unknown",
+        "operations": "read"
+      },
+      {
+        "id": "flow:entity:developers>process:build-runner>rebuild-main",
+        "name": "rebuild main",
+        "description": "A developer logs in to the build runner and manually kicks off a rebuild of main.",
+        "assets": [
+          "credentials",
+          "availability-critical"
+        ],
+        "source_excerpt": "any developer can log in to the build runner and kick off a rebuild of `main` by hand",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "That path does not require a merge and is not reviewed.",
+        "source": "entity:developers",
+        "destination": "process:build-runner",
+        "protocol": "unknown",
+        "authentication": "unknown",
+        "data_description": "manual rebuild request for main",
+        "encryption_in_transit": "unknown",
+        "operations": "write"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:corporate-network",
+        "name": "corporate network",
+        "description": "Corporate network containing the self-hosted Git server and deploy controller.",
+        "assets": [],
+        "source_excerpt": "which sits on the corporate network",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:build-environment",
+        "name": "build environment",
+        "description": "Separate build environment containing the build runner and image registry.",
+        "assets": [],
+        "source_excerpt": "The runner lives in its own build environment, separate from the corporate network.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:store-estate",
+        "name": "store estate",
+        "description": "The estate of approximately 1,200 stores and their back-office servers.",
+        "assets": [],
+        "source_excerpt": "We run about 1,200 stores.",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:internet",
+        "name": "internet",
+        "description": "Public internet zone reached for dependency resolution.",
+        "assets": [],
+        "source_excerpt": "the public package registry on the internet",
+        "source_label": "System description",
+        "source_speaker": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": []
+  },
+  "issues": [],
+  "repair": null
+}
