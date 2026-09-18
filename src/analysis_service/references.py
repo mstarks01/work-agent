@@ -29,9 +29,10 @@ ID is ``derive_element_id``'s output, and every ID a validated model carries
 equals it: the gate's ``id-mismatch`` rule enforces that for every element, on
 every path, whether or not the caller asked for normalization. That output runs
 through :func:`~analysis_service.system_model.normalize_name`, which lowercases
-the name and maps every character outside ``[a-z0-9]`` to ``-``. An ID therefore
-carries neither an uppercase character nor a space, and folding one cannot merge
-two elements a run could otherwise tell apart.
+the name, elides an apostrophe and maps every other character outside
+``[a-z0-9]`` to ``-``. An ID therefore carries neither an uppercase character
+nor a space, and folding one cannot merge two elements a run could otherwise
+tell apart.
 
 There is one hole, and it is why the guard exists rather than decorating the
 module. ``normalize_name`` raises on a name that slugs to nothing, and the gate
