@@ -63,8 +63,8 @@ Not part of the question, but the records cite these names, so you need them.
 
 | id | exposure | interface | zone | technology |
 |---|---|---|---|---|
-| process:ingest-scheduler | internal | non-web | boundary:landing-network | Airflow |
-| process:spark-transform-job | internal | non-web | boundary:warehouse-network | Spark |
+| process:ingest-scheduler | unknown | non-web | boundary:landing-network | Airflow |
+| process:spark-transform-job | unknown | non-web | boundary:warehouse-network | Spark |
 
 **Data stores**
 
@@ -101,6 +101,9 @@ Not part of the question, but the records cite these names, so you need them.
 
 - `flow:entity:insurance-partner>store:landing-bucket>push-daily-extract` — SFTP traffic from partners is protected by the SSH transport it runs over. (basis: The text names SFTP, whose transport encryption is intrinsic to the protocol; no other transport claim is made.)
 - `store:claims-warehouse` — The claims data is health-related personal data. (basis: Described as insurance claim records carrying member names and dates of birth.)
+- `entity:insurance-partner` — insurance partner's trust_zone is boundary:partner-network, which the schema requires and no source states. (basis: The insurance-partner role supports an organizational boundary. It does not establish one common network across partners or locate their sending infrastructure.)
+- `store:landing-bucket` — landing bucket's trust_zone is boundary:landing-network, which the schema requires and no source states. (basis: The landing role and name do not locate the bucket on the scheduler's network. Storage-encryption status provides no placement evidence.)
+- `store:airflow-metadata-database` — Airflow metadata database's trust_zone is boundary:landing-network, which the schema requires and no source states. (basis: Airflow owning or using a metadata database does not imply that the database shares its network. It could be remotely hosted.)
 
 **Reviewed aliases** — other names a reader ruled identify the same element, each with the words in the source that support it. An extraction using one is named differently, not wrong.
 
@@ -336,7 +339,7 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "df7757178c394258cbcf1643e81fca5b01f324058a0841824f008e74346da2d0",
-      "model.json": "4cc4e9095e0003827944cc231b4ef8827b184421b138551069e40d4974d5603e",
+      "model.json": "bbacd7e66fbe1a3948242b911ad7de90799dacc1b24012c64f74f5cd13ac19dd",
       "claims/stride.json": "47ff8bbda7f4ddda4ac89fa54e207db321fccfa05d93dbe04ada85f6a7597857"
       }
     }

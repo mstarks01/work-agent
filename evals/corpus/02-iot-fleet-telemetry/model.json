@@ -60,7 +60,7 @@
       "source_label": "System description",
       "technology": "Python Pub/Sub consumer",
       "trust_zone": "boundary:analytics-core",
-      "exposure": "internal",
+      "exposure": "unknown",
       "interface_kind": "non-web"
     }
   ],
@@ -317,6 +317,36 @@
       "element_id": "store:pub-sub",
       "attribute": "trust_zone",
       "basis": "The source places the normalizer \"in our analytics network\" and places the broker nowhere. It associates the broker with the gateway's onward hop \u2014 \"Readings the gateway accepts are forwarded onto Pub/Sub\" \u2014 so it takes the gateway's zone. Either placement leaves exactly one crossing on this path."
+    },
+    {
+      "assumption": "field technician's trust_zone is boundary:field-network, which the schema requires and no source states.",
+      "element_id": "entity:field-technician",
+      "attribute": "trust_zone",
+      "basis": "A local service session supports proximity to the node. It does not establish membership in a common network across customer sites."
+    },
+    {
+      "assumption": "device registry's trust_zone is boundary:ingest-edge, which the schema requires and no source states.",
+      "element_id": "store:device-registry",
+      "attribute": "trust_zone",
+      "basis": "Device-registry function and confidential classification do not establish ingest-edge membership. No placement evidence is supplied."
+    },
+    {
+      "assumption": "Pub/Sub's trust_zone is boundary:ingest-edge, which the schema requires and no source states.",
+      "element_id": "store:pub-sub",
+      "attribute": "trust_zone",
+      "basis": "An existing assumption label establishes how a claim is represented, not whether it is defensible. No supporting placement evidence is supplied."
+    },
+    {
+      "assumption": "sensor node's trust_zone is boundary:field-network, which the schema requires and no source states.",
+      "element_id": "entity:sensor-node",
+      "attribute": "trust_zone",
+      "basis": "Customer-site installation supports a field grouping. Preserve separate site boundaries where relevant; this infers no shared connectivity or trust."
+    },
+    {
+      "assumption": "device gateway's trust_zone is boundary:ingest-edge, which the schema requires and no source states.",
+      "element_id": "process:device-gateway",
+      "attribute": "trust_zone",
+      "basis": "An internet-facing ingest broker supports an edge-role abstraction. GKE hosting and internet exposure do not establish a particular network perimeter."
     }
   ]
 }

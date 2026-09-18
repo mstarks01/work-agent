@@ -278,40 +278,54 @@
       },
       "rationale": "Traffic arriving across the public internet states that it is reachable from there.",
       "reviewed_by": "mstarks01"
-    }
-  ],
-  "disputed": [
-    {
-      "element_id": "process:background-worker-process",
-      "attribute": "exposure",
-      "blessed": "internal",
-      "proposed": "record as an inference",
-      "kind": "defensible-inference",
-      "basis": "No sentence states its reachability. Sitting in an internal network implies it, which is an inference rather than a statement.",
-      "ruling": null,
-      "reviewed_by": null
     },
     {
-      "element_id": "store:web-application-config",
-      "attribute": "trust_zone",
-      "blessed": "boundary:web-tier",
-      "proposed": "record as an inference",
-      "kind": "defensible-inference",
-      "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-      "ruling": null,
-      "reviewed_by": null
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:background-worker-process",
+        "predicate": "internet-exposure",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "exclusive": false
+      },
+      "rationale": "Behind the web tier supplies architectural evidence beyond a network name. It still does not prove that every worker interface is inaccessible from the internet.",
+      "reviewed_by": "mstarks01"
     },
     {
-      "element_id": "store:worker-config",
-      "attribute": "trust_zone",
-      "blessed": "boundary:backend-tier",
-      "proposed": "record as an inference",
-      "kind": "defensible-inference",
-      "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-      "ruling": null,
-      "reviewed_by": null
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:web-application-config",
+        "predicate": "network-membership",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "exclusive": false
+      },
+      "rationale": "The application's use of a config store does not establish that store's network location. A remote configuration service is also possible.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:worker-config",
+        "predicate": "network-membership",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "exclusive": false
+      },
+      "rationale": "The worker's use of a config store does not establish backend-tier membership.",
+      "reviewed_by": "mstarks01"
     }
   ],
+  "disputed": [],
   "aliases": {
     "subjects": [],
     "qualifiers": []

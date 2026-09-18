@@ -69,7 +69,7 @@ Not part of the question, but the records cite these names, so you need them.
 | id | exposure | interface | zone | technology |
 |---|---|---|---|---|
 | process:device-gateway | internet-facing | non-web | boundary:ingest-edge | MQTT broker on GKE |
-| process:telemetry-normalizer | internal | non-web | boundary:analytics-core | Python Pub/Sub consumer |
+| process:telemetry-normalizer | unknown | non-web | boundary:analytics-core | Python Pub/Sub consumer |
 
 **Data stores**
 
@@ -108,6 +108,11 @@ Not part of the question, but the records cite these names, so you need them.
 - `store:telemetry-lake` — The telemetry lake holds personal data about customer sites. (basis: Stated to contain "site addresses and occupancy patterns", described as customer data.)
 - `store:telemetry-lake` — The telemetry lake holds confidential data under the scheme in prompts/extract.md. (basis: The source says the lake has "site addresses and occupancy patterns" in it and calls it customer data. Both describe identifiable customer premises and when they are occupied, so disclosure harms the customers described.)
 - `store:pub-sub` — Pub/Sub sits in the ingest edge rather than the analytics network. (basis: The source places the normalizer "in our analytics network" and places the broker nowhere. It associates the broker with the gateway's onward hop — "Readings the gateway accepts are forwarded onto Pub/Sub" — so it takes the gateway's zone. Either placement leaves exactly one crossing on this path.)
+- `entity:field-technician` — field technician's trust_zone is boundary:field-network, which the schema requires and no source states. (basis: A local service session supports proximity to the node. It does not establish membership in a common network across customer sites.)
+- `store:device-registry` — device registry's trust_zone is boundary:ingest-edge, which the schema requires and no source states. (basis: Device-registry function and confidential classification do not establish ingest-edge membership. No placement evidence is supplied.)
+- `store:pub-sub` — Pub/Sub's trust_zone is boundary:ingest-edge, which the schema requires and no source states. (basis: An existing assumption label establishes how a claim is represented, not whether it is defensible. No supporting placement evidence is supplied.)
+- `entity:sensor-node` — sensor node's trust_zone is boundary:field-network, which the schema requires and no source states. (basis: Customer-site installation supports a field grouping. Preserve separate site boundaries where relevant; this infers no shared connectivity or trust.)
+- `process:device-gateway` — device gateway's trust_zone is boundary:ingest-edge, which the schema requires and no source states. (basis: An internet-facing ingest broker supports an edge-role abstraction. GKE hosting and internet exposure do not establish a particular network perimeter.)
 
 **Reviewed aliases** — other names a reader ruled identify the same element, each with the words in the source that support it. An extraction using one is named differently, not wrong.
 
@@ -350,7 +355,7 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "fc745e273aff8be740a814f0a9b4a45d6f3c6fe39dc7c8efa2b879d4f270ac74",
-      "model.json": "41078fc5cbf143a5581c7a54baeae135774430edb713a5b7ee6e6938768e2632",
+      "model.json": "ab90a14f2bc4c5ca5742405db1803f4348cfeed9e8d0ee3640f5507ab8fcb43c",
       "claims/stride.json": "2bce750ba6ddc1307074a289e48c4591c59f7f2883ff687d9bd98e4f5e7db675"
       }
     }

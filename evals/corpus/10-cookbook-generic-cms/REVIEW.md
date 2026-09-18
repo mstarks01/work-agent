@@ -99,6 +99,9 @@ Not part of the question, but the records cite these names, so you need them.
 - `process:web-server` — The web server is reachable from the internet. (basis: Described as the 'Public site' that 'readers hit ... over HTTPS'.)
 - `entity:admin` — The admin connects from outside the hosted network. (basis: "they do it from wherever they happen to be — there is no jump host".)
 - `entity:cdn` — The CDN and its bucket sit in a separate trust zone from the hosted network. (basis: Assets 'do not come off the web server'; the web server 'pushes them up to the CDN's bucket', implying a distinct, separately operated location.)
+- `entity:cdn` — CDN's trust_zone is boundary:cdn, which the schema requires and no source states. (basis: A CDN entity can reasonably belong to a CDN-provider grouping. This does not establish a particular network perimeter or shared connectivity.)
+- `store:cdn-bucket` — CDN bucket's trust_zone is boundary:cdn, which the schema requires and no source states. (basis: The stated ownership supports the grouping. It does not establish network co-location with CDN serving infrastructure.)
+- `entity:reader` — Reader's trust_zone is boundary:public-internet, which the schema requires and no source states. (basis: A public audience supports this abstraction. It does not locate every reader on a specific network.)
 
 **Reviewed aliases** — other names a reader ruled identify the same element, each with the words in the source that support it. An extraction using one is named differently, not wrong.
 
@@ -403,7 +406,7 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "11d2a58f0e1d5773054f0a72d222b3cc96f889cdd0206dd3656495a3d5fe8313",
-      "model.json": "d5d125e135751bbe5e8f074aac280b0d77167cd0e5e5c2f5a6944cbe4f0c3a9c",
+      "model.json": "c89911777cd70655676903a6c7b7dc10c70282233eb31533b2b58d4fd5662227",
       "claims/asvs.json": "a9729f279ab4f3c7f855a19131ad3b3504ad4cba5dbd23c6c6ae86053147e1dc",
       "claims/stride.json": "b914aa99215333ed4a49748b1c03ab422d37a5cb741ec9fb63a81e82f11db06f"
       }

@@ -232,39 +232,39 @@
       },
       "rationale": "A signed-in state does not identify the mechanism. The text supports mixed reader session states \u2014 some readers are signed in \u2014 and not a blanket assertion that authentication is optional for all pages or operations.",
       "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "entity:cdn",
+        "predicate": "network-membership",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "exclusive": false
+      },
+      "rationale": "Assets 'do not come off the web server'; the web server 'pushes them up to the CDN's bucket', implying a distinct, separately operated location.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:cdn-bucket",
+        "predicate": "network-membership",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "exclusive": false
+      },
+      "rationale": "The stated ownership supports the grouping. It does not establish network co-location with CDN serving infrastructure.",
+      "reviewed_by": "mstarks01"
     }
   ],
   "disputed": [
-    {
-      "element_id": "entity:cdn",
-      "attribute": "trust_zone",
-      "blessed": "boundary:cdn",
-      "proposed": "record as an inference",
-      "kind": "defensible-inference",
-      "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-      "ruling": null,
-      "reviewed_by": null
-    },
-    {
-      "element_id": "store:cdn-bucket",
-      "attribute": "trust_zone",
-      "blessed": "boundary:cdn",
-      "proposed": "record as an inference",
-      "kind": "defensible-inference",
-      "basis": "The bucket is named as the CDN's; which zone that is remains the model's reading. No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-      "ruling": null,
-      "reviewed_by": null
-    },
-    {
-      "element_id": "entity:reader",
-      "attribute": "trust_zone",
-      "blessed": "boundary:public-internet",
-      "proposed": "record as an inference",
-      "kind": "defensible-inference",
-      "basis": "'Public site' supports a public audience. It does not specify every reader's network location, so the model's zone is a reading rather than a statement.",
-      "ruling": null,
-      "reviewed_by": null
-    },
     {
       "element_id": "flow:entity:reader>process:web-server>page-requests",
       "attribute": "authentication",

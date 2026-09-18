@@ -118,3 +118,14 @@ pattern survives re-bootstrapping against the real `extract` node.
 `self-hosted git server` is an alias for `store:git-server`. The public package
 registry is a distinct element that supplies dependencies; neither replaces
 the other.
+
+## Disputed values ruled 2026-09-18
+
+The maintainer's sitting on the drafted reference facts. A `change` ruling is applied to `model.json` and its entry removed; the reviewer's own words are the basis recorded there.
+
+| Element | Attribute | Ruling | Why |
+|---|---|---|---|
+| `entity:developer` | `trust_zone` | keep `boundary:corporate-network`, recorded as an inference | The description locates the git server, not developers. Access to a corporate service does not establish the caller's network membership. |
+| `process:build-runner` | `exposure` | `internal` to `unknown` | A separate build environment establishes separation from the corporate network, not absence of internet-facing interfaces. |
+| `process:deploy-controller` | `exposure` | `internal` to `unknown` | Corporate-network membership and retail-WAN access identify placement and an access path. They do not exclude additional public access paths. |
+| `process:store-server` | `exposure` | `internal` to `unknown` | Not receiving deployment pushes describes this workflow. It does not imply that store servers lack inbound services or are unreachable from the internet. |

@@ -25,3 +25,13 @@ reads. Across five cases that is the single most repeated extraction failure.
 
 `user's browser` is an alias for `entity:browser`, and `background worker` for
 `process:background-worker-process`.
+
+## Disputed values ruled 2026-09-18
+
+The maintainer's sitting on the drafted reference facts. A `change` ruling is applied to `model.json` and its entry removed; the reviewer's own words are the basis recorded there.
+
+| Element | Attribute | Ruling | Why |
+|---|---|---|---|
+| `process:background-worker-process` | `exposure` | keep `internal`, recorded as an inference | Behind the web tier supplies architectural evidence beyond a network name. It still does not prove that every worker interface is inaccessible from the internet. |
+| `store:web-application-config` | `trust_zone` | keep `boundary:web-tier`, recorded as an inference | The application's use of a config store does not establish that store's network location. A remote configuration service is also possible. |
+| `store:worker-config` | `trust_zone` | keep `boundary:backend-tier`, recorded as an inference | The worker's use of a config store does not establish backend-tier membership. |
