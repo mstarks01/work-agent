@@ -33,3 +33,11 @@ The maintainer's sitting on the drafted reference facts. A `change` ruling is ap
 | `store:pub-sub` | `trust_zone` | keep `boundary:ingest-edge`, recorded as an inference | An existing assumption label establishes how a claim is represented, not whether it is defensible. No supporting placement evidence is supplied. |
 | `entity:sensor-node` | `trust_zone` | keep `boundary:field-network`, recorded as an inference | Customer-site installation supports a field grouping. Preserve separate site boundaries where relevant; this infers no shared connectivity or trust. |
 | `process:device-gateway` | `trust_zone` | keep `boundary:ingest-edge`, recorded as an inference | An internet-facing ingest broker supports an edge-role abstraction. GKE hosting and internet exposure do not establish a particular network perimeter. |
+
+### The remaining values, ruled 2026-09-18
+
+| Element | Attribute | Ruling | Why |
+|---|---|---|---|
+| `store:telemetry-lake` | `trust_zone` | retain `boundary:analytics-core` as an explicit assumption | An analytics role does not establish network membership. The zone is retained because the schema requires one, not because the source places it. |
+| `store:firmware-bucket` | `trust_zone` | retain `boundary:ingest-edge` as an explicit assumption | No sentence places it. The zone is retained because the schema requires one. Public-read access is not the justification: it is an access policy and supports no placement. |
+

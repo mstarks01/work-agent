@@ -322,6 +322,12 @@
       "element_id": "entity:colleague",
       "attribute": "trust_zone",
       "basis": "Home sign-ins support an external-origin scenario. They do not place all colleagues outside the corporate network or exclude VPN connectivity."
+    },
+    {
+      "assumption": "HR system sits in boundary:outside-corporate-network, which the schema requires and no source states.",
+      "element_id": "entity:hr-system",
+      "attribute": "trust_zone",
+      "basis": "The source does not establish whether the HR system is inside or outside the corporate network. The zone is retained because the schema requires one."
     }
   ]
 }

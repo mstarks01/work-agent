@@ -403,30 +403,39 @@
       },
       "rationale": "Device-registry function and confidential classification do not establish ingest-edge membership. No placement evidence is supplied.",
       "reviewed_by": "mstarks01"
-    }
-  ],
-  "disputed": [
-    {
-      "element_id": "store:telemetry-lake",
-      "attribute": "trust_zone",
-      "blessed": "boundary:analytics-core",
-      "proposed": "record as an inference",
-      "kind": "defensible-inference",
-      "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-      "ruling": null,
-      "reviewed_by": null
     },
     {
-      "element_id": "store:firmware-bucket",
-      "attribute": "trust_zone",
-      "blessed": "boundary:ingest-edge",
-      "proposed": "record as an inference",
-      "kind": "defensible-inference",
-      "basis": "Public read makes its placement arguable as well as unstated. No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-      "ruling": null,
-      "reviewed_by": null
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:telemetry-lake",
+        "predicate": "network-membership",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "exclusive": false
+      },
+      "rationale": "An analytics role does not establish network membership. The zone is retained because the schema requires one, not because the source places it.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:firmware-bucket",
+        "predicate": "network-membership",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "exclusive": false
+      },
+      "rationale": "No sentence places it. The zone is retained because the schema requires one. Public-read access is not the justification: it is an access policy and supports no placement.",
+      "reviewed_by": "mstarks01"
     }
   ],
+  "disputed": [],
   "aliases": {
     "subjects": [],
     "qualifiers": []

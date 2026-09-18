@@ -113,6 +113,8 @@ Not part of the question, but the records cite these names, so you need them.
 - `store:pub-sub` — Pub/Sub's trust_zone is boundary:ingest-edge, which the schema requires and no source states. (basis: An existing assumption label establishes how a claim is represented, not whether it is defensible. No supporting placement evidence is supplied.)
 - `entity:sensor-node` — sensor node's trust_zone is boundary:field-network, which the schema requires and no source states. (basis: Customer-site installation supports a field grouping. Preserve separate site boundaries where relevant; this infers no shared connectivity or trust.)
 - `process:device-gateway` — device gateway's trust_zone is boundary:ingest-edge, which the schema requires and no source states. (basis: An internet-facing ingest broker supports an edge-role abstraction. GKE hosting and internet exposure do not establish a particular network perimeter.)
+- `store:telemetry-lake` — telemetry lake sits in boundary:analytics-core, which the schema requires and no source states. (basis: An analytics role does not establish network membership. The zone is retained because the schema requires one, not because the source places it.)
+- `store:firmware-bucket` — firmware bucket sits in boundary:ingest-edge, which the schema requires and no source states. (basis: No sentence places it. The zone is retained because the schema requires one. Public-read access is not the justification: it is an access policy and supports no placement.)
 
 **Reviewed aliases** — other names a reader ruled identify the same element, each with the words in the source that support it. An extraction using one is named differently, not wrong.
 
@@ -355,7 +357,7 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "fc745e273aff8be740a814f0a9b4a45d6f3c6fe39dc7c8efa2b879d4f270ac74",
-      "model.json": "ab90a14f2bc4c5ca5742405db1803f4348cfeed9e8d0ee3640f5507ab8fcb43c",
+      "model.json": "c9d58fb5ea8836db8022d0fe04ca03b121d9f65e1326d8eaed9bcc5a1f0bf978",
       "claims/stride.json": "2bce750ba6ddc1307074a289e48c4591c59f7f2883ff687d9bd98e4f5e7db675"
       }
     }

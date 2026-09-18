@@ -125,6 +125,7 @@ Not part of the question, but the records cite these names, so you need them.
 - `store:key-store` — key store's trust_zone is boundary:corporate-network, which the schema requires and no source states. (basis: The broker keeping its key in a key store does not locate that store. A remote key-management service is compatible with the description.)
 - `store:audit-log` — audit log's trust_zone is boundary:corporate-network, which the schema requires and no source states. (basis: Writing to an audit log does not place its storage on the writer's network. Centralized or externally hosted logging remains possible.)
 - `entity:colleague` — colleague's trust_zone is boundary:outside-corporate-network, which the schema requires and no source states. (basis: Home sign-ins support an external-origin scenario. They do not place all colleagues outside the corporate network or exclude VPN connectivity.)
+- `entity:hr-system` — HR system sits in boundary:outside-corporate-network, which the schema requires and no source states. (basis: The source does not establish whether the HR system is inside or outside the corporate network. The zone is retained because the schema requires one.)
 
 **Reviewed aliases** — other names a reader ruled identify the same element, each with the words in the source that support it. An extraction using one is named differently, not wrong.
 
@@ -520,7 +521,7 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "36115502847aa04640666b0dd9f458881e6f7f8968e4d499b58983b3403dc721",
-      "model.json": "71ed0fb603b40e3b80de2efaae88e285d6748a94145e576f028d01a46d667599",
+      "model.json": "6ee4a1688a294a7f288730b5a7100e1ee3435f8dda3e2dc7e4d07f495fc557fc",
       "claims/asvs.json": "80d8f95844658dbd83985ff1c9ecd70a675f6dc5861fafe499164b82287a5e9a",
       "claims/stride.json": "e7d9ea199f055777363e62b00eaf13504355343e6ce84bb5230556fb1ab77cfa"
       }
