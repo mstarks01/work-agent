@@ -345,6 +345,28 @@ class TestFiring:
         assert hits[0].facts["source_zone_kind"] == "tenant"
         assert hits[0].facts["destination_zone_kind"] == "tenant"
 
+    def test_an_undecidable_crossing_raises_a_lead_and_not_a_transition(self, model):
+        """ADR 0039 rules 3 and 4, in the one place they differ.
+
+        A rule whose premise is the crossing fires on an undecidable one and
+        says so, because the flow is still eligible for analysis. The privilege
+        rule's premise is what the two zones *are*, and an unplaced endpoint has
+        no kind to read — firing there would assert the authority change an
+        undecidable crossing cannot establish.
+        """
+        for element in model.zoned_elements():
+            if element.id == "process:admin":
+                element.trust_zone = UNKNOWN
+
+        keyed = fired(model, "spoofing-unverified-boundary-auth")
+        privilege = fired(model, "elevation-of-privilege-privilege-zone-crossing")
+
+        undecided = [hit for hit in keyed if hit.facts["crossing_decided"] is False]
+        assert undecided, "the flow stays eligible for analysis"
+        assert all(hit.facts["crossing_decided"] is True for hit in privilege), (
+            "no privilege transition rests on a zone nobody stated"
+        )
+
     def test_exposed_process_authority_needs_a_crossing(self, model):
         hits = fired(model, "elevation-of-privilege-inbound-from-exposed-process")
         assert [hit.element_ids[0] for hit in hits] == [

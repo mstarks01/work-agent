@@ -111,7 +111,6 @@ def _unverified_boundary_auth(
             {
                 "authentication": _clip(flow.authentication),
                 "authentication_state": control_state(flow.authentication),
-                "crosses_boundary": True,
                 **crossing_facts(crossings[flow.id], flow),
             },
         )
@@ -224,7 +223,6 @@ def _unprotected_transit_crossing(
                 "encryption_in_transit": _clip(flow.encryption_in_transit),
                 "encryption_state": control_state(flow.encryption_in_transit),
                 "protocol": _clip(flow.protocol),
-                "crosses_boundary": True,
                 **crossing_facts(crossings[flow.id], flow),
             },
         )
@@ -424,6 +422,15 @@ def _privilege_zone_crossing(
     # do. A flow that somehow does not resolve yields no candidate instead.
     flows = {flow.id: flow for flow in model.data_flows}
     for crossing in model.boundary_crossings():
+        # The one crossing-keyed rule that skips an undecidable crossing, and
+        # its premise is why: this rule fires on what the two zones *are*, and
+        # an unknown zone has no kind to read. An undecidable crossing confers
+        # eligibility for analysis and never a privilege transition, so firing
+        # here would assert the authority change the crossing cannot establish
+        # (ADR 0039 rule 4). Stated rather than left to the empty kind that
+        # falls through both sets below.
+        if not crossing.decided:
+            continue
         source_kind = kinds.get(crossing.source_zone, "")
         destination_kind = kinds.get(crossing.destination_zone, "")
         if destination_kind in ENTERED_ZONE_KINDS:
@@ -471,7 +478,6 @@ def _inbound_from_exposed_process(
                 "source_exposure": "internet-facing",
                 "authentication": _clip(flow.authentication),
                 "authentication_state": control_state(flow.authentication),
-                "crosses_boundary": True,
                 **crossing_facts(crossings[flow.id], flow),
             },
         )

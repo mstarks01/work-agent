@@ -1,10 +1,11 @@
 # 39. A crossing a model cannot decide is still a lead
 
-- **Status**: proposed. Rules 1 to 3 carry the maintainer's ruling of
-  2026-09-18 on the 26 findings in
-  [the reading](../research/undecidable-crossings.md); rule 4 is that
-  ruling's own wording. Acceptance waits on the execution comparison
-  named below
+- **Status**: accepted for rules 1 to 3, which ship; rule 4 binds the lane and
+  critic prompts and is not yet built. Rules 1 to 3 carry the maintainer's
+  ruling of 2026-09-18 on the 26 findings in
+  [the reading](../research/undecidable-crossings.md); rule 4 is that ruling's
+  own wording. What a lane agent does with an undecidable lead still needs the
+  execution comparison named below
 - **Date**: 2026-09-18
 - **Effort**: [#1052](https://github.com/mstarks01/work-agent/issues/1052),
   which reopened [ADR 0038](0038-a-component-reaches-the-graph-only-in-a-zone.md)
@@ -99,6 +100,34 @@ lead says the crossing is undecided.
 The implementation cost is the one ADR 0038 priced: `trust_zone` is read by 32
 sites across nine modules, and every rule that reasons about a crossing gains a
 case. Rule 3 is what makes that spend worth making rather than merely honest.
+
+## What the change measures offline
+
+Rules 1 to 3 ship, and the two free instruments move:
+
+| | before | after |
+|---|---:|---:|
+| oracle: required rows a perfect reading keeps | 121 of 122 | **122 of 122** |
+| oracle: placements the reading had to invent | 46 | **0** |
+| `bottleneck`: rows the `unknown-placement` shape loses | 3 | **0** |
+| archived emissions the gate refuses on replay | 0 | 0 |
+
+The one row the path lost was case 12's: the sources name a supplier and never
+place it, so ADR 0038 rule 2 dropped the supplier, the interaction to the portal
+and the authentication fact on that interaction. That is the first of ADR 0038's
+own revisit conditions, and it is now closed.
+
+The 46 invented placements are the more important number. A perfect reading of
+the corpus needed 46 guesses to satisfy the schema, and every one of them was
+charged against the reference's own `unknown` as a wrong claim. It now needs
+none.
+
+**One reading this decision did not spell out.** Rule 3 says a rule keyed on a
+crossing fires on an undecidable one. Four of the five crossing-keyed rules do.
+The fifth, STRIDE's privilege-zone transition, does not: its premise is what the
+two zones *are*, and an unplaced endpoint has no kind to read, so firing there
+would assert the authority change rule 4 says an undecidable crossing cannot
+establish. The rule skips it and says why.
 
 ## What this decision does not settle
 

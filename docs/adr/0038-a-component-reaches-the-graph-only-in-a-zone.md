@@ -1,8 +1,12 @@
 # 38. A component reaches the graph only in a zone
 
-- **Status**: accepted; reopened by
-  [#1052](https://github.com/mstarks01/work-agent/issues/1052), which records two of
-  the three conditions below as met
+- **Status**: superseded by
+  [ADR 0039](0039-a-crossing-a-model-cannot-decide-is-still-a-lead.md), whose
+  rule 1 replaces the decision below. Reopened by
+  [#1052](https://github.com/mstarks01/work-agent/issues/1052), which recorded
+  two of the three conditions below as met, and closed by the first of them:
+  case 12's supplier was a component rule 2 dropped that carried a required
+  fact
 - **Date**: 2026-09-17
 - **Effort**: the placement finding of
   [#1003's execution audit](https://github.com/mstarks01/work-agent/issues/1003),

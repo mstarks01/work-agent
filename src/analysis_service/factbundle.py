@@ -1096,16 +1096,12 @@ def _place(
         )
         return element.model_copy(update={"trust_zone": boundary.id}), assumed, "", ""
     if not sole:
-        return (
-            None,
-            None,
-            "unplaced",
-            (
-                f"no source places {mention.text!r}, and the bundle names"
-                f" {len(zones)} zones, so the graph's required trust_zone would"
-                " be a choice nobody stated"
-            ),
-        )
+        # The graph no longer requires a zone, so the component enters unplaced
+        # rather than falling out of the model with every fact about it (ADR
+        # 0039 rule 1). No Assumption rides along: an assumption records a
+        # placement this service *chose*, and this is the one case where it
+        # declines to choose. A reader tells the two apart by the zone itself.
+        return element.model_copy(update={"trust_zone": UNKNOWN}), None, "", ""
     assumption = Assumption(
         assumption=f"{mention.text} sits in the one zone the sources describe",
         element_id=element.id,

@@ -334,6 +334,10 @@ def crossing_facts(crossing: BoundaryCrossing, flow: DataFlow) -> dict[str, str 
         "destination_zone": crossing.destination_zone,
         "source_zone_assumed": flow.source in assumed,
         "destination_zone_assumed": flow.destination in assumed,
+        # False says the model could not compare the two zones at all, so the
+        # lead is eligibility for analysis and nothing more. A reader that
+        # weighs it as a crossing has accepted a fact nobody stated.
+        "crossing_decided": crossing.decided,
     }
 
 

@@ -191,6 +191,12 @@ def validate(
         issues.extend(_ambiguous_control_issues(element))
 
     for zoned in model.zoned_elements():
+        # The unknown sentinel is a placement the sources do not make, which
+        # ADR 0039 admits: a component the sources place is placed, and one
+        # they do not is unplaced. Any other value must still name a boundary
+        # this model holds, so a typo is caught as it always was.
+        if zoned.trust_zone == UNKNOWN:
+            continue
         if zoned.trust_zone not in boundary_ids:
             issues.append(
                 ValidationIssue(

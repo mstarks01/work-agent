@@ -4,7 +4,7 @@ from typing import ClassVar
 
 import pytest
 
-from analysis_service.system_model import SystemModel, make_flow_id
+from analysis_service.system_model import UNKNOWN, SystemModel, make_flow_id
 from analysis_service.validation import (
     CITATION_FIELDS,
     MAX_ELEMENTS,
@@ -71,6 +71,19 @@ class TestReferentialIntegrity:
         model.data_stores[0].trust_zone = "boundary:dmz"
         issues = [i for i in validate(model) if i.code == "invalid-reference"]
         assert any(i.field == "trust_zone" for i in issues)
+
+    def test_an_unplaced_component_passes_the_gate(self):
+        """ADR 0039 rule 1: the sentinel is a placement the sources do not make.
+
+        The gate is what made rule 1 of ADR 0038 the only way into the graph, so
+        this is the check that had to move for a component to enter unplaced.
+        Every other value still has to name a boundary the model holds, which
+        the test above keeps.
+        """
+        model = valid_model()
+        model.data_stores[0].trust_zone = UNKNOWN
+
+        assert not [i for i in validate(model) if i.field == "trust_zone"]
 
     def test_assumption_must_reference_existing_element(self):
         model = valid_model()
