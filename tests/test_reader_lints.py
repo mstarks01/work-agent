@@ -518,7 +518,8 @@ def test_no_second_site_respells_an_owned_vocabulary(owner):
     found = [
         f"{path.relative_to(REPO_ROOT)}:{line}"
         for path in source_files("src", "evals", "webapp")
-        if path.relative_to(REPO_ROOT).as_posix() not in (owner, *DECLARED_RESPELLINGS)
+        if path.relative_to(REPO_ROOT).as_posix()
+        not in (owner.split(":")[0], *DECLARED_RESPELLINGS)
         for line in _respelled(parse(path), members)
     ]
 
