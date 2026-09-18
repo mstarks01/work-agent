@@ -47,7 +47,8 @@ from collections.abc import Iterator
 
 from analysis_service.analysis import (
     control_state,
-    crossing_flow_ids,
+    crossing_facts,
+    crossings_by_flow,
     inbound_flows,
     internet_exposed_elements,
     is_unverified,
@@ -101,20 +102,17 @@ _clip = clip_fact
 def _unverified_boundary_auth(
     model: SystemModel, catalog: AssertionCatalog
 ) -> Iterator[Match]:
-    crossing_ids = crossing_flow_ids(model)
-    zones = {crossing.flow_id: crossing for crossing in model.boundary_crossings()}
+    crossings = crossings_by_flow(model)
     for flow in model.data_flows:
-        if flow.id not in crossing_ids or not is_unverified(flow.authentication):
+        if flow.id not in crossings or not is_unverified(flow.authentication):
             continue
-        crossing = zones[flow.id]
         yield (
             (flow.id, flow.source, flow.destination),
             {
                 "authentication": _clip(flow.authentication),
                 "authentication_state": control_state(flow.authentication),
                 "crosses_boundary": True,
-                "source_zone": crossing.source_zone,
-                "destination_zone": crossing.destination_zone,
+                **crossing_facts(crossings[flow.id], flow),
             },
         )
 
@@ -216,9 +214,9 @@ def _principal_absence(
 def _unprotected_transit_crossing(
     model: SystemModel, catalog: AssertionCatalog
 ) -> Iterator[Match]:
-    crossing_ids = crossing_flow_ids(model)
+    crossings = crossings_by_flow(model)
     for flow in model.data_flows:
-        if flow.id not in crossing_ids or not is_unverified(flow.encryption_in_transit):
+        if flow.id not in crossings or not is_unverified(flow.encryption_in_transit):
             continue
         yield (
             (flow.id, flow.source, flow.destination),
@@ -227,6 +225,7 @@ def _unprotected_transit_crossing(
                 "encryption_state": control_state(flow.encryption_in_transit),
                 "protocol": _clip(flow.protocol),
                 "crosses_boundary": True,
+                **crossing_facts(crossings[flow.id], flow),
             },
         )
 
@@ -443,12 +442,11 @@ def _privilege_zone_crossing(
                 "direction": direction,
                 "zone": zone,
                 "zone_kind": kinds[zone],
-                "source_zone": crossing.source_zone,
                 "source_zone_kind": source_kind,
-                "destination_zone": crossing.destination_zone,
                 "destination_zone_kind": destination_kind,
                 "authentication": _clip(authentication),
                 "authentication_state": control_state(authentication),
+                **crossing_facts(crossing, flow),
             },
         )
 
@@ -463,9 +461,9 @@ def _inbound_from_exposed_process(
     whether the authority is excessive is the agent's call.
     """
     exposed = {process.id for process in internet_exposed_elements(model)}
-    crossing_ids = crossing_flow_ids(model)
+    crossings = crossings_by_flow(model)
     for flow in model.data_flows:
-        if flow.source not in exposed or flow.id not in crossing_ids:
+        if flow.source not in exposed or flow.id not in crossings:
             continue
         yield (
             (flow.id, flow.source, flow.destination),
@@ -474,6 +472,7 @@ def _inbound_from_exposed_process(
                 "authentication": _clip(flow.authentication),
                 "authentication_state": control_state(flow.authentication),
                 "crosses_boundary": True,
+                **crossing_facts(crossings[flow.id], flow),
             },
         )
 

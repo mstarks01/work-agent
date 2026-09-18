@@ -12,7 +12,9 @@ from analysis_service.analysis import (
     CONTROL_ATTRIBUTES,
     control_state,
     cross_boundary_flows,
+    crossing_facts,
     crossing_flow_ids,
+    crossings_by_flow,
     inbound_flows,
     internet_exposed_elements,
     is_unverified,
@@ -25,6 +27,8 @@ from analysis_service.analysis import (
 )
 from analysis_service.system_model import (
     CORE_ASSET_TAGS,
+    UNKNOWN,
+    BoundaryCrossing,
     DataFlow,
     DataStore,
     ExternalEntity,
@@ -298,3 +302,65 @@ class TestTheAssetVocabularySplitsInTwo:
 
     def test_no_tag_is_both(self):
         assert not (analysis.SENSITIVE_ASSET_TAGS & analysis.CONSEQUENCE_ASSET_TAGS)
+
+
+class TestACrossingSaysWhichZoneWasAssumed:
+    """#1052: a rule keyed on a crossing owes its reader the inference behind it.
+
+    A **Boundary Crossing** is derived from two zones and either may be a
+    placement this service inferred rather than read. Over the thirteen corpus
+    cases 29 of 43 crossings rest on at least one, so a lead that said only
+    ``crosses_boundary`` told a lane agent the same thing whether both sources
+    stated the zones or neither did.
+    """
+
+    def crossing(self, source_zone: str, destination_zone: str, assumed):
+        return BoundaryCrossing(
+            flow_id="flow:process:a>store:b>write",
+            source_zone=source_zone,
+            destination_zone=destination_zone,
+            assumed_endpoints=list(assumed),
+        )
+
+    def flow(self):
+        return DataFlow(
+            id="flow:process:a>store:b>write",
+            name="write",
+            source="process:a",
+            destination="store:b",
+            protocol=UNKNOWN,
+            authentication=UNKNOWN,
+            data_description=UNKNOWN,
+            encryption_in_transit=UNKNOWN,
+        )
+
+    def test_a_crossing_both_sources_state_is_flagged_neither_side(self) -> None:
+        facts = crossing_facts(
+            self.crossing("boundary:x", "boundary:y", ()), self.flow()
+        )
+
+        assert facts["source_zone_assumed"] is False
+        assert facts["destination_zone_assumed"] is False
+
+    def test_each_side_is_named_by_the_endpoint_it_belongs_to(self) -> None:
+        """One assumed endpoint says which side, which a count could not."""
+        held = self.crossing("boundary:x", "boundary:y", ("store:b",))
+
+        facts = crossing_facts(held, self.flow())
+
+        assert facts["source_zone_assumed"] is False
+        assert facts["destination_zone_assumed"] is True
+
+    def test_both_sides_are_named(self) -> None:
+        held = self.crossing("boundary:x", "boundary:y", ("process:a", "store:b"))
+
+        facts = crossing_facts(held, self.flow())
+
+        assert facts["source_zone_assumed"] is True
+        assert facts["destination_zone_assumed"] is True
+
+    def test_the_two_readers_of_which_flows_cross_agree(self) -> None:
+        """``crossing_flow_ids`` reads the mapping rather than deriving again."""
+        model = valid_model()
+
+        assert crossing_flow_ids(model) == frozenset(crossings_by_flow(model))
