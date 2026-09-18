@@ -8,9 +8,9 @@ Write a ref as a **type letter, a colon and a short slug**: `p:api`, `s:orders-d
 
 **Name a flow's ref after the flow's label, not its endpoints.** The flow `view shifts` is `f:view-shifts`. Its full ID carries both endpoints *and* the label, so a ref built from the endpoints alone leaves out the half that tells two flows apart: where a colleague both reads and writes through one app, `f:colleague-to-app` names both flows and neither. Where two flows genuinely share a label, add the endpoint that differs — `f:read-configuration-builder` and `f:read-configuration-runner`.
 
-Four fields hold a ref and nothing else:
+Four fields hold a ref. Write a ref and nothing else, with the one exception named below:
 
-- an element's `trust_zone`, which is the ref of a trust boundary;
+- an element's `trust_zone`, which is the ref of a trust boundary — or the word `unknown`, the exception, where no sentence says where the element runs;
 - a flow's `source` and `destination`, each the ref of an external entity, a process or a data store;
 - an assumption's `element`, the ref of any element.
 

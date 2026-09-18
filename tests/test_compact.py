@@ -47,6 +47,7 @@ from analysis_service.prompts import (
 from analysis_service.sources import DEFAULT_DESCRIPTION_LABEL
 from analysis_service.system_model import (
     ELEMENT_GROUPS,
+    UNKNOWN,
     Element,
     SystemModel,
     _Element,
@@ -443,6 +444,41 @@ class TestMalformedOutputFailsExplicitly:
 
         assert model is None
         assert codes(issues) == ["schema"]
+
+    def test_an_unplaced_component_is_carried_rather_than_refused(self):
+        """The half ADR 0039 rule 1 left on the floor.
+
+        ``prompts/extract.md`` asks for ``unknown`` where no sentence places a
+        component, and ``extract-compact.md`` is a delta appended after it, so
+        a compact run is asked for exactly this word. Bounded by ``REF`` alone
+        the field refuses it, ``expand`` returns no model, and ``validate``
+        sends the whole emission to the rejection rather than to ``repair`` —
+        so one unplaced component would end the job.
+        """
+        payload = compact_fixture()
+        payload["data_stores"][0]["trust_zone"] = UNKNOWN
+
+        model, issues = parse_extraction(payload, COMPACT_FORMAT)
+
+        assert issues == []
+        assert model is not None
+        assert model.data_stores[0].trust_zone == UNKNOWN
+
+    def test_the_sentinel_is_the_one_extra_word_a_placement_admits(self):
+        """An allow list of two shapes, not a loosened fence.
+
+        Every reason the ref pattern gives for bounding a ref holds for a
+        placement: an unresolved value survives expansion verbatim into the
+        model the gate reports on.
+        """
+        for written in ("unknow", "internal network", "unknown\n```", "b:corp"):
+            payload = compact_fixture()
+            payload["data_stores"][0]["trust_zone"] = written
+
+            model, issues = parse_extraction(payload, COMPACT_FORMAT)
+
+            refused = model is None and codes(issues) == ["schema"]
+            assert refused is (written != "b:corp"), written
 
     def test_an_unknown_field_is_refused(self):
         """``extra="forbid"``: a field nobody reads is a fact silently dropped."""

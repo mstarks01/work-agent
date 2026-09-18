@@ -397,7 +397,7 @@ class TestGroundReferences:
         drafts = self.grounded(
             Ground(kind="derived-fact", flow_id="flow:not-a:crossing")
         )
-        with pytest.raises(DraftJoinError, match="not a derived boundary crossing"):
+        with pytest.raises(DraftJoinError, match="not a decided boundary crossing"):
             join_drafts(drafts, STRIDE, model, SOURCES)
 
     def test_a_respelled_source_label_resolves_to_the_jobs_label(self, model):

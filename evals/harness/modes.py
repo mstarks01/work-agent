@@ -498,11 +498,17 @@ class ExtractionScore:
     #: The blessed model's pure initiators — elements that only ever start an
     #: interaction. Carried so the reading below needs no second model walk.
     blessed_initiators: tuple[str, ...] = ()
-    #: The blessed crossings and the extraction's, each as endpoint-pair keys.
-    #: ``extracted_crossings`` is ``None`` where derivation raised — a model
-    #: whose endpoints are not zoned has said nothing, not "nothing crosses".
+    #: The blessed **decided** crossings and the extraction's, each as
+    #: endpoint-pair keys. ``extracted_crossings`` is ``None`` where derivation
+    #: raised — a model with a dangling endpoint has said nothing, not "nothing
+    #: crosses".
     blessed_crossings: tuple[str, ...] = ()
     extracted_crossings: tuple[str, ...] | None = None
+    #: The flows whose crossing the extraction could not decide, because it
+    #: placed one endpoint nowhere (ADR 0039). Beside the two figures above
+    #: rather than inside them: an extraction that placed nothing has not
+    #: separated a pair, and it has not put the pair together either.
+    extracted_undecidable_crossings: tuple[str, ...] | None = None
     #: The extraction's stated controls that its own cited source does not echo
     #: (:mod:`analysis_service.basis`). The same failure the ``unverified ->
     #: stated`` attribute check names, read from the other side: that check asks
@@ -1161,6 +1167,12 @@ class ExtractionScore:
             # Beside recall, which never charges an invented crossing.
             "crossings_precision": round(self.crossings_precision, 3),
             "crossings_derivable": self.crossings_derivable,
+            # Beside recall and precision rather than inside either. A flow
+            # here is one the extraction found and placed one endpoint of
+            # nowhere, so neither figure has an answer to give about it, and a
+            # sweep reading them alone would see the silence as a low score
+            # without seeing what caused it (ADR 0039).
+            "crossings_undecidable": sorted(self.extracted_undecidable_crossings or ()),
             "crossings_missing": sorted(
                 frozenset(self.blessed_crossings) - self.crossings_found
             ),
@@ -1908,6 +1920,7 @@ def score_extraction(case: GoldenCase, result: ExtractionResult) -> ExtractionSc
         blessed_initiators=tuple(sorted(pure_initiators(case.model))),
         blessed_crossings=crossing_keys(case.model) or (),
         extracted_crossings=crossing_keys(result.extracted),
+        extracted_undecidable_crossings=undecidable_crossing_keys(result.extracted),
         uncited=tuple(issue for issue in result.issues if issue.is_citation),
         unbased=unbased,
         basis_coverage=read,
@@ -2034,18 +2047,31 @@ def _zone_pairs(
     The pairs a dropped element takes with it are still in ``reference_total``,
     so the coverage beside the figure says how many were never asked.
 
+    **An unplaced element is not asked about either.** Since
+    [ADR 0039](../../docs/adr/0039-a-crossing-a-model-cannot-decide-is-still-a-lead.md)
+    ``trust_zone`` holds the unknown sentinel for a component the sources place
+    nowhere, and two of them compare equal — so a model that placed nothing
+    would read as putting every one of those pairs *together*, which is a claim
+    it never made. Either side unplaced drops the element, on the same rule the
+    unpaired ones follow: ``reference_total`` still counts its pairs, so the
+    coverage says how much the figure did not ask.
+
     ``None`` where no extraction was handed in: nothing was measured, which is
     a different fact from every pair agreeing.
     """
     if extracted is None:
         return None
-    theirs = {element.id: element.trust_zone for element in extracted.zoned_elements()}
+    theirs = {
+        element.id: element.trust_zone
+        for element in extracted.zoned_elements()
+        if element.trust_zone != UNKNOWN
+    }
     produced_of = alignment.produced_of
     zoned = blessed.zoned_elements()
     shared = [
         (produced_of[element.id], element.trust_zone)
         for element in zoned
-        if produced_of.get(element.id) in theirs
+        if produced_of.get(element.id) in theirs and element.trust_zone != UNKNOWN
     ]
     agreed = Counter[bool]()
     total = Counter[bool]()
@@ -2167,7 +2193,7 @@ def pure_initiators(model: SystemModel) -> frozenset[str]:
 
 
 def crossing_keys(model: SystemModel | None) -> tuple[str, ...] | None:
-    """Each crossing as its flow's endpoint pair, or ``None`` if underivable.
+    """Each decided crossing as its flow's endpoint pair, or ``None``.
 
     **A crossing means "this interaction has its two endpoints in different
     zones", and that sentence contains no zone name.** Two extractions can
@@ -2178,21 +2204,54 @@ def crossing_keys(model: SystemModel | None) -> tuple[str, ...] | None:
     13 of 13 cases for two models five times apart in price.
 
     So the zones drop out entirely and membership survives as *set membership*:
-    a flow is in this set exactly when the model separated its endpoints. The
-    flow itself is keyed by :func:`_endpoint_key`, for the reason #293 gives.
+    a flow is in this set exactly when the model **separated** its endpoints.
+    The flow itself is keyed by :func:`_endpoint_key`, for the reason #293
+    gives.
+
+    **Separated, which is why an undecidable crossing is not here.** Since
+    [ADR 0039](../../docs/adr/0039-a-crossing-a-model-cannot-decide-is-still-a-lead.md)
+    a flow one of whose endpoints the model never placed derives a crossing
+    carrying ``decided=False``. Counting it would credit an extraction that
+    placed nothing with separating the pair, and the recall and precision
+    figures below both read this set. :func:`undecidable_crossing_keys` is
+    where those flows are reported, as their own figure, so the reading is
+    beside the two rather than folded into them.
 
     ``None`` rather than an empty tuple where derivation raises, because a model
-    whose flow endpoints are not zoned elements has not said that nothing
-    crosses — it has said nothing at all, and scoring that as perfect agreement
-    with an empty blessed set would reward the worst extraction in the sweep.
+    with a dangling flow endpoint has not said that nothing crosses — it has
+    said nothing at all, and scoring that as perfect agreement with an empty
+    blessed set would reward the worst extraction in the sweep.
     """
+    return _crossing_keys(model, decided=True)
+
+
+def undecidable_crossing_keys(model: SystemModel | None) -> tuple[str, ...] | None:
+    """Each undecidable crossing as its flow's endpoint pair, or ``None``.
+
+    The complement of :func:`crossing_keys` over the same derivation, on the
+    same key, so the two can be read side by side and neither can hold a flow
+    the other does. A large count here is an extraction that found the
+    interactions and placed the components nowhere, which reads on the two
+    crossing figures as silence rather than as a wrong answer.
+    """
+    return _crossing_keys(model, decided=False)
+
+
+def _crossing_keys(
+    model: SystemModel | None, *, decided: bool
+) -> tuple[str, ...] | None:
+    """One half of the derivation, keyed by endpoint pair. The one reader."""
     if model is None:
         return None
     try:
         crossings = model.boundary_crossings()
     except ValueError:
         return None
-    return tuple(sorted({_endpoint_key(one.flow_id) for one in crossings}))
+    return tuple(
+        sorted(
+            {_endpoint_key(one.flow_id) for one in crossings if one.decided is decided}
+        )
+    )
 
 
 async def run_analysis(case: GoldenCase, pipeline: Pipeline) -> AnalysisRun:

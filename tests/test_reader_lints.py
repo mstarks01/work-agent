@@ -32,6 +32,7 @@ from pathlib import Path
 
 import pytest
 
+from analysis_service.factbundle import LANDED
 from evals.harness.reference import MUST_FIND
 from tests.source_tree import REPO_ROOT, parse, source_files
 from webapp import main, offline_sitting, review, sitting
@@ -447,3 +448,70 @@ def test_the_constant_interpolation_scan_finds_one_when_there_is_one(tmp_path):
     assert [(expr, literal) for _, expr, literal in found] == [
         ("predicate.value", "'reference'")
     ]
+
+
+#: The vocabularies a module owns, against the module that owns each one. A
+#: second site spelling the same members out is the fourth shape of this
+#: module's class: not a fact with no reader, but a rule with two, where each
+#: reader's own test agrees with it and neither moves when the rule does.
+#:
+#: Found in the checkpoint round over ``reviewed/2026-09-16b...main``.
+#: ``factbundle.LANDED`` said "Derived nowhere else" while
+#: ``patch.apply_patch`` and ``oracle._stage`` each wrote
+#: ``("consumed", "preserved")`` again, so a sixth landing disposition would
+#: have reached one of the three.
+#: Read from the owner rather than written out here, so this table is not
+#: itself the second spelling it exists to forbid.
+OWNED_VOCABULARIES: dict[str, frozenset[str]] = {
+    "src/analysis_service/factbundle.py": LANDED,
+}
+
+
+def _respelled(tree: ast.Module, members: frozenset[str]) -> list[int]:
+    """Each line holding a literal collection whose strings are ``members``."""
+    found = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Tuple | ast.List | ast.Set):
+            continue
+        written = {
+            element.value
+            for element in node.elts
+            if isinstance(element, ast.Constant) and isinstance(element.value, str)
+        }
+        if len(written) == len(node.elts) and written == members:
+            found.append(node.lineno)
+    return found
+
+
+@pytest.mark.parametrize("owner", sorted(OWNED_VOCABULARIES))
+def test_no_second_site_respells_an_owned_vocabulary(owner):
+    """One rule, one reader, for the half a scan can decide.
+
+    A caller that wants the set imports the name. A caller that writes the
+    members out again is a reader the owner cannot move.
+    """
+    members = OWNED_VOCABULARIES[owner]
+    found = [
+        f"{path.relative_to(REPO_ROOT)}:{line}"
+        for path in source_files(*SEARCHED)
+        if path.relative_to(REPO_ROOT).as_posix() != owner
+        for line in _respelled(parse(path), members)
+    ]
+
+    assert not found, (
+        f"these sites spell out {sorted(members)}, which {owner} owns:"
+        f" {found}. Import the name rather than repeating its members."
+    )
+
+
+def test_the_respelling_scan_finds_one_when_there_is_one(tmp_path):
+    """Positive control, spelled as the defect was: patch.py before the fix."""
+    probe = tmp_path / "probe.py"
+    probe.write_text(
+        'def landed(row):\n    return row.disposition in ("consumed", "preserved")\n',
+        encoding="utf-8",
+    )
+
+    found = _respelled(ast.parse(probe.read_text(encoding="utf-8")), LANDED)
+
+    assert found == [2]

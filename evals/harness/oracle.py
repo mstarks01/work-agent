@@ -80,6 +80,7 @@ from analysis_service.assertions import (
     spans_for,
 )
 from analysis_service.factbundle import (
+    LANDED,
     FactProposal,
     InteractionProposal,
     MentionProposal,
@@ -473,7 +474,7 @@ def _stage_of(
     if handle not in carried:
         return "not-authored", "the oracle wrote no row for it"
     landed = dispositions.get(handle)
-    if landed is not None and landed.disposition not in ("consumed", "preserved"):
+    if landed is not None and landed.disposition not in LANDED:
         return "resolution", landed.code
     if row not in kept:
         return "gate", "the catalog does not hold it"
