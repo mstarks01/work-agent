@@ -577,6 +577,31 @@ class TestAnAliasReadsANameAndNotAnId:
             (pair.reference, pair.produced) for pair in aligned.by_evidence("alias")
         ]
 
+    def test_a_flow_alias_reads_the_label_a_name_derives(self):
+        """The same rule one row down: a flow's ID follows its label too.
+
+        Case 13 carries the corpus's one flow alias. The produced flow keeps an
+        ID an older slug rule would have written and carries the label the
+        reader ruled as its name, so the pair rests on the ruling rather than
+        on the one-flow-each-side fallback.
+        """
+        golden = case("13")
+        alias = next(
+            one for one in golden.meta.aliases if one.element.startswith("flow:")
+        )
+        raw = golden.model.model_dump()
+        moved = ""
+        for flow in raw["data_flows"]:
+            if flow["id"] == alias.element:
+                moved = flow["id"].rpartition(">")[0] + ">call-api-s"
+                flow["id"], flow["name"] = moved, alias.name
+
+        aligned = align(golden, SystemModel.model_validate(raw))
+        ruled = {pair.reference: pair for pair in aligned.by_evidence("alias")}
+
+        assert alias.element in ruled
+        assert ruled[alias.element].produced == moved
+
     def test_a_name_no_alias_rules_still_pairs_with_nothing(self):
         """The negative control: the name decides, so a wrong name pairs nothing."""
         golden = case("03")

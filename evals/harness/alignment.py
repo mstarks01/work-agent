@@ -457,14 +457,30 @@ def _align_flows(
 
 
 def _label(flow: DataFlow) -> str:
-    """The describing half of a flow ID, read through the identity's own decoder.
+    """One flow's label, slugged, for comparing it with another flow's.
 
-    A produced flow can carry any version's ID — an archived emission is read
-    back here — and the delegate answers under whichever rule wrote it. Read as
-    the last colon-separated segment while every flow ID ended in ``:<label>``,
-    which version 2 stopped being true of.
+    **Read off the name, for the reason the node rule reads a name.** A flow's
+    ID is derived from its label — ``derive_element_id`` composes it through
+    ``make_flow_id`` and the gate's ``id-mismatch`` holds every flow to that —
+    so the two agree on any model the gate passed. They part on an **archived**
+    flow, whose ID was slugged under whatever
+    :func:`~analysis_service.system_model.normalize_name` said on the day, and
+    a reader's flow alias is slugged here *today*. Keying on the ID made those
+    two readings of one rule.
+
+    The ID answers where the name cannot be slugged at all: an archived flow
+    carrying an empty or symbol-only name still has to compare with something,
+    and :func:`~analysis_service.system_model.flow_label` reads it under
+    whichever version wrote it.
+
+    Measured over the whole of ``evals/emissions/`` when this moved off the ID:
+    216 of 913 archived flows key differently and **no figure moves**, because
+    both sides of every comparison are keyed the same way.
     """
-    return flow_label(flow.id)
+    try:
+        return normalize_name(flow.name)
+    except ValueError:
+        return flow_label(flow.id)
 
 
 def _signature(flow: DataFlow) -> tuple[str, ...]:
