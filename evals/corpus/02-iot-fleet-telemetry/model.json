@@ -317,48 +317,6 @@
       "element_id": "store:pub-sub",
       "attribute": "trust_zone",
       "basis": "The source places the normalizer \"in our analytics network\" and places the broker nowhere. It associates the broker with the gateway's onward hop \u2014 \"Readings the gateway accepts are forwarded onto Pub/Sub\" \u2014 so it takes the gateway's zone. Either placement leaves exactly one crossing on this path."
-    },
-    {
-      "assumption": "field technician's trust_zone is boundary:field-network, which the schema requires and no source states.",
-      "element_id": "entity:field-technician",
-      "attribute": "trust_zone",
-      "basis": "Servicing nodes over a local console implies being where the nodes are. No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says."
-    },
-    {
-      "assumption": "telemetry normalizer's exposure is internal, which the schema requires and no source states.",
-      "element_id": "process:telemetry-normalizer",
-      "attribute": "exposure",
-      "basis": "No sentence states its reachability. Sitting in an internal network implies it, which is an inference rather than a statement."
-    },
-    {
-      "assumption": "device registry's trust_zone is boundary:ingest-edge, which the schema requires and no source states.",
-      "element_id": "store:device-registry",
-      "attribute": "trust_zone",
-      "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says."
-    },
-    {
-      "assumption": "telemetry lake's trust_zone is boundary:analytics-core, which the schema requires and no source states.",
-      "element_id": "store:telemetry-lake",
-      "attribute": "trust_zone",
-      "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says."
-    },
-    {
-      "assumption": "firmware bucket's trust_zone is boundary:ingest-edge, which the schema requires and no source states.",
-      "element_id": "store:firmware-bucket",
-      "attribute": "trust_zone",
-      "basis": "Public read makes its placement arguable as well as unstated. No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says."
-    },
-    {
-      "assumption": "sensor node's trust_zone is boundary:field-network, which the schema requires and no source states.",
-      "element_id": "entity:sensor-node",
-      "attribute": "trust_zone",
-      "basis": "Installation at customer sites is explicit; a single field network is not. The model's zone is a reasonable grouping of those sites, not something the source says."
-    },
-    {
-      "assumption": "device gateway's trust_zone is boundary:ingest-edge, which no source states.",
-      "element_id": "process:device-gateway",
-      "attribute": "trust_zone",
-      "basis": "The quote names GKE and internet exposure, not an ingest-edge network or membership in it. The zone is the model's own grouping of the ingest path."
     }
   ]
 }

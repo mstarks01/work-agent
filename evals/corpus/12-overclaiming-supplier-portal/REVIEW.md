@@ -105,8 +105,6 @@ Not part of the question, but the records cite these names, so you need them.
 **Assumptions**
 
 - `entity:supplier` — Suppliers are placed on the public internet because the schema requires a zone; the source places them nowhere. (basis: Supplier access to a SaaS product does not establish the suppliers' network location. The value is a placement the schema requires, not a source-backed fact.)
-- `entity:portal-vendor` — portal vendor's trust_zone is boundary:vendor-platform, which the schema requires and no source states. (basis: No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.)
-- `process:supplier-master-service` — supplier master service's exposure is internal, which the schema requires and no source states. (basis: No sentence states its reachability. Sitting in an internal network implies it, which is an inference rather than a statement.)
 
 **Reviewed aliases** — other names a reader ruled identify the same element, each with the words in the source that support it. An extraction using one is named differently, not wrong.
 
@@ -419,7 +417,7 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
-      "model.json": "992439d053fa625167294a6d268df1c257a407b5fdf8447dee33bd1220d30a25",
+      "model.json": "7d4b811fe9349babbe1857d64573002ffe87dbe890e538be8ceef3a2763fb2e6",
       "claims/asvs.json": "1557978c4d8757e7d5243d8839aa3a0950bec51093b9851e24b470fa4abb6e31",
       "claims/stride.json": "682ed7f034133a83c6bcef123cba03d91f2cfface683d15eab24d4e6f57a60e5"
       }

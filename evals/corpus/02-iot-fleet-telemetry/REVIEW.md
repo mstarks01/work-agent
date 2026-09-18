@@ -108,13 +108,6 @@ Not part of the question, but the records cite these names, so you need them.
 - `store:telemetry-lake` — The telemetry lake holds personal data about customer sites. (basis: Stated to contain "site addresses and occupancy patterns", described as customer data.)
 - `store:telemetry-lake` — The telemetry lake holds confidential data under the scheme in prompts/extract.md. (basis: The source says the lake has "site addresses and occupancy patterns" in it and calls it customer data. Both describe identifiable customer premises and when they are occupied, so disclosure harms the customers described.)
 - `store:pub-sub` — Pub/Sub sits in the ingest edge rather than the analytics network. (basis: The source places the normalizer "in our analytics network" and places the broker nowhere. It associates the broker with the gateway's onward hop — "Readings the gateway accepts are forwarded onto Pub/Sub" — so it takes the gateway's zone. Either placement leaves exactly one crossing on this path.)
-- `entity:field-technician` — field technician's trust_zone is boundary:field-network, which the schema requires and no source states. (basis: Servicing nodes over a local console implies being where the nodes are. No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.)
-- `process:telemetry-normalizer` — telemetry normalizer's exposure is internal, which the schema requires and no source states. (basis: No sentence states its reachability. Sitting in an internal network implies it, which is an inference rather than a statement.)
-- `store:device-registry` — device registry's trust_zone is boundary:ingest-edge, which the schema requires and no source states. (basis: No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.)
-- `store:telemetry-lake` — telemetry lake's trust_zone is boundary:analytics-core, which the schema requires and no source states. (basis: No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.)
-- `store:firmware-bucket` — firmware bucket's trust_zone is boundary:ingest-edge, which the schema requires and no source states. (basis: Public read makes its placement arguable as well as unstated. No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.)
-- `entity:sensor-node` — sensor node's trust_zone is boundary:field-network, which the schema requires and no source states. (basis: Installation at customer sites is explicit; a single field network is not. The model's zone is a reasonable grouping of those sites, not something the source says.)
-- `process:device-gateway` — device gateway's trust_zone is boundary:ingest-edge, which no source states. (basis: The quote names GKE and internet exposure, not an ingest-edge network or membership in it. The zone is the model's own grouping of the ingest path.)
 
 **Reviewed aliases** — other names a reader ruled identify the same element, each with the words in the source that support it. An extraction using one is named differently, not wrong.
 
@@ -357,7 +350,7 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "fc745e273aff8be740a814f0a9b4a45d6f3c6fe39dc7c8efa2b879d4f270ac74",
-      "model.json": "b6098e4e22e399e340c16f360b720ea1e1434e8edeeaebf45ff02f8f559f1a06",
+      "model.json": "41078fc5cbf143a5581c7a54baeae135774430edb713a5b7ee6e6938768e2632",
       "claims/stride.json": "2bce750ba6ddc1307074a289e48c4591c59f7f2883ff687d9bd98e4f5e7db675"
       }
     }

@@ -242,8 +242,8 @@
       "proposed": "record as an inference",
       "kind": "defensible-inference",
       "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-      "ruling": "change",
-      "reviewed_by": "mstarks01"
+      "ruling": null,
+      "reviewed_by": null
     },
     {
       "element_id": "store:cdn-bucket",
@@ -252,8 +252,8 @@
       "proposed": "record as an inference",
       "kind": "defensible-inference",
       "basis": "The bucket is named as the CDN's; which zone that is remains the model's reading. No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-      "ruling": "change",
-      "reviewed_by": "mstarks01"
+      "ruling": null,
+      "reviewed_by": null
     },
     {
       "element_id": "entity:reader",
@@ -262,8 +262,8 @@
       "proposed": "record as an inference",
       "kind": "defensible-inference",
       "basis": "'Public site' supports a public audience. It does not specify every reader's network location, so the model's zone is a reading rather than a statement.",
-      "ruling": "change",
-      "reviewed_by": "mstarks01"
+      "ruling": null,
+      "reviewed_by": null
     },
     {
       "element_id": "flow:entity:reader>process:web-server>page-requests",
@@ -272,8 +272,8 @@
       "proposed": "record as an inference",
       "kind": "defensible-inference",
       "basis": "'Some of them signed in' states that a sign-in exists for some readers. It does not identify the mechanism, so the attribute's wording is the model's reading rather than a stated control.",
-      "ruling": "change",
-      "reviewed_by": "mstarks01"
+      "ruling": null,
+      "reviewed_by": null
     }
   ],
   "aliases": {
