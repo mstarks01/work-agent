@@ -97,6 +97,9 @@ Not part of the question, but the records cite these names, so you need them.
 **Assumptions**
 
 - `process:web-application` — The web application is reachable from the public internet. (basis: The browser is stated to reach it across the public internet.)
+- `process:background-worker-process` — background worker process's exposure is internal, which the schema requires and no source states. (basis: Behind the web tier supplies architectural evidence beyond a network name. It still does not prove that every worker interface is inaccessible from the internet.)
+- `store:web-application-config` — web application config's trust_zone is boundary:web-tier, which the schema requires and no source states. (basis: The application's use of a config store does not establish that store's network location. A remote configuration service is also possible.)
+- `store:worker-config` — worker config's trust_zone is boundary:backend-tier, which the schema requires and no source states. (basis: The worker's use of a config store does not establish backend-tier membership.)
 
 **Reviewed aliases** — other names a reader ruled identify the same element, each with the words in the source that support it. An extraction using one is named differently, not wrong.
 
@@ -402,7 +405,7 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "20b0aa82c922766db2353cade33f7a26b38c60a3c7061244ef4686b7a647778b",
-      "model.json": "828bc9a79a8299013b667bd92c0184814f51cee8f181f5ec8e34f14fc950ca1d",
+      "model.json": "eed16da2e2d5d7a7202be5d2f31e5017d371c19ebc23f67a4e30eb3fdd20fb4c",
       "claims/asvs.json": "9e4ee6be326673ba2101ed60662718b0d50ecaf6aba7218bcec702c785b033c5",
       "claims/stride.json": "eb2f6e6330b22dbf3f6151e8d93290df9b401f89a1171f146c17f0b27bab572e"
       }

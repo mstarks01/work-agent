@@ -115,3 +115,13 @@ property of the *link* ("not HTTPS", "no TLS on it" — both landed) or as a
 property of the *actor* ("some of them signed in" — did not). Case 07's miss
 fits that reading too: "the runner does not verify signatures" is phrased about
 the actor at one end, not about the connection.
+
+## Disputed values ruled 2026-09-18
+
+The maintainer's sitting on the drafted reference facts. A `change` ruling is applied to `model.json` and its entry removed; the reviewer's own words are the basis recorded there.
+
+| Element | Attribute | Ruling | Why |
+|---|---|---|---|
+| `entity:cdn` | `trust_zone` | keep `boundary:cdn`, recorded as an inference | A CDN entity can reasonably belong to a CDN-provider grouping. This does not establish a particular network perimeter or shared connectivity. |
+| `store:cdn-bucket` | `trust_zone` | keep `boundary:cdn`, recorded as an inference | The stated ownership supports the grouping. It does not establish network co-location with CDN serving infrastructure. |
+| `entity:reader` | `trust_zone` | keep `boundary:public-internet`, recorded as an inference | A public audience supports this abstraction. It does not locate every reader on a specific network. |

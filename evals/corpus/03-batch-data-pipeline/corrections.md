@@ -23,3 +23,15 @@ credentials. Correction 4 is the same "detail lost between excerpt and
 attribute" failure as case 02's correction 2, now on a stated *absence* rather
 than a stated control — worth watching as a distinct extraction metric, since a
 dropped absence reads to an analyst as an unremarkable element.
+
+## Disputed values ruled 2026-09-18
+
+The maintainer's sitting on the drafted reference facts. A `change` ruling is applied to `model.json` and its entry removed; the reviewer's own words are the basis recorded there.
+
+| Element | Attribute | Ruling | Why |
+|---|---|---|---|
+| `entity:insurance-partner` | `trust_zone` | keep `boundary:partner-network`, recorded as an inference | The insurance-partner role supports an organizational boundary. It does not establish one common network across partners or locate their sending infrastructure. |
+| `process:ingest-scheduler` | `exposure` | `internal` to `unknown` | Landing-network membership does not establish lack of internet exposure. The scheduler's role does not exclude other interfaces. |
+| `process:spark-transform-job` | `exposure` | `internal` to `unknown` | Warehouse-network membership does not establish lack of internet exposure. |
+| `store:landing-bucket` | `trust_zone` | keep `boundary:landing-network`, recorded as an inference | The landing role and name do not locate the bucket on the scheduler's network. Storage-encryption status provides no placement evidence. |
+| `store:airflow-metadata-database` | `trust_zone` | keep `boundary:landing-network`, recorded as an inference | Airflow owning or using a metadata database does not imply that the database shares its network. It could be remotely hosted. |

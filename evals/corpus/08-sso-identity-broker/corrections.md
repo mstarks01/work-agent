@@ -169,3 +169,15 @@ stays distinct from the corporate broker; a separately extracted franchise
 colleague is a supported actor. `franchise stores` is an alias for
 `boundary:franchise-partner`, an organisational identity-trust boundary and
 not a network segment; `home devices` does not substitute for it.
+
+## Disputed values ruled 2026-09-18
+
+The maintainer's sitting on the drafted reference facts. A `change` ruling is applied to `model.json` and its entry removed; the reviewer's own words are the basis recorded there.
+
+| Element | Attribute | Ruling | Why |
+|---|---|---|---|
+| `entity:franchise-identity-provider` | `trust_zone` | keep `boundary:franchise-partner`, recorded as an inference | Their own identity provider establishes a distinct authority relationship. It does not establish the provider's physical network or hosting location. |
+| `store:directory` | `trust_zone` | keep `boundary:corporate-network`, recorded as an inference | Its own directory establishes the broker's directory relationship, not the directory's network location. |
+| `store:key-store` | `trust_zone` | keep `boundary:corporate-network`, recorded as an inference | The broker keeping its key in a key store does not locate that store. A remote key-management service is compatible with the description. |
+| `store:audit-log` | `trust_zone` | keep `boundary:corporate-network`, recorded as an inference | Writing to an audit log does not place its storage on the writer's network. Centralized or externally hosted logging remains possible. |
+| `entity:colleague` | `trust_zone` | keep `boundary:outside-corporate-network`, recorded as an inference | Home sign-ins support an external-origin scenario. They do not place all colleagues outside the corporate network or exclude VPN connectivity. |

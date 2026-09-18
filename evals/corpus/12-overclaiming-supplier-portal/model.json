@@ -60,7 +60,7 @@
       "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:cloud-account",
-      "exposure": "internal",
+      "exposure": "unknown",
       "interface_kind": "non-web"
     }
   ],
@@ -264,6 +264,18 @@
       "element_id": "entity:supplier",
       "attribute": "trust_zone",
       "basis": "Supplier access to a SaaS product does not establish the suppliers' network location. The value is a placement the schema requires, not a source-backed fact."
+    },
+    {
+      "assumption": "supplier's trust_zone is boundary:public-internet, which the schema requires and no source states.",
+      "element_id": "entity:supplier",
+      "attribute": "trust_zone",
+      "basis": "External suppliers using a SaaS portal supports this interpretation, but private access remains possible. The inference does not establish public reachability."
+    },
+    {
+      "assumption": "portal vendor's trust_zone is boundary:vendor-platform, which the schema requires and no source states.",
+      "element_id": "entity:portal-vendor",
+      "attribute": "trust_zone",
+      "basis": "The vendor operates the platform, supporting an ownership grouping. That does not locate the vendor's extract-sending infrastructure on a particular network."
     }
   ]
 }

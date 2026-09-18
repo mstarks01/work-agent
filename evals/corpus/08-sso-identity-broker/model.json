@@ -292,6 +292,36 @@
       "element_id": "entity:hr-system",
       "attribute": "trust_zone",
       "basis": "The source names it as the system of record the broker pulls from and never places it; grouped with the other unplaced parties rather than assumed internal."
+    },
+    {
+      "assumption": "franchise identity provider's trust_zone is boundary:franchise-partner, which the schema requires and no source states.",
+      "element_id": "entity:franchise-identity-provider",
+      "attribute": "trust_zone",
+      "basis": "Their own identity provider establishes a distinct authority relationship. It does not establish the provider's physical network or hosting location."
+    },
+    {
+      "assumption": "directory's trust_zone is boundary:corporate-network, which the schema requires and no source states.",
+      "element_id": "store:directory",
+      "attribute": "trust_zone",
+      "basis": "Its own directory establishes the broker's directory relationship, not the directory's network location."
+    },
+    {
+      "assumption": "key store's trust_zone is boundary:corporate-network, which the schema requires and no source states.",
+      "element_id": "store:key-store",
+      "attribute": "trust_zone",
+      "basis": "The broker keeping its key in a key store does not locate that store. A remote key-management service is compatible with the description."
+    },
+    {
+      "assumption": "audit log's trust_zone is boundary:corporate-network, which the schema requires and no source states.",
+      "element_id": "store:audit-log",
+      "attribute": "trust_zone",
+      "basis": "Writing to an audit log does not place its storage on the writer's network. Centralized or externally hosted logging remains possible."
+    },
+    {
+      "assumption": "colleague's trust_zone is boundary:outside-corporate-network, which the schema requires and no source states.",
+      "element_id": "entity:colleague",
+      "attribute": "trust_zone",
+      "basis": "Home sign-ins support an external-origin scenario. They do not place all colleagues outside the corporate network or exclude VPN connectivity."
     }
   ]
 }

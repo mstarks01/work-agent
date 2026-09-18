@@ -20,3 +20,16 @@ attribute detail (2) — and adds two new ones worth tracking: **direction
 reversal on poll/pull flows** (5) and **whole elements dropped when they appear
 outside the main narrative path** (4). Both are extraction-eval failures that an
 end-to-end-only fixture would have attributed to the analysts.
+
+## Disputed values ruled 2026-09-18
+
+The maintainer's sitting on the drafted reference facts. A `change` ruling is applied to `model.json` and its entry removed; the reviewer's own words are the basis recorded there.
+
+| Element | Attribute | Ruling | Why |
+|---|---|---|---|
+| `entity:field-technician` | `trust_zone` | keep `boundary:field-network`, recorded as an inference | A local service session supports proximity to the node. It does not establish membership in a common network across customer sites. |
+| `process:telemetry-normalizer` | `exposure` | `internal` to `unknown` | A consumer running in the analytics network is not necessarily free of public interfaces. Membership does not establish exposure. |
+| `store:device-registry` | `trust_zone` | keep `boundary:ingest-edge`, recorded as an inference | Device-registry function and confidential classification do not establish ingest-edge membership. No placement evidence is supplied. |
+| `store:pub-sub` | `trust_zone` | keep `boundary:ingest-edge`, recorded as an inference | An existing assumption label establishes how a claim is represented, not whether it is defensible. No supporting placement evidence is supplied. |
+| `entity:sensor-node` | `trust_zone` | keep `boundary:field-network`, recorded as an inference | Customer-site installation supports a field grouping. Preserve separate site boundaries where relevant; this infers no shared connectivity or trust. |
+| `process:device-gateway` | `trust_zone` | keep `boundary:ingest-edge`, recorded as an inference | An internet-facing ingest broker supports an edge-role abstraction. GKE hosting and internet exposure do not establish a particular network perimeter. |

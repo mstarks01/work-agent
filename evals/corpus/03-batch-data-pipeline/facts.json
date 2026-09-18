@@ -325,59 +325,54 @@
       },
       "rationale": "The source says the warehouse carries member-identifying columns.",
       "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "entity:insurance-partner",
+        "predicate": "network-membership",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "exclusive": false
+      },
+      "rationale": "The insurance-partner role supports an organizational boundary. It does not establish one common network across partners or locate their sending infrastructure.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:landing-bucket",
+        "predicate": "network-membership",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "exclusive": false
+      },
+      "rationale": "The landing role and name do not locate the bucket on the scheduler's network. Storage-encryption status provides no placement evidence.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:airflow-metadata-database",
+        "predicate": "network-membership",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "exclusive": false
+      },
+      "rationale": "Airflow owning or using a metadata database does not imply that the database shares its network. It could be remotely hosted.",
+      "reviewed_by": "mstarks01"
     }
   ],
   "disputed": [
-    {
-      "element_id": "entity:insurance-partner",
-      "attribute": "trust_zone",
-      "blessed": "boundary:partner-network",
-      "proposed": "record as an inference",
-      "kind": "defensible-inference",
-      "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-      "ruling": null,
-      "reviewed_by": null
-    },
-    {
-      "element_id": "process:ingest-scheduler",
-      "attribute": "exposure",
-      "blessed": "internal",
-      "proposed": "record as an inference",
-      "kind": "defensible-inference",
-      "basis": "No sentence states its reachability. Sitting in an internal network implies it, which is an inference rather than a statement.",
-      "ruling": null,
-      "reviewed_by": null
-    },
-    {
-      "element_id": "process:spark-transform-job",
-      "attribute": "exposure",
-      "blessed": "internal",
-      "proposed": "record as an inference",
-      "kind": "defensible-inference",
-      "basis": "No sentence states its reachability. Sitting in an internal network implies it, which is an inference rather than a statement.",
-      "ruling": null,
-      "reviewed_by": null
-    },
-    {
-      "element_id": "store:landing-bucket",
-      "attribute": "trust_zone",
-      "blessed": "boundary:landing-network",
-      "proposed": "record as an inference",
-      "kind": "defensible-inference",
-      "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-      "ruling": null,
-      "reviewed_by": null
-    },
-    {
-      "element_id": "store:airflow-metadata-database",
-      "attribute": "trust_zone",
-      "blessed": "boundary:landing-network",
-      "proposed": "record as an inference",
-      "kind": "defensible-inference",
-      "basis": "Airflow keeping its own metadata database implies the scheduler's network. No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-      "ruling": null,
-      "reviewed_by": null
-    },
     {
       "element_id": "store:claims-warehouse",
       "attribute": "trust_zone",

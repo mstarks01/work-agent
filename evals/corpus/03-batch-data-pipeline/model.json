@@ -36,7 +36,7 @@
       "source_label": "System description",
       "technology": "Airflow",
       "trust_zone": "boundary:landing-network",
-      "exposure": "internal",
+      "exposure": "unknown",
       "interface_kind": "non-web"
     },
     {
@@ -51,7 +51,7 @@
       "source_label": "System description",
       "technology": "Spark",
       "trust_zone": "boundary:warehouse-network",
-      "exposure": "internal",
+      "exposure": "unknown",
       "interface_kind": "non-web"
     }
   ],
@@ -249,6 +249,24 @@
       "element_id": "store:claims-warehouse",
       "attribute": "assets",
       "basis": "Described as insurance claim records carrying member names and dates of birth."
+    },
+    {
+      "assumption": "insurance partner's trust_zone is boundary:partner-network, which the schema requires and no source states.",
+      "element_id": "entity:insurance-partner",
+      "attribute": "trust_zone",
+      "basis": "The insurance-partner role supports an organizational boundary. It does not establish one common network across partners or locate their sending infrastructure."
+    },
+    {
+      "assumption": "landing bucket's trust_zone is boundary:landing-network, which the schema requires and no source states.",
+      "element_id": "store:landing-bucket",
+      "attribute": "trust_zone",
+      "basis": "The landing role and name do not locate the bucket on the scheduler's network. Storage-encryption status provides no placement evidence."
+    },
+    {
+      "assumption": "Airflow metadata database's trust_zone is boundary:landing-network, which the schema requires and no source states.",
+      "element_id": "store:airflow-metadata-database",
+      "attribute": "trust_zone",
+      "basis": "Airflow owning or using a metadata database does not imply that the database shares its network. It could be remotely hosted."
     }
   ]
 }

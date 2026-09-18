@@ -295,40 +295,54 @@
       },
       "rationale": "Stated directly.",
       "reviewed_by": "mstarks01"
-    }
-  ],
-  "disputed": [
-    {
-      "element_id": "process:moderation-website",
-      "attribute": "trust_zone",
-      "blessed": "boundary:production-network",
-      "proposed": "record as an inference",
-      "kind": "defensible-inference",
-      "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-      "ruling": null,
-      "reviewed_by": null
     },
     {
-      "element_id": "store:player-database",
-      "attribute": "trust_zone",
-      "blessed": "boundary:production-network",
-      "proposed": "record as an inference",
-      "kind": "defensible-inference",
-      "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-      "ruling": null,
-      "reviewed_by": null
+      "assertion": {
+        "subject_type": "component",
+        "subject": "process:moderation-website",
+        "predicate": "network-membership",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "exclusive": false
+      },
+      "rationale": "The source places the lobby and game server in production. That placement does not automatically extend to the moderation website.",
+      "reviewed_by": "mstarks01"
     },
     {
-      "element_id": "store:stats-database",
-      "attribute": "trust_zone",
-      "blessed": "boundary:production-network",
-      "proposed": "record as an inference",
-      "kind": "defensible-inference",
-      "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-      "ruling": null,
-      "reviewed_by": null
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:player-database",
+        "predicate": "network-membership",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "exclusive": false
+      },
+      "rationale": "A database serving production components need not share their network. Unknown storage encryption supplies no placement evidence.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:stats-database",
+        "predicate": "network-membership",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "exclusive": false
+      },
+      "rationale": "The stats database's role does not establish production-network membership. Unknown storage encryption supplies no placement evidence.",
+      "reviewed_by": "mstarks01"
     }
   ],
+  "disputed": [],
   "aliases": {
     "subjects": [],
     "qualifiers": []

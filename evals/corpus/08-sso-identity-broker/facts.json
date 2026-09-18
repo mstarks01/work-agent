@@ -321,19 +321,84 @@
       },
       "rationale": "Token use is explicit and applications check its signature. The absence of a callback establishes no live broker recheck, not the absence of every other authentication or access control. Group authorization and the missing store scoping are separate facts.",
       "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "entity:franchise-identity-provider",
+        "predicate": "network-membership",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "exclusive": false
+      },
+      "rationale": "The source introduces the franchise stores as a distinct group let in on distinct terms; it does not say where the provider runs, so the zone is drawn on the party rather than on a network.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "entity:hr-system",
+        "predicate": "network-membership",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "exclusive": false
+      },
+      "rationale": "The source names it as the system of record the broker pulls from and never places it; grouped with the other unplaced parties rather than assumed internal.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:directory",
+        "predicate": "network-membership",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "exclusive": false
+      },
+      "rationale": "Its own directory establishes the broker's directory relationship, not the directory's network location.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:key-store",
+        "predicate": "network-membership",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "exclusive": false
+      },
+      "rationale": "The broker keeping its key in a key store does not locate that store. A remote key-management service is compatible with the description.",
+      "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "store:audit-log",
+        "predicate": "network-membership",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "exclusive": false
+      },
+      "rationale": "Writing to an audit log does not place its storage on the writer's network. Centralized or externally hosted logging remains possible.",
+      "reviewed_by": "mstarks01"
     }
   ],
   "disputed": [
-    {
-      "element_id": "entity:franchise-identity-provider",
-      "attribute": "trust_zone",
-      "blessed": "boundary:franchise-partner",
-      "proposed": "record as an inference",
-      "kind": "defensible-inference",
-      "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-      "ruling": null,
-      "reviewed_by": null
-    },
     {
       "element_id": "entity:hr-system",
       "attribute": "trust_zone",
@@ -341,46 +406,6 @@
       "proposed": "record as an inference",
       "kind": "defensible-inference",
       "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-      "ruling": null,
-      "reviewed_by": null
-    },
-    {
-      "element_id": "store:directory",
-      "attribute": "trust_zone",
-      "blessed": "boundary:corporate-network",
-      "proposed": "record as an inference",
-      "kind": "defensible-inference",
-      "basis": "The broker is placed; its directory is not. No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-      "ruling": null,
-      "reviewed_by": null
-    },
-    {
-      "element_id": "store:key-store",
-      "attribute": "trust_zone",
-      "blessed": "boundary:corporate-network",
-      "proposed": "record as an inference",
-      "kind": "defensible-inference",
-      "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-      "ruling": null,
-      "reviewed_by": null
-    },
-    {
-      "element_id": "store:audit-log",
-      "attribute": "trust_zone",
-      "blessed": "boundary:corporate-network",
-      "proposed": "record as an inference",
-      "kind": "defensible-inference",
-      "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-      "ruling": null,
-      "reviewed_by": null
-    },
-    {
-      "element_id": "entity:colleague",
-      "attribute": "trust_zone",
-      "blessed": "boundary:outside-corporate-network",
-      "proposed": "record as an inference",
-      "kind": "defensible-inference",
-      "basis": "Home use establishes a physical location, not network membership: a VPN remains possible. The model's zone is a reading of the architecture, not something the source says.",
       "ruling": null,
       "reviewed_by": null
     }

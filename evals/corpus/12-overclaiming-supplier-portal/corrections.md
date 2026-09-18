@@ -41,3 +41,14 @@ model, the one on the far side of an organizational boundary.
 | a | `entity:supplier.trust_zone` | Supplier access to SaaS does not establish the suppliers' network location. The placement is now recorded as an assumption, so the replay reads `boundary:public-internet` as a placeholder and not a required zone. `suppliers` may describe an actor group, not a network. |
 | b | `store:document-store` | The reference stands as a logical document store; `vendor platform` is accepted as an alias for that storage role (`case.json`). |
 | c | `process:supplier-portal` | `portal` is accepted as an alias. |
+
+## Disputed values ruled 2026-09-18
+
+The maintainer's sitting on the drafted reference facts. A `change` ruling is applied to `model.json` and its entry removed; the reviewer's own words are the basis recorded there.
+
+| Element | Attribute | Ruling | Why |
+|---|---|---|---|
+| `entity:supplier` | `trust_zone` | keep `boundary:public-internet`, recorded as an inference | External suppliers using a SaaS portal supports this interpretation, but private access remains possible. The inference does not establish public reachability. |
+| `entity:portal-vendor` | `trust_zone` | keep `boundary:vendor-platform`, recorded as an inference | The vendor operates the platform, supporting an ownership grouping. That does not locate the vendor's extract-sending infrastructure on a particular network. |
+| `process:supplier-master-service` | `exposure` | `internal` to `unknown` | Cloud-account membership does not imply an internal network or exclude public endpoints. |
+| `flow:entity:portal-vendor>store:landing-bucket>push-nightly-extract` | `encryption_in_transit` | keep `unknown` | Plain CSV describes the artifact, not transport encryption: it can arrive over an encrypted channel. The runbook does not contradict the attributed encryption claim. |

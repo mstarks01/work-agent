@@ -24,3 +24,13 @@ findings lose their grounding. Correction 5 is the third occurrence of
 which is now the most repeated *structural* extraction failure in the corpus,
 alongside the most repeated *attribute* failure (facts stranded in
 `source_excerpt`, cases 02, 03, 05).
+
+## Disputed values ruled 2026-09-18
+
+The maintainer's sitting on the drafted reference facts. A `change` ruling is applied to `model.json` and its entry removed; the reviewer's own words are the basis recorded there.
+
+| Element | Attribute | Ruling | Why |
+|---|---|---|---|
+| `process:moderation-website` | `trust_zone` | keep `boundary:production-network`, recorded as an inference | The source places the lobby and game server in production. That placement does not automatically extend to the moderation website. |
+| `store:player-database` | `trust_zone` | keep `boundary:production-network`, recorded as an inference | A database serving production components need not share their network. Unknown storage encryption supplies no placement evidence. |
+| `store:stats-database` | `trust_zone` | keep `boundary:production-network`, recorded as an inference | The stats database's role does not establish production-network membership. Unknown storage encryption supplies no placement evidence. |

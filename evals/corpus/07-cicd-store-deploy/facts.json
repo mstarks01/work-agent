@@ -367,50 +367,24 @@
       },
       "rationale": "The mechanism for this call, stated. The credential it presents and the sharing and rotation facts about that credential sit on the principal and the credential respectively.",
       "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "component",
+        "subject": "entity:developer",
+        "predicate": "network-membership",
+        "value": "unknown",
+        "reason": "silent",
+        "scope": [],
+        "basis": "stated",
+        "quotes": [],
+        "exclusive": false
+      },
+      "rationale": "The git server they push to is stated to sit on the corporate network; the source places developers nowhere else.",
+      "reviewed_by": "mstarks01"
     }
   ],
-  "disputed": [
-    {
-      "element_id": "entity:developer",
-      "attribute": "trust_zone",
-      "blessed": "boundary:corporate-network",
-      "proposed": "record as an inference",
-      "kind": "defensible-inference",
-      "basis": "The sentence places the git server on the corporate network, not the developer. No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-      "ruling": null,
-      "reviewed_by": null
-    },
-    {
-      "element_id": "process:build-runner",
-      "attribute": "exposure",
-      "blessed": "internal",
-      "proposed": "record as an inference",
-      "kind": "defensible-inference",
-      "basis": "No sentence states its reachability. Sitting in an internal network implies it, which is an inference rather than a statement.",
-      "ruling": null,
-      "reviewed_by": null
-    },
-    {
-      "element_id": "process:deploy-controller",
-      "attribute": "exposure",
-      "blessed": "internal",
-      "proposed": "record as an inference",
-      "kind": "defensible-inference",
-      "basis": "No sentence states its reachability. Sitting in an internal network implies it, which is an inference rather than a statement.",
-      "ruling": null,
-      "reviewed_by": null
-    },
-    {
-      "element_id": "process:store-server",
-      "attribute": "exposure",
-      "blessed": "internal",
-      "proposed": "record as an inference",
-      "kind": "defensible-inference",
-      "basis": "Store servers poll outward and are never pushed to, which implies but does not state that they are unreachable.",
-      "ruling": null,
-      "reviewed_by": null
-    }
-  ],
+  "disputed": [],
   "aliases": {
     "subjects": [],
     "qualifiers": []

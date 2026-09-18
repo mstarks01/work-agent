@@ -65,7 +65,7 @@ Not part of the question, but the records cite these names, so you need them.
 | id | exposure | interface | zone | technology |
 |---|---|---|---|---|
 | process:supplier-portal | unknown | web | boundary:vendor-platform | unknown |
-| process:supplier-master-service | internal | non-web | boundary:cloud-account | unknown |
+| process:supplier-master-service | unknown | non-web | boundary:cloud-account | unknown |
 
 **Data stores**
 
@@ -105,6 +105,8 @@ Not part of the question, but the records cite these names, so you need them.
 **Assumptions**
 
 - `entity:supplier` — Suppliers are placed on the public internet because the schema requires a zone; the source places them nowhere. (basis: Supplier access to a SaaS product does not establish the suppliers' network location. The value is a placement the schema requires, not a source-backed fact.)
+- `entity:supplier` — supplier's trust_zone is boundary:public-internet, which the schema requires and no source states. (basis: External suppliers using a SaaS portal supports this interpretation, but private access remains possible. The inference does not establish public reachability.)
+- `entity:portal-vendor` — portal vendor's trust_zone is boundary:vendor-platform, which the schema requires and no source states. (basis: The vendor operates the platform, supporting an ownership grouping. That does not locate the vendor's extract-sending infrastructure on a particular network.)
 
 **Reviewed aliases** — other names a reader ruled identify the same element, each with the words in the source that support it. An extraction using one is named differently, not wrong.
 
@@ -417,7 +419,7 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
-      "model.json": "7d4b811fe9349babbe1857d64573002ffe87dbe890e538be8ceef3a2763fb2e6",
+      "model.json": "dcfd28bad38f897c03648d173c9cfd9454673988d6d13e3cd11abed53723c036",
       "claims/asvs.json": "1557978c4d8757e7d5243d8839aa3a0950bec51093b9851e24b470fa4abb6e31",
       "claims/stride.json": "682ed7f034133a83c6bcef123cba03d91f2cfface683d15eab24d4e6f57a60e5"
       }
