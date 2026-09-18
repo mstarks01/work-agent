@@ -68,7 +68,7 @@
       "process:schedule-importer",
       "process:dispatch-api"
     ],
-    "claim": "An attacker returns an XML document to the hourly pull that plants work orders the partner never sent.",
+    "claim": "An attacker who can supply the hourly pull with a document it accepts returns XML that plants work orders the partner never sent, if the control plane turns that document into orders unchecked.",
     "tier": "must-find",
     "severity": {
       "likelihood": "medium",
