@@ -303,7 +303,6 @@ class ArmRun:
         valid: bool = True,
         cost_usd: float = 0.0,
         seconds: float = 0.0,
-        aligned: Collection[str] = (),
         catalog: AssertionCatalog | None = None,
     ) -> ArmRun:
         """One run, read off the replay that graded it.
@@ -311,6 +310,11 @@ class ArmRun:
         The fates are narrowed to the required rows here, which is the one place
         the endpoint's denominator is applied: a reader counting ``found`` in
         this record is counting stated facts by construction.
+
+        **The aligned reading comes off the replay rather than from a caller.**
+        :class:`~evals.harness.replay.AssertionReplay` computes both readings
+        where it computes the fates, so no caller can build an ``ArmRun``
+        carrying the strict figure and an empty aligned one (#1015).
         """
         required = frozenset(required_rows(reference))
         fates: dict[str, int] = dict.fromkeys(ROW_FATES, 0)
@@ -340,7 +344,7 @@ class ArmRun:
             produced=MappingProxyType(produced),
             found_rows=answered,
             # Only what the strict matcher missed, so the two never double-count.
-            aligned_rows=tuple(sorted(set(aligned) & required - set(answered))),
+            aligned_rows=tuple(sorted(replay.credited & required)),
             kinds=MappingProxyType(kinds),
             valid=valid,
             cost_usd=cost_usd,

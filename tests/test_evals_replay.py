@@ -23,9 +23,12 @@ from analysis_service.assertions import (
     identity_parts,
 )
 from analysis_service.system_model import (
+    DataFlow,
     SystemModel,
+    flow_id_version,
     make_flow_id,
     normalize_element_ids,
+    parse_flow_id,
 )
 from analysis_service.validation import parse_and_validate
 from evals.harness import replay
@@ -734,6 +737,90 @@ class TestEveryReferenceRowTakesOneFate:
             assert assertion_id(entry) == (
                 f"assertion:{parts.predicate}~{parts.subject}~{parts.scope}~{parts.value}"
             )
+
+
+class TestBothReadingsArriveTogether:
+    """#1015's ruling: the strict fates and the aligned reading are one result.
+
+    The pair is computed where the fates are, so no caller can report the
+    strict figure with an empty aligned one beside it. The gap between them is
+    the naming measurement, and these hold the strict half still while the
+    looser half moves.
+    """
+
+    @pytest.fixture(scope="class")
+    def golden(self):
+        return case("01")
+
+    @pytest.fixture(scope="class")
+    def reference(self, golden):
+        catalog = replay.signed_reference(CORPUS, golden)
+        if catalog is None:
+            pytest.skip("case 01's facts are unsigned, so nothing grades a proposal")
+        return catalog
+
+    def graded(self, golden, reference, entries):
+        produced = AssertionCatalog(subjects=reference.subjects, entries=list(entries))
+        result = AssertionResult(golden.id, {"assertions": []}, produced, ())
+        return replay.replay_assertions(golden, reference, result)
+
+    def relabelled(self, reference):
+        """One reference row moved to another label between the same endpoints."""
+        row = next(
+            entry
+            for entry in reference.entries
+            if entry.subject.startswith(f"{DataFlow.id_prefix}:")
+        )
+        parts = parse_flow_id(row.subject, flow_id_version(row.subject))
+        moved = make_flow_id(parts.source, parts.destination, "another word entirely")
+        return row, row.model_copy(update={"subject": moved})
+
+    def test_a_perfect_run_credits_nothing_extra(self, golden, reference):
+        """Every row is found strictly, so the gap is empty rather than doubled."""
+        graded = self.graded(golden, reference, reference.entries)
+
+        assert graded.credited == frozenset()
+        assert len(graded.aligned) == graded.counts["found"]
+
+    def test_a_relabelled_row_is_missed_strictly_and_credited_beside(
+        self, golden, reference
+    ):
+        row, moved = self.relabelled(reference)
+        entries = [moved if entry is row else entry for entry in reference.entries]
+
+        graded = self.graded(golden, reference, entries)
+
+        assert graded.counts["omitted"] == 1
+        assert graded.credited == {assertion_id(row)}
+
+    def test_the_looser_reading_moves_no_strict_fate(self, golden, reference):
+        """The whole rule: crediting a name never changes what the fates say."""
+        row, moved = self.relabelled(reference)
+        entries = [moved if entry is row else entry for entry in reference.entries]
+
+        graded = self.graded(golden, reference, entries)
+        strict = {fate.reference: fate.fate for fate in graded.rows}
+
+        assert strict[assertion_id(row)] == "omitted"
+        assert graded.counts["found"] == len(reference.entries) - 1
+
+    def test_the_pooled_reading_reports_the_pair(self, golden, reference):
+        row, moved = self.relabelled(reference)
+        entries = [moved if entry is row else entry for entry in reference.entries]
+        graded = self.graded(golden, reference, entries)
+        sweep = replay.SweepReplay(
+            artifact="synthetic.json",
+            arm=replay.Arm(("assert",), ("digest",), ("a/model",)),
+            commit="0000000",
+            clean=True,
+            corpus_digest="synthetic",
+            assertions=(graded,),
+        )
+
+        pool = replay.pooled_assertions([sweep])
+
+        assert pool["found"] == pool["fates"]["found"]
+        assert pool["relabelled"] == 1
 
 
 class TestAnUnsignedReferenceGradesNothing:

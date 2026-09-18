@@ -12,6 +12,10 @@ run answered, under the aliases a reviewer signed, and
 :meth:`~evals.harness.arms.ArmRun.of` narrows those fates to the stated rows the
 denominator counts. A case whose reference nobody has signed is skipped and
 named, because a run graded against a draft is graded against nothing.
+
+That replay carries both readings — the strict fates and the rows stated on the
+same fact under another flow label — so the pair #1015 settles arrives here
+already made rather than being asked for at this one call site.
 """
 
 from __future__ import annotations
@@ -95,9 +99,6 @@ def score(
                     reference,
                     arm=arm,
                     repeat=repeat,
-                    # Beside the strict fates, never instead of them: the gap
-                    # between the two figures is #1015's naming measurement.
-                    aligned=replay.aligned_rows(reference, result),
                     catalog=result.catalog,
                 )
             )
