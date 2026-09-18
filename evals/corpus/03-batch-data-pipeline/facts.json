@@ -385,6 +385,27 @@
       },
       "rationale": "The supplied evidence does not establish this membership. The zone is retained because the schema requires one, not because the source places it.",
       "reviewed_by": "mstarks01"
+    },
+    {
+      "assertion": {
+        "subject_type": "interaction",
+        "subject": "flow:process:ingest-scheduler>store:landing-bucket>list-and-read-files",
+        "predicate": "origin-verification",
+        "value": "absent",
+        "reason": null,
+        "scope": [],
+        "basis": "stated",
+        "quotes": [
+          {
+            "source_label": "System description",
+            "quote": "It does not check that a file came from the partner whose folder it landed in."
+          }
+        ],
+        "explanation": "",
+        "exclusive": false
+      },
+      "rationale": "An explicit absence: the check is named and said not to happen. The missing check is who supplied the file, not where it was sent, and no signature is mentioned \u2014 which is why the sitting of 2026-09-18 declined both destination-verification and signature-verification and the row waited for a predicate of its own (#1053).",
+      "reviewed_by": "mstarks01"
     }
   ],
   "disputed": [],

@@ -164,19 +164,23 @@ class TestTheRegistryAnswersItsVocabularies:
         """A predicate cannot be authoritative for a field that does not exist."""
         assert set(projection_fields().values()) <= set(all_attribute_names())
 
-    def test_eleven_of_the_eighteen_predicates_project_into_nothing(self):
+    def test_most_predicates_project_into_nothing(self):
         """ADR 0034's figure, re-derived rather than asserted in its prose.
 
         It is the whole argument for the catalog: the graph has no field for
-        most of what this release scopes. `represented-by` is the eleventh, and
-        it could have no field by construction — it says which element a
-        subject *is*, and no element has an attribute for that.
+        most of what this release scopes. `represented-by` is one of them by
+        construction — it says which element a subject *is*, and no element has
+        an attribute for that.
 
-        The eleven do not move when a predicate is added for a field the graph
-        already holds, which is what `data-classification` is.
+        The count moves two ways and the ratio is the claim. A predicate for a
+        field the graph already holds joins the projecting side, which
+        `data-classification` did; one for a fact the graph has no field for
+        joins the other, which `origin-verification` did.
         """
-        assert len(REGISTRY) == 18
-        assert len(REGISTRY) - len(projection_fields()) == 11
+        unprojected = len(REGISTRY) - len(projection_fields())
+
+        assert (len(REGISTRY), unprojected) == (19, 12)
+        assert unprojected > len(projection_fields())
 
     def test_two_predicates_can_project_into_one_field(self):
         """A mechanism and the credential it presents share one string today.
