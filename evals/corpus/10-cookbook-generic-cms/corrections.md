@@ -125,3 +125,10 @@ The maintainer's sitting on the drafted reference facts. A `change` ruling is ap
 | `entity:cdn` | `trust_zone` | keep `boundary:cdn`, recorded as an inference | A CDN entity can reasonably belong to a CDN-provider grouping. This does not establish a particular network perimeter or shared connectivity. |
 | `store:cdn-bucket` | `trust_zone` | keep `boundary:cdn`, recorded as an inference | The stated ownership supports the grouping. It does not establish network co-location with CDN serving infrastructure. |
 | `entity:reader` | `trust_zone` | keep `boundary:public-internet`, recorded as an inference | A public audience supports this abstraction. It does not locate every reader on a specific network. |
+
+### The remaining values, ruled 2026-09-18
+
+| Element | Attribute | Ruling | Why |
+|---|---|---|---|
+| `flow:entity:reader>process:web-server>page-requests` | `authentication` | keep the wording, not marked inferred | Sign-in exists for some readers and is stated; the mechanism remains unspecified, and the existing wording already preserves that distinction. |
+

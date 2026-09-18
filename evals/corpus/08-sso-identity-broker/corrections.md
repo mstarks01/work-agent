@@ -181,3 +181,10 @@ The maintainer's sitting on the drafted reference facts. A `change` ruling is ap
 | `store:key-store` | `trust_zone` | keep `boundary:corporate-network`, recorded as an inference | The broker keeping its key in a key store does not locate that store. A remote key-management service is compatible with the description. |
 | `store:audit-log` | `trust_zone` | keep `boundary:corporate-network`, recorded as an inference | Writing to an audit log does not place its storage on the writer's network. Centralized or externally hosted logging remains possible. |
 | `entity:colleague` | `trust_zone` | keep `boundary:outside-corporate-network`, recorded as an inference | Home sign-ins support an external-origin scenario. They do not place all colleagues outside the corporate network or exclude VPN connectivity. |
+
+### The remaining values, ruled 2026-09-18
+
+| Element | Attribute | Ruling | Why |
+|---|---|---|---|
+| `entity:hr-system` | `trust_zone` | retain `boundary:outside-corporate-network` as an explicit assumption | The source does not establish whether the HR system is inside or outside the corporate network. The zone is retained because the schema requires one. |
+

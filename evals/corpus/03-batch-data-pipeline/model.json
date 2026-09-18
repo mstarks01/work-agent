@@ -267,6 +267,12 @@
       "element_id": "store:airflow-metadata-database",
       "attribute": "trust_zone",
       "basis": "Airflow owning or using a metadata database does not imply that the database shares its network. It could be remotely hosted."
+    },
+    {
+      "assumption": "claims warehouse sits in boundary:warehouse-network, which the schema requires and no source states.",
+      "element_id": "store:claims-warehouse",
+      "attribute": "trust_zone",
+      "basis": "The supplied evidence does not establish this membership. The zone is retained because the schema requires one, not because the source places it."
     }
   ]
 }

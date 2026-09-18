@@ -104,6 +104,7 @@ Not part of the question, but the records cite these names, so you need them.
 - `entity:insurance-partner` — insurance partner's trust_zone is boundary:partner-network, which the schema requires and no source states. (basis: The insurance-partner role supports an organizational boundary. It does not establish one common network across partners or locate their sending infrastructure.)
 - `store:landing-bucket` — landing bucket's trust_zone is boundary:landing-network, which the schema requires and no source states. (basis: The landing role and name do not locate the bucket on the scheduler's network. Storage-encryption status provides no placement evidence.)
 - `store:airflow-metadata-database` — Airflow metadata database's trust_zone is boundary:landing-network, which the schema requires and no source states. (basis: Airflow owning or using a metadata database does not imply that the database shares its network. It could be remotely hosted.)
+- `store:claims-warehouse` — claims warehouse sits in boundary:warehouse-network, which the schema requires and no source states. (basis: The supplied evidence does not establish this membership. The zone is retained because the schema requires one, not because the source places it.)
 
 **Reviewed aliases** — other names a reader ruled identify the same element, each with the words in the source that support it. An extraction using one is named differently, not wrong.
 
@@ -339,7 +340,7 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "df7757178c394258cbcf1643e81fca5b01f324058a0841824f008e74346da2d0",
-      "model.json": "bbacd7e66fbe1a3948242b911ad7de90799dacc1b24012c64f74f5cd13ac19dd",
+      "model.json": "3800082a9fa433aff29c46f4b0e170d578d64b05bde8186dff0d11b0252ce73d",
       "claims/stride.json": "47ff8bbda7f4ddda4ac89fa54e207db321fccfa05d93dbe04ada85f6a7597857"
       }
     }

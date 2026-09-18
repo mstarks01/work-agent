@@ -398,18 +398,7 @@
       "reviewed_by": "mstarks01"
     }
   ],
-  "disputed": [
-    {
-      "element_id": "entity:hr-system",
-      "attribute": "trust_zone",
-      "blessed": "boundary:outside-corporate-network",
-      "proposed": "record as an inference",
-      "kind": "defensible-inference",
-      "basis": "No sentence places it. The model's zone is a reasonable reading of the architecture, not something the source says.",
-      "ruling": null,
-      "reviewed_by": null
-    }
-  ],
+  "disputed": [],
   "aliases": {
     "subjects": [],
     "qualifiers": []

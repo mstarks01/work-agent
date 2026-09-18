@@ -347,6 +347,18 @@
       "element_id": "process:device-gateway",
       "attribute": "trust_zone",
       "basis": "An internet-facing ingest broker supports an edge-role abstraction. GKE hosting and internet exposure do not establish a particular network perimeter."
+    },
+    {
+      "assumption": "telemetry lake sits in boundary:analytics-core, which the schema requires and no source states.",
+      "element_id": "store:telemetry-lake",
+      "attribute": "trust_zone",
+      "basis": "An analytics role does not establish network membership. The zone is retained because the schema requires one, not because the source places it."
+    },
+    {
+      "assumption": "firmware bucket sits in boundary:ingest-edge, which the schema requires and no source states.",
+      "element_id": "store:firmware-bucket",
+      "attribute": "trust_zone",
+      "basis": "No sentence places it. The zone is retained because the schema requires one. Public-read access is not the justification: it is an access policy and supports no placement."
     }
   ]
 }

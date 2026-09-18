@@ -272,8 +272,8 @@
       "proposed": "record as an inference",
       "kind": "defensible-inference",
       "basis": "'Some of them signed in' states that a sign-in exists for some readers. It does not identify the mechanism, so the attribute's wording is the model's reading rather than a stated control.",
-      "ruling": null,
-      "reviewed_by": null
+      "ruling": "keep",
+      "reviewed_by": "mstarks01"
     }
   ],
   "aliases": {
