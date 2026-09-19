@@ -35,8 +35,8 @@ from types import MappingProxyType
 from typing import Any, Literal, NamedTuple, get_args
 
 from analysis_service.analysis import (
-    CONSEQUENCE_ASSET_TAGS,
     control_state,
+    held_asset_tags,
 )
 from analysis_service.assertions import (
     ABSENT,
@@ -249,8 +249,12 @@ def _tags(value: list[str]) -> str:
     cost rather than what the element holds, no source states one, and the
     corpus applies no rule an extraction could follow — so their disagreements
     measured the vocabulary rather than the model (#877).
+
+    :func:`~analysis_service.analysis.held_asset_tags` draws that line, here
+    and in the candidate rule that reports what an element holds, so the
+    scorer and the rule cannot part company about which tags are a fact.
     """
-    return ", ".join(sorted(set(value) - CONSEQUENCE_ASSET_TAGS))
+    return ", ".join(held_asset_tags(value))
 
 
 #: The attributes an extraction is measured on, each with the function that

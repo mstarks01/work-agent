@@ -37,7 +37,7 @@ this is analysis over it.
 from __future__ import annotations
 
 import re
-from collections.abc import Collection, Iterator, Mapping
+from collections.abc import Collection, Iterable, Iterator, Mapping
 from functools import cache
 from types import MappingProxyType
 from typing import Literal
@@ -64,6 +64,7 @@ __all__ = [
     "crossing_facts",
     "crossing_flow_ids",
     "crossings_by_flow",
+    "held_asset_tags",
     "inbound_flows",
     "internet_exposed_elements",
     "is_unverified",
@@ -281,6 +282,25 @@ def reachable_from(model: SystemModel, element_id: str) -> list[str]:
 def sensitive_assets(element: Element) -> tuple[str, ...]:
     """The element's asset tags whose disclosure is itself a loss."""
     return tuple(tag for tag in element.assets if tag in SENSITIVE_ASSET_TAGS)
+
+
+def held_asset_tags(tags: Iterable[str]) -> tuple[str, ...]:
+    """``tags`` without the consequence tags, sorted: what the element holds.
+
+    The one reader of that distinction, so the places that draw it cannot
+    disagree. An extraction is scored on these
+    (:mod:`evals.harness.modes`) and a candidate rule reports these as the
+    fact it read, because a consequence tag states what a failure would cost
+    and no source states one (#877). It is subtraction rather than an
+    intersection with :data:`SENSITIVE_ASSET_TAGS`: a deployment may configure
+    further tags
+    (:func:`~analysis_service.validation.allowed_asset_tags`), and one of those
+    names something an element holds.
+
+    Sorted, because both readers compare the result and neither may depend on
+    the order a model happened to emit.
+    """
+    return tuple(sorted(set(tags) - CONSEQUENCE_ASSET_TAGS))
 
 
 def cross_boundary_flows(model: SystemModel) -> list[BoundaryCrossing]:
