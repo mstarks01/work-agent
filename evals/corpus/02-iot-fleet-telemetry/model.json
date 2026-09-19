@@ -4,9 +4,7 @@
       "id": "entity:sensor-node",
       "name": "sensor node",
       "description": "Deployed sensor on a customer site, outside the operator's physical control. Publishes readings and self-installs firmware.",
-      "assets": [
-        "availability-critical"
-      ],
+      "assets": [],
       "source_excerpt": "They are outside our physical control \u2014 a technician can be standing next to one with a laptop.",
       "source_label": "System description",
       "kind": "external-system",
@@ -38,10 +36,7 @@
       "id": "process:device-gateway",
       "name": "device gateway",
       "description": "Internet-exposed MQTT broker on GKE; authenticates nodes against the registry and forwards accepted readings.",
-      "assets": [
-        "availability-critical",
-        "reputation"
-      ],
+      "assets": [],
       "source_excerpt": "an MQTT broker we run on GKE and expose to the internet because the nodes dial in from anywhere",
       "source_label": "System description",
       "technology": "MQTT broker on GKE",

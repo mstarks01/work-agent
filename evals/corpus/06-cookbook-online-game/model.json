@@ -40,9 +40,7 @@
       "id": "process:lobby",
       "name": "lobby",
       "description": "Matchmaking service that clients connect to and that hands matches to the game servers.",
-      "assets": [
-        "availability-critical"
-      ],
+      "assets": [],
       "source_excerpt": "It talks to the lobby on TCP 1234 for matchmaking",
       "source_label": "System description",
       "technology": "unknown",
@@ -55,7 +53,6 @@
       "name": "game server",
       "description": "Match servers that clients connect to directly and that record match outcomes.",
       "assets": [
-        "availability-critical",
         "business-critical-data"
       ],
       "source_excerpt": "once a match starts it talks directly to the game servers on TCP 1235",

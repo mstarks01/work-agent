@@ -304,15 +304,16 @@ class TestFiring:
         assert {hit.element_ids[0] for hit in hits} == {"process:api", "store:ledger"}
 
     def test_shared_dependency_reports_what_the_element_holds(self, model):
-        """A consequence tag is a guess, and the lane reads a count instead.
+        """The trigger is the convergence the rule counts, never a tag.
 
-        The trigger is the convergence the rule counts. ``availability-critical``
-        names the same idea and a model supplies it: over the thirteen corpus
-        models this rule fires on 20 elements, a consequence tag sits on 12,
-        and the two agree about 3 (#877).
+        ``availability-critical`` named the same idea and a model supplied it:
+        over the thirteen corpus models this rule fired on 20 elements, that
+        tag sat on 12, and the two agreed about 3. The vocabulary carries only
+        what an element holds now, and the count is what says an outage
+        spreads (#877).
         """
         store = next(one for one in model.data_stores if one.id == "store:ledger")
-        store.assets = ["availability-critical", "pii", "reputation"]
+        store.assets = ["secrets", "pii"]
 
         (hit,) = [
             candidate
@@ -320,7 +321,7 @@ class TestFiring:
             if candidate.element_ids[0] == "store:ledger"
         ]
 
-        assert hit.facts["assets"] == "pii"
+        assert hit.facts["assets"] == "pii, secrets"
         assert hit.facts["distinct_callers"] == 2
 
     def test_the_rule_and_the_extraction_scorer_read_one_rule(self, model):
@@ -334,7 +335,7 @@ class TestFiring:
         from evals.harness.modes import _tags
 
         store = next(one for one in model.data_stores if one.id == "store:ledger")
-        store.assets = ["reputation", "secrets", "availability-critical", "pii"]
+        store.assets = ["secrets", "pii", "credentials"]
 
         (hit,) = [
             candidate
