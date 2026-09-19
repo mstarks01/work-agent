@@ -67,8 +67,16 @@ def prompt_key(name: str) -> str:
 #: be a table that answers for the frameworks somebody already wrote.
 TOKEN_CAPS: dict[str, int] = {
     # The five shared bodies, under ``prompts/``.
-    "prompts/analyze": 4500,
-    "prompts/critic": 2400,
+    #
+    # ``analyze`` raised from 4500 and ``critic`` from 2400 for ADR 0039 rule
+    # 4, which binds these two readers and nothing else: an undecidable
+    # crossing confers eligibility for analysis and establishes nothing, so a
+    # lane agent rests the claim on a fact the model states and a critic
+    # refuses the crossing as a premise. The code already carried the rule —
+    # the catalog omits such a crossing and ``crossing_facts`` marks it — and
+    # neither prompt told its reader what the ``decided`` field it reads means.
+    "prompts/analyze": 5000,
+    "prompts/critic": 2700,
     "prompts/recritic": 1100,
     # Raised from 2900 for the naming rule in rule 3. The extraction sweep of
     # 2026-09-12 lost 98 blessed elements by ID, 59 of them to a name the model

@@ -62,7 +62,11 @@ from analysis_service.report import (
 )
 from analysis_service.sampling import load_sampling
 from analysis_service.sources import DEFAULT_DESCRIPTION_LABEL, Source
-from analysis_service.system_model import SystemModel, normalize_element_ids
+from analysis_service.system_model import (
+    UNKNOWN,
+    SystemModel,
+    normalize_element_ids,
+)
 from analysis_service.validation import ValidationIssue
 from tests.factories import (
     DEFAULT_FRAMEWORKS,
@@ -1383,6 +1387,30 @@ def test_prepare_derives_crossings_rather_than_trusting_them(
         in ctx.state[graph.STATE_BOUNDARY_CROSSINGS]
     )
     assert "process:web-app" in ctx.state[graph.STATE_SYSTEM_MODEL]
+
+
+def test_prepare_marks_an_undecidable_crossing_in_the_block_the_agents_read(
+    domain_loader, package_loaders
+):
+    """ADR 0039 rule 4 reaches a lane agent and the critic through this block.
+
+    Both prompts tell their reader what ``decided`` means, and both read this
+    rendering. Dumping the crossing without defaults would take the field away
+    and leave the instruction pointing at nothing, so the field is asserted in
+    the text rather than on the object.
+    """
+    model = valid_model()
+    model.data_stores[0].trust_zone = UNKNOWN
+
+    ctx = FakeContext()
+    output = prepare(ctx, model, domain_loader, package_loaders)
+
+    # Two now: the login flow still crosses, and the store's flow can no longer
+    # be compared. Eligibility for analysis is what the second one confers.
+    assert output["crossing_count"] == 2
+    block = ctx.state[graph.STATE_BOUNDARY_CROSSINGS]
+    assert '"decided": false' in block
+    assert '"decided": true' in block
 
 
 def test_prepare_shows_the_agents_the_evidence_catalog_as_references(
