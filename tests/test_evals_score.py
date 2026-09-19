@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 
 from analysis_service.report import Report
-from evals.harness.artifact import ARTIFACT_VERSION
+from evals.harness.artifact import ARTIFACT_VERSION, corpus_digest, load_artifact
 from evals.harness.bundle import reports_dir, stride_threats, write_reports
 from evals.harness.content import prose, structural
 from evals.harness.fingerprint import components_for
@@ -141,6 +141,85 @@ def down_vote(entry: dict, artifact: Path, case, path: Path) -> None:
         "the scorer and the queue must key one finding alike"
     )
     append(recorded, path)
+
+
+class TestARescoreRecordsWhatItRead:
+    """A re-score moves the figures and leaves ``corpus_digest`` alone.
+
+    ``evals/baselines/README.md`` states the rule the block exists for: a
+    number compares only inside its group of repository commit and corpus
+    digest. Re-scoring is how a reader crosses that line without noticing, and
+    it happened -- a Baseline sealed on 2026-09-12 lost 16 references when it
+    was re-scored on 2026-09-19, to a flow identity rule and a rename rather
+    than to anything wrong.
+    """
+
+    def scored_block(self, swept, roster_path, tmp_path):
+        assert (
+            main(
+                [
+                    "score",
+                    str(swept),
+                    "--ledger",
+                    str(tmp_path / "none"),
+                    "--roster",
+                    str(roster_path),
+                ]
+            )
+            == 0
+        )
+        return json.loads(swept.read_text())
+
+    def test_it_records_the_corpus_and_commit_the_scorer_read(
+        self, swept, roster_path, tmp_path
+    ):
+        payload = self.scored_block(swept, roster_path, tmp_path)
+
+        assert payload["scored"]["corpus_digest"] == corpus_digest()
+        assert payload["scored"]["repo_commit"]["commit"]
+
+    def test_it_leaves_the_corpus_the_sweep_ran_on_untouched(
+        self, swept, roster_path, tmp_path
+    ):
+        """Two facts, two fields. Overwriting one to fix the other loses it."""
+        payload = self.scored_block(swept, roster_path, tmp_path)
+
+        assert payload["corpus_digest"] == "0" * 64
+        assert payload["scored"]["corpus_digest"] != payload["corpus_digest"]
+
+    def test_the_block_is_declared_so_an_older_sweep_reads_as_absent(
+        self, swept, roster_path, tmp_path
+    ):
+        """``carries`` answers it, which is why this needs no version bump."""
+        before = load_artifact(swept)
+        assert before.carries("scored") is False
+
+        self.scored_block(swept, roster_path, tmp_path)
+
+        assert load_artifact(swept).carries("scored") is True
+
+    def test_a_rescore_across_a_corpus_edit_says_it_is_not_comparable(
+        self, swept, roster_path, tmp_path, capsys
+    ):
+        """The half a person reads. The sweep ran on a digest of zeroes."""
+        self.scored_block(swept, roster_path, tmp_path)
+
+        said = capsys.readouterr().err
+        assert "NOT COMPARABLE" in said
+        assert "0" * 12 in said
+        assert corpus_digest()[:12] in said
+
+    def test_a_rescore_on_the_corpus_the_sweep_ran_says_nothing(
+        self, swept, roster_path, tmp_path, capsys
+    ):
+        """Not a refusal and not a nag: the warning is about crossing groups."""
+        payload = json.loads(swept.read_text())
+        payload["corpus_digest"] = corpus_digest()
+        swept.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+        self.scored_block(swept, roster_path, tmp_path)
+
+        assert "NOT COMPARABLE" not in capsys.readouterr().err
 
 
 class TestAVoteReachesTheNumbersWithoutASweep:
