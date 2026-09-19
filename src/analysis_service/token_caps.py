@@ -92,7 +92,13 @@ TOKEN_CAPS: dict[str, int] = {
     # decided inside the corpus and nowhere else, which graded every extraction
     # against rules it was never given — the defect the audit is about, in the
     # contract rather than in the code.
-    "prompts/extract": 3600,
+    #
+    # Raised again to 4100 for the one shape rule 3 had two answers for
+    # (#1040). "Name it as the text does" and "name two same-named elements
+    # apart" cannot both be obeyed where a source genuinely calls two things
+    # by one name, so the rule now states what to write: the text's own
+    # distinguishing word in front, and the shared name in `notes`.
+    "prompts/extract": 4100,
     # The facts-first body (#1003 arm B). It carries the reading rules a second
     # time rather than appending to `extract.md`, because the two routes read
     # the same sources and write different things: one emits a System Model and
@@ -119,7 +125,12 @@ TOKEN_CAPS: dict[str, int] = {
     # against 1.04% of the corpus emission it removes, on ADR 0016's reading
     # that a cap here alarms rather than rations.
     "prompts/extract-compact": 750,
-    "prompts/repair": 900,
+    # Raised from 900 for the `duplicate-id` step (#1040). The repair pass is
+    # the one reader that sees that code, and it had no rule for it: its issue
+    # list named an asset tag, an enum, an endpoint and a trust zone, and
+    # "change nothing the issues do not cite" forbade the flows a rename
+    # carries.
+    "prompts/repair": 1000,
     # The source-driven review body (#1003 arms C and D). The role and predicate
     # tables beside it are rendered, as they are for the facts-first body, so
     # neither moves this number.

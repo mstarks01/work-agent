@@ -347,7 +347,7 @@ class TestAReferenceResolvesOrTheGateSaysSo:
         payload["processes"].append(dict(payload["processes"][0], ref="p:app"))
 
         _, issues = parse_extraction(payload, COMPACT_FORMAT)
-        scope, implicated = repair_scope(issues)
+        scope, implicated = repair_scope(issues, payload)
 
         assert (scope, implicated) == ("whole", [])
 

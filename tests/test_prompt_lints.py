@@ -914,7 +914,13 @@ def test_the_critic_prompt_names_every_rejection_step(step):
 # alternative is finding out from a dead job on a live sweep.
 EXTRACTION_FAILURE_RULES: dict[str, tuple[str, str]] = {
     "schema": ("Your output is validated mechanically", EXTRACT_PROMPT_NAME),
-    "duplicate-id": ("Two elements sharing a name share an ID", EXTRACT_PROMPT_NAME),
+    # The rule and not the prohibition (#1040). "Two elements sharing a name
+    # share an ID, which is an error: name them apart" could not be obeyed
+    # beside "name it as the text does", so the prompt now says what to write.
+    "duplicate-id": (
+        "Two things of one type that the text calls by one name",
+        EXTRACT_PROMPT_NAME,
+    ),
     # The compact transport's own refusal, so its rule is in the compact
     # transport's own text. A phrase checked against ``extract.md`` would be a
     # rule the route that can trip this never reads.

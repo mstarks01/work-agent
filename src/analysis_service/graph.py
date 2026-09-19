@@ -1438,7 +1438,7 @@ def validate_extraction(
             STATE_VALIDATION_ISSUES,
             render_fenced([issue.model_dump(mode="json") for issue in issues]),
         )
-        scope, implicated = repair_scope(issues)
+        scope, implicated = repair_scope(issues, parked)
         state.put(
             STATE_REPAIR_BASELINE,
             {"model": parked, "scope": scope, "implicated": implicated},
