@@ -573,6 +573,30 @@ def assumable_attributes(element: Element) -> tuple[str, ...]:
     return (*attribute_names(element), "assets")
 
 
+def assumable_attribute_names() -> tuple[str, ...]:
+    """Every name an **Assumption** may carry, over all element types.
+
+    The union counterpart of :func:`assumable_attributes`, which answers for
+    one element: this answers "could any element carry this name at all", which
+    is the question a provider-facing schema can put and the per-element check
+    cannot. Both read the same classes, and ``tests/test_validation.py`` holds
+    this to the union of that one over every element type, so a field added to
+    a type reaches both the day it lands.
+
+    **Spelled once because four fields name an attribute** -- the two ``Ground``
+    branches, the :class:`Assumption` and its compact form. The enum sat on one
+    of them, so a model was told the closed set in one place and asked for free
+    text in three, and one wrote a whole sentence into
+    ``Assumption.attribute``: legal against ``max_length=100``, and refused by
+    the gate one layer later.
+
+    ``assets`` rides along here and not in :func:`all_attribute_names`, for the
+    reason :func:`assumable_attributes` gives: it is the one fact every type
+    can hold, so an inference can land on it.
+    """
+    return (*all_attribute_names(), "assets")
+
+
 def derive_element_id(element: Element) -> str:
     """The deterministic ID an element's type, name, and endpoints imply.
 
@@ -615,7 +639,19 @@ class Assumption(BaseModel):
 
     assumption: str = Field(min_length=1, max_length=1000)
     element_id: str = Field(max_length=300)
-    attribute: str = Field(min_length=1, max_length=100)
+    # The provider-facing schema lists the legal names, on the rule
+    # :class:`~analysis_service.claims.Ground` already follows: a model asked
+    # for a bounded string writes prose into it, and one wrote a 100-character
+    # sentence here. The enum is a schema fact and not a validator, so a model
+    # written before it still loads and a value outside the set stays an
+    # ``invalid-reference`` the repair pass can answer narrowly, rather than a
+    # schema fault that condemns the whole object. Whether the named attribute
+    # belongs to the *named element* stays with the gate.
+    attribute: str = Field(
+        min_length=1,
+        max_length=100,
+        json_schema_extra={"enum": list(assumable_attribute_names())},
+    )
     basis: str = Field(min_length=1, max_length=1000)
 
 

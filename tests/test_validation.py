@@ -155,6 +155,54 @@ class TestAssumptionsRecordAnInference:
             extra = set(assumable_attributes(element)) - set(attribute_names(element))
             assert extra == {"assets"}
 
+    def test_every_field_naming_an_attribute_states_the_closed_set(self):
+        """Four fields name an attribute; the enum was on one of them.
+
+        A model asked for a bounded string writes prose into it: one wrote a
+        100-character sentence into ``Assumption.attribute``, which
+        ``max_length=100`` admits and the gate refuses a layer later. The four
+        are tested against the two registry functions rather than against a
+        list here, so a field added to an element type reaches every schema the
+        day it lands.
+
+        ``Ground`` carries the empty string and an assumption does not, because
+        a ground's attribute is optional and an assumption's names the whole
+        point of the entry. ``assets`` is the mirror of the exception above.
+        """
+        from analysis_service.claims import Ground, UnknownRef
+        from analysis_service.compact import CompactSystemModel
+        from analysis_service.system_model import (
+            SystemModel,
+            all_attribute_names,
+            assumable_attribute_names,
+        )
+
+        def enum_of(model, defs_name):
+            schema = model.model_json_schema()
+            return schema["$defs"][defs_name]["properties"]["attribute"]["enum"]
+
+        assumable = list(assumable_attribute_names())
+        assert enum_of(SystemModel, "Assumption") == assumable
+        assert enum_of(CompactSystemModel, "CompactAssumption") == assumable
+
+        grounded = ["", *all_attribute_names()]
+        for shape in (Ground, UnknownRef):
+            assert shape.model_json_schema()["properties"]["attribute"]["enum"] == (
+                grounded
+            ), f"{shape.__name__} does not state the closed set"
+
+    def test_the_assumable_union_covers_every_element_type(self):
+        """The table against its registry: no type carries a name outside it."""
+        from analysis_service.system_model import (
+            assumable_attribute_names,
+            assumable_attributes,
+        )
+
+        union = set()
+        for element in valid_model().elements():
+            union |= set(assumable_attributes(element))
+        assert union == set(assumable_attribute_names())
+
 
 class TestTrustZones:
     def test_model_without_zones_is_reported(self):
