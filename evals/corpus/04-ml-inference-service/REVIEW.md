@@ -210,7 +210,7 @@ The narrower question, per record: **does this requirement apply to this system,
 **A8.** `V12.3.3` — The gateway to model server link states neither a protocol nor transport protection.
 
 - `process:inference-gateway`, `process:model-server`, `flow:process:inference-gateway>process:model-server>forward-request`
-- protocol and encryption_in_transit are both unknown on an internal crossing.
+- protocol and encryption_in_transit are both unknown on an internal crossing. The submitter can state what protects this link, and in this corpus they do: case 05 states transport absent on every internal link and that reference reads gap-from-prose. A property a description settles when it is written down is settled by a description when it is not, so the primary route is prose and the configuration is the alternate.
 
 > mark:
 
@@ -457,7 +457,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
       "model.json": "4f4193d4b0435635054b15c8671a2184acac80c9377c98a0b41ad0064e926f1a",
-      "claims/asvs.json": "706763e2a779d88882eb261120141984574e9f0f116b6e94fbac1842798788c9",
+      "claims/asvs.json": "e57cbcaae94bab0af36e361174b7c71a6b27f7564f4f616d9cda8eb24d91fa2b",
       "claims/stride.json": "3c266c4f193ac011357c62709d2457e256610c29d02e498e0f4adf69fbfde5e1"
       }
     }

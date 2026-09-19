@@ -186,7 +186,7 @@ The narrower question, per record: **does this requirement apply to this system,
 **A4.** `V4.4.1` — Nothing states whether the live job status WebSocket runs over TLS.
 
 - `flow:process:dispatch-console>process:dispatch-api>live-job-status`
-- The corpus's first WebSocket, and the transport is the attribute the source leaves unwritten by name.
+- The corpus's first WebSocket, and the transport is the attribute the source leaves unwritten by name. The submitter can state what protects this link, and in this corpus they do: case 05 states transport absent on every internal link and that reference reads gap-from-prose. A property a description settles when it is written down is settled by a description when it is not, so the primary route is prose and the configuration is the alternate.
 
 > mark:
 
@@ -441,7 +441,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7",
       "model.json": "b31bc54f80f1e972ebf62c0b2c380109a67034c38cc9c15f655d36992bea9b98",
-      "claims/asvs.json": "51c6af9b7ef4046e6b6651ad6aee4290907a72b6916932821aa419b8cba6a75c",
+      "claims/asvs.json": "e2a9c33f73e15df69bd2a4645afa0bb6070692516af24a275100775832359970",
       "claims/stride.json": "a7800ca4d14d10a99c563c7b7b2cc997115548223bdf3f4faf23a741df19b991"
       }
     }

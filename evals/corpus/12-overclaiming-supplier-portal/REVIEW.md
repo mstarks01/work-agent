@@ -200,7 +200,7 @@ The narrower question, per record: **does this requirement apply to this system,
 **A8.** `V12.2.1` — Suppliers upload to an externally hosted portal and no flow states its transport.
 
 - `entity:supplier`, `process:supplier-portal`, `flow:entity:supplier>process:supplier-portal>upload-documents`
-- 'Enterprise-grade encryption throughout' is the vendor's claim about its own product, not a stated fact about this connection. The requirement applies and is unsettled.
+- 'Enterprise-grade encryption throughout' is the vendor's claim about its own product, not a stated fact about this connection. The requirement applies and is unsettled. The submitter can state what protects this link, and in this corpus they do: case 05 states transport absent on every internal link and that reference reads gap-from-prose. A property a description settles when it is written down is settled by a description when it is not, so the primary route is prose and the configuration is the alternate.
 
 > mark:
 
@@ -420,7 +420,7 @@ your missing list, your notes and a digest of each file you read:
       "opened_digests": {
       "source.md": "3542d5a0939da730951ce8c09de7a18d1bbc74d5e972180acacba73bfd168d41",
       "model.json": "dcfd28bad38f897c03648d173c9cfd9454673988d6d13e3cd11abed53723c036",
-      "claims/asvs.json": "1557978c4d8757e7d5243d8839aa3a0950bec51093b9851e24b470fa4abb6e31",
+      "claims/asvs.json": "5e505c3078704dfc0dc35288158f3090ce00160f7e39286f66f7cd8a2e7cd48c",
       "claims/stride.json": "559fffbbdd6787424ca09a29fc43ef22e382ac426716e7136b9c1b633b3204dd"
       }
     }
