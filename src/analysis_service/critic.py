@@ -71,6 +71,14 @@ from analysis_service.system_model import (
 # Read off that type rather than listed again, so a band added there is ordered
 # the day it lands. The reversal is the whole difference: the type is declared
 # least severe first and a claims array reads most severe first.
+#
+# **The reversal is why the type's order is load bearing.** A band appended to
+# :data:`~analysis_service.claims.SeverityLevel` as the *least* severe reverses
+# into the first rank here, and :func:`_claim_order` then sorts it above
+# ``critical``. That is a wrong order rather than a raised error, and no reader
+# here can see it. ``tests/test_critic.py`` pins the order and the vocabulary it
+# covers, because neither side checks the other: which word outranks which is
+# the material, and it lives in no table.
 SEVERITY_ORDER: tuple[SeverityLevel, ...] = tuple(reversed(get_args(SeverityLevel)))
 
 

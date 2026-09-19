@@ -313,11 +313,12 @@ class SourceLimits:
 def plain_name(value: str) -> str:
     """A caller-supplied name with nothing a renderer reads as structure.
 
-    The rule :meth:`Source._single_line_label` applies, exported because the
-    same question is asked of a name that arrives at another entry point. A
-    value carried into a report somebody reads must not hold a line break or a
-    bidirectional override: either changes what they see without changing what
-    they are told they are seeing.
+    **The rule, and the one reader of it.** Every entry point that takes a name
+    somebody will see calls this: :meth:`Source._single_line_label` for a source
+    label, :func:`clean_system_name` for a system name. A value carried into a
+    report somebody reads must not hold a line break or a bidirectional
+    override: either changes what they see without changing what they are told
+    they are seeing.
     """
     if carries_line_break(value):
         raise ValueError("carries a line break")

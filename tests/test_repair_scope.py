@@ -84,7 +84,20 @@ def test_a_flow_that_does_not_touch_the_named_element_stays_out_of_scope():
 
 
 @pytest.mark.parametrize(
-    "flows", [None, "not a list", [None], [{"id": 1}], [{"no": "id"}]]
+    "flows",
+    [
+        None,
+        "not a list",
+        [None],
+        [{"id": 1}],
+        [{"no": "id"}],
+        # An endpoint of any other shape names no element. These two are apart
+        # from the rest: a list and a table raise ``TypeError`` on a set
+        # membership test, so the guard has to drop them before the comparison
+        # rather than let the comparison answer.
+        [{"id": "flow:x", "source": ["process:web-app"], "destination": "store:db"}],
+        [{"id": "flow:x", "source": {"a": 1}, "destination": "store:db"}],
+    ],
 )
 def test_a_model_that_failed_the_schema_still_yields_a_scope(flows):
     """The model here is whatever extraction emitted, not a validated one."""

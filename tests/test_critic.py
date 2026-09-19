@@ -1,5 +1,7 @@
 """Tests for the mechanical checks around the critic: review and assemble."""
 
+from typing import get_args
+
 import pytest
 
 from analysis_service import critic
@@ -9,6 +11,7 @@ from analysis_service.claims import (
     Mitigation,
     ProposedVerdict,
     Severity,
+    SeverityLevel,
     UnknownRef,
     Verdict,
 )
@@ -34,6 +37,24 @@ LABEL = DEFAULT_DESCRIPTION_LABEL
 SOURCES = {LABEL: "Customers log in to the web app, which stores orders."}
 # A flow the sample model really derives as a boundary crossing.
 CROSSING = "flow:entity:customer>process:web-app>login"
+
+
+def test_the_severity_order_runs_most_severe_first():
+    """The rank the report sorts by, pinned against the vocabulary it covers.
+
+    ``SEVERITY_ORDER`` reverses ``SeverityLevel``, so that type's declaration
+    order decides this one. A band appended there as the *least* severe
+    reverses into the first rank and sorts a trivial claim above a critical
+    one. ``_claim_order`` cannot see that: every rank it reads is a legal
+    index, so the report comes out backwards and nothing raises.
+
+    Two assertions, because neither side proves the other. Which word outranks
+    which is the material the rule derives from, and it lives in no table, so
+    the first line states it. The second line holds the coverage: a band added
+    to the type fails here rather than taking a rank nobody chose.
+    """
+    assert critic.SEVERITY_ORDER == ("critical", "high", "medium", "low")
+    assert frozenset(critic.SEVERITY_ORDER) == frozenset(get_args(SeverityLevel))
 
 
 @pytest.fixture

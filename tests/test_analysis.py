@@ -236,7 +236,14 @@ class TestStructuralFacts:
     def test_zone_kinds_maps_boundary_to_kind(self, chain):
         assert zone_kinds(chain)["boundary:core"] == "privilege"
 
-    def test_sensitive_assets_drops_the_non_confidentiality_tags(self):
+    def test_sensitive_assets_drops_a_tag_this_rule_did_not_admit(self):
+        """A deployment tag is held, and its disclosure is still not a loss.
+
+        ``extra_asset_tags`` extends the vocabulary, so an element can carry a
+        tag ``SENSITIVE_ASSET_TAGS`` never listed. What that tag means to the
+        deployment is the deployment's business; this rule may not read it as a
+        confidentiality loss, so it drops out here (#877).
+        """
         element = Process(
             id="process:p",
             name="P",
@@ -244,7 +251,7 @@ class TestStructuralFacts:
             trust_zone="boundary:z",
             exposure="internal",
             interface_kind="non-web",
-            assets=["pii", "availability-critical", "reputation"],
+            assets=["pii", "cardholder-data"],
         )
         assert sensitive_assets(element) == ("pii",)
 
@@ -305,9 +312,9 @@ class TestTheAssetVocabularyNamesWhatAnElementHolds:
         """
         assert "cardholder-data" not in analysis.SENSITIVE_ASSET_TAGS
 
-    def test_held_tags_are_sorted_and_deduplicated(self):
+    def test_comparable_tags_are_sorted_and_deduplicated(self):
         """Both readers compare the result, so neither may read an emitted order."""
-        assert analysis.held_asset_tags(["pii", "credentials", "pii"]) == (
+        assert analysis.comparable_asset_tags(["pii", "credentials", "pii"]) == (
             "credentials",
             "pii",
         )
