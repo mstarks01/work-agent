@@ -582,7 +582,19 @@ def parse_and_validate(
     return model, issues + validate(model, extra_asset_tags, max_elements, sources)
 
 
-def repair_scope(issues: Sequence[ValidationIssue]) -> tuple[str, list[str]]:
+#: The issue codes whose repair changes an element's *name*, and therefore its
+#: ID. Only ``duplicate-id`` does: two elements hold one ID, and the repair
+#: either names them apart or keeps one of them. ``id-mismatch`` is not here
+#: because :func:`~analysis_service.system_model.normalize_element_ids` settles
+#: it before this gate runs, so no extraction reaches the repair pass carrying
+#: one. A code absent from this set keeps its element's ID, which is the safe
+#: default: the flows stay pinned.
+RENAMING_CODES: frozenset[str] = frozenset({"duplicate-id"})
+
+
+def repair_scope(
+    issues: Sequence[ValidationIssue], model: Mapping[str, Any]
+) -> tuple[str, list[str]]:
     """What a repair of these issues may change: the scope, and the elements it names.
 
     ``"elements"`` when every issue names an element: the repair may change
@@ -591,12 +603,51 @@ def repair_scope(issues: Sequence[ValidationIssue]) -> tuple[str, list[str]]:
     zones, too many elements — because there is no narrower patch that could
     answer it, and a whole re-extraction is the honest reading rather than a
     preservation repair that preserved nothing.
+
+    **The flows through a renamed element are named with it.** A flow ID is
+    derived from its endpoints, so renaming an element renames every flow
+    through it: the repair returns that flow under a new ID, and the model it
+    was given holds it under the ID the rename replaces. Unless that flow is
+    in scope, :func:`restore_unimplicated` puts the replaced entry back,
+    pointing at an element ID the repaired model does not carry; the gate
+    reports the dangling reference, and the one repair pass is spent on a
+    repair that was correct (#1040). The flows are the rename's own half
+    rather than a change of the repair's own, which is why they are derived
+    here instead of being asked for in the prompt.
+
+    Only :data:`RENAMING_CODES` widens the scope that way. An element named by
+    any other issue keeps its ID, so a flow through it that changed did so on
+    the repair's own initiative, which is the edit the preservation rule
+    exists to stop.
+
+    ``model`` is whatever extraction emitted, which may have failed the schema
+    outright, so every read of it is defensive: ``data_flows`` need not be a
+    list and an entry need not be a table.
     """
     if any(issue.element_id is None for issue in issues):
         return "whole", []
-    return "elements", sorted(
-        {issue.element_id for issue in issues if issue.element_id}
-    )
+    named = {issue.element_id for issue in issues if issue.element_id}
+    renamed = {
+        issue.element_id
+        for issue in issues
+        if issue.element_id and issue.code in RENAMING_CODES
+    }
+    return "elements", sorted(named | _flows_touching(model, renamed))
+
+
+def _flows_touching(model: Mapping[str, Any], element_ids: Collection[str]) -> set[str]:
+    """Every flow ID in ``model`` with an endpoint in ``element_ids``."""
+    flows = model.get("data_flows")
+    if not isinstance(flows, list):
+        return set()
+    wanted = set(element_ids)
+    return {
+        flow["id"]
+        for flow in flows
+        if isinstance(flow, dict)
+        and isinstance(flow.get("id"), str)
+        and {flow.get("source"), flow.get("destination")} & wanted
+    }
 
 
 def restore_unimplicated(
@@ -609,7 +660,9 @@ def restore_unimplicated(
     ``prompts/repair.md`` asks for untouched elements byte-identical and
     forbids a "while I'm here" edit; this is what enforces it (#675 D01). Both
     arguments are JSON dumps, the previous one normalized — the model the
-    issues were computed against. Per element group: an element the issues
+    issues were computed against. ``implicated`` is what :func:`repair_scope`
+    returns: the elements the issues named, and the flows through them, whose
+    IDs a rename of a named element re-derives. Per element group: an element the issues
     named keeps whatever the repair made of it, deleted included; an element
     they did not name reads as it did before, whether the repair changed or
     dropped it, and its ID is returned so the report can say so; an element

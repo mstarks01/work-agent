@@ -256,6 +256,14 @@ name them apart", and "**Name it as the text does**, in the singular, with
 nothing added … Attach no qualifier the text does not attach to that thing." A
 model reading a source that genuinely names two things alike cannot obey both.
 
+> **The prompt half is answered; the schema half stands.** #1040 replaced those
+> two rules with one on 2026-09-19. A name still comes from the text, and two
+> things of one type that the text calls by one name take the text's own
+> distinguishing word in front, with the shared name in `notes`. The schema
+> finding above is unchanged — it still holds one element per type and name —
+> and the shape reached the gate **zero times in 520 archived extraction
+> emissions**, so the rule was shipped without a paid run.
+
 ### 3.2 The three the adapter loses and the schema holds
 
 All three are the facts-first route, and all three refuse rather than guess.
