@@ -400,12 +400,51 @@ ENVELOPE_KEYS: tuple[str, ...] = (
     "completion",
 )
 
+#: What a **re-score** writes and a sweep never does, which is why these are
+#: apart from :data:`ENVELOPE_KEYS`. ``tests/test_evals_instruments.py`` holds
+#: a sweep to the declared set *minus* this tuple, so the separation is a
+#: statement the suite checks rather than a comment: a sweep that started
+#: writing one of these would fail there.
+#:
+#: ``scored`` records what ``run.py score`` read. Declared without a version
+#: bump on the ``flow_identity_version`` precedent above -- :meth:`carries`
+#: answers whether an artifact holds it, and an absent block is not an unknown
+#: one but the ordinary case, a sweep whose figures came from the corpus it
+#: ran on. It sits **beside** ``corpus_digest`` rather than overwriting it,
+#: because the two are different facts: one says what the run read and the
+#: other what the scorer did, and a re-score moves only the second.
+RESCORED_KEYS: tuple[str, ...] = ("scored",)
+
 #: Every key an artifact of this version carries. The envelope's, plus each
 #: instrument's own declaration — so an instrument added to the table is a key
 #: the loader starts requiring, with no edit here.
 DECLARED_KEYS: frozenset[str] = frozenset(ENVELOPE_KEYS).union(
-    *(instrument.keys for instrument in INSTRUMENTS.values())
+    RESCORED_KEYS, *(instrument.keys for instrument in INSTRUMENTS.values())
 )
+
+
+class ScoredAgainst(BaseModel):
+    """What a re-score read, where that is not what the sweep ran on.
+
+    ``evals/baselines/README.md`` states the rule this records: a number
+    compares only inside its group of repository commit and corpus digest,
+    because a corpus edit moves every figure under it. Re-scoring is how a
+    reader crosses that line without noticing -- the figures change and
+    ``corpus_digest`` does not, so the artifact goes on naming the corpus its
+    *run* read while its numbers come from another one.
+
+    A frozen artifact against a moved corpus loses matches to nothing anybody
+    did wrong. A Baseline sealed on 2026-09-12 cites flow IDs under the rule of
+    the day and element names the corpus has since edited, so 16 of its
+    references stopped matching when it was re-scored on 2026-09-19: 10 to the
+    flow identity rule and 6 to a rename. Neither the sealed figure nor the
+    fresh one is wrong, and they are not comparable.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    corpus_digest: str = Field(max_length=200)
+    repo_commit: RepoCommit
 
 
 def _completion(sweep: Sweep, cases: Sequence[str]) -> dict[str, int]:

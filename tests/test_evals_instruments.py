@@ -253,15 +253,31 @@ class TestTheDeclaredKeysAreTheWrittenKeys:
         assert set(written) == set(instrument.keys)
 
     def test_the_declared_set_is_the_envelope_plus_every_instrument(self):
-        from evals.harness.artifact import DECLARED_KEYS, ENVELOPE_KEYS
+        from evals.harness.artifact import (
+            DECLARED_KEYS,
+            ENVELOPE_KEYS,
+            RESCORED_KEYS,
+        )
 
         owned = {key for i in INSTRUMENTS.values() for key in i.keys}
-        assert DECLARED_KEYS == set(ENVELOPE_KEYS) | owned
+        assert DECLARED_KEYS == set(ENVELOPE_KEYS) | owned | set(RESCORED_KEYS)
 
     def test_a_sweep_writes_exactly_the_declared_set(self, tmp_path):
-        """``build`` produces the keys the loader is told to expect."""
+        """``build`` produces the keys the loader is told to expect.
+
+        Minus :data:`~evals.harness.artifact.RESCORED_KEYS`, which only
+        ``run.py score`` writes. The
+        subtraction is the check rather than a loosening: a sweep that started
+        writing one of those keys fails here, and so does a re-score key nobody
+        declared.
+        """
         from analysis_service.certification import CertifyResult
-        from evals.harness.artifact import DECLARED_KEYS, RepoCommit, build
+        from evals.harness.artifact import (
+            DECLARED_KEYS,
+            RESCORED_KEYS,
+            RepoCommit,
+            build,
+        )
 
         run = empty_run(tuple(PACKAGES))
         artifact = build(
@@ -274,7 +290,7 @@ class TestTheDeclaredKeysAreTheWrittenKeys:
             commit=RepoCommit(commit="0" * 40, clean=True),
             corpus="0" * 64,
         )
-        assert set(artifact) == DECLARED_KEYS
+        assert set(artifact) == DECLARED_KEYS - set(RESCORED_KEYS)
 
     def test_the_artifact_carries_the_charges_the_run_folded(self):
         """The value, not just the key: one fold, read once and written once.

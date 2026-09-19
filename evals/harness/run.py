@@ -92,6 +92,7 @@ from evals.harness.artifact import (
     ARTIFACT_VERSION,
     REPO_ROOT,
     EvalArtifact,
+    ScoredAgainst,
     corpus_digest,
     load_artifact,
     repo_commit,
@@ -1225,11 +1226,44 @@ def command_score(args: argparse.Namespace) -> int:
     raw = dict(loaded.raw)
     raw |= _scored_keys(sweep)
     raw["series"] = _series_record(by_series)
+    scored_against = ScoredAgainst(
+        corpus_digest=corpus_digest(Path(args.corpus)), repo_commit=repo_commit()
+    )
+    raw["scored"] = scored_against.model_dump()
 
     out.write_text(archive_bytes("artifact", raw), "utf-8")
     print(f"\n{len(votes)} vote(s) read from {args.ledger}")
     print(f"{out} rewritten" if out == path else f"scored artifact written to {out}")
+    _warn_across_groups(loaded.corpus_digest, scored_against.corpus_digest)
     return 0
+
+
+def _warn_across_groups(ran_on: str, scored_on: str) -> None:
+    """Say so when the figures and the artifact name different corpora.
+
+    ``evals/baselines/README.md`` states the rule: a number compares only
+    inside its group of repository commit and corpus digest. Re-scoring is how
+    a reader crosses that line without noticing, because the figures move and
+    ``corpus_digest`` does not. The artifact records both facts either way; this
+    is the half a person reads.
+
+    **Not a refusal.** Re-scoring across a corpus edit is the operation the
+    command exists for -- it is what puts two sweeps on one scorer. What it is
+    not is a licence to read the result beside a figure the artifact was sealed
+    with.
+    """
+    if ran_on == scored_on:
+        return
+    print(
+        f"\nNOT COMPARABLE TO THIS ARTIFACT'S OWN FIGURES: it ran on corpus"
+        f" {ran_on[:12]} and these numbers come from {scored_on[:12]}."
+        "\n  A frozen artifact cites the element IDs of its own day, so a"
+        " reference the corpus has since renamed or re-keyed stops matching"
+        " and nothing is wrong."
+        "\n  Read this against another sweep scored the same way, never"
+        " against a figure recorded when it was sealed.",
+        file=sys.stderr,
+    )
 
 
 def command_migrate(args: argparse.Namespace) -> int:
