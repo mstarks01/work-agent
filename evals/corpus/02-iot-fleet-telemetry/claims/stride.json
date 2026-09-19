@@ -186,7 +186,7 @@
       "likelihood": "high",
       "impact": "high"
     },
-    "notes": "The gateway is the single ingest point for the whole fleet and is tagged availability-critical.",
+    "notes": "The gateway is the single ingest point for the whole fleet.",
     "verb": "flood"
   },
   {

@@ -23,7 +23,7 @@ How plausible is it that a capable attacker exploits this within the system's no
 
 What is lost if the threat succeeds? Anchor on model facts:
 
-- **Assets touched.** Asset tags on the affected elements are the primary input: `credentials` and `secrets` compromise usually rates **high** (they unlock further systems); `pii`, `health`, `financial` rate at least **medium**, high at scale or with regulatory exposure; `availability-critical` makes outage impact high; `reputation` colors public-facing failures.
+- **Assets touched.** Asset tags on the affected elements are the primary input: `credentials` and `secrets` compromise usually rates **high** (they unlock further systems); `pii`, `health`, `financial` rate at least **medium**, high at scale or with regulatory exposure. Every tag names what an element holds, so an outage has none to read: rate it on the dependent set instead — a candidate's `distinct_callers` counts how many elements flow into the one that stops.
 - **Data classification.** A Data Store's `data_classification` sets a floor: restricted/confidential data disclosure or corruption is not low-impact.
 - **Blast radius.** Score the full reach, including second-order consequences the threat description names: elements reachable through outbound flows, dependents that fail in a cascade, every consumer of a poisoned store. One record vs. the corpus; one user vs. all tenants.
 - **Reversibility.** Recoverable interruptions rate lower than irreversible disclosure, unrecoverable corruption, or safety-relevant harm.

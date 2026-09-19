@@ -190,7 +190,7 @@
       "likelihood": "high",
       "impact": "high"
     },
-    "notes": "The lobby is a single availability-critical chokepoint that every session passes through.",
+    "notes": "The lobby is a single chokepoint that every session passes through.",
     "verb": "flood"
   },
   {

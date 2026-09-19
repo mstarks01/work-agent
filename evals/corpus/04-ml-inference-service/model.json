@@ -26,10 +26,7 @@
       "id": "process:inference-gateway",
       "name": "inference gateway",
       "description": "Internet-exposed FastAPI service on GKE; authenticates callers by API key, forwards requests, and logs every request and response.",
-      "assets": [
-        "reputation",
-        "availability-critical"
-      ],
+      "assets": [],
       "source_excerpt": "our inference gateway, a FastAPI service on GKE that we expose on the internet",
       "source_label": "System description",
       "technology": "FastAPI on GKE",
@@ -42,8 +39,7 @@
       "name": "model server",
       "description": "GPU-backed server that loads model artifacts at startup, reads customer features, and runs inference.",
       "assets": [
-        "business-critical-data",
-        "availability-critical"
+        "business-critical-data"
       ],
       "source_excerpt": "the model server, which runs the actual model on GPU nodes in our model network",
       "source_label": "System description",

@@ -308,7 +308,7 @@ on either of them. That is the finding this sitting exists for.
 
 - `process:lobby`, `flow:process:game-client>process:lobby>matchmaking`
 - severity: high/high · verb: `flood`
-- The lobby is a single availability-critical chokepoint that every session passes through.
+- The lobby is a single chokepoint that every session passes through.
 
 > mark:
 
@@ -400,9 +400,9 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "17e797d0315fdd53d5acf05962ca0ae8a23e08f84779f8528ade6422c34577a3",
-      "model.json": "52d29ed9a3eca1fb9d3d702d88659cd3f8b81b0d47b89fcacde589e0eaa59b4a",
+      "model.json": "400ad2ee53ee5b0e87c310c881be77f6cc748b7f817fc176bf8967818238c3eb",
       "claims/asvs.json": "79b1fb614daf429bf079268027870240a41c056ba1d41174eb35007f22006bf8",
-      "claims/stride.json": "68cbca75a6fc4d8ae365c1108cd252948cfbad0b50b518e7aa61ef2f360639c6"
+      "claims/stride.json": "2c8b0ec74170edd5d5671594ad6c2c50e699d1cd4960c61c4c5b3e34c8fb70ff"
       }
     }
   }

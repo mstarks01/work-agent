@@ -16,9 +16,7 @@
       "id": "process:web-application",
       "name": "web application",
       "description": "Serves the browser and enqueues work rather than performing it inline.",
-      "assets": [
-        "reputation"
-      ],
+      "assets": [],
       "source_excerpt": "the web application runs in our web tier",
       "source_label": "System description",
       "technology": "unknown",

@@ -166,7 +166,7 @@ Include, as far as you know them:
   (is it internet-facing?), `interface_kind` (does the process present a web
   interface?), and `data_classification`.
 - **Sensitive assets** in play — credentials, PII, financial, health, secrets,
-  business-critical or availability-critical data.
+  business-critical data.
 
 Two behaviours worth knowing:
 

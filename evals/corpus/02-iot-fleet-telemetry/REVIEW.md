@@ -265,7 +265,7 @@ on either of them. That is the finding this sitting exists for.
 
 - `process:device-gateway`, `flow:entity:sensor-node>process:device-gateway>publish-readings`
 - severity: high/high · verb: `flood`
-- The gateway is the single ingest point for the whole fleet and is tagged availability-critical.
+- The gateway is the single ingest point for the whole fleet.
 
 > mark:
 
@@ -357,8 +357,8 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "fc745e273aff8be740a814f0a9b4a45d6f3c6fe39dc7c8efa2b879d4f270ac74",
-      "model.json": "c9d58fb5ea8836db8022d0fe04ca03b121d9f65e1326d8eaed9bcc5a1f0bf978",
-      "claims/stride.json": "2bce750ba6ddc1307074a289e48c4591c59f7f2883ff687d9bd98e4f5e7db675"
+      "model.json": "fbe6f9b1304f947a2efe454df07391e4a430acf808055be11c5b3bb7911995a4",
+      "claims/stride.json": "5e19650733b2e65206dc03b7522d469f010afe34a8618c3b813b3e41ca12cc61"
       }
     }
   }

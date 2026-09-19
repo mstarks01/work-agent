@@ -117,7 +117,7 @@ Written against exemplar system B. Repudiation does not require anyone to tamper
   "severity": {
     "likelihood": "medium",
     "impact": "medium",
-    "justification": "Likelihood is medium and conditional on the unknown `authentication` value: partner disputes are routine and need no attacker, but the control may in fact be present. Impact is medium: individual settlement disputes carry `financial` and `reputation` cost, bounded per event."
+    "justification": "Likelihood is medium and conditional on the unknown `authentication` value: partner disputes are routine and need no attacker, but the control may in fact be present. Impact is medium: individual settlement disputes carry `financial` cost, bounded per event."
   },
   "mitigations": [
     {

@@ -405,7 +405,7 @@ your missing list, your notes and a digest of each file you read:
       "notes": "<counts, and anything you would change>",
       "opened_digests": {
       "source.md": "20b0aa82c922766db2353cade33f7a26b38c60a3c7061244ef4686b7a647778b",
-      "model.json": "eed16da2e2d5d7a7202be5d2f31e5017d371c19ebc23f67a4e30eb3fdd20fb4c",
+      "model.json": "bf3cfe67eb9ecbc49237bb6cf388bf664e1de8b54b444c8c004cdf87de5fdc46",
       "claims/asvs.json": "9e4ee6be326673ba2101ed60662718b0d50ecaf6aba7218bcec702c785b033c5",
       "claims/stride.json": "eb2f6e6330b22dbf3f6151e8d93290df9b401f89a1171f146c17f0b27bab572e"
       }

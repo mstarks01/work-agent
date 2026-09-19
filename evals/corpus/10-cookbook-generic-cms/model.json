@@ -40,8 +40,7 @@
       "name": "Web server",
       "description": "Serves the public content site over HTTPS and runs the CMS. Reads and writes pages, accounts and comments in MySQL and pushes newly published assets to the CDN bucket.",
       "assets": [
-        "business-critical-data",
-        "reputation"
+        "business-critical-data"
       ],
       "source_excerpt": "The web server runs the CMS and keeps pages, accounts and comments in a MySQL database on the same hosted network.",
       "source_label": "System description",
