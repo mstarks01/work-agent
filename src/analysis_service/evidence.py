@@ -443,6 +443,34 @@ def render_catalog(
     )
 
 
+def ground_gloss(ground: Ground, assertions: AssertionCatalog | None = None) -> str:
+    """What one ground asserts, in the words the evidence table already uses.
+
+    **The one reader of "what does this ground say".** The lane agent selects
+    a fact out of :func:`render_catalog`'s table, and the critic then rules on
+    whether the argument follows from it — so the two have to read one
+    sentence. An assertion ground is what makes that a live question rather
+    than a tidiness one: it carries a digest of the row's value and scope and
+    nothing else, so a critic handed the ground alone could not see the fact
+    (#1082).
+
+    Raises for an assertion ground with no catalog behind it, exactly as
+    :func:`render_catalog` does: a bare identity says nothing, and answering
+    with one would be the failure this exists to prevent.
+    """
+    rows = (
+        {}
+        if assertions is None
+        else {assertion_id(row): row for row in assertions.entries}
+    )
+    subjects = (
+        {}
+        if assertions is None
+        else {subject.id: subject for subject in assertions.subjects}
+    )
+    return _gloss(ground, rows, subjects)
+
+
 def render_rows(catalog: AssertionCatalog) -> str:
     """Every assertion row as a table, keyed by the identity a patch names.
 

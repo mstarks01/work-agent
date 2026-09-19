@@ -33,6 +33,11 @@ from tests.factories import sample_draft, sample_ruling, severity, valid_model
 SCHEMAS = schemas_for("stride")
 
 LABEL = DEFAULT_DESCRIPTION_LABEL
+# Two identities of the shape ``assertion_id`` composes, used as opaque
+# references: this seam never resolves one, which is the point of the tests
+# that use them.
+OPEN_ROW = "assertion:mfa-requirement~principal:customer-accounts~any~unknown"
+SECOND_OPEN_ROW = "assertion:credential-sharing~credential:build-token~any~unknown"
 # The job's one source, as the executor hands it to the fan-in.
 SOURCES = {LABEL: "Customers log in to the web app, which stores orders."}
 # A flow the sample model really derives as a boundary crossing.
@@ -757,12 +762,113 @@ class TestAnUnknownGroundMakesTheClaimConditional:
         ]
         assert "encryption_at_rest" in verdict.reason
 
+    def test_an_open_assertion_earns_the_same_confirmation_safeguard(self, model):
+        """One uncertainty, two representations, one safeguard (#1082).
+
+        ``CONDITIONAL_GROUNDS`` already declared itself the reader of "is this
+        claim conditional" and holds both kinds; ``unknown_grounds`` read only
+        ``unknown-attribute``. So moving a fact out of a model field and into
+        the assertion catalog silently dropped the requirement that a
+        ``confirmed`` say the claim stands without it.
+
+        Both halves are asserted here, because neither proves the other: the
+        safeguard fires, and naming the row answers it.
+        """
+        draft = sample_draft(
+            "S-01",
+            grounds=[Ground(kind="unknown-assertion", assertion=OPEN_ROW)],
+        )
+
+        silent = review_issues([draft], [sample_ruling("S-01")], model)
+
+        assert {p.kind for p in silent.problems} == {"confirmed-on-unknown"}
+        assert OPEN_ROW in "; ".join(silent.messages)
+
+        dismissed = sample_ruling(
+            "S-01",
+            verdict=ProposedVerdict(
+                status="confirmed",
+                immaterial_unknowns=[UnknownRef(assertion=OPEN_ROW)],
+            ),
+        )
+
+        assert not review_issues([draft], [dismissed], model)
+
+    def test_two_open_rows_are_two_dismissals(self, model):
+        """A reference is compared by all three of its fields.
+
+        Every assertion-spelled reference carries the empty element and the
+        empty attribute, so a set keyed on that pair read two different open
+        rows as one and let a single dismissal answer both.
+        """
+        draft = sample_draft(
+            "S-01",
+            grounds=[
+                Ground(kind="unknown-assertion", assertion=OPEN_ROW),
+                Ground(kind="unknown-assertion", assertion=SECOND_OPEN_ROW),
+            ],
+        )
+        ruling = sample_ruling(
+            "S-01",
+            verdict=ProposedVerdict(
+                status="confirmed",
+                immaterial_unknowns=[UnknownRef(assertion=OPEN_ROW)],
+            ),
+        )
+
+        message = "; ".join(review_issues([draft], [ruling], model).messages)
+
+        assert SECOND_OPEN_ROW in message
+        assert OPEN_ROW not in message.replace(SECOND_OPEN_ROW, "")
+
+    def test_a_needs_info_may_name_the_open_row_it_rests_on(self, model):
+        """The third spelling resolves against nothing, and that is the shape.
+
+        An element reference is checked against the model because a critic
+        writes it; an assertion identity names a row of a catalog this seam
+        does not hold, and the ground it came from was built from that catalog
+        by code.
+        """
+        ruling = sample_ruling(
+            "S-01",
+            confidence="low",
+            verdict=ProposedVerdict(
+                status="needs-info",
+                reason="the sources were asked and left it open",
+                related_unknowns=[UnknownRef(assertion=OPEN_ROW)],
+            ),
+        )
+        draft = sample_draft(
+            "S-01",
+            grounds=[Ground(kind="unknown-assertion", assertion=OPEN_ROW)],
+        )
+
+        assert not review_issues([draft], [ruling], model)
+
+    def test_a_reference_naming_nothing_at_all_is_still_refused(self, model):
+        """Widening the shape must not widen it to the empty reference."""
+        ruling = sample_ruling(
+            "S-01",
+            confidence="low",
+            verdict=ProposedVerdict(
+                status="needs-info",
+                reason="something",
+                related_unknowns=[UnknownRef()],
+            ),
+        )
+
+        problems = review_issues([self._draft()], [ruling], model)
+
+        assert "unresolved-unknown" in {p.kind for p in problems.problems}
+
     def test_many_unknowns_are_counted_rather_than_named(self):
         """The composed reason has a maximum length, and the pairs do not.
 
         A draft can rest on more unknowns than the field holds a sentence for.
-        The reason names the count instead of the pairs, and
-        ``related_unknowns`` still carries every pair, so nothing is lost.
+        The reason names the count instead of the references, and
+        ``related_unknowns`` still carries every one, so nothing is lost. It
+        counts *facts* rather than attributes, because an open assertion row
+        is one of them and has no attribute.
         """
         draft = sample_draft(
             "S-01",
@@ -779,7 +885,7 @@ class TestAnUnknownGroundMakesTheClaimConditional:
         ruling = type(draft).settled_by_grounds(draft)
 
         assert len(ruling.verdict.reason) <= REASON_MAX_CHARS
-        assert "40 attributes" in ruling.verdict.reason
+        assert "40 facts" in ruling.verdict.reason
         assert len(ruling.verdict.related_unknowns) == 40
 
     def test_the_critics_own_unknowns_and_reason_are_kept(self, model):

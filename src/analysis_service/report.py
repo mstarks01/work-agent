@@ -277,6 +277,14 @@ from analysis_service.vendors import ServedTrust, vendor_for_route
 # not make a sound threat go away. ``None`` says the critic read no advice
 # here, which on a surviving threat is a different fact from advice it approved
 # and is why the field is not a bare boolean defaulting to true.
+# 3.0 also carries a third spelling on an ``UnknownRef``: ``assertion``, one
+# row of the job's fact catalog the sources left open. ``unknown-attribute``
+# and ``unknown-assertion`` are one question at two seams — ``CONDITIONAL_
+# GROUNDS`` is the set that says so — and the record could name only the
+# first, so a ``confirmed`` resting on an open assertion had nothing to
+# dismiss and passed the review seam while the same claim resting on an open
+# attribute was refused (#1082). Additive, and it rides 3.0 for the reason
+# everything above does: 3.0 has never shipped.
 SCHEMA_VERSION = "3.0"
 
 # The envelope's disclaimer, which is about the *service* rather than about any

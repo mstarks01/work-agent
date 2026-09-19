@@ -197,7 +197,7 @@ def compose_facts_prompt(loader: MarkdownLoader) -> str:
     parts = [
         loader.load(EXTRACT_FACTS_PROMPT_NAME),
         render_roles(),
-        render_predicates(),
+        render_predicates("bundle"),
     ]
     return "\n\n".join(part.strip() for part in parts) + "\n"
 
@@ -224,7 +224,7 @@ def compose_rows_prompt(loader: MarkdownLoader) -> str:
     No role table, for the reason the first call carries no predicates: this
     call names no mention and types nothing.
     """
-    parts = [loader.load(EXTRACT_ROWS_PROMPT_NAME), render_predicates()]
+    parts = [loader.load(EXTRACT_ROWS_PROMPT_NAME), render_predicates("bundle")]
     return "\n\n".join(part.strip() for part in parts) + "\n"
 
 
@@ -236,7 +236,11 @@ def compose_reread_prompt(loader: MarkdownLoader) -> str:
     names a predicate. Rendered rather than restated, so a role or a predicate
     added tomorrow reaches both prompts and neither file moves.
     """
-    parts = [loader.load(REREAD_PROMPT_NAME), render_roles(), render_predicates()]
+    parts = [
+        loader.load(REREAD_PROMPT_NAME),
+        render_roles(),
+        render_predicates("batch"),
+    ]
     return "\n\n".join(part.strip() for part in parts) + "\n"
 
 
@@ -249,7 +253,7 @@ def compose_assert_prompt(loader: MarkdownLoader) -> str:
     gate reads them from there. A second copy in prose would be a second reader
     of one rule, and the prompt's copy is the one nothing checks.
     """
-    parts = [loader.load(ASSERT_PROMPT_NAME), render_predicates()]
+    parts = [loader.load(ASSERT_PROMPT_NAME), render_predicates("catalog")]
     return "\n\n".join(part.strip() for part in parts) + "\n"
 
 
@@ -287,13 +291,39 @@ def _element_words(element_type: type) -> str:
     return re.sub(r"(?<!^)(?=[A-Z])", " ", element_type.__name__)
 
 
-def render_predicates() -> str:
+#: How a ``reference`` predicate's value is spelled, per stage that renders the
+#: table. **A table rather than one sentence**, because the answer differs by
+#: stage and the single sentence was wrong at every one of them: it said "the
+#: name of a component", and no resolver takes a display name. A bundle stage
+#: writes the handle it invented in the same emission
+#: (:func:`~analysis_service.factbundle._referent` looks the value up among the
+#: bundle's own handles); a catalog stage writes the subject's identity, which
+#: :func:`~analysis_service.assertions.resolve_catalog` looks up among the
+#: subjects the catalog declares; and the re-read batch does either, because an
+#: operation may reach a thing it is adding or one the model already holds.
+#:
+#: Keyed by the composer that renders it, so a stage added tomorrow raises here
+#: rather than inheriting whichever sentence happened to be first.
+REFERENCE_FORMS: dict[str, str] = {
+    "bundle": "the handle of a {referent}",
+    "catalog": "the ID of a {referent}",
+    "batch": "the handle or the element ID of a {referent}",
+}
+
+
+def render_predicates(stage: str = "catalog") -> str:
     """The predicate registry as the table a model reads.
 
     One row per predicate, in registry order: what it means, which subjects it
     takes, and what its value may be. A ``term`` predicate lists its own words
     beside the two every predicate admits; a ``reference`` one names what it
-    points at; free text says so.
+    points at, in the spelling ``stage``'s own resolver reads
+    (:data:`REFERENCE_FORMS`); free text says so.
+
+    A ``stated_only`` predicate says so in the same row. That is a registry
+    field the gate reads — it refuses an ``inferred`` basis on a predicate
+    whose value *identifies* rather than describes — and a row that did not
+    carry it cost the model the whole fact with no way to have known.
     """
     rows = [
         "## The predicates",
@@ -308,9 +338,11 @@ def render_predicates() -> str:
     ]
     for name, predicate in REGISTRY.items():
         subjects = ", ".join(sorted(predicate.subjects))
+        meaning = predicate.meaning
+        if predicate.stated_only:
+            meaning += "; only where a source states it, never inferred"
         rows.append(
-            f"| `{name}` | {subjects} | {_value_form(predicate)} |"
-            f" {predicate.meaning} |"
+            f"| `{name}` | {subjects} | {_value_form(predicate, stage)} | {meaning} |"
         )
     scoped = [
         f"`{name}` needs a scope naming its " + " and ".join(predicate.requires)
@@ -322,10 +354,10 @@ def render_predicates() -> str:
     return "\n".join(rows)
 
 
-def _value_form(predicate: Predicate) -> str:
+def _value_form(predicate: Predicate, stage: str) -> str:
     """How one predicate's value is written, for the rendered table."""
     if predicate.value == "term":
         return ", ".join(f"`{term}`" for term in sorted(predicate.terms))
     if predicate.value == "reference":
-        return f"the name of a {referent_type(predicate)}"
+        return REFERENCE_FORMS[stage].format(referent=referent_type(predicate))
     return "what the source says, in a few words"

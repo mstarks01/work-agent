@@ -168,10 +168,12 @@ class FixtureOutcome:
     #: no argument behind it, and a reader asking whether the critic found the
     #: *right* flaw has nothing else to read.
     recommendation_note: str = ""
-    #: The unknown pairs the critic said this claim does not rest on. Empty
+    #: The open facts the critic said this claim does not rest on, each as the
+    #: three fields an ``UnknownRef`` compares by: an element, an attribute,
+    #: and an assertion row, of which exactly one spelling is filled. Empty
     #: where it dismissed none, which on a draft citing one is a critic that
     #: left the question alone — the fact #894 asks for, in a field.
-    dismissed_unknowns: tuple[tuple[str, str], ...] = ()
+    dismissed_unknowns: tuple[tuple[str, str, str], ...] = ()
 
     @property
     def judged_the_unknown(self) -> bool:
@@ -481,7 +483,7 @@ def score(
                 dismissed_unknowns=(
                     ()
                     if ruling is None
-                    else tuple(sorted(ruling.verdict.dismissed_pairs()))
+                    else tuple(sorted(ruling.verdict.dismissed_refs()))
                 ),
             )
         )
