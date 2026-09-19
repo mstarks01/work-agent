@@ -59,12 +59,12 @@ __all__ = [
     "WHOLE_WORD",
     "ControlState",
     "UnknownControl",
+    "comparable_asset_tags",
     "control_state",
     "cross_boundary_flows",
     "crossing_facts",
     "crossing_flow_ids",
     "crossings_by_flow",
-    "held_asset_tags",
     "inbound_flows",
     "internet_exposed_elements",
     "is_unverified",
@@ -272,14 +272,19 @@ def sensitive_assets(element: Element) -> tuple[str, ...]:
     return tuple(tag for tag in element.assets if tag in SENSITIVE_ASSET_TAGS)
 
 
-def held_asset_tags(tags: Iterable[str]) -> tuple[str, ...]:
+def comparable_asset_tags(tags: Iterable[str]) -> tuple[str, ...]:
     """``tags`` as a comparable value: sorted, and each one once.
+
+    **It normalises and it selects nothing.** Every shipped tag names what an
+    element holds, so there is no half to drop: #877 retired the two that named
+    a consequence, and a tag a deployment adds through ``extra_asset_tags``
+    names what that deployment models. The selection this once made went with
+    those two tags.
 
     The one reader, so the places that compare an element's tags cannot
     disagree about what they are comparing. An extraction is scored on the
     result (:mod:`evals.harness.modes`) and a candidate rule reports it as the
-    fact it read, and neither may depend on the order a model happened to emit
-    (#877).
+    fact it read, and neither may depend on the order a model happened to emit.
     """
     return tuple(sorted(set(tags)))
 

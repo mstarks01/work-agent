@@ -620,9 +620,12 @@ def repair_scope(
     the repair's own initiative, which is the edit the preservation rule
     exists to stop.
 
-    ``model`` is whatever extraction emitted, which may have failed the schema
-    outright, so every read of it is defensive: ``data_flows`` need not be a
-    list and an entry need not be a table.
+    ``model`` is the parsed model's own dump wherever the gate has one. A
+    payload that failed the schema outright reaches here too, and it is read by
+    nobody: every issue such a payload raises carries ``code="schema"`` and no
+    ``element_id``, so the guard below returns ``"whole"`` and the flows are
+    never asked for. :func:`_flows_touching` still reads defensively, on the
+    rule that a guard belongs beside the read rather than beside the caller.
     """
     if any(issue.element_id is None for issue in issues):
         return "whole", []
@@ -636,18 +639,31 @@ def repair_scope(
 
 
 def _flows_touching(model: Mapping[str, Any], element_ids: Collection[str]) -> set[str]:
-    """Every flow ID in ``model`` with an endpoint in ``element_ids``."""
+    """Every flow ID in ``model`` with an endpoint in ``element_ids``.
+
+    Every shape the value can take is handled, because ``model`` is a payload a
+    model wrote: ``data_flows`` need not be a list, an entry need not be a
+    table, and an endpoint need not be a string. An endpoint of any other shape
+    names no element, so it matches nothing — and it is filtered rather than
+    compared, because a list or a table raises ``TypeError`` on the membership
+    test itself.
+    """
     flows = model.get("data_flows")
     if not isinstance(flows, list):
         return set()
     wanted = set(element_ids)
-    return {
-        flow["id"]
-        for flow in flows
-        if isinstance(flow, dict)
-        and isinstance(flow.get("id"), str)
-        and {flow.get("source"), flow.get("destination")} & wanted
-    }
+    touching: set[str] = set()
+    for flow in flows:
+        if not isinstance(flow, dict) or not isinstance(flow.get("id"), str):
+            continue
+        endpoints = [
+            value
+            for value in (flow.get("source"), flow.get("destination"))
+            if isinstance(value, str)
+        ]
+        if wanted.intersection(endpoints):
+            touching.add(flow["id"])
+    return touching
 
 
 def restore_unimplicated(

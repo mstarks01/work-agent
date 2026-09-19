@@ -69,6 +69,11 @@ FRAMEWORK_NAMES: tuple[FrameworkName, ...] = get_args(FrameworkName)
 # the matrix arithmetic is written once. A package declares the field, and the
 # gate then requires the ``severity_rubric.md`` that explains how it is read.
 Rating = Literal["low", "medium", "high"]
+#: The severity bands, **declared least severe first**. The order is load
+#: bearing: :data:`~analysis_service.critic.SEVERITY_ORDER` reverses this to
+#: sort a claims array, so a band written out of rank sorts the report out of
+#: rank too, and nothing at the sort site can see it. Write a new band at its
+#: own rank; ``tests/test_critic.py`` fails until you do.
 SeverityLevel = Literal["low", "medium", "high", "critical"]
 VerdictStatus = Literal["confirmed", "needs-info", "rejected"]
 
