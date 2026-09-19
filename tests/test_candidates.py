@@ -303,6 +303,47 @@ class TestFiring:
         hits = fired(model, "denial-of-service-shared-dependency")
         assert {hit.element_ids[0] for hit in hits} == {"process:api", "store:ledger"}
 
+    def test_shared_dependency_reports_what_the_element_holds(self, model):
+        """A consequence tag is a guess, and the lane reads a count instead.
+
+        The trigger is the convergence the rule counts. ``availability-critical``
+        names the same idea and a model supplies it: over the thirteen corpus
+        models this rule fires on 20 elements, a consequence tag sits on 12,
+        and the two agree about 3 (#877).
+        """
+        store = next(one for one in model.data_stores if one.id == "store:ledger")
+        store.assets = ["availability-critical", "pii", "reputation"]
+
+        (hit,) = [
+            candidate
+            for candidate in fired(model, "denial-of-service-shared-dependency")
+            if candidate.element_ids[0] == "store:ledger"
+        ]
+
+        assert hit.facts["assets"] == "pii"
+        assert hit.facts["distinct_callers"] == 2
+
+    def test_the_rule_and_the_extraction_scorer_read_one_rule(self, model):
+        """Tested against each other, never each against its own expectation.
+
+        Which tags state a fact is one rule with two readers: the candidate
+        that reports them and the scorer that grades them. They agreed by
+        having the same subtraction written out twice, which is how two
+        readers start to disagree.
+        """
+        from evals.harness.modes import _tags
+
+        store = next(one for one in model.data_stores if one.id == "store:ledger")
+        store.assets = ["reputation", "secrets", "availability-critical", "pii"]
+
+        (hit,) = [
+            candidate
+            for candidate in fired(model, "denial-of-service-shared-dependency")
+            if candidate.element_ids[0] == "store:ledger"
+        ]
+
+        assert hit.facts["assets"] == _tags(store.assets)
+
     def test_privilege_crossing_reads_the_boundary_kind(self, model):
         hits = fired(model, "elevation-of-privilege-privilege-zone-crossing")
         assert hits[0].element_ids == (
