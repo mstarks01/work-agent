@@ -437,8 +437,13 @@ class Ground(BaseModel):
     text: str = Field(default="", max_length=1000)  # quote
     source_label: str = Field(default="", max_length=200)  # quote
     element_id: str = Field(default="", max_length=300)  # both attribute branches
+    # The same enum its sibling above carries. This one went without it, so the
+    # rule that a critic cannot spell ``description`` here held on one Ground
+    # shape and not on the other.
     attribute: AttributeName = Field(
-        default="", max_length=100
+        default="",
+        max_length=100,
+        json_schema_extra={"enum": ["", *all_attribute_names()]},
     )  # both attribute branches
     flow_id: str = Field(default="", max_length=300)  # derived-fact
     term: str = Field(default="", max_length=GROUND_TERM_MAX_CHARS)  # absent-element

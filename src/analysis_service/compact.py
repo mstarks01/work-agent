@@ -111,6 +111,7 @@ from analysis_service.system_model import (
     Process,
     SystemModel,
     TrustBoundary,
+    assumable_attribute_names,
 )
 from analysis_service.validation import (
     MAX_ELEMENTS,
@@ -339,7 +340,14 @@ class CompactAssumption(BaseModel):
 
     assumption: str = Field(min_length=1, max_length=1000)
     element: str = _ref_field()
-    attribute: str = Field(min_length=1, max_length=100)
+    # The closed set, as the full model states it: one rule, and the compact
+    # transport is not where it gets a second answer. Worth its tokens because
+    # a model told only "a string" writes prose here.
+    attribute: str = Field(
+        min_length=1,
+        max_length=100,
+        json_schema_extra={"enum": list(assumable_attribute_names())},
+    )
     basis: str = Field(min_length=1, max_length=1000)
 
 
