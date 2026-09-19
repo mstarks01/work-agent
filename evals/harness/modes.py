@@ -35,8 +35,8 @@ from types import MappingProxyType
 from typing import Any, Literal, NamedTuple, get_args
 
 from analysis_service.analysis import (
+    comparable_asset_tags,
     control_state,
-    held_asset_tags,
 )
 from analysis_service.assertions import (
     ABSENT,
@@ -245,16 +245,15 @@ class AnalysisRun:
 def _tags(value: list[str]) -> str:
     """One element's asset tags as a comparable string, order removed.
 
-    Consequence tags are dropped from both sides. They say what a failure would
-    cost rather than what the element holds, no source states one, and the
-    corpus applies no rule an extraction could follow — so their disagreements
-    measured the vocabulary rather than the model (#877).
+    Every tag counts, on both sides. #877 retired the two that named what a
+    failure would cost rather than what the element holds, so this scorer no
+    longer drops a half: the vocabulary itself carries the rule now.
 
-    :func:`~analysis_service.analysis.held_asset_tags` draws that line, here
-    and in the candidate rule that reports what an element holds, so the
-    scorer and the rule cannot part company about which tags are a fact.
+    :func:`~analysis_service.analysis.comparable_asset_tags` builds the value,
+    here and in the candidate rule that reports an element's tags, so the
+    scorer and the rule cannot part company about what they compare.
     """
-    return ", ".join(held_asset_tags(value))
+    return ", ".join(comparable_asset_tags(value))
 
 
 #: The attributes an extraction is measured on, each with the function that

@@ -46,10 +46,10 @@ from __future__ import annotations
 from collections.abc import Iterator
 
 from analysis_service.analysis import (
+    comparable_asset_tags,
     control_state,
     crossing_facts,
     crossings_by_flow,
-    held_asset_tags,
     inbound_flows,
     internet_exposed_elements,
     is_unverified,
@@ -391,10 +391,11 @@ def _shared_dependency(
     ``availability-critical`` tag names the same idea and a model guesses it:
     over the thirteen corpus models this rule fires on 20 elements, a
     consequence tag sits on 12, and the two agree about 3 (#877). So the facts
-    carry the count, and ``assets`` reports what the element *holds* through
-    :func:`~analysis_service.analysis.held_asset_tags`. A tag a source really
-    did state is still in the System Model the agent reads; what stops here is
-    a guess being handed to it as a lead.
+    carry the count, and ``assets`` reports the element's tags through
+    :func:`~analysis_service.analysis.comparable_asset_tags`, which the
+    extraction scorer reads too. Every shipped tag names what the element
+    holds, because #877 retired the two that did not; what stops here is a
+    guess being handed to the agent as a lead.
     """
     for element in model.elements():
         flows = inbound_flows(model, element.id)
@@ -406,7 +407,7 @@ def _shared_dependency(
             {
                 "inbound_flows": len(flows),
                 "distinct_callers": len(callers),
-                "assets": ", ".join(held_asset_tags(element.assets)),
+                "assets": ", ".join(comparable_asset_tags(element.assets)),
             },
         )
 

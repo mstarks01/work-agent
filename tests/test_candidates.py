@@ -327,10 +327,9 @@ class TestFiring:
     def test_the_rule_and_the_extraction_scorer_read_one_rule(self, model):
         """Tested against each other, never each against its own expectation.
 
-        Which tags state a fact is one rule with two readers: the candidate
-        that reports them and the scorer that grades them. They agreed by
-        having the same subtraction written out twice, which is how two
-        readers start to disagree.
+        How an element's tags read as one value is one rule with two readers:
+        the candidate that reports them and the scorer that grades them. Both
+        call ``comparable_asset_tags``, and this holds them to it.
         """
         from evals.harness.modes import _tags
 
