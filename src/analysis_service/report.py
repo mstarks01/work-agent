@@ -588,9 +588,11 @@ class ModelRepair(BaseModel):
     """What the one repair pass was allowed to change, and what it changed anyway.
 
     Recorded by the revalidate gate. ``scope`` is ``elements`` when every
-    issue named an element, and then ``implicated`` is those elements: the
-    repair may change them, add elements, and nothing else, and every other
-    element is put back as it was. ``restored`` names the ones that had to be,
+    issue named an element, and then ``implicated`` is those elements together
+    with the flows through them: the repair may change them, add elements, and
+    nothing else, and every other element is put back as it was. The flows are
+    there because a flow ID is derived from its endpoints, so renaming a named
+    element renames every flow through it (#1040). ``restored`` names the ones that had to be,
     because the repair changed or dropped an element the issues never cited.
     ``scope`` is ``whole`` when an issue named no element — a fault over the
     whole object — and then nothing is put back, because no narrower patch
